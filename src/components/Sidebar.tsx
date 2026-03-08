@@ -1,0 +1,165 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+    LayoutDashboard,
+    MessageCircle,
+    Shield,
+    Scale,
+    BookOpen,
+    Settings,
+    ChevronLeft,
+    ChevronRight,
+    LogOut,
+    User,
+} from 'lucide-react';
+import { useState } from 'react';
+
+const navItems = [
+    { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { label: 'Chat', href: '/chat', icon: MessageCircle },
+    { label: 'DocuVault', href: '/docuvault', icon: Shield },
+    { label: 'Legal Suite', href: '/legal', icon: Scale },
+    { label: 'Resources', href: '/resources', icon: BookOpen },
+    { label: 'Settings', href: '/settings', icon: Settings },
+];
+
+export default function Sidebar() {
+    const pathname = usePathname();
+    const [collapsed, setCollapsed] = useState(false);
+
+    return (
+        <motion.aside
+            animate={{ width: collapsed ? 72 : 260 }}
+            transition={{ duration: 0.3, ease: [0.25, 1, 0.5, 1] }}
+            className="fixed left-0 top-0 h-screen z-50 flex flex-col"
+            style={{
+                background: 'linear-gradient(180deg, #211607 0%, #1A1008 100%)',
+                borderRight: '1px solid rgba(197, 139, 7, 0.12)',
+            }}
+        >
+            {/* Logo */}
+            <div className="flex items-center px-5 h-[72px] flex-shrink-0">
+                <Link href="/dashboard" className="flex items-center gap-3 no-underline">
+                    <div
+                        className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{
+                            background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
+                            boxShadow: '0 2px 12px rgba(197, 139, 7, 0.3)',
+                        }}
+                    >
+                        <span className="text-sm font-black" style={{ color: '#02022d' }}>N</span>
+                    </div>
+                    <AnimatePresence>
+                        {!collapsed && (
+                            <motion.span
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -10 }}
+                                className="text-lg font-serif font-bold tracking-widest"
+                                style={{ color: '#C58B07' }}
+                            >
+                                NEXX
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
+                </Link>
+            </div>
+
+            {/* Divider */}
+            <div className="mx-4 gold-divider" />
+
+            {/* Navigation */}
+            <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+                {navItems.map((item) => {
+                    const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+                    const Icon = item.icon;
+
+                    return (
+                        <Link
+                            key={item.href}
+                            href={item.href}
+                            className="no-underline"
+                        >
+                            <motion.div
+                                whileHover={{ x: 2 }}
+                                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${collapsed ? 'justify-center' : ''
+                                    }`}
+                                style={{
+                                    background: isActive
+                                        ? '#02022d'
+                                        : 'transparent',
+                                    color: isActive ? '#C58B07' : '#B8A88A',
+                                    borderLeft: isActive ? '3px solid #C58B07' : '3px solid transparent',
+                                }}
+                            >
+                                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
+                                <AnimatePresence>
+                                    {!collapsed && (
+                                        <motion.span
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            className="text-sm font-medium whitespace-nowrap"
+                                        >
+                                            {item.label}
+                                        </motion.span>
+                                    )}
+                                </AnimatePresence>
+                            </motion.div>
+                        </Link>
+                    );
+                })}
+            </nav>
+
+            {/* User Section */}
+            <div className="px-3 pb-4 space-y-2">
+                <div className="gold-divider mb-3" />
+                <div
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(65,105,225,0.06)] ${collapsed ? 'justify-center' : ''
+                        }`}
+                >
+                    <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ background: 'rgba(197, 139, 7, 0.1)', border: '1px solid rgba(197, 139, 7, 0.25)' }}
+                    >
+                        <User size={16} style={{ color: '#C58B07' }} />
+                    </div>
+                    <AnimatePresence>
+                        {!collapsed && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="flex-1 min-w-0"
+                            >
+                                <p className="text-sm font-medium truncate" style={{ color: '#E0F2F7' }}>
+                                    Guest User
+                                </p>
+                                <p className="text-xs truncate" style={{ color: '#6A8BAA' }}>
+                                    Free Plan
+                                </p>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </div>
+
+            {/* Collapse Toggle */}
+            <button
+                onClick={() => setCollapsed(!collapsed)}
+                className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer
+          transition-all duration-200 hover:scale-110"
+                style={{
+                    background: 'linear-gradient(135deg, #211607, #1A1008)',
+                    border: '1px solid rgba(197, 139, 7, 0.2)',
+                    color: '#C58B07',
+                }}
+            >
+                {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
+            </button>
+        </motion.aside>
+    );
+}

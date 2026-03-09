@@ -64,7 +64,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }, [clerkUser, ensureUser]);
 
     useEffect(() => {
-        if (clerkLoaded && clerkUser && !hasSynced.current) {
+        if (!clerkLoaded) return;
+
+        if (!clerkUser) {
+            setSyncError(null);
+            setIsSyncing(false);
+            return;
+        }
+
+        if (!hasSynced.current) {
             syncUser().then(() => {
                 hasSynced.current = true;
             }).catch(() => {

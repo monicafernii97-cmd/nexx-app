@@ -1,6 +1,18 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 
+// ── Helper: resolve authenticated user from Clerk identity ──
+async function authenticatedUser(ctx: { auth: { getUserIdentity: () => Promise<{ subject: string } | null> }; db: any }) {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Not authenticated');
+    const user = await ctx.db
+        .query('users')
+        .withIndex('by_clerk', (q: any) => q.eq('clerkId', identity.subject))
+        .first();
+    if (!user) throw new Error('User not found');
+    return { identity, user };
+}
+
 // Ensure a Convex user exists for a given Clerk user — auth-guarded
 export const ensureFromClerk = mutation({
     args: {
@@ -29,7 +41,7 @@ export const ensureFromClerk = mutation({
             if (args.email !== undefined && existing.email !== args.email) patch.email = args.email;
 
             if (Object.keys(patch).length > 0) {
-                await ctx.db.patch(existing._id, patch);
+                await ctx.db.patch(existing._id, { ...patch, updatedAt: Date.now() });
             }
             return existing._id;
         }
@@ -60,7 +72,7 @@ export const me = query({
     },
 });
 
-// Get user by ID — auth-guarded
+// Get user by ID — auth-guarded (own record only)
 export const get = query({
     args: { id: v.id('users') },
     handler: async (ctx, args) => {
@@ -79,13 +91,31 @@ export const updateProfile = mutation({
     args: {
         id: v.id('users'),
         name: v.optional(v.string()),
+        avatarUrl: v.optional(v.string()),
+        phone: v.optional(v.string()),
         state: v.optional(v.string()),
         county: v.optional(v.string()),
         childrenCount: v.optional(v.number()),
-        childrenAges: v.optional(v.string()),
-        custodyType: v.optional(v.string()),
-        hasAttorney: v.optional(v.string()),
-        hasTherapist: v.optional(v.string()),
+        childrenAges: v.optional(v.array(v.number())),
+        custodyType: v.optional(
+            v.union(
+                v.literal('sole'),
+                v.literal('joint'),
+                v.literal('split'),
+                v.literal('none'),
+                v.literal('pending')
+            )
+        ),
+        hasAttorney: v.optional(v.boolean()),
+        hasTherapist: v.optional(v.boolean()),
+        courtStatus: v.optional(
+            v.union(
+                v.literal('pending'),
+                v.literal('active'),
+                v.literal('closed'),
+                v.literal('none')
+            )
+        ),
         primaryGoals: v.optional(v.array(v.string())),
     },
     handler: async (ctx, args) => {
@@ -102,7 +132,7 @@ export const updateProfile = mutation({
             Object.entries(updates).filter(([_, v]) => v !== undefined)
         );
         if (Object.keys(filtered).length > 0) {
-            await ctx.db.patch(id, filtered);
+            await ctx.db.patch(id, { ...filtered, updatedAt: Date.now() });
         }
     },
 });
@@ -119,6 +149,9 @@ export const completeOnboarding = mutation({
             throw new Error('Not authorized to complete onboarding for this user');
         }
 
-        await ctx.db.patch(args.id, { onboardingComplete: true });
+        await ctx.db.patch(args.id, {
+            onboardingComplete: true,
+            updatedAt: Date.now(),
+        });
     },
 });

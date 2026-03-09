@@ -8,15 +8,14 @@ export const NAV_ITEMS = [
 ] as const;
 
 export const INCIDENT_CATEGORIES = [
-    { value: 'parental-alienation', label: 'Parental Alienation', color: '#C75A5A' },
-    { value: 'court-order-violation', label: 'Court Order Violation', color: '#7C6FA0' },
-    { value: 'financial-abuse', label: 'Financial Abuse', color: '#5A8EC9' },
-    { value: 'harassment', label: 'Harassment', color: '#E5A84A' },
-    { value: 'micromanagement', label: 'Micromanagement', color: '#5A9E6F' },
-    { value: 'gaslighting', label: 'Gaslighting', color: '#C58B07' },
+    { value: 'emotional_abuse', label: 'Emotional Abuse', color: '#C75A5A' },
+    { value: 'financial_abuse', label: 'Financial Abuse', color: '#5A8EC9' },
+    { value: 'parental_alienation', label: 'Parental Alienation', color: '#7C6FA0' },
+    { value: 'custody_violation', label: 'Custody Violation', color: '#E5A84A' },
+    { value: 'harassment', label: 'Harassment', color: '#C58B07' },
+    { value: 'threats', label: 'Threats', color: '#C75A5A' },
     { value: 'manipulation', label: 'Manipulation', color: '#92783A' },
-    { value: 'false-accusations', label: 'False Accusations', color: '#C75A5A' },
-    { value: 'stalking-monitoring', label: 'Stalking / Monitoring', color: '#7C6FA0' },
+    { value: 'neglect', label: 'Neglect', color: '#5A9E6F' },
     { value: 'other', label: 'Other', color: '#8A7A60' },
 ] as const;
 

@@ -24,7 +24,13 @@ import { INCIDENT_CATEGORIES } from '@/lib/constants';
 export default function IncidentDetailPage() {
     const params = useParams();
     const router = useRouter();
-    const incidentId = params.id as Id<'incidents'>;
+
+    const rawId = params.id;
+    if (typeof rawId !== 'string') {
+        router.push('/docuvault');
+        return null;
+    }
+    const incidentId = rawId as Id<'incidents'>;
 
     const incident = useQuery(api.incidents.get, { id: incidentId });
     const updateIncident = useMutation(api.incidents.update);
@@ -41,6 +47,7 @@ export default function IncidentDetailPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analysisError, setAnalysisError] = useState<string | null>(null);
     const [analysis, setAnalysis] = useState<{
         behavioralAnalysis?: string;
         strategicResponse?: string;
@@ -112,6 +119,7 @@ export default function IncidentDetailPage() {
 
     const handleAnalyze = async () => {
         setIsAnalyzing(true);
+        setAnalysisError(null);
         try {
             const response = await fetch('/api/incidents/analyze', {
                 method: 'POST',
@@ -142,6 +150,7 @@ export default function IncidentDetailPage() {
             });
         } catch (error) {
             console.error('Analysis error:', error);
+            setAnalysisError('Failed to analyze incident. Please try again.');
         } finally {
             setIsAnalyzing(false);
         }
@@ -335,6 +344,11 @@ export default function IncidentDetailPage() {
                     </p>
                 )}
             </motion.div>
+
+            {/* Analysis error */}
+            {analysisError && (
+                <p className="text-sm mb-4 px-1" style={{ color: '#C75A5A' }}>{analysisError}</p>
+            )}
 
             {/* AI Analysis (if available) */}
             {analysis?.behavioralAnalysis && (

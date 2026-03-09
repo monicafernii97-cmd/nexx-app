@@ -426,9 +426,10 @@ export default function IncidentDetailPage() {
                     >
                         <Check size={14} /> {isConfirming ? 'Confirming...' : 'Confirm & Finalize'}
                     </button>
-                    {confirmError && (
-                        <p className="text-sm w-full" style={{ color: '#C75A5A' }}>{confirmError}</p>
-                    )}
+                </motion.div>
+                {confirmError && (
+                    <p className="text-sm mt-2" style={{ color: '#C75A5A' }}>{confirmError}</p>
+                )}
                 </motion.div>
             )}
         </div>

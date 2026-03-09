@@ -245,7 +245,7 @@ export default function ChatListPage() {
                         <Archive size={14} /> Archived ({archivedConversations.length})
                     </h2>
                     <div className="space-y-3 opacity-60">
-                        {archivedConversations.slice(0, 5).map((conv) => {
+                        {archivedConversations.map((conv) => {
                             const modeInfo = MODE_LABELS[conv.mode] || MODE_LABELS.general;
                             return (
                                 <Link

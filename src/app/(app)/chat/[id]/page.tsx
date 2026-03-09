@@ -15,15 +15,12 @@ export default function ConversationPage() {
     const params = useParams();
     const router = useRouter();
     const rawId = params.id;
+    const isValidId = typeof rawId === 'string';
+    const conversationId = isValidId ? (rawId as Id<'conversations'>) : ('' as Id<'conversations'>);
 
-    if (typeof rawId !== 'string') {
-        router.push('/chat');
-        return null;
-    }
-    const conversationId = rawId as Id<'conversations'>;
-
-    const conversation = useQuery(api.conversations.get, { id: conversationId });
-    const messages = useQuery(api.messages.list, { conversationId });
+    // All hooks must be called unconditionally — use 'skip' when ID is invalid
+    const conversation = useQuery(api.conversations.get, isValidId ? { id: conversationId } : 'skip');
+    const messages = useQuery(api.messages.list, isValidId ? { conversationId } : 'skip');
     const sendMessage = useMutation(api.messages.send);
     const archiveConversation = useMutation(api.conversations.archive);
 
@@ -35,6 +32,15 @@ export default function ConversationPage() {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, streamingContent]);
+
+    // Redirect if ID is invalid (after all hooks)
+    useEffect(() => {
+        if (!isValidId) {
+            router.push('/chat');
+        }
+    }, [isValidId, router]);
+
+    if (!isValidId) return null;
 
     const handleSend = useCallback(
         async (input: string) => {
@@ -83,10 +89,13 @@ export default function ConversationPage() {
                     while (true) {
                         const { done, value } = await reader.read();
                         if (done) break;
-                        const chunk = decoder.decode(value);
+                        const chunk = decoder.decode(value, { stream: true });
                         fullContent += chunk;
                         setStreamingContent(fullContent);
                     }
+                    // Flush any remaining bytes from incomplete multi-byte sequences
+                    fullContent += decoder.decode();
+                    setStreamingContent(fullContent);
                 }
 
                 // Save the full AI response to Convex

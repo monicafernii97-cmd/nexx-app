@@ -45,7 +45,9 @@ export default function IncidentDetailPage() {
         category: string;
     } | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
     const [isConfirming, setIsConfirming] = useState(false);
+    const [confirmError, setConfirmError] = useState<string | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisError, setAnalysisError] = useState<string | null>(null);
     const [analysis, setAnalysis] = useState<{
@@ -88,6 +90,7 @@ export default function IncidentDetailPage() {
     const handleSave = async () => {
         if (!editData) return;
         setIsSaving(true);
+        setSaveError(null);
         try {
             await updateIncident({
                 id: incidentId,
@@ -101,6 +104,7 @@ export default function IncidentDetailPage() {
             setEditData(null);
         } catch (error) {
             console.error('Failed to save:', error);
+            setSaveError('Failed to save changes. Please try again.');
         } finally {
             setIsSaving(false);
         }
@@ -108,10 +112,12 @@ export default function IncidentDetailPage() {
 
     const handleConfirm = async () => {
         setIsConfirming(true);
+        setConfirmError(null);
         try {
             await confirmIncident({ id: incidentId });
         } catch (error) {
             console.error('Failed to confirm:', error);
+            setConfirmError('Failed to confirm incident. Please try again.');
         } finally {
             setIsConfirming(false);
         }
@@ -207,6 +213,9 @@ export default function IncidentDetailPage() {
                         </>
                     )}
                 </div>
+                {saveError && (
+                    <p className="text-xs mt-1" style={{ color: '#C75A5A' }}>{saveError}</p>
+                )}
             </motion.div>
 
             {/* Status & Meta */}
@@ -417,6 +426,9 @@ export default function IncidentDetailPage() {
                     >
                         <Check size={14} /> {isConfirming ? 'Confirming...' : 'Confirm & Finalize'}
                     </button>
+                    {confirmError && (
+                        <p className="text-sm w-full" style={{ color: '#C75A5A' }}>{confirmError}</p>
+                    )}
                 </motion.div>
             )}
         </div>

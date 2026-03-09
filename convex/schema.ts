@@ -40,7 +40,6 @@ export default defineSchema({
         onboardingComplete: v.boolean(),
         primaryGoals: v.optional(v.array(v.string())),
         createdAt: v.number(),
-        updatedAt: v.optional(v.number()),
     }).index('by_clerk', ['clerkId']),
 
     // ═══ NEX Profiles ═══

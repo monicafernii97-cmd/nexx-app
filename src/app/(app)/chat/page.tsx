@@ -23,10 +23,8 @@ export default function ChatListPage() {
     const createConversation = useMutation(api.conversations.create);
     const [selectedMode, setSelectedMode] = useState<'therapeutic' | 'legal' | 'strategic' | 'general'>('general');
     const [isCreating, setIsCreating] = useState(false);
-    const [createError, setCreateError] = useState<string | null>(null);
 
     const handleNewChat = async () => {
-        setCreateError(null);
         setIsCreating(true);
         try {
             const id = await createConversation({
@@ -36,7 +34,6 @@ export default function ChatListPage() {
             router.push(`/chat/${id}`);
         } catch (error) {
             console.error('Failed to create conversation:', error);
-            setCreateError('Could not start a new conversation. Please try again.');
         } finally {
             setIsCreating(false);
         }
@@ -116,11 +113,6 @@ export default function ChatListPage() {
                     <Plus size={14} />
                     {isCreating ? 'Creating...' : 'New Conversation'}
                 </button>
-                {createError && (
-                    <p className="text-xs mt-2" role="alert" style={{ color: '#D4A5A5' }}>
-                        {createError}
-                    </p>
-                )}
             </motion.div>
 
             {/* Active Conversations */}
@@ -165,12 +157,10 @@ export default function ChatListPage() {
                             <MessageCircle size={28} style={{ color: '#775E22' }} />
                         </div>
                         <p className="text-sm font-medium mb-2" style={{ color: '#B8A88A' }}>
-                            {archivedConversations.length > 0 ? 'No active conversations' : 'No conversations yet'}
+                            No conversations yet
                         </p>
                         <p className="text-xs" style={{ color: '#8A7A60' }}>
-                            {archivedConversations.length > 0
-                                ? 'Start a new session to continue, or review an archived one below.'
-                                : 'Start your first session with NEXX to get strategic counsel.'}
+                            Start your first session with NEXX to get strategic counsel.
                         </p>
                     </div>
                 ) : (

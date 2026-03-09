@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { useUser } from '@/lib/user-context';
 import {
     ChevronRight,
     ChevronLeft,
@@ -20,6 +21,7 @@ import { US_STATES, ONBOARDING_STEPS } from '@/lib/constants';
 
 export default function OnboardingPage() {
     const router = useRouter();
+    const { userId } = useUser();
     const [currentStep, setCurrentStep] = useState(0);
     const [formData, setFormData] = useState({
         name: '',
@@ -62,7 +64,6 @@ export default function OnboardingPage() {
         }
     };
 
-    const createUser = useMutation(api.users.createOrGet);
     const updateProfile = useMutation(api.users.updateProfile);
     const completeOnboarding = useMutation(api.users.completeOnboarding);
     const createNexProfile = useMutation(api.nexProfiles.create);
@@ -72,13 +73,10 @@ export default function OnboardingPage() {
         if (currentStep < ONBOARDING_STEPS.length - 1) {
             setCurrentStep((prev) => prev + 1);
         } else {
-            // Final step — save everything to Convex
+            if (!userId) return;
+            // Final step — save profile data to Convex
             setIsSaving(true);
             try {
-                // Create user
-                const userId = await createUser({ name: formData.name || 'Guest' });
-                localStorage.setItem('nexx_user_id', userId);
-
                 // Update user profile with onboarding data
                 await updateProfile({
                     id: userId,

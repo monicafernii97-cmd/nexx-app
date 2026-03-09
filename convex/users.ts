@@ -1,21 +1,49 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 
-// Create or get a user (for now, creates a guest user)
-export const createOrGet = mutation({
+// Ensure a Convex user exists for a given Clerk user
+export const ensureFromClerk = mutation({
     args: {
+        clerkId: v.string(),
         name: v.string(),
+        email: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        // For now, just create a new user each time
-        // Later this will integrate with Clerk
-        const userId = await ctx.db.insert('users', {
+        // Check if user with this clerkId already exists
+        const existing = await ctx.db
+            .query('users')
+            .withIndex('by_clerk', (q) => q.eq('clerkId', args.clerkId))
+            .first();
+
+        if (existing) {
+            // Update name/email if changed
+            await ctx.db.patch(existing._id, {
+                name: args.name,
+                email: args.email,
+            });
+            return existing._id;
+        }
+
+        // Create new user
+        return await ctx.db.insert('users', {
+            clerkId: args.clerkId,
             name: args.name,
+            email: args.email,
             role: 'parent',
             onboardingComplete: false,
             createdAt: Date.now(),
         });
-        return userId;
+    },
+});
+
+// Get user by Clerk ID
+export const getByClerkId = query({
+    args: { clerkId: v.string() },
+    handler: async (ctx, args) => {
+        return await ctx.db
+            .query('users')
+            .withIndex('by_clerk', (q) => q.eq('clerkId', args.clerkId))
+            .first();
     },
 });
 
@@ -55,5 +83,20 @@ export const completeOnboarding = mutation({
     args: { id: v.id('users') },
     handler: async (ctx, args) => {
         await ctx.db.patch(args.id, { onboardingComplete: true });
+    },
+});
+
+// Legacy: Create a guest user (kept for backward compatibility)
+export const createOrGet = mutation({
+    args: {
+        name: v.string(),
+    },
+    handler: async (ctx, args) => {
+        return await ctx.db.insert('users', {
+            name: args.name,
+            role: 'parent',
+            onboardingComplete: false,
+            createdAt: Date.now(),
+        });
     },
 });

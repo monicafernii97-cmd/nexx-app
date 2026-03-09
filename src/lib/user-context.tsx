@@ -1,18 +1,22 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useMutation } from 'convex/react';
+import { createContext, useContext, ReactNode } from 'react';
+import { useUser as useClerkUser } from '@clerk/nextjs';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
+import { useEffect } from 'react';
 
 interface UserContextType {
     userId: Id<'users'> | null;
     isLoading: boolean;
+    clerkUser: ReturnType<typeof useClerkUser>['user'];
 }
 
 const UserContext = createContext<UserContextType>({
     userId: null,
     isLoading: true,
+    clerkUser: null,
 });
 
 export function useUser() {
@@ -20,27 +24,29 @@ export function useUser() {
 }
 
 export function UserProvider({ children }: { children: ReactNode }) {
-    const [userId, setUserId] = useState<Id<'users'> | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const createUser = useMutation(api.users.createOrGet);
+    const { user: clerkUser, isLoaded: clerkLoaded } = useClerkUser();
+    const ensureUser = useMutation(api.users.ensureFromClerk);
+    const currentUser = useQuery(
+        api.users.getByClerkId,
+        clerkUser?.id ? { clerkId: clerkUser.id } : 'skip'
+    );
 
+    // On Clerk login, ensure our Convex user record exists
     useEffect(() => {
-        const stored = localStorage.getItem('nexx_user_id');
-        if (stored) {
-            setUserId(stored as Id<'users'>);
-            setIsLoading(false);
-        } else {
-            // Create a guest user on first visit
-            createUser({ name: 'Guest' }).then((id) => {
-                localStorage.setItem('nexx_user_id', id);
-                setUserId(id);
-                setIsLoading(false);
+        if (clerkLoaded && clerkUser) {
+            ensureUser({
+                clerkId: clerkUser.id,
+                name: clerkUser.firstName || clerkUser.fullName || 'User',
+                email: clerkUser.primaryEmailAddress?.emailAddress,
             });
         }
-    }, [createUser]);
+    }, [clerkLoaded, clerkUser, ensureUser]);
+
+    const userId = currentUser?._id ?? null;
+    const isLoading = !clerkLoaded || (clerkUser !== null && currentUser === undefined);
 
     return (
-        <UserContext.Provider value={{ userId, isLoading }}>
+        <UserContext.Provider value={{ userId, isLoading, clerkUser: clerkUser ?? null }}>
             {children}
         </UserContext.Provider>
     );

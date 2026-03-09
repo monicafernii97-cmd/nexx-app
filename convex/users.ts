@@ -79,13 +79,31 @@ export const updateProfile = mutation({
     args: {
         id: v.id('users'),
         name: v.optional(v.string()),
+        avatarUrl: v.optional(v.string()),
+        phone: v.optional(v.string()),
         state: v.optional(v.string()),
         county: v.optional(v.string()),
         childrenCount: v.optional(v.number()),
-        childrenAges: v.optional(v.string()),
-        custodyType: v.optional(v.string()),
-        hasAttorney: v.optional(v.string()),
-        hasTherapist: v.optional(v.string()),
+        childrenAges: v.optional(v.array(v.number())),
+        custodyType: v.optional(
+            v.union(
+                v.literal('sole'),
+                v.literal('joint'),
+                v.literal('split'),
+                v.literal('none'),
+                v.literal('pending')
+            )
+        ),
+        hasAttorney: v.optional(v.boolean()),
+        hasTherapist: v.optional(v.boolean()),
+        courtStatus: v.optional(
+            v.union(
+                v.literal('pending'),
+                v.literal('active'),
+                v.literal('closed'),
+                v.literal('none')
+            )
+        ),
         primaryGoals: v.optional(v.array(v.string())),
     },
     handler: async (ctx, args) => {

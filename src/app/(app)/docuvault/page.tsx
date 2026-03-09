@@ -17,7 +17,7 @@ import { INCIDENT_CATEGORIES } from '@/lib/constants';
 
 export default function DocuVaultPage() {
     const { userId } = useUser();
-    const incidents = useQuery(api.incidents.list, userId ? { userId } : 'skip');
+    const incidents = useQuery(api.incidents.list);
     const [activeFilter, setActiveFilter] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 

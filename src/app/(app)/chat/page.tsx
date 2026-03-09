@@ -79,7 +79,6 @@ export default function ChatPage() {
         // Create conversation if first message
         if (!convId) {
             convId = await createConversation({
-                userId,
                 title: input.trim().slice(0, 50),
                 mode: 'general',
             });

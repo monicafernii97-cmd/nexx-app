@@ -83,22 +83,35 @@ export default function OnboardingPage() {
             setSaveError(null);
             try {
                 // Update user profile with onboarding data
+                // Convert childrenAges string to number array
+                const parsedAges = formData.childrenAges
+                    ? formData.childrenAges.split(',').map((a) => parseInt(a.trim())).filter((n) => !isNaN(n))
+                    : undefined;
+
+                // Map custodyType display values to schema enum
+                const custodyMap: Record<string, 'sole' | 'joint' | 'split' | 'none' | 'pending'> = {
+                    'Joint / Shared Custody': 'joint',
+                    'Sole Custody': 'sole',
+                    'Visitation Only': 'split',
+                    'No Order Yet': 'pending',
+                    'Other': 'none',
+                };
+
                 await updateProfile({
                     id: userId,
                     name: formData.name || undefined,
                     state: formData.state || undefined,
                     county: formData.county || undefined,
                     childrenCount: formData.childrenCount ? parseInt(formData.childrenCount) : undefined,
-                    childrenAges: formData.childrenAges || undefined,
-                    custodyType: formData.custodyType || undefined,
-                    hasAttorney: formData.hasAttorney || undefined,
+                    childrenAges: parsedAges && parsedAges.length > 0 ? parsedAges : undefined,
+                    custodyType: formData.custodyType ? custodyMap[formData.custodyType] ?? undefined : undefined,
+                    hasAttorney: formData.hasAttorney ? formData.hasAttorney === 'Yes' : undefined,
                     primaryGoals: formData.primaryGoals.length > 0 ? formData.primaryGoals : undefined,
                 });
 
                 // Create NEX profile with behaviors
                 if (formData.nexBehaviors.length > 0) {
                     await createNexProfile({
-                        userId,
                         behaviors: formData.nexBehaviors,
                         description: formData.nexDescription || undefined,
                     });

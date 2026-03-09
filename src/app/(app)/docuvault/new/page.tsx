@@ -53,10 +53,9 @@ export default function NewIncidentPage() {
         if (!userId) return;
 
         const incidentId = await createIncident({
-            userId,
             narrative,
             courtSummary,
-            category: category || 'other',
+            category: (category || 'other') as 'emotional_abuse' | 'financial_abuse' | 'parental_alienation' | 'custody_violation' | 'harassment' | 'threats' | 'manipulation' | 'neglect' | 'other',
             severity: 2,
             date,
             time,

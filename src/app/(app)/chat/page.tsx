@@ -5,6 +5,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
     MessageCircle,
     Plus,
@@ -44,8 +45,9 @@ export default function ChatListPage() {
         }
     };
 
-    const activeConversations = conversations?.filter((c) => c.status === 'active') ?? [];
-    const archivedConversations = conversations?.filter((c) => c.status === 'archived') ?? [];
+    const isLoadingConversations = conversations === undefined;
+    const activeConversations = isLoadingConversations ? [] : conversations.filter((c) => c.status === 'active');
+    const archivedConversations = isLoadingConversations ? [] : conversations.filter((c) => c.status === 'archived');
 
     return (
         <div className="max-w-4xl mx-auto">
@@ -94,6 +96,7 @@ export default function ChatListPage() {
                         <button
                             key={key}
                             onClick={() => setSelectedMode(key as typeof selectedMode)}
+                            aria-pressed={selectedMode === key}
                             className="badge cursor-pointer transition-all"
                             style={{
                                 background:
@@ -128,10 +131,27 @@ export default function ChatListPage() {
                     className="text-sm font-semibold tracking-[0.15em] uppercase mb-4"
                     style={{ color: '#92783A' }}
                 >
-                    Active Sessions ({activeConversations.length})
+                    Active Sessions ({isLoadingConversations ? '…' : activeConversations.length})
                 </h2>
 
-                {activeConversations.length === 0 ? (
+                {isLoadingConversations ? (
+                    <div className="card-gilded p-8 text-center mb-8">
+                        <div className="flex gap-1.5 justify-center">
+                            {[0, 1, 2].map((j) => (
+                                <motion.div
+                                    key={j}
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ background: '#C58B07' }}
+                                    animate={{ opacity: [0.3, 1, 0.3] }}
+                                    transition={{ duration: 1, repeat: Infinity, delay: j * 0.2 }}
+                                />
+                            ))}
+                        </div>
+                        <p className="text-sm font-medium mt-3" style={{ color: '#B8A88A' }}>
+                            Loading conversations…
+                        </p>
+                    </div>
+                ) : activeConversations.length === 0 ? (
                     <div className="card-gilded p-8 text-center mb-8">
                         <div
                             className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
@@ -159,57 +179,57 @@ export default function ChatListPage() {
                                     initial={{ opacity: 0, y: 8 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.05 * i }}
-                                    onClick={() => router.push(`/chat/${conv._id}`)}
-                                    className="card-gilded p-4 cursor-pointer group"
                                 >
-                                    <div className="flex items-center gap-4">
-                                        <div
-                                            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                                            style={{
-                                                background: `${modeInfo.color}15`,
-                                                border: `1px solid ${modeInfo.color}30`,
-                                            }}
-                                        >
-                                            <Sparkles size={16} style={{ color: modeInfo.color }} />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <p
-                                                    className="text-sm font-semibold truncate"
-                                                    style={{ color: '#F5EFE0' }}
-                                                >
-                                                    {conv.title}
-                                                </p>
-                                                <span
-                                                    className="badge text-xs"
-                                                    style={{
-                                                        background: `${modeInfo.color}20`,
-                                                        color: modeInfo.color,
-                                                    }}
-                                                >
-                                                    {modeInfo.label}
-                                                </span>
+                                    <Link href={`/chat/${conv._id}`} className="card-gilded p-4 cursor-pointer group block">
+                                        <div className="flex items-center gap-4">
+                                            <div
+                                                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                                                style={{
+                                                    background: `${modeInfo.color}15`,
+                                                    border: `1px solid ${modeInfo.color}30`,
+                                                }}
+                                            >
+                                                <Sparkles size={16} style={{ color: modeInfo.color }} />
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <Clock size={10} style={{ color: '#8A7A60' }} />
-                                                <p className="text-xs" style={{ color: '#8A7A60' }}>
-                                                    {formatDistanceToNow(conv.lastMessageAt, {
-                                                        addSuffix: true,
-                                                    })}
-                                                </p>
-                                                {conv.messageCount !== undefined && (
-                                                    <p className="text-xs" style={{ color: '#775E22' }}>
-                                                        · {conv.messageCount} messages
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <p
+                                                        className="text-sm font-semibold truncate"
+                                                        style={{ color: '#F5EFE0' }}
+                                                    >
+                                                        {conv.title}
                                                     </p>
-                                                )}
+                                                    <span
+                                                        className="badge text-xs"
+                                                        style={{
+                                                            background: `${modeInfo.color}20`,
+                                                            color: modeInfo.color,
+                                                        }}
+                                                    >
+                                                        {modeInfo.label}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Clock size={10} style={{ color: '#8A7A60' }} />
+                                                    <p className="text-xs" style={{ color: '#8A7A60' }}>
+                                                        {formatDistanceToNow(conv.lastMessageAt, {
+                                                            addSuffix: true,
+                                                        })}
+                                                    </p>
+                                                    {conv.messageCount !== undefined && (
+                                                        <p className="text-xs" style={{ color: '#775E22' }}>
+                                                            · {conv.messageCount} messages
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
+                                            <ChevronRight
+                                                size={14}
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                                style={{ color: '#C58B07' }}
+                                            />
                                         </div>
-                                        <ChevronRight
-                                            size={14}
-                                            className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                            style={{ color: '#C58B07' }}
-                                        />
-                                    </div>
+                                    </Link>
                                 </motion.div>
                             );
                         })}
@@ -234,10 +254,10 @@ export default function ChatListPage() {
                         {archivedConversations.slice(0, 5).map((conv) => {
                             const modeInfo = MODE_LABELS[conv.mode] || MODE_LABELS.general;
                             return (
-                                <div
+                                <Link
                                     key={conv._id}
-                                    onClick={() => router.push(`/chat/${conv._id}`)}
-                                    className="card-gilded p-3 cursor-pointer"
+                                    href={`/chat/${conv._id}`}
+                                    className="card-gilded p-3 cursor-pointer block"
                                 >
                                     <div className="flex items-center gap-3">
                                         <p className="text-sm truncate flex-1" style={{ color: '#B8A88A' }}>
@@ -253,7 +273,7 @@ export default function ChatListPage() {
                                             {modeInfo.label}
                                         </span>
                                     </div>
-                                </div>
+                                </Link>
                             );
                         })}
                     </div>

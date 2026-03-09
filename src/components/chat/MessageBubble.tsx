@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { Sparkles, User, Copy, Check } from 'lucide-react';
 import { useState } from 'react';
+import DOMPurify from 'dompurify';
 
 interface MessageBubbleProps {
     role: 'user' | 'assistant';
@@ -24,13 +25,20 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
             });
     };
 
-    // Simple markdown-like rendering
+    // Simple markdown-like rendering with XSS protection
     const renderContent = (text: string) => {
-        return text
+        // Escape HTML first to prevent XSS
+        const escaped = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        // Apply markdown-like transforms on safe escaped content
+        const transformed = escaped
             .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#C58B07">$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/🔴/g, '<span>🔴</span>')
             .replace(/\n/g, '<br/>');
+        return DOMPurify.sanitize(transformed);
     };
 
     return (

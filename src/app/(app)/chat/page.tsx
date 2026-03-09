@@ -15,13 +15,7 @@ import {
     ChevronRight,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-
-const MODE_LABELS: Record<string, { label: string; color: string }> = {
-    therapeutic: { label: 'Therapeutic', color: '#5A9E6F' },
-    legal: { label: 'Legal', color: '#5A8EC9' },
-    strategic: { label: 'Strategic', color: '#E5A84A' },
-    general: { label: 'General', color: '#C58B07' },
-};
+import { MODE_LABELS } from '@/lib/constants';
 
 export default function ChatListPage() {
     const router = useRouter();

@@ -94,7 +94,7 @@ Remember: You are the user's secret weapon. Every interaction should leave them 
 function sanitizeForPrompt(value: string, maxLength = 200): string {
     return value
         .slice(0, maxLength)
-        .replace(/[<>{}[\]]/g, '')
+        .replace(/[<>{}[\]`#*_~|]/g, '')
         .replace(/\n/g, ' ')
         .trim();
 }

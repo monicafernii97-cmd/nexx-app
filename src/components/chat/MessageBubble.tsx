@@ -87,6 +87,7 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
                         <button
                             className="btn-ghost text-xs flex items-center gap-1 py-1 px-2"
                             onClick={handleCopy}
+                            aria-label={copied ? 'Copied to clipboard' : 'Copy message to clipboard'}
                         >
                             {copied ? (
                                 <>

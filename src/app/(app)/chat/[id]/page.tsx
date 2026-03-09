@@ -9,13 +9,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Sparkles, ArrowLeft, Archive as ArchiveIcon } from 'lucide-react';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
-
-const MODE_LABELS: Record<string, { label: string; color: string }> = {
-    therapeutic: { label: 'Therapeutic', color: '#5A9E6F' },
-    legal: { label: 'Legal', color: '#5A8EC9' },
-    strategic: { label: 'Strategic', color: '#E5A84A' },
-    general: { label: 'General', color: '#C58B07' },
-};
+import { MODE_LABELS } from '@/lib/constants';
 
 export default function ConversationPage() {
     const params = useParams();
@@ -121,8 +115,14 @@ export default function ConversationPage() {
     );
 
     const handleArchive = async () => {
-        await archiveConversation({ id: conversationId });
-        router.push('/chat');
+        const confirmed = window.confirm('Archive this conversation? You can still view it in the Archived section.');
+        if (!confirmed) return;
+        try {
+            await archiveConversation({ id: conversationId });
+            router.push('/chat');
+        } catch (error) {
+            console.error('Failed to archive:', error);
+        }
     };
 
     const modeInfo = MODE_LABELS[conversation?.mode ?? 'general'] ?? MODE_LABELS.general;

@@ -20,6 +20,13 @@ export const INCIDENT_CATEGORIES = [
     { value: 'other', label: 'Other', color: '#8A7A60' },
 ] as const;
 
+export const MODE_LABELS: Record<string, { label: string; color: string }> = {
+    therapeutic: { label: 'Therapeutic', color: '#5A9E6F' },
+    legal: { label: 'Legal', color: '#5A8EC9' },
+    strategic: { label: 'Strategic', color: '#E5A84A' },
+    general: { label: 'General', color: '#C58B07' },
+};
+
 export const ONBOARDING_STEPS = [
     { id: 'welcome', title: 'Welcome', description: 'Welcome to NEXX' },
     { id: 'about-you', title: 'About You', description: 'Tell us about yourself' },

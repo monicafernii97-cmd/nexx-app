@@ -145,7 +145,10 @@ export default function IncidentDetailPage() {
                 }),
             });
 
-            if (!response.ok) throw new Error('Analysis failed');
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => '');
+                throw new Error(`Analysis failed: ${response.status}${errorText ? ` - ${errorText}` : ''}`);
+            }
 
             const data = await response.json();
 
@@ -177,16 +180,15 @@ export default function IncidentDetailPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-center gap-4 mb-6"
             >
-                <Link href="/docuvault">
-                    <button
-                        className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
-                        style={{
-                            background: 'rgba(197, 139, 7, 0.08)',
-                            border: '1px solid rgba(197, 139, 7, 0.15)',
-                        }}
-                    >
-                        <ArrowLeft size={16} style={{ color: '#C58B07' }} />
-                    </button>
+                <Link
+                    href="/docuvault"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
+                    style={{
+                        background: 'rgba(197, 139, 7, 0.08)',
+                        border: '1px solid rgba(197, 139, 7, 0.15)',
+                    }}
+                >
+                    <ArrowLeft size={16} style={{ color: '#C58B07' }} />
                 </Link>
                 <div className="flex-1">
                     <h1 className="text-headline text-xl" style={{ color: '#F5EFE0' }}>

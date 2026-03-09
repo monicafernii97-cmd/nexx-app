@@ -20,7 +20,13 @@ const MODE_LABELS: Record<string, { label: string; color: string }> = {
 export default function ConversationPage() {
     const params = useParams();
     const router = useRouter();
-    const conversationId = params.id as Id<'conversations'>;
+    const rawId = params.id;
+    
+    if (typeof rawId !== 'string') {
+        router.push('/chat');
+        return null;
+    }
+    const conversationId = rawId as Id<'conversations'>;
 
     const conversation = useQuery(api.conversations.get, { id: conversationId });
     const messages = useQuery(api.messages.list, { conversationId });

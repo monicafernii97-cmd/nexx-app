@@ -25,6 +25,7 @@ export default function ConversationPage() {
     const archiveConversation = useMutation(api.conversations.archive);
 
     const [isStreaming, setIsStreaming] = useState(false);
+    const [isPending, setIsPending] = useState(false);
     const [streamingContent, setStreamingContent] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -40,24 +41,27 @@ export default function ConversationPage() {
         }
     }, [isValidId, router]);
 
-    if (!isValidId) return null;
+    const isThreadReady = conversation !== undefined && messages !== undefined;
 
     const handleSend = useCallback(
         async (input: string) => {
-            if (isStreaming) return;
+            if (isStreaming || isPending || !isThreadReady) return;
 
-            // Save user message
-            await sendMessage({
-                conversationId,
-                role: 'user',
-                content: input,
-            });
-
-            // Stream AI response
-            setIsStreaming(true);
-            setStreamingContent('');
+            // Set pending immediately to prevent double-submit
+            setIsPending(true);
 
             try {
+                // Save user message inside try so failures are caught
+                await sendMessage({
+                    conversationId,
+                    role: 'user',
+                    content: input,
+                });
+
+                // Stream AI response
+                setIsStreaming(true);
+                setStreamingContent('');
+
                 // Build message history for the API
                 // Note: `messages` from useQuery won't include the just-saved user message yet,
                 // so we append the current input manually below to ensure the API gets the full history.
@@ -114,14 +118,18 @@ export default function ConversationPage() {
                     role: 'assistant',
                     content:
                         "I apologize, but I'm unable to respond right now. Please try again in a moment. If this issue persists, check that the OpenAI API key is configured correctly.",
-                });
+                }).catch(() => { }); // Don't throw if fallback also fails
             } finally {
                 setIsStreaming(false);
+                setIsPending(false);
                 setStreamingContent('');
             }
         },
-        [conversationId, messages, conversation?.mode, sendMessage, isStreaming]
+        [conversationId, messages, conversation?.mode, sendMessage, isStreaming, isPending, isThreadReady]
     );
+
+    // Early return AFTER all hooks
+    if (!isValidId) return null;
 
     const handleArchive = async () => {
         const confirmed = window.confirm('Archive this conversation? You can still view it in the Archived section.');
@@ -290,7 +298,7 @@ export default function ConversationPage() {
                 className="pt-4"
                 style={{ borderTop: '1px solid rgba(197, 139, 7, 0.1)' }}
             >
-                <ChatInput onSend={handleSend} disabled={isStreaming} />
+                <ChatInput onSend={handleSend} disabled={isStreaming || isPending || !isThreadReady} />
                 <p className="text-center text-xs mt-2" style={{ color: '#5A4A30' }}>
                     NEXX provides legal information and strategic guidance, not legal advice.
                 </p>

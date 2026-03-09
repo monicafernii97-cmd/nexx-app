@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
 import { Id } from '../../../../../convex/_generated/dataModel';
@@ -24,15 +24,12 @@ import { INCIDENT_CATEGORIES } from '@/lib/constants';
 export default function IncidentDetailPage() {
     const params = useParams();
     const router = useRouter();
-
     const rawId = params.id;
-    if (typeof rawId !== 'string') {
-        router.push('/docuvault');
-        return null;
-    }
-    const incidentId = rawId as Id<'incidents'>;
+    const isValidId = typeof rawId === 'string';
+    const incidentId = isValidId ? (rawId as Id<'incidents'>) : ('' as Id<'incidents'>);
 
-    const incident = useQuery(api.incidents.get, { id: incidentId });
+    // All hooks called unconditionally — use 'skip' when ID is invalid
+    const incident = useQuery(api.incidents.get, isValidId ? { id: incidentId } : 'skip');
     const updateIncident = useMutation(api.incidents.update);
     const confirmIncident = useMutation(api.incidents.confirm);
 
@@ -54,6 +51,16 @@ export default function IncidentDetailPage() {
         behavioralAnalysis?: string;
         strategicResponse?: string;
     } | null>(null);
+
+    // Redirect if ID is invalid (after all hooks)
+    useEffect(() => {
+        if (!isValidId) {
+            router.push('/docuvault');
+        }
+    }, [isValidId, router]);
+
+    // Early return AFTER all hooks
+    if (!isValidId) return null;
 
     if (!incident) {
         return (
@@ -404,34 +411,35 @@ export default function IncidentDetailPage() {
 
             {/* Actions */}
             {incident.status === 'draft' && !isEditing && (
-                <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="flex gap-3"
-                >
-                    {!incident.courtSummary && (
-                        <button
-                            onClick={handleAnalyze}
-                            disabled={isAnalyzing}
-                            className="btn-outline flex-1 flex items-center justify-center gap-2"
-                        >
-                            <Sparkles size={14} /> Analyze with AI
-                        </button>
-                    )}
-                    <button
-                        onClick={handleConfirm}
-                        disabled={isConfirming}
-                        className="btn-gold flex-1 flex items-center justify-center gap-2"
+                <>
+                    <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="flex gap-3"
                     >
-                        <Check size={14} /> {isConfirming ? 'Confirming...' : 'Confirm & Finalize'}
-                    </button>
-                </motion.div>
-                {confirmError && (
-                    <p className="text-sm mt-2" style={{ color: '#C75A5A' }}>{confirmError}</p>
-                )}
-                </motion.div>
+                        {!incident.courtSummary && (
+                            <button
+                                onClick={handleAnalyze}
+                                disabled={isAnalyzing}
+                                className="btn-outline flex-1 flex items-center justify-center gap-2"
+                            >
+                                <Sparkles size={14} /> Analyze with AI
+                            </button>
+                        )}
+                        <button
+                            onClick={handleConfirm}
+                            disabled={isConfirming}
+                            className="btn-gold flex-1 flex items-center justify-center gap-2"
+                        >
+                            <Check size={14} /> {isConfirming ? 'Confirming...' : 'Confirm & Finalize'}
+                        </button>
+                    </motion.div>
+                    {confirmError && (
+                        <p className="text-sm mt-2" style={{ color: '#C75A5A' }}>{confirmError}</p>
+                    )}
+                </>
             )}
-        </div>
+        </div >
     );
 }

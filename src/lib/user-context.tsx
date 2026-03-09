@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, ReactNode, useState } from 'react';
 import { useUser as useClerkUser } from '@clerk/nextjs';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
@@ -10,12 +10,14 @@ import { useEffect } from 'react';
 interface UserContextType {
     userId: Id<'users'> | null;
     isLoading: boolean;
+    error: string | null;
     clerkUser: ReturnType<typeof useClerkUser>['user'];
 }
 
 const UserContext = createContext<UserContextType>({
     userId: null,
     isLoading: true,
+    error: null,
     clerkUser: null,
 });
 
@@ -26,6 +28,7 @@ export function useUser() {
 export function UserProvider({ children }: { children: ReactNode }) {
     const { user: clerkUser, isLoaded: clerkLoaded } = useClerkUser();
     const ensureUser = useMutation(api.users.ensureFromClerk);
+    const [syncError, setSyncError] = useState<string | null>(null);
     const currentUser = useQuery(
         api.users.getByClerkId,
         clerkUser?.id ? { clerkId: clerkUser.id } : 'skip'
@@ -38,6 +41,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
                 clerkId: clerkUser.id,
                 name: clerkUser.firstName || clerkUser.fullName || 'User',
                 email: clerkUser.primaryEmailAddress?.emailAddress,
+            }).catch((err) => {
+                console.error('Failed to sync user to Convex:', err);
+                setSyncError(err?.message ?? String(err));
             });
         }
     }, [clerkLoaded, clerkUser, ensureUser]);
@@ -46,7 +52,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const isLoading = !clerkLoaded || (clerkUser !== null && currentUser === undefined);
 
     return (
-        <UserContext.Provider value={{ userId, isLoading, clerkUser: clerkUser ?? null }}>
+        <UserContext.Provider value={{ userId, isLoading, error: syncError, clerkUser: clerkUser ?? null }}>
             {children}
         </UserContext.Provider>
     );

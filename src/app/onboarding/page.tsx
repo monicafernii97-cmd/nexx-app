@@ -68,14 +68,19 @@ export default function OnboardingPage() {
     const completeOnboarding = useMutation(api.users.completeOnboarding);
     const createNexProfile = useMutation(api.nexProfiles.create);
     const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     const handleNext = async () => {
         if (currentStep < ONBOARDING_STEPS.length - 1) {
             setCurrentStep((prev) => prev + 1);
         } else {
-            if (!userId) return;
+            if (!userId) {
+                router.push('/sign-in');
+                return;
+            }
             // Final step — save profile data to Convex
             setIsSaving(true);
+            setSaveError(null);
             try {
                 // Update user profile with onboarding data
                 await updateProfile({
@@ -103,8 +108,10 @@ export default function OnboardingPage() {
                 await completeOnboarding({ id: userId });
 
                 router.push('/dashboard');
-            } catch (error) {
+            } catch (error: unknown) {
+                const message = error instanceof Error ? error.message : String(error);
                 console.error('Failed to save onboarding data:', error);
+                setSaveError(message);
                 setIsSaving(false);
             }
         }
@@ -391,7 +398,7 @@ export default function OnboardingPage() {
                     )}
                     <button
                         onClick={handleNext}
-                        disabled={!canProceed()}
+                        disabled={!canProceed() || isSaving || (currentStep === ONBOARDING_STEPS.length - 1 && !userId)}
                         className="btn-gold flex-1 flex items-center justify-center gap-2 disabled:opacity-30"
                     >
                         {currentStep === ONBOARDING_STEPS.length - 1 ? (
@@ -401,6 +408,11 @@ export default function OnboardingPage() {
                         )}
                     </button>
                 </div>
+                {saveError && (
+                    <p className="text-xs mt-3 text-center" style={{ color: '#e74c3c' }}>
+                        {saveError}
+                    </p>
+                )}
             </div>
         </div>
     );

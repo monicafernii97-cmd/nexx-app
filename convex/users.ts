@@ -16,11 +16,14 @@ export const ensureFromClerk = mutation({
             .first();
 
         if (existing) {
-            // Update name/email if changed
-            await ctx.db.patch(existing._id, {
-                name: args.name,
-                email: args.email,
-            });
+            // Only patch if name or email actually changed
+            const patch: Record<string, string | undefined> = {};
+            if (existing.name !== args.name) patch.name = args.name;
+            if (existing.email !== args.email) patch.email = args.email;
+
+            if (Object.keys(patch).length > 0) {
+                await ctx.db.patch(existing._id, patch);
+            }
             return existing._id;
         }
 
@@ -55,7 +58,7 @@ export const get = query({
     },
 });
 
-// Update user profile (onboarding data)
+// Update user profile (onboarding data) — auth-guarded
 export const updateProfile = mutation({
     args: {
         id: v.id('users'),
@@ -70,24 +73,42 @@ export const updateProfile = mutation({
         primaryGoals: v.optional(v.array(v.string())),
     },
     handler: async (ctx, args) => {
+        // Auth guard: verify caller owns this user record
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error('Not authenticated');
+        const user = await ctx.db.get(args.id);
+        if (!user || user.clerkId !== identity.subject) {
+            throw new Error('Not authorized to update this profile');
+        }
+
         const { id, ...updates } = args;
         const filtered = Object.fromEntries(
             Object.entries(updates).filter(([_, v]) => v !== undefined)
         );
-        await ctx.db.patch(id, filtered);
+        if (Object.keys(filtered).length > 0) {
+            await ctx.db.patch(id, filtered);
+        }
     },
 });
 
-// Complete onboarding
+// Complete onboarding — auth-guarded
 export const completeOnboarding = mutation({
     args: { id: v.id('users') },
     handler: async (ctx, args) => {
+        // Auth guard: verify caller owns this user record
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error('Not authenticated');
+        const user = await ctx.db.get(args.id);
+        if (!user || user.clerkId !== identity.subject) {
+            throw new Error('Not authorized to complete onboarding for this user');
+        }
+
         await ctx.db.patch(args.id, { onboardingComplete: true });
     },
 });
 
-// Legacy: Create a guest user (kept for backward compatibility)
-export const createOrGet = mutation({
+// Legacy: kept for backward compatibility during migration
+export const createGuestUser = mutation({
     args: {
         name: v.string(),
     },

@@ -21,7 +21,7 @@ import { US_STATES, ONBOARDING_STEPS } from '@/lib/constants';
 
 export default function OnboardingPage() {
     const router = useRouter();
-    const { userId } = useUser();
+    const { userId, isLoading: userLoading, error: userError } = useUser();
     const [currentStep, setCurrentStep] = useState(0);
     const [formData, setFormData] = useState({
         name: '',
@@ -398,19 +398,19 @@ export default function OnboardingPage() {
                     )}
                     <button
                         onClick={handleNext}
-                        disabled={!canProceed() || isSaving || (currentStep === ONBOARDING_STEPS.length - 1 && !userId)}
+                        disabled={!canProceed() || isSaving || userLoading || (currentStep === ONBOARDING_STEPS.length - 1 && !userId)}
                         className="btn-gold flex-1 flex items-center justify-center gap-2 disabled:opacity-30"
                     >
                         {currentStep === ONBOARDING_STEPS.length - 1 ? (
-                            <>{isSaving ? 'Saving...' : 'Enter NEXX'} <Sparkles size={14} /></>
+                            <>{isSaving ? 'Saving...' : userLoading ? 'Loading...' : 'Enter NEXX'} <Sparkles size={14} /></>
                         ) : (
                             <>Continue <ChevronRight size={14} /></>
                         )}
                     </button>
                 </div>
-                {saveError && (
+                {(saveError || userError) && (
                     <p className="text-xs mt-3 text-center" style={{ color: '#e74c3c' }}>
-                        {saveError}
+                        {saveError || userError}
                     </p>
                 )}
             </div>

@@ -1,7 +1,7 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 
-// Ensure a Convex user exists for a given Clerk user
+// Ensure a Convex user exists for a given Clerk user — auth-guarded
 export const ensureFromClerk = mutation({
     args: {
         clerkId: v.string(),
@@ -9,6 +9,13 @@ export const ensureFromClerk = mutation({
         email: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
+        // Auth guard: verify caller is authenticated and clerkId matches
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error('Not authenticated');
+        if (identity.subject !== args.clerkId) {
+            throw new Error('Not authorized: clerkId mismatch');
+        }
+
         // Check if user with this clerkId already exists
         const existing = await ctx.db
             .query('users')
@@ -39,13 +46,16 @@ export const ensureFromClerk = mutation({
     },
 });
 
-// Get user by Clerk ID
-export const getByClerkId = query({
-    args: { clerkId: v.string() },
-    handler: async (ctx, args) => {
+// Get the authenticated user's own record — derives clerkId from auth context
+export const me = query({
+    args: {},
+    handler: async (ctx) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) return null;
+
         return await ctx.db
             .query('users')
-            .withIndex('by_clerk', (q) => q.eq('clerkId', args.clerkId))
+            .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
             .first();
     },
 });
@@ -104,20 +114,5 @@ export const completeOnboarding = mutation({
         }
 
         await ctx.db.patch(args.id, { onboardingComplete: true });
-    },
-});
-
-// Legacy: kept for backward compatibility during migration
-export const createGuestUser = mutation({
-    args: {
-        name: v.string(),
-    },
-    handler: async (ctx, args) => {
-        return await ctx.db.insert('users', {
-            name: args.name,
-            role: 'parent',
-            onboardingComplete: false,
-            createdAt: Date.now(),
-        });
     },
 });

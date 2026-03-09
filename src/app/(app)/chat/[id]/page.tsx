@@ -15,7 +15,7 @@ export default function ConversationPage() {
     const params = useParams();
     const router = useRouter();
     const rawId = params.id;
-    
+
     if (typeof rawId !== 'string') {
         router.push('/chat');
         return null;
@@ -139,6 +139,7 @@ export default function ConversationPage() {
                 <button
                     onClick={() => router.push('/chat')}
                     className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(197,139,7,0.08)]"
+                    aria-label="Back to conversations"
                 >
                     <ArrowLeft size={16} style={{ color: '#C58B07' }} />
                 </button>
@@ -174,6 +175,7 @@ export default function ConversationPage() {
                     onClick={handleArchive}
                     className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(197,139,7,0.08)]"
                     title="Archive conversation"
+                    aria-label="Archive conversation"
                 >
                     <ArchiveIcon size={14} style={{ color: '#8A7A60' }} />
                 </button>

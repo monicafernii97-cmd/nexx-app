@@ -26,7 +26,7 @@ export const ensureFromClerk = mutation({
             // Only patch if name or email actually changed
             const patch: Record<string, string | undefined> = {};
             if (existing.name !== args.name) patch.name = args.name;
-            if (existing.email !== args.email) patch.email = args.email;
+            if (args.email !== undefined && existing.email !== args.email) patch.email = args.email;
 
             if (Object.keys(patch).length > 0) {
                 await ctx.db.patch(existing._id, patch);

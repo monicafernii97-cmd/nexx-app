@@ -32,6 +32,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const [syncError, setSyncError] = useState<string | null>(null);
     const hasSynced = useRef(false);
 
+    // Reset sync flag when user changes (e.g., account switch)
+    useEffect(() => {
+        hasSynced.current = false;
+    }, [clerkUser?.id]);
+
     // Auth-derived query: no args, server derives clerkId from auth context
     const currentUser = useQuery(
         api.users.me,

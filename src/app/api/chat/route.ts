@@ -1,10 +1,9 @@
 import { NextRequest } from 'next/server';
-import OpenAI from 'openai';
+import { getOpenAI } from '@/lib/openai';
 import { buildSystemPrompt } from '@/lib/systemPrompt';
 
-function getOpenAI() {
-    return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-}
+const MAX_MESSAGE_LENGTH = 10000;
+const MAX_MESSAGES = 50;
 
 export async function POST(req: NextRequest) {
     try {
@@ -26,6 +25,19 @@ export async function POST(req: NextRequest) {
 
         if (!messages || messages.length === 0) {
             return Response.json({ error: 'Messages are required' }, { status: 400 });
+        }
+
+        if (messages.length > MAX_MESSAGES) {
+            return Response.json({ error: 'Too many messages' }, { status: 400 });
+        }
+
+        for (const msg of messages) {
+            if (!msg.role || !['user', 'assistant'].includes(msg.role)) {
+                return Response.json({ error: 'Invalid message role' }, { status: 400 });
+            }
+            if (typeof msg.content !== 'string' || msg.content.length > MAX_MESSAGE_LENGTH) {
+                return Response.json({ error: 'Invalid message content' }, { status: 400 });
+            }
         }
 
         // Build context-enriched system prompt

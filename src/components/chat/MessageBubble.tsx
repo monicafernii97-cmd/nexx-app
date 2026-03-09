@@ -14,9 +14,14 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
     const [copied, setCopied] = useState(false);
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(content);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        navigator.clipboard.writeText(content)
+            .then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            })
+            .catch((err) => {
+                console.error('Failed to copy:', err);
+            });
     };
 
     // Simple markdown-like rendering

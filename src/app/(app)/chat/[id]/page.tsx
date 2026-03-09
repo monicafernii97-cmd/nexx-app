@@ -53,6 +53,8 @@ export default function ConversationPage() {
 
             try {
                 // Build message history for the API
+                // Note: `messages` from useQuery won't include the just-saved user message yet,
+                // so we append the current input manually below to ensure the API gets the full history.
                 const history = (messages ?? []).map((m) => ({
                     role: m.role as 'user' | 'assistant',
                     content: m.content,
@@ -69,7 +71,8 @@ export default function ConversationPage() {
                 });
 
                 if (!response.ok) {
-                    throw new Error('Failed to get AI response');
+                    const errorText = await response.text().catch(() => '');
+                    throw new Error(`Failed to get AI response: ${response.status} ${errorText}`);
                 }
 
                 const reader = response.body?.getReader();

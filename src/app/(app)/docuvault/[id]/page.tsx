@@ -17,7 +17,6 @@ import {
     AlertTriangle,
     Sparkles,
     Save,
-    Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
@@ -40,6 +39,7 @@ export default function IncidentDetailPage() {
         category: string;
     } | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [isConfirming, setIsConfirming] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysis, setAnalysis] = useState<{
         behavioralAnalysis?: string;
@@ -100,7 +100,14 @@ export default function IncidentDetailPage() {
     };
 
     const handleConfirm = async () => {
-        await confirmIncident({ id: incidentId });
+        setIsConfirming(true);
+        try {
+            await confirmIncident({ id: incidentId });
+        } catch (error) {
+            console.error('Failed to confirm:', error);
+        } finally {
+            setIsConfirming(false);
+        }
     };
 
     const handleAnalyze = async () => {
@@ -391,9 +398,10 @@ export default function IncidentDetailPage() {
                     )}
                     <button
                         onClick={handleConfirm}
+                        disabled={isConfirming}
                         className="btn-gold flex-1 flex items-center justify-center gap-2"
                     >
-                        <Check size={14} /> Confirm &amp; Finalize
+                        <Check size={14} /> {isConfirming ? 'Confirming...' : 'Confirm & Finalize'}
                     </button>
                 </motion.div>
             )}

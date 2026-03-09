@@ -112,6 +112,7 @@ export default function OnboardingPage() {
                 const message = error instanceof Error ? error.message : String(error);
                 console.error('Failed to save onboarding data:', error);
                 setSaveError(message);
+            } finally {
                 setIsSaving(false);
             }
         }

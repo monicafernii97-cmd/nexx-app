@@ -60,11 +60,17 @@ export const me = query({
     },
 });
 
-// Get user by ID
+// Get user by ID — auth-guarded
 export const get = query({
     args: { id: v.id('users') },
     handler: async (ctx, args) => {
-        return await ctx.db.get(args.id);
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error('Not authenticated');
+        const user = await ctx.db.get(args.id);
+        if (!user || user.clerkId !== identity.subject) {
+            throw new Error('Not authorized');
+        }
+        return user;
     },
 });
 

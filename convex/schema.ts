@@ -4,6 +4,7 @@ import { v } from 'convex/values';
 export default defineSchema({
     // ═══ Users ═══
     users: defineTable({
+        clerkId: v.optional(v.string()),
         name: v.string(),
         email: v.optional(v.string()),
         role: v.union(v.literal('parent'), v.literal('attorney'), v.literal('therapist')),
@@ -18,7 +19,7 @@ export default defineSchema({
         onboardingComplete: v.boolean(),
         primaryGoals: v.optional(v.array(v.string())),
         createdAt: v.number(),
-    }),
+    }).index('by_clerk', ['clerkId']),
 
     // ═══ NEX Profiles ═══
     nexProfiles: defineTable({

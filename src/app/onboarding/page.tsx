@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { useUser } from '@/lib/user-context';
 import {
     ChevronRight,
     ChevronLeft,
@@ -20,6 +21,7 @@ import { US_STATES, ONBOARDING_STEPS } from '@/lib/constants';
 
 export default function OnboardingPage() {
     const router = useRouter();
+    const { userId, isLoading: userLoading, error: userError } = useUser();
     const [currentStep, setCurrentStep] = useState(0);
     const [formData, setFormData] = useState({
         name: '',
@@ -62,23 +64,24 @@ export default function OnboardingPage() {
         }
     };
 
-    const createUser = useMutation(api.users.createOrGet);
     const updateProfile = useMutation(api.users.updateProfile);
     const completeOnboarding = useMutation(api.users.completeOnboarding);
     const createNexProfile = useMutation(api.nexProfiles.create);
     const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     const handleNext = async () => {
         if (currentStep < ONBOARDING_STEPS.length - 1) {
             setCurrentStep((prev) => prev + 1);
         } else {
-            // Final step — save everything to Convex
+            if (!userId) {
+                router.push('/sign-in');
+                return;
+            }
+            // Final step — save profile data to Convex
             setIsSaving(true);
+            setSaveError(null);
             try {
-                // Create user
-                const userId = await createUser({ name: formData.name || 'Guest' });
-                localStorage.setItem('nexx_user_id', userId);
-
                 // Update user profile with onboarding data
                 await updateProfile({
                     id: userId,
@@ -105,8 +108,11 @@ export default function OnboardingPage() {
                 await completeOnboarding({ id: userId });
 
                 router.push('/dashboard');
-            } catch (error) {
+            } catch (error: unknown) {
+                const message = error instanceof Error ? error.message : String(error);
                 console.error('Failed to save onboarding data:', error);
+                setSaveError(message);
+            } finally {
                 setIsSaving(false);
             }
         }
@@ -393,16 +399,21 @@ export default function OnboardingPage() {
                     )}
                     <button
                         onClick={handleNext}
-                        disabled={!canProceed()}
+                        disabled={!canProceed() || isSaving || userLoading || (currentStep === ONBOARDING_STEPS.length - 1 && !userId)}
                         className="btn-gold flex-1 flex items-center justify-center gap-2 disabled:opacity-30"
                     >
                         {currentStep === ONBOARDING_STEPS.length - 1 ? (
-                            <>{isSaving ? 'Saving...' : 'Enter NEXX'} <Sparkles size={14} /></>
+                            <>{isSaving ? 'Saving...' : userLoading ? 'Loading...' : 'Enter NEXX'} <Sparkles size={14} /></>
                         ) : (
                             <>Continue <ChevronRight size={14} /></>
                         )}
                     </button>
                 </div>
+                {(saveError || userError) && (
+                    <p className="text-xs mt-3 text-center" style={{ color: '#e74c3c' }}>
+                        {saveError || userError}
+                    </p>
+                )}
             </div>
         </div>
     );

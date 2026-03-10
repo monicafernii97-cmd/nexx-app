@@ -91,3 +91,34 @@ export const update = mutation({
         }
     },
 });
+
+// Update AI-generated insights on a NEX profile — auth-guarded
+export const updateAiInsights = mutation({
+    args: {
+        id: v.id('nexProfiles'),
+        aiInsights: v.optional(v.string()),
+        dangerLevel: v.optional(v.number()),
+        detectedPatterns: v.optional(v.array(v.string())),
+    },
+    handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+
+        // Verify ownership
+        const profile = await ctx.db.get(args.id);
+        if (!profile || profile.userId !== user._id) {
+            throw new Error('Not authorized to update this NEX profile');
+        }
+
+        const { id, ...updates } = args;
+        const filtered = Object.fromEntries(
+            Object.entries(updates).filter(([_, v]) => v !== undefined)
+        );
+        if (Object.keys(filtered).length > 0) {
+            await ctx.db.patch(id, {
+                ...filtered,
+                lastAnalyzedAt: Date.now(),
+                updatedAt: Date.now(),
+            });
+        }
+    },
+});

@@ -18,6 +18,8 @@ export default defineSchema({
         county: v.optional(v.string()),
         childrenCount: v.optional(v.number()),
         childrenAges: v.optional(v.array(v.number())),
+        childrenNames: v.optional(v.array(v.string())),
+        courtCaseNumber: v.optional(v.string()),
         custodyType: v.optional(
             v.union(
                 v.literal('sole'),
@@ -37,6 +39,23 @@ export default defineSchema({
                 v.literal('none')
             )
         ),
+        tonePreference: v.optional(
+            v.union(
+                v.literal('direct'),
+                v.literal('gentle'),
+                v.literal('strategic'),
+                v.literal('clinical')
+            )
+        ),
+        emotionalState: v.optional(
+            v.union(
+                v.literal('calm'),
+                v.literal('anxious'),
+                v.literal('angry'),
+                v.literal('overwhelmed'),
+                v.literal('numb')
+            )
+        ),
         onboardingComplete: v.boolean(),
         primaryGoals: v.optional(v.array(v.string())),
         createdAt: v.number(),
@@ -52,6 +71,11 @@ export default defineSchema({
         communicationStyle: v.optional(v.string()),
         manipulationTactics: v.optional(v.array(v.string())),
         triggerPatterns: v.optional(v.array(v.string())),
+        // AI-enriched fields
+        aiInsights: v.optional(v.string()),
+        dangerLevel: v.optional(v.number()),
+        detectedPatterns: v.optional(v.array(v.string())),
+        lastAnalyzedAt: v.optional(v.number()),
         createdAt: v.number(),
         updatedAt: v.optional(v.number()),
     }).index('by_user', ['userId']),

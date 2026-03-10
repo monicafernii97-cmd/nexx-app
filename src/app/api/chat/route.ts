@@ -18,8 +18,25 @@ export async function POST(req: NextRequest) {
             userContext?: {
                 userName?: string;
                 state?: string;
+                county?: string;
                 custodyType?: string;
                 nexBehaviors?: string[];
+                // Enhanced fields
+                tonePreference?: string;
+                emotionalState?: string;
+                childrenNames?: string[];
+                childrenAges?: number[];
+                courtCaseNumber?: string;
+                hasAttorney?: boolean;
+                hasTherapist?: boolean;
+                // NEX profile
+                nexNickname?: string;
+                nexCommunicationStyle?: string;
+                nexManipulationTactics?: string[];
+                nexTriggerPatterns?: string[];
+                nexAiInsights?: string;
+                nexDangerLevel?: number;
+                nexDetectedPatterns?: string[];
             };
         } = body;
 

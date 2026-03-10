@@ -26,6 +26,7 @@ export default function DocuVaultPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [deleteId, setDeleteId] = useState<Id<'incidents'> | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     const filteredIncidents = (incidents ?? []).filter((incident) => {
         if (activeFilter && incident.category !== activeFilter) return false;
@@ -37,13 +38,15 @@ export default function DocuVaultPage() {
     const handleDelete = async () => {
         if (!deleteId) return;
         setIsDeleting(true);
+        setDeleteError(null);
         try {
             await removeIncident({ id: deleteId });
+            setDeleteId(null);
         } catch (error) {
             console.error('Delete error:', error);
+            setDeleteError('Failed to delete incident. Please try again.');
         } finally {
             setIsDeleting(false);
-            setDeleteId(null);
         }
     };
 
@@ -265,6 +268,9 @@ export default function DocuVaultPage() {
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
                             className="card-gilded p-6 max-w-sm mx-4"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="list-delete-dialog-title"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="flex items-center gap-3 mb-4">
@@ -275,7 +281,7 @@ export default function DocuVaultPage() {
                                     <AlertTriangle size={18} style={{ color: '#C75A5A' }} />
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-semibold" style={{ color: '#F5EFE0' }}>
+                                    <h3 id="list-delete-dialog-title" className="text-sm font-semibold" style={{ color: '#F5EFE0' }}>
                                         Delete Incident
                                     </h3>
                                     <p className="text-xs" style={{ color: '#8A7A60' }}>
@@ -283,8 +289,9 @@ export default function DocuVaultPage() {
                                     </p>
                                 </div>
                                 <button
-                                    onClick={() => !isDeleting && setDeleteId(null)}
+                                    onClick={() => { setDeleteId(null); setDeleteError(null); }}
                                     className="ml-auto p-1 rounded-lg hover:bg-[rgba(138,122,96,0.1)]"
+                                    disabled={isDeleting}
                                 >
                                     <X size={14} style={{ color: '#8A7A60' }} />
                                 </button>
@@ -292,9 +299,12 @@ export default function DocuVaultPage() {
                             <p className="text-sm mb-5" style={{ color: '#B8A88A' }}>
                                 Are you sure you want to permanently delete this incident record? All associated analysis and court summaries will be lost.
                             </p>
+                            {deleteError && (
+                                <p className="text-xs mb-3" style={{ color: '#C75A5A' }}>{deleteError}</p>
+                            )}
                             <div className="flex gap-3">
                                 <button
-                                    onClick={() => setDeleteId(null)}
+                                    onClick={() => { setDeleteId(null); setDeleteError(null); }}
                                     disabled={isDeleting}
                                     className="btn-outline flex-1"
                                 >

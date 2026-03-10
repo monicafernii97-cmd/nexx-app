@@ -59,6 +59,7 @@ export default function IncidentDetailPage() {
     } | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     // Redirect if ID is invalid (after all hooks)
     useEffect(() => {
@@ -181,13 +182,14 @@ export default function IncidentDetailPage() {
 
     const handleDelete = async () => {
         setIsDeleting(true);
+        setDeleteError(null);
         try {
             await removeIncident({ id: incidentId });
             router.push('/docuvault');
         } catch (error) {
             console.error('Delete error:', error);
+            setDeleteError('Failed to delete incident. Please try again.');
             setIsDeleting(false);
-            setShowDeleteConfirm(false);
         }
     };
 
@@ -285,28 +287,33 @@ export default function IncidentDetailPage() {
                     <Clock size={10} /> {incident.time}
                 </span>
                 {/* Severity */}
-                <span
-                    className="badge"
-                    style={{
-                        background: `${severityColors[incident.severity - 1]}15`,
-                        color: severityColors[incident.severity - 1],
-                    }}
-                >
-                    <div className="flex gap-0.5 mr-1">
-                        {[1, 2, 3].map((level) => (
-                            <div
-                                key={level}
-                                className="w-1.5 h-3 rounded-sm"
-                                style={{
-                                    background: level <= incident.severity
-                                        ? severityColors[incident.severity - 1]
-                                        : 'rgba(138, 122, 96, 0.15)',
-                                }}
-                            />
-                        ))}
-                    </div>
-                    {severityLabels[incident.severity - 1]}
-                </span>
+                {(() => {
+                    const sev = Math.max(1, Math.min(3, incident.severity ?? 2));
+                    return (
+                        <span
+                            className="badge"
+                            style={{
+                                background: `${severityColors[sev - 1]}15`,
+                                color: severityColors[sev - 1],
+                            }}
+                        >
+                            <div className="flex gap-0.5 mr-1">
+                                {[1, 2, 3].map((level) => (
+                                    <div
+                                        key={level}
+                                        className="w-1.5 h-3 rounded-sm"
+                                        style={{
+                                            background: level <= sev
+                                                ? severityColors[sev - 1]
+                                                : 'rgba(138, 122, 96, 0.15)',
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                            {severityLabels[sev - 1]}
+                        </span>
+                    );
+                })()}
                 {incident.childrenInvolved && (
                     <span className="badge" style={{ background: 'rgba(229, 168, 74, 0.12)', color: '#E5A84A' }}>
                         <Baby size={10} /> Children Involved
@@ -528,6 +535,9 @@ export default function IncidentDetailPage() {
                         initial={{ scale: 0.95 }}
                         animate={{ scale: 1 }}
                         className="card-gilded p-6 max-w-sm mx-4"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="delete-dialog-title"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center gap-3 mb-4">
@@ -538,15 +548,18 @@ export default function IncidentDetailPage() {
                                 <AlertTriangle size={18} style={{ color: '#C75A5A' }} />
                             </div>
                             <div>
-                                <h3 className="text-sm font-semibold" style={{ color: '#F5EFE0' }}>Delete Incident</h3>
+                                <h3 id="delete-dialog-title" className="text-sm font-semibold" style={{ color: '#F5EFE0' }}>Delete Incident</h3>
                                 <p className="text-xs" style={{ color: '#8A7A60' }}>This action cannot be undone.</p>
                             </div>
                         </div>
                         <p className="text-sm mb-5" style={{ color: '#B8A88A' }}>
                             Are you sure you want to permanently delete this incident record?
                         </p>
+                        {deleteError && (
+                            <p className="text-xs mb-3" style={{ color: '#C75A5A' }}>{deleteError}</p>
+                        )}
                         <div className="flex gap-3">
-                            <button onClick={() => setShowDeleteConfirm(false)} disabled={isDeleting} className="btn-outline flex-1">Cancel</button>
+                            <button onClick={() => { setShowDeleteConfirm(false); setDeleteError(null); }} disabled={isDeleting} className="btn-outline flex-1">Cancel</button>
                             <button
                                 onClick={handleDelete}
                                 disabled={isDeleting}

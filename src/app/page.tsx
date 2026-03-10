@@ -2,8 +2,67 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { useAuth } from '@clerk/nextjs';
+import { useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function WelcomePage() {
+  const { isSignedIn, isLoaded } = useAuth();
+  const router = useRouter();
+
+  // Only query the user's record if they're signed in
+  const currentUser = useQuery(
+    api.users.me,
+    isSignedIn ? {} : 'skip'
+  );
+
+  // Smart redirect for returning users
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isSignedIn) return; // Not signed in — show welcome page
+
+    // Signed in — wait for user data to load
+    if (currentUser === undefined) return; // Still loading
+
+    if (currentUser === null) {
+      // Signed in but no Convex record yet — send to onboarding
+      router.replace('/onboarding');
+    } else if (currentUser.onboardingComplete) {
+      // Returning user — straight to dashboard
+      router.replace('/dashboard');
+    } else {
+      // Has account but hasn't finished onboarding
+      router.replace('/onboarding');
+    }
+  }, [isLoaded, isSignedIn, currentUser, router]);
+
+  // Show loading state while checking auth
+  if (!isLoaded || (isSignedIn && currentUser === undefined)) {
+    return (
+      <div className="silk-bg min-h-screen flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center"
+        >
+          <div
+            className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
+            style={{
+              background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
+              boxShadow: '0 8px 32px rgba(197, 139, 7, 0.3)',
+            }}
+          >
+            <span className="text-lg font-black" style={{ color: '#02022d' }}>N</span>
+          </div>
+          <p className="text-sm" style={{ color: '#8A7A60' }}>Loading...</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Only render welcome page for unauthenticated users
   return (
     <div className="silk-bg min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
       {/* Ambient Gold Particles */}
@@ -94,7 +153,7 @@ export default function WelcomePage() {
           transition={{ delay: 1.3, duration: 0.6 }}
           className="space-y-4"
         >
-          <Link href="/onboarding">
+          <Link href="/sign-up">
             <button
               className="w-full max-w-xs text-sm tracking-[0.15em] uppercase font-semibold py-3 px-7 rounded-lg cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5"
               style={{
@@ -108,9 +167,9 @@ export default function WelcomePage() {
           </Link>
 
           <div className="pt-2">
-            <Link href="/dashboard">
+            <Link href="/sign-in">
               <button className="btn-outline w-full max-w-xs text-sm tracking-[0.1em]">
-                Consultation
+                Sign In
               </button>
             </Link>
           </div>
@@ -130,3 +189,4 @@ export default function WelcomePage() {
     </div>
   );
 }
+

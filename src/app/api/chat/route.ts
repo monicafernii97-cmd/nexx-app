@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
         // ── Legal statute search (server-side, before OpenAI) ──
         // Wrapped in a 3s timeout to prevent slow Tavily responses from stalling chat.
         let legalContext: LegalSearchResult[] | undefined;
-        const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
+        const lastUserMessage = messages.findLast((m) => m.role === 'user');
 
         if (lastUserMessage && detectLegalTopic(lastUserMessage.content) && userContext?.state) {
             const LEGAL_SEARCH_TIMEOUT_MS = 3000;

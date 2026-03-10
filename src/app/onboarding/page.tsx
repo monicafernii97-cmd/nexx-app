@@ -1,9 +1,9 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import {
@@ -21,7 +21,15 @@ import { US_STATES, ONBOARDING_STEPS } from '@/lib/constants';
 
 export default function OnboardingPage() {
     const router = useRouter();
-    const { userId, isLoading: userLoading, error: userError } = useUser();
+    const { userId, isLoading: userLoading, error: userError, clerkUser } = useUser();
+
+    // Guard: redirect returning users who already completed onboarding
+    const currentUser = useQuery(api.users.me, clerkUser ? {} : 'skip');
+    useEffect(() => {
+        if (currentUser?.onboardingComplete) {
+            router.replace('/dashboard');
+        }
+    }, [currentUser, router]);
     const [currentStep, setCurrentStep] = useState(0);
     const [formData, setFormData] = useState({
         name: '',

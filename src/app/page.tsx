@@ -4,26 +4,34 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
 import { useQuery } from 'convex/react';
+import { useConvexAuth } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function WelcomePage() {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded: clerkLoaded } = useAuth();
+  // useConvexAuth waits for the Clerk JWT to be synced to Convex.
+  // This prevents a race where Clerk says "signed in" but Convex
+  // hasn't received the token yet, causing users.me to return null.
+  const { isAuthenticated: convexReady, isLoading: convexLoading } = useConvexAuth();
   const router = useRouter();
 
-  // Only query the user's record if they're signed in
+  // Only query when Convex auth is fully synced (not just Clerk signed-in)
   const currentUser = useQuery(
     api.users.me,
-    isSignedIn ? {} : 'skip'
+    convexReady ? {} : 'skip'
   );
 
   // Smart redirect for returning users
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!clerkLoaded) return;
     if (!isSignedIn) return; // Not signed in — show welcome page
 
-    // Signed in — wait for user data to load
+    // Wait for Convex auth to sync before making routing decisions
+    if (convexLoading) return;
+
+    // Signed in + Convex ready — wait for user data to load
     if (currentUser === undefined) return; // Still loading
 
     if (currentUser === null) {
@@ -36,10 +44,10 @@ export default function WelcomePage() {
       // Has account but hasn't finished onboarding
       router.replace('/onboarding');
     }
-  }, [isLoaded, isSignedIn, currentUser, router]);
+  }, [clerkLoaded, isSignedIn, convexLoading, currentUser, router]);
 
   // Show loading state while checking auth
-  if (!isLoaded || (isSignedIn && currentUser === undefined)) {
+  if (!clerkLoaded || convexLoading || (isSignedIn && currentUser === undefined)) {
     return (
       <div className="silk-bg min-h-screen flex items-center justify-center">
         <motion.div

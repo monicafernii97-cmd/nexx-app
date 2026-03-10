@@ -84,7 +84,7 @@ export default function ProfilePage() {
                 name: form.name || undefined,
                 state: form.state || undefined,
                 county: form.county || undefined,
-                childrenCount: form.childrenCount || undefined,
+                childrenCount: form.childrenCount,
                 childrenAges: form.childrenAges.length > 0 ? form.childrenAges : undefined,
                 childrenNames: form.childrenNames.length > 0 ? form.childrenNames : undefined,
                 courtCaseNumber: form.courtCaseNumber || undefined,

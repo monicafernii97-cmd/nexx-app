@@ -99,15 +99,38 @@ function sanitizeForPrompt(value: string, maxLength = 200): string {
         .trim();
 }
 
+// ── Allow-lists for prompt-safe enumerated values ──
+const ALLOWED_TONES = new Set(['direct', 'gentle', 'strategic', 'clinical']);
+const ALLOWED_EMOTIONAL_STATES = new Set(['calm', 'anxious', 'angry', 'overwhelmed', 'numb']);
+
 /**
  * Build a system prompt enriched with user context
  */
 export function buildSystemPrompt(context?: {
     userName?: string;
     state?: string;
+    county?: string;
     custodyType?: string;
     nexBehaviors?: string[];
     conversationMode?: string;
+    // New personalization fields
+    tonePreference?: string;
+    emotionalState?: string;
+    childrenNames?: string[];
+    childrenAges?: number[];
+    courtCaseNumber?: string;
+    hasAttorney?: boolean;
+    hasTherapist?: boolean;
+    // NEX profile data
+    nexNickname?: string;
+    nexCommunicationStyle?: string;
+    nexManipulationTactics?: string[];
+    nexTriggerPatterns?: string[];
+    nexAiInsights?: string;
+    nexDangerLevel?: number;
+    nexDetectedPatterns?: string[];
+    // Flow flags
+    isDraftingMode?: boolean;
 }): string {
     let prompt = NEXX_SYSTEM_PROMPT;
 
@@ -120,21 +143,152 @@ export function buildSystemPrompt(context?: {
         if (context.userName) {
             parts.push(`The user's name is ${sanitizeForPrompt(context.userName, 100)}.`);
         }
+
+        // ── Children Context ──
+        // In default mode, use initials only to minimize PII exposure.
+        // Full names are passed only in explicit drafting flows.
+        if (context.childrenNames && context.childrenNames.length > 0) {
+            const ages = (context.childrenAges?.slice(0, 10) ?? [])
+                .map(age => (Number.isFinite(age) && age >= 0 && age <= 25 ? age : undefined));
+
+            if (context.isDraftingMode) {
+                // Drafting mode — include full names for court documents
+                const names = context.childrenNames
+                    .slice(0, 10)
+                    .map((n) => sanitizeForPrompt(n, 50));
+                const childInfo = names.map((name, i) =>
+                    ages[i] !== undefined ? `${name} (age ${ages[i]})` : name
+                );
+                parts.push(`Their children: ${childInfo.join(', ')}. Use the children's names when drafting documents.`);
+            } else {
+                // Default mode — initials only
+                const initials = context.childrenNames
+                    .slice(0, 10)
+                    .map((n) => sanitizeForPrompt(n, 50))
+                    .map((n) => n.charAt(0).toUpperCase() + '.');
+                const childInfo = initials.map((initial, i) =>
+                    ages[i] !== undefined ? `${initial} (age ${ages[i]})` : initial
+                );
+                parts.push(`Their children (initials): ${childInfo.join(', ')}. Refer to children generically unless the user uses their names first.`);
+            }
+        } else if (context.childrenAges && context.childrenAges.length > 0) {
+            parts.push(`They have ${context.childrenAges.length} child(ren), ages: ${context.childrenAges.join(', ')}.`);
+        }
+
+        // ── Legal Context ──
         if (context.state) {
             const state = sanitizeForPrompt(context.state, 50);
-            parts.push(`They are located in ${state}. When discussing legal matters, reference ${state} family law when relevant.`);
+            const county = context.county ? sanitizeForPrompt(context.county, 50) : null;
+            parts.push(`They are located in ${state}${county ? `, ${county} County` : ''}.`);
+            parts.push(`When discussing legal matters, reference ${state} family law statutes. Note the court system structure and any state-specific custody requirements.`);
+        }
+        if (context.courtCaseNumber) {
+            const sanitized = sanitizeForPrompt(context.courtCaseNumber, 50);
+            if (context.isDraftingMode) {
+                // Drafting mode — include full case number
+                parts.push(`Their court case number is ${sanitized}. Reference it when drafting legal documents or summaries.`);
+            } else {
+                // Default mode — mask to last 4 characters
+                const masked = sanitized.length > 4
+                    ? '•••' + sanitized.slice(-4)
+                    : sanitized;
+                parts.push(`They have an active court case (ref: ${masked}). The user can share the full case number if needed.`);
+            }
         }
         if (context.custodyType) {
             parts.push(`Their custody arrangement is: ${sanitizeForPrompt(context.custodyType, 50)}.`);
         }
+        if (context.hasAttorney !== undefined) {
+            parts.push(context.hasAttorney
+                ? 'They have an attorney. Suggest coordination with their legal counsel when appropriate.'
+                : 'They do NOT have an attorney. Recommend finding one when legal complexity warrants it.');
+        }
+        if (context.hasTherapist !== undefined) {
+            parts.push(context.hasTherapist
+                ? 'They have a therapist. Suggest discussing emotional impacts with their therapist when appropriate.'
+                : 'They do NOT have a therapist. Recommend finding one for trauma support when applicable.');
+        }
+
+        // ── NEX Behavioral Profile ──
         if (context.nexBehaviors && context.nexBehaviors.length > 0) {
             const sanitized = context.nexBehaviors
                 .slice(0, 20)
                 .map((b) => sanitizeForPrompt(b, 100));
             parts.push(`Their NEX exhibits these documented behaviors: ${sanitized.join(', ')}.`);
         }
+        if (context.nexNickname) {
+            parts.push(`The user refers to their narcissistic ex as "${sanitizeForPrompt(context.nexNickname, 50)}". Use this term when discussing the NEX.`);
+        }
+        if (context.nexCommunicationStyle) {
+            parts.push(`The NEX's communication style: ${sanitizeForPrompt(context.nexCommunicationStyle, 200)}.`);
+        }
+        if (context.nexManipulationTactics && context.nexManipulationTactics.length > 0) {
+            const tactics = context.nexManipulationTactics
+                .slice(0, 10)
+                .map((t) => sanitizeForPrompt(t, 100));
+            parts.push(`Known manipulation tactics: ${tactics.join(', ')}. Proactively flag these when they appear in the user's descriptions.`);
+        }
+        if (context.nexTriggerPatterns && context.nexTriggerPatterns.length > 0) {
+            const triggers = context.nexTriggerPatterns
+                .slice(0, 10)
+                .map((t) => sanitizeForPrompt(t, 100));
+            parts.push(`Known trigger patterns for the NEX: ${triggers.join(', ')}.`);
+        }
+        if (context.nexAiInsights) {
+            parts.push(`AI behavioral analysis of the NEX: ${sanitizeForPrompt(context.nexAiInsights, 500)}`);
+        }
+        if (context.nexDangerLevel !== undefined) {
+            const level = Math.max(0, Math.min(5, context.nexDangerLevel));
+            parts.push(`NEX danger assessment level: ${level}/5. ${level >= 4 ? 'THIS IS A HIGH-RISK SITUATION. Prioritize safety recommendations.' : ''}`);
+        }
+        if (context.nexDetectedPatterns && context.nexDetectedPatterns.length > 0) {
+            const patterns = context.nexDetectedPatterns
+                .slice(0, 10)
+                .map((p) => sanitizeForPrompt(p, 100));
+            parts.push(`AI-detected behavioral patterns: ${patterns.join(', ')}.`);
+        }
+
+        // ── Conversation Mode ──
         if (context.conversationMode) {
             parts.push(`This conversation is in **${sanitizeForPrompt(context.conversationMode, 20)}** mode. Prioritize that lens in your responses.`);
+        }
+
+        // ── Tone Adaptation (language only, NEVER content) ──
+        // Values are validated against allow-lists to prevent prompt injection.
+        const validTone = context.tonePreference && ALLOWED_TONES.has(context.tonePreference)
+            ? context.tonePreference
+            : undefined;
+        const validEmotional = context.emotionalState && ALLOWED_EMOTIONAL_STATES.has(context.emotionalState)
+            ? context.emotionalState
+            : undefined;
+
+        if (validTone || validEmotional) {
+            parts.push('\n## TONE ADAPTATION RULES');
+            parts.push('CRITICAL: NEVER change the SUBSTANCE of your advice based on tone preference or emotional state.');
+            parts.push('NEVER omit warnings, red flags, or safety concerns to "spare feelings".');
+            parts.push('NEVER soften the severity assessment of a dangerous situation.');
+            parts.push('The CONTENT and ACCURACY of your guidance must be identical regardless of tone.');
+            parts.push('What MAY change: sentence length, formatting density, opening validation language, and pacing.');
+
+            if (validTone) {
+                const toneGuide: Record<string, string> = {
+                    direct: 'Be concise, factual, and action-oriented. Lead with the strategy. Minimal emotional preamble.',
+                    gentle: 'Use warm, validating language. Acknowledge emotions before presenting strategies. Use softer transitions.',
+                    strategic: 'Frame everything through a tactical lens. Emphasize power dynamics and positioning. Think like a chess player.',
+                    clinical: 'Use precise, professional language. Reference frameworks and research. Maintain analytical distance.',
+                };
+                parts.push(`Tone preference: ${validTone}. ${toneGuide[validTone]}`);
+            }
+            if (validEmotional) {
+                const stateGuide: Record<string, string> = {
+                    calm: 'User is in a stable state. Normal pacing and depth.',
+                    anxious: 'Use shorter paragraphs. More bullet points. Include grounding affirmations between sections.',
+                    angry: 'Validate the anger briefly, then redirect to strategy. Channel the energy into actionable steps.',
+                    overwhelmed: 'Simplify. One recommendation at a time. Use numbered steps. End with the single most important next action.',
+                    numb: 'Use gentle warmth. Normalize the freeze response. Shorter responses with clear next steps.',
+                };
+                parts.push(`Current emotional state: ${validEmotional}. ${stateGuide[validEmotional]}`);
+            }
         }
 
         if (parts.length > 1) {
@@ -144,3 +298,4 @@ export function buildSystemPrompt(context?: {
 
     return prompt;
 }
+

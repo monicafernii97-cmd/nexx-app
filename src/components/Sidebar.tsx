@@ -7,8 +7,10 @@ import {
     LayoutDashboard,
     MessageCircle,
     Shield,
+    Siren,
     Scale,
     BookOpen,
+    UserCircle,
     Settings,
     ChevronLeft,
     ChevronRight,
@@ -22,8 +24,10 @@ const navItems = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Chat', href: '/chat', icon: MessageCircle },
     { label: 'DocuVault', href: '/docuvault', icon: Shield },
+    { label: 'NEX Profile', href: '/nex-profile', icon: Siren },
     { label: 'Legal Suite', href: '/legal', icon: Scale },
     { label: 'Resources', href: '/resources', icon: BookOpen },
+    { label: 'My Profile', href: '/profile', icon: UserCircle },
     { label: 'Settings', href: '/settings', icon: Settings },
 ];
 

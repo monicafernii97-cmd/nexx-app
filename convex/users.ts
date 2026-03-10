@@ -85,6 +85,8 @@ export const updateProfile = mutation({
         county: v.optional(v.string()),
         childrenCount: v.optional(v.number()),
         childrenAges: v.optional(v.array(v.number())),
+        childrenNames: v.optional(v.array(v.string())),
+        courtCaseNumber: v.optional(v.string()),
         custodyType: v.optional(
             v.union(
                 v.literal('sole'),
@@ -102,6 +104,23 @@ export const updateProfile = mutation({
                 v.literal('active'),
                 v.literal('closed'),
                 v.literal('none')
+            )
+        ),
+        tonePreference: v.optional(
+            v.union(
+                v.literal('direct'),
+                v.literal('gentle'),
+                v.literal('strategic'),
+                v.literal('clinical')
+            )
+        ),
+        emotionalState: v.optional(
+            v.union(
+                v.literal('calm'),
+                v.literal('anxious'),
+                v.literal('angry'),
+                v.literal('overwhelmed'),
+                v.literal('numb')
             )
         ),
         primaryGoals: v.optional(v.array(v.string())),

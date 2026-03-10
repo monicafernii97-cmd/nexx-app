@@ -21,6 +21,8 @@ export default function ConversationPage() {
     // All hooks must be called unconditionally — use 'skip' when ID is invalid
     const conversation = useQuery(api.conversations.get, isValidId ? { id: conversationId } : 'skip');
     const messages = useQuery(api.messages.list, isValidId ? { conversationId } : 'skip');
+    const userProfile = useQuery(api.users.me);
+    const nexProfile = useQuery(api.nexProfiles.getByUser);
     const sendMessage = useMutation(api.messages.send);
     const archiveConversation = useMutation(api.conversations.archive);
 
@@ -77,6 +79,27 @@ export default function ConversationPage() {
                     body: JSON.stringify({
                         messages: history,
                         conversationMode: conversation?.mode ?? 'general',
+                        userContext: {
+                            userName: userProfile?.name,
+                            state: userProfile?.state,
+                            county: userProfile?.county,
+                            custodyType: userProfile?.custodyType,
+                            childrenNames: userProfile?.childrenNames,
+                            childrenAges: userProfile?.childrenAges,
+                            courtCaseNumber: userProfile?.courtCaseNumber,
+                            hasAttorney: userProfile?.hasAttorney,
+                            hasTherapist: userProfile?.hasTherapist,
+                            tonePreference: userProfile?.tonePreference,
+                            emotionalState: userProfile?.emotionalState,
+                            nexBehaviors: nexProfile?.behaviors,
+                            nexNickname: nexProfile?.nickname,
+                            nexCommunicationStyle: nexProfile?.communicationStyle,
+                            nexManipulationTactics: nexProfile?.manipulationTactics,
+                            nexTriggerPatterns: nexProfile?.triggerPatterns,
+                            nexAiInsights: nexProfile?.aiInsights,
+                            nexDangerLevel: nexProfile?.dangerLevel,
+                            nexDetectedPatterns: nexProfile?.detectedPatterns,
+                        },
                     }),
                 });
 
@@ -125,7 +148,7 @@ export default function ConversationPage() {
                 setStreamingContent('');
             }
         },
-        [conversationId, messages, conversation?.mode, sendMessage, isStreaming, isPending, isThreadReady]
+        [conversationId, messages, conversation?.mode, sendMessage, isStreaming, isPending, isThreadReady, userProfile, nexProfile]
     );
 
     // Early return AFTER all hooks

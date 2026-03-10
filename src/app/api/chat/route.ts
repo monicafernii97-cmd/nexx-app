@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getOpenAI } from '@/lib/openai';
 import { buildSystemPrompt } from '@/lib/systemPrompt';
+import { UserContext } from '@/lib/types';
 
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_MESSAGES = 50;
@@ -15,12 +16,7 @@ export async function POST(req: NextRequest) {
         }: {
             messages: { role: 'user' | 'assistant'; content: string }[];
             conversationMode?: string;
-            userContext?: {
-                userName?: string;
-                state?: string;
-                custodyType?: string;
-                nexBehaviors?: string[];
-            };
+            userContext?: UserContext;
         } = body;
 
         if (!messages || messages.length === 0) {

@@ -155,3 +155,18 @@ export const confirm = mutation({
         });
     },
 });
+
+// Delete an incident — auth-guarded
+export const remove = mutation({
+    args: { id: v.id('incidents') },
+    handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+
+        const incident = await ctx.db.get(args.id);
+        if (!incident || incident.userId !== user._id) {
+            throw new Error('Not authorized to delete this incident');
+        }
+
+        await ctx.db.delete(args.id);
+    },
+});

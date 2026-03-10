@@ -14,6 +14,9 @@ import {
     Calendar,
     Clock,
     Tag,
+    MapPin,
+    Users,
+    Baby,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -29,41 +32,81 @@ export default function NewIncidentPage() {
     const [category, setCategory] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
+    const [severity, setSeverity] = useState(2);
+    const [location, setLocation] = useState('');
+    const [witnesses, setWitnesses] = useState('');
+    const [childrenInvolved, setChildrenInvolved] = useState(false);
     const [courtSummary, setCourtSummary] = useState('');
+    const [behavioralAnalysis, setBehavioralAnalysis] = useState('');
+    const [strategicResponse, setStrategicResponse] = useState('');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+    const [isEditing, setIsEditing] = useState(false);
 
     const createIncident = useMutation(api.incidents.create);
     const confirmIncident = useMutation(api.incidents.confirm);
 
-    const handleAnalyze = () => {
+    const handleAnalyze = async () => {
         if (!narrative.trim()) return;
         setIsAnalyzing(true);
+        setAnalyzeError(null);
 
-        // Mock AI analysis (will be replaced with real OpenAI later)
-        setTimeout(() => {
-            setCourtSummary(
-                `On ${new Date(date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} at approximately ${time}, the following incident was documented:\n\n${narrative}\n\nThis incident has been recorded in a neutral, fact-based format suitable for court presentation. The event demonstrates a pattern consistent with documented co-parenting conflict behaviors.\n\nRecommendation: This incident should be preserved as part of the ongoing documentation portfolio.`
-            );
+        try {
+            const response = await fetch('/api/incidents/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    narrative: narrative.trim(),
+                    category: category || 'other',
+                    date,
+                    time,
+                }),
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || 'Analysis failed');
+            }
+
+            const data = await response.json();
+            setCourtSummary(data.courtSummary || '');
+            setBehavioralAnalysis(data.behavioralAnalysis || '');
+            setStrategicResponse(data.strategicResponse || '');
             setStep('review');
+        } catch (error) {
+            console.error('Analysis error:', error);
+            setAnalyzeError(error instanceof Error ? error.message : 'Failed to analyze incident');
+        } finally {
             setIsAnalyzing(false);
-        }, 2000);
+        }
     };
 
     const handleConfirm = async () => {
         if (!userId) return;
 
+        const witnessArr = witnesses.trim()
+            ? witnesses.split(',').map((w) => w.trim()).filter(Boolean)
+            : undefined;
+
         const incidentId = await createIncident({
             narrative,
             courtSummary,
             category: (category || 'other') as 'emotional_abuse' | 'financial_abuse' | 'parental_alienation' | 'custody_violation' | 'harassment' | 'threats' | 'manipulation' | 'neglect' | 'other',
-            severity: 2,
+            severity,
             date,
             time,
+            location: location.trim() || undefined,
+            witnesses: witnessArr,
+            childrenInvolved: childrenInvolved || undefined,
+            aiAnalysis: behavioralAnalysis || undefined,
         });
 
         await confirmIncident({ id: incidentId });
         setStep('confirmed');
     };
+
+    const severityLabels = ['Low', 'Medium', 'High'];
+    const severityColors = ['#5A9E6F', '#E5A84A', '#C75A5A'];
 
     return (
         <div className="max-w-3xl mx-auto">
@@ -152,10 +195,13 @@ export default function NewIncidentPage() {
                         <textarea
                             value={narrative}
                             onChange={(e) => setNarrative(e.target.value)}
-                            placeholder="Describe the incident with precision..."
+                            placeholder="Describe the incident with precision — what happened, who was present, what was said or done..."
                             rows={6}
                             className="input-gilded resize-none"
                         />
+                        <p className="text-xs mt-1 text-right" style={{ color: narrative.length > 4500 ? '#C75A5A' : '#5A4A30' }}>
+                            {narrative.length}/5000
+                        </p>
                     </div>
 
                     {/* Date & Time */}
@@ -171,6 +217,51 @@ export default function NewIncidentPage() {
                                 <Clock size={12} /> Time
                             </label>
                             <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="input-gilded" />
+                        </div>
+                    </div>
+
+                    {/* Severity Selector */}
+                    <div>
+                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#92783A' }}>
+                            Severity Level
+                        </label>
+                        <div className="flex gap-3">
+                            {[1, 2, 3].map((level) => (
+                                <button
+                                    key={level}
+                                    onClick={() => setSeverity(level)}
+                                    className="flex-1 py-3 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                                    style={{
+                                        background: severity === level
+                                            ? `${severityColors[level - 1]}20`
+                                            : 'rgba(42, 29, 14, 0.3)',
+                                        border: `1px solid ${severity === level
+                                            ? `${severityColors[level - 1]}50`
+                                            : 'rgba(138, 122, 96, 0.1)'}`,
+                                        color: severity === level
+                                            ? severityColors[level - 1]
+                                            : '#8A7A60',
+                                    }}
+                                >
+                                    <div className="flex items-center justify-center gap-2">
+                                        <div className="flex gap-0.5">
+                                            {[1, 2, 3].map((bar) => (
+                                                <div
+                                                    key={bar}
+                                                    className="w-1.5 h-4 rounded-sm"
+                                                    style={{
+                                                        background: bar <= level
+                                                            ? severityColors[level - 1]
+                                                            : 'rgba(138, 122, 96, 0.15)',
+                                                        opacity: severity === level ? 1 : 0.4,
+                                                    }}
+                                                />
+                                            ))}
+                                        </div>
+                                        {severityLabels[level - 1]}
+                                    </div>
+                                </button>
+                            ))}
                         </div>
                     </div>
 
@@ -197,6 +288,65 @@ export default function NewIncidentPage() {
                         </div>
                     </div>
 
+                    {/* Additional Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 flex items-center gap-2 block" style={{ color: '#92783A' }}>
+                                <MapPin size={12} /> Location (optional)
+                            </label>
+                            <input
+                                type="text"
+                                value={location}
+                                onChange={(e) => setLocation(e.target.value)}
+                                placeholder="Where did it happen?"
+                                className="input-gilded"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 flex items-center gap-2 block" style={{ color: '#92783A' }}>
+                                <Users size={12} /> Witnesses (optional)
+                            </label>
+                            <input
+                                type="text"
+                                value={witnesses}
+                                onChange={(e) => setWitnesses(e.target.value)}
+                                placeholder="Comma-separated names"
+                                className="input-gilded"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Children Involved */}
+                    <div
+                        className="flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all"
+                        style={{
+                            background: childrenInvolved ? 'rgba(229, 168, 74, 0.08)' : 'rgba(42, 29, 14, 0.3)',
+                            border: `1px solid ${childrenInvolved ? 'rgba(229, 168, 74, 0.25)' : 'rgba(138, 122, 96, 0.1)'}`,
+                        }}
+                        onClick={() => setChildrenInvolved(!childrenInvolved)}
+                    >
+                        <div
+                            className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+                            style={{
+                                background: childrenInvolved ? 'rgba(229, 168, 74, 0.25)' : 'rgba(138, 122, 96, 0.1)',
+                                border: `1px solid ${childrenInvolved ? '#E5A84A' : 'rgba(138, 122, 96, 0.2)'}`,
+                            }}
+                        >
+                            {childrenInvolved && <Check size={12} style={{ color: '#E5A84A' }} />}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Baby size={14} style={{ color: childrenInvolved ? '#E5A84A' : '#8A7A60' }} />
+                            <span className="text-sm" style={{ color: childrenInvolved ? '#E5A84A' : '#8A7A60' }}>
+                                Children were present or involved
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Error */}
+                    {analyzeError && (
+                        <p className="text-sm px-1" style={{ color: '#C75A5A' }}>{analyzeError}</p>
+                    )}
+
                     {/* Submit */}
                     <button
                         onClick={handleAnalyze}
@@ -208,7 +358,7 @@ export default function NewIncidentPage() {
                                 <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
                                     <Sparkles size={16} />
                                 </motion.div>
-                                Analyzing...
+                                Analyzing with AI...
                             </>
                         ) : (
                             <><Sparkles size={16} /> Generate Court-Ready Summary</>
@@ -220,19 +370,57 @@ export default function NewIncidentPage() {
             {/* Step: Review */}
             {step === 'review' && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                    {/* Court Summary */}
                     <div className="card-gilded p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-sm font-semibold tracking-[0.15em] uppercase" style={{ color: '#C58B07' }}>
                                 Court-Ready Summary
                             </h3>
-                            <button className="btn-ghost text-xs flex items-center gap-1">
-                                <Pencil size={12} /> Edit
+                            <button
+                                onClick={() => setIsEditing(!isEditing)}
+                                className="btn-ghost text-xs flex items-center gap-1"
+                            >
+                                <Pencil size={12} /> {isEditing ? 'Done' : 'Edit'}
                             </button>
                         </div>
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#D4C9B0' }}>
-                            {courtSummary}
-                        </p>
+                        {isEditing ? (
+                            <textarea
+                                value={courtSummary}
+                                onChange={(e) => setCourtSummary(e.target.value)}
+                                className="input-gilded resize-none w-full"
+                                rows={8}
+                            />
+                        ) : (
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#D4C9B0' }}>
+                                {courtSummary}
+                            </p>
+                        )}
                     </div>
+
+                    {/* Behavioral Analysis */}
+                    {behavioralAnalysis && (
+                        <div className="card-gilded p-6">
+                            <h3 className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2" style={{ color: '#E5A84A' }}>
+                                <Sparkles size={14} /> NPD Behavioral Analysis
+                            </h3>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#D4C9B0' }}>
+                                {behavioralAnalysis}
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Strategic Response */}
+                    {strategicResponse && (
+                        <div className="card-gilded p-6">
+                            <h3 className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2" style={{ color: '#5A9E6F' }}>
+                                <Check size={14} /> Strategic Response
+                            </h3>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#D4C9B0' }}>
+                                {strategicResponse}
+                            </p>
+                        </div>
+                    )}
+
                     <div className="flex gap-3">
                         <button onClick={() => setStep('describe')} className="btn-outline flex-1">
                             Back to Edit
@@ -264,7 +452,19 @@ export default function NewIncidentPage() {
                             <button className="btn-outline">View All Records</button>
                         </Link>
                         <button
-                            onClick={() => { setStep('describe'); setNarrative(''); setCourtSummary(''); setCategory(''); }}
+                            onClick={() => {
+                                setStep('describe');
+                                setNarrative('');
+                                setCourtSummary('');
+                                setBehavioralAnalysis('');
+                                setStrategicResponse('');
+                                setCategory('');
+                                setSeverity(2);
+                                setLocation('');
+                                setWitnesses('');
+                                setChildrenInvolved(false);
+                                setAnalyzeError(null);
+                            }}
                             className="btn-gold"
                         >
                             Log Another

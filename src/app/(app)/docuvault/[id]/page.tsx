@@ -17,6 +17,11 @@ import {
     AlertTriangle,
     Sparkles,
     Save,
+    Trash2,
+    MapPin,
+    Users,
+    Baby,
+    RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
@@ -32,6 +37,7 @@ export default function IncidentDetailPage() {
     const incident = useQuery(api.incidents.get, isValidId ? { id: incidentId } : 'skip');
     const updateIncident = useMutation(api.incidents.update);
     const confirmIncident = useMutation(api.incidents.confirm);
+    const removeIncident = useMutation(api.incidents.remove);
 
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState<{
@@ -51,6 +57,8 @@ export default function IncidentDetailPage() {
         behavioralAnalysis?: string;
         strategicResponse?: string;
     } | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     // Redirect if ID is invalid (after all hooks)
     useEffect(() => {
@@ -82,6 +90,8 @@ export default function IncidentDetailPage() {
 
     const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
     const incidentDate = new Date(incident.date);
+    const severityColors = ['#5A9E6F', '#E5A84A', '#C75A5A'];
+    const severityLabels = ['Low', 'Medium', 'High'];
 
     const startEditing = () => {
         setEditData({
@@ -169,6 +179,18 @@ export default function IncidentDetailPage() {
         }
     };
 
+    const handleDelete = async () => {
+        setIsDeleting(true);
+        try {
+            await removeIncident({ id: incidentId });
+            router.push('/docuvault');
+        } catch (error) {
+            console.error('Delete error:', error);
+            setIsDeleting(false);
+            setShowDeleteConfirm(false);
+        }
+    };
+
     return (
         <div className="max-w-3xl mx-auto">
             {/* Header */}
@@ -219,6 +241,13 @@ export default function IncidentDetailPage() {
                             )}
                         </>
                     )}
+                    <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="btn-outline text-xs flex items-center gap-1"
+                        style={{ borderColor: 'rgba(199, 90, 90, 0.2)', color: '#C75A5A' }}
+                    >
+                        <Trash2 size={12} /> Delete
+                    </button>
                 </div>
                 {saveError && (
                     <p className="text-xs mt-1" style={{ color: '#C75A5A' }}>{saveError}</p>
@@ -255,21 +284,56 @@ export default function IncidentDetailPage() {
                 <span className="badge" style={{ background: 'rgba(138, 122, 96, 0.1)', color: '#8A7A60' }}>
                     <Clock size={10} /> {incident.time}
                 </span>
-                <div className="flex gap-0.5">
-                    {[1, 2, 3].map((level) => (
-                        <div
-                            key={level}
-                            className="w-1.5 h-4 rounded-sm"
-                            style={{
-                                background:
-                                    level <= incident.severity
-                                        ? cat?.color || '#C58B07'
+                {/* Severity */}
+                <span
+                    className="badge"
+                    style={{
+                        background: `${severityColors[incident.severity - 1]}15`,
+                        color: severityColors[incident.severity - 1],
+                    }}
+                >
+                    <div className="flex gap-0.5 mr-1">
+                        {[1, 2, 3].map((level) => (
+                            <div
+                                key={level}
+                                className="w-1.5 h-3 rounded-sm"
+                                style={{
+                                    background: level <= incident.severity
+                                        ? severityColors[incident.severity - 1]
                                         : 'rgba(138, 122, 96, 0.15)',
-                            }}
-                        />
-                    ))}
-                </div>
+                                }}
+                            />
+                        ))}
+                    </div>
+                    {severityLabels[incident.severity - 1]}
+                </span>
+                {incident.childrenInvolved && (
+                    <span className="badge" style={{ background: 'rgba(229, 168, 74, 0.12)', color: '#E5A84A' }}>
+                        <Baby size={10} /> Children Involved
+                    </span>
+                )}
             </motion.div>
+
+            {/* Location & Witnesses (if present) */}
+            {(incident.location || (incident.witnesses && incident.witnesses.length > 0)) && (
+                <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.12 }}
+                    className="flex flex-wrap gap-4 mb-6"
+                >
+                    {incident.location && (
+                        <div className="flex items-center gap-2 text-xs" style={{ color: '#8A7A60' }}>
+                            <MapPin size={12} /> {incident.location}
+                        </div>
+                    )}
+                    {incident.witnesses && incident.witnesses.length > 0 && (
+                        <div className="flex items-center gap-2 text-xs" style={{ color: '#8A7A60' }}>
+                            <Users size={12} /> Witnesses: {incident.witnesses.join(', ')}
+                        </div>
+                    )}
+                </motion.div>
+            )}
 
             {/* Narrative */}
             <motion.div
@@ -315,14 +379,24 @@ export default function IncidentDetailPage() {
                     >
                         <Shield size={14} /> Court-Ready Summary
                     </h3>
-                    {!incident.courtSummary && !isAnalyzing && (
-                        <button
-                            onClick={handleAnalyze}
-                            className="btn-outline text-xs flex items-center gap-1"
-                        >
-                            <Sparkles size={12} /> Generate with AI
-                        </button>
-                    )}
+                    <div className="flex gap-2">
+                        {incident.courtSummary && !isAnalyzing && (
+                            <button
+                                onClick={handleAnalyze}
+                                className="btn-ghost text-xs flex items-center gap-1"
+                            >
+                                <RefreshCw size={12} /> Re-generate
+                            </button>
+                        )}
+                        {!incident.courtSummary && !isAnalyzing && (
+                            <button
+                                onClick={handleAnalyze}
+                                className="btn-outline text-xs flex items-center gap-1"
+                            >
+                                <Sparkles size={12} /> Generate with AI
+                            </button>
+                        )}
+                    </div>
                 </div>
                 {isAnalyzing ? (
                     <div className="flex items-center gap-3 py-4">
@@ -440,6 +514,51 @@ export default function IncidentDetailPage() {
                     )}
                 </>
             )}
-        </div >
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteConfirm && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="fixed inset-0 z-50 flex items-center justify-center"
+                    style={{ background: 'rgba(2, 2, 45, 0.8)' }}
+                    onClick={() => !isDeleting && setShowDeleteConfirm(false)}
+                >
+                    <motion.div
+                        initial={{ scale: 0.95 }}
+                        animate={{ scale: 1 }}
+                        className="card-gilded p-6 max-w-sm mx-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center gap-3 mb-4">
+                            <div
+                                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                                style={{ background: 'rgba(199, 90, 90, 0.12)', border: '1px solid rgba(199, 90, 90, 0.25)' }}
+                            >
+                                <AlertTriangle size={18} style={{ color: '#C75A5A' }} />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-semibold" style={{ color: '#F5EFE0' }}>Delete Incident</h3>
+                                <p className="text-xs" style={{ color: '#8A7A60' }}>This action cannot be undone.</p>
+                            </div>
+                        </div>
+                        <p className="text-sm mb-5" style={{ color: '#B8A88A' }}>
+                            Are you sure you want to permanently delete this incident record?
+                        </p>
+                        <div className="flex gap-3">
+                            <button onClick={() => setShowDeleteConfirm(false)} disabled={isDeleting} className="btn-outline flex-1">Cancel</button>
+                            <button
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                                className="flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all"
+                                style={{ background: 'rgba(199, 90, 90, 0.15)', border: '1px solid rgba(199, 90, 90, 0.3)', color: '#C75A5A' }}
+                            >
+                                {isDeleting ? 'Deleting...' : 'Delete'}
+                            </button>
+                        </div>
+                    </motion.div>
+                </motion.div>
+            )}
+        </div>
     );
 }

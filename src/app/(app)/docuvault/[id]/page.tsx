@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
 import { Id } from '../../../../../convex/_generated/dataModel';
@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 export default function IncidentDetailPage() {
     const params = useParams();
@@ -297,11 +298,11 @@ export default function IncidentDetailPage() {
                                 color: severityColors[sev - 1],
                             }}
                         >
-                            <div className="flex gap-0.5 mr-1">
+                            <span className="flex gap-0.5 mr-1" aria-hidden="true">
                                 {[1, 2, 3].map((level) => (
-                                    <div
+                                    <span
                                         key={level}
-                                        className="w-1.5 h-3 rounded-sm"
+                                        className="w-1.5 h-3 rounded-sm inline-block"
                                         style={{
                                             background: level <= sev
                                                 ? severityColors[sev - 1]
@@ -309,7 +310,7 @@ export default function IncidentDetailPage() {
                                         }}
                                     />
                                 ))}
-                            </div>
+                            </span>
                             {severityLabels[sev - 1]}
                         </span>
                     );
@@ -523,17 +524,50 @@ export default function IncidentDetailPage() {
             )}
 
             {/* Delete Confirmation Modal */}
-            <AnimatePresence>
-            {showDeleteConfirm && (
+            <DeleteConfirmModal
+                isOpen={showDeleteConfirm}
+                isDeleting={isDeleting}
+                deleteError={deleteError}
+                onClose={() => { if (!isDeleting) { setShowDeleteConfirm(false); setDeleteError(null); } }}
+                onDelete={handleDelete}
+            />
+        </div>
+    );
+}
+
+/** Extracted modal component so the focus trap hook can run at the top level. */
+function DeleteConfirmModal({
+    isOpen,
+    isDeleting,
+    deleteError,
+    onClose,
+    onDelete,
+}: {
+    isOpen: boolean;
+    isDeleting: boolean;
+    deleteError: string | null;
+    onClose: () => void;
+    onDelete: () => void;
+}) {
+    const handleClose = useCallback(() => {
+        if (!isDeleting) onClose();
+    }, [isDeleting, onClose]);
+
+    const dialogRef = useFocusTrap(isOpen, handleClose);
+
+    return (
+        <AnimatePresence>
+            {isOpen && (
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     className="fixed inset-0 z-50 flex items-center justify-center"
                     style={{ background: 'rgba(2, 2, 45, 0.8)' }}
-                    onClick={() => !isDeleting && setShowDeleteConfirm(false)}
+                    onClick={handleClose}
                 >
                     <motion.div
+                        ref={dialogRef}
                         initial={{ scale: 0.95, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0.95, opacity: 0 }}
@@ -562,9 +596,9 @@ export default function IncidentDetailPage() {
                             <p className="text-xs mb-3" style={{ color: '#C75A5A' }}>{deleteError}</p>
                         )}
                         <div className="flex gap-3">
-                            <button onClick={() => { setShowDeleteConfirm(false); setDeleteError(null); }} disabled={isDeleting} className="btn-outline flex-1">Cancel</button>
+                            <button onClick={handleClose} disabled={isDeleting} className="btn-outline flex-1">Cancel</button>
                             <button
-                                onClick={handleDelete}
+                                onClick={onDelete}
                                 disabled={isDeleting}
                                 className="flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all"
                                 style={{ background: 'rgba(199, 90, 90, 0.15)', border: '1px solid rgba(199, 90, 90, 0.3)', color: '#C75A5A' }}
@@ -575,7 +609,6 @@ export default function IncidentDetailPage() {
                     </motion.div>
                 </motion.div>
             )}
-            </AnimatePresence>
-        </div>
+        </AnimatePresence>
     );
 }

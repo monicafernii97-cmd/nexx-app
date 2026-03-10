@@ -73,16 +73,21 @@ export function detectLegalTopic(message: string): boolean {
 // ── Tavily Search ────────────────────────────────────────────────────────────
 
 /**
- * Lazily initialised Tavily client.
+ * Lazily initialised Tavily client (singleton).
  * Returns null if the API key is not configured (graceful degradation).
  */
+let cachedTavilyClient: ReturnType<typeof tavily> | null = null;
+
 function getTavilyClient() {
+    if (cachedTavilyClient) return cachedTavilyClient;
+
     const apiKey = process.env.TAVILY_API_KEY;
     if (!apiKey) {
         console.warn('[legal/search] TAVILY_API_KEY is not set — statute search disabled.');
         return null;
     }
-    return tavily({ apiKey });
+    cachedTavilyClient = tavily({ apiKey });
+    return cachedTavilyClient;
 }
 
 /**

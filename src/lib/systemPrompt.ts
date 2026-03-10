@@ -101,6 +101,22 @@ function sanitizeForPrompt(value: string, maxLength = 200): string {
         .trim();
 }
 
+/**
+ * Validate and sanitize a URL from external sources (e.g. Tavily).
+ * Only allows http/https protocols. Returns empty string for invalid URLs.
+ */
+function sanitizeUrl(url: string, maxLength = 500): string {
+    try {
+        const parsed = new URL(url);
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+            return '';
+        }
+        return url.slice(0, maxLength);
+    } catch {
+        return '';
+    }
+}
+
 // ── Allow-lists for prompt-safe enumerated values ──
 const ALLOWED_TONES = new Set(['direct', 'gentle', 'strategic', 'clinical']);
 const ALLOWED_EMOTIONAL_STATES = new Set(['calm', 'anxious', 'angry', 'overwhelmed', 'numb']);
@@ -305,13 +321,17 @@ export function buildSystemPrompt(context?: {
 
         // ── Append verified legal references from Tavily ──
         if (context.legalContext && context.legalContext.length > 0) {
-            const lawSection = context.legalContext.map((result) => {
-                const title = sanitizeForPrompt(result.title, 200);
-                const snippet = sanitizeForPrompt(result.snippet, 500);
-                return `### ${title}\n"${snippet}"\n📎 ${result.url}`;
-            }).join('\n\n');
+            const lawSection = context.legalContext
+                .filter((result) => sanitizeUrl(result.url))
+                .map((result) => {
+                    const title = sanitizeForPrompt(result.title, 200);
+                    const snippet = sanitizeForPrompt(result.snippet, 500);
+                    return `### ${title}\n"${snippet}"\n📎 ${sanitizeUrl(result.url)}`;
+                }).join('\n\n');
 
-            prompt += `\n\n## APPLICABLE LAW\nThe following are verified legal references for the user's jurisdiction.\nCite these when relevant. Always include the 📎 source URL so the user can verify.\nIf the user's question requires statutes not listed here, state that you cannot\nconfirm the exact citation and recommend they verify with their attorney or\nsearch their state's official statute website.\n\n${lawSection}`;
+            if (lawSection) {
+                prompt += `\n\n## APPLICABLE LAW\nThe following are verified legal references for the user's jurisdiction.\nCite these when relevant. Always include the 📎 source URL so the user can verify.\nIf the user's question requires statutes not listed here, state that you cannot\nconfirm the exact citation and recommend they verify with their attorney or\nsearch their state's official statute website.\n\n${lawSection}`;
+            }
         }
     }
 

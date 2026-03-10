@@ -38,15 +38,25 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Legal statute search (server-side, before OpenAI) ──
+        // Wrapped in a 3s timeout to prevent slow Tavily responses from stalling chat.
         let legalContext: LegalSearchResult[] | undefined;
         const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
 
         if (lastUserMessage && detectLegalTopic(lastUserMessage.content) && userContext?.state) {
-            legalContext = await searchStatutes(
+            const LEGAL_SEARCH_TIMEOUT_MS = 3000;
+            const searchPromise = searchStatutes(
                 userContext.state,
                 lastUserMessage.content,
                 userContext.county
             );
+            const timeoutPromise = new Promise<LegalSearchResult[]>((resolve) =>
+                setTimeout(() => {
+                    console.warn('[chat] Tavily search timed out — proceeding without citations');
+                    resolve([]);
+                }, LEGAL_SEARCH_TIMEOUT_MS)
+            );
+            const results = await Promise.race([searchPromise, timeoutPromise]);
+            legalContext = results.length > 0 ? results : undefined;
         }
 
         // Build context-enriched system prompt (now with legal citations when available)

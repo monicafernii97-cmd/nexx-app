@@ -2,15 +2,27 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { useAuth } from '@clerk/nextjs';
-import { useQuery } from 'convex/react';
-import { useConvexAuth } from 'convex/react';
+import { useAuth, useClerk } from '@clerk/nextjs';
+import { useQuery, useConvexAuth } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
+/**
+ * Welcome / landing page and auth-aware router.
+ *
+ * - Unauthenticated visitors see the branded welcome page with sign-in/up CTAs.
+ * - Authenticated users are redirected based on their Convex user record:
+ *   - `onboardingComplete === true` → `/dashboard`
+ *   - Otherwise → `/onboarding`
+ *
+ * Uses `useConvexAuth()` to wait for the Clerk JWT to sync to Convex before
+ * querying `users.me`, preventing a race condition where Clerk reports
+ * `isSignedIn` before Convex has the auth token.
+ */
 export default function WelcomePage() {
   const { isSignedIn, isLoaded: clerkLoaded } = useAuth();
+  const { signOut } = useClerk();
   // useConvexAuth waits for the Clerk JWT to be synced to Convex.
   // This prevents a race where Clerk says "signed in" but Convex
   // hasn't received the token yet, causing users.me to return null.
@@ -23,6 +35,9 @@ export default function WelcomePage() {
     convexReady ? {} : 'skip'
   );
 
+  // Terminal state: Clerk is signed in but Convex auth failed to sync
+  const convexAuthFailed = clerkLoaded && isSignedIn && !convexLoading && !convexReady;
+
   // Smart redirect for returning users
   useEffect(() => {
     if (!clerkLoaded) return;
@@ -30,6 +45,10 @@ export default function WelcomePage() {
 
     // Wait for Convex auth to sync before making routing decisions
     if (convexLoading) return;
+
+    // If Convex auth settled as unauthenticated, don't route — the
+    // error UI below will handle this terminal state.
+    if (!convexReady) return;
 
     // Signed in + Convex ready — wait for user data to load
     if (currentUser === undefined) return; // Still loading
@@ -44,7 +63,42 @@ export default function WelcomePage() {
       // Has account but hasn't finished onboarding
       router.replace('/onboarding');
     }
-  }, [clerkLoaded, isSignedIn, convexLoading, currentUser, router]);
+  }, [clerkLoaded, isSignedIn, convexLoading, convexReady, currentUser, router]);
+
+  // Terminal auth error: Clerk signed in but Convex token sync failed
+  if (convexAuthFailed) {
+    return (
+      <div className="silk-bg min-h-screen flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center max-w-sm px-6"
+        >
+          <div
+            className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
+            style={{
+              background: 'rgba(199, 90, 90, 0.15)',
+              border: '1px solid rgba(199, 90, 90, 0.3)',
+            }}
+          >
+            <span className="text-lg" style={{ color: '#C75A5A' }}>!</span>
+          </div>
+          <p className="text-sm font-semibold mb-2" style={{ color: '#F5EFE0' }}>
+            Connection issue
+          </p>
+          <p className="text-xs mb-5" style={{ color: '#8A7A60' }}>
+            We couldn&apos;t sync your session. Please try signing in again.
+          </p>
+          <button
+            onClick={() => signOut({ redirectUrl: '/' })}
+            className="btn-outline text-xs"
+          >
+            Sign in again
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   // Show loading state while checking auth
   if (!clerkLoaded || convexLoading || (isSignedIn && currentUser === undefined)) {
@@ -69,6 +123,7 @@ export default function WelcomePage() {
       </div>
     );
   }
+
 
   // Only render welcome page for unauthenticated users
   return (

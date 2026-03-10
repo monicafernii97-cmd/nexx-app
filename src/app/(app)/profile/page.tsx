@@ -257,7 +257,7 @@ export default function ProfilePage() {
                                                 type="number"
                                                 min={0}
                                                 max={18}
-                                                value={form.childrenAges[i] || ''}
+                                                value={form.childrenAges[i] ?? ''}
                                                 onChange={(e) => updateChildAge(i, parseInt(e.target.value) || 0)}
                                                 placeholder="Age"
                                             />

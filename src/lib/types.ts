@@ -26,16 +26,3 @@ export interface UserContext {
     /** When true, full PII (children names, case numbers) is included in the prompt for drafting flows */
     isDraftingMode?: boolean;
 }
-
-/** A single legal statute search result from Tavily */
-export interface LegalSearchResult {
-    title: string;
-    url: string;
-    snippet: string;
-}
-
-/** Extended context passed to buildSystemPrompt — composes UserContext with server-side fields */
-export interface BuildSystemPromptContext extends UserContext {
-    conversationMode?: string;
-    legalContext?: LegalSearchResult[];
-}

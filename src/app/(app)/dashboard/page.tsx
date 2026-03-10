@@ -48,7 +48,7 @@ export default function DashboardPage() {
         return 'Good evening';
     };
 
-    const userName = user?.name && user.name !== 'Guest' ? `, ${user.name}` : '';
+    const userName = user?.name ? `, ${user.name}` : '';
 
     return (
         <div className="max-w-6xl mx-auto">

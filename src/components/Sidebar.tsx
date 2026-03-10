@@ -14,10 +14,11 @@ import {
     Settings,
     ChevronLeft,
     ChevronRight,
-    LogOut,
-    User,
+    LogIn,
 } from 'lucide-react';
 import { useState } from 'react';
+import { UserButton, useUser } from '@clerk/nextjs';
+import { nexxClerkAppearance } from '@/lib/clerk-theme';
 
 const navItems = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -33,6 +34,7 @@ const navItems = [
 export default function Sidebar() {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
+    const { user, isLoaded } = useUser();
 
     return (
         <motion.aside
@@ -121,34 +123,73 @@ export default function Sidebar() {
             {/* User Section */}
             <div className="px-3 pb-4 space-y-2">
                 <div className="gold-divider mb-3" />
-                <div
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(65,105,225,0.06)] ${collapsed ? 'justify-center' : ''
-                        }`}
-                >
+
+                {isLoaded && user ? (
+                    /* ─── Authenticated: Clerk UserButton + user info ─── */
                     <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ background: 'rgba(197, 139, 7, 0.1)', border: '1px solid rgba(197, 139, 7, 0.25)' }}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-[rgba(197,139,7,0.06)] ${collapsed ? 'justify-center' : ''
+                            }`}
                     >
-                        <User size={16} style={{ color: '#C58B07' }} />
+                        <UserButton
+                            appearance={{
+                                ...nexxClerkAppearance,
+                                elements: {
+                                    ...nexxClerkAppearance.elements,
+                                    userButtonAvatarBox: {
+                                        width: 32,
+                                        height: 32,
+                                    },
+                                },
+                            }}
+                        />
+
+                        <AnimatePresence>
+                            {!collapsed && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="flex-1 min-w-0"
+                                >
+                                    <p className="text-sm font-medium truncate" style={{ color: '#F5EFE0' }}>
+                                        {user.firstName || user.fullName || 'User'}
+                                    </p>
+                                    <p className="text-xs truncate" style={{ color: '#8A7A60' }}>
+                                        {user.primaryEmailAddress?.emailAddress || 'Manage Account'}
+                                    </p>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
-                    <AnimatePresence>
-                        {!collapsed && (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="flex-1 min-w-0"
+                ) : isLoaded && !user ? (
+                    /* ─── Not authenticated: Sign In link ─── */
+                    <Link href="/sign-in" className="no-underline">
+                        <div
+                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(197,139,7,0.06)] ${collapsed ? 'justify-center' : ''
+                                }`}
+                        >
+                            <div
+                                className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                                style={{ background: 'rgba(197, 139, 7, 0.1)', border: '1px solid rgba(197, 139, 7, 0.25)' }}
                             >
-                                <p className="text-sm font-medium truncate" style={{ color: '#E0F2F7' }}>
-                                    Guest User
-                                </p>
-                                <p className="text-xs truncate" style={{ color: '#6A8BAA' }}>
-                                    Free Plan
-                                </p>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
+                                <LogIn size={16} style={{ color: '#C58B07' }} />
+                            </div>
+                            <AnimatePresence>
+                                {!collapsed && (
+                                    <motion.span
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        className="text-sm font-medium"
+                                        style={{ color: '#C58B07' }}
+                                    >
+                                        Sign In
+                                    </motion.span>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </Link>
+                ) : null}
             </div>
 
             {/* Collapse Toggle */}

@@ -7,6 +7,9 @@ import { useEffect, useRef, useCallback } from 'react';
  * - Traps Tab / Shift+Tab within focusable elements
  * - Closes on Escape (if onClose provided)
  * - Restores focus to the previously-focused element on unmount
+ *
+ * @note The element receiving the returned ref should have `tabIndex={-1}`
+ * to enable the fallback focus behavior when no focusable children exist.
  */
 export function useFocusTrap(
     isOpen: boolean,

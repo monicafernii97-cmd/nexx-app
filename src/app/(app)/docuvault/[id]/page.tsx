@@ -1,7 +1,7 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
 import { Id } from '../../../../../convex/_generated/dataModel';
@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
-import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 
 export default function IncidentDetailPage() {
     const params = useParams();
@@ -524,91 +524,14 @@ export default function IncidentDetailPage() {
             )}
 
             {/* Delete Confirmation Modal */}
-            <DeleteConfirmModal
+            <ConfirmDeleteModal
                 isOpen={showDeleteConfirm}
                 isDeleting={isDeleting}
                 deleteError={deleteError}
                 onClose={() => { if (!isDeleting) { setShowDeleteConfirm(false); setDeleteError(null); } }}
                 onDelete={handleDelete}
+                dialogTitleId="delete-dialog-title"
             />
         </div>
-    );
-}
-
-/** Extracted modal component so the focus trap hook can run at the top level. */
-function DeleteConfirmModal({
-    isOpen,
-    isDeleting,
-    deleteError,
-    onClose,
-    onDelete,
-}: {
-    isOpen: boolean;
-    isDeleting: boolean;
-    deleteError: string | null;
-    onClose: () => void;
-    onDelete: () => void;
-}) {
-    const handleClose = useCallback(() => {
-        if (!isDeleting) onClose();
-    }, [isDeleting, onClose]);
-
-    const dialogRef = useFocusTrap(isOpen, handleClose);
-
-    return (
-        <AnimatePresence>
-            {isOpen && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-50 flex items-center justify-center"
-                    style={{ background: 'rgba(2, 2, 45, 0.8)' }}
-                    onClick={handleClose}
-                >
-                    <motion.div
-                        ref={dialogRef}
-                        initial={{ scale: 0.95, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.95, opacity: 0 }}
-                        className="card-gilded p-6 max-w-sm mx-4"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="delete-dialog-title"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex items-center gap-3 mb-4">
-                            <div
-                                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                                style={{ background: 'rgba(199, 90, 90, 0.12)', border: '1px solid rgba(199, 90, 90, 0.25)' }}
-                            >
-                                <AlertTriangle size={18} style={{ color: '#C75A5A' }} />
-                            </div>
-                            <div>
-                                <h3 id="delete-dialog-title" className="text-sm font-semibold" style={{ color: '#F5EFE0' }}>Delete Incident</h3>
-                                <p className="text-xs" style={{ color: '#8A7A60' }}>This action cannot be undone.</p>
-                            </div>
-                        </div>
-                        <p className="text-sm mb-5" style={{ color: '#B8A88A' }}>
-                            Are you sure you want to permanently delete this incident record?
-                        </p>
-                        {deleteError && (
-                            <p className="text-xs mb-3" style={{ color: '#C75A5A' }}>{deleteError}</p>
-                        )}
-                        <div className="flex gap-3">
-                            <button onClick={handleClose} disabled={isDeleting} className="btn-outline flex-1">Cancel</button>
-                            <button
-                                onClick={onDelete}
-                                disabled={isDeleting}
-                                className="flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all"
-                                style={{ background: 'rgba(199, 90, 90, 0.15)', border: '1px solid rgba(199, 90, 90, 0.3)', color: '#C75A5A' }}
-                            >
-                                {isDeleting ? 'Deleting...' : 'Delete'}
-                            </button>
-                        </div>
-                    </motion.div>
-                </motion.div>
-            )}
-        </AnimatePresence>
     );
 }

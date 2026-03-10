@@ -1,7 +1,7 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { useState } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { Id } from '../../../../convex/_generated/dataModel';
@@ -12,12 +12,10 @@ import {
     Search,
     Clock,
     Trash2,
-    X,
-    AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
-import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 
 export default function DocuVaultPage() {
     const { userId } = useUser();
@@ -259,113 +257,17 @@ export default function DocuVaultPage() {
             </div>
 
             {/* Delete Confirmation Modal */}
-            <ListDeleteModal
+            <ConfirmDeleteModal
                 isOpen={!!deleteId}
                 isDeleting={isDeleting}
                 deleteError={deleteError}
                 onClose={() => { if (!isDeleting) { setDeleteId(null); setDeleteError(null); } }}
                 onDelete={handleDelete}
+                description="Are you sure you want to permanently delete this incident record? All associated analysis and court summaries will be lost."
+                confirmLabel="Delete Permanently"
+                showCloseButton
+                dialogTitleId="list-delete-dialog-title"
             />
         </div>
-    );
-}
-
-/** Extracted modal for the focus trap hook. */
-function ListDeleteModal({
-    isOpen,
-    isDeleting,
-    deleteError,
-    onClose,
-    onDelete,
-}: {
-    isOpen: boolean;
-    isDeleting: boolean;
-    deleteError: string | null;
-    onClose: () => void;
-    onDelete: () => void;
-}) {
-    const handleClose = useCallback(() => {
-        if (!isDeleting) onClose();
-    }, [isDeleting, onClose]);
-
-    const dialogRef = useFocusTrap(isOpen, handleClose);
-
-    return (
-        <AnimatePresence>
-            {isOpen && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-50 flex items-center justify-center"
-                    style={{ background: 'rgba(2, 2, 45, 0.8)' }}
-                    onClick={handleClose}
-                >
-                    <motion.div
-                        ref={dialogRef}
-                        initial={{ scale: 0.95, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.95, opacity: 0 }}
-                        className="card-gilded p-6 max-w-sm mx-4"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="list-delete-dialog-title"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex items-center gap-3 mb-4">
-                            <div
-                                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                                style={{ background: 'rgba(199, 90, 90, 0.12)', border: '1px solid rgba(199, 90, 90, 0.25)' }}
-                            >
-                                <AlertTriangle size={18} style={{ color: '#C75A5A' }} />
-                            </div>
-                            <div>
-                                <h3 id="list-delete-dialog-title" className="text-sm font-semibold" style={{ color: '#F5EFE0' }}>
-                                    Delete Incident
-                                </h3>
-                                <p className="text-xs" style={{ color: '#8A7A60' }}>
-                                    This action cannot be undone.
-                                </p>
-                            </div>
-                            <button
-                                onClick={handleClose}
-                                className="ml-auto p-1 rounded-lg hover:bg-[rgba(138,122,96,0.1)]"
-                                disabled={isDeleting}
-                                aria-label="Close"
-                            >
-                                <X size={14} style={{ color: '#8A7A60' }} />
-                            </button>
-                        </div>
-                        <p className="text-sm mb-5" style={{ color: '#B8A88A' }}>
-                            Are you sure you want to permanently delete this incident record? All associated analysis and court summaries will be lost.
-                        </p>
-                        {deleteError && (
-                            <p className="text-xs mb-3" style={{ color: '#C75A5A' }}>{deleteError}</p>
-                        )}
-                        <div className="flex gap-3">
-                            <button
-                                onClick={handleClose}
-                                disabled={isDeleting}
-                                className="btn-outline flex-1"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={onDelete}
-                                disabled={isDeleting}
-                                className="flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all"
-                                style={{
-                                    background: 'rgba(199, 90, 90, 0.15)',
-                                    border: '1px solid rgba(199, 90, 90, 0.3)',
-                                    color: '#C75A5A',
-                                }}
-                            >
-                                {isDeleting ? 'Deleting...' : 'Delete Permanently'}
-                            </button>
-                        </div>
-                    </motion.div>
-                </motion.div>
-            )}
-        </AnimatePresence>
     );
 }

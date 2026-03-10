@@ -61,6 +61,12 @@ const LEGAL_PATTERN = new RegExp(
     'i'
 );
 
+/** Global-match version of the same regex for keyword extraction */
+const LEGAL_PATTERN_GLOBAL = new RegExp(
+    LEGAL_KEYWORDS.map((kw) => kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
+    'gi'
+);
+
 /**
  * Detects whether a message contains family law topics.
  * Simple keyword heuristic — no AI call needed.
@@ -68,6 +74,23 @@ const LEGAL_PATTERN = new RegExp(
 export function detectLegalTopic(message: string): boolean {
     if (!message || typeof message !== 'string') return false;
     return LEGAL_PATTERN.test(message);
+}
+
+/**
+ * Extract only the legal keywords from a user message to build a privacy-safe
+ * search query. This prevents PII (names, case numbers, addresses) from being
+ * sent to the third-party Tavily API.
+ *
+ * Example: "My ex John Smith filed a motion for custody modification in case 24-CV-1234"
+ *       → "motion custody modification"
+ */
+export function extractLegalQuery(message: string): string {
+    if (!message || typeof message !== 'string') return '';
+    const matches = message.match(LEGAL_PATTERN_GLOBAL);
+    if (!matches || matches.length === 0) return '';
+    // Deduplicate (case-insensitive) and join
+    const unique = [...new Set(matches.map((m) => m.toLowerCase()))];
+    return unique.join(' ');
 }
 
 // ── Tavily Search ────────────────────────────────────────────────────────────

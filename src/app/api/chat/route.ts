@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { getOpenAI } from '@/lib/openai';
 import { buildSystemPrompt } from '@/lib/systemPrompt';
 import type { UserContext, LegalSearchResult } from '@/lib/types';
-import { detectLegalTopic, searchStatutes } from '@/lib/legal/search';
+import { detectLegalTopic, extractLegalQuery, searchStatutes } from '@/lib/legal/search';
 
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_MESSAGES = 50;
@@ -39,29 +39,34 @@ export async function POST(req: NextRequest) {
 
         // ── Legal statute search (server-side, before OpenAI) ──
         // Uses AbortController to cancel the request after 3s if Tavily is slow.
+        // PRIVACY: Only extracted legal keywords are sent to Tavily, never raw user text.
         let legalContext: LegalSearchResult[] | undefined;
         const lastUserMessage = messages.findLast((m) => m.role === 'user');
 
         if (lastUserMessage && detectLegalTopic(lastUserMessage.content) && userContext?.state) {
-            const LEGAL_SEARCH_TIMEOUT_MS = 3000;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => {
-                controller.abort();
-                console.warn('[chat] Tavily search timed out — proceeding without citations');
-            }, LEGAL_SEARCH_TIMEOUT_MS);
+            const legalQuery = extractLegalQuery(lastUserMessage.content);
 
-            try {
-                const results = await searchStatutes(
-                    userContext.state,
-                    lastUserMessage.content,
-                    userContext.county,
-                    controller.signal
-                );
-                legalContext = results.length > 0 ? results : undefined;
-            } catch (e) {
-                if (e instanceof Error && e.name !== 'AbortError') throw e;
-            } finally {
-                clearTimeout(timeoutId);
+            if (legalQuery) {
+                const LEGAL_SEARCH_TIMEOUT_MS = 3000;
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => {
+                    controller.abort();
+                    console.warn('[chat] Tavily search timed out — proceeding without citations');
+                }, LEGAL_SEARCH_TIMEOUT_MS);
+
+                try {
+                    const results = await searchStatutes(
+                        userContext.state,
+                        legalQuery,
+                        userContext.county,
+                        controller.signal
+                    );
+                    legalContext = results.length > 0 ? results : undefined;
+                } catch (e) {
+                    if (e instanceof Error && e.name !== 'AbortError') throw e;
+                } finally {
+                    clearTimeout(timeoutId);
+                }
             }
         }
 

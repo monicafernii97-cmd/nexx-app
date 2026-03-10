@@ -162,14 +162,14 @@ export default function OnboardingPage() {
                 // Update user profile with onboarding data
                 // Convert childrenAges string to number array
                 const parsedAges = formData.childrenAges
-                    ? formData.childrenAges.split(',').map((a) => parseInt(a.trim())).filter((n) => !isNaN(n))
+                    ? formData.childrenAges.split(',').map((a) => parseInt(a.trim(), 10)).filter((n) => !isNaN(n))
                     : undefined;
 
                 // Map custodyType display values to schema enum
-                const custodyMap: Record<string, 'sole' | 'joint' | 'split' | 'none' | 'pending'> = {
+                const custodyMap: Record<string, 'sole' | 'joint' | 'split' | 'visitation' | 'none' | 'pending'> = {
                     'Joint / Shared Custody': 'joint',
                     'Sole Custody': 'sole',
-                    'Visitation Only': 'split',
+                    'Visitation Only': 'visitation',
                     'No Order Yet': 'pending',
                     'Other': 'none',
                 };
@@ -179,7 +179,7 @@ export default function OnboardingPage() {
                     name: formData.name || undefined,
                     state: formData.state || undefined,
                     county: formData.county || undefined,
-                    childrenCount: formData.childrenCount ? parseInt(formData.childrenCount) : undefined,
+                    childrenCount: formData.childrenCount ? parseInt(formData.childrenCount, 10) : undefined,
                     childrenAges: parsedAges && parsedAges.length > 0 ? parsedAges : undefined,
                     custodyType: formData.custodyType ? custodyMap[formData.custodyType] ?? undefined : undefined,
                     hasAttorney: formData.hasAttorney ? formData.hasAttorney === 'Yes' : undefined,
@@ -197,7 +197,7 @@ export default function OnboardingPage() {
                 // Mark onboarding complete
                 await completeOnboarding({ id: userId });
 
-                router.push('/dashboard');
+                router.replace('/dashboard');
             } catch (error: unknown) {
                 const message = error instanceof Error ? error.message : String(error);
                 console.error('Failed to save onboarding data:', error);

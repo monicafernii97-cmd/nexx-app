@@ -32,7 +32,7 @@ const EMOTIONAL_STATES = [
     { value: 'numb', label: 'Numb', emoji: '😶' },
 ] as const;
 
-type CustodyType = 'sole' | 'joint' | 'split' | 'none' | 'pending' | '';
+type CustodyType = 'sole' | 'joint' | 'split' | 'visitation' | 'none' | 'pending' | '';
 type CourtStatus = 'pending' | 'active' | 'closed' | 'none' | '';
 type TonePreference = 'direct' | 'gentle' | 'strategic' | 'clinical' | '';
 type EmotionalState = 'calm' | 'anxious' | 'angry' | 'overwhelmed' | 'numb' | '';
@@ -292,6 +292,7 @@ export default function ProfilePage() {
                                     <option value="sole">Sole Custody</option>
                                     <option value="joint">Joint Custody</option>
                                     <option value="split">Split Custody</option>
+                                    <option value="visitation">Visitation Only</option>
                                     <option value="pending">Pending</option>
                                     <option value="none">No Custody Order</option>
                                 </select>

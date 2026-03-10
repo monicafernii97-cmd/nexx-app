@@ -101,10 +101,6 @@ function sanitizeForPrompt(value: string, maxLength = 200): string {
         .trim();
 }
 
-// ── Allow-lists for prompt-safe enumerated values ──
-const ALLOWED_TONES = new Set(['direct', 'gentle', 'strategic', 'clinical']);
-const ALLOWED_EMOTIONAL_STATES = new Set(['calm', 'anxious', 'angry', 'overwhelmed', 'numb']);
-
 /**
  * Validate and sanitize a URL from external sources (e.g. Tavily).
  * Only allows http/https protocols. Returns empty string for invalid URLs.
@@ -128,32 +124,7 @@ const ALLOWED_EMOTIONAL_STATES = new Set(['calm', 'anxious', 'angry', 'overwhelm
 /**
  * Build a system prompt enriched with user context
  */
-export function buildSystemPrompt(context?: {
-    userName?: string;
-    state?: string;
-    county?: string;
-    custodyType?: string;
-    nexBehaviors?: string[];
-    conversationMode?: string;
-    // New personalization fields
-    tonePreference?: string;
-    emotionalState?: string;
-    childrenNames?: string[];
-    childrenAges?: number[];
-    courtCaseNumber?: string;
-    hasAttorney?: boolean;
-    hasTherapist?: boolean;
-    // NEX profile data
-    nexNickname?: string;
-    nexCommunicationStyle?: string;
-    nexManipulationTactics?: string[];
-    nexTriggerPatterns?: string[];
-    nexAiInsights?: string;
-    nexDangerLevel?: number;
-    nexDetectedPatterns?: string[];
-    // Flow flags
-    isDraftingMode?: boolean;
-}): string {
+export function buildSystemPrompt(context?: BuildSystemPromptContext): string {
     let prompt = NEXX_SYSTEM_PROMPT;
 
     if (context) {
@@ -194,7 +165,12 @@ export function buildSystemPrompt(context?: {
                 parts.push(`Their children (initials): ${childInfo.join(', ')}. Refer to children generically unless the user uses their names first.`);
             }
         } else if (context.childrenAges && context.childrenAges.length > 0) {
-            parts.push(`They have ${context.childrenAges.length} child(ren), ages: ${context.childrenAges.join(', ')}.`);
+            const validAges = context.childrenAges
+                .slice(0, 10)
+                .filter(age => Number.isFinite(age) && age >= 0 && age <= 25);
+            if (validAges.length > 0) {
+                parts.push(`They have ${validAges.length} child(ren), ages: ${validAges.join(', ')}.`);
+            }
         }
 
         // ── Legal Context ──

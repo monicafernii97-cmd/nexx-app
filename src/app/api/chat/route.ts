@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { getOpenAI } from '@/lib/openai';
 import { buildSystemPrompt } from '@/lib/systemPrompt';
-import { UserContext } from '@/lib/types';
+import type { UserContext, LegalSearchResult } from '@/lib/types';
+import { detectLegalTopic, extractLegalQuery, searchStatutes } from '@/lib/legal/search';
 
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_MESSAGES = 50;

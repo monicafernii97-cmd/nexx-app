@@ -165,7 +165,12 @@ export function buildSystemPrompt(context?: BuildSystemPromptContext): string {
                 parts.push(`Their children (initials): ${childInfo.join(', ')}. Refer to children generically unless the user uses their names first.`);
             }
         } else if (context.childrenAges && context.childrenAges.length > 0) {
-            parts.push(`They have ${context.childrenAges.length} child(ren), ages: ${context.childrenAges.join(', ')}.`);
+            const validAges = context.childrenAges
+                .slice(0, 10)
+                .filter(age => Number.isFinite(age) && age >= 0 && age <= 25);
+            if (validAges.length > 0) {
+                parts.push(`They have ${validAges.length} child(ren), ages: ${validAges.join(', ')}.`);
+            }
         }
 
         // ── Legal Context ──

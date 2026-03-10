@@ -41,7 +41,14 @@ export async function POST(req: NextRequest) {
         // Uses AbortController to cancel the request after 3s if Tavily is slow.
         // PRIVACY: Only extracted legal keywords are sent to Tavily, never raw user text.
         let legalContext: LegalSearchResult[] | undefined;
-        const lastUserMessage = messages.findLast((m) => m.role === 'user');
+        // Find the last user message (backward loop — compatible with ES2017 target)
+        let lastUserMessage: { role: 'user' | 'assistant'; content: string } | undefined;
+        for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].role === 'user') {
+                lastUserMessage = messages[i];
+                break;
+            }
+        }
 
         if (lastUserMessage && detectLegalTopic(lastUserMessage.content) && userContext?.state) {
             const legalQuery = extractLegalQuery(lastUserMessage.content);

@@ -380,7 +380,7 @@ export default function IncidentDetailPage() {
                         <Shield size={14} /> Court-Ready Summary
                     </h3>
                     <div className="flex gap-2">
-                        {incident.courtSummary && !isAnalyzing && (
+                        {incident.courtSummary && !isAnalyzing && !isEditing && (
                             <button
                                 onClick={handleAnalyze}
                                 className="btn-ghost text-xs flex items-center gap-1"
@@ -388,7 +388,7 @@ export default function IncidentDetailPage() {
                                 <RefreshCw size={12} /> Re-generate
                             </button>
                         )}
-                        {!incident.courtSummary && !isAnalyzing && (
+                        {!incident.courtSummary && !isAnalyzing && !isEditing && (
                             <button
                                 onClick={handleAnalyze}
                                 className="btn-outline text-xs flex items-center gap-1"

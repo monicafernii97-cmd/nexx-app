@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useState } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
+import { Id } from '../../../../../convex/_generated/dataModel';
 import { useUser } from '@/lib/user-context';
 import {
     Mic,
@@ -42,6 +43,8 @@ export default function NewIncidentPage() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analyzeError, setAnalyzeError] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [createdId, setCreatedId] = useState<Id<'incidents'> | null>(null);
 
     const createIncident = useMutation(api.incidents.create);
     const confirmIncident = useMutation(api.incidents.confirm);
@@ -52,6 +55,10 @@ export default function NewIncidentPage() {
         setAnalyzeError(null);
 
         try {
+            const witnessArr = witnesses.trim()
+                ? witnesses.split(',').map((w) => w.trim()).filter(Boolean)
+                : undefined;
+
             const response = await fetch('/api/incidents/analyze', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -60,6 +67,10 @@ export default function NewIncidentPage() {
                     category: category || 'other',
                     date,
                     time,
+                    severity,
+                    location: location.trim() || undefined,
+                    witnesses: witnessArr,
+                    childrenInvolved: childrenInvolved || undefined,
                 }),
             });
 
@@ -82,27 +93,40 @@ export default function NewIncidentPage() {
     };
 
     const handleConfirm = async () => {
-        if (!userId) return;
+        if (!userId || isSaving) return;
+        setIsSaving(true);
 
-        const witnessArr = witnesses.trim()
-            ? witnesses.split(',').map((w) => w.trim()).filter(Boolean)
-            : undefined;
+        try {
+            const witnessArr = witnesses.trim()
+                ? witnesses.split(',').map((w) => w.trim()).filter(Boolean)
+                : undefined;
 
-        const incidentId = await createIncident({
-            narrative,
-            courtSummary,
-            category: (category || 'other') as 'emotional_abuse' | 'financial_abuse' | 'parental_alienation' | 'custody_violation' | 'harassment' | 'threats' | 'manipulation' | 'neglect' | 'other',
-            severity,
-            date,
-            time,
-            location: location.trim() || undefined,
-            witnesses: witnessArr,
-            childrenInvolved: childrenInvolved || undefined,
-            aiAnalysis: behavioralAnalysis || undefined,
-        });
+            // Reuse previously created ID to prevent duplicates on retry
+            let incidentId = createdId;
+            if (!incidentId) {
+                incidentId = await createIncident({
+                    narrative,
+                    courtSummary,
+                    category: (category || 'other') as 'emotional_abuse' | 'financial_abuse' | 'parental_alienation' | 'custody_violation' | 'harassment' | 'threats' | 'manipulation' | 'neglect' | 'other',
+                    severity,
+                    date,
+                    time,
+                    location: location.trim() || undefined,
+                    witnesses: witnessArr,
+                    childrenInvolved: childrenInvolved || undefined,
+                    aiAnalysis: behavioralAnalysis || undefined,
+                });
+                setCreatedId(incidentId);
+            }
 
-        await confirmIncident({ id: incidentId });
-        setStep('confirmed');
+            await confirmIncident({ id: incidentId });
+            setStep('confirmed');
+        } catch (error) {
+            console.error('Save error:', error);
+            setAnalyzeError('Failed to save incident. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const severityLabels = ['Low', 'Medium', 'High'];
@@ -317,14 +341,19 @@ export default function NewIncidentPage() {
                     </div>
 
                     {/* Children Involved */}
-                    <div
+                    <label
                         className="flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all"
                         style={{
                             background: childrenInvolved ? 'rgba(229, 168, 74, 0.08)' : 'rgba(42, 29, 14, 0.3)',
                             border: `1px solid ${childrenInvolved ? 'rgba(229, 168, 74, 0.25)' : 'rgba(138, 122, 96, 0.1)'}`,
                         }}
-                        onClick={() => setChildrenInvolved(!childrenInvolved)}
                     >
+                        <input
+                            type="checkbox"
+                            checked={childrenInvolved}
+                            onChange={(e) => setChildrenInvolved(e.target.checked)}
+                            className="sr-only"
+                        />
                         <div
                             className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
                             style={{
@@ -340,7 +369,7 @@ export default function NewIncidentPage() {
                                 Children were present or involved
                             </span>
                         </div>
-                    </div>
+                    </label>
 
                     {/* Error */}
                     {analyzeError && (
@@ -454,6 +483,7 @@ export default function NewIncidentPage() {
                         <button
                             onClick={() => {
                                 setStep('describe');
+                                setIsEditing(false);
                                 setNarrative('');
                                 setCourtSummary('');
                                 setBehavioralAnalysis('');
@@ -464,6 +494,7 @@ export default function NewIncidentPage() {
                                 setWitnesses('');
                                 setChildrenInvolved(false);
                                 setAnalyzeError(null);
+                                setCreatedId(null);
                             }}
                             className="btn-gold"
                         >

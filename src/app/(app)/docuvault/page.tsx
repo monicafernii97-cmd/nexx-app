@@ -167,82 +167,82 @@ export default function DocuVaultPage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.05 * i }}
                             >
-                                <Link href={`/docuvault/${incident._id}`}>
-                                    <div className="card-gilded p-5 group cursor-pointer relative overflow-hidden hover:border-[rgba(197,139,7,0.3)] transition-all">
-                                        {/* Severity Indicator */}
-                                        <div
-                                            className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl"
-                                            style={{ background: cat?.color || '#C58B07' }}
-                                        />
+                                <div className="flex items-stretch gap-0 group relative">
+                                    <Link href={`/docuvault/${incident._id}`} className="flex-1 min-w-0">
+                                        <div className="card-gilded p-5 cursor-pointer relative overflow-hidden hover:border-[rgba(197,139,7,0.3)] transition-all rounded-r-none">
+                                            {/* Severity Indicator */}
+                                            <div
+                                                className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl"
+                                                style={{ background: cat?.color || '#C58B07' }}
+                                            />
 
-                                        <div className="flex items-start gap-4 pl-3">
-                                            {/* Date Column */}
-                                            <div className="flex-shrink-0 text-center" style={{ minWidth: 60 }}>
-                                                <p className="text-xs font-semibold" style={{ color: '#C58B07' }}>
-                                                    {date.toLocaleDateString('en-US', { month: 'short' })}
-                                                </p>
-                                                <p className="text-2xl font-bold" style={{ color: '#F5EFE0' }}>
-                                                    {date.getDate()}
-                                                </p>
-                                                <p className="text-xs" style={{ color: '#8A7A60' }}>
-                                                    {incident.time}
-                                                </p>
-                                            </div>
-
-                                            {/* Content */}
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span
-                                                        className="badge text-xs"
-                                                        style={{ background: `${cat?.color}20`, color: cat?.color }}
-                                                    >
-                                                        {cat?.label || incident.category}
-                                                    </span>
-                                                    {incident.status === 'draft' && (
-                                                        <span className="badge badge-warning text-xs">Draft</span>
-                                                    )}
-                                                    {incident.status === 'confirmed' && (
-                                                        <span className="badge badge-success text-xs">Confirmed</span>
-                                                    )}
-                                                    {incident.childrenInvolved && (
-                                                        <span className="badge text-xs" style={{ background: 'rgba(229, 168, 74, 0.15)', color: '#E5A84A' }}>
-                                                            Children
-                                                        </span>
-                                                    )}
-                                                    <div className="flex gap-0.5 ml-auto">
-                                                        {[1, 2, 3].map((level) => (
-                                                            <div
-                                                                key={level}
-                                                                className="w-1.5 h-4 rounded-sm"
-                                                                style={{
-                                                                    background: level <= incident.severity
-                                                                        ? cat?.color
-                                                                        : 'rgba(138, 122, 96, 0.15)',
-                                                                }}
-                                                            />
-                                                        ))}
-                                                    </div>
+                                            <div className="flex items-start gap-4 pl-3">
+                                                {/* Date Column */}
+                                                <div className="flex-shrink-0 text-center" style={{ minWidth: 60 }}>
+                                                    <p className="text-xs font-semibold" style={{ color: '#C58B07' }}>
+                                                        {date.toLocaleDateString('en-US', { month: 'short' })}
+                                                    </p>
+                                                    <p className="text-2xl font-bold" style={{ color: '#F5EFE0' }}>
+                                                        {date.getDate()}
+                                                    </p>
+                                                    <p className="text-xs" style={{ color: '#8A7A60' }}>
+                                                        {incident.time}
+                                                    </p>
                                                 </div>
-                                                <p className="text-sm leading-relaxed line-clamp-2" style={{ color: '#D4C9B0' }}>
-                                                    {incident.courtSummary || incident.narrative}
-                                                </p>
-                                            </div>
 
-                                            {/* Delete Button */}
-                                            <button
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    setDeleteId(incident._id);
-                                                }}
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 p-2 rounded-lg hover:bg-[rgba(199,90,90,0.1)]"
-                                                title="Delete incident"
-                                            >
-                                                <Trash2 size={14} style={{ color: '#C75A5A' }} />
-                                            </button>
+                                                {/* Content */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span
+                                                            className="badge text-xs"
+                                                            style={{ background: `${cat?.color}20`, color: cat?.color }}
+                                                        >
+                                                            {cat?.label || incident.category}
+                                                        </span>
+                                                        {incident.status === 'draft' && (
+                                                            <span className="badge badge-warning text-xs">Draft</span>
+                                                        )}
+                                                        {incident.status === 'confirmed' && (
+                                                            <span className="badge badge-success text-xs">Confirmed</span>
+                                                        )}
+                                                        {incident.childrenInvolved && (
+                                                            <span className="badge text-xs" style={{ background: 'rgba(229, 168, 74, 0.15)', color: '#E5A84A' }}>
+                                                                Children
+                                                            </span>
+                                                        )}
+                                                        <div className="flex gap-0.5 ml-auto">
+                                                            {[1, 2, 3].map((level) => (
+                                                                <div
+                                                                    key={level}
+                                                                    className="w-1.5 h-4 rounded-sm"
+                                                                    style={{
+                                                                        background: level <= incident.severity
+                                                                            ? cat?.color
+                                                                            : 'rgba(138, 122, 96, 0.15)',
+                                                                    }}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-sm leading-relaxed line-clamp-2" style={{ color: '#D4C9B0' }}>
+                                                        {incident.courtSummary || incident.narrative}
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                </Link>
+                                    </Link>
+
+                                    {/* Delete Button — outside Link for valid HTML */}
+                                    <button
+                                        onClick={() => setDeleteId(incident._id)}
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 px-3 flex items-center rounded-r-2xl hover:bg-[rgba(199,90,90,0.1)]"
+                                        style={{ border: '1px solid rgba(138, 122, 96, 0.08)', borderLeft: 'none' }}
+                                        title="Delete incident"
+                                        aria-label="Delete incident"
+                                    >
+                                        <Trash2 size={14} style={{ color: '#C75A5A' }} />
+                                    </button>
+                                </div>
                             </motion.div>
                         );
                     })

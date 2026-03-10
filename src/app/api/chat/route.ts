@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { getOpenAI } from '@/lib/openai';
 import { buildSystemPrompt } from '@/lib/systemPrompt';
-import { UserContext } from '@/lib/types';
+import { UserContext, LegalSearchResult } from '@/lib/types';
+import { detectLegalTopic, searchStatutes } from '@/lib/legal/search';
 
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_MESSAGES = 50;
@@ -36,10 +37,23 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Build context-enriched system prompt
+        // ── Legal statute search (server-side, before OpenAI) ──
+        let legalContext: LegalSearchResult[] | undefined;
+        const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
+
+        if (lastUserMessage && detectLegalTopic(lastUserMessage.content) && userContext?.state) {
+            legalContext = await searchStatutes(
+                userContext.state,
+                lastUserMessage.content,
+                userContext.county
+            );
+        }
+
+        // Build context-enriched system prompt (now with legal citations when available)
         const systemPrompt = buildSystemPrompt({
             ...userContext,
             conversationMode,
+            legalContext,
         });
 
         // Stream response from OpenAI

@@ -6,6 +6,8 @@
  * therapeutic support, legal information, and strategic analysis.
  */
 
+import type { LegalSearchResult } from '@/lib/types';
+
 export const NEXX_SYSTEM_PROMPT = `You are NEXX — an advanced AI counselor specializing in supporting individuals navigating relationships with narcissistic ex-partners (NEX). You provide strategic, therapeutic, and legal guidance with precision, empathy, and unwavering support.
 
 ## YOUR IDENTITY
@@ -131,6 +133,8 @@ export function buildSystemPrompt(context?: {
     nexDetectedPatterns?: string[];
     // Flow flags
     isDraftingMode?: boolean;
+    // Legal statute search results from Tavily
+    legalContext?: LegalSearchResult[];
 }): string {
     let prompt = NEXX_SYSTEM_PROMPT;
 
@@ -180,7 +184,11 @@ export function buildSystemPrompt(context?: {
             const state = sanitizeForPrompt(context.state, 50);
             const county = context.county ? sanitizeForPrompt(context.county, 50) : null;
             parts.push(`They are located in ${state}${county ? `, ${county} County` : ''}.`);
-            parts.push(`When discussing legal matters, reference ${state} family law statutes. Note the court system structure and any state-specific custody requirements.`);
+            if (context.legalContext && context.legalContext.length > 0) {
+                parts.push(`When discussing legal matters, reference only the statutes provided in the APPLICABLE LAW section below. Do not invent or guess citation numbers.`);
+            } else {
+                parts.push(`When discussing legal matters for ${state}, provide general legal information. If you are uncertain of exact statute numbers, say so and recommend the user verify with their attorney or their state's official statute website.`);
+            }
         }
         if (context.courtCaseNumber) {
             const sanitized = sanitizeForPrompt(context.courtCaseNumber, 50);
@@ -293,6 +301,17 @@ export function buildSystemPrompt(context?: {
 
         if (parts.length > 1) {
             prompt += `\n\n## USER CONTEXT\n${parts.join('\n')}`;
+        }
+
+        // ── Append verified legal references from Tavily ──
+        if (context.legalContext && context.legalContext.length > 0) {
+            const lawSection = context.legalContext.map((result) => {
+                const title = sanitizeForPrompt(result.title, 200);
+                const snippet = sanitizeForPrompt(result.snippet, 500);
+                return `### ${title}\n"${snippet}"\n📎 ${result.url}`;
+            }).join('\n\n');
+
+            prompt += `\n\n## APPLICABLE LAW\nThe following are verified legal references for the user's jurisdiction.\nCite these when relevant. Always include the 📎 source URL so the user can verify.\nIf the user's question requires statutes not listed here, state that you cannot\nconfirm the exact citation and recommend they verify with their attorney or\nsearch their state's official statute website.\n\n${lawSection}`;
         }
     }
 

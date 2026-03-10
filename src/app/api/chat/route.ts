@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { getOpenAI } from '@/lib/openai';
 import { buildSystemPrompt } from '@/lib/systemPrompt';
-import { UserContext } from '@/lib/types';
+import type { UserContext, LegalSearchResult } from '@/lib/types';
+import { detectLegalTopic, extractLegalQuery, searchStatutes } from '@/lib/legal/search';
 
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_MESSAGES = 50;
@@ -36,10 +37,51 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Build context-enriched system prompt
+        // ── Legal statute search (server-side, before OpenAI) ──
+        // Uses AbortController to cancel the request after 3s if Tavily is slow.
+        // PRIVACY: Only extracted legal keywords are sent to Tavily, never raw user text.
+        let legalContext: LegalSearchResult[] | undefined;
+        // Find the last user message (backward loop — compatible with ES2017 target)
+        let lastUserMessage: { role: 'user' | 'assistant'; content: string } | undefined;
+        for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].role === 'user') {
+                lastUserMessage = messages[i];
+                break;
+            }
+        }
+
+        if (lastUserMessage && detectLegalTopic(lastUserMessage.content) && userContext?.state) {
+            const legalQuery = extractLegalQuery(lastUserMessage.content);
+
+            if (legalQuery) {
+                const LEGAL_SEARCH_TIMEOUT_MS = 3000;
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => {
+                    controller.abort();
+                    console.warn('[chat] Tavily search timed out — proceeding without citations');
+                }, LEGAL_SEARCH_TIMEOUT_MS);
+
+                try {
+                    const results = await searchStatutes(
+                        userContext.state,
+                        legalQuery,
+                        userContext.county,
+                        controller.signal
+                    );
+                    legalContext = results.length > 0 ? results : undefined;
+                } catch (e) {
+                    if (e instanceof Error && e.name !== 'AbortError') throw e;
+                } finally {
+                    clearTimeout(timeoutId);
+                }
+            }
+        }
+
+        // Build context-enriched system prompt (now with legal citations when available)
         const systemPrompt = buildSystemPrompt({
             ...userContext,
             conversationMode,
+            legalContext,
         });
 
         // Stream response from OpenAI

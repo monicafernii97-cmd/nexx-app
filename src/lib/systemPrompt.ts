@@ -6,6 +6,8 @@
  * therapeutic support, legal information, and strategic analysis.
  */
 
+import type { BuildSystemPromptContext } from '@/lib/types';
+
 export const NEXX_SYSTEM_PROMPT = `You are NEXX — an advanced AI counselor specializing in supporting individuals navigating relationships with narcissistic ex-partners (NEX). You provide strategic, therapeutic, and legal guidance with precision, empathy, and unwavering support.
 
 ## YOUR IDENTITY
@@ -99,6 +101,22 @@ function sanitizeForPrompt(value: string, maxLength = 200): string {
         .trim();
 }
 
+/**
+ * Validate and sanitize a URL from external sources (e.g. Tavily).
+ * Only allows http/https protocols. Returns empty string for invalid URLs.
+ */
+function sanitizeUrl(url: string, maxLength = 500): string {
+    try {
+        const parsed = new URL(url);
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+            return '';
+        }
+        return url.slice(0, maxLength);
+    } catch {
+        return '';
+    }
+}
+
 // ── Allow-lists for prompt-safe enumerated values ──
 const ALLOWED_TONES = new Set(['direct', 'gentle', 'strategic', 'clinical']);
 const ALLOWED_EMOTIONAL_STATES = new Set(['calm', 'anxious', 'angry', 'overwhelmed', 'numb']);
@@ -106,32 +124,7 @@ const ALLOWED_EMOTIONAL_STATES = new Set(['calm', 'anxious', 'angry', 'overwhelm
 /**
  * Build a system prompt enriched with user context
  */
-export function buildSystemPrompt(context?: {
-    userName?: string;
-    state?: string;
-    county?: string;
-    custodyType?: string;
-    nexBehaviors?: string[];
-    conversationMode?: string;
-    // New personalization fields
-    tonePreference?: string;
-    emotionalState?: string;
-    childrenNames?: string[];
-    childrenAges?: number[];
-    courtCaseNumber?: string;
-    hasAttorney?: boolean;
-    hasTherapist?: boolean;
-    // NEX profile data
-    nexNickname?: string;
-    nexCommunicationStyle?: string;
-    nexManipulationTactics?: string[];
-    nexTriggerPatterns?: string[];
-    nexAiInsights?: string;
-    nexDangerLevel?: number;
-    nexDetectedPatterns?: string[];
-    // Flow flags
-    isDraftingMode?: boolean;
-}): string {
+export function buildSystemPrompt(context?: BuildSystemPromptContext): string {
     let prompt = NEXX_SYSTEM_PROMPT;
 
     if (context) {
@@ -172,7 +165,12 @@ export function buildSystemPrompt(context?: {
                 parts.push(`Their children (initials): ${childInfo.join(', ')}. Refer to children generically unless the user uses their names first.`);
             }
         } else if (context.childrenAges && context.childrenAges.length > 0) {
-            parts.push(`They have ${context.childrenAges.length} child(ren), ages: ${context.childrenAges.join(', ')}.`);
+            const validAges = context.childrenAges
+                .slice(0, 10)
+                .filter(age => Number.isFinite(age) && age >= 0 && age <= 25);
+            if (validAges.length > 0) {
+                parts.push(`They have ${validAges.length} child(ren), ages: ${validAges.join(', ')}.`);
+            }
         }
 
         // ── Legal Context ──
@@ -293,6 +291,24 @@ export function buildSystemPrompt(context?: {
 
         if (parts.length > 1) {
             prompt += `\n\n## USER CONTEXT\n${parts.join('\n')}`;
+        }
+
+        // ── Append verified legal references from Tavily ──
+        if (context.legalContext && context.legalContext.length > 0) {
+            const lawSection = context.legalContext
+                .map((result) => {
+                    const safeUrl = sanitizeUrl(result.url);
+                    if (!safeUrl) return null;
+                    const title = sanitizeForPrompt(result.title, 200);
+                    const snippet = sanitizeForPrompt(result.snippet, 500);
+                    return `### ${title}\n"${snippet}"\n📎 ${safeUrl}`;
+                })
+                .filter(Boolean)
+                .join('\n\n');
+
+            if (lawSection) {
+                prompt += `\n\n## APPLICABLE LAW\nThe following are verified legal references for the user's jurisdiction.\nCite these when relevant. Always include the 📎 source URL so the user can verify.\nIf the user's question requires statutes not listed here, state that you cannot\nconfirm the exact citation and recommend they verify with their attorney or\nsearch their state's official statute website.\n\n${lawSection}`;
+            }
         }
     }
 

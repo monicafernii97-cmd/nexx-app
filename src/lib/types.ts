@@ -23,4 +23,6 @@ export interface UserContext {
     nexAiInsights?: string;
     nexDangerLevel?: number;
     nexDetectedPatterns?: string[];
+    /** When true, full PII (children names, case numbers) is included in the prompt for drafting flows */
+    isDraftingMode?: boolean;
 }

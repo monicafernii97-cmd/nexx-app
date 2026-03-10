@@ -99,6 +99,10 @@ function sanitizeForPrompt(value: string, maxLength = 200): string {
         .trim();
 }
 
+// ── Allow-lists for prompt-safe enumerated values ──
+const ALLOWED_TONES = new Set(['direct', 'gentle', 'strategic', 'clinical']);
+const ALLOWED_EMOTIONAL_STATES = new Set(['calm', 'anxious', 'angry', 'overwhelmed', 'numb']);
+
 /**
  * Build a system prompt enriched with user context
  */
@@ -125,6 +129,8 @@ export function buildSystemPrompt(context?: {
     nexAiInsights?: string;
     nexDangerLevel?: number;
     nexDetectedPatterns?: string[];
+    // Flow flags
+    isDraftingMode?: boolean;
 }): string {
     let prompt = NEXX_SYSTEM_PROMPT;
 
@@ -139,16 +145,32 @@ export function buildSystemPrompt(context?: {
         }
 
         // ── Children Context ──
+        // In default mode, use initials only to minimize PII exposure.
+        // Full names are passed only in explicit drafting flows.
         if (context.childrenNames && context.childrenNames.length > 0) {
-            const names = context.childrenNames
-                .slice(0, 10)
-                .map((n) => sanitizeForPrompt(n, 50));
             const ages = (context.childrenAges?.slice(0, 10) ?? [])
                 .map(age => (Number.isFinite(age) && age >= 0 && age <= 25 ? age : undefined));
-            const childInfo = names.map((name, i) =>
-                ages[i] !== undefined ? `${name} (age ${ages[i]})` : name
-            );
-            parts.push(`Their children: ${childInfo.join(', ')}. Use the children's names when relevant to personalize advice.`);
+
+            if (context.isDraftingMode) {
+                // Drafting mode — include full names for court documents
+                const names = context.childrenNames
+                    .slice(0, 10)
+                    .map((n) => sanitizeForPrompt(n, 50));
+                const childInfo = names.map((name, i) =>
+                    ages[i] !== undefined ? `${name} (age ${ages[i]})` : name
+                );
+                parts.push(`Their children: ${childInfo.join(', ')}. Use the children's names when drafting documents.`);
+            } else {
+                // Default mode — initials only
+                const initials = context.childrenNames
+                    .slice(0, 10)
+                    .map((n) => sanitizeForPrompt(n, 50))
+                    .map((n) => n.charAt(0).toUpperCase() + '.');
+                const childInfo = initials.map((initial, i) =>
+                    ages[i] !== undefined ? `${initial} (age ${ages[i]})` : initial
+                );
+                parts.push(`Their children (initials): ${childInfo.join(', ')}. Refer to children generically unless the user uses their names first.`);
+            }
         } else if (context.childrenAges && context.childrenAges.length > 0) {
             parts.push(`They have ${context.childrenAges.length} child(ren), ages: ${context.childrenAges.join(', ')}.`);
         }
@@ -161,7 +183,17 @@ export function buildSystemPrompt(context?: {
             parts.push(`When discussing legal matters, reference ${state} family law statutes. Note the court system structure and any state-specific custody requirements.`);
         }
         if (context.courtCaseNumber) {
-            parts.push(`Their court case number is ${sanitizeForPrompt(context.courtCaseNumber, 50)}. Reference it when drafting legal documents or summaries.`);
+            const sanitized = sanitizeForPrompt(context.courtCaseNumber, 50);
+            if (context.isDraftingMode) {
+                // Drafting mode — include full case number
+                parts.push(`Their court case number is ${sanitized}. Reference it when drafting legal documents or summaries.`);
+            } else {
+                // Default mode — mask to last 4 characters
+                const masked = sanitized.length > 4
+                    ? '•••' + sanitized.slice(-4)
+                    : sanitized;
+                parts.push(`They have an active court case (ref: ${masked}). The user can share the full case number if needed.`);
+            }
         }
         if (context.custodyType) {
             parts.push(`Their custody arrangement is: ${sanitizeForPrompt(context.custodyType, 50)}.`);
@@ -221,7 +253,15 @@ export function buildSystemPrompt(context?: {
         }
 
         // ── Tone Adaptation (language only, NEVER content) ──
-        if (context.tonePreference || context.emotionalState) {
+        // Values are validated against allow-lists to prevent prompt injection.
+        const validTone = context.tonePreference && ALLOWED_TONES.has(context.tonePreference)
+            ? context.tonePreference
+            : undefined;
+        const validEmotional = context.emotionalState && ALLOWED_EMOTIONAL_STATES.has(context.emotionalState)
+            ? context.emotionalState
+            : undefined;
+
+        if (validTone || validEmotional) {
             parts.push('\n## TONE ADAPTATION RULES');
             parts.push('CRITICAL: NEVER change the SUBSTANCE of your advice based on tone preference or emotional state.');
             parts.push('NEVER omit warnings, red flags, or safety concerns to "spare feelings".');
@@ -229,16 +269,16 @@ export function buildSystemPrompt(context?: {
             parts.push('The CONTENT and ACCURACY of your guidance must be identical regardless of tone.');
             parts.push('What MAY change: sentence length, formatting density, opening validation language, and pacing.');
 
-            if (context.tonePreference) {
+            if (validTone) {
                 const toneGuide: Record<string, string> = {
                     direct: 'Be concise, factual, and action-oriented. Lead with the strategy. Minimal emotional preamble.',
                     gentle: 'Use warm, validating language. Acknowledge emotions before presenting strategies. Use softer transitions.',
                     strategic: 'Frame everything through a tactical lens. Emphasize power dynamics and positioning. Think like a chess player.',
                     clinical: 'Use precise, professional language. Reference frameworks and research. Maintain analytical distance.',
                 };
-                parts.push(`Tone preference: ${context.tonePreference}. ${toneGuide[context.tonePreference] || ''}`);
+                parts.push(`Tone preference: ${validTone}. ${toneGuide[validTone]}`);
             }
-            if (context.emotionalState) {
+            if (validEmotional) {
                 const stateGuide: Record<string, string> = {
                     calm: 'User is in a stable state. Normal pacing and depth.',
                     anxious: 'Use shorter paragraphs. More bullet points. Include grounding affirmations between sections.',
@@ -246,7 +286,7 @@ export function buildSystemPrompt(context?: {
                     overwhelmed: 'Simplify. One recommendation at a time. Use numbered steps. End with the single most important next action.',
                     numb: 'Use gentle warmth. Normalize the freeze response. Shorter responses with clear next steps.',
                 };
-                parts.push(`Current emotional state: ${context.emotionalState}. ${stateGuide[context.emotionalState] || ''}`);
+                parts.push(`Current emotional state: ${validEmotional}. ${stateGuide[validEmotional]}`);
             }
         }
 

@@ -32,12 +32,18 @@ const EMOTIONAL_STATES = [
     { value: 'numb', label: 'Numb', emoji: '😶' },
 ] as const;
 
+type CustodyType = 'sole' | 'joint' | 'split' | 'none' | 'pending' | '';
+type CourtStatus = 'pending' | 'active' | 'closed' | 'none' | '';
+type TonePreference = 'direct' | 'gentle' | 'strategic' | 'clinical' | '';
+type EmotionalState = 'calm' | 'anxious' | 'angry' | 'overwhelmed' | 'numb' | '';
+
 export default function ProfilePage() {
     const user = useQuery(api.users.me);
     const updateProfile = useMutation(api.users.updateProfile);
 
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState({
         name: '',
         state: '',
@@ -46,12 +52,12 @@ export default function ProfilePage() {
         childrenAges: [] as number[],
         childrenNames: [] as string[],
         courtCaseNumber: '',
-        custodyType: '' as string,
+        custodyType: '' as CustodyType,
         hasAttorney: false,
         hasTherapist: false,
-        courtStatus: '' as string,
-        tonePreference: '' as string,
-        emotionalState: '' as string,
+        courtStatus: '' as CourtStatus,
+        tonePreference: '' as TonePreference,
+        emotionalState: '' as EmotionalState,
     });
 
     // Sync form with loaded user data
@@ -78,6 +84,7 @@ export default function ProfilePage() {
     const handleSave = async () => {
         if (!user) return;
         setSaving(true);
+        setError(null);
         try {
             await updateProfile({
                 id: user._id,
@@ -88,17 +95,18 @@ export default function ProfilePage() {
                 childrenAges: form.childrenAges.length > 0 ? form.childrenAges : undefined,
                 childrenNames: form.childrenNames.length > 0 ? form.childrenNames : undefined,
                 courtCaseNumber: form.courtCaseNumber || undefined,
-                custodyType: (form.custodyType as 'sole' | 'joint' | 'split' | 'none' | 'pending') || undefined,
+                custodyType: form.custodyType || undefined,
                 hasAttorney: form.hasAttorney,
                 hasTherapist: form.hasTherapist,
-                courtStatus: (form.courtStatus as 'pending' | 'active' | 'closed' | 'none') || undefined,
-                tonePreference: (form.tonePreference as 'direct' | 'gentle' | 'strategic' | 'clinical') || undefined,
-                emotionalState: (form.emotionalState as 'calm' | 'anxious' | 'angry' | 'overwhelmed' | 'numb') || undefined,
+                courtStatus: form.courtStatus || undefined,
+                tonePreference: form.tonePreference || undefined,
+                emotionalState: form.emotionalState || undefined,
             });
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
-        } catch (error) {
-            console.error('Failed to save profile:', error);
+        } catch (err) {
+            console.error('Failed to save profile:', err);
+            setError('Failed to save profile. Please try again.');
         } finally {
             setSaving(false);
         }
@@ -174,6 +182,9 @@ export default function ProfilePage() {
                         {saved ? <Check size={16} /> : <Save size={16} />}
                         {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Changes'}
                     </button>
+                    {error && (
+                        <p className="text-xs mt-1" style={{ color: '#C75A5A' }}>{error}</p>
+                    )}
                 </div>
 
                 <div className="space-y-6">
@@ -275,7 +286,7 @@ export default function ProfilePage() {
                                 <select
                                     className="input-gilded w-full"
                                     value={form.custodyType}
-                                    onChange={(e) => setForm({ ...form, custodyType: e.target.value })}
+                                    onChange={(e) => setForm({ ...form, custodyType: e.target.value as CustodyType })}
                                 >
                                     <option value="">Select</option>
                                     <option value="sole">Sole Custody</option>
@@ -289,7 +300,7 @@ export default function ProfilePage() {
                                 <select
                                     className="input-gilded w-full"
                                     value={form.courtStatus}
-                                    onChange={(e) => setForm({ ...form, courtStatus: e.target.value })}
+                                    onChange={(e) => setForm({ ...form, courtStatus: e.target.value as CourtStatus })}
                                 >
                                     <option value="">Select</option>
                                     <option value="active">Active Case</option>

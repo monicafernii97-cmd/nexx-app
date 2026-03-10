@@ -296,12 +296,15 @@ export function buildSystemPrompt(context?: BuildSystemPromptContext): string {
         // ── Append verified legal references from Tavily ──
         if (context.legalContext && context.legalContext.length > 0) {
             const lawSection = context.legalContext
-                .filter((result) => sanitizeUrl(result.url))
                 .map((result) => {
+                    const safeUrl = sanitizeUrl(result.url);
+                    if (!safeUrl) return null;
                     const title = sanitizeForPrompt(result.title, 200);
                     const snippet = sanitizeForPrompt(result.snippet, 500);
-                    return `### ${title}\n"${snippet}"\n📎 ${sanitizeUrl(result.url)}`;
-                }).join('\n\n');
+                    return `### ${title}\n"${snippet}"\n📎 ${safeUrl}`;
+                })
+                .filter(Boolean)
+                .join('\n\n');
 
             if (lawSection) {
                 prompt += `\n\n## APPLICABLE LAW\nThe following are verified legal references for the user's jurisdiction.\nCite these when relevant. Always include the 📎 source URL so the user can verify.\nIf the user's question requires statutes not listed here, state that you cannot\nconfirm the exact citation and recommend they verify with their attorney or\nsearch their state's official statute website.\n\n${lawSection}`;

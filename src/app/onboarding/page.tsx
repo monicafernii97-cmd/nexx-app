@@ -46,6 +46,29 @@ export default function OnboardingPage() {
         }
     }, [currentUser, router]);
 
+    // ─── Form state (must be declared before any early returns) ───
+    const [currentStep, setCurrentStep] = useState(0);
+    const [formData, setFormData] = useState({
+        name: '',
+        state: '',
+        county: '',
+        childrenCount: '',
+        childrenAges: '',
+        custodyType: '',
+        hasAttorney: '',
+        hasTherapist: '',
+        courtStatus: '',
+        nexBehaviors: [] as string[],
+        nexDescription: '',
+        primaryGoals: [] as string[],
+        acceptedDisclaimer: false,
+    });
+    const updateProfile = useMutation(api.users.updateProfile);
+    const completeOnboarding = useMutation(api.users.completeOnboarding);
+    const createNexProfile = useMutation(api.nexProfiles.create);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+
     // Terminal state: Clerk signed in but Convex auth failed to sync
     const convexAuthFailed = !convexLoading && !convexReady && !!clerkUser;
 
@@ -95,22 +118,6 @@ export default function OnboardingPage() {
             </div>
         );
     }
-    const [currentStep, setCurrentStep] = useState(0);
-    const [formData, setFormData] = useState({
-        name: '',
-        state: '',
-        county: '',
-        childrenCount: '',
-        childrenAges: '',
-        custodyType: '',
-        hasAttorney: '',
-        hasTherapist: '',
-        courtStatus: '',
-        nexBehaviors: [] as string[],
-        nexDescription: '',
-        primaryGoals: [] as string[],
-        acceptedDisclaimer: false,
-    });
 
     const update = (field: string, value: unknown) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
@@ -137,12 +144,6 @@ export default function OnboardingPage() {
         }
     };
 
-    const updateProfile = useMutation(api.users.updateProfile);
-    const completeOnboarding = useMutation(api.users.completeOnboarding);
-    const createNexProfile = useMutation(api.nexProfiles.create);
-    const [isSaving, setIsSaving] = useState(false);
-    const [saveError, setSaveError] = useState<string | null>(null);
-
     const handleNext = async () => {
         if (currentStep < ONBOARDING_STEPS.length - 1) {
             setCurrentStep((prev) => prev + 1);
@@ -151,7 +152,10 @@ export default function OnboardingPage() {
                 router.push('/sign-in');
                 return;
             }
-            // Final step — save profile data to Convex
+            // Final step — save profile data to Convex.
+            // Mutations run sequentially: updateProfile → createNexProfile → completeOnboarding.
+            // completeOnboarding is called last so a partial failure leaves the flag false,
+            // allowing the user to retry the onboarding flow without data corruption.
             setIsSaving(true);
             setSaveError(null);
             try {

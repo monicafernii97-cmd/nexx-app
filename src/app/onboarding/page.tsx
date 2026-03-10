@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useConvexAuth } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useUser } from '@/lib/user-context';
+import { useClerk } from '@clerk/nextjs';
 import {
     ChevronRight,
     ChevronLeft,
@@ -31,10 +32,11 @@ import { US_STATES, ONBOARDING_STEPS } from '@/lib/constants';
 export default function OnboardingPage() {
     const router = useRouter();
     const { userId, isLoading: userLoading, error: userError, clerkUser } = useUser();
+    const { signOut } = useClerk();
 
     // Wait for Convex auth to sync before querying — prevents false-null
     // from querying before the Clerk JWT is available on the Convex side.
-    const { isAuthenticated: convexReady } = useConvexAuth();
+    const { isAuthenticated: convexReady, isLoading: convexLoading } = useConvexAuth();
 
     // Guard: redirect returning users who already completed onboarding
     const currentUser = useQuery(api.users.me, convexReady ? {} : 'skip');
@@ -43,6 +45,52 @@ export default function OnboardingPage() {
             router.replace('/dashboard');
         }
     }, [currentUser, router]);
+
+    // Terminal state: Clerk signed in but Convex auth failed to sync
+    const convexAuthFailed = !convexLoading && !convexReady && !!clerkUser;
+
+    // Show loading state while Convex auth is syncing
+    if (convexLoading || (convexReady && currentUser === undefined)) {
+        return (
+            <div className="silk-bg min-h-screen flex items-center justify-center">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
+                    <div
+                        className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
+                        style={{
+                            background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
+                            boxShadow: '0 8px 32px rgba(197, 139, 7, 0.3)',
+                        }}
+                    >
+                        <span className="text-lg font-black" style={{ color: '#02022d' }}>N</span>
+                    </div>
+                    <p className="text-sm" style={{ color: '#8A7A60' }}>Loading...</p>
+                </motion.div>
+            </div>
+        );
+    }
+
+    // Terminal auth error: Clerk signed in but Convex token sync failed
+    if (convexAuthFailed) {
+        return (
+            <div className="silk-bg min-h-screen flex items-center justify-center">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center max-w-sm px-6">
+                    <div
+                        className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
+                        style={{ background: 'rgba(199, 90, 90, 0.15)', border: '1px solid rgba(199, 90, 90, 0.3)' }}
+                    >
+                        <span className="text-lg" style={{ color: '#C75A5A' }}>!</span>
+                    </div>
+                    <p className="text-sm font-semibold mb-2" style={{ color: '#F5EFE0' }}>Connection issue</p>
+                    <p className="text-xs mb-5" style={{ color: '#8A7A60' }}>
+                        We couldn&apos;t sync your session. Please try signing in again.
+                    </p>
+                    <button onClick={() => signOut({ redirectUrl: '/' })} className="btn-outline text-xs">
+                        Sign in again
+                    </button>
+                </motion.div>
+            </div>
+        );
+    }
     const [currentStep, setCurrentStep] = useState(0);
     const [formData, setFormData] = useState({
         name: '',

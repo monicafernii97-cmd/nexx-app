@@ -1,11 +1,12 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation } from 'convex/react';
+import { useMutation, useQuery, useConvexAuth } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useUser } from '@/lib/user-context';
+import { useClerk } from '@clerk/nextjs';
 import {
     ChevronRight,
     ChevronLeft,
@@ -19,9 +20,33 @@ import {
 } from 'lucide-react';
 import { US_STATES, ONBOARDING_STEPS } from '@/lib/constants';
 
+/**
+ * Onboarding flow for new NEXX users.
+ *
+ * Collects user profile data (name, state, custody arrangement, NEX behaviors,
+ * goals) across a multi-step form and saves it to Convex on completion.
+ *
+ * Returning users who have already completed onboarding are automatically
+ * redirected to the dashboard via a Convex-auth-gated guard.
+ */
 export default function OnboardingPage() {
     const router = useRouter();
-    const { userId, isLoading: userLoading, error: userError } = useUser();
+    const { userId, isLoading: userLoading, error: userError, clerkUser } = useUser();
+    const { signOut } = useClerk();
+
+    // Wait for Convex auth to sync before querying — prevents false-null
+    // from querying before the Clerk JWT is available on the Convex side.
+    const { isAuthenticated: convexReady, isLoading: convexLoading } = useConvexAuth();
+
+    // Guard: redirect returning users who already completed onboarding
+    const currentUser = useQuery(api.users.me, convexReady ? {} : 'skip');
+    useEffect(() => {
+        if (currentUser?.onboardingComplete) {
+            router.replace('/dashboard');
+        }
+    }, [currentUser, router]);
+
+    // ─── Form state (must be declared before any early returns) ───
     const [currentStep, setCurrentStep] = useState(0);
     const [formData, setFormData] = useState({
         name: '',
@@ -38,6 +63,61 @@ export default function OnboardingPage() {
         primaryGoals: [] as string[],
         acceptedDisclaimer: false,
     });
+    const updateProfile = useMutation(api.users.updateProfile);
+    const completeOnboarding = useMutation(api.users.completeOnboarding);
+    const createNexProfile = useMutation(api.nexProfiles.create);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+
+    // Terminal state: Clerk signed in but Convex auth failed to sync
+    const convexAuthFailed = !convexLoading && !convexReady && !!clerkUser;
+
+    // Show loading state while Convex auth is syncing
+    if (
+        convexLoading ||
+        (convexReady && currentUser === undefined) ||
+        currentUser?.onboardingComplete
+    ) {
+        return (
+            <div className="silk-bg min-h-screen flex items-center justify-center">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
+                    <div
+                        className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
+                        style={{
+                            background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
+                            boxShadow: '0 8px 32px rgba(197, 139, 7, 0.3)',
+                        }}
+                    >
+                        <span className="text-lg font-black" style={{ color: '#02022d' }}>N</span>
+                    </div>
+                    <p className="text-sm" style={{ color: '#8A7A60' }}>Loading...</p>
+                </motion.div>
+            </div>
+        );
+    }
+
+    // Terminal auth error: Clerk signed in but Convex token sync failed
+    if (convexAuthFailed) {
+        return (
+            <div className="silk-bg min-h-screen flex items-center justify-center">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center max-w-sm px-6">
+                    <div
+                        className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
+                        style={{ background: 'rgba(199, 90, 90, 0.15)', border: '1px solid rgba(199, 90, 90, 0.3)' }}
+                    >
+                        <span className="text-lg" style={{ color: '#C75A5A' }}>!</span>
+                    </div>
+                    <p className="text-sm font-semibold mb-2" style={{ color: '#F5EFE0' }}>Connection issue</p>
+                    <p className="text-xs mb-5" style={{ color: '#8A7A60' }}>
+                        We couldn&apos;t sync your session. Please try signing in again.
+                    </p>
+                    <button onClick={() => signOut({ redirectUrl: '/' })} className="btn-outline text-xs">
+                        Sign in again
+                    </button>
+                </motion.div>
+            </div>
+        );
+    }
 
     const update = (field: string, value: unknown) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
@@ -64,12 +144,6 @@ export default function OnboardingPage() {
         }
     };
 
-    const updateProfile = useMutation(api.users.updateProfile);
-    const completeOnboarding = useMutation(api.users.completeOnboarding);
-    const createNexProfile = useMutation(api.nexProfiles.create);
-    const [isSaving, setIsSaving] = useState(false);
-    const [saveError, setSaveError] = useState<string | null>(null);
-
     const handleNext = async () => {
         if (currentStep < ONBOARDING_STEPS.length - 1) {
             setCurrentStep((prev) => prev + 1);
@@ -78,21 +152,24 @@ export default function OnboardingPage() {
                 router.push('/sign-in');
                 return;
             }
-            // Final step — save profile data to Convex
+            // Final step — save profile data to Convex.
+            // Mutations run sequentially: updateProfile → createNexProfile → completeOnboarding.
+            // completeOnboarding is called last so a partial failure leaves the flag false,
+            // allowing the user to retry the onboarding flow without data corruption.
             setIsSaving(true);
             setSaveError(null);
             try {
                 // Update user profile with onboarding data
                 // Convert childrenAges string to number array
                 const parsedAges = formData.childrenAges
-                    ? formData.childrenAges.split(',').map((a) => parseInt(a.trim())).filter((n) => !isNaN(n))
+                    ? formData.childrenAges.split(',').map((a) => parseInt(a.trim(), 10)).filter((n) => !isNaN(n))
                     : undefined;
 
                 // Map custodyType display values to schema enum
-                const custodyMap: Record<string, 'sole' | 'joint' | 'split' | 'none' | 'pending'> = {
+                const custodyMap: Record<string, 'sole' | 'joint' | 'split' | 'visitation' | 'none' | 'pending'> = {
                     'Joint / Shared Custody': 'joint',
                     'Sole Custody': 'sole',
-                    'Visitation Only': 'split',
+                    'Visitation Only': 'visitation',
                     'No Order Yet': 'pending',
                     'Other': 'none',
                 };
@@ -102,7 +179,7 @@ export default function OnboardingPage() {
                     name: formData.name || undefined,
                     state: formData.state || undefined,
                     county: formData.county || undefined,
-                    childrenCount: formData.childrenCount ? parseInt(formData.childrenCount) : undefined,
+                    childrenCount: formData.childrenCount ? parseInt(formData.childrenCount, 10) : undefined,
                     childrenAges: parsedAges && parsedAges.length > 0 ? parsedAges : undefined,
                     custodyType: formData.custodyType ? custodyMap[formData.custodyType] ?? undefined : undefined,
                     hasAttorney: formData.hasAttorney ? formData.hasAttorney === 'Yes' : undefined,
@@ -120,7 +197,7 @@ export default function OnboardingPage() {
                 // Mark onboarding complete
                 await completeOnboarding({ id: userId });
 
-                router.push('/dashboard');
+                router.replace('/dashboard');
             } catch (error: unknown) {
                 const message = error instanceof Error ? error.message : String(error);
                 console.error('Failed to save onboarding data:', error);

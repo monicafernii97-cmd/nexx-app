@@ -17,9 +17,15 @@ import {
     AlertTriangle,
     Sparkles,
     Save,
+    Trash2,
+    MapPin,
+    Users,
+    Baby,
+    RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
+import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 
 export default function IncidentDetailPage() {
     const params = useParams();
@@ -32,6 +38,7 @@ export default function IncidentDetailPage() {
     const incident = useQuery(api.incidents.get, isValidId ? { id: incidentId } : 'skip');
     const updateIncident = useMutation(api.incidents.update);
     const confirmIncident = useMutation(api.incidents.confirm);
+    const removeIncident = useMutation(api.incidents.remove);
 
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState<{
@@ -51,6 +58,9 @@ export default function IncidentDetailPage() {
         behavioralAnalysis?: string;
         strategicResponse?: string;
     } | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     // Redirect if ID is invalid (after all hooks)
     useEffect(() => {
@@ -82,6 +92,8 @@ export default function IncidentDetailPage() {
 
     const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
     const incidentDate = new Date(incident.date);
+    const severityColors = ['#5A9E6F', '#E5A84A', '#C75A5A'];
+    const severityLabels = ['Low', 'Medium', 'High'];
 
     const startEditing = () => {
         setEditData({
@@ -169,6 +181,19 @@ export default function IncidentDetailPage() {
         }
     };
 
+    const handleDelete = async () => {
+        setIsDeleting(true);
+        setDeleteError(null);
+        try {
+            await removeIncident({ id: incidentId });
+            router.push('/docuvault');
+        } catch (error) {
+            console.error('Delete error:', error);
+            setDeleteError('Failed to delete incident. Please try again.');
+            setIsDeleting(false);
+        }
+    };
+
     return (
         <div className="max-w-3xl mx-auto">
             {/* Header */}
@@ -219,6 +244,13 @@ export default function IncidentDetailPage() {
                             )}
                         </>
                     )}
+                    <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="btn-outline text-xs flex items-center gap-1"
+                        style={{ borderColor: 'rgba(199, 90, 90, 0.2)', color: '#C75A5A' }}
+                    >
+                        <Trash2 size={12} /> Delete
+                    </button>
                 </div>
                 {saveError && (
                     <p className="text-xs mt-1" style={{ color: '#C75A5A' }}>{saveError}</p>
@@ -255,21 +287,61 @@ export default function IncidentDetailPage() {
                 <span className="badge" style={{ background: 'rgba(138, 122, 96, 0.1)', color: '#8A7A60' }}>
                     <Clock size={10} /> {incident.time}
                 </span>
-                <div className="flex gap-0.5">
-                    {[1, 2, 3].map((level) => (
-                        <div
-                            key={level}
-                            className="w-1.5 h-4 rounded-sm"
+                {/* Severity */}
+                {(() => {
+                    const sev = Math.max(1, Math.min(3, incident.severity ?? 2));
+                    return (
+                        <span
+                            className="badge"
                             style={{
-                                background:
-                                    level <= incident.severity
-                                        ? cat?.color || '#C58B07'
-                                        : 'rgba(138, 122, 96, 0.15)',
+                                background: `${severityColors[sev - 1]}15`,
+                                color: severityColors[sev - 1],
                             }}
-                        />
-                    ))}
-                </div>
+                        >
+                            <span className="flex gap-0.5 mr-1" aria-hidden="true">
+                                {[1, 2, 3].map((level) => (
+                                    <span
+                                        key={level}
+                                        className="w-1.5 h-3 rounded-sm inline-block"
+                                        style={{
+                                            background: level <= sev
+                                                ? severityColors[sev - 1]
+                                                : 'rgba(138, 122, 96, 0.15)',
+                                        }}
+                                    />
+                                ))}
+                            </span>
+                            {severityLabels[sev - 1]}
+                        </span>
+                    );
+                })()}
+                {incident.childrenInvolved && (
+                    <span className="badge" style={{ background: 'rgba(229, 168, 74, 0.12)', color: '#E5A84A' }}>
+                        <Baby size={10} /> Children Involved
+                    </span>
+                )}
             </motion.div>
+
+            {/* Location & Witnesses (if present) */}
+            {(incident.location || (incident.witnesses && incident.witnesses.length > 0)) && (
+                <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.12 }}
+                    className="flex flex-wrap gap-4 mb-6"
+                >
+                    {incident.location && (
+                        <div className="flex items-center gap-2 text-xs" style={{ color: '#8A7A60' }}>
+                            <MapPin size={12} /> {incident.location}
+                        </div>
+                    )}
+                    {incident.witnesses && incident.witnesses.length > 0 && (
+                        <div className="flex items-center gap-2 text-xs" style={{ color: '#8A7A60' }}>
+                            <Users size={12} /> Witnesses: {incident.witnesses.join(', ')}
+                        </div>
+                    )}
+                </motion.div>
+            )}
 
             {/* Narrative */}
             <motion.div
@@ -315,14 +387,24 @@ export default function IncidentDetailPage() {
                     >
                         <Shield size={14} /> Court-Ready Summary
                     </h3>
-                    {!incident.courtSummary && !isAnalyzing && (
-                        <button
-                            onClick={handleAnalyze}
-                            className="btn-outline text-xs flex items-center gap-1"
-                        >
-                            <Sparkles size={12} /> Generate with AI
-                        </button>
-                    )}
+                    <div className="flex gap-2">
+                        {incident.courtSummary && !isAnalyzing && !isEditing && (
+                            <button
+                                onClick={handleAnalyze}
+                                className="btn-ghost text-xs flex items-center gap-1"
+                            >
+                                <RefreshCw size={12} /> Re-generate
+                            </button>
+                        )}
+                        {!incident.courtSummary && !isAnalyzing && !isEditing && (
+                            <button
+                                onClick={handleAnalyze}
+                                className="btn-outline text-xs flex items-center gap-1"
+                            >
+                                <Sparkles size={12} /> Generate with AI
+                            </button>
+                        )}
+                    </div>
                 </div>
                 {isAnalyzing ? (
                     <div className="flex items-center gap-3 py-4">
@@ -440,6 +522,16 @@ export default function IncidentDetailPage() {
                     )}
                 </>
             )}
-        </div >
+
+            {/* Delete Confirmation Modal */}
+            <ConfirmDeleteModal
+                isOpen={showDeleteConfirm}
+                isDeleting={isDeleting}
+                deleteError={deleteError}
+                onClose={() => { if (!isDeleting) { setShowDeleteConfirm(false); setDeleteError(null); } }}
+                onDelete={handleDelete}
+                dialogTitleId="delete-dialog-title"
+            />
+        </div>
     );
 }

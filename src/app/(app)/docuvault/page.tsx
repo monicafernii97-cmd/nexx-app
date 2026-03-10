@@ -2,24 +2,30 @@
 
 import { motion } from 'framer-motion';
 import { useState } from 'react';
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
+import { Id } from '../../../../convex/_generated/dataModel';
 import { useUser } from '@/lib/user-context';
 import {
     Shield,
     Plus,
     Search,
-    ChevronRight,
     Clock,
+    Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
+import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 
 export default function DocuVaultPage() {
     const { userId } = useUser();
     const incidents = useQuery(api.incidents.list);
+    const removeIncident = useMutation(api.incidents.remove);
     const [activeFilter, setActiveFilter] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [deleteId, setDeleteId] = useState<Id<'incidents'> | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     const filteredIncidents = (incidents ?? []).filter((incident) => {
         if (activeFilter && incident.category !== activeFilter) return false;
@@ -27,6 +33,21 @@ export default function DocuVaultPage() {
             && !(incident.courtSummary || '').toLowerCase().includes(searchQuery.toLowerCase())) return false;
         return true;
     });
+
+    const handleDelete = async () => {
+        if (!deleteId) return;
+        setIsDeleting(true);
+        setDeleteError(null);
+        try {
+            await removeIncident({ id: deleteId });
+            setDeleteId(null);
+        } catch (error) {
+            console.error('Delete error:', error);
+            setDeleteError('Failed to delete incident. Please try again.');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     return (
         <div className="max-w-5xl mx-auto">
@@ -87,7 +108,7 @@ export default function DocuVaultPage() {
                     >
                         All
                     </button>
-                    {INCIDENT_CATEGORIES.slice(0, 6).map((cat) => (
+                    {INCIDENT_CATEGORIES.map((cat) => (
                         <button
                             key={cat.value}
                             onClick={() => setActiveFilter(activeFilter === cat.value ? null : cat.value)}
@@ -104,7 +125,15 @@ export default function DocuVaultPage() {
                 </div>
             </motion.div>
 
-            {/* Timeline */}
+            {/* Incident Count */}
+            {incidents && incidents.length > 0 && (
+                <p className="text-xs mb-4" style={{ color: '#5A4A30' }}>
+                    {filteredIncidents.length} of {incidents.length} incident{incidents.length !== 1 ? 's' : ''}
+                    {activeFilter || searchQuery ? ' (filtered)' : ''}
+                </p>
+            )}
+
+            {/* Incident List */}
             <div className="space-y-4">
                 {filteredIncidents.length === 0 ? (
                     <motion.div
@@ -140,67 +169,105 @@ export default function DocuVaultPage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.05 * i }}
                             >
-                                <div className="card-gilded p-5 group cursor-pointer relative overflow-hidden">
-                                    {/* Severity Indicator */}
-                                    <div
-                                        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl"
-                                        style={{ background: cat?.color || '#C58B07' }}
-                                    />
+                                <div className="flex items-stretch gap-0 group relative">
+                                    <Link href={`/docuvault/${incident._id}`} className="flex-1 min-w-0">
+                                        <div className="card-gilded p-5 cursor-pointer relative overflow-hidden hover:border-[rgba(197,139,7,0.3)] transition-all rounded-r-none">
+                                            {/* Severity Indicator */}
+                                            <div
+                                                className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl"
+                                                style={{ background: cat?.color || '#C58B07' }}
+                                            />
 
-                                    <div className="flex items-start gap-4 pl-3">
-                                        {/* Date Column */}
-                                        <div className="flex-shrink-0 text-center" style={{ minWidth: 60 }}>
-                                            <p className="text-xs font-semibold" style={{ color: '#C58B07' }}>
-                                                {date.toLocaleDateString('en-US', { month: 'short' })}
-                                            </p>
-                                            <p className="text-2xl font-bold" style={{ color: '#F5EFE0' }}>
-                                                {date.getDate()}
-                                            </p>
-                                            <p className="text-xs" style={{ color: '#8A7A60' }}>
-                                                {incident.time}
-                                            </p>
-                                        </div>
+                                            <div className="flex items-start gap-4 pl-3">
+                                                {/* Date Column */}
+                                                <div className="flex-shrink-0 text-center" style={{ minWidth: 60 }}>
+                                                    <p className="text-xs font-semibold" style={{ color: '#C58B07' }}>
+                                                        {date.toLocaleDateString('en-US', { month: 'short' })}
+                                                    </p>
+                                                    <p className="text-2xl font-bold" style={{ color: '#F5EFE0' }}>
+                                                        {date.getDate()}
+                                                    </p>
+                                                    <p className="text-xs" style={{ color: '#8A7A60' }}>
+                                                        {incident.time}
+                                                    </p>
+                                                </div>
 
-                                        {/* Content */}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span
-                                                    className="badge text-xs"
-                                                    style={{ background: `${cat?.color}20`, color: cat?.color }}
-                                                >
-                                                    {cat?.label || incident.category}
-                                                </span>
-                                                {incident.status === 'draft' && (
-                                                    <span className="badge badge-warning text-xs">Draft</span>
-                                                )}
-                                                {incident.status === 'confirmed' && (
-                                                    <span className="badge badge-success text-xs">Confirmed</span>
-                                                )}
-                                                <div className="flex gap-0.5 ml-auto">
-                                                    {[1, 2, 3].map((level) => (
-                                                        <div
-                                                            key={level}
-                                                            className="w-1.5 h-4 rounded-sm"
-                                                            style={{
-                                                                background: level <= incident.severity
-                                                                    ? cat?.color
-                                                                    : 'rgba(138, 122, 96, 0.15)',
-                                                            }}
-                                                        />
-                                                    ))}
+                                                {/* Content */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span
+                                                            className="badge text-xs"
+                                                            style={{ background: `${cat?.color}20`, color: cat?.color }}
+                                                        >
+                                                            {cat?.label || incident.category}
+                                                        </span>
+                                                        {incident.status === 'draft' && (
+                                                            <span className="badge badge-warning text-xs">Draft</span>
+                                                        )}
+                                                        {incident.status === 'confirmed' && (
+                                                            <span className="badge badge-success text-xs">Confirmed</span>
+                                                        )}
+                                                        {incident.childrenInvolved && (
+                                                            <span className="badge text-xs" style={{ background: 'rgba(229, 168, 74, 0.15)', color: '#E5A84A' }}>
+                                                                Children
+                                                            </span>
+                                                        )}
+                                                        {(() => {
+                                                            const sev = Math.max(1, Math.min(3, incident.severity ?? 2));
+                                                            return (
+                                                                <div className="flex gap-0.5 ml-auto">
+                                                                    {[1, 2, 3].map((level) => (
+                                                                        <div
+                                                                            key={level}
+                                                                            className="w-1.5 h-4 rounded-sm"
+                                                                            style={{
+                                                                                background: level <= sev
+                                                                                    ? cat?.color
+                                                                                    : 'rgba(138, 122, 96, 0.15)',
+                                                                            }}
+                                                                        />
+                                                                    ))}
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                    <p className="text-sm leading-relaxed line-clamp-2" style={{ color: '#D4C9B0' }}>
+                                                        {incident.courtSummary || incident.narrative}
+                                                    </p>
                                                 </div>
                                             </div>
-                                            <p className="text-sm leading-relaxed line-clamp-2" style={{ color: '#D4C9B0' }}>
-                                                {incident.courtSummary || incident.narrative}
-                                            </p>
                                         </div>
-                                    </div>
+                                    </Link>
+
+                                    {/* Delete Button — outside Link for valid HTML */}
+                                    <button
+                                        onClick={() => setDeleteId(incident._id)}
+                                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity flex-shrink-0 px-3 flex items-center rounded-r-2xl hover:bg-[rgba(199,90,90,0.1)]"
+                                        style={{ border: '1px solid rgba(138, 122, 96, 0.08)', borderLeft: 'none' }}
+                                        title="Delete incident"
+                                        aria-label="Delete incident"
+                                    >
+                                        <Trash2 size={14} style={{ color: '#C75A5A' }} />
+                                    </button>
                                 </div>
                             </motion.div>
                         );
                     })
                 )}
             </div>
+
+            {/* Delete Confirmation Modal */}
+            <ConfirmDeleteModal
+                isOpen={!!deleteId}
+                isDeleting={isDeleting}
+                deleteError={deleteError}
+                onClose={() => { if (!isDeleting) { setDeleteId(null); setDeleteError(null); } }}
+                onDelete={handleDelete}
+                description="Are you sure you want to permanently delete this incident record? All associated analysis and court summaries will be lost."
+                confirmLabel="Delete Permanently"
+                showCloseButton
+                dialogTitleId="list-delete-dialog-title"
+            />
         </div>
     );
 }

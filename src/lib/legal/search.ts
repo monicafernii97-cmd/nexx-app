@@ -96,26 +96,34 @@ function getTavilyClient() {
  * @param state  - US state name (e.g. "Texas", "California")
  * @param query  - The user's message or extracted legal query
  * @param county - Optional county for more specific results
+ * @param signal - Optional AbortSignal for request cancellation
  * @returns Array of { title, url, snippet } from official .gov sources
  */
 export async function searchStatutes(
     state: string,
     query: string,
-    county?: string
+    county?: string,
+    signal?: AbortSignal
 ): Promise<LegalSearchResult[]> {
     const client = getTavilyClient();
     if (!client) return [];
 
     try {
+        // Check if already aborted before making the API call
+        if (signal?.aborted) return [];
+
         const searchQuery = county
             ? `${state} ${county} County family law ${query}`
             : `${state} family law ${query}`;
 
         const response = await client.search(searchQuery, {
             maxResults: 5,
-            includeDomains: ['.gov'],
+            includeDomains: ['*.gov'],
             searchDepth: 'advanced',
         });
+
+        // Check if aborted while waiting for response
+        if (signal?.aborted) return [];
 
         if (!response.results || response.results.length === 0) {
             return [];
@@ -127,6 +135,8 @@ export async function searchStatutes(
             snippet: result.content || '',
         }));
     } catch (error) {
+        // Don't log abort errors — they're expected
+        if (error instanceof Error && error.name === 'AbortError') return [];
         // Graceful degradation — log the error but don't break chat
         console.error('[legal/search] Tavily search failed:', error);
         return [];

@@ -33,3 +33,9 @@ export interface LegalSearchResult {
     url: string;
     snippet: string;
 }
+
+/** Extended context passed to buildSystemPrompt — composes UserContext with server-side fields */
+export interface BuildSystemPromptContext extends UserContext {
+    conversationMode?: string;
+    legalContext?: LegalSearchResult[];
+}

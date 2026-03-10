@@ -38,25 +38,31 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Legal statute search (server-side, before OpenAI) ──
-        // Wrapped in a 3s timeout to prevent slow Tavily responses from stalling chat.
+        // Uses AbortController to cancel the request after 3s if Tavily is slow.
         let legalContext: LegalSearchResult[] | undefined;
         const lastUserMessage = messages.findLast((m) => m.role === 'user');
 
         if (lastUserMessage && detectLegalTopic(lastUserMessage.content) && userContext?.state) {
             const LEGAL_SEARCH_TIMEOUT_MS = 3000;
-            const searchPromise = searchStatutes(
-                userContext.state,
-                lastUserMessage.content,
-                userContext.county
-            );
-            const timeoutPromise = new Promise<LegalSearchResult[]>((resolve) =>
-                setTimeout(() => {
-                    console.warn('[chat] Tavily search timed out — proceeding without citations');
-                    resolve([]);
-                }, LEGAL_SEARCH_TIMEOUT_MS)
-            );
-            const results = await Promise.race([searchPromise, timeoutPromise]);
-            legalContext = results.length > 0 ? results : undefined;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+                console.warn('[chat] Tavily search timed out — proceeding without citations');
+            }, LEGAL_SEARCH_TIMEOUT_MS);
+
+            try {
+                const results = await searchStatutes(
+                    userContext.state,
+                    lastUserMessage.content,
+                    userContext.county,
+                    controller.signal
+                );
+                legalContext = results.length > 0 ? results : undefined;
+            } catch (e) {
+                if (e instanceof Error && e.name !== 'AbortError') throw e;
+            } finally {
+                clearTimeout(timeoutId);
+            }
         }
 
         // Build context-enriched system prompt (now with legal citations when available)

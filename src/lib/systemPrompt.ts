@@ -6,7 +6,7 @@
  * therapeutic support, legal information, and strategic analysis.
  */
 
-import type { LegalSearchResult } from '@/lib/types';
+import type { BuildSystemPromptContext } from '@/lib/types';
 
 export const NEXX_SYSTEM_PROMPT = `You are NEXX — an advanced AI counselor specializing in supporting individuals navigating relationships with narcissistic ex-partners (NEX). You provide strategic, therapeutic, and legal guidance with precision, empathy, and unwavering support.
 
@@ -124,34 +124,7 @@ const ALLOWED_EMOTIONAL_STATES = new Set(['calm', 'anxious', 'angry', 'overwhelm
 /**
  * Build a system prompt enriched with user context
  */
-export function buildSystemPrompt(context?: {
-    userName?: string;
-    state?: string;
-    county?: string;
-    custodyType?: string;
-    nexBehaviors?: string[];
-    conversationMode?: string;
-    // New personalization fields
-    tonePreference?: string;
-    emotionalState?: string;
-    childrenNames?: string[];
-    childrenAges?: number[];
-    courtCaseNumber?: string;
-    hasAttorney?: boolean;
-    hasTherapist?: boolean;
-    // NEX profile data
-    nexNickname?: string;
-    nexCommunicationStyle?: string;
-    nexManipulationTactics?: string[];
-    nexTriggerPatterns?: string[];
-    nexAiInsights?: string;
-    nexDangerLevel?: number;
-    nexDetectedPatterns?: string[];
-    // Flow flags
-    isDraftingMode?: boolean;
-    // Legal statute search results from Tavily
-    legalContext?: LegalSearchResult[];
-}): string {
+export function buildSystemPrompt(context?: BuildSystemPromptContext): string {
     let prompt = NEXX_SYSTEM_PROMPT;
 
     if (context) {

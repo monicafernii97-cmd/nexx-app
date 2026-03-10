@@ -1,0 +1,657 @@
+/**
+ * Legal Document CSS Stylesheet
+ *
+ * This CSS is injected into the HTML template before Puppeteer renders to PDF.
+ * CSS custom properties (--var) are dynamically set from CourtFormattingRules
+ * at render time so the same stylesheet adapts to any state/county.
+ *
+ * Based on measured Texas pleading PDF geometry:
+ *   - Page: 8.5 × 11 in
+ *   - Margins: ~1.083 in left/right, ~1.12 in top
+ *   - Body text width: 6.333 in
+ *   - Font: Times New Roman 12pt
+ *   - Line spacing: 1.5 (18pt baseline-to-baseline)
+ *   - Body alignment: justified
+ *   - Caption § column centered at page midpoint
+ */
+
+/* ═══ CSS Custom Properties — set dynamically at render time ═══ */
+:root {
+  --page-width: 8.5in;
+  --page-height: 11in;
+  --margin-top: 1.12in;
+  --margin-bottom: 1in;
+  --margin-left: 1.083in;
+  --margin-right: 1.083in;
+  --font-family: 'Times New Roman', Times, serif;
+  --font-size: 12pt;
+  --line-spacing: 1.5;
+  --body-alignment: justify;
+  --paragraph-indent: 0in;
+  --footer-font-size: 10pt;
+}
+
+/* ═══ Page Setup ═══ */
+@page {
+  size: var(--page-width) var(--page-height);
+  margin-top: var(--margin-top);
+  margin-bottom: var(--margin-bottom);
+  margin-left: var(--margin-left);
+  margin-right: var(--margin-right);
+}
+
+/* ═══ Base ═══ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  line-height: var(--line-spacing);
+  text-align: var(--body-alignment);
+  color: #000;
+  background: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CAPTION — Texas § Column Style
+   Three-column layout centered within body text width.
+   § symbols centered in the narrow middle column.
+   ═══════════════════════════════════════════════════════════════ */
+
+.caption-block {
+  margin-bottom: 18pt;
+}
+
+.cause-number {
+  text-align: center;
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: var(--font-size);
+  margin-bottom: 12pt;
+  letter-spacing: 0.5pt;
+}
+
+.caption-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.caption-table td {
+  vertical-align: top;
+  font-size: var(--font-size);
+  line-height: 1.4;
+  padding: 1pt 0;
+}
+
+/* Left column: case style — centered text */
+.caption-left {
+  width: 48%;
+  text-align: center;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+/* Center column: § symbols — exact horizontal center */
+.caption-center {
+  width: 4%;
+  text-align: center;
+  font-weight: normal;
+}
+
+/* Right column: court info — centered text */
+.caption-right {
+  width: 48%;
+  text-align: center;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   CAPTION — Versus Style (most states outside TX)
+   ═══════════════════════════════════════════════════════════════ */
+
+.caption-versus {
+  text-align: center;
+  margin-bottom: 18pt;
+}
+
+.caption-versus .party-name {
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.caption-versus .party-role {
+  font-style: italic;
+  margin-bottom: 6pt;
+}
+
+.caption-versus .vs-line {
+  margin: 8pt 0;
+  font-weight: bold;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   TITLE BLOCK — between horizontal rules
+   Bold, ALL CAPS, centered
+   ═══════════════════════════════════════════════════════════════ */
+
+.title-block {
+  text-align: center;
+  margin: 6pt 0;
+}
+
+.title-rule {
+  border: none;
+  border-top: 1pt solid #000;
+  margin: 4pt 0;
+}
+
+.document-title {
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: var(--font-size);
+  line-height: 1.4;
+  padding: 8pt 0;
+  text-align: center;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   COURT ADDRESS
+   ═══════════════════════════════════════════════════════════════ */
+
+.court-address {
+  text-transform: uppercase;
+  margin-top: 18pt;
+  margin-bottom: 12pt;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SECTION HEADINGS
+   Level 1: Roman numeral + Bold ALL CAPS (I. BACKGROUND)
+   Level 2: Bold Title Case (A. Hearing was properly noticed)
+   ═══════════════════════════════════════════════════════════════ */
+
+.section-heading {
+  font-weight: bold;
+  text-transform: uppercase;
+  margin-top: 24pt;
+  margin-bottom: 12pt;
+  text-align: left;
+}
+
+.section-heading-l2 {
+  font-weight: bold;
+  text-transform: none;
+  margin-top: 18pt;
+  margin-bottom: 8pt;
+  text-indent: 0.5in;
+  text-align: left;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   BODY PARAGRAPHS
+   ═══════════════════════════════════════════════════════════════ */
+
+.body-paragraph {
+  text-indent: var(--paragraph-indent);
+  margin-bottom: 12pt;
+  text-align: var(--body-alignment);
+}
+
+.body-paragraph:first-of-type {
+  /* First paragraph after intro — often no indent */
+  text-indent: 0;
+}
+
+/* Numbered paragraphs (hanging indent) */
+.numbered-paragraph {
+  margin-bottom: 12pt;
+  text-align: var(--body-alignment);
+  padding-left: 0.25in;
+  text-indent: -0.25in;
+}
+
+.numbered-paragraph .number {
+  display: inline;
+  font-weight: normal;
+}
+
+/* Numbered list (1., 2., 3.) */
+.numbered-list {
+  list-style: none;
+  padding-left: 0.5in;
+  margin: 12pt 0;
+}
+
+.numbered-list li {
+  margin-bottom: 8pt;
+  text-indent: -0.3in;
+  padding-left: 0.3in;
+}
+
+.numbered-list li::before {
+  content: attr(data-number) ".";
+  display: inline-block;
+  width: 0.3in;
+  font-weight: normal;
+}
+
+/* Block quotes (indented, single-spaced for quotes >2 lines) */
+.block-quote {
+  margin: 12pt 0.5in;
+  line-height: 1.15;
+  text-indent: 0;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   PRAYER FOR RELIEF
+   ═══════════════════════════════════════════════════════════════ */
+
+.prayer {
+  margin-top: 18pt;
+  margin-bottom: 18pt;
+  text-indent: var(--paragraph-indent);
+}
+
+.prayer .formal-phrase {
+  text-transform: uppercase;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SIGNATURE BLOCK — left-aligned for pro se, right for attorneys
+   ═══════════════════════════════════════════════════════════════ */
+
+.signature-block {
+  margin-top: 36pt;
+  text-align: left;
+}
+
+.signature-block.right-aligned {
+  text-align: right;
+}
+
+.signature-line {
+  margin-top: 24pt;
+  margin-bottom: 2pt;
+}
+
+.signature-name {
+  font-weight: normal;
+}
+
+.signature-role {
+  font-weight: normal;
+}
+
+.signature-details {
+  font-weight: normal;
+  font-size: var(--font-size);
+  line-height: 1.3;
+  margin-top: 4pt;
+}
+
+.e-signature {
+  font-style: normal;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   JUDGE SIGNATURE BLOCK
+   ═══════════════════════════════════════════════════════════════ */
+
+.judge-signature {
+  margin-top: 36pt;
+}
+
+.judge-signed-line {
+  text-transform: uppercase;
+  margin-bottom: 36pt;
+}
+
+.judge-sign-underline {
+  display: inline-block;
+  width: 3in;
+  border-bottom: 1pt solid #000;
+  margin-top: 24pt;
+}
+
+.judge-label {
+  text-transform: uppercase;
+  margin-top: 2pt;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   CERTIFICATE OF SERVICE
+   ═══════════════════════════════════════════════════════════════ */
+
+.certificate-of-service {
+  margin-top: 36pt;
+  page-break-inside: avoid;
+}
+
+.cos-title {
+  font-weight: bold;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 12pt;
+}
+
+.cos-body {
+  text-indent: var(--paragraph-indent);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   APPROVAL LINE
+   ═══════════════════════════════════════════════════════════════ */
+
+.approval-block {
+  margin-top: 24pt;
+}
+
+.approval-label {
+  text-transform: uppercase;
+  margin-bottom: 24pt;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   NOTARY BLOCK
+   ═══════════════════════════════════════════════════════════════ */
+
+.notary-block {
+  margin-top: 24pt;
+  page-break-inside: avoid;
+}
+
+.notary-sworn {
+  text-transform: uppercase;
+  margin-bottom: 24pt;
+}
+
+.notary-sign-underline {
+  display: inline-block;
+  width: 3in;
+  border-bottom: 1pt solid #000;
+  margin-top: 24pt;
+}
+
+.notary-details {
+  margin-top: 4pt;
+  line-height: 1.3;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ORDER-SPECIFIC STYLING
+   IT IS ORDERED, GRANTED, DENIED, etc.
+   ═══════════════════════════════════════════════════════════════ */
+
+.order-keyword {
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.order-paragraph {
+  margin-bottom: 12pt;
+  text-indent: var(--paragraph-indent);
+}
+
+/* Checkbox options in proposed orders */
+.order-checkbox {
+  margin-bottom: 8pt;
+  padding-left: 0.3in;
+  text-indent: -0.3in;
+}
+
+.order-checkbox::before {
+  content: "☐ ";
+  font-size: 14pt;
+}
+
+.order-checkbox.checked::before {
+  content: "☑ ";
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   EXHIBIT STYLING
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Exhibit cover page */
+.exhibit-cover {
+  page-break-before: always;
+  text-align: center;
+  padding-top: 3in;
+}
+
+.exhibit-label {
+  font-weight: bold;
+  font-size: 16pt;
+  text-transform: uppercase;
+  margin-bottom: 24pt;
+}
+
+.exhibit-title {
+  font-size: 14pt;
+  margin-bottom: 12pt;
+}
+
+.exhibit-description {
+  font-size: 12pt;
+  font-style: normal;
+}
+
+/* Exhibit index */
+.exhibit-index {
+  margin: 18pt 0;
+}
+
+.exhibit-index-title {
+  font-weight: bold;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 18pt;
+}
+
+.exhibit-index-entry {
+  margin-bottom: 6pt;
+}
+
+/* Bates stamp (positioned in footer/corner) */
+.bates-stamp {
+  position: fixed;
+  bottom: 0.5in;
+  right: 0.5in;
+  font-family: 'Courier New', monospace;
+  font-size: 9pt;
+  color: #333;
+}
+
+/* Communication summary page */
+.comm-summary {
+  page-break-before: always;
+  margin-bottom: 24pt;
+}
+
+.comm-summary-title {
+  font-weight: bold;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 12pt;
+}
+
+.comm-summary-subtitle {
+  text-align: center;
+  text-transform: uppercase;
+  margin-bottom: 18pt;
+}
+
+.comm-summary-label {
+  font-weight: bold;
+  margin-bottom: 8pt;
+}
+
+.comm-summary-points {
+  list-style: decimal;
+  padding-left: 0.5in;
+  margin-bottom: 12pt;
+}
+
+/* Timeline table */
+.timeline-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12pt 0;
+}
+
+.timeline-table th {
+  text-align: left;
+  font-weight: bold;
+  border-bottom: 1pt solid #000;
+  padding: 4pt 8pt;
+}
+
+.timeline-table td {
+  padding: 4pt 8pt;
+  border-bottom: 0.5pt solid #ccc;
+  vertical-align: top;
+}
+
+/* Key point / highlight box */
+.key-point-box {
+  border: 1.5pt solid #000;
+  padding: 8pt 12pt;
+  margin: 12pt 0;
+  page-break-inside: avoid;
+}
+
+.key-point-label {
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 10pt;
+  margin-bottom: 4pt;
+}
+
+.key-point-content {
+  font-size: var(--font-size);
+}
+
+/* "Records Reflect" callout */
+.records-reflect-box {
+  border: 1.5pt solid #000;
+  background: #f9f9f9;
+  padding: 8pt 12pt;
+  margin: 12pt 0;
+  page-break-inside: avoid;
+}
+
+.records-reflect-label {
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 10pt;
+  margin-bottom: 4pt;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   FOOTER (optional — case no + doc title + page)
+   ═══════════════════════════════════════════════════════════════ */
+
+.page-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  font-size: var(--footer-font-size);
+  text-align: center;
+  color: #555;
+  padding: 0 var(--margin-left);
+}
+
+.page-footer-split {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--footer-font-size);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE BREAK UTILITIES
+   ═══════════════════════════════════════════════════════════════ */
+
+.page-break {
+  page-break-after: always;
+}
+
+.no-break {
+  page-break-inside: avoid;
+}
+
+.keep-together {
+  page-break-inside: avoid;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   DIVIDER (used between exhibits)
+   ═══════════════════════════════════════════════════════════════ */
+
+.exhibit-divider {
+  page-break-before: always;
+  border-top: 1pt solid #000;
+  margin: 0;
+  padding: 0;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPHASIS CONVENTIONS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Bold ALL CAPS — titles, orders */
+.bold-caps {
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* Bold Title Case — section headings */
+.bold-title {
+  font-weight: bold;
+}
+
+/* ALL CAPS no bold — formal legal phrases, court address */
+.caps-only {
+  text-transform: uppercase;
+}
+
+/* Italics — case citations, Latin phrases */
+.case-cite {
+  font-style: italic;
+}
+
+/* Fill-in blanks */
+.fill-blank {
+  display: inline-block;
+  min-width: 2in;
+  border-bottom: 1pt solid #000;
+}
+
+.fill-blank-short {
+  display: inline-block;
+  min-width: 0.75in;
+  border-bottom: 1pt solid #000;
+}

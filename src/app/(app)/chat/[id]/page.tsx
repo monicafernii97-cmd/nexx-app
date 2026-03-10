@@ -148,7 +148,7 @@ export default function ConversationPage() {
                 setStreamingContent('');
             }
         },
-        [conversationId, messages, conversation?.mode, sendMessage, isStreaming, isPending, isThreadReady]
+        [conversationId, messages, conversation?.mode, sendMessage, isStreaming, isPending, isThreadReady, userProfile, nexProfile]
     );
 
     // Early return AFTER all hooks

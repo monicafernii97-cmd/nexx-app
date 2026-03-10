@@ -109,6 +109,11 @@ export const updateAiInsights = mutation({
             throw new Error('Not authorized to update this NEX profile');
         }
 
+        // Validate dangerLevel range if provided
+        if (args.dangerLevel !== undefined && (args.dangerLevel < 1 || args.dangerLevel > 5 || !Number.isInteger(args.dangerLevel))) {
+            throw new Error('dangerLevel must be an integer between 1 and 5');
+        }
+
         const { id, ...updates } = args;
         const filtered = Object.fromEntries(
             Object.entries(updates).filter(([_, v]) => v !== undefined)

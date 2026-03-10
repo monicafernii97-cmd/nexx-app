@@ -143,7 +143,8 @@ export function buildSystemPrompt(context?: {
             const names = context.childrenNames
                 .slice(0, 10)
                 .map((n) => sanitizeForPrompt(n, 50));
-            const ages = context.childrenAges?.slice(0, 10) ?? [];
+            const ages = (context.childrenAges?.slice(0, 10) ?? [])
+                .map(age => (Number.isFinite(age) && age >= 0 && age <= 25 ? age : undefined));
             const childInfo = names.map((name, i) =>
                 ages[i] !== undefined ? `${name} (age ${ages[i]})` : name
             );
@@ -206,6 +207,12 @@ export function buildSystemPrompt(context?: {
         }
         if (context.nexDangerLevel !== undefined) {
             parts.push(`NEX danger assessment level: ${context.nexDangerLevel}/5. ${context.nexDangerLevel >= 4 ? 'THIS IS A HIGH-RISK SITUATION. Prioritize safety recommendations.' : ''}`);
+        }
+        if (context.nexDetectedPatterns && context.nexDetectedPatterns.length > 0) {
+            const patterns = context.nexDetectedPatterns
+                .slice(0, 10)
+                .map((p) => sanitizeForPrompt(p, 100));
+            parts.push(`AI-detected behavioral patterns: ${patterns.join(', ')}.`);
         }
 
         // ── Conversation Mode ──

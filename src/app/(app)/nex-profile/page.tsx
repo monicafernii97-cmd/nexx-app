@@ -48,6 +48,7 @@ export default function NexProfilePage() {
 
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState({
         nickname: '',
         relationship: '',
@@ -95,6 +96,7 @@ export default function NexProfilePage() {
 
     const handleSave = async () => {
         setSaving(true);
+        setError(null);
         try {
             if (nexProfile) {
                 await updateProfile({
@@ -120,8 +122,9 @@ export default function NexProfilePage() {
             }
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
-        } catch (error) {
-            console.error('Failed to save NEX profile:', error);
+        } catch (err) {
+            console.error('Failed to save NEX profile:', err);
+            setError('Failed to save. Please try again.');
         } finally {
             setSaving(false);
         }
@@ -153,6 +156,9 @@ export default function NexProfilePage() {
                         {saved ? <Check size={16} /> : <Save size={16} />}
                         {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Profile'}
                     </button>
+                    {error && (
+                        <p className="text-xs mt-1" style={{ color: '#C75A5A' }}>{error}</p>
+                    )}
                 </div>
 
                 <div className="space-y-6">
@@ -367,9 +373,9 @@ export default function NexProfilePage() {
                                     <div className="mt-3">
                                         <span className="text-xs font-medium block mb-1.5" style={{ color: '#8A7A60' }}>AI-Detected Patterns:</span>
                                         <div className="flex flex-wrap gap-1.5">
-                                            {nexProfile.detectedPatterns.map((pattern) => (
+                                            {nexProfile.detectedPatterns.map((pattern, index) => (
                                                 <span
-                                                    key={pattern}
+                                                    key={`${pattern}-${index}`}
                                                     className="px-2 py-1 rounded-md text-xs"
                                                     style={{
                                                         background: 'rgba(197, 139, 7, 0.08)',

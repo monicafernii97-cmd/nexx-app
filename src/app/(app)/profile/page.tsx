@@ -118,20 +118,23 @@ export default function ProfilePage() {
 
     useEffect(() => {
         // Sync arrays when childrenCount changes
-        const count = form.childrenCount;
-        if (count > form.childrenNames.length) {
-            setForm(prev => ({
-                ...prev,
-                childrenNames: [...prev.childrenNames, ...Array(count - prev.childrenNames.length).fill('')],
-                childrenAges: [...prev.childrenAges, ...Array(count - prev.childrenAges.length).fill(0)],
-            }));
-        } else if (count < form.childrenNames.length) {
-            setForm(prev => ({
-                ...prev,
-                childrenNames: prev.childrenNames.slice(0, count),
-                childrenAges: prev.childrenAges.slice(0, count),
-            }));
-        }
+        setForm(prev => {
+            const count = prev.childrenCount;
+            if (count > prev.childrenNames.length) {
+                return {
+                    ...prev,
+                    childrenNames: [...prev.childrenNames, ...Array(count - prev.childrenNames.length).fill('')],
+                    childrenAges: [...prev.childrenAges, ...Array(count - prev.childrenAges.length).fill(0)],
+                };
+            } else if (count < prev.childrenNames.length) {
+                return {
+                    ...prev,
+                    childrenNames: prev.childrenNames.slice(0, count),
+                    childrenAges: prev.childrenAges.slice(0, count),
+                };
+            }
+            return prev;
+        });
     }, [form.childrenCount]);
 
     if (!user) {

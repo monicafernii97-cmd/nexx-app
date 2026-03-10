@@ -213,19 +213,24 @@ export default function DocuVaultPage() {
                                                                 Children
                                                             </span>
                                                         )}
-                                                        <div className="flex gap-0.5 ml-auto">
-                                                            {[1, 2, 3].map((level) => (
-                                                                <div
-                                                                    key={level}
-                                                                    className="w-1.5 h-4 rounded-sm"
-                                                                    style={{
-                                                                        background: level <= incident.severity
-                                                                            ? cat?.color
-                                                                            : 'rgba(138, 122, 96, 0.15)',
-                                                                    }}
-                                                                />
-                                                            ))}
-                                                        </div>
+                                                        {(() => {
+                                                            const sev = Math.max(1, Math.min(3, incident.severity ?? 2));
+                                                            return (
+                                                                <div className="flex gap-0.5 ml-auto">
+                                                                    {[1, 2, 3].map((level) => (
+                                                                        <div
+                                                                            key={level}
+                                                                            className="w-1.5 h-4 rounded-sm"
+                                                                            style={{
+                                                                                background: level <= sev
+                                                                                    ? cat?.color
+                                                                                    : 'rgba(138, 122, 96, 0.15)',
+                                                                            }}
+                                                                        />
+                                                                    ))}
+                                                                </div>
+                                                            );
+                                                        })()}
                                                     </div>
                                                     <p className="text-sm leading-relaxed line-clamp-2" style={{ color: '#D4C9B0' }}>
                                                         {incident.courtSummary || incident.narrative}

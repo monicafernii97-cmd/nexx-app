@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
@@ -523,17 +523,20 @@ export default function IncidentDetailPage() {
             )}
 
             {/* Delete Confirmation Modal */}
+            <AnimatePresence>
             {showDeleteConfirm && (
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                     className="fixed inset-0 z-50 flex items-center justify-center"
                     style={{ background: 'rgba(2, 2, 45, 0.8)' }}
                     onClick={() => !isDeleting && setShowDeleteConfirm(false)}
                 >
                     <motion.div
-                        initial={{ scale: 0.95 }}
-                        animate={{ scale: 1 }}
+                        initial={{ scale: 0.95, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.95, opacity: 0 }}
                         className="card-gilded p-6 max-w-sm mx-4"
                         role="dialog"
                         aria-modal="true"
@@ -572,6 +575,7 @@ export default function IncidentDetailPage() {
                     </motion.div>
                 </motion.div>
             )}
+            </AnimatePresence>
         </div>
     );
 }

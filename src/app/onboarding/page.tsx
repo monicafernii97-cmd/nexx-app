@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery } from 'convex/react';
+import { useMutation, useQuery, useConvexAuth } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import {
@@ -19,12 +19,25 @@ import {
 } from 'lucide-react';
 import { US_STATES, ONBOARDING_STEPS } from '@/lib/constants';
 
+/**
+ * Onboarding flow for new NEXX users.
+ *
+ * Collects user profile data (name, state, custody arrangement, NEX behaviors,
+ * goals) across a multi-step form and saves it to Convex on completion.
+ *
+ * Returning users who have already completed onboarding are automatically
+ * redirected to the dashboard via a Convex-auth-gated guard.
+ */
 export default function OnboardingPage() {
     const router = useRouter();
     const { userId, isLoading: userLoading, error: userError, clerkUser } = useUser();
 
+    // Wait for Convex auth to sync before querying — prevents false-null
+    // from querying before the Clerk JWT is available on the Convex side.
+    const { isAuthenticated: convexReady } = useConvexAuth();
+
     // Guard: redirect returning users who already completed onboarding
-    const currentUser = useQuery(api.users.me, clerkUser ? {} : 'skip');
+    const currentUser = useQuery(api.users.me, convexReady ? {} : 'skip');
     useEffect(() => {
         if (currentUser?.onboardingComplete) {
             router.replace('/dashboard');

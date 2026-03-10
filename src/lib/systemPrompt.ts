@@ -238,7 +238,8 @@ export function buildSystemPrompt(context?: {
             parts.push(`AI behavioral analysis of the NEX: ${sanitizeForPrompt(context.nexAiInsights, 500)}`);
         }
         if (context.nexDangerLevel !== undefined) {
-            parts.push(`NEX danger assessment level: ${context.nexDangerLevel}/5. ${context.nexDangerLevel >= 4 ? 'THIS IS A HIGH-RISK SITUATION. Prioritize safety recommendations.' : ''}`);
+            const level = Math.max(0, Math.min(5, context.nexDangerLevel));
+            parts.push(`NEX danger assessment level: ${level}/5. ${level >= 4 ? 'THIS IS A HIGH-RISK SITUATION. Prioritize safety recommendations.' : ''}`);
         }
         if (context.nexDetectedPatterns && context.nexDetectedPatterns.length > 0) {
             const patterns = context.nexDetectedPatterns

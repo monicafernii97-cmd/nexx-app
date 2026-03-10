@@ -50,7 +50,11 @@ export default function OnboardingPage() {
     const convexAuthFailed = !convexLoading && !convexReady && !!clerkUser;
 
     // Show loading state while Convex auth is syncing
-    if (convexLoading || (convexReady && currentUser === undefined)) {
+    if (
+        convexLoading ||
+        (convexReady && currentUser === undefined) ||
+        currentUser?.onboardingComplete
+    ) {
         return (
             <div className="silk-bg min-h-screen flex items-center justify-center">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">

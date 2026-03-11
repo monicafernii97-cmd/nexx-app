@@ -15,20 +15,9 @@ import { renderDocumentHTML } from '@/lib/legal/templateRenderer';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
 import type { DocumentGenerationRequest, CaptionData } from '@/lib/legal/types';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import { titleCase } from '@/lib/utils/stringHelpers';
 
 export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
-
-/**
- * Title-case a string: first letter uppercase, rest lowercase.
- * Used to normalize state/county to match the canonical casing used in rule maps.
- */
-function titleCase(s: string): string {
-  return s
-    .trim()
-    .split(/\s+/)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
-}
 
 /** Handle POST requests to generate legal documents as PDF or HTML preview. */
 export async function POST(request: NextRequest) {

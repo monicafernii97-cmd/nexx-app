@@ -60,11 +60,12 @@ export const markAiVerified = mutation({
             throw new Error('Not authorized');
         }
 
+        const now = Date.now();
         await ctx.db.patch(args.id, {
             aiVerified: true,
-            aiVerifiedAt: Date.now(),
+            aiVerifiedAt: now,
             ...(args.formattingOverrides ? { formattingOverrides: args.formattingOverrides } : {}),
-            updatedAt: Date.now(),
+            updatedAt: now,
         });
     },
 });

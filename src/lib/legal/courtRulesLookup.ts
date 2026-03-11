@@ -34,27 +34,28 @@ const MAX_CACHE_SIZE = 500;
 /** Process-local cache keyed by "state|county" */
 const rulesCache = new Map<string, CacheEntry>();
 
-function getCacheKey(state: string, county: string): string {
-    return `${state}|${county}`;
+function getCacheKey(state: string, county: string, courtName?: string): string {
+    return courtName ? `${state}|${county}|${courtName}` : `${state}|${county}`;
 }
 
-function getCached(state: string, county: string): CourtRulesLookupResult | null {
-    const entry = rulesCache.get(getCacheKey(state, county));
+function getCached(state: string, county: string, courtName?: string): CourtRulesLookupResult | null {
+    const key = getCacheKey(state, county, courtName);
+    const entry = rulesCache.get(key);
     if (!entry) return null;
     if (Date.now() > entry.expiresAt) {
-        rulesCache.delete(getCacheKey(state, county));
+        rulesCache.delete(key);
         return null;
     }
     return { ...entry.result, cached: true };
 }
 
-function setCache(state: string, county: string, result: CourtRulesLookupResult): void {
+function setCache(state: string, county: string, result: CourtRulesLookupResult, courtName?: string): void {
     // Evict oldest entry if cache is full (FIFO)
     if (rulesCache.size >= MAX_CACHE_SIZE) {
         const oldestKey = rulesCache.keys().next().value;
         if (oldestKey) rulesCache.delete(oldestKey);
     }
-    rulesCache.set(getCacheKey(state, county), {
+    rulesCache.set(getCacheKey(state, county, courtName), {
         result,
         expiresAt: Date.now() + CACHE_TTL_MS,
     });
@@ -204,7 +205,7 @@ async function extractRulesWithAI(
 
         // Calculate confidence based on how many fields were extracted
         const fieldCount = Object.keys(parsed).length;
-        const maxFields = 15;
+        const maxFields = 17; // Must match extractable fields in EXTRACTION_PROMPT
         const confidence = Math.min(fieldCount / maxFields, 1.0);
 
         return {
@@ -247,7 +248,7 @@ export async function lookupCourtRules(
 ): Promise<CourtRulesLookupResult> {
     // Step 1: Check cache (unless force-refreshing)
     if (!forceRefresh) {
-        const cached = getCached(state, county);
+        const cached = getCached(state, county, courtName);
         if (cached) return cached;
     }
 
@@ -273,7 +274,7 @@ export async function lookupCourtRules(
 
     // Step 4: Cache for future requests
     if (extraction.confidence > 0) {
-        setCache(state, county, result);
+        setCache(state, county, result, courtName);
     }
 
     return result;

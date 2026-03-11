@@ -192,31 +192,52 @@ export const COUNTY_OVERRIDES: Record<string, CountyOverrides> = {
 
 /**
  * Get the merged formatting rules for a given state + county.
- * Priority: NEXX_DEFAULTS → State baseline → County overrides → User overrides
+ * Priority: NEXX_DEFAULTS → State baseline → County overrides → User overrides.
+ * Deep-merges nested objects (e.g., captionColumnWidths) so partial overrides
+ * don't wipe out sibling properties.
  */
 export function getMergedRules(
   state?: string,
   county?: string,
   userOverrides?: Partial<CourtFormattingRules>
 ): CourtFormattingRules {
+  /** Deep-merge that handles nested objects explicitly */
+  const mergeRules = (
+    base: CourtFormattingRules,
+    overrides?: Partial<CourtFormattingRules>
+  ): CourtFormattingRules => ({
+    ...base,
+    ...overrides,
+    // Deep-merge nested objects so partial overrides preserve siblings
+    captionColumnWidths: {
+      ...base.captionColumnWidths,
+      ...overrides?.captionColumnWidths,
+    },
+    // Merge notes arrays instead of replacing
+    notes: [
+      ...base.notes,
+      ...(overrides?.notes ?? []),
+    ],
+  });
+
   let rules = { ...NEXX_DEFAULTS };
 
   // Layer 2: State baseline
   if (state && STATE_RULES[state]) {
-    rules = { ...rules, ...STATE_RULES[state] };
+    rules = mergeRules(rules, STATE_RULES[state]);
   }
 
   // Layer 3: County overrides
   if (state && county) {
     const key = `${state}:${county}`;
     if (COUNTY_OVERRIDES[key]?.formattingOverrides) {
-      rules = { ...rules, ...COUNTY_OVERRIDES[key].formattingOverrides };
+      rules = mergeRules(rules, COUNTY_OVERRIDES[key].formattingOverrides);
     }
   }
 
   // Layer 4: User overrides (highest priority)
   if (userOverrides) {
-    rules = { ...rules, ...userOverrides };
+    rules = mergeRules(rules, userOverrides);
   }
 
   return rules;

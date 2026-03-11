@@ -12,7 +12,7 @@ import { getMergedRules } from '@/lib/legal/courtRules';
 import { getTemplate } from '@/lib/legal/templates';
 import { renderDocumentHTML } from '@/lib/legal/templateRenderer';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
-import type { DocumentGenerationRequest, CaptionData, GeneratedSection } from '@/lib/legal/types';
+import type { DocumentGenerationRequest, CaptionData } from '@/lib/legal/types';
 
 export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
 
@@ -21,10 +21,33 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as DocumentGenerationRequest;
 
-    // ── 1. Validate request ──
+    // ── 1. Validate request shape ──
+    // Validate all required fields up front so missing data returns 400
+    // instead of crashing with a 500 when nested properties are accessed.
     if (!body.templateId) {
       return NextResponse.json(
         { error: 'templateId is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!body.courtSettings?.state || !body.courtSettings?.county) {
+      return NextResponse.json(
+        { error: 'courtSettings with state and county is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!body.petitioner?.name) {
+      return NextResponse.json(
+        { error: 'petitioner with name is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!body.caseType) {
+      return NextResponse.json(
+        { error: 'caseType is required' },
         { status: 400 }
       );
     }
@@ -37,11 +60,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 2. Merge court formatting rules ──
+    // ── 2. Normalize and merge court formatting rules ──
+    // Normalize state/county to consistent casing for rule lookup
+    const normalizedState = body.courtSettings.state.trim();
+    const normalizedCounty = body.courtSettings.county.trim();
+
     // Priority: NEXX defaults → State → County → User overrides
     const rules = getMergedRules(
-      body.courtSettings.state,
-      body.courtSettings.county,
+      normalizedState,
+      normalizedCounty,
       body.formattingOverrides ?? {}
     );
 
@@ -130,10 +157,13 @@ function buildDefaultCaption(body: DocumentGenerationRequest): CaptionData {
       children.length === 1 ? 'A CHILD' : 'CHILDREN',
     ];
   } else {
-    // Standard versus-style
+    // Standard versus-style caption
+    // Use party designation ('Petitioner'), NOT the signing role
+    // (e.g., 'Attorney for Petitioner') — SignatureBlockData.role models
+    // the signer's capacity, not the caption party designation.
     leftLines = [
       `${petitioner.name.toUpperCase()},`,
-      petitioner.role,
+      'Petitioner',
       '',
       'v.',
       '',

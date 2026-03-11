@@ -835,34 +835,41 @@ export const TEMPLATE_LIBRARY: DocumentTemplate[] = [
 ];
 
 /**
- * Get a template by its ID
+ * Get a template by its ID. Returns a deep copy to prevent shared-state mutation.
  */
 export function getTemplate(id: string): DocumentTemplate | undefined {
-  return TEMPLATE_LIBRARY.find(t => t.id === id);
+  const template = TEMPLATE_LIBRARY.find(t => t.id === id);
+  return template ? structuredClone(template) : undefined;
 }
 
 /**
- * Get templates filtered by category
+ * Get templates filtered by category. Returns deep copies to prevent shared-state mutation.
  */
 export function getTemplatesByCategory(category: string): DocumentTemplate[] {
-  return TEMPLATE_LIBRARY.filter(t => t.category === category);
+  return TEMPLATE_LIBRARY
+    .filter(t => t.category === category)
+    .map(t => structuredClone(t));
 }
 
 /**
- * Get templates relevant to a specific case type
+ * Get templates relevant to a specific case type. Returns deep copies to prevent shared-state mutation.
  */
 export function getTemplatesForCaseType(caseType: string): DocumentTemplate[] {
-  return TEMPLATE_LIBRARY.filter(t => t.caseTypes.includes(caseType as never));
+  return TEMPLATE_LIBRARY
+    .filter(t => t.caseTypes.includes(caseType as never))
+    .map(t => structuredClone(t));
 }
 
 /**
- * Search templates by keyword in title or description
+ * Search templates by keyword in title or description. Returns deep copies to prevent shared-state mutation.
  */
 export function searchTemplates(query: string): DocumentTemplate[] {
   const lower = query.toLowerCase();
-  return TEMPLATE_LIBRARY.filter(
-    t => t.title.toLowerCase().includes(lower) || t.description.toLowerCase().includes(lower)
-  );
+  return TEMPLATE_LIBRARY
+    .filter(
+      t => t.title.toLowerCase().includes(lower) || t.description.toLowerCase().includes(lower)
+    )
+    .map(t => structuredClone(t));
 }
 
 /**

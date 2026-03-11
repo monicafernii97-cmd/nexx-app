@@ -23,38 +23,37 @@ export async function checkDocumentCompliance(
   rules: CourtFormattingRules,
   countyInfo?: CountyOverrides | null
 ): Promise<ComplianceReport> {
-  const { default: OpenAI } = await import('openai');
+  try {
+    const { default: OpenAI } = await import('openai');
 
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
 
-  // Build the compliance rules checklist for the prompt
-  const rulesChecklist = buildRulesChecklist(rules, countyInfo);
+    // Build the compliance rules checklist for the prompt
+    const rulesChecklist = buildRulesChecklist(rules, countyInfo);
 
-  // Send the PDF as a base64 image to GPT-4o Vision
-  // Note: For multi-page PDFs, we send the first page as the primary check
-  // and include a text description of what to verify across all pages
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      {
-        role: 'system',
-        content: `You are a legal document formatting compliance checker. You analyze legal documents and verify they meet specific court formatting requirements. Return your analysis as valid JSON only, no markdown.`,
-      },
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:application/pdf;base64,${pdfBase64}`,
-              detail: 'high',
-            },
-          },
-          {
-            type: 'text',
-            text: `Analyze this legal document and verify it meets ALL of the following court formatting requirements. For each rule, determine if the document passes, has a warning, or fails.
+    // Send the PDF as a file input to GPT-4o Vision
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a legal document formatting compliance checker. You analyze legal documents and verify they meet specific court formatting requirements. Return your analysis as valid JSON only, no markdown.`,
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'file',
+              file: {
+                filename: 'document.pdf',
+                file_data: `data:application/pdf;base64,${pdfBase64}`,
+              },
+            } as never, // type: 'file' is valid but not in all TS typings yet
+            {
+              type: 'text',
+              text: `Analyze this legal document and verify it meets ALL of the following court formatting requirements. For each rule, determine if the document passes, has a warning, or fails.
 
 ${rulesChecklist}
 
@@ -73,33 +72,32 @@ Return ONLY a JSON object with this exact structure:
 }
 
 Be thorough but practical. Minor deviations that don't affect court acceptance should be "warning" not "fail". Missing required sections should be "fail".`,
-          },
-        ],
-      },
-    ],
-    response_format: { type: 'json_object' },
-    max_tokens: 2000,
-    temperature: 0.1,
-  });
-
-  // Parse the response
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    return {
-      overallStatus: 'warning',
-      checks: [
-        {
-          rule: 'AI Analysis',
-          status: 'warning',
-          detail: 'Unable to complete automated compliance check',
-          fix: 'Manual review recommended',
+            },
+          ],
         },
       ],
-      suggestions: ['AI compliance check could not complete. Please review the document manually.'],
-    };
-  }
+      response_format: { type: 'json_object' },
+      max_tokens: 2000,
+      temperature: 0.1,
+    });
 
-  try {
+    // Parse the response
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      return {
+        overallStatus: 'warning',
+        checks: [
+          {
+            rule: 'AI Analysis',
+            status: 'warning',
+            detail: 'Unable to complete automated compliance check',
+            fix: 'Manual review recommended',
+          },
+        ],
+        suggestions: ['AI compliance check could not complete. Please review the document manually.'],
+      };
+    }
+
     const result = JSON.parse(content) as ComplianceReport;
 
     // Validate the structure
@@ -108,17 +106,20 @@ Be thorough but practical. Minor deviations that don't affect court acceptance s
     }
 
     return result;
-  } catch {
+  } catch (error) {
+    // Graceful fallback for any error: network, auth, rate-limit, parse, etc.
+    console.error('[Compliance Check Error]', error instanceof Error ? error.message : error);
     return {
       overallStatus: 'warning',
       checks: [
         {
           rule: 'AI Analysis',
           status: 'warning',
-          detail: 'Compliance check returned unexpected format',
+          detail: 'Compliance check encountered an error',
+          fix: 'Manual review recommended',
         },
       ],
-      suggestions: ['Please review the document manually for formatting compliance.'],
+      suggestions: ['Automated compliance check failed. Please review the document manually.'],
     };
   }
 }

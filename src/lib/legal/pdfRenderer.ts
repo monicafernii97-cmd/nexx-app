@@ -34,9 +34,9 @@ export async function renderHTMLToPDF(
       browser = await puppeteerCore.default.launch({
         args: chromium.default.args,
         executablePath: await chromium.default.executablePath(
-          // Chromium binary hosted in Vercel blob storage or bundled
+          // Chromium binary URL must match @sparticuz/chromium-min version (v143.0.4)
           process.env.CHROMIUM_BINARY_URL ||
-          'https://github.com/nicholasgasior/puppeteer-chromium/releases/download/v131.0.0/chromium-v131.0.0-pack.tar'
+          'https://github.com/nicholasgasior/puppeteer-chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.tar'
         ),
         headless: true,
       });
@@ -82,6 +82,16 @@ export async function renderHTMLToPDF(
       timeout: 30000,
     });
 
+    // Build footer template for page numbering (TRCP requires page numbers)
+    const showPageNumbers = rules.pageNumbering;
+    const pageNumberContent = rules.pageNumberFormat === 'x-of-y'
+      ? 'Page <span class="pageNumber"></span> of <span class="totalPages"></span>'
+      : '<span class="pageNumber"></span>';
+
+    const footerTemplate = showPageNumbers
+      ? `<div style="font-size: ${rules.footerFontSize}pt; font-family: '${rules.fontFamily}', times, serif; color: #555; width: 100%; text-align: ${rules.pageNumberPosition === 'bottom-right' ? 'right' : 'center'}; padding: 0 ${rules.marginLeft}in;">${pageNumberContent}</div>`
+      : '';
+
     // Generate PDF with court-rules-derived settings
     const pdfBuffer = await page.pdf({
       format: undefined, // Use explicit width/height instead
@@ -89,13 +99,18 @@ export async function renderHTMLToPDF(
       height: `${rules.paperHeight}in`,
       margin: {
         top: `${rules.marginTop}in`,
-        bottom: `${rules.marginBottom}in`,
+        // Extra bottom margin when page numbers are enabled to accommodate footer
+        bottom: showPageNumbers
+          ? `${Math.max(rules.marginBottom, 1.0)}in`
+          : `${rules.marginBottom}in`,
         left: `${rules.marginLeft}in`,
         right: `${rules.marginRight}in`,
       },
       printBackground: true,
-      preferCSSPageSize: true,
-      displayHeaderFooter: false,
+      preferCSSPageSize: false, // Use explicit dimensions from rules instead of CSS @page
+      displayHeaderFooter: showPageNumbers,
+      headerTemplate: '<span></span>', // Empty header
+      footerTemplate,
     });
 
     return Buffer.from(pdfBuffer);

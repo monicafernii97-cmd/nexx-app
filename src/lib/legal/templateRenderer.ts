@@ -37,24 +37,61 @@ function getLegalCSS(): string {
 // CSS Variable Injection
 // ═══════════════════════════════════════════════════════════════
 
+/** Allowed font families — prevents CSS injection via fontFamily field. */
+const ALLOWED_FONTS: Record<string, string> = {
+  'Times New Roman': "'Times New Roman', times, serif",
+  'Arial': "Arial, Helvetica, sans-serif",
+  'Courier New': "'Courier New', Courier, monospace",
+  'Georgia': "Georgia, times, serif",
+  'Garamond': "Garamond, times, serif",
+};
+
+/** Validate a numeric value is a finite number within a sane range, or return the fallback. */
+function safeNum(value: unknown, fallback: number, min = 0, max = 100): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < min || n > max) return fallback;
+  return n;
+}
+
+/** Validate alignment is one of the allowed values. */
+function safeAlignment(value: string): string {
+  const allowed = ['left', 'right', 'center', 'justify'];
+  return allowed.includes(value) ? value : 'left';
+}
+
 /**
  * Convert CourtFormattingRules to CSS custom property overrides.
+ * Validates and sanitizes all values before interpolation to prevent
+ * CSS injection when Puppeteer loads the HTML.
  */
 function rulesToCSS(rules: CourtFormattingRules): string {
+  const fontStack = ALLOWED_FONTS[rules.fontFamily] ?? ALLOWED_FONTS['Times New Roman'];
+
+  // Compute caption column width percentages from inch values
+  const totalCaptionWidth = (rules.captionColumnWidths?.left ?? 3.125)
+    + (rules.captionColumnWidths?.center ?? 0.083)
+    + (rules.captionColumnWidths?.right ?? 3.125);
+  const leftPct = ((rules.captionColumnWidths?.left ?? 3.125) / totalCaptionWidth * 100).toFixed(1);
+  const centerPct = ((rules.captionColumnWidths?.center ?? 0.083) / totalCaptionWidth * 100).toFixed(1);
+  const rightPct = ((rules.captionColumnWidths?.right ?? 3.125) / totalCaptionWidth * 100).toFixed(1);
+
   return `
     :root {
-      --page-width: ${rules.paperWidth}in;
-      --page-height: ${rules.paperHeight}in;
-      --margin-top: ${rules.marginTop}in;
-      --margin-bottom: ${rules.marginBottom}in;
-      --margin-left: ${rules.marginLeft}in;
-      --margin-right: ${rules.marginRight}in;
-      --font-family: '${rules.fontFamily}', Times, serif;
-      --font-size: ${rules.fontSize}pt;
-      --line-spacing: ${rules.lineSpacing};
-      --body-alignment: ${rules.bodyAlignment};
-      --paragraph-indent: ${rules.paragraphIndent}in;
-      --footer-font-size: ${rules.footerFontSize}pt;
+      --page-width: ${safeNum(rules.paperWidth, 8.5, 1, 20)}in;
+      --page-height: ${safeNum(rules.paperHeight, 11, 1, 20)}in;
+      --margin-top: ${safeNum(rules.marginTop, 1.0, 0, 5)}in;
+      --margin-bottom: ${safeNum(rules.marginBottom, 1.0, 0, 5)}in;
+      --margin-left: ${safeNum(rules.marginLeft, 1.0, 0, 5)}in;
+      --margin-right: ${safeNum(rules.marginRight, 1.0, 0, 5)}in;
+      --font-family: ${fontStack};
+      --font-size: ${safeNum(rules.fontSize, 12, 6, 72)}pt;
+      --line-spacing: ${safeNum(rules.lineSpacing, 1.5, 1.0, 3.0)};
+      --body-alignment: ${safeAlignment(rules.bodyAlignment)};
+      --paragraph-indent: ${safeNum(rules.paragraphIndent, 0.5, 0, 3)}in;
+      --footer-font-size: ${safeNum(rules.footerFontSize, 10, 6, 72)}pt;
+      --caption-left-width: ${leftPct}%;
+      --caption-center-width: ${centerPct}%;
+      --caption-right-width: ${rightPct}%;
     }
   `;
 }
@@ -136,7 +173,7 @@ function renderCourtAddress(): string {
 
 /** Render the opening introduction paragraph identifying the filer and document purpose. */
 function renderIntroduction(content: string): string {
-  return `<div class="body-paragraph">${content}</div>`;
+  return `<div class="body-paragraph">${escapeHtml(content)}</div>`;
 }
 
 /** Render Roman-numeral-headed body sections (I. Background, II. Argument, etc.). */
@@ -148,7 +185,7 @@ function renderBodySections(sections: GeneratedSection[]): string {
       if (s.heading) {
         html += `<div class="section-heading">${escapeHtml(s.heading)}</div>`;
       }
-      html += `<div class="body-paragraph">${s.content}</div>`;
+      html += `<div class="body-paragraph">${escapeHtml(s.content)}</div>`;
       return html;
     })
     .join('\n');
@@ -158,7 +195,7 @@ function renderBodySections(sections: GeneratedSection[]): string {
 function renderNumberedParagraphs(items: string[]): string {
   return items
     .map((item, i) => {
-      return `<div class="numbered-paragraph"><span class="number">${i + 1}.</span> ${item}</div>`;
+      return `<div class="numbered-paragraph"><span class="number">${i + 1}.</span> ${escapeHtml(item)}</div>`;
     })
     .join('\n');
 }
@@ -167,7 +204,7 @@ function renderNumberedParagraphs(items: string[]): string {
 function renderPrayer(content: string): string {
   return `
     <div class="prayer">
-      <span class="formal-phrase">WHEREFORE, PREMISES CONSIDERED,</span> ${content}
+      <span class="formal-phrase">WHEREFORE, PREMISES CONSIDERED,</span> ${escapeHtml(content)}
     </div>`;
 }
 
@@ -247,6 +284,38 @@ function renderNotaryBlock(): string {
   return `
     <div class="notary-block">
       <div class="notary-sworn">
+        SWORN TO AND SUBSCRIBED before me on this <span class="fill-blank-short"></span> day of
+        <span class="fill-blank-short"></span>, <span class="fill-blank-short"></span>.
+      </div>
+      <div>
+        <div class="notary-sign-underline">&nbsp;</div>
+      </div>
+      <div class="notary-details">
+        <div>Notary Public</div>
+        <div>State of <span class="fill-blank-short"></span></div>
+        <div>My Commission Expires: <span class="fill-blank-short"></span></div>
+      </div>
+    </div>`;
+}
+
+/**
+ * Render a verification block (distinct from notary).
+ * Verification contains the verified-statement language required by court rules.
+ */
+function renderVerificationBlock(): string {
+  return `
+    <div class="notary-block">
+      <div class="cos-title">VERIFICATION</div>
+      <div class="body-paragraph">
+        I, <span class="fill-blank"></span>, being duly sworn, state under oath that
+        the facts stated in the foregoing document are true and correct to the best of
+        my knowledge and belief.
+      </div>
+      <div style="margin-top: 24pt;">
+        <div class="signature-line">_________________________</div>
+        <div class="signature-name"><span class="fill-blank"></span></div>
+      </div>
+      <div class="notary-sworn" style="margin-top: 24pt;">
         SWORN TO AND SUBSCRIBED before me on this <span class="fill-blank-short"></span> day of
         <span class="fill-blank-short"></span>, <span class="fill-blank-short"></span>.
       </div>
@@ -424,7 +493,13 @@ export function renderDocumentHTML(options: RenderDocumentOptions): string {
         break;
 
       case 'body_numbered': {
-        const numbered = bodyContent.find(s => s.sectionType === 'body_numbered');
+        // Match by sectionId when available so templates with multiple
+        // body_numbered sections (e.g., unsworn declarations) each render
+        // their own content instead of duplicating the first match.
+        const numbered = bodyContent.find(s =>
+          s.sectionType === 'body_numbered' &&
+          (section.id ? s.sectionId === section.id : true)
+        ) ?? bodyContent.find(s => s.sectionType === 'body_numbered');
         if (numbered?.numberedItems) {
           sectionHTML.push(renderNumberedParagraphs(numbered.numberedItems));
         }
@@ -453,7 +528,7 @@ export function renderDocumentHTML(options: RenderDocumentOptions): string {
 
       case 'verification':
         if (rules.requiresVerification) {
-          sectionHTML.push(renderNotaryBlock());
+          sectionHTML.push(renderVerificationBlock());
         }
         break;
 

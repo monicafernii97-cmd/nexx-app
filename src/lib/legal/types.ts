@@ -284,6 +284,8 @@ export interface DocumentGenerationRequest {
 
 /** A section of AI-generated content */
 export interface GeneratedSection {
+  /** Must match the DocumentSection.id in the template for correct rendering order */
+  sectionId?: string;
   sectionType: SectionType;
   heading?: string;
   content: string;               // HTML content

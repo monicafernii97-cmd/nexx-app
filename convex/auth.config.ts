@@ -1,7 +1,15 @@
+const clerkDomain = process.env.CLERK_ISSUER_DOMAIN;
+if (!clerkDomain) {
+    throw new Error(
+        'Missing CLERK_ISSUER_DOMAIN environment variable. ' +
+        'Set it in your Convex dashboard under Settings → Environment Variables.'
+    );
+}
+
 const authConfig = {
     providers: [
         {
-            domain: "https://full-cat-58.clerk.accounts.dev",
+            domain: clerkDomain,
             applicationID: "convex",
         },
     ],

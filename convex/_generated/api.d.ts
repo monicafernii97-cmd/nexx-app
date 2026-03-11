@@ -9,7 +9,11 @@
  */
 
 import type * as conversations from "../conversations.js";
+import type * as courtSettings from "../courtSettings.js";
+import type * as documents from "../documents.js";
+import type * as generatedDocuments from "../generatedDocuments.js";
 import type * as incidents from "../incidents.js";
+import type * as lib_auth from "../lib/auth.js";
 import type * as messages from "../messages.js";
 import type * as nexProfiles from "../nexProfiles.js";
 import type * as users from "../users.js";
@@ -22,7 +26,11 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   conversations: typeof conversations;
+  courtSettings: typeof courtSettings;
+  documents: typeof documents;
+  generatedDocuments: typeof generatedDocuments;
   incidents: typeof incidents;
+  "lib/auth": typeof lib_auth;
   messages: typeof messages;
   nexProfiles: typeof nexProfiles;
   users: typeof users;

@@ -164,4 +164,74 @@ export default defineSchema({
     })
         .index('by_user', ['userId'])
         .index('by_user_type', ['userId', 'type']),
+
+    // ═══ User Court Settings (Legal Document System) ═══
+    userCourtSettings: defineTable({
+        userId: v.id('users'),
+        state: v.string(),
+        county: v.string(),
+        courtName: v.optional(v.string()),
+        judicialDistrict: v.optional(v.string()),
+        assignedJudge: v.optional(v.string()),
+        causeNumber: v.optional(v.string()),
+        /** User-verified formatting overrides (merged on top of state/county defaults) */
+        formattingOverrides: v.optional(v.any()),
+        /** Whether the user has verified these settings via AI lookup */
+        aiVerified: v.optional(v.boolean()),
+        aiVerifiedAt: v.optional(v.number()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    }).index('by_user', ['userId']),
+
+    // ═══ Generated Documents (Legal Document System) ═══
+    generatedDocuments: defineTable({
+        userId: v.id('users'),
+        templateId: v.string(),
+        templateTitle: v.string(),
+        caseType: v.string(),
+        /** Reference to user's court settings at generation time */
+        courtSettingsId: v.optional(v.id('userCourtSettings')),
+        /** Convex storage ID for the generated PDF */
+        storageId: v.optional(v.id('_storage')),
+        /** Document status lifecycle */
+        status: v.union(
+            v.literal('draft'),
+            v.literal('final'),
+            v.literal('filed')
+        ),
+        /** Snapshot of the court settings used for this document */
+        courtState: v.string(),
+        courtCounty: v.string(),
+        /** Caption data used */
+        causeNumber: v.optional(v.string()),
+        petitionerName: v.string(),
+        respondentName: v.optional(v.string()),
+        /** Compliance check results (if run) */
+        complianceStatus: v.optional(v.union(
+            v.literal('pass'),
+            v.literal('warning'),
+            v.literal('fail'),
+            v.literal('unchecked')
+        )),
+        complianceCheckedAt: v.optional(v.number()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_user', ['userId'])
+        .index('by_user_status', ['userId', 'status']),
+
+    // ═══ Court Rules Cache (Legal Document System) ═══
+    courtRulesCache: defineTable({
+        state: v.string(),
+        county: v.string(),
+        /** AI-discovered formatting rules (stored as JSON) */
+        discoveredRules: v.any(),
+        /** Source URLs from Tavily search */
+        sources: v.optional(v.array(v.string())),
+        /** AI confidence score (0-1) */
+        confidence: v.optional(v.number()),
+        /** Cache expiration timestamp */
+        expiresAt: v.number(),
+        createdAt: v.number(),
+    }).index('by_state_county', ['state', 'county']),
 });

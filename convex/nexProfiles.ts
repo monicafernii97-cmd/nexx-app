@@ -2,9 +2,9 @@ import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { getAuthenticatedUser } from './lib/auth';
 
-// ── Mutations ──
+/** ── Mutations ── */
 
-// Create a NEX profile — auth-guarded
+/** Create a NEX profile — auth-guarded */
 export const create = mutation({
     args: {
         behaviors: v.array(v.string()),
@@ -32,7 +32,7 @@ export const create = mutation({
     },
 });
 
-// Get NEX profile for the authenticated user
+/** Get NEX profile for the authenticated user */
 export const getByUser = query({
     args: {},
     handler: async (ctx) => {
@@ -52,17 +52,17 @@ export const getByUser = query({
     },
 });
 
-// Update an existing NEX profile — auth-guarded
+/** Update an existing NEX profile — auth-guarded */
 export const update = mutation({
     args: {
         id: v.id('nexProfiles'),
         behaviors: v.optional(v.array(v.string())),
-        nickname: v.optional(v.string()),
-        relationship: v.optional(v.string()),
-        description: v.optional(v.string()),
-        communicationStyle: v.optional(v.string()),
-        manipulationTactics: v.optional(v.array(v.string())),
-        triggerPatterns: v.optional(v.array(v.string())),
+        nickname: v.optional(v.union(v.string(), v.null())),
+        relationship: v.optional(v.union(v.string(), v.null())),
+        description: v.optional(v.union(v.string(), v.null())),
+        communicationStyle: v.optional(v.union(v.string(), v.null())),
+        manipulationTactics: v.optional(v.union(v.array(v.string()), v.null())),
+        triggerPatterns: v.optional(v.union(v.array(v.string()), v.null())),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
@@ -83,7 +83,7 @@ export const update = mutation({
     },
 });
 
-// Update AI-generated insights on a NEX profile — auth-guarded
+/** Update AI-generated insights on a NEX profile — auth-guarded */
 export const updateAiInsights = mutation({
     args: {
         id: v.id('nexProfiles'),
@@ -107,6 +107,7 @@ export const updateAiInsights = mutation({
 
         const { id, ...updates } = args;
         const filtered = Object.fromEntries(
+            // undefined = no change (AI insight fields are not nullable)
             Object.entries(updates).filter(([, val]) => val !== undefined)
         );
         if (Object.keys(filtered).length > 0) {

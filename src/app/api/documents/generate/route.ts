@@ -8,30 +8,36 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { getMergedRules, getCountyRequirements } from '@/lib/legal/courtRules';
 import { getTemplate } from '@/lib/legal/templates';
 import { renderDocumentHTML } from '@/lib/legal/templateRenderer';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
 import type { DocumentGenerationRequest, CaptionData } from '@/lib/legal/types';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import { titleCase } from '@/lib/utils/stringHelpers';
 
 export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
 
-/**
- * Title-case a string: first letter uppercase, rest lowercase.
- * Used to normalize state/county to match the canonical casing used in rule maps.
- */
-function titleCase(s: string): string {
-  return s
-    .trim()
-    .split(/\s+/)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
-}
-
 /** Handle POST requests to generate legal documents as PDF or HTML preview. */
 export async function POST(request: NextRequest) {
-  // ── 0. Parse JSON body — separate from business logic so malformed
-  //       input returns 400 instead of 500 and doesn't leak internals ──
+  // ── Auth guard ──
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json(
+      { error: 'Authentication required' },
+      { status: 401 }
+    );
+  }
+
+  // ── Rate limit (3/month free tier) ──
+  const rl = checkRateLimit(userId, 'document_generation');
+  if (!rl.allowed) {
+    const { body, status } = rateLimitResponse(rl);
+    return NextResponse.json(body, { status });
+  }
+
+  // ── 0. Parse JSON body ──
   let body: DocumentGenerationRequest;
   try {
     body = (await request.json()) as DocumentGenerationRequest;
@@ -101,7 +107,9 @@ export async function POST(request: NextRequest) {
       missingForms.push('Civil Case Information Sheet');
     }
     if (countyReqs?.requiredForms) {
-      missingForms.push(...countyReqs.requiredForms);
+      for (const f of countyReqs.requiredForms) {
+        missingForms.push(f);
+      }
     }
 
     // ── 3. Build caption data ──

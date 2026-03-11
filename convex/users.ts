@@ -1,7 +1,7 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 
-// Ensure a Convex user exists for a given Clerk user — auth-guarded
+/** Ensure a Convex user exists for a given Clerk user — auth-guarded */
 export const ensureFromClerk = mutation({
     args: {
         clerkId: v.string(),
@@ -46,7 +46,7 @@ export const ensureFromClerk = mutation({
     },
 });
 
-// Get the authenticated user's own record — derives clerkId from auth context
+/** Get the authenticated user's own record — derives clerkId from auth context */
 export const me = query({
     args: {},
     handler: async (ctx) => {
@@ -60,7 +60,7 @@ export const me = query({
     },
 });
 
-// Get user by ID — auth-guarded
+/** Get user by ID — auth-guarded */
 export const get = query({
     args: { id: v.id('users') },
     handler: async (ctx, args) => {
@@ -74,19 +74,19 @@ export const get = query({
     },
 });
 
-// Update user profile (onboarding data) — auth-guarded
+/** Update user profile (onboarding data) — auth-guarded */
 export const updateProfile = mutation({
     args: {
         id: v.id('users'),
-        name: v.optional(v.string()),
-        avatarUrl: v.optional(v.string()),
-        phone: v.optional(v.string()),
-        state: v.optional(v.string()),
-        county: v.optional(v.string()),
-        childrenCount: v.optional(v.number()),
-        childrenAges: v.optional(v.array(v.number())),
-        childrenNames: v.optional(v.array(v.string())),
-        courtCaseNumber: v.optional(v.string()),
+        name: v.optional(v.union(v.string(), v.null())),
+        avatarUrl: v.optional(v.union(v.string(), v.null())),
+        phone: v.optional(v.union(v.string(), v.null())),
+        state: v.optional(v.union(v.string(), v.null())),
+        county: v.optional(v.union(v.string(), v.null())),
+        childrenCount: v.optional(v.union(v.number(), v.null())),
+        childrenAges: v.optional(v.union(v.array(v.number()), v.null())),
+        childrenNames: v.optional(v.union(v.array(v.string()), v.null())),
+        courtCaseNumber: v.optional(v.union(v.string(), v.null())),
         custodyType: v.optional(
             v.union(
                 v.literal('sole'),
@@ -94,17 +94,19 @@ export const updateProfile = mutation({
                 v.literal('split'),
                 v.literal('visitation'),
                 v.literal('none'),
-                v.literal('pending')
+                v.literal('pending'),
+                v.null()
             )
         ),
-        hasAttorney: v.optional(v.boolean()),
-        hasTherapist: v.optional(v.boolean()),
+        hasAttorney: v.optional(v.union(v.boolean(), v.null())),
+        hasTherapist: v.optional(v.union(v.boolean(), v.null())),
         courtStatus: v.optional(
             v.union(
                 v.literal('pending'),
                 v.literal('active'),
                 v.literal('closed'),
-                v.literal('none')
+                v.literal('none'),
+                v.null()
             )
         ),
         tonePreference: v.optional(
@@ -112,7 +114,8 @@ export const updateProfile = mutation({
                 v.literal('direct'),
                 v.literal('gentle'),
                 v.literal('strategic'),
-                v.literal('clinical')
+                v.literal('clinical'),
+                v.null()
             )
         ),
         emotionalState: v.optional(
@@ -121,10 +124,11 @@ export const updateProfile = mutation({
                 v.literal('anxious'),
                 v.literal('angry'),
                 v.literal('overwhelmed'),
-                v.literal('numb')
+                v.literal('numb'),
+                v.null()
             )
         ),
-        primaryGoals: v.optional(v.array(v.string())),
+        primaryGoals: v.optional(v.union(v.array(v.string()), v.null())),
     },
     handler: async (ctx, args) => {
         // Auth guard: verify caller owns this user record
@@ -136,6 +140,7 @@ export const updateProfile = mutation({
         }
 
         const { id, ...updates } = args;
+        // undefined = no change; to clear a field, callers should set it to null
         const filtered = Object.fromEntries(
             Object.entries(updates).filter(([, val]) => val !== undefined)
         );
@@ -145,7 +150,7 @@ export const updateProfile = mutation({
     },
 });
 
-// Complete onboarding — auth-guarded
+/** Complete onboarding — auth-guarded */
 export const completeOnboarding = mutation({
     args: { id: v.id('users') },
     handler: async (ctx, args) => {

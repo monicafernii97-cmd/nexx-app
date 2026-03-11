@@ -2,7 +2,7 @@ import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { getAuthenticatedUser } from './lib/auth';
 
-// Incident category enum — shared across args
+/** Incident category enum — shared across args */
 const categoryValidator = v.union(
     v.literal('emotional_abuse'),
     v.literal('financial_abuse'),
@@ -15,9 +15,9 @@ const categoryValidator = v.union(
     v.literal('other')
 );
 
-// ── Helper: incident category enum ──
+/** ── Helper: incident category enum ── */
 
-// Create a new incident — auth-guarded
+/** Create a new incident — auth-guarded */
 export const create = mutation({
     args: {
         narrative: v.string(),
@@ -55,7 +55,7 @@ export const create = mutation({
     },
 });
 
-// List incidents for the authenticated user
+/** List incidents for the authenticated user */
 export const list = query({
     args: {},
     handler: async (ctx) => {
@@ -76,7 +76,7 @@ export const list = query({
     },
 });
 
-// Get a single incident — auth-guarded
+/** Get a single incident — auth-guarded */
 export const get = query({
     args: { id: v.id('incidents') },
     handler: async (ctx, args) => {
@@ -97,7 +97,7 @@ export const get = query({
     },
 });
 
-// Update an incident — auth-guarded
+/** Update an incident — auth-guarded */
 export const update = mutation({
     args: {
         id: v.id('incidents'),
@@ -129,7 +129,7 @@ export const update = mutation({
     },
 });
 
-// Confirm an incident (mark as finalized) — auth-guarded
+/** Confirm an incident (mark as finalized) — auth-guarded */
 export const confirm = mutation({
     args: { id: v.id('incidents') },
     handler: async (ctx, args) => {
@@ -147,7 +147,7 @@ export const confirm = mutation({
     },
 });
 
-// Delete an incident — auth-guarded
+/** Delete an incident — auth-guarded */
 export const remove = mutation({
     args: { id: v.id('incidents') },
     handler: async (ctx, args) => {

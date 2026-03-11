@@ -2,7 +2,7 @@ import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { getAuthenticatedUser } from './lib/auth';
 
-// Document type enum — shared across args
+/** Document type enum — shared across args */
 const documentTypeValidator = v.union(
     v.literal('court_order'),
     v.literal('police_report'),
@@ -13,9 +13,9 @@ const documentTypeValidator = v.union(
     v.literal('other')
 );
 
-// ── Helper: document type enum ──
+/** ── Helper: document type enum ── */
 
-// Generate an upload URL for Convex file storage — auth-guarded
+/** Generate an upload URL for Convex file storage — auth-guarded */
 export const generateUploadUrl = mutation({
     args: {},
     handler: async (ctx) => {
@@ -24,7 +24,7 @@ export const generateUploadUrl = mutation({
     },
 });
 
-// Create a new document — auth-guarded
+/** Create a new document — auth-guarded */
 export const create = mutation({
     args: {
         title: v.string(),
@@ -39,6 +39,14 @@ export const create = mutation({
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
+
+        // Verify incidentId belongs to this user
+        if (args.incidentId) {
+            const incident = await ctx.db.get(args.incidentId);
+            if (!incident || incident.userId !== user._id) {
+                throw new Error('Not authorized to link to this incident');
+            }
+        }
 
         return await ctx.db.insert('documents', {
             userId: user._id,
@@ -57,7 +65,7 @@ export const create = mutation({
     },
 });
 
-// List documents for the authenticated user, optionally filtered by type
+/** List documents for the authenticated user, optionally filtered by type */
 export const list = query({
     args: {
         type: v.optional(documentTypeValidator),
@@ -90,7 +98,7 @@ export const list = query({
     },
 });
 
-// Get a single document — auth-guarded
+/** Get a single document — auth-guarded */
 export const get = query({
     args: { id: v.id('documents') },
     handler: async (ctx, args) => {
@@ -111,7 +119,7 @@ export const get = query({
     },
 });
 
-// Update a document — auth-guarded
+/** Update a document — auth-guarded */
 export const update = mutation({
     args: {
         id: v.id('documents'),
@@ -133,6 +141,23 @@ export const update = mutation({
             throw new Error('Not authorized to update this document');
         }
 
+        // Verify incidentId belongs to this user
+        if (args.incidentId) {
+            const incident = await ctx.db.get(args.incidentId);
+            if (!incident || incident.userId !== user._id) {
+                throw new Error('Not authorized to link to this incident');
+            }
+        }
+
+        // Best-effort cleanup of old blob when storageId changes
+        if (args.storageId && doc.storageId && args.storageId !== doc.storageId) {
+            try {
+                await ctx.storage.delete(doc.storageId);
+            } catch (err) {
+                console.warn('Failed to clean up old storage blob:', err);
+            }
+        }
+
         const { id, ...updates } = args;
         const filtered = Object.fromEntries(
             Object.entries(updates).filter(([, val]) => val !== undefined)
@@ -141,7 +166,7 @@ export const update = mutation({
     },
 });
 
-// Remove a document — auth-guarded
+/** Remove a document — auth-guarded */
 export const remove = mutation({
     args: { id: v.id('documents') },
     handler: async (ctx, args) => {
@@ -152,9 +177,13 @@ export const remove = mutation({
             throw new Error('Not authorized to delete this document');
         }
 
-        // Delete the stored file if present
+        // Best-effort storage blob cleanup — don't block document deletion
         if (doc.storageId) {
-            await ctx.storage.delete(doc.storageId);
+            try {
+                await ctx.storage.delete(doc.storageId);
+            } catch (err) {
+                console.warn('Failed to delete storage blob:', err);
+            }
         }
 
         await ctx.db.delete(args.id);

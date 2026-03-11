@@ -1,13 +1,29 @@
 import { NextRequest } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { getOpenAI } from '@/lib/openai';
 import { buildSystemPrompt } from '@/lib/systemPrompt';
 import type { UserContext, LegalSearchResult } from '@/lib/types';
 import { detectLegalTopic, extractLegalQuery, searchStatutes } from '@/lib/legal/search';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_MESSAGES = 50;
 
+/** Handle POST requests for AI chat — authenticates user, rate-limits, and streams GPT responses. */
 export async function POST(req: NextRequest) {
+    // ── Auth guard ──
+    const { userId } = await auth();
+    if (!userId) {
+        return Response.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    // ── Rate limit (50/day free tier) ──
+    const rl = checkRateLimit(userId, 'chat_message');
+    if (!rl.allowed) {
+        const { body, status } = rateLimitResponse(rl);
+        return Response.json(body, { status });
+    }
+
     try {
         const body = await req.json();
         const {

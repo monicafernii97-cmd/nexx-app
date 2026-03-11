@@ -13,6 +13,7 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { searchStatutes } from '@/lib/legal/search';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 const MAX_QUERY_LENGTH = 500;
 const MAX_STATE_LENGTH = 50;
@@ -23,6 +24,13 @@ export async function POST(req: NextRequest) {
         const { userId } = await auth();
         if (!userId) {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // ── Rate limit (10/month free tier) ──
+        const rl = checkRateLimit(userId, 'legal_search');
+        if (!rl.allowed) {
+            const { body, status } = rateLimitResponse(rl);
+            return Response.json(body, { status });
         }
 
         const body = await req.json();

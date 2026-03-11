@@ -1,8 +1,9 @@
-import { mutation, query } from './_generated/server';
+import { mutation, query, internalMutation } from './_generated/server';
 import { v } from 'convex/values';
+import { internal } from './_generated/api';
 import { getAuthenticatedUser } from './lib/auth';
 
-// Create a new conversation — auth-guarded
+/** Create a new conversation — auth-guarded */
 export const create = mutation({
     args: {
         title: v.string(),
@@ -28,7 +29,7 @@ export const create = mutation({
     },
 });
 
-// Update conversation title — auth-guarded
+/** Update conversation title — auth-guarded */
 export const updateTitle = mutation({
     args: {
         id: v.id('conversations'),
@@ -46,7 +47,7 @@ export const updateTitle = mutation({
     },
 });
 
-// Archive a conversation — auth-guarded
+/** Archive a conversation — auth-guarded */
 export const archive = mutation({
     args: { id: v.id('conversations') },
     handler: async (ctx, args) => {
@@ -61,7 +62,7 @@ export const archive = mutation({
     },
 });
 
-// Delete a conversation and all its messages — auth-guarded
+/** Delete a conversation and all its messages — auth-guarded */
 export const remove = mutation({
     args: { id: v.id('conversations') },
     handler: async (ctx, args) => {
@@ -72,22 +73,53 @@ export const remove = mutation({
             throw new Error('Not authorized to delete this conversation');
         }
 
-        // Delete associated messages
-        const messages = await ctx.db
-            .query('messages')
-            .withIndex('by_conversation', (q) => q.eq('conversationId', args.id))
-            .collect();
-        for (const msg of messages) {
-            await ctx.db.delete(msg._id);
-        }
-
-        await ctx.db.delete(args.id);
+        // Schedule batched message deletion (avoids Convex mutation limits).
+        // The conversation itself is deleted only after all messages are gone,
+        // preventing orphaned messages if a scheduled job fails.
+        await ctx.scheduler.runAfter(0, internal.conversations.deleteMessagesBatch, {
+            conversationId: args.id,
+            deleteConversation: true,
+        });
     },
 });
 
-// ── Queries ──
+/** Delete messages in batches to stay within Convex mutation limits. */
+const BATCH_SIZE = 500;
 
-// List conversations for the authenticated user
+export const deleteMessagesBatch = internalMutation({
+    args: {
+        conversationId: v.id('conversations'),
+        deleteConversation: v.optional(v.boolean()),
+    },
+    handler: async (ctx, args) => {
+        const batch = await ctx.db
+            .query('messages')
+            .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
+            .take(BATCH_SIZE);
+
+        for (const msg of batch) {
+            await ctx.db.delete(msg._id);
+        }
+
+        if (batch.length === BATCH_SIZE) {
+            // More messages remain — schedule continuation
+            await ctx.scheduler.runAfter(0, internal.conversations.deleteMessagesBatch, {
+                conversationId: args.conversationId,
+                deleteConversation: args.deleteConversation,
+            });
+        } else if (args.deleteConversation) {
+            // All messages deleted — now safe to remove the conversation
+            const conversation = await ctx.db.get(args.conversationId);
+            if (conversation) {
+                await ctx.db.delete(args.conversationId);
+            }
+        }
+    },
+});
+
+/** ── Queries ── */
+
+/** List conversations for the authenticated user */
 export const list = query({
     args: {
         status: v.optional(
@@ -122,7 +154,7 @@ export const list = query({
     },
 });
 
-// Get a single conversation — auth-guarded
+/** Get a single conversation — auth-guarded */
 export const get = query({
     args: { id: v.id('conversations') },
     handler: async (ctx, args) => {

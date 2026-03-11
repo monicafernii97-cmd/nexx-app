@@ -51,10 +51,6 @@ export {
 } from './templates';
 
 // ── HTML Template Renderer ──
-export {
-  renderDocumentHTML,
-  renderExhibitCover,
-  renderExhibitIndex,
-  renderTextExcerptExhibit,
-} from './templateRenderer';
+// NOTE: Renderer *functions* are server-only (Node.js fs/path).
+// Import them from '@/lib/legal/server' instead.
 export type { RenderDocumentOptions } from './templateRenderer';

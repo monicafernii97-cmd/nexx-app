@@ -1,14 +1,16 @@
 import { mutation, query } from './_generated/server';
+import type { MutationCtx } from './_generated/server';
+import type { Id } from './_generated/dataModel';
 import { v } from 'convex/values';
 
 // ── Helper: resolve authenticated user & verify conversation ownership ──
-async function getAuthenticatedUserAndConversation(ctx: any, conversationId: any) {
+async function getAuthenticatedUserAndConversation(ctx: MutationCtx, conversationId: Id<'conversations'>) {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error('Not authenticated');
 
     const user = await ctx.db
         .query('users')
-        .withIndex('by_clerk', (q: any) => q.eq('clerkId', identity.subject))
+        .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
         .first();
     if (!user) throw new Error('User not found');
 

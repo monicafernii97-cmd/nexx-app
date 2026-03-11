@@ -1,4 +1,5 @@
 import { mutation, query } from './_generated/server';
+import type { MutationCtx } from './_generated/server';
 import { v } from 'convex/values';
 
 // Incident category enum — shared across args
@@ -15,12 +16,12 @@ const categoryValidator = v.union(
 );
 
 // ── Helper: resolve authenticated user ──
-async function getAuthenticatedUser(ctx: any) {
+async function getAuthenticatedUser(ctx: MutationCtx) {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error('Not authenticated');
     const user = await ctx.db
         .query('users')
-        .withIndex('by_clerk', (q: any) => q.eq('clerkId', identity.subject))
+        .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
         .first();
     if (!user) throw new Error('User not found');
     return user;
@@ -132,7 +133,7 @@ export const update = mutation({
 
         const { id, ...updates } = args;
         const filtered = Object.fromEntries(
-            Object.entries(updates).filter(([_, v]) => v !== undefined)
+            Object.entries(updates).filter(([_key, val]) => val !== undefined)
         );
         await ctx.db.patch(id, { ...filtered, updatedAt: Date.now() });
     },

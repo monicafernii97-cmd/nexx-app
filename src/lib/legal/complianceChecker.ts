@@ -21,8 +21,25 @@ import type { CountyOverrides } from './courtRules';
 export async function checkDocumentCompliance(
   pdfBase64: string,
   rules: CourtFormattingRules,
-  countyInfo?: CountyOverrides | null
+  countyInfo?: CountyOverrides | null,
+  /** Caller must confirm user has consented to sending the document to OpenAI for analysis. */
+  userConsent = false
 ): Promise<ComplianceReport> {
+  // Privacy gate: do not send PII-bearing documents to third-party APIs without consent
+  if (!userConsent) {
+    return {
+      overallStatus: 'warning',
+      checks: [
+        {
+          rule: 'Privacy',
+          status: 'warning',
+          detail: 'User has not consented to AI-based compliance analysis',
+          fix: 'Enable the compliance check consent toggle before running this check',
+        },
+      ],
+      suggestions: ['AI compliance checking requires explicit user consent before document data is transmitted.'],
+    };
+  }
   try {
     const { default: OpenAI } = await import('openai');
 
@@ -215,8 +232,12 @@ export function quickComplianceCheck(
 ): ComplianceCheck[] {
   const checks: ComplianceCheck[] = [];
 
+  // Use class-attribute regex to match actual HTML elements, not CSS selectors
+  // or serialized data that might coincidentally contain the class name.
+  const hasClass = (cls: string) => new RegExp(`class="[^"]*\\b${cls}\\b[^"]*"`, 'i').test(html);
+
   // Check for caption
-  if (!html.includes('caption-block') && !html.includes('caption-versus')) {
+  if (!hasClass('caption-block') && !hasClass('caption-versus')) {
     checks.push({
       rule: 'Caption',
       status: 'fail',
@@ -228,7 +249,7 @@ export function quickComplianceCheck(
   }
 
   // Check for title
-  if (!html.includes('document-title')) {
+  if (!hasClass('document-title')) {
     checks.push({
       rule: 'Document Title',
       status: 'fail',
@@ -240,7 +261,7 @@ export function quickComplianceCheck(
   }
 
   // Check for signature block
-  if (rules.requiresSignatureBlock && !html.includes('signature-block')) {
+  if (rules.requiresSignatureBlock && !hasClass('signature-block')) {
     checks.push({
       rule: 'Signature Block',
       status: 'fail',
@@ -252,7 +273,7 @@ export function quickComplianceCheck(
   }
 
   // Check for certificate of service
-  if (rules.requiresCertificateOfService && !html.includes('certificate-of-service')) {
+  if (rules.requiresCertificateOfService && !hasClass('certificate-of-service')) {
     checks.push({
       rule: 'Certificate of Service',
       status: 'fail',
@@ -264,7 +285,7 @@ export function quickComplianceCheck(
   }
 
   // Check for court address
-  if (!html.includes('court-address')) {
+  if (!hasClass('court-address')) {
     checks.push({
       rule: 'Court Address',
       status: 'warning',

@@ -84,13 +84,27 @@ export async function renderHTMLToPDF(
 
     // Build footer template for page numbering (TRCP requires page numbers)
     const showPageNumbers = rules.pageNumbering;
+    // Build the page number content based on format preference
     const pageNumberContent = rules.pageNumberFormat === 'x-of-y'
       ? 'Page <span class="pageNumber"></span> of <span class="totalPages"></span>'
       : '<span class="pageNumber"></span>';
 
-    const footerTemplate = showPageNumbers
-      ? `<div style="font-size: ${rules.footerFontSize}pt; font-family: '${rules.fontFamily}', times, serif; color: #555; width: 100%; text-align: ${rules.pageNumberPosition === 'bottom-right' ? 'right' : 'center'}; padding: 0 ${rules.marginLeft}in;">${pageNumberContent}</div>`
-      : '';
+    // Build footer template handling all pageNumberPosition values
+    let footerTemplate = '';
+    if (showPageNumbers) {
+      const fontStyle = `font-size: ${rules.footerFontSize}pt; font-family: '${rules.fontFamily}', times, serif; color: #555;`;
+      const padding = `padding: 0 ${rules.marginLeft}in;`;
+
+      if (rules.pageNumberPosition === 'bottom-right') {
+        footerTemplate = `<div style="${fontStyle} width: 100%; text-align: right; ${padding}">${pageNumberContent}</div>`;
+      } else if (rules.pageNumberPosition === 'footer-split') {
+        // Footer-split: page number left, cause number right
+        footerTemplate = `<div style="${fontStyle} width: 100%; display: flex; justify-content: space-between; ${padding}"><span>${pageNumberContent}</span><span></span></div>`;
+      } else {
+        // Default: centered (covers 'bottom-center' and any other value)
+        footerTemplate = `<div style="${fontStyle} width: 100%; text-align: center; ${padding}">${pageNumberContent}</div>`;
+      }
+    }
 
     // Generate PDF with court-rules-derived settings
     const pdfBuffer = await page.pdf({

@@ -267,15 +267,15 @@ export interface DocumentGenerationRequest {
     judicialDistrict?: string;
     assignedJudge?: string;
   };
-  /** Caption data */
-  caption: CaptionData;
+  /** Caption data (omit to auto-generate from petitioner/respondent/children) */
+  caption?: CaptionData;
   /** Party info for signature blocks */
   petitioner: SignatureBlockData;
   respondent?: { name: string };
   /** Children (for SAPCR / custody cases) */
   children?: { name: string; age?: number }[];
-  /** AI-generated body content (structured sections) */
-  bodyContent: GeneratedSection[];
+  /** AI-generated body content (structured sections, defaults to empty) */
+  bodyContent?: GeneratedSection[];
   /** Exhibits to include */
   exhibits?: ExhibitEntry[];
   /** Formatting overrides (user's verified settings) */

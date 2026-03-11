@@ -7,7 +7,7 @@
  * Based on nationwide family law practice with Texas as the primary reference.
  */
 
-import type { DocumentTemplate, DocumentSection } from './types';
+import type { DocumentTemplate, DocumentSection, DocumentCategory, CaseType } from './types';
 
 // ── Reusable section builders ─────────────────────────────────
 
@@ -57,7 +57,7 @@ const certificateOfService: DocumentSection = {
   guidance: 'CERTIFICATE OF SERVICE — certify true and correct copy served via e-filing.',
 };
 
-const verification: DocumentSection = {
+const _verification: DocumentSection = {
   id: 'verification', type: 'verification', required: false,
 };
 
@@ -76,7 +76,7 @@ const notaryBlock: DocumentSection = {
   guidance: 'SWORN TO AND SUBSCRIBED before me...',
 };
 
-const hrule: DocumentSection = {
+const _hrule: DocumentSection = {
   id: 'hrule', type: 'horizontal_rule', required: true,
 };
 
@@ -819,7 +819,7 @@ const certificates: DocumentTemplate[] = [
 // FULL TEMPLATE LIBRARY — Exported
 // ═══════════════════════════════════════════════════════════════
 
-export const TEMPLATE_LIBRARY: DocumentTemplate[] = [
+export const TEMPLATE_LIBRARY: readonly DocumentTemplate[] = Object.freeze([
   ...petitions,
   ...motionsTemporary,
   ...motionsProcedure,
@@ -832,7 +832,7 @@ export const TEMPLATE_LIBRARY: DocumentTemplate[] = [
   ...declarations,
   ...orders,
   ...certificates,
-];
+]);
 
 /**
  * Get a template by its ID. Returns a deep copy to prevent shared-state mutation.
@@ -845,7 +845,7 @@ export function getTemplate(id: string): DocumentTemplate | undefined {
 /**
  * Get templates filtered by category. Returns deep copies to prevent shared-state mutation.
  */
-export function getTemplatesByCategory(category: string): DocumentTemplate[] {
+export function getTemplatesByCategory(category: DocumentCategory): DocumentTemplate[] {
   return TEMPLATE_LIBRARY
     .filter(t => t.category === category)
     .map(t => structuredClone(t));
@@ -854,9 +854,9 @@ export function getTemplatesByCategory(category: string): DocumentTemplate[] {
 /**
  * Get templates relevant to a specific case type. Returns deep copies to prevent shared-state mutation.
  */
-export function getTemplatesForCaseType(caseType: string): DocumentTemplate[] {
+export function getTemplatesForCaseType(caseType: CaseType): DocumentTemplate[] {
   return TEMPLATE_LIBRARY
-    .filter(t => t.caseTypes.includes(caseType as never))
+    .filter(t => t.caseTypes.includes(caseType))
     .map(t => structuredClone(t));
 }
 

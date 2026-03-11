@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getMergedRules } from '@/lib/legal/courtRules';
+import { getMergedRules, getCountyRequirements } from '@/lib/legal/courtRules';
 import { getTemplate } from '@/lib/legal/templates';
 import { renderDocumentHTML } from '@/lib/legal/templateRenderer';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
@@ -16,14 +16,34 @@ import type { DocumentGenerationRequest, CaptionData } from '@/lib/legal/types';
 
 export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
 
+/**
+ * Title-case a string: first letter uppercase, rest lowercase.
+ * Used to normalize state/county to match the canonical casing used in rule maps.
+ */
+function titleCase(s: string): string {
+  return s
+    .trim()
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
 /** Handle POST requests to generate legal documents as PDF or HTML preview. */
 export async function POST(request: NextRequest) {
+  // ── 0. Parse JSON body — separate from business logic so malformed
+  //       input returns 400 instead of 500 and doesn't leak internals ──
+  let body: DocumentGenerationRequest;
   try {
-    const body = (await request.json()) as DocumentGenerationRequest;
+    body = (await request.json()) as DocumentGenerationRequest;
+  } catch {
+    return NextResponse.json(
+      { error: 'Malformed JSON in request body' },
+      { status: 400 }
+    );
+  }
 
+  try {
     // ── 1. Validate request shape ──
-    // Validate all required fields up front so missing data returns 400
-    // instead of crashing with a 500 when nested properties are accessed.
     if (!body.templateId) {
       return NextResponse.json(
         { error: 'templateId is required' },
@@ -61,9 +81,10 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 2. Normalize and merge court formatting rules ──
-    // Normalize state/county to consistent casing for rule lookup
-    const normalizedState = body.courtSettings.state.trim();
-    const normalizedCounty = body.courtSettings.county.trim();
+    // Title-case state/county so lookups match STATE_RULES['Texas'] and
+    // COUNTY_OVERRIDES['Texas:Fort Bend'] regardless of input casing.
+    const normalizedState = titleCase(body.courtSettings.state);
+    const normalizedCounty = titleCase(body.courtSettings.county);
 
     // Priority: NEXX defaults → State → County → User overrides
     const rules = getMergedRules(
@@ -72,8 +93,24 @@ export async function POST(request: NextRequest) {
       body.formattingOverrides ?? {}
     );
 
+    // ── 2b. Warn about missing required companion forms ──
+    const countyReqs = getCountyRequirements(normalizedState, normalizedCounty);
+    const missingForms: string[] = [];
+
+    if (rules.requiresCivilCaseInfoSheet) {
+      missingForms.push('Civil Case Information Sheet');
+    }
+    if (countyReqs?.requiredForms) {
+      missingForms.push(...countyReqs.requiredForms);
+    }
+
     // ── 3. Build caption data ──
-    const caption: CaptionData = body.caption ?? buildDefaultCaption(body);
+    // Use normalized values for consistent caption output
+    const captionBody = {
+      ...body,
+      courtSettings: { ...body.courtSettings, state: normalizedState, county: normalizedCounty },
+    };
+    const caption: CaptionData = body.caption ?? buildDefaultCaption(captionBody);
 
     // ── 4. Determine document title ──
     const titleText = template.sections.find(s => s.type === 'title')?.title ?? template.title;
@@ -94,9 +131,9 @@ export async function POST(request: NextRequest) {
     // ── 6. Check if user just wants HTML preview ──
     const format = request.nextUrl.searchParams.get('format');
     if (format === 'html') {
-      return new NextResponse(html, {
-        status: 200,
-        headers: { 'Content-Type': 'text/html' },
+      return NextResponse.json({
+        html,
+        ...(missingForms.length > 0 ? { missingRequiredForms: missingForms } : {}),
       });
     }
 
@@ -104,22 +141,25 @@ export async function POST(request: NextRequest) {
     const pdfBytes = await renderHTMLToPDF(html, rules);
 
     // ── 8. Return PDF ──
+    // Include missing forms warning in a custom header so clients can detect it
     const filename = `${template.id}_${Date.now()}.pdf`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': pdfBytes.length.toString(),
+    };
+    if (missingForms.length > 0) {
+      headers['X-Missing-Required-Forms'] = missingForms.join(', ');
+    }
+
     return new NextResponse(pdfBytes as unknown as BodyInit, {
       status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Length': pdfBytes.length.toString(),
-      },
+      headers,
     });
   } catch (error) {
     console.error('[Document Generation Error]', error);
     return NextResponse.json(
-      {
-        error: 'Document generation failed',
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: 'Document generation failed' },
       { status: 500 }
     );
   }

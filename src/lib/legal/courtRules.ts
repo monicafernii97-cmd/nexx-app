@@ -220,7 +220,8 @@ export function getMergedRules(
     ],
   });
 
-  let rules = { ...NEXX_DEFAULTS };
+  // Deep-clone defaults so nested objects (captionColumnWidths, notes) are not aliased
+  let rules = mergeRules({} as CourtFormattingRules, NEXX_DEFAULTS);
 
   // Layer 2: State baseline
   if (state && STATE_RULES[state]) {

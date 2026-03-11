@@ -25,7 +25,7 @@ const quickActions = [
 ];
 
 export default function DashboardPage() {
-    const { userId, isLoading: userLoading } = useUser();
+    const { userId } = useUser();
     const incidents = useQuery(api.incidents.list);
     const conversations = useQuery(api.conversations.list, {});
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');

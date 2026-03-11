@@ -173,7 +173,7 @@ function renderCourtAddress(): string {
 
 /** Render the opening introduction paragraph identifying the filer and document purpose. */
 function renderIntroduction(content: string): string {
-  return `<div class="body-paragraph">${escapeHtml(content)}</div>`;
+  return `<div class="body-paragraph">${sanitizeTrustedHtml(content)}</div>`;
 }
 
 /** Render Roman-numeral-headed body sections (I. Background, II. Argument, etc.). */
@@ -185,7 +185,7 @@ function renderBodySections(sections: GeneratedSection[]): string {
       if (s.heading) {
         html += `<div class="section-heading">${escapeHtml(s.heading)}</div>`;
       }
-      html += `<div class="body-paragraph">${escapeHtml(s.content)}</div>`;
+      html += `<div class="body-paragraph">${sanitizeTrustedHtml(s.content)}</div>`;
       return html;
     })
     .join('\n');
@@ -204,7 +204,7 @@ function renderNumberedParagraphs(items: string[]): string {
 function renderPrayer(content: string): string {
   return `
     <div class="prayer">
-      <span class="formal-phrase">WHEREFORE, PREMISES CONSIDERED,</span> ${escapeHtml(content)}
+      <span class="formal-phrase">WHEREFORE, PREMISES CONSIDERED,</span> ${sanitizeTrustedHtml(content)}
     </div>`;
 }
 
@@ -590,7 +590,8 @@ export function renderDocumentHTML(options: RenderDocumentOptions): string {
 // Utilities
 // ═══════════════════════════════════════════════════════════════
 
-/** Escape HTML special characters to prevent XSS in rendered documents. */
+/** Escape HTML special characters to prevent XSS in rendered documents.
+ *  Use for user-provided text (names, headings, addresses). */
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -598,4 +599,22 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+/**
+ * Sanitize AI-generated HTML content (from GeneratedSection.content).
+ * Allows safe structural tags used in legal documents while stripping
+ * dangerous elements (script, iframe, event handlers, etc.).
+ *
+ * Use for content from our own AI generation pipeline — NOT for raw user input.
+ */
+function sanitizeTrustedHtml(html: string): string {
+  // Strip <script>, <iframe>, <object>, <embed>, <style>, <link> tags entirely
+  let clean = html.replace(/<\s*\/?\s*(script|iframe|object|embed|style|link)[^>]*>/gi, '');
+  // Strip on* event handler attributes (onclick, onerror, etc.)
+  clean = clean.replace(/\s+on\w+\s*=\s*['"][^'"]*['"]/gi, '');
+  clean = clean.replace(/\s+on\w+\s*=\s*\S+/gi, '');
+  // Strip javascript: and data: URIs in href/src attributes
+  clean = clean.replace(/(href|src)\s*=\s*['"]\s*(javascript|data):[^'"]*['"]/gi, '$1=""');
+  return clean;
 }

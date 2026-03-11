@@ -39,6 +39,7 @@ export default function CourtSettingsPage() {
     const [stateQuery, setStateQuery] = useState('');
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
     const [verifying, setVerifying] = useState(false);
     const [verifyResult, setVerifyResult] = useState<{
         confidence: number;
@@ -92,6 +93,7 @@ export default function CourtSettingsPage() {
     const handleSave = useCallback(async () => {
         if (!state || !county) return;
         setSaving(true);
+        setSaveError(null);
         try {
             await upsertSettings({
                 state,
@@ -105,6 +107,7 @@ export default function CourtSettingsPage() {
             setTimeout(() => setSaved(false), 3000);
         } catch (error) {
             console.error('Failed to save court settings:', error);
+            setSaveError('Failed to save settings. Please try again.');
         } finally {
             setSaving(false);
         }
@@ -121,6 +124,9 @@ export default function CourtSettingsPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ state, county, courtName: courtName || undefined }),
             });
+            if (!response.ok) {
+                throw new Error(`Verification failed: ${response.status}`);
+            }
             const data = await response.json();
             setVerifyResult({
                 confidence: data.confidence ?? 0,
@@ -529,7 +535,10 @@ export default function CourtSettingsPage() {
                                                     className="text-xs truncate block hover:underline"
                                                     style={{ color: '#C58B07' }}
                                                 >
-                                                    {new URL(url).hostname}
+                                                    {(() => {
+                                                        try { return new URL(url).hostname; }
+                                                        catch { return url; }
+                                                    })()}
                                                 </a>
                                             </li>
                                         ))}
@@ -579,6 +588,17 @@ export default function CourtSettingsPage() {
                         style={{ color: '#4CAF50' }}
                     >
                         Settings saved successfully
+                    </motion.span>
+                )}
+
+                {saveError && (
+                    <motion.span
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="text-xs"
+                        style={{ color: '#EF4444' }}
+                    >
+                        {saveError}
                     </motion.span>
                 )}
             </motion.div>

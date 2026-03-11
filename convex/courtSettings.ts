@@ -26,9 +26,11 @@ export const upsert = mutation({
             .first();
 
         if (existing) {
-            // Update existing
+            // Update existing — reset AI verification since settings changed
             await ctx.db.patch(existing._id, {
                 ...args,
+                aiVerified: false,
+                aiVerifiedAt: undefined,
                 updatedAt: now,
             });
             return existing._id;

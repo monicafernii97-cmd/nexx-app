@@ -50,11 +50,6 @@ export {
   searchTemplates,
 } from './templates';
 
-// ── HTML Template Renderer ──
-export {
-  renderDocumentHTML,
-  renderExhibitCover,
-  renderExhibitIndex,
-  renderTextExcerptExhibit,
-} from './templateRenderer';
-export type { RenderDocumentOptions } from './templateRenderer';
+// ── Server-only exports (templateRenderer, pdfRenderer, courtRulesLookup)
+//    are in './server' to avoid pulling Node.js builtins into client bundles.
+//    Import from '@/lib/legal/server' in server components and API routes.

@@ -4,30 +4,21 @@
  * POST /api/court-rules/lookup
  *
  * Discovers local court formatting rules via Tavily + GPT-4o.
- * Checks Convex cache first (30-day TTL) before querying AI.
+ * TODO: Integrate Convex courtRulesCache (30-day TTL) when ready.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { lookupCourtRules, CACHE_TTL_MS } from '@/lib/legal/courtRulesLookup';
+import { titleCase } from '@/lib/utils/stringHelpers';
 
 export const maxDuration = 30;
-
-/**
- * Title-case a string for consistent lookups.
- */
-function titleCase(s: string): string {
-    return s
-        .trim()
-        .split(/\s+/)
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(' ');
-}
 
 export async function POST(request: NextRequest) {
     let body: {
         state: string;
         county: string;
         courtName?: string;
+        /** TODO: Wire into cache-busting once Convex cache is integrated. */
         forceRefresh?: boolean;
     };
 
@@ -50,9 +41,10 @@ export async function POST(request: NextRequest) {
 
         const state = titleCase(body.state);
         const county = titleCase(body.county);
+        const courtName = body.courtName ? titleCase(body.courtName) : undefined;
 
         // Look up rules via Tavily + GPT-4o
-        const result = await lookupCourtRules(state, county, body.courtName);
+        const result = await lookupCourtRules(state, county, courtName);
 
         return NextResponse.json({
             state,

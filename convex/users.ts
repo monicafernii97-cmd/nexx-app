@@ -136,6 +136,7 @@ export const updateProfile = mutation({
         }
 
         const { id, ...updates } = args;
+        // undefined = no change; to clear a field, callers should set it to null
         const filtered = Object.fromEntries(
             Object.entries(updates).filter(([, val]) => val !== undefined)
         );

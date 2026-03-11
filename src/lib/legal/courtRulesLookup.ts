@@ -5,18 +5,18 @@
  * then GPT-4o to extract structured CourtFormattingRules from the results.
  *
  * Flow:
- * 1. Check courtRulesCache (Convex) — return cached if fresh
- * 2. Search Tavily for "[state] [county] court local rules formatting filing requirements"
- * 3. Feed search results to GPT-4o with a structured extraction prompt
- * 4. Return Partial<CourtFormattingRules> for merge into the rules pipeline
- * 5. Cache results in Convex for 30 days
+ * 1. Search Tavily for "[state] [county] court local rules formatting filing requirements"
+ * 2. Feed search results to GPT-4o with a structured extraction prompt
+ * 3. Return Partial<CourtFormattingRules> for merge into the rules pipeline
+ *
+ * TODO: Integrate Convex courtRulesCache for 30-day TTL caching.
  */
 
 import { tavily } from '@tavily/core';
 import OpenAI from 'openai';
 import type { CourtFormattingRules } from './types';
 
-/** How long cached rules remain valid (30 days in ms) */
+/** How long cached rules remain valid (30 days in ms). Exported for API route. */
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 // ── Tavily Search for Court Rules ──
@@ -155,7 +155,13 @@ async function extractRulesWithAI(
         const content = response.choices[0]?.message?.content;
         if (!content) return { rules: {}, sources: [], confidence: 0 };
 
-        const parsed = JSON.parse(content) as Partial<CourtFormattingRules>;
+        let parsed: Partial<CourtFormattingRules>;
+        try {
+            parsed = JSON.parse(content) as Partial<CourtFormattingRules>;
+        } catch (parseError) {
+            console.warn('[courtRulesLookup] Failed to parse GPT response:', content.slice(0, 200), parseError);
+            return { rules: {}, sources: [], confidence: 0 };
+        }
 
         // Calculate confidence based on how many fields were extracted
         const fieldCount = Object.keys(parsed).length;

@@ -13,7 +13,21 @@ import { checkDocumentCompliance, quickComplianceCheck } from '@/lib/legal/compl
 
 export const maxDuration = 30;
 
+/** Maximum allowed payload sizes to prevent abuse. */
+const MAX_BODY_BYTES = 12 * 1024 * 1024;
+const MAX_HTML_CHARS = 500_000;
+const MAX_PDF_BASE64_CHARS = 10 * 1024 * 1024;
+
 export async function POST(request: NextRequest) {
+  // Early rejection of oversized payloads
+  const contentLength = Number(request.headers.get('content-length') ?? 0);
+  if (contentLength > MAX_BODY_BYTES) {
+    return NextResponse.json(
+      { error: 'Request body too large' },
+      { status: 413 }
+    );
+  }
+
   let body: {
     pdfBase64?: string;
     html?: string;
@@ -48,6 +62,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Per-field size checks
+    if (body.html && body.html.length > MAX_HTML_CHARS) {
+      return NextResponse.json(
+        { error: 'html payload too large' },
+        { status: 413 }
+      );
+    }
+    if (body.pdfBase64 && body.pdfBase64.length > MAX_PDF_BASE64_CHARS) {
+      return NextResponse.json(
+        { error: 'pdfBase64 payload too large' },
+        { status: 413 }
+      );
+    }
+
     // Merge court rules for this state/county
     const rules = getMergedRules(body.state, body.county);
     const countyInfo = getCountyRequirements(body.state, body.county);
@@ -69,6 +97,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Full AI compliance check (requires user consent + PDF)
+    // Note: userConsent is client-declared. The complianceChecker itself enforces
+    // the privacy gate and will refuse to transmit PII without consent=true.
+    // For production, this should be gated on server-side persisted consent.
     const aiReport = await checkDocumentCompliance(
       body.pdfBase64,
       rules,

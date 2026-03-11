@@ -57,12 +57,12 @@ export const update = mutation({
     args: {
         id: v.id('nexProfiles'),
         behaviors: v.optional(v.array(v.string())),
-        nickname: v.optional(v.string()),
-        relationship: v.optional(v.string()),
-        description: v.optional(v.string()),
-        communicationStyle: v.optional(v.string()),
-        manipulationTactics: v.optional(v.array(v.string())),
-        triggerPatterns: v.optional(v.array(v.string())),
+        nickname: v.optional(v.union(v.string(), v.null())),
+        relationship: v.optional(v.union(v.string(), v.null())),
+        description: v.optional(v.union(v.string(), v.null())),
+        communicationStyle: v.optional(v.union(v.string(), v.null())),
+        manipulationTactics: v.optional(v.union(v.array(v.string()), v.null())),
+        triggerPatterns: v.optional(v.union(v.array(v.string()), v.null())),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
@@ -75,6 +75,7 @@ export const update = mutation({
 
         const { id, ...updates } = args;
         const filtered = Object.fromEntries(
+            // null = caller wants to clear the field; undefined = no change
             Object.entries(updates).filter(([, val]) => val !== undefined)
         );
         if (Object.keys(filtered).length > 0) {
@@ -107,6 +108,7 @@ export const updateAiInsights = mutation({
 
         const { id, ...updates } = args;
         const filtered = Object.fromEntries(
+            // null = caller wants to clear the field; undefined = no change
             Object.entries(updates).filter(([, val]) => val !== undefined)
         );
         if (Object.keys(filtered).length > 0) {

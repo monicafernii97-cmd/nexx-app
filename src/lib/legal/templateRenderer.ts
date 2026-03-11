@@ -171,7 +171,9 @@ function renderCourtAddress(): string {
   return `<div class="court-address">TO THE HONORABLE JUDGE OF SAID COURT:</div>`;
 }
 
-/** Render the opening introduction paragraph identifying the filer and document purpose. */
+/** Render the opening introduction paragraph identifying the filer and document purpose.
+ *  Note: escapeHtml is intentional — GeneratedSection.content is treated as plain text
+ *  at the render boundary for defense-in-depth against injection. */
 function renderIntroduction(content: string): string {
   return `<div class="body-paragraph">${escapeHtml(content)}</div>`;
 }
@@ -549,13 +551,22 @@ export function renderDocumentHTML(options: RenderDocumentOptions): string {
       case 'horizontal_rule':
         sectionHTML.push(renderHorizontalRule());
         break;
+
+      case 'exhibit_index':
+        if (exhibits?.length) {
+          sectionHTML.push('<div class="page-break"></div>');
+          sectionHTML.push(renderExhibitIndex(exhibits));
+        }
+        break;
     }
   }
 
-  // Add exhibits if present
+  // Add exhibits if present (only if template didn't already place exhibit_index)
   if (exhibits && exhibits.length > 0) {
-    sectionHTML.push('<div class="page-break"></div>');
-    sectionHTML.push(renderExhibitIndex(exhibits));
+    if (!template.sections.some(s => s.type === 'exhibit_index')) {
+      sectionHTML.push('<div class="page-break"></div>');
+      sectionHTML.push(renderExhibitIndex(exhibits));
+    }
     for (const exhibit of exhibits) {
       sectionHTML.push(renderExhibitCover(exhibit));
     }

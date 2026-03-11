@@ -215,13 +215,13 @@ export function getMergedRules(
     },
     // Merge notes arrays instead of replacing
     notes: [
-      ...base.notes,
+      ...(base.notes ?? []),
       ...(overrides?.notes ?? []),
     ],
   });
 
-  // Deep-clone defaults so nested objects (captionColumnWidths, notes) are not aliased
-  let rules = mergeRules({} as CourtFormattingRules, NEXX_DEFAULTS);
+  // Bootstrap from NEXX_DEFAULTS directly (avoids spreading undefined on empty base)
+  let rules = structuredClone(NEXX_DEFAULTS);
 
   // Layer 2: State baseline
   if (state && STATE_RULES[state]) {

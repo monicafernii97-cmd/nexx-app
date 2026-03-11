@@ -22,6 +22,14 @@ export const create = mutation({
         const user = await getAuthenticatedUser(ctx);
         const now = Date.now();
 
+        // Verify ownership of courtSettingsId if provided
+        if (args.courtSettingsId) {
+            const settings = await ctx.db.get(args.courtSettingsId);
+            if (!settings || settings.userId !== user._id) {
+                throw new Error('Not authorized to use these court settings');
+            }
+        }
+
         return await ctx.db.insert('generatedDocuments', {
             userId: user._id,
             ...args,
@@ -49,6 +57,19 @@ export const updateStatus = mutation({
         const doc = await ctx.db.get(args.id);
         if (!doc || doc.userId !== user._id) {
             throw new Error('Not authorized');
+        }
+
+        // Enforce status lifecycle: draft → final → filed
+        const allowedTransitions: Record<string, Set<string>> = {
+            draft: new Set(['draft', 'final']),
+            final: new Set(['final', 'filed']),
+            filed: new Set(['filed']),
+        };
+
+        if (!allowedTransitions[doc.status]?.has(args.status)) {
+            throw new Error(
+                `Invalid status transition from ${doc.status} to ${args.status}`
+            );
         }
 
         await ctx.db.patch(args.id, {
@@ -115,6 +136,11 @@ export const remove = mutation({
         const doc = await ctx.db.get(args.id);
         if (!doc || doc.userId !== user._id) {
             throw new Error('Not authorized');
+        }
+
+        // Clean up stored PDF blob
+        if (doc.storageId) {
+            await ctx.storage.delete(doc.storageId);
         }
 
         await ctx.db.delete(args.id);

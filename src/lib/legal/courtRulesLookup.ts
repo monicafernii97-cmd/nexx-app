@@ -86,7 +86,7 @@ const EXTRACTION_PROMPT = `You are a legal formatting expert. Given search resul
 
 Return a JSON object with ONLY the fields you can confidently determine from the sources. Do NOT guess or assume — if a rule is not mentioned, omit that field entirely.
 
-The JSON fields you may extract:
+The JSON fields you may extract (must match CourtFormattingRules type exactly):
 {
   "paperWidth": <number in inches, e.g. 8.5>,
   "paperHeight": <number in inches, e.g. 11>,
@@ -96,16 +96,14 @@ The JSON fields you may extract:
   "marginRight": <number in inches>,
   "fontFamily": <string, e.g. "Times New Roman">,
   "fontSize": <number in points, e.g. 14>,
-  "lineHeight": <number, e.g. 2 for double-spaced>,
-  "lineSpacing": <"single" | "1.5" | "double">,
+  "lineSpacing": <number, e.g. 2.0 for double-spaced, 1.5 for one-and-a-half>,
   "pageNumbering": <boolean>,
   "pageNumberFormat": <"simple" | "x-of-y">,
   "pageNumberPosition": <"bottom-center" | "bottom-right" | "footer-split">,
-  "captionStyle": <"texas-standard" | "california" | "federal">,
-  "signatureBlockRequired": <boolean>,
-  "certificateOfServiceRequired": <boolean>,
-  "verificationRequired": <boolean>,
-  "notaryRequired": <boolean>,
+  "captionStyle": <"section-symbol" | "versus" | "centered">,
+  "requiresSignatureBlock": <boolean>,
+  "requiresCertificateOfService": <boolean>,
+  "requiresVerification": <boolean>,
   "notes": [<array of string notes about specific requirements>]
 }
 

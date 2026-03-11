@@ -120,6 +120,11 @@ export const attachPdf = mutation({
             throw new Error('Not authorized');
         }
 
+        // Clean up previous PDF blob to prevent storage leaks
+        if (doc.storageId && doc.storageId !== args.storageId) {
+            await ctx.storage.delete(doc.storageId);
+        }
+
         await ctx.db.patch(args.id, {
             storageId: args.storageId,
             updatedAt: Date.now(),

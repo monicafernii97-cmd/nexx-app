@@ -101,7 +101,9 @@ export async function POST(request: NextRequest) {
       missingForms.push('Civil Case Information Sheet');
     }
     if (countyReqs?.requiredForms) {
-      missingForms.push(...countyReqs.requiredForms);
+      for (const f of countyReqs.requiredForms) {
+        missingForms.push(f);
+      }
     }
 
     // ── 3. Build caption data ──

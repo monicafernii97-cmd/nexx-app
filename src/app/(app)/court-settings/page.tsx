@@ -41,6 +41,7 @@ export default function CourtSettingsPage() {
     const [saved, setSaved] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [verifying, setVerifying] = useState(false);
+    const [verifyError, setVerifyError] = useState<string | null>(null);
     const [verifyResult, setVerifyResult] = useState<{
         confidence: number;
         sources: string[];
@@ -118,6 +119,7 @@ export default function CourtSettingsPage() {
         if (!state || !county) return;
         setVerifying(true);
         setVerifyResult(null);
+        setVerifyError(null);
         try {
             const response = await fetch('/api/court-rules/lookup', {
                 method: 'POST',
@@ -142,6 +144,7 @@ export default function CourtSettingsPage() {
             }
         } catch (error) {
             console.error('AI verification failed:', error);
+            setVerifyError('AI verification failed. Please try again.');
         } finally {
             setVerifying(false);
         }
@@ -495,6 +498,12 @@ export default function CourtSettingsPage() {
                     {existingSettings?.aiVerified && (
                         <span className="flex items-center gap-1.5 text-xs" style={{ color: '#4CAF50' }}>
                             <Check size={12} /> AI Verified
+                        </span>
+                    )}
+
+                    {verifyError && (
+                        <span className="flex items-center gap-1.5 text-xs" style={{ color: '#EF4444' }}>
+                            <AlertTriangle size={12} /> {verifyError}
                         </span>
                     )}
                 </div>

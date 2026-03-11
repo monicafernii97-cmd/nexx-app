@@ -605,9 +605,8 @@ body {
   break-inside: avoid;
 }
 
-.keep-together {
-  break-inside: avoid;
-}
+/* Semantic alias for .no-break — used in document structure contexts */
+.keep-together { break-inside: avoid; }
 
 
 /* ═══════════════════════════════════════════════════════════════

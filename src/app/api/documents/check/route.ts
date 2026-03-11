@@ -97,9 +97,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Full AI compliance check (requires user consent + PDF)
-    // Note: userConsent is client-declared. The complianceChecker itself enforces
-    // the privacy gate and will refuse to transmit PII without consent=true.
-    // For production, this should be gated on server-side persisted consent.
+    // TODO(security): Replace client-declared userConsent with server-side
+    // persisted consent lookup (e.g., from userCourtSettings.consentGrantedAt).
+    // Currently the privacy gate in complianceChecker prevents PII transmission
+    // without consent=true, but a caller can trivially set it to true.
     const aiReport = await checkDocumentCompliance(
       body.pdfBase64,
       rules,

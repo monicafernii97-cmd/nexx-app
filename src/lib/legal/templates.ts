@@ -57,9 +57,6 @@ const certificateOfService: DocumentSection = {
   guidance: 'CERTIFICATE OF SERVICE — certify true and correct copy served via e-filing.',
 };
 
-const _verification: DocumentSection = {
-  id: 'verification', type: 'verification', required: false,
-};
 
 const judgeSignature: DocumentSection = {
   id: 'judge-sig', type: 'judge_signature', required: true,
@@ -76,9 +73,6 @@ const notaryBlock: DocumentSection = {
   guidance: 'SWORN TO AND SUBSCRIBED before me...',
 };
 
-const _hrule: DocumentSection = {
-  id: 'hrule', type: 'horizontal_rule', required: true,
-};
 
 // ── Standard motion section set ───────────────────────────────
 /** Builds the standard section set for motions (caption → title → address → intro → body → prayer → sig → COS). */

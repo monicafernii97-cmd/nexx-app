@@ -107,6 +107,7 @@ export const updateAiInsights = mutation({
 
         const { id, ...updates } = args;
         const filtered = Object.fromEntries(
+            // undefined = no change (AI insight fields are not nullable)
             Object.entries(updates).filter(([, val]) => val !== undefined)
         );
         if (Object.keys(filtered).length > 0) {

@@ -51,16 +51,18 @@ export default function CourtSettingsPage() {
     const countyDropdownRef = useRef<HTMLDivElement>(null);
     const stateInputRef = useRef<HTMLInputElement>(null);
     const stateDropdownRef = useRef<HTMLDivElement>(null);
+    const initializedRef = useRef(false);
 
-    // Load existing settings
+    // Load existing settings (only on first data arrival to avoid resetting mid-edit)
     useEffect(() => {
-        if (existingSettings) {
+        if (existingSettings && !initializedRef.current) {
             setState(existingSettings.state || '');
             setCounty(existingSettings.county || '');
             setCourtName(existingSettings.courtName || '');
             setCauseNumber(existingSettings.causeNumber || '');
             setAssignedJudge(existingSettings.assignedJudge || '');
             setJudicialDistrict(existingSettings.judicialDistrict || '');
+            initializedRef.current = true;
         }
     }, [existingSettings]);
 
@@ -137,10 +139,15 @@ export default function CourtSettingsPage() {
 
             // Auto-save the AI-verified formatting if we have settings
             if (existingSettings?._id && data.rules && Object.keys(data.rules).length > 0) {
-                await markVerified({
-                    id: existingSettings._id,
-                    formattingOverrides: data.rules,
-                });
+                try {
+                    await markVerified({
+                        id: existingSettings._id,
+                        formattingOverrides: data.rules,
+                    });
+                } catch (markErr) {
+                    console.warn('Failed to persist AI formatting:', markErr);
+                    // Continue — verification result is still shown to user
+                }
             }
         } catch (error) {
             console.error('AI verification failed:', error);

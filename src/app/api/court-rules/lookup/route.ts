@@ -4,21 +4,32 @@
  * POST /api/court-rules/lookup
  *
  * Discovers local court formatting rules via Tavily + GPT-4o.
- * TODO: Integrate Convex courtRulesCache (30-day TTL) when ready.
+ * Requires authentication (Clerk) to protect against uncontrolled API costs.
+ * Results are cached in-memory for 30 days per state/county pair.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { lookupCourtRules, CACHE_TTL_MS } from '@/lib/legal/courtRulesLookup';
 import { titleCase } from '@/lib/utils/stringHelpers';
 
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
+    // ── Auth guard ──
+    const { userId } = await auth();
+    if (!userId) {
+        return NextResponse.json(
+            { error: 'Authentication required' },
+            { status: 401 }
+        );
+    }
+
     let body: {
         state: string;
         county: string;
         courtName?: string;
-        /** TODO: Wire into cache-busting once Convex cache is integrated. */
+        /** Pass true to bypass the in-memory cache and re-query AI sources. */
         forceRefresh?: boolean;
     };
 
@@ -63,3 +74,4 @@ export async function POST(request: NextRequest) {
         );
     }
 }
+

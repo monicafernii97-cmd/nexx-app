@@ -150,7 +150,12 @@ export const remove = mutation({
 
         // Clean up stored PDF blob
         if (doc.storageId) {
-            await ctx.storage.delete(doc.storageId);
+            try {
+                await ctx.storage.delete(doc.storageId);
+            } catch (err) {
+                console.warn('[remove] Failed to delete blob:', doc.storageId, err);
+                // Continue with document deletion — orphan blob is acceptable
+            }
         }
 
         await ctx.db.delete(args.id);
@@ -179,10 +184,11 @@ export const list = query({
         if (!user) return [];
 
         if (args.status) {
+            const statusFilter = args.status;
             return await ctx.db
                 .query('generatedDocuments')
                 .withIndex('by_user_status', (q) =>
-                    q.eq('userId', user._id).eq('status', args.status!)
+                    q.eq('userId', user._id).eq('status', statusFilter)
                 )
                 .order('desc')
                 .collect();

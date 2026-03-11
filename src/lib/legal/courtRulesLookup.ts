@@ -28,6 +28,9 @@ interface CacheEntry {
     expiresAt: number;
 }
 
+/** Max entries to prevent unbounded memory growth */
+const MAX_CACHE_SIZE = 500;
+
 /** Process-local cache keyed by "state|county" */
 const rulesCache = new Map<string, CacheEntry>();
 
@@ -46,6 +49,11 @@ function getCached(state: string, county: string): CourtRulesLookupResult | null
 }
 
 function setCache(state: string, county: string, result: CourtRulesLookupResult): void {
+    // Evict oldest entry if cache is full (FIFO)
+    if (rulesCache.size >= MAX_CACHE_SIZE) {
+        const oldestKey = rulesCache.keys().next().value;
+        if (oldestKey) rulesCache.delete(oldestKey);
+    }
     rulesCache.set(getCacheKey(state, county), {
         result,
         expiresAt: Date.now() + CACHE_TTL_MS,

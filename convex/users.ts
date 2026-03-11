@@ -1,7 +1,7 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 
-// Ensure a Convex user exists for a given Clerk user — auth-guarded
+/** Ensure a Convex user exists for a given Clerk user — auth-guarded */
 export const ensureFromClerk = mutation({
     args: {
         clerkId: v.string(),
@@ -46,7 +46,7 @@ export const ensureFromClerk = mutation({
     },
 });
 
-// Get the authenticated user's own record — derives clerkId from auth context
+/** Get the authenticated user's own record — derives clerkId from auth context */
 export const me = query({
     args: {},
     handler: async (ctx) => {
@@ -60,7 +60,7 @@ export const me = query({
     },
 });
 
-// Get user by ID — auth-guarded
+/** Get user by ID — auth-guarded */
 export const get = query({
     args: { id: v.id('users') },
     handler: async (ctx, args) => {
@@ -74,7 +74,7 @@ export const get = query({
     },
 });
 
-// Update user profile (onboarding data) — auth-guarded
+/** Update user profile (onboarding data) — auth-guarded */
 export const updateProfile = mutation({
     args: {
         id: v.id('users'),
@@ -146,7 +146,7 @@ export const updateProfile = mutation({
     },
 });
 
-// Complete onboarding — auth-guarded
+/** Complete onboarding — auth-guarded */
 export const completeOnboarding = mutation({
     args: { id: v.id('users') },
     handler: async (ctx, args) => {

@@ -233,7 +233,7 @@ function renderSignatureBlock(data: SignatureBlockData): string {
     </div>`;
 }
 
-/** Render the Certificate of Service section certifying proper service via e-filing. */
+/** Render the Certificate of Service attestation block with signer name and service date. */
 function renderCertificateOfService(
   serverName: string,
   servedParty: string,
@@ -255,7 +255,7 @@ function renderCertificateOfService(
     </div>`;
 }
 
-/** Render the judge signature block with SIGNED date line and JUDGE PRESIDING label. */
+/** Render the judge's signature block with blank lines for date and judge name. */
 function renderJudgeSignature(): string {
   return `
     <div class="judge-signature">
@@ -270,7 +270,7 @@ function renderJudgeSignature(): string {
     </div>`;
 }
 
-/** Render the APPROVED AS TO FORM ONLY block for proposed orders. */
+/** Render an 'APPROVED AS TO FORM' line for opposing counsel acknowledgment. */
 function renderApprovalLine(name: string, role: string): string {
   return `
     <div class="approval-block">
@@ -281,7 +281,7 @@ function renderApprovalLine(name: string, role: string): string {
     </div>`;
 }
 
-/** Render the notary block with SWORN TO AND SUBSCRIBED section for sworn affidavits. */
+/** Render a notary public acknowledgment block with blank fields for signature and commission. */
 function renderNotaryBlock(): string {
   return `
     <div class="notary-block">

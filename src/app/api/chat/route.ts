@@ -9,6 +9,7 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_MESSAGES = 50;
 
+/** Handle POST requests for AI chat — authenticates user, rate-limits, and streams GPT responses. */
 export async function POST(req: NextRequest) {
     // ── Auth guard ──
     const { userId } = await auth();

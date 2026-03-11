@@ -34,10 +34,12 @@ const MAX_CACHE_SIZE = 500;
 /** Process-local cache keyed by "state|county" */
 const rulesCache = new Map<string, CacheEntry>();
 
+/** Build a cache key from state, county, and optional court name. */
 function getCacheKey(state: string, county: string, courtName?: string): string {
     return courtName ? `${state}|${county}|${courtName}` : `${state}|${county}`;
 }
 
+/** Return a cached lookup result if available and not expired; otherwise null. */
 function getCached(state: string, county: string, courtName?: string): CourtRulesLookupResult | null {
     const key = getCacheKey(state, county, courtName);
     const entry = rulesCache.get(key);
@@ -49,6 +51,7 @@ function getCached(state: string, county: string, courtName?: string): CourtRule
     return { ...entry.result, cached: true };
 }
 
+/** Store a lookup result in the process-local cache with TTL and FIFO eviction. */
 function setCache(state: string, county: string, result: CourtRulesLookupResult, courtName?: string): void {
     // Evict oldest entry if cache is full (FIFO)
     if (rulesCache.size >= MAX_CACHE_SIZE) {
@@ -65,6 +68,7 @@ function setCache(state: string, county: string, result: CourtRulesLookupResult,
 
 let cachedTavilyClient: ReturnType<typeof tavily> | null = null;
 
+/** Lazily initialize and return the Tavily API client, or null if the API key is not configured. */
 function getTavilyClient() {
     if (cachedTavilyClient) return cachedTavilyClient;
     const apiKey = process.env.TAVILY_API_KEY;
@@ -76,9 +80,7 @@ function getTavilyClient() {
     return cachedTavilyClient;
 }
 
-/**
- * Search Tavily for local court formatting rules and requirements.
- */
+/** Search Tavily for official court rules and filing requirements for a given jurisdiction. */
 async function searchCourtRules(
     state: string,
     county: string,

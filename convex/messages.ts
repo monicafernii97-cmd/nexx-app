@@ -1,9 +1,9 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { getAuthenticatedUserAndConversation } from './lib/auth';
-// ── Mutations ──
+/** ── Mutations ── */
 
-// Send a message — auth-guarded
+/** Send a message — auth-guarded */
 export const send = mutation({
     args: {
         conversationId: v.id('conversations'),
@@ -33,7 +33,7 @@ export const send = mutation({
     },
 });
 
-// List messages for a conversation — auth-guarded
+/** List messages for a conversation — auth-guarded */
 export const list = query({
     args: { conversationId: v.id('conversations') },
     handler: async (ctx, args) => {

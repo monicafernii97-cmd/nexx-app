@@ -2,9 +2,9 @@ import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { getAuthenticatedUser } from './lib/auth';
 
-// ── Mutations ──
+/** ── Mutations ── */
 
-// Create a NEX profile — auth-guarded
+/** Create a NEX profile — auth-guarded */
 export const create = mutation({
     args: {
         behaviors: v.array(v.string()),
@@ -32,7 +32,7 @@ export const create = mutation({
     },
 });
 
-// Get NEX profile for the authenticated user
+/** Get NEX profile for the authenticated user */
 export const getByUser = query({
     args: {},
     handler: async (ctx) => {
@@ -52,7 +52,7 @@ export const getByUser = query({
     },
 });
 
-// Update an existing NEX profile — auth-guarded
+/** Update an existing NEX profile — auth-guarded */
 export const update = mutation({
     args: {
         id: v.id('nexProfiles'),
@@ -83,7 +83,7 @@ export const update = mutation({
     },
 });
 
-// Update AI-generated insights on a NEX profile — auth-guarded
+/** Update AI-generated insights on a NEX profile — auth-guarded */
 export const updateAiInsights = mutation({
     args: {
         id: v.id('nexProfiles'),

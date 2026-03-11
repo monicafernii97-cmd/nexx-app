@@ -3,7 +3,7 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { getAuthenticatedUser } from './lib/auth';
 
-// Create a new conversation — auth-guarded
+/** Create a new conversation — auth-guarded */
 export const create = mutation({
     args: {
         title: v.string(),
@@ -29,7 +29,7 @@ export const create = mutation({
     },
 });
 
-// Update conversation title — auth-guarded
+/** Update conversation title — auth-guarded */
 export const updateTitle = mutation({
     args: {
         id: v.id('conversations'),
@@ -47,7 +47,7 @@ export const updateTitle = mutation({
     },
 });
 
-// Archive a conversation — auth-guarded
+/** Archive a conversation — auth-guarded */
 export const archive = mutation({
     args: { id: v.id('conversations') },
     handler: async (ctx, args) => {
@@ -62,7 +62,7 @@ export const archive = mutation({
     },
 });
 
-// Delete a conversation and all its messages — auth-guarded
+/** Delete a conversation and all its messages — auth-guarded */
 export const remove = mutation({
     args: { id: v.id('conversations') },
     handler: async (ctx, args) => {
@@ -117,9 +117,9 @@ export const deleteMessagesBatch = internalMutation({
     },
 });
 
-// ── Queries ──
+/** ── Queries ── */
 
-// List conversations for the authenticated user
+/** List conversations for the authenticated user */
 export const list = query({
     args: {
         status: v.optional(
@@ -154,7 +154,7 @@ export const list = query({
     },
 });
 
-// Get a single conversation — auth-guarded
+/** Get a single conversation — auth-guarded */
 export const get = query({
     args: { id: v.id('conversations') },
     handler: async (ctx, args) => {

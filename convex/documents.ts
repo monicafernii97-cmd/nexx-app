@@ -2,7 +2,7 @@ import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { getAuthenticatedUser } from './lib/auth';
 
-// Document type enum — shared across args
+/** Document type enum — shared across args */
 const documentTypeValidator = v.union(
     v.literal('court_order'),
     v.literal('police_report'),
@@ -13,9 +13,9 @@ const documentTypeValidator = v.union(
     v.literal('other')
 );
 
-// ── Helper: document type enum ──
+/** ── Helper: document type enum ── */
 
-// Generate an upload URL for Convex file storage — auth-guarded
+/** Generate an upload URL for Convex file storage — auth-guarded */
 export const generateUploadUrl = mutation({
     args: {},
     handler: async (ctx) => {
@@ -24,7 +24,7 @@ export const generateUploadUrl = mutation({
     },
 });
 
-// Create a new document — auth-guarded
+/** Create a new document — auth-guarded */
 export const create = mutation({
     args: {
         title: v.string(),
@@ -57,7 +57,7 @@ export const create = mutation({
     },
 });
 
-// List documents for the authenticated user, optionally filtered by type
+/** List documents for the authenticated user, optionally filtered by type */
 export const list = query({
     args: {
         type: v.optional(documentTypeValidator),
@@ -90,7 +90,7 @@ export const list = query({
     },
 });
 
-// Get a single document — auth-guarded
+/** Get a single document — auth-guarded */
 export const get = query({
     args: { id: v.id('documents') },
     handler: async (ctx, args) => {
@@ -111,7 +111,7 @@ export const get = query({
     },
 });
 
-// Update a document — auth-guarded
+/** Update a document — auth-guarded */
 export const update = mutation({
     args: {
         id: v.id('documents'),
@@ -141,7 +141,7 @@ export const update = mutation({
     },
 });
 
-// Remove a document — auth-guarded
+/** Remove a document — auth-guarded */
 export const remove = mutation({
     args: { id: v.id('documents') },
     handler: async (ctx, args) => {

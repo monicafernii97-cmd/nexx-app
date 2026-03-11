@@ -79,6 +79,7 @@ const MAX_STORE_SIZE = 10_000;
 let lastCleanup = Date.now();
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
+/** Periodically evict stale entries from the rate limit store to prevent unbounded memory growth. */
 function cleanup(): void {
     const now = Date.now();
     if (now - lastCleanup < CLEANUP_INTERVAL_MS) return;
@@ -92,6 +93,7 @@ function cleanup(): void {
     }
 }
 
+/** Extract the feature limit config from a composite store key ("userId:feature"). */
 function getLimitForKey(key: string): FeatureLimit | null {
     const feature = key.split(':')[1] as RateLimitFeature;
     return FEATURE_LIMITS[feature] ?? null;

@@ -15,6 +15,7 @@ import { titleCase } from '@/lib/utils/stringHelpers';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { getConvexClient } from '@/lib/convexServer';
 import { api } from '../../../../../convex/_generated/api';
+import type { Id } from '../../../../../convex/_generated/dataModel';
 
 export const maxDuration = 30;
 
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
                 await convex.mutation(
                     api.courtSettings.markNEXXverified,
                     {
-                        id: body.settingsId as any,
+                        id: body.settingsId as Id<'userCourtSettings'>,
                         formattingOverrides: result.rules,
                     }
                 );

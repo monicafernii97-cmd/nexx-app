@@ -25,6 +25,7 @@ export default defineSchema({
                 v.literal('sole'),
                 v.literal('joint'),
                 v.literal('split'),
+                v.literal('visitation'),
                 v.literal('none'),
                 v.literal('pending')
             )

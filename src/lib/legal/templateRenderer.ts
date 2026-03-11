@@ -9,6 +9,8 @@
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import createDOMPurify from 'dompurify';
+import { JSDOM } from 'jsdom';
 import type {
   CourtFormattingRules,
   CaptionData,
@@ -603,18 +605,34 @@ function escapeHtml(text: string): string {
 
 /**
  * Sanitize AI-generated HTML content (from GeneratedSection.content).
- * Allows safe structural tags used in legal documents while stripping
- * dangerous elements (script, iframe, event handlers, etc.).
+ * Uses DOMPurify + jsdom for robust server-side sanitization that handles
+ * all bypass vectors (script content, unquoted URIs, entity-encoded URIs,
+ * SVG event handlers, base/meta tags, etc.).
  *
- * Use for content from our own AI generation pipeline — NOT for raw user input.
+ * Allows safe structural tags used in legal documents while stripping
+ * dangerous elements. Use for content from our AI pipeline — NOT raw user input.
  */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const DOMPurify = createDOMPurify(new JSDOM('').window as any);
+
+/** Allowlist of tags safe for legal document content */
+const ALLOWED_TAGS = [
+  'p', 'br', 'em', 'strong', 'b', 'i', 'u',
+  'ol', 'ul', 'li',
+  'span', 'div',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'table', 'thead', 'tbody', 'tr', 'th', 'td',
+  'blockquote', 'pre', 'code',
+  'sub', 'sup', 'hr',
+];
+
+const ALLOWED_ATTR = ['class', 'id', 'style'];
+
 function sanitizeTrustedHtml(html: string): string {
-  // Strip <script>, <iframe>, <object>, <embed>, <style>, <link> tags entirely
-  let clean = html.replace(/<\s*\/?\s*(script|iframe|object|embed|style|link)[^>]*>/gi, '');
-  // Strip on* event handler attributes (onclick, onerror, etc.)
-  clean = clean.replace(/\s+on\w+\s*=\s*['"][^'"]*['"]/gi, '');
-  clean = clean.replace(/\s+on\w+\s*=\s*\S+/gi, '');
-  // Strip javascript: and data: URIs in href/src attributes
-  clean = clean.replace(/(href|src)\s*=\s*['"]\s*(javascript|data):[^'"]*['"]/gi, '$1=""');
-  return clean;
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS,
+    ALLOWED_ATTR,
+    ALLOW_DATA_ATTR: false,
+  });
 }

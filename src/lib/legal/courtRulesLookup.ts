@@ -94,7 +94,7 @@ async function searchCourtRules(
 
         const response = await client.search(query, {
             maxResults: 8,
-            includeDomains: ['*.gov', '*.uscourts.gov', '*.txcourts.gov'],
+            includeDomains: ['uscourts.gov', 'txcourts.gov', 'courts.state.tx.us'],
             searchDepth: 'advanced',
         });
 

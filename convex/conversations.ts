@@ -73,12 +73,13 @@ export const remove = mutation({
             throw new Error('Not authorized to delete this conversation');
         }
 
-        // Schedule batched message deletion (avoids Convex mutation limits)
+        // Schedule batched message deletion (avoids Convex mutation limits).
+        // The conversation itself is deleted only after all messages are gone,
+        // preventing orphaned messages if a scheduled job fails.
         await ctx.scheduler.runAfter(0, internal.conversations.deleteMessagesBatch, {
             conversationId: args.id,
+            deleteConversation: true,
         });
-
-        await ctx.db.delete(args.id);
     },
 });
 
@@ -86,7 +87,10 @@ export const remove = mutation({
 const BATCH_SIZE = 500;
 
 export const deleteMessagesBatch = internalMutation({
-    args: { conversationId: v.id('conversations') },
+    args: {
+        conversationId: v.id('conversations'),
+        deleteConversation: v.optional(v.boolean()),
+    },
     handler: async (ctx, args) => {
         const batch = await ctx.db
             .query('messages')
@@ -97,11 +101,18 @@ export const deleteMessagesBatch = internalMutation({
             await ctx.db.delete(msg._id);
         }
 
-        // If we got a full batch, there may be more — schedule continuation
         if (batch.length === BATCH_SIZE) {
+            // More messages remain — schedule continuation
             await ctx.scheduler.runAfter(0, internal.conversations.deleteMessagesBatch, {
                 conversationId: args.conversationId,
+                deleteConversation: args.deleteConversation,
             });
+        } else if (args.deleteConversation) {
+            // All messages deleted — now safe to remove the conversation
+            const conversation = await ctx.db.get(args.conversationId);
+            if (conversation) {
+                await ctx.db.delete(args.conversationId);
+            }
         }
     },
 });

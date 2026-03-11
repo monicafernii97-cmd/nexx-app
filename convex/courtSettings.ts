@@ -100,9 +100,10 @@ export const grantComplianceConsent = mutation({
             throw new Error('No court settings found. Save your court settings first.');
         }
 
+        const now = Date.now();
         await ctx.db.patch(settings._id, {
-            complianceConsentGrantedAt: Date.now(),
-            updatedAt: Date.now(),
+            complianceConsentGrantedAt: now,
+            updatedAt: now,
         });
     },
 });

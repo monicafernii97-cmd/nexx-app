@@ -1,5 +1,6 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
+import { getAuthenticatedUser } from './lib/auth';
 
 // Document type enum — shared across args
 const documentTypeValidator = v.union(
@@ -12,17 +13,7 @@ const documentTypeValidator = v.union(
     v.literal('other')
 );
 
-// ── Helper: resolve authenticated user ──
-async function getAuthenticatedUser(ctx: any) {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error('Not authenticated');
-    const user = await ctx.db
-        .query('users')
-        .withIndex('by_clerk', (q: any) => q.eq('clerkId', identity.subject))
-        .first();
-    if (!user) throw new Error('User not found');
-    return user;
-}
+// ── Helper: document type enum ──
 
 // Generate an upload URL for Convex file storage — auth-guarded
 export const generateUploadUrl = mutation({
@@ -144,7 +135,7 @@ export const update = mutation({
 
         const { id, ...updates } = args;
         const filtered = Object.fromEntries(
-            Object.entries(updates).filter(([_, v]) => v !== undefined)
+            Object.entries(updates).filter(([, val]) => val !== undefined)
         );
         await ctx.db.patch(id, { ...filtered, updatedAt: Date.now() });
     },

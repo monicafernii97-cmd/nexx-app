@@ -1,24 +1,7 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
-
-// ── Helper: resolve authenticated user & verify conversation ownership ──
-async function getAuthenticatedUserAndConversation(ctx: any, conversationId: any) {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error('Not authenticated');
-
-    const user = await ctx.db
-        .query('users')
-        .withIndex('by_clerk', (q: any) => q.eq('clerkId', identity.subject))
-        .first();
-    if (!user) throw new Error('User not found');
-
-    const conversation = await ctx.db.get(conversationId);
-    if (!conversation || conversation.userId !== user._id) {
-        throw new Error('Not authorized to access this conversation');
-    }
-
-    return { user, conversation };
-}
+import { getAuthenticatedUserAndConversation } from './lib/auth';
+// ── Mutations ──
 
 // Send a message — auth-guarded
 export const send = mutation({

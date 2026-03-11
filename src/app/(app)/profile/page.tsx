@@ -10,7 +10,6 @@ import {
     Users,
     Scale,
     Briefcase,
-    Heart,
     Save,
     Check,
     Sparkles,

@@ -5,12 +5,10 @@ import { useState } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { Id } from '../../../../convex/_generated/dataModel';
-import { useUser } from '@/lib/user-context';
 import {
     Shield,
     Plus,
     Search,
-    Clock,
     Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -18,7 +16,6 @@ import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 
 export default function DocuVaultPage() {
-    const { userId } = useUser();
     const incidents = useQuery(api.incidents.list);
     const removeIncident = useMutation(api.incidents.remove);
     const [activeFilter, setActiveFilter] = useState<string | null>(null);

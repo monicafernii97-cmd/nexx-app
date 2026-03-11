@@ -20,14 +20,12 @@ import {
     Baby,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 
 type Step = 'describe' | 'review' | 'confirmed';
 
 export default function NewIncidentPage() {
     const { userId } = useUser();
-    const router = useRouter();
     const [step, setStep] = useState<Step>('describe');
     const [narrative, setNarrative] = useState('');
     const [category, setCategory] = useState('');

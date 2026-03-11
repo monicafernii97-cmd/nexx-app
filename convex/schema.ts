@@ -179,6 +179,8 @@ export default defineSchema({
         /** Whether the user has verified these settings via AI lookup */
         aiVerified: v.optional(v.boolean()),
         aiVerifiedAt: v.optional(v.number()),
+        /** Server-side consent for AI compliance checking (timestamp when granted) */
+        complianceConsentGrantedAt: v.optional(v.number()),
         createdAt: v.number(),
         updatedAt: v.number(),
     }).index('by_user', ['userId']),

@@ -1,17 +1,10 @@
-/**
- * Document Compliance Check API Route
- *
- * POST /api/documents/check
- *
- * Accepts a generated PDF (base64) and court settings,
- * runs both quick structural checks and AI-powered compliance analysis.
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getMergedRules, getCountyRequirements } from '@/lib/legal/courtRules';
 import { checkDocumentCompliance, quickComplianceCheck } from '@/lib/legal/complianceChecker';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import { getConvexClient } from '@/lib/convexServer';
+import { api } from '../../../../../convex/_generated/api';
 
 export const maxDuration = 30;
 
@@ -51,7 +44,6 @@ export async function POST(request: NextRequest) {
     html?: string;
     state: string;
     county: string;
-    userConsent?: boolean;
     quickOnly?: boolean;
   };
 
@@ -114,16 +106,32 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Full AI compliance check (requires user consent + PDF)
-    // TODO(security): Replace client-declared userConsent with server-side
-    // persisted consent lookup (e.g., from userCourtSettings.consentGrantedAt).
-    // Currently the privacy gate in complianceChecker prevents PII transmission
-    // without consent=true, but a caller can trivially set it to true.
+    // ── Server-side consent check ──
+    // Do NOT trust client-sent consent. Check the persisted consent
+    // timestamp from the user's court settings in Convex.
+    const convex = getConvexClient();
+    const hasConsent = await convex.query(
+      api.courtSettings.hasComplianceConsent,
+      { clerkId: userId }
+    );
+
+    if (!hasConsent) {
+      return NextResponse.json(
+        {
+          error: 'Compliance consent required',
+          message: 'You must grant consent for AI compliance checking before running a full analysis. This can be done in Court Settings.',
+          quickChecks, // Still return the free structural checks
+        },
+        { status: 403 }
+      );
+    }
+
+    // Full AI compliance check (server-verified consent)
     const aiReport = await checkDocumentCompliance(
       body.pdfBase64,
       rules,
       countyInfo,
-      body.userConsent ?? false
+      true // consent verified server-side above
     );
 
     return NextResponse.json({
@@ -138,3 +146,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

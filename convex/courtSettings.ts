@@ -84,6 +84,28 @@ export const remove = mutation({
     },
 });
 
+/** Grant server-side consent for AI compliance checking. */
+export const grantComplianceConsent = mutation({
+    args: {},
+    handler: async (ctx) => {
+        const user = await getAuthenticatedUser(ctx);
+
+        const settings = await ctx.db
+            .query('userCourtSettings')
+            .withIndex('by_user', (q) => q.eq('userId', user._id))
+            .first();
+
+        if (!settings) {
+            throw new Error('No court settings found. Save your court settings first.');
+        }
+
+        await ctx.db.patch(settings._id, {
+            complianceConsentGrantedAt: Date.now(),
+            updatedAt: Date.now(),
+        });
+    },
+});
+
 // ── Queries ──
 
 /** Get the authenticated user's court settings. */
@@ -103,5 +125,24 @@ export const get = query({
             .query('userCourtSettings')
             .withIndex('by_user', (q) => q.eq('userId', user._id))
             .first();
+    },
+});
+
+/** Check if the user has granted compliance consent (server-side, by Clerk ID). */
+export const hasComplianceConsent = query({
+    args: { clerkId: v.string() },
+    handler: async (ctx, args) => {
+        const user = await ctx.db
+            .query('users')
+            .withIndex('by_clerk', (q) => q.eq('clerkId', args.clerkId))
+            .first();
+        if (!user) return false;
+
+        const settings = await ctx.db
+            .query('userCourtSettings')
+            .withIndex('by_user', (q) => q.eq('userId', user._id))
+            .first();
+
+        return !!settings?.complianceConsentGrantedAt;
     },
 });

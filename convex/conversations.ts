@@ -1,5 +1,6 @@
-import { mutation, query } from './_generated/server';
+import { mutation, query, internalMutation } from './_generated/server';
 import { v } from 'convex/values';
+import { internal } from './_generated/api';
 import { getAuthenticatedUser } from './lib/auth';
 
 // Create a new conversation — auth-guarded
@@ -72,16 +73,36 @@ export const remove = mutation({
             throw new Error('Not authorized to delete this conversation');
         }
 
-        // Delete associated messages
-        const messages = await ctx.db
+        // Schedule batched message deletion (avoids Convex mutation limits)
+        await ctx.scheduler.runAfter(0, internal.conversations.deleteMessagesBatch, {
+            conversationId: args.id,
+        });
+
+        await ctx.db.delete(args.id);
+    },
+});
+
+/** Delete messages in batches to stay within Convex mutation limits. */
+const BATCH_SIZE = 500;
+
+export const deleteMessagesBatch = internalMutation({
+    args: { conversationId: v.id('conversations') },
+    handler: async (ctx, args) => {
+        const batch = await ctx.db
             .query('messages')
-            .withIndex('by_conversation', (q) => q.eq('conversationId', args.id))
-            .collect();
-        for (const msg of messages) {
+            .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
+            .take(BATCH_SIZE);
+
+        for (const msg of batch) {
             await ctx.db.delete(msg._id);
         }
 
-        await ctx.db.delete(args.id);
+        // If we got a full batch, there may be more — schedule continuation
+        if (batch.length === BATCH_SIZE) {
+            await ctx.scheduler.runAfter(0, internal.conversations.deleteMessagesBatch, {
+                conversationId: args.conversationId,
+            });
+        }
     },
 });
 

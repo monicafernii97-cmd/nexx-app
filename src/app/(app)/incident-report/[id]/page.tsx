@@ -65,7 +65,7 @@ export default function IncidentDetailPage() {
     // Redirect if ID is invalid (after all hooks)
     useEffect(() => {
         if (!isValidId) {
-            router.push('/docuvault');
+            router.push('/incident-report');
         }
     }, [isValidId, router]);
 
@@ -186,7 +186,7 @@ export default function IncidentDetailPage() {
         setDeleteError(null);
         try {
             await removeIncident({ id: incidentId });
-            router.push('/docuvault');
+            router.push('/incident-report');
         } catch (error) {
             console.error('Delete error:', error);
             setDeleteError('Failed to delete incident. Please try again.');
@@ -202,7 +202,7 @@ export default function IncidentDetailPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-center gap-4 mb-6"
             >
-                <Link href="/docuvault">
+                <Link href="/incident-report">
                     <button
                         className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
                         style={{

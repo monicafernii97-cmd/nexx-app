@@ -20,8 +20,8 @@ import { INCIDENT_CATEGORIES } from '@/lib/constants';
 
 const quickActions = [
     { label: 'New Chat', desc: 'Talk to NEXX', href: '/chat', icon: Mic, color: '#C58B07' },
-    { label: 'Log Incident', desc: 'Document an event', href: '/docuvault/new', icon: Plus, color: '#5A9E6F' },
-    { label: 'Draft Document', desc: 'Create a legal doc', href: '/legal', icon: FileText, color: '#5A8EC9' },
+    { label: 'Log Incident', desc: 'Document an event', href: '/incident-report/new', icon: Plus, color: '#5A9E6F' },
+    { label: 'Draft Document', desc: 'Create a legal doc', href: '/docuvault', icon: FileText, color: '#5A8EC9' },
 ];
 
 export default function DashboardPage() {
@@ -179,7 +179,7 @@ export default function DashboardPage() {
                             const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
                             const date = new Date(incident.date);
                             return (
-                                <Link key={incident._id} href={`/docuvault/${incident._id}`} className="no-underline block">
+                                <Link key={incident._id} href={`/incident-report/${incident._id}`} className="no-underline block">
                                     <div className="card-gilded p-4 group cursor-pointer">
                                         <div className="flex items-center gap-4">
                                             <div className="text-center flex-shrink-0" style={{ minWidth: 45 }}>

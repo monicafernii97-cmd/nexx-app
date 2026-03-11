@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutDashboard,
     MessageCircle,
-    Shield,
+    Landmark,
+    ClipboardList,
     Siren,
     Scale,
     Gavel,
@@ -24,10 +25,10 @@ import { nexxClerkAppearance } from '@/lib/clerk-theme';
 const navItems = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Chat', href: '/chat', icon: MessageCircle },
-    { label: 'DocuVault', href: '/docuvault', icon: Shield },
+    { label: 'DocuVault', href: '/docuvault', icon: Landmark },
+    { label: 'Incident Report', href: '/incident-report', icon: ClipboardList },
     { label: 'NEX Profile', href: '/nex-profile', icon: Siren },
-    { label: 'Legal Suite', href: '/legal', icon: Scale },
-    { label: 'Court Settings', href: '/court-settings', icon: Gavel },
+    { label: 'Legal Suite', href: '/court-settings', icon: Scale },
     { label: 'Resources', href: '/resources', icon: BookOpen },
     { label: 'My Profile', href: '/profile', icon: UserCircle },
     { label: 'Settings', href: '/settings', icon: Settings },

@@ -122,7 +122,12 @@ export const attachPdf = mutation({
 
         // Clean up previous PDF blob to prevent storage leaks
         if (doc.storageId && doc.storageId !== args.storageId) {
-            await ctx.storage.delete(doc.storageId);
+            try {
+                await ctx.storage.delete(doc.storageId);
+            } catch (err) {
+                console.warn('[attachPdf] Failed to delete previous blob:', doc.storageId, err);
+                // Continue with attach — orphan is acceptable over blocking the update
+            }
         }
 
         await ctx.db.patch(args.id, {

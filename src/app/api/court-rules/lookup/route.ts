@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
         const county = titleCase(body.county);
         const courtName = body.courtName ? titleCase(body.courtName) : undefined;
 
-        // Look up rules via Tavily + GPT-4o
-        const result = await lookupCourtRules(state, county, courtName);
+        // Look up rules via Tavily + GPT-4o (with in-memory cache)
+        const result = await lookupCourtRules(state, county, courtName, body.forceRefresh);
 
         return NextResponse.json({
             state,

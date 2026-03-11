@@ -5,19 +5,52 @@
  * then GPT-4o to extract structured CourtFormattingRules from the results.
  *
  * Flow:
- * 1. Search Tavily for "[state] [county] court local rules formatting filing requirements"
- * 2. Feed search results to GPT-4o with a structured extraction prompt
- * 3. Return Partial<CourtFormattingRules> for merge into the rules pipeline
+ * 1. Check in-memory cache — return cached if fresh (30-day TTL)
+ * 2. Search Tavily for "[state] [county] court local rules formatting filing requirements"
+ * 3. Feed search results to GPT-4o with a structured extraction prompt
+ * 4. Cache results in memory and return Partial<CourtFormattingRules>
  *
- * TODO: Integrate Convex courtRulesCache for 30-day TTL caching.
+ * NOTE: In-memory cache is per-process. For multi-instance deployments,
+ * integrate the Convex courtRulesCache table for persistent cross-instance caching.
  */
 
 import { tavily } from '@tavily/core';
 import OpenAI from 'openai';
 import type { CourtFormattingRules } from './types';
 
-/** How long cached rules remain valid (30 days in ms). Exported for API route. */
-const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** How long cached rules remain valid (30 days in ms). */
+export const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+// ── In-Memory Cache ──
+
+interface CacheEntry {
+    result: CourtRulesLookupResult;
+    expiresAt: number;
+}
+
+/** Process-local cache keyed by "state|county" */
+const rulesCache = new Map<string, CacheEntry>();
+
+function getCacheKey(state: string, county: string): string {
+    return `${state}|${county}`;
+}
+
+function getCached(state: string, county: string): CourtRulesLookupResult | null {
+    const entry = rulesCache.get(getCacheKey(state, county));
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+        rulesCache.delete(getCacheKey(state, county));
+        return null;
+    }
+    return { ...entry.result, cached: true };
+}
+
+function setCache(state: string, county: string, result: CourtRulesLookupResult): void {
+    rulesCache.set(getCacheKey(state, county), {
+        result,
+        expiresAt: Date.now() + CACHE_TTL_MS,
+    });
+}
 
 // ── Tavily Search for Court Rules ──
 
@@ -189,17 +222,28 @@ export interface CourtRulesLookupResult {
 /**
  * Look up local court formatting rules for a given state/county.
  *
+ * Results are cached in-memory for 30 days per state/county pair.
+ * Use `forceRefresh` to bypass the cache and re-query AI sources.
+ *
  * @param state - US state name (e.g. "Texas")
  * @param county - County name (e.g. "Fort Bend")
  * @param courtName - Optional specific court name
+ * @param forceRefresh - Skip the cache and re-query
  * @returns Partial formatting rules discovered from official sources
  */
 export async function lookupCourtRules(
     state: string,
     county: string,
-    courtName?: string
+    courtName?: string,
+    forceRefresh = false
 ): Promise<CourtRulesLookupResult> {
-    // Step 1: Search Tavily
+    // Step 1: Check cache (unless force-refreshing)
+    if (!forceRefresh) {
+        const cached = getCached(state, county);
+        if (cached) return cached;
+    }
+
+    // Step 2: Search Tavily
     const searchResults = await searchCourtRules(state, county, courtName);
 
     if (searchResults.length === 0) {
@@ -211,14 +255,18 @@ export async function lookupCourtRules(
         };
     }
 
-    // Step 2: Extract rules with GPT-4o
+    // Step 3: Extract rules with GPT-4o
     const extraction = await extractRulesWithAI(searchResults, state, county);
 
-    return {
+    const result: CourtRulesLookupResult = {
         ...extraction,
         cached: false,
     };
-}
 
-/** Cache TTL constant exported for the API route. */
-export { CACHE_TTL_MS };
+    // Step 4: Cache for future requests
+    if (extraction.confidence > 0) {
+        setCache(state, county, result);
+    }
+
+    return result;
+}

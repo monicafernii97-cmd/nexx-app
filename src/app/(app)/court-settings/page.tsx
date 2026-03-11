@@ -199,7 +199,7 @@ export default function CourtSettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* State Dropdown */}
                     <div className="relative">
-                        <label className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
+                        <label htmlFor="court-state-input" className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
                             State <span style={{ color: '#C58B07' }}>*</span>
                         </label>
                         <div className="relative">
@@ -270,7 +270,7 @@ export default function CourtSettingsPage() {
 
                     {/* County Typeahead */}
                     <div className="relative">
-                        <label className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
+                        <label htmlFor="court-county-input" className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
                             County <span style={{ color: '#C58B07' }}>*</span>
                         </label>
                         <div className="relative">
@@ -340,7 +340,7 @@ export default function CourtSettingsPage() {
 
                     {/* Court Name */}
                     <div className="md:col-span-2">
-                        <label className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
+                        <label htmlFor="court-name-input" className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
                             Court Name <span className="text-xs" style={{ color: '#5A4A30' }}>(optional)</span>
                         </label>
                         <input
@@ -379,7 +379,7 @@ export default function CourtSettingsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
+                        <label htmlFor="cause-number-input" className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
                             Cause Number
                         </label>
                         <input
@@ -397,7 +397,7 @@ export default function CourtSettingsPage() {
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
+                        <label htmlFor="judge-input" className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
                             Assigned Judge
                         </label>
                         <div className="relative">
@@ -422,7 +422,7 @@ export default function CourtSettingsPage() {
                         </div>
                     </div>
                     <div className="md:col-span-2">
-                        <label className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
+                        <label htmlFor="judicial-district-input" className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
                             Judicial District
                         </label>
                         <div className="relative">

@@ -601,12 +601,11 @@ body {
   break-after: page;
 }
 
-.no-break {
+/* Semantic alias for document structure contexts */
+.no-break,
+.keep-together {
   break-inside: avoid;
 }
-
-/* Semantic alias for .no-break — used in document structure contexts */
-.keep-together { break-inside: avoid; }
 
 
 /* ═══════════════════════════════════════════════════════════════

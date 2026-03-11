@@ -95,6 +95,7 @@ export default function CourtSettingsPage() {
     const handleSave = useCallback(async () => {
         if (!state || !county) return;
         setSaving(true);
+        setSaved(false);
         setSaveError(null);
         try {
             await upsertSettings({
@@ -533,22 +534,29 @@ export default function CourtSettingsPage() {
                                 <div className="mt-2">
                                     <span className="text-xs" style={{ color: '#5A4A30' }}>Sources:</span>
                                     <ul className="mt-1 space-y-1">
-                                        {verifyResult.sources.slice(0, 3).map((url, i) => (
-                                            <li key={i}>
-                                                <a
-                                                    href={url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-xs truncate block hover:underline"
-                                                    style={{ color: '#C58B07' }}
-                                                >
-                                                    {(() => {
-                                                        try { return new URL(url).hostname; }
-                                                        catch { return url; }
-                                                    })()}
-                                                </a>
-                                            </li>
-                                        ))}
+                                        {verifyResult.sources.slice(0, 3).map((url) => {
+                                            try {
+                                                const parsed = new URL(url);
+                                                if (!['http:', 'https:'].includes(parsed.protocol)) {
+                                                    return null;
+                                                }
+                                                return (
+                                                    <li key={parsed.href}>
+                                                        <a
+                                                            href={parsed.href}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-xs truncate block hover:underline"
+                                                            style={{ color: '#C58B07' }}
+                                                        >
+                                                            {parsed.hostname}
+                                                        </a>
+                                                    </li>
+                                                );
+                                            } catch {
+                                                return null;
+                                            }
+                                        })}
                                     </ul>
                                 </div>
                             )}

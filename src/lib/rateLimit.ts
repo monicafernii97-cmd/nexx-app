@@ -67,8 +67,6 @@ export const FEATURE_LIMITS: Record<RateLimitFeature, FeatureLimit> = {
 interface UserFeatureWindow {
     /** Timestamps of requests within the current window */
     timestamps: number[];
-    /** Start of the current window */
-    windowStart: number;
 }
 
 /** Key: "userId:feature" → window state */
@@ -87,7 +85,16 @@ function cleanup(): void {
 
     for (const [key, window] of store.entries()) {
         const limit = getLimitForKey(key);
-        if (!limit || now - window.windowStart > limit.windowMs * 2) {
+        if (!limit) {
+            store.delete(key);
+            continue;
+        }
+        // Prune expired timestamps
+        window.timestamps = window.timestamps.filter(
+            (t) => now - t < limit.windowMs
+        );
+        // Remove empty buckets
+        if (window.timestamps.length === 0) {
             store.delete(key);
         }
     }
@@ -116,6 +123,8 @@ export interface RateLimitResult {
 
 /**
  * Check and consume a rate limit for a user + feature.
+ * Uses a true sliding window — timestamps are pruned by age,
+ * not by a fixed window start anchor.
  *
  * @param userId - Clerk user ID
  * @param feature - Which feature is being rate-limited
@@ -134,9 +143,9 @@ export function checkRateLimit(
 
     let window = store.get(key);
 
-    // Initialize or reset expired window
-    if (!window || now - window.windowStart >= featureLimit.windowMs) {
-        window = { timestamps: [], windowStart: now };
+    // Initialize if no prior state
+    if (!window) {
+        window = { timestamps: [] };
         store.set(key, window);
 
         // Enforce max store size (FIFO eviction)
@@ -146,12 +155,16 @@ export function checkRateLimit(
         }
     }
 
-    // Prune timestamps outside the current window
+    // Prune timestamps outside the sliding window
     window.timestamps = window.timestamps.filter(
         (t) => now - t < featureLimit.windowMs
     );
 
-    const resetInMs = Math.max(0, featureLimit.windowMs - (now - window.windowStart));
+    // Compute resetInMs from the oldest remaining timestamp
+    const resetInMs =
+        window.timestamps.length === 0
+            ? featureLimit.windowMs
+            : Math.max(0, featureLimit.windowMs - (now - window.timestamps[0]));
 
     if (window.timestamps.length >= featureLimit.maxRequests) {
         return {

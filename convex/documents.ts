@@ -40,6 +40,14 @@ export const create = mutation({
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
 
+        // Verify incidentId belongs to this user
+        if (args.incidentId) {
+            const incident = await ctx.db.get(args.incidentId);
+            if (!incident || incident.userId !== user._id) {
+                throw new Error('Not authorized to link to this incident');
+            }
+        }
+
         return await ctx.db.insert('documents', {
             userId: user._id,
             title: args.title,
@@ -133,6 +141,23 @@ export const update = mutation({
             throw new Error('Not authorized to update this document');
         }
 
+        // Verify incidentId belongs to this user
+        if (args.incidentId) {
+            const incident = await ctx.db.get(args.incidentId);
+            if (!incident || incident.userId !== user._id) {
+                throw new Error('Not authorized to link to this incident');
+            }
+        }
+
+        // Best-effort cleanup of old blob when storageId changes
+        if (args.storageId && doc.storageId && args.storageId !== doc.storageId) {
+            try {
+                await ctx.storage.delete(doc.storageId);
+            } catch (err) {
+                console.warn('Failed to clean up old storage blob:', err);
+            }
+        }
+
         const { id, ...updates } = args;
         const filtered = Object.fromEntries(
             Object.entries(updates).filter(([, val]) => val !== undefined)
@@ -152,9 +177,13 @@ export const remove = mutation({
             throw new Error('Not authorized to delete this document');
         }
 
-        // Delete the stored file if present
+        // Best-effort storage blob cleanup — don't block document deletion
         if (doc.storageId) {
-            await ctx.storage.delete(doc.storageId);
+            try {
+                await ctx.storage.delete(doc.storageId);
+            } catch (err) {
+                console.warn('Failed to delete storage blob:', err);
+            }
         }
 
         await ctx.db.delete(args.id);

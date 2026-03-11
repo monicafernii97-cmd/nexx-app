@@ -1,4 +1,5 @@
-import { mutation, query } from './_generated/server';
+import { mutation, query, internalMutation, action } from './_generated/server';
+import { internal } from './_generated/api';
 import { v } from 'convex/values';
 import { getAuthenticatedUser } from './lib/auth';
 
@@ -48,21 +49,18 @@ export const upsert = mutation({
 
 /**
  * Mark court settings as NEXXverified.
- * Auth-guarded — only the settings owner can mark as verified.
- * Called server-side by the court-rules lookup API route after
- * actual AI verification succeeds.
+ * Internal only — cannot be called from clients.
+ * Use applyNEXXverification action to trigger from API routes.
  */
-export const markNEXXverified = mutation({
+export const markNEXXverified = internalMutation({
     args: {
         id: v.id('userCourtSettings'),
         formattingOverrides: v.optional(v.any()),
     },
     handler: async (ctx, args) => {
-        const user = await getAuthenticatedUser(ctx);
-
         const settings = await ctx.db.get(args.id);
-        if (!settings || settings.userId !== user._id) {
-            throw new Error('Not authorized');
+        if (!settings) {
+            throw new Error('Court settings not found');
         }
 
         const now = Date.now();
@@ -71,6 +69,31 @@ export const markNEXXverified = mutation({
             aiVerifiedAt: now,
             ...(args.formattingOverrides ? { formattingOverrides: args.formattingOverrides } : {}),
             updatedAt: now,
+        });
+    },
+});
+
+/**
+ * Public action to apply NEXXverification — gated by server secret.
+ * Only the court-rules lookup API route should call this after
+ * successful AI verification. Clients cannot call this without
+ * knowing the VERIFICATION_SECRET.
+ */
+export const applyNEXXverification = action({
+    args: {
+        id: v.id('userCourtSettings'),
+        formattingOverrides: v.optional(v.any()),
+        serverSecret: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const expected = process.env.VERIFICATION_SECRET;
+        if (!expected || args.serverSecret !== expected) {
+            throw new Error('Not authorized — invalid verification secret');
+        }
+
+        await ctx.runMutation(internal.courtSettings.markNEXXverified, {
+            id: args.id,
+            formattingOverrides: args.formattingOverrides,
         });
     },
 });

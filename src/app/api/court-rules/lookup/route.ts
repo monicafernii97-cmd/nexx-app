@@ -13,12 +13,13 @@ import { auth } from '@clerk/nextjs/server';
 import { lookupCourtRules, CACHE_TTL_MS } from '@/lib/legal/courtRulesLookup';
 import { titleCase } from '@/lib/utils/stringHelpers';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
-import { getConvexClient } from '@/lib/convexServer';
+import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '../../../../../convex/_generated/api';
 import type { Id } from '../../../../../convex/_generated/dataModel';
 
 export const maxDuration = 30;
 
+/** Handle POST requests for court rules lookup — authenticates, rate-limits, and queries AI sources. */
 export async function POST(request: NextRequest) {
     // ── Auth guard ──
     const { userId } = await auth();
@@ -36,15 +37,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(body, { status });
     }
 
-    let body: {
-        state: string;
-        county: string;
-        courtName?: string;
-        /** Court settings ID to mark as NEXXverified after successful lookup. */
-        settingsId?: string;
-        /** Pass true to bypass the in-memory cache and re-query AI sources. */
-        forceRefresh?: boolean;
-    };
+    let body: Record<string, unknown>;
 
     try {
         body = await request.json();
@@ -55,34 +48,64 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    try {
-        if (!body.state || !body.county) {
-            return NextResponse.json(
-                { error: 'state and county are required' },
-                { status: 400 }
-            );
-        }
+    // ── Type validation ──
+    const { state, county, courtName, settingsId, forceRefresh } = body;
 
-        const state = titleCase(body.state);
-        const county = titleCase(body.county);
-        const courtName = body.courtName ? titleCase(body.courtName) : undefined;
+    if (typeof state !== 'string' || typeof county !== 'string') {
+        return NextResponse.json(
+            { error: 'state and county must be non-empty strings' },
+            { status: 400 }
+        );
+    }
+    if (!state || !county) {
+        return NextResponse.json(
+            { error: 'state and county are required' },
+            { status: 400 }
+        );
+    }
+    if (courtName !== undefined && typeof courtName !== 'string') {
+        return NextResponse.json(
+            { error: 'courtName must be a string' },
+            { status: 400 }
+        );
+    }
+    if (settingsId !== undefined && typeof settingsId !== 'string') {
+        return NextResponse.json(
+            { error: 'settingsId must be a string' },
+            { status: 400 }
+        );
+    }
+    if (forceRefresh !== undefined && typeof forceRefresh !== 'boolean') {
+        return NextResponse.json(
+            { error: 'forceRefresh must be a boolean' },
+            { status: 400 }
+        );
+    }
+
+    try {
+        const normalizedState = titleCase(state);
+        const normalizedCounty = titleCase(county);
+        const normalizedCourtName = courtName ? titleCase(courtName) : undefined;
 
         // Look up rules via Tavily + GPT-4o (with in-memory cache)
-        const result = await lookupCourtRules(state, county, courtName, body.forceRefresh);
+        const result = await lookupCourtRules(
+            normalizedState,
+            normalizedCounty,
+            normalizedCourtName,
+            forceRefresh,
+        );
 
         // If settingsId provided and verification yielded results,
-        // mark settings as NEXXverified server-side.
-        if (body.settingsId && result.rules && Object.keys(result.rules).length > 0) {
+        // mark settings as NEXXverified via server-secret-gated action.
+        if (settingsId && result.rules && Object.keys(result.rules).length > 0) {
             try {
-                const convex = getConvexClient();
-                const { getToken } = await auth();
-                const token = await getToken({ template: 'convex' });
-                if (token) convex.setAuth(token);
-                await convex.mutation(
-                    api.courtSettings.markNEXXverified,
+                const convex = await getAuthenticatedConvexClient();
+                await convex.action(
+                    api.courtSettings.applyNEXXverification,
                     {
-                        id: body.settingsId as Id<'userCourtSettings'>,
+                        id: settingsId as Id<'userCourtSettings'>,
                         formattingOverrides: result.rules,
+                        serverSecret: process.env.VERIFICATION_SECRET ?? '',
                     }
                 );
             } catch (markErr) {
@@ -92,8 +115,8 @@ export async function POST(request: NextRequest) {
         }
 
         return NextResponse.json({
-            state,
-            county,
+            state: normalizedState,
+            county: normalizedCounty,
             rules: result.rules,
             sources: result.sources,
             confidence: result.confidence,
@@ -108,4 +131,3 @@ export async function POST(request: NextRequest) {
         );
     }
 }
-

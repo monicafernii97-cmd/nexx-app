@@ -12,12 +12,21 @@ import { getMergedRules, getCountyRequirements } from '@/lib/legal/courtRules';
 import { getTemplate } from '@/lib/legal/templates';
 import { renderDocumentHTML } from '@/lib/legal/templateRenderer';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
-import { titleCase } from '@/lib/utils/stringHelpers';
 import type { DocumentGenerationRequest, CaptionData } from '@/lib/legal/types';
 
 export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
 
-
+/**
+ * Title-case a string: first letter uppercase, rest lowercase.
+ * Used to normalize state/county to match the canonical casing used in rule maps.
+ */
+function titleCase(s: string): string {
+  return s
+    .trim()
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
 
 /** Handle POST requests to generate legal documents as PDF or HTML preview. */
 export async function POST(request: NextRequest) {
@@ -86,15 +95,14 @@ export async function POST(request: NextRequest) {
 
     // ── 2b. Warn about missing required companion forms ──
     const countyReqs = getCountyRequirements(normalizedState, normalizedCounty);
-    const missingFormsSet = new Set<string>();
+    const missingForms: string[] = [];
 
     if (rules.requiresCivilCaseInfoSheet) {
-      missingFormsSet.add('Civil Case Information Sheet');
+      missingForms.push('Civil Case Information Sheet');
     }
     if (countyReqs?.requiredForms) {
-      countyReqs.requiredForms.forEach(f => missingFormsSet.add(f));
+      missingForms.push(...countyReqs.requiredForms);
     }
-    const missingForms = Array.from(missingFormsSet);
 
     // ── 3. Build caption data ──
     // Use normalized values for consistent caption output

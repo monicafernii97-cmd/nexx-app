@@ -57,10 +57,9 @@ const certificateOfService: DocumentSection = {
   guidance: 'CERTIFICATE OF SERVICE — certify true and correct copy served via e-filing.',
 };
 
-// _verification section is used via the 'verification' case in templateRenderer switch
 const _verification: DocumentSection = {
   id: 'verification', type: 'verification', required: false,
-}; void _verification; // Suppress unused warning — used by templateRenderer dynamically
+};
 
 const judgeSignature: DocumentSection = {
   id: 'judge-sig', type: 'judge_signature', required: true,
@@ -77,10 +76,9 @@ const notaryBlock: DocumentSection = {
   guidance: 'SWORN TO AND SUBSCRIBED before me...',
 };
 
-// _hrule is used via the 'horizontal_rule' case in templateRenderer switch
 const _hrule: DocumentSection = {
   id: 'hrule', type: 'horizontal_rule', required: true,
-}; void _hrule; // Suppress unused warning — used by templateRenderer dynamically
+};
 
 // ── Standard motion section set ───────────────────────────────
 /** Builds the standard section set for motions (caption → title → address → intro → body → prayer → sig → COS). */
@@ -95,8 +93,18 @@ const standardMotionSections = (titleText: string): DocumentSection[] => [
   certificateOfService,
 ];
 
-// Alias for semantic clarity — responses currently use the same structure as motions
-const standardResponseSections = standardMotionSections;
+// ── Standard response section set ─────────────────────────────
+/** Builds the standard section set for responses/answers (same as motion sections). */
+const standardResponseSections = (titleText: string): DocumentSection[] => [
+  caption,
+  title(titleText),
+  courtAddress,
+  introduction,
+  bodySections,
+  prayer,
+  signatureBlock,
+  certificateOfService,
+];
 
 // ── Standard order section set ────────────────────────────────
 /** Builds the standard section set for proposed orders (caption → title → intro → body → judge sig → approval). */

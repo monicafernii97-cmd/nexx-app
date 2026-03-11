@@ -75,7 +75,6 @@ export const update = mutation({
 
         const { id, ...updates } = args;
         const filtered = Object.fromEntries(
-            // null = caller wants to clear the field; undefined = no change
             Object.entries(updates).filter(([, val]) => val !== undefined)
         );
         if (Object.keys(filtered).length > 0) {
@@ -108,7 +107,6 @@ export const updateAiInsights = mutation({
 
         const { id, ...updates } = args;
         const filtered = Object.fromEntries(
-            // null = caller wants to clear the field; undefined = no change
             Object.entries(updates).filter(([, val]) => val !== undefined)
         );
         if (Object.keys(filtered).length > 0) {

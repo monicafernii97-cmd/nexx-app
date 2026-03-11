@@ -36,8 +36,13 @@
 }
 
 /* ═══ Page Setup ═══ */
-/* NOTE: Page size and margins are set programmatically via pdfRenderer.ts
-   using CourtFormattingRules (preferCSSPageSize: false). CSS @page is NOT used. */
+@page {
+  size: var(--page-width) var(--page-height);
+  margin-top: var(--margin-top);
+  margin-bottom: var(--margin-bottom);
+  margin-left: var(--margin-left);
+  margin-right: var(--margin-right);
+}
 
 /* ═══ Base ═══ */
 * {

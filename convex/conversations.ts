@@ -72,20 +72,13 @@ export const remove = mutation({
             throw new Error('Not authorized to delete this conversation');
         }
 
-        // Delete associated messages in batches to stay within Convex mutation limits
-        let hasMore = true;
-        while (hasMore) {
-            const batch = await ctx.db
-                .query('messages')
-                .withIndex('by_conversation', (q) => q.eq('conversationId', args.id))
-                .take(500);
-            if (batch.length === 0) {
-                hasMore = false;
-            } else {
-                for (const msg of batch) {
-                    await ctx.db.delete(msg._id);
-                }
-            }
+        // Delete associated messages
+        const messages = await ctx.db
+            .query('messages')
+            .withIndex('by_conversation', (q) => q.eq('conversationId', args.id))
+            .collect();
+        for (const msg of messages) {
+            await ctx.db.delete(msg._id);
         }
 
         await ctx.db.delete(args.id);

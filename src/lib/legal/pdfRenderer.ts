@@ -33,13 +33,12 @@ export async function renderHTMLToPDF(
       // ── Production / Vercel ──
       const chromium = await import('@sparticuz/chromium-min');
 
-      // Chromium binary version — MUST match @sparticuz/chromium-min in package.json
-      const CHROMIUM_VERSION = '143.0.4';
       browser = await puppeteerCore.default.launch({
         args: chromium.default.args,
         executablePath: await chromium.default.executablePath(
+          // Chromium binary URL must match @sparticuz/chromium-min version (v143.0.4)
           process.env.CHROMIUM_BINARY_URL ||
-          `https://github.com/nicholasgasior/puppeteer-chromium/releases/download/v${CHROMIUM_VERSION}/chromium-v${CHROMIUM_VERSION}-pack.tar`
+          'https://github.com/nicholasgasior/puppeteer-chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.tar'
         ),
         headless: true,
       });
@@ -117,10 +116,9 @@ export async function renderHTMLToPDF(
       height: `${rules.paperHeight}in`,
       margin: {
         top: `${rules.marginTop}in`,
-        // Add footer accommodation when page numbers are enabled.
-        // Use footerMarginMin from rules if available, otherwise add 0.25in buffer.
+        // Extra bottom margin when page numbers are enabled to accommodate footer
         bottom: showPageNumbers
-          ? `${Math.max(rules.marginBottom, rules.marginBottom + 0.25)}in`
+          ? `${Math.max(rules.marginBottom, 1.0)}in`
           : `${rules.marginBottom}in`,
         left: `${rules.marginLeft}in`,
         right: `${rules.marginRight}in`,
@@ -149,5 +147,5 @@ export async function renderHTMLToPDFBase64(
   rules: CourtFormattingRules
 ): Promise<string> {
   const pdfBytes = await renderHTMLToPDF(html, rules);
-  return pdfBytes.toString('base64');
+  return Buffer.from(pdfBytes).toString('base64');
 }

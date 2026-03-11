@@ -16,6 +16,7 @@ const caption: DocumentSection = {
   guidance: 'Auto-populated from user profile: cause number, party names, court, county, state.',
 };
 
+/** Builds a title section definition for a document template. */
 const title = (label: string): DocumentSection => ({
   id: 'title', type: 'title', title: label, required: true,
   guidance: 'Bold, ALL CAPS, centered. Auto-generated from template.',
@@ -80,6 +81,7 @@ const hrule: DocumentSection = {
 };
 
 // ── Standard motion section set ───────────────────────────────
+/** Builds the standard section set for motions (caption → title → address → intro → body → prayer → sig → COS). */
 const standardMotionSections = (titleText: string): DocumentSection[] => [
   caption,
   title(titleText),
@@ -92,6 +94,7 @@ const standardMotionSections = (titleText: string): DocumentSection[] => [
 ];
 
 // ── Standard response section set ─────────────────────────────
+/** Builds the standard section set for responses/answers (same as motion sections). */
 const standardResponseSections = (titleText: string): DocumentSection[] => [
   caption,
   title(titleText),
@@ -104,6 +107,7 @@ const standardResponseSections = (titleText: string): DocumentSection[] => [
 ];
 
 // ── Standard order section set ────────────────────────────────
+/** Builds the standard section set for proposed orders (caption → title → intro → body → judge sig → approval). */
 const standardOrderSections = (titleText: string): DocumentSection[] => [
   caption,
   title(titleText),

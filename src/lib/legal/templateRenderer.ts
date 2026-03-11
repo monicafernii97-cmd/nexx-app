@@ -22,6 +22,7 @@ import type {
 // ── Load the CSS stylesheet ──────────────────────────────────
 let cachedCSS: string | null = null;
 
+/** Load and cache the legal document CSS stylesheet from disk. */
 function getLegalCSS(): string {
   if (!cachedCSS) {
     cachedCSS = readFileSync(
@@ -118,6 +119,7 @@ function renderCaption(data: CaptionData): string {
 // Section Renderers
 // ═══════════════════════════════════════════════════════════════
 
+/** Render the document title block between two horizontal rules, bold ALL CAPS centered. */
 function renderTitle(titleText: string): string {
   return `
     <div class="title-block">
@@ -127,14 +129,17 @@ function renderTitle(titleText: string): string {
     </div>`;
 }
 
+/** Render the standard court address line: "TO THE HONORABLE JUDGE OF SAID COURT:" */
 function renderCourtAddress(): string {
   return `<div class="court-address">TO THE HONORABLE JUDGE OF SAID COURT:</div>`;
 }
 
+/** Render the opening introduction paragraph identifying the filer and document purpose. */
 function renderIntroduction(content: string): string {
   return `<div class="body-paragraph">${content}</div>`;
 }
 
+/** Render Roman-numeral-headed body sections (I. Background, II. Argument, etc.). */
 function renderBodySections(sections: GeneratedSection[]): string {
   return sections
     .filter(s => s.sectionType === 'body_sections')
@@ -149,6 +154,7 @@ function renderBodySections(sections: GeneratedSection[]): string {
     .join('\n');
 }
 
+/** Render numbered paragraphs (1., 2., 3.) with hanging indent formatting. */
 function renderNumberedParagraphs(items: string[]): string {
   return items
     .map((item, i) => {
@@ -157,6 +163,7 @@ function renderNumberedParagraphs(items: string[]): string {
     .join('\n');
 }
 
+/** Render the Prayer for Relief section with WHEREFORE, PREMISES CONSIDERED preamble. */
 function renderPrayer(content: string): string {
   return `
     <div class="prayer">
@@ -164,6 +171,7 @@ function renderPrayer(content: string): string {
     </div>`;
 }
 
+/** Render a party signature block with name, role, contact details, and optional e-signature. */
 function renderSignatureBlock(data: SignatureBlockData): string {
   const alignClass = data.barNumber ? 'right-aligned' : '';
   const sigLine = data.electronicSignature
@@ -186,6 +194,7 @@ function renderSignatureBlock(data: SignatureBlockData): string {
     </div>`;
 }
 
+/** Render the Certificate of Service section certifying proper service via e-filing. */
 function renderCertificateOfService(
   serverName: string,
   servedParty: string,
@@ -207,6 +216,7 @@ function renderCertificateOfService(
     </div>`;
 }
 
+/** Render the judge signature block with SIGNED date line and JUDGE PRESIDING label. */
 function renderJudgeSignature(): string {
   return `
     <div class="judge-signature">
@@ -221,6 +231,7 @@ function renderJudgeSignature(): string {
     </div>`;
 }
 
+/** Render the APPROVED AS TO FORM ONLY block for proposed orders. */
 function renderApprovalLine(name: string, role: string): string {
   return `
     <div class="approval-block">
@@ -231,6 +242,7 @@ function renderApprovalLine(name: string, role: string): string {
     </div>`;
 }
 
+/** Render the notary block with SWORN TO AND SUBSCRIBED section for sworn affidavits. */
 function renderNotaryBlock(): string {
   return `
     <div class="notary-block">
@@ -249,6 +261,7 @@ function renderNotaryBlock(): string {
     </div>`;
 }
 
+/** Render a full-width horizontal rule spanning the body text width. */
 function renderHorizontalRule(): string {
   return '<hr class="title-rule" />';
 }
@@ -502,6 +515,7 @@ export function renderDocumentHTML(options: RenderDocumentOptions): string {
 // Utilities
 // ═══════════════════════════════════════════════════════════════
 
+/** Escape HTML special characters to prevent XSS in rendered documents. */
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')

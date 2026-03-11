@@ -16,6 +16,7 @@ import type { DocumentGenerationRequest, CaptionData, GeneratedSection } from '@
 
 export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
 
+/** Handle POST requests to generate legal documents as PDF or HTML preview. */
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as DocumentGenerationRequest;
@@ -100,6 +101,10 @@ export async function POST(request: NextRequest) {
 
 // ── Helper: Build default caption from request data ──
 
+/**
+ * Build a default caption from the request data.
+ * Automatically detects SAPCR cases and uses "IN THE INTEREST OF" caption style.
+ */
 function buildDefaultCaption(body: DocumentGenerationRequest): CaptionData {
   const { courtSettings, petitioner, respondent, children, caseType } = body;
 
@@ -155,6 +160,7 @@ function buildDefaultCaption(body: DocumentGenerationRequest): CaptionData {
 
 // ── Helper: Build footer text ──
 
+/** Build the page footer text containing the cause number and document title. */
 function buildFooterText(body: DocumentGenerationRequest, docTitle: string): string {
   const causeNo = body.caption?.causeNumber ?? '';
   return `Cause No. ${causeNo}        ${docTitle}`;

@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { lookupCourtRules, CACHE_TTL_MS } from '@/lib/legal/courtRulesLookup';
 import { titleCase } from '@/lib/utils/stringHelpers';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 export const maxDuration = 30;
 
@@ -23,6 +24,13 @@ export async function POST(request: NextRequest) {
             { error: 'Authentication required' },
             { status: 401 }
         );
+    }
+
+    // ── Rate limit (3/month free tier) ──
+    const rl = checkRateLimit(userId, 'court_rules_lookup');
+    if (!rl.allowed) {
+        const { body, status } = rateLimitResponse(rl);
+        return NextResponse.json(body, { status });
     }
 
     let body: {

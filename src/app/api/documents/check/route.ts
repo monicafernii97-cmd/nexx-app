@@ -8,8 +8,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { getMergedRules, getCountyRequirements } from '@/lib/legal/courtRules';
 import { checkDocumentCompliance, quickComplianceCheck } from '@/lib/legal/complianceChecker';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 export const maxDuration = 30;
 
@@ -19,6 +21,22 @@ const MAX_HTML_CHARS = 500_000;
 const MAX_PDF_BASE64_CHARS = 10 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
+  // ── Auth guard ──
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json(
+      { error: 'Authentication required' },
+      { status: 401 }
+    );
+  }
+
+  // ── Rate limit (3/month free tier) ──
+  const rl = checkRateLimit(userId, 'compliance_check');
+  if (!rl.allowed) {
+    const { body, status } = rateLimitResponse(rl);
+    return NextResponse.json(body, { status });
+  }
+
   // Early rejection of oversized payloads
   const contentLength = Number(request.headers.get('content-length') ?? 0);
   if (contentLength > MAX_BODY_BYTES) {

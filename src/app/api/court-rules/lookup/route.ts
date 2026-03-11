@@ -13,6 +13,8 @@ import { auth } from '@clerk/nextjs/server';
 import { lookupCourtRules, CACHE_TTL_MS } from '@/lib/legal/courtRulesLookup';
 import { titleCase } from '@/lib/utils/stringHelpers';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import { getConvexClient } from '@/lib/convexServer';
+import { api } from '../../../../../convex/_generated/api';
 
 export const maxDuration = 30;
 
@@ -37,6 +39,8 @@ export async function POST(request: NextRequest) {
         state: string;
         county: string;
         courtName?: string;
+        /** Court settings ID to mark as NEXXverified after successful lookup. */
+        settingsId?: string;
         /** Pass true to bypass the in-memory cache and re-query AI sources. */
         forceRefresh?: boolean;
     };
@@ -64,6 +68,27 @@ export async function POST(request: NextRequest) {
 
         // Look up rules via Tavily + GPT-4o (with in-memory cache)
         const result = await lookupCourtRules(state, county, courtName, body.forceRefresh);
+
+        // If settingsId provided and verification yielded results,
+        // mark settings as NEXXverified server-side.
+        if (body.settingsId && result.rules && Object.keys(result.rules).length > 0) {
+            try {
+                const convex = getConvexClient();
+                const { getToken } = await auth();
+                const token = await getToken({ template: 'convex' });
+                if (token) convex.setAuth(token);
+                await convex.mutation(
+                    api.courtSettings.markNEXXverified,
+                    {
+                        id: body.settingsId as any,
+                        formattingOverrides: result.rules,
+                    }
+                );
+            } catch (markErr) {
+                console.warn('[Court Rules Lookup] Failed to mark NEXXverified:', markErr);
+                // Continue — lookup result is still returned
+            }
+        }
 
         return NextResponse.json({
             state,

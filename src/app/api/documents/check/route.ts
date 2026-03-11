@@ -110,9 +110,13 @@ export async function POST(request: NextRequest) {
     // Do NOT trust client-sent consent. Check the persisted consent
     // timestamp from the user's court settings in Convex.
     const convex = getConvexClient();
+    // Pass the Clerk session token so hasComplianceConsent can use ctx.auth
+    const { getToken } = await auth();
+    const token = await getToken({ template: 'convex' });
+    if (token) convex.setAuth(token);
     const hasConsent = await convex.query(
       api.courtSettings.hasComplianceConsent,
-      { clerkId: userId }
+      {}
     );
 
     if (!hasConsent) {

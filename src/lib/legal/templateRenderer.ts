@@ -627,7 +627,7 @@ const ALLOWED_TAGS = [
   'sub', 'sup', 'hr',
 ];
 
-const ALLOWED_ATTR = ['class', 'id', 'style'];
+const ALLOWED_ATTR: string[] = [];
 
 function sanitizeTrustedHtml(html: string): string {
   return DOMPurify.sanitize(html, {

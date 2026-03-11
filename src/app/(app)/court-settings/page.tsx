@@ -22,7 +22,6 @@ import {
 export default function CourtSettingsPage() {
     const existingSettings = useQuery(api.courtSettings.get);
     const upsertSettings = useMutation(api.courtSettings.upsert);
-    const markVerified = useMutation(api.courtSettings.markAiVerified);
 
     // Form state
     const [state, setState] = useState('');
@@ -126,7 +125,12 @@ export default function CourtSettingsPage() {
             const response = await fetch('/api/court-rules/lookup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ state, county, courtName: courtName || undefined }),
+                body: JSON.stringify({
+                    state,
+                    county,
+                    courtName: courtName || undefined,
+                    settingsId: existingSettings?._id,
+                }),
             });
             if (!response.ok) {
                 throw new Error(`Verification failed: ${response.status}`);
@@ -136,26 +140,13 @@ export default function CourtSettingsPage() {
                 confidence: data.confidence ?? 0,
                 sources: data.sources ?? [],
             });
-
-            // Auto-save the AI-verified formatting if we have settings
-            if (existingSettings?._id && data.rules && Object.keys(data.rules).length > 0) {
-                try {
-                    await markVerified({
-                        id: existingSettings._id,
-                        formattingOverrides: data.rules,
-                    });
-                } catch (markErr) {
-                    console.warn('Failed to persist AI formatting:', markErr);
-                    // Continue — verification result is still shown to user
-                }
-            }
         } catch (error) {
             console.error('AI verification failed:', error);
             setVerifyError('AI verification failed. Please try again.');
         } finally {
             setVerifying(false);
         }
-    }, [state, county, courtName, existingSettings, markVerified]);
+    }, [state, county, courtName, existingSettings]);
 
     return (
         <div className="max-w-3xl mx-auto">

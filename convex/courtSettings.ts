@@ -46,8 +46,13 @@ export const upsert = mutation({
     },
 });
 
-/** Mark court settings as AI-verified. */
-export const markAiVerified = mutation({
+/**
+ * Mark court settings as NEXXverified.
+ * Auth-guarded — only the settings owner can mark as verified.
+ * Called server-side by the court-rules lookup API route after
+ * actual AI verification succeeds.
+ */
+export const markNEXXverified = mutation({
     args: {
         id: v.id('userCourtSettings'),
         formattingOverrides: v.optional(v.any()),
@@ -130,13 +135,19 @@ export const get = query({
     },
 });
 
-/** Check if the user has granted compliance consent (server-side, by Clerk ID). */
+/**
+ * Check if the authenticated user has granted compliance consent.
+ * Uses ctx.auth to derive the user — no caller-supplied IDs.
+ */
 export const hasComplianceConsent = query({
-    args: { clerkId: v.string() },
-    handler: async (ctx, args) => {
+    args: {},
+    handler: async (ctx) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) return false;
+
         const user = await ctx.db
             .query('users')
-            .withIndex('by_clerk', (q) => q.eq('clerkId', args.clerkId))
+            .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
             .first();
         if (!user) return false;
 

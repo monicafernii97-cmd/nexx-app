@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 7. Render PDF ──
-    const pdfBytes = await renderHTMLToPDF(html, rules);
+    const pdfBytes = await renderHTMLToPDF(html, rules, caption.causeNumber);
 
     // ── 8. Return PDF ──
     // Include missing forms warning in a custom header so clients can detect it
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
       headers['X-Missing-Required-Forms'] = missingForms.join(', ');
     }
 
-    return new NextResponse(pdfBytes as unknown as BodyInit, {
+    return new NextResponse(new Uint8Array(pdfBytes), {
       status: 200,
       headers,
     });

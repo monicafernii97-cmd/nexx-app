@@ -19,7 +19,9 @@ import type { CourtFormattingRules } from './types';
  */
 export async function renderHTMLToPDF(
   html: string,
-  rules: CourtFormattingRules
+  rules: CourtFormattingRules,
+  /** Optional cause number to display in the right side of footer-split. */
+  causeNumber?: string
 ): Promise<Buffer> {
   let browser;
 
@@ -99,7 +101,8 @@ export async function renderHTMLToPDF(
         footerTemplate = `<div style="${fontStyle} width: 100%; text-align: right; ${padding}">${pageNumberContent}</div>`;
       } else if (rules.pageNumberPosition === 'footer-split') {
         // Footer-split: page number left, cause number right
-        footerTemplate = `<div style="${fontStyle} width: 100%; display: flex; justify-content: space-between; ${padding}"><span>${pageNumberContent}</span><span></span></div>`;
+        const causeText = causeNumber ? `Cause No. ${causeNumber}` : '';
+        footerTemplate = `<div style="${fontStyle} width: 100%; display: flex; justify-content: space-between; ${padding}"><span>${pageNumberContent}</span><span>${causeText}</span></div>`;
       } else {
         // Default: centered (covers 'bottom-center' and any other value)
         footerTemplate = `<div style="${fontStyle} width: 100%; text-align: center; ${padding}">${pageNumberContent}</div>`;

@@ -137,7 +137,7 @@ export const updateProfile = mutation({
 
         const { id, ...updates } = args;
         const filtered = Object.fromEntries(
-            Object.entries(updates).filter(([_key, val]) => val !== undefined)
+            Object.entries(updates).filter(([, val]) => val !== undefined)
         );
         if (Object.keys(filtered).length > 0) {
             await ctx.db.patch(id, filtered);

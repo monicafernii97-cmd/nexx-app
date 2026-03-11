@@ -6,6 +6,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   typecheck:
     name: TypeScript Check
@@ -42,6 +46,12 @@ jobs:
   build:
     name: Production Build
     runs-on: ubuntu-latest
+    env:
+      # Dummy values for build-time only — Convex and Clerk providers
+      # require these env vars at module load, but the build only checks
+      # compilation, not runtime connectivity.
+      NEXT_PUBLIC_CONVEX_URL: "https://placeholder.convex.cloud"
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_placeholder"
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 

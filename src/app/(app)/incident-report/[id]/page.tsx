@@ -91,7 +91,8 @@ export default function IncidentDetailPage() {
     }
 
     const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
-    const incidentDate = new Date(incident.date);
+    const [yr, mo, dy] = incident.date.split('-').map(Number);
+    const incidentDate = new Date(yr, mo - 1, dy);
     const severityColors = ['#5A9E6F', '#E5A84A', '#C75A5A'];
     const severityLabels = ['Low', 'Medium', 'High'];
 

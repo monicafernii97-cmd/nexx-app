@@ -43,13 +43,13 @@ export default function DocuVaultPage() {
     const [view, setView] = useState<GeneratorView>('compose');
     const [progress, setProgress] = useState(0);
     const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
-    const [generatedPdfBlob, setGeneratedPdfBlob] = useState<Blob | null>(null);
     const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
     const [generationError, setGenerationError] = useState<string | null>(null);
     const [caseNumber, setCaseNumber] = useState<string | null>(null);
 
     // Abort mechanism for generation
     const generationTokenRef = useRef(0);
+    const completedRef = useRef(false);
 
     // Gallery drawer
     const [showGallery, setShowGallery] = useState(false);
@@ -76,7 +76,7 @@ export default function DocuVaultPage() {
         setView('working');
         setProgress(0);
         setGenerationError(null);
-        setGeneratedPdfBlob(null);
+        completedRef.current = false;
         if (generatedPdfUrl) {
             URL.revokeObjectURL(generatedPdfUrl);
             setGeneratedPdfUrl(null);
@@ -130,7 +130,15 @@ export default function DocuVaultPage() {
                     if (generationTokenRef.current !== currentToken) return;
                     if (!line.startsWith('data: ')) continue;
 
-                    const event = JSON.parse(line.slice(6));
+                    const event = (() => {
+                        try {
+                            return JSON.parse(line.slice(6));
+                        } catch {
+                            console.warn('[DocuVault] Malformed SSE event:', line);
+                            return null;
+                        }
+                    })();
+                    if (!event) continue;
 
                     // Update progress
                     setProgress(event.progress);
@@ -157,12 +165,12 @@ export default function DocuVaultPage() {
                     // Handle completion
                     if (event.step === 'complete' && event.result?.pdfBase64) {
                         if (generationTokenRef.current !== currentToken) return;
+                        completedRef.current = true;
 
                         const bytes = Uint8Array.from(atob(event.result.pdfBase64), c => c.charCodeAt(0));
                         const blob = new Blob([bytes], { type: 'application/pdf' });
                         const url = URL.createObjectURL(blob);
 
-                        setGeneratedPdfBlob(blob);
                         setGeneratedPdfUrl(url);
                         setCaseNumber(Math.random().toString(36).substr(2, 6).toUpperCase());
                         setView('result');
@@ -171,7 +179,7 @@ export default function DocuVaultPage() {
             }
 
             // If stream ended without a complete event, move to result anyway
-            if (generationTokenRef.current === currentToken && view !== 'result') {
+            if (generationTokenRef.current === currentToken && !completedRef.current) {
                 setCaseNumber(Math.random().toString(36).substr(2, 6).toUpperCase());
                 setView('result');
             }
@@ -181,7 +189,7 @@ export default function DocuVaultPage() {
             setGenerationError(error instanceof Error ? error.message : 'Generation failed');
             setView('compose');
         }
-    }, [documentContent, selectedTemplate, generatedPdfUrl, view]);
+    }, [documentContent, selectedTemplate, generatedPdfUrl]);
 
     /** Reset to compose view, aborting any in-flight generation. */
     const handleNewDocument = useCallback(() => {
@@ -193,7 +201,6 @@ export default function DocuVaultPage() {
         setDocumentContent('');
         setProgress(0);
         setProgressSteps([]);
-        setGeneratedPdfBlob(null);
         if (generatedPdfUrl) URL.revokeObjectURL(generatedPdfUrl);
         setGeneratedPdfUrl(null);
         setGenerationError(null);
@@ -618,6 +625,23 @@ export default function DocuVaultPage() {
                         </button>
                     </motion.div>
 
+                    {/* ── Error Message ── */}
+                    {generationError && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="mt-4 px-4 py-3 rounded-xl"
+                            style={{
+                                background: 'rgba(220, 38, 38, 0.08)',
+                                border: '1px solid rgba(220, 38, 38, 0.2)',
+                            }}
+                        >
+                            <p className="text-sm" style={{ color: '#DC2626' }}>
+                                {generationError}
+                            </p>
+                        </motion.div>
+                    )}
+
                     {/* ── Bottom Flow Icons ── */}
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -903,7 +927,19 @@ export default function DocuVaultPage() {
                                 onClick={() => {
                                     if (!generatedPdfUrl) return;
                                     const win = window.open(generatedPdfUrl, '_blank');
-                                    win?.addEventListener('load', () => win.print());
+                                    if (win) {
+                                        win.onload = () => win.print();
+                                    } else {
+                                        // Fallback for popup blockers: use hidden iframe
+                                        const iframe = document.createElement('iframe');
+                                        iframe.style.display = 'none';
+                                        iframe.src = generatedPdfUrl;
+                                        iframe.onload = () => {
+                                            iframe.contentWindow?.print();
+                                            setTimeout(() => iframe.remove(), 1000);
+                                        };
+                                        document.body.appendChild(iframe);
+                                    }
                                 }}
                                 disabled={!generatedPdfUrl}
                                 className="flex flex-col items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"

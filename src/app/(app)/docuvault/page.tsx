@@ -50,6 +50,7 @@ export default function DocuVaultPage() {
     // Abort mechanism for generation
     const generationTokenRef = useRef(0);
     const completedRef = useRef(false);
+    const pdfUrlRef = useRef<string | null>(null);
 
     // Gallery drawer
     const [showGallery, setShowGallery] = useState(false);
@@ -77,8 +78,9 @@ export default function DocuVaultPage() {
         setProgress(0);
         setGenerationError(null);
         completedRef.current = false;
-        if (generatedPdfUrl) {
-            URL.revokeObjectURL(generatedPdfUrl);
+        if (pdfUrlRef.current) {
+            URL.revokeObjectURL(pdfUrlRef.current);
+            pdfUrlRef.current = null;
             setGeneratedPdfUrl(null);
         }
 
@@ -171,6 +173,7 @@ export default function DocuVaultPage() {
                         const blob = new Blob([bytes], { type: 'application/pdf' });
                         const url = URL.createObjectURL(blob);
 
+                        pdfUrlRef.current = url;
                         setGeneratedPdfUrl(url);
                         setCaseNumber(Math.random().toString(36).substr(2, 6).toUpperCase());
                         setView('result');
@@ -178,10 +181,10 @@ export default function DocuVaultPage() {
                 }
             }
 
-            // If stream ended without a complete event, move to result anyway
+            // If stream ended without a complete event, treat as incomplete
             if (generationTokenRef.current === currentToken && !completedRef.current) {
-                setCaseNumber(Math.random().toString(36).substr(2, 6).toUpperCase());
-                setView('result');
+                setGenerationError('Document generation incomplete. Please try again.');
+                setView('compose');
             }
         } catch (error) {
             if (generationTokenRef.current !== currentToken) return;
@@ -189,7 +192,7 @@ export default function DocuVaultPage() {
             setGenerationError(error instanceof Error ? error.message : 'Generation failed');
             setView('compose');
         }
-    }, [documentContent, selectedTemplate, generatedPdfUrl]);
+    }, [documentContent, selectedTemplate]);
 
     /** Reset to compose view, aborting any in-flight generation. */
     const handleNewDocument = useCallback(() => {
@@ -201,11 +204,12 @@ export default function DocuVaultPage() {
         setDocumentContent('');
         setProgress(0);
         setProgressSteps([]);
-        if (generatedPdfUrl) URL.revokeObjectURL(generatedPdfUrl);
+        if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
+        pdfUrlRef.current = null;
         setGeneratedPdfUrl(null);
         setGenerationError(null);
         setCaseNumber(null);
-    }, [generatedPdfUrl]);
+    }, []);
 
     return (
         <div className="max-w-5xl mx-auto relative">
@@ -588,8 +592,10 @@ export default function DocuVaultPage() {
                         <div className="flex items-center justify-between mt-3">
                             <div className="flex gap-3">
                                 <button
-                                    className="flex items-center gap-1.5 text-xs cursor-pointer transition-colors"
-                                    style={{ color: '#8A7A60' }}
+                                    disabled
+                                    title="File attachment coming soon"
+                                    className="flex items-center gap-1.5 text-xs transition-colors cursor-not-allowed"
+                                    style={{ color: '#8A7A60', opacity: 0.5 }}
                                 >
                                     <Paperclip size={13} /> Attach
                                 </button>
@@ -711,7 +717,13 @@ export default function DocuVaultPage() {
                             Document Context
                         </p>
                         <p className="text-sm italic leading-relaxed" style={{ color: '#D4C9B0' }}>
-                            &ldquo;{selectedTemplate?.title || documentContent.slice(0, 120)}...&rdquo;
+                            &ldquo;{selectedTemplate?.title || (() => {
+                                const text = documentContent;
+                                if (text.length <= 120) return text;
+                                const truncated = text.slice(0, 120);
+                                const lastSpace = truncated.lastIndexOf(' ');
+                                return lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated;
+                            })()}...&rdquo;
                         </p>
                     </div>
 
@@ -928,17 +940,14 @@ export default function DocuVaultPage() {
                                     if (!generatedPdfUrl) return;
                                     const win = window.open(generatedPdfUrl, '_blank');
                                     if (win) {
-                                        win.onload = () => win.print();
+                                        // Give the PDF time to render before printing
+                                        setTimeout(() => {
+                                            try { win.print(); }
+                                            catch { console.warn('Print dialog could not be opened'); }
+                                        }, 500);
                                     } else {
-                                        // Fallback for popup blockers: use hidden iframe
-                                        const iframe = document.createElement('iframe');
-                                        iframe.style.display = 'none';
-                                        iframe.src = generatedPdfUrl;
-                                        iframe.onload = () => {
-                                            iframe.contentWindow?.print();
-                                            setTimeout(() => iframe.remove(), 1000);
-                                        };
-                                        document.body.appendChild(iframe);
+                                        // Popup blocked — inform user
+                                        alert('Please allow popups to print the document, or use Download instead.');
                                     }
                                 }}
                                 disabled={!generatedPdfUrl}

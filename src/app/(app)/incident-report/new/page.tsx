@@ -138,7 +138,7 @@ export default function NewIncidentPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-center gap-4 mb-8"
             >
-                <Link href="/docuvault">
+                <Link href="/incident-report">
                     <button
                         className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
                         style={{ background: 'rgba(197, 139, 7, 0.08)', border: '1px solid rgba(197, 139, 7, 0.15)' }}
@@ -472,10 +472,10 @@ export default function NewIncidentPage() {
                         Incident Documented
                     </h2>
                     <p className="text-sm mb-6" style={{ color: '#8A7A60' }}>
-                        This record has been securely saved to your DocuVault and is court-ready.
+                        This record has been securely saved and is court-ready.
                     </p>
                     <div className="flex gap-3 justify-center">
-                        <Link href="/docuvault">
+                        <Link href="/incident-report">
                             <button className="btn-outline">View All Records</button>
                         </Link>
                         <button

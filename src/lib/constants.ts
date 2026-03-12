@@ -1,8 +1,9 @@
 export const NAV_ITEMS = [
     { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
     { label: 'Chat', href: '/chat', icon: 'MessageCircle' },
-    { label: 'DocuVault', href: '/docuvault', icon: 'Shield' },
-    { label: 'Legal Suite', href: '/legal', icon: 'Scale' },
+    { label: 'DocuVault', href: '/docuvault', icon: 'Landmark' },
+    { label: 'Incident Report', href: '/incident-report', icon: 'ClipboardList' },
+    { label: 'Legal Suite', href: '/court-settings', icon: 'Scale' },
     { label: 'Resources', href: '/resources', icon: 'BookOpen' },
     { label: 'Settings', href: '/settings', icon: 'Settings' },
 ] as const;

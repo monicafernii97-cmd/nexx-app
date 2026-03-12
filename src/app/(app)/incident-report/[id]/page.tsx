@@ -65,7 +65,7 @@ export default function IncidentDetailPage() {
     // Redirect if ID is invalid (after all hooks)
     useEffect(() => {
         if (!isValidId) {
-            router.push('/docuvault');
+            router.replace('/incident-report');
         }
     }, [isValidId, router]);
 
@@ -91,7 +91,10 @@ export default function IncidentDetailPage() {
     }
 
     const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
-    const incidentDate = new Date(incident.date);
+    const dateParts = incident.date?.split('-').map(Number) ?? [];
+    const incidentDate = dateParts.length === 3
+        ? new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
+        : new Date();
     const severityColors = ['#5A9E6F', '#E5A84A', '#C75A5A'];
     const severityLabels = ['Low', 'Medium', 'High'];
 
@@ -186,7 +189,7 @@ export default function IncidentDetailPage() {
         setDeleteError(null);
         try {
             await removeIncident({ id: incidentId });
-            router.push('/docuvault');
+            router.replace('/incident-report');
         } catch (error) {
             console.error('Delete error:', error);
             setDeleteError('Failed to delete incident. Please try again.');
@@ -202,7 +205,7 @@ export default function IncidentDetailPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-center gap-4 mb-6"
             >
-                <Link href="/docuvault">
+                <Link href="/incident-report">
                     <button
                         className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
                         style={{

@@ -24,6 +24,7 @@ interface SavedDocument {
     fileSize: string;
 }
 
+/** Gallery page displaying saved and draft legal documents with search and filters. */
 export default function DocuVaultGalleryPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<string>('all');

@@ -35,11 +35,12 @@ interface ProgressEvent {
   };
 }
 
-/** Encode a progress event for SSE */
+/** Encode a progress event as a server-sent event (SSE) data line. */
 function encodeEvent(event: ProgressEvent): string {
   return `data: ${JSON.stringify(event)}\n\n`;
 }
 
+/** Handle POST requests to stream document generation progress via SSE. */
 export async function POST(request: NextRequest) {
   // ── Auth guard ──
   const { userId } = await auth();
@@ -235,7 +236,7 @@ export async function POST(request: NextRequest) {
 }
 
 
-/** Build default caption for streaming route */
+/** Build a default caption from the request data for the streaming generation route. */
 function buildStreamCaption(
   body: DocumentGenerationRequest,
   normalizedState: string,
@@ -266,6 +267,7 @@ function buildStreamCaption(
   };
 }
 
+/** Return a promise that resolves after the given number of milliseconds. */
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }

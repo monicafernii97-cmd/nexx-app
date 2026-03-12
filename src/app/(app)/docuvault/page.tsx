@@ -29,6 +29,7 @@ interface ProgressStep {
     status: 'pending' | 'active' | 'complete';
 }
 
+/** DocuVault document generator page with compose, working, and result views. */
 export default function DocuVaultPage() {
     // Tab & template state
     const [activeTab, setActiveTab] = useState<UITabCategory>('lead');

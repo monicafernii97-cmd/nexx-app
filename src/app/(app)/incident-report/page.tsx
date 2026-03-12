@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 
+/** Incident Report listing page with search, category filters, and delete functionality. */
 export default function IncidentReportPage() {
     const incidents = useQuery(api.incidents.list);
     const removeIncident = useMutation(api.incidents.remove);

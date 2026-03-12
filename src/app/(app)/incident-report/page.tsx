@@ -25,6 +25,8 @@ export default function IncidentReportPage() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
+    const isLoading = incidents === undefined;
+
     const filteredIncidents = (incidents ?? []).filter((incident) => {
         if (activeFilter && incident.category !== activeFilter) return false;
         if (searchQuery && !incident.narrative.toLowerCase().includes(searchQuery.toLowerCase())
@@ -74,10 +76,8 @@ export default function IncidentReportPage() {
                         Sanctuary of Truth and Admissibility — your court-ready incident records.
                     </p>
                 </div>
-                <Link href="/incident-report/new">
-                    <button className="btn-gold text-xs flex items-center gap-2">
-                        <Plus size={14} /> Log Incident
-                    </button>
+                <Link href="/incident-report/new" className="btn-gold text-xs flex items-center gap-2 no-underline">
+                    <Plus size={14} /> Log Incident
                 </Link>
             </motion.div>
 
@@ -96,6 +96,7 @@ export default function IncidentReportPage() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search incidents..."
                         className="input-gilded pl-11"
+                        aria-label="Search incidents"
                     />
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -133,7 +134,24 @@ export default function IncidentReportPage() {
 
             {/* Incident List */}
             <div className="space-y-4">
-                {filteredIncidents.length === 0 ? (
+                {isLoading ? (
+                    <div className="space-y-4">
+                        {[0, 1, 2].map((j) => (
+                            <div key={j} className="card-gilded p-5 animate-pulse">
+                                <div className="flex items-start gap-4 pl-3">
+                                    <div className="flex-shrink-0 text-center" style={{ minWidth: 60 }}>
+                                        <div className="h-3 w-10 rounded" style={{ background: 'rgba(197, 139, 7, 0.1)' }} />
+                                        <div className="h-7 w-8 rounded mt-1 mx-auto" style={{ background: 'rgba(197, 139, 7, 0.08)' }} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="h-3 w-20 rounded mb-2" style={{ background: 'rgba(138, 122, 96, 0.1)' }} />
+                                        <div className="h-3 w-full rounded" style={{ background: 'rgba(138, 122, 96, 0.06)' }} />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : filteredIncidents.length === 0 ? (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -151,21 +169,22 @@ export default function IncidentReportPage() {
                         <p className="text-xs mb-5" style={{ color: '#8A7A60' }}>
                             Start documenting incidents to build your court-ready evidence portfolio.
                         </p>
-                        <Link href="/incident-report/new">
-                            <button className="btn-gold text-xs">Log Your First Incident</button>
+                        <Link href="/incident-report/new" className="btn-gold text-xs no-underline">
+                            Log Your First Incident
                         </Link>
                     </motion.div>
                 ) : (
                     filteredIncidents.map((incident, i) => {
                         const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
-                        const date = new Date(incident.date);
+                        const [yr, mo, dy] = incident.date.split('-').map(Number);
+                        const date = new Date(yr, mo - 1, dy);
 
                         return (
                             <motion.div
                                 key={incident._id}
                                 initial={{ opacity: 0, y: 12 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.05 * i }}
+                                transition={{ delay: Math.min(0.05 * i, 0.5) }}
                             >
                                 <div className="flex items-stretch gap-0 group relative">
                                     <Link href={`/incident-report/${incident._id}`} className="flex-1 min-w-0">

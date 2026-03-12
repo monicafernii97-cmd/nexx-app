@@ -65,7 +65,7 @@ export default function IncidentDetailPage() {
     // Redirect if ID is invalid (after all hooks)
     useEffect(() => {
         if (!isValidId) {
-            router.push('/incident-report');
+            router.replace('/incident-report');
         }
     }, [isValidId, router]);
 
@@ -186,7 +186,7 @@ export default function IncidentDetailPage() {
         setDeleteError(null);
         try {
             await removeIncident({ id: incidentId });
-            router.push('/incident-report');
+            router.replace('/incident-report');
         } catch (error) {
             console.error('Delete error:', error);
             setDeleteError('Failed to delete incident. Please try again.');

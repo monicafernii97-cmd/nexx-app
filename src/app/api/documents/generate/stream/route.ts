@@ -9,7 +9,7 @@
 
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { getMergedRules, getCountyRequirements } from '@/lib/legal/courtRules';
+import { getMergedRules } from '@/lib/legal/courtRules';
 import { getTemplate } from '@/lib/legal/templates';
 import { renderDocumentHTML } from '@/lib/legal/templateRenderer';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
@@ -51,16 +51,6 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // ── Rate limit ──
-  const rl = checkRateLimit(userId, 'document_generation');
-  if (!rl.allowed) {
-    const { body, status } = rateLimitResponse(rl);
-    return new Response(JSON.stringify(body), {
-      status,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
   // ── Parse body ──
   let body: DocumentGenerationRequest;
   try {
@@ -76,6 +66,16 @@ export async function POST(request: NextRequest) {
   if (!body.templateId || !body.courtSettings?.state || !body.courtSettings?.county || !body.petitioner?.name || !body.caseType) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), {
       status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // ── Rate limit (only after valid request) ──
+  const rl = checkRateLimit(userId, 'document_generation');
+  if (!rl.allowed) {
+    const { body: rlBody, status } = rateLimitResponse(rl);
+    return new Response(JSON.stringify(rlBody), {
+      status,
       headers: { 'Content-Type': 'application/json' },
     });
   }
@@ -100,8 +100,7 @@ export async function POST(request: NextRequest) {
             progress: 0,
             status: 'error',
           })));
-          controller.close();
-          return;
+          return;  // finally block will close the controller
         }
 
         const normalizedState = titleCase(body.courtSettings.state);
@@ -153,7 +152,7 @@ export async function POST(request: NextRequest) {
           respondentName: body.respondent?.name,
           exhibits: body.exhibits,
           rules,
-          footerText: `Cause No. ${body.caption?.causeNumber ?? ''} ${titleText}`,
+          footerText: `Cause No. ${caption.causeNumber ?? ''} ${titleText}`,
         });
 
         controller.enqueue(new TextEncoder().encode(encodeEvent({

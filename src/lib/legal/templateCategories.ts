@@ -6,7 +6,7 @@
  */
 
 import type { DocumentCategory, DocumentTemplate } from './types';
-import { TEMPLATE_LIBRARY, getTemplatesByCategory } from './templates';
+import { getTemplatesByCategory } from './templates';
 
 /** UI tab categories for the DocuVault generator */
 export type UITabCategory = 'lead' | 'affidavit' | 'exhibits' | 'proposed_order' | 'response' | 'create_own';

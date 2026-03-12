@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
     Landmark,
     ChevronLeft,
@@ -43,11 +43,17 @@ export default function DocuVaultPage() {
     const [view, setView] = useState<GeneratorView>('compose');
     const [progress, setProgress] = useState(0);
     const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
+    const [generatedPdfBlob, setGeneratedPdfBlob] = useState<Blob | null>(null);
     const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
     const [generationError, setGenerationError] = useState<string | null>(null);
+    const [caseNumber, setCaseNumber] = useState<string | null>(null);
+
+    // Abort mechanism for generation
+    const generationTokenRef = useRef(0);
 
     // Gallery drawer
     const [showGallery, setShowGallery] = useState(false);
+    const [gallerySearch, setGallerySearch] = useState('');
 
     // Get templates for current tab
     const templates = getTemplatesForTab(activeTab);
@@ -60,52 +66,139 @@ export default function DocuVaultPage() {
         }
     };
 
-    // Handle generation
-    const handleGenerate = async () => {
+    /** Handle document generation via the streaming API endpoint. */
+    const handleGenerate = useCallback(async () => {
         if (!documentContent.trim() && !selectedTemplate) return;
+
+        // Increment token so stale runs can detect cancellation
+        const currentToken = ++generationTokenRef.current;
 
         setView('working');
         setProgress(0);
         setGenerationError(null);
+        setGeneratedPdfBlob(null);
+        if (generatedPdfUrl) {
+            URL.revokeObjectURL(generatedPdfUrl);
+            setGeneratedPdfUrl(null);
+        }
 
         const steps: ProgressStep[] = [
             { label: 'Analyzing Legal Frameworks', status: 'active' },
             { label: 'Drafting Document Structure', status: 'pending' },
             { label: 'Applying Court Formatting', status: 'pending' },
             { label: 'NEXXverification Compliance', status: 'pending' },
-            { label: 'Final Review', status: 'pending' },
+            { label: 'Rendering PDF', status: 'pending' },
         ];
         setProgressSteps(steps);
 
-        // Simulate progress for now (will connect to streaming API)
-        for (let i = 0; i < steps.length; i++) {
-            await new Promise(r => setTimeout(r, 1200 + Math.random() * 800));
-            const updated = steps.map((s, idx) => ({
-                ...s,
-                status: idx < i + 1 ? 'complete' as const : idx === i + 1 ? 'active' as const : 'pending' as const,
-            }));
-            if (i === steps.length - 1) {
-                updated[i] = { ...updated[i], status: 'complete' };
+        try {
+            const res = await fetch('/api/documents/generate/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    templateId: selectedTemplate?.id ?? 'petition_divorce',
+                    courtSettings: { state: 'Texas', county: 'Fort Bend' },
+                    petitioner: { name: 'Petitioner' },
+                    caseType: 'divorce_no_children',
+                    bodyContent: documentContent ? [{ heading: 'Content', paragraphs: [documentContent] }] : [],
+                }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: 'Generation failed' }));
+                throw new Error(err.error || 'Generation failed');
             }
-            setProgressSteps(updated);
-            setProgress(Math.min(100, ((i + 1) / steps.length) * 100));
+
+            const reader = res.body?.getReader();
+            if (!reader) throw new Error('No response stream');
+
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                // Check abort token before each read
+                if (generationTokenRef.current !== currentToken) return;
+
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n\n');
+                buffer = lines.pop() ?? '';
+
+                for (const line of lines) {
+                    if (generationTokenRef.current !== currentToken) return;
+                    if (!line.startsWith('data: ')) continue;
+
+                    const event = JSON.parse(line.slice(6));
+
+                    // Update progress
+                    setProgress(event.progress);
+
+                    // Map SSE step names to UI labels
+                    const stepMap: Record<string, number> = {
+                        analyzing: 0, drafting: 1, formatting: 2, compliance: 3, pdf: 4, complete: 4,
+                    };
+                    const stepIdx = stepMap[event.step] ?? -1;
+                    if (stepIdx >= 0) {
+                        setProgressSteps(prev => prev.map((s, idx) => ({
+                            ...s,
+                            status: idx < stepIdx ? 'complete' as const
+                                : idx === stepIdx ? (event.status === 'complete' ? 'complete' as const : 'active' as const)
+                                : 'pending' as const,
+                        })));
+                    }
+
+                    // Handle error
+                    if (event.status === 'error') {
+                        throw new Error(event.message);
+                    }
+
+                    // Handle completion
+                    if (event.step === 'complete' && event.result?.pdfBase64) {
+                        if (generationTokenRef.current !== currentToken) return;
+
+                        const bytes = Uint8Array.from(atob(event.result.pdfBase64), c => c.charCodeAt(0));
+                        const blob = new Blob([bytes], { type: 'application/pdf' });
+                        const url = URL.createObjectURL(blob);
+
+                        setGeneratedPdfBlob(blob);
+                        setGeneratedPdfUrl(url);
+                        setCaseNumber(Math.random().toString(36).substr(2, 6).toUpperCase());
+                        setView('result');
+                    }
+                }
+            }
+
+            // If stream ended without a complete event, move to result anyway
+            if (generationTokenRef.current === currentToken && view !== 'result') {
+                setCaseNumber(Math.random().toString(36).substr(2, 6).toUpperCase());
+                setView('result');
+            }
+        } catch (error) {
+            if (generationTokenRef.current !== currentToken) return;
+            console.error('[DocuVault Generation Error]', error);
+            setGenerationError(error instanceof Error ? error.message : 'Generation failed');
+            setView('compose');
         }
+    }, [documentContent, selectedTemplate, generatedPdfUrl, view]);
 
-        // Move to result
-        setView('result');
-        setGeneratedPdfUrl('/api/documents/generate'); // placeholder
-    };
+    /** Reset to compose view, aborting any in-flight generation. */
+    const handleNewDocument = useCallback(() => {
+        // Increment token to abort any running generation
+        generationTokenRef.current++;
 
-    // Reset to compose
-    const handleNewDocument = () => {
         setView('compose');
         setSelectedTemplate(null);
         setDocumentContent('');
         setProgress(0);
         setProgressSteps([]);
+        setGeneratedPdfBlob(null);
+        if (generatedPdfUrl) URL.revokeObjectURL(generatedPdfUrl);
         setGeneratedPdfUrl(null);
         setGenerationError(null);
-    };
+        setCaseNumber(null);
+    }, [generatedPdfUrl]);
 
     return (
         <div className="max-w-5xl mx-auto relative">
@@ -155,15 +248,19 @@ export default function DocuVaultPage() {
                                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#5A4A30' }} />
                                     <input
                                         type="text"
+                                        value={gallerySearch}
+                                        onChange={e => setGallerySearch(e.target.value)}
                                         placeholder="Search templates..."
                                         className="input-gilded pl-9 text-xs"
                                         style={{ fontSize: '12px' }}
+                                        aria-label="Search templates"
                                     />
                                 </div>
 
                                 {/* Template categories */}
                                 {UI_TABS.filter(t => t.id !== 'create_own').map(tab => {
-                                    const tabTemplates = getTemplatesForTab(tab.id);
+                                    const tabTemplates = getTemplatesForTab(tab.id)
+                                        .filter(t => !gallerySearch || t.title.toLowerCase().includes(gallerySearch.toLowerCase()));
                                     return (
                                         <div key={tab.id} className="mb-5">
                                             <h3
@@ -736,7 +833,7 @@ export default function DocuVaultPage() {
                                 {selectedTemplate?.title || 'Generated Document'}
                             </h1>
                             <p className="text-xs" style={{ color: '#8A7A60' }}>
-                                Case #{Math.random().toString(36).substr(2, 6).toUpperCase()}
+                                Case #{caseNumber ?? '------'}
                             </p>
                         </div>
                     </div>
@@ -781,27 +878,59 @@ export default function DocuVaultPage() {
 
                         {/* Action Buttons */}
                         <div className="flex items-center justify-center gap-6 mt-5">
-                            {['Download', 'Print', 'Save'].map(action => (
-                                <button
-                                    key={action}
-                                    className="flex flex-col items-center gap-1.5 cursor-pointer transition-colors"
+                            {/* Download */}
+                            <button
+                                onClick={() => {
+                                    if (!generatedPdfUrl) return;
+                                    const a = document.createElement('a');
+                                    a.href = generatedPdfUrl;
+                                    a.download = `${selectedTemplate?.id ?? 'document'}_${Date.now()}.pdf`;
+                                    a.click();
+                                }}
+                                disabled={!generatedPdfUrl}
+                                className="flex flex-col items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                <div
+                                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                                    style={{ background: 'rgba(197, 139, 7, 0.06)', border: '1px solid rgba(197, 139, 7, 0.15)' }}
                                 >
-                                    <div
-                                        className="w-10 h-10 rounded-full flex items-center justify-center"
-                                        style={{
-                                            background: 'rgba(197, 139, 7, 0.06)',
-                                            border: '1px solid rgba(197, 139, 7, 0.15)',
-                                        }}
-                                    >
-                                        {action === 'Download' && <ArrowRight size={16} className="rotate-90" style={{ color: '#C58B07' }} />}
-                                        {action === 'Print' && <FileText size={16} style={{ color: '#C58B07' }} />}
-                                        {action === 'Save' && <Landmark size={16} style={{ color: '#C58B07' }} />}
-                                    </div>
-                                    <span className="text-xs" style={{ color: '#8A7A60' }}>
-                                        {action}
-                                    </span>
-                                </button>
-                            ))}
+                                    <ArrowRight size={16} className="rotate-90" style={{ color: '#C58B07' }} />
+                                </div>
+                                <span className="text-xs" style={{ color: '#8A7A60' }}>Download</span>
+                            </button>
+                            {/* Print */}
+                            <button
+                                onClick={() => {
+                                    if (!generatedPdfUrl) return;
+                                    const win = window.open(generatedPdfUrl, '_blank');
+                                    win?.addEventListener('load', () => win.print());
+                                }}
+                                disabled={!generatedPdfUrl}
+                                className="flex flex-col items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                <div
+                                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                                    style={{ background: 'rgba(197, 139, 7, 0.06)', border: '1px solid rgba(197, 139, 7, 0.15)' }}
+                                >
+                                    <FileText size={16} style={{ color: '#C58B07' }} />
+                                </div>
+                                <span className="text-xs" style={{ color: '#8A7A60' }}>Print</span>
+                            </button>
+                            {/* Save — TODO: wire to Convex backend */}
+                            <button
+                                disabled
+                                aria-disabled="true"
+                                title="Save to DocuVault coming soon"
+                                className="flex flex-col items-center gap-1.5 transition-colors opacity-40 cursor-not-allowed"
+                            >
+                                <div
+                                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                                    style={{ background: 'rgba(197, 139, 7, 0.06)', border: '1px solid rgba(197, 139, 7, 0.15)' }}
+                                >
+                                    <Landmark size={16} style={{ color: '#C58B07' }} />
+                                </div>
+                                <span className="text-xs" style={{ color: '#8A7A60' }}>Save</span>
+                            </button>
                         </div>
                     </div>
 
@@ -843,23 +972,27 @@ export default function DocuVaultPage() {
                         </div>
                     </div>
 
-                    {/* Revision Input */}
+                    {/* Revision Input — TODO: wire to re-generation API */}
                     <div
                         className="flex items-center gap-3 px-4 py-3 rounded-xl"
                         style={{
                             background: 'rgba(42, 29, 14, 0.3)',
                             border: '1px solid rgba(138, 122, 96, 0.1)',
+                            opacity: 0.5,
                         }}
                     >
                         <Plus size={16} style={{ color: '#8A7A60' }} />
                         <input
                             type="text"
-                            placeholder="Request a revision or new draft..."
+                            placeholder="Revision requests coming soon..."
                             className="flex-1 bg-transparent text-sm outline-none"
                             style={{ color: '#B8A88A' }}
+                            disabled
+                            aria-disabled="true"
                         />
                         <button
-                            className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
+                            disabled
+                            className="w-8 h-8 rounded-full flex items-center justify-center cursor-not-allowed opacity-50"
                             style={{
                                 background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
                             }}

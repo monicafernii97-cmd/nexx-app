@@ -9,7 +9,6 @@ import {
     Download,
     Trash2,
     Clock,
-    Filter,
 } from 'lucide-react';
 import Link from 'next/link';
 import { UI_TABS } from '@/lib/legal/templateCategories';
@@ -218,19 +217,25 @@ export default function DocuVaultGalleryPage() {
                                         </div>
                                         <div className="flex items-center gap-1 text-xs" style={{ color: '#8A7A60' }}>
                                             <Clock size={10} />
-                                            Updated {doc.createdAt.toLocaleDateString()}
+                                            Updated {doc.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                         </div>
                                     </div>
-                                    {/* Actions */}
+                                    {/* Actions — disabled until backend wiring */}
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button
-                                            className="w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer"
+                                            disabled
+                                            aria-disabled="true"
+                                            title="Download not available yet"
+                                            className="w-7 h-7 rounded-lg flex items-center justify-center cursor-not-allowed"
                                             style={{ background: 'rgba(197, 139, 7, 0.06)' }}
                                         >
                                             <Download size={12} style={{ color: '#C58B07' }} />
                                         </button>
                                         <button
-                                            className="w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer"
+                                            disabled
+                                            aria-disabled="true"
+                                            title="Delete not available yet"
+                                            className="w-7 h-7 rounded-lg flex items-center justify-center cursor-not-allowed"
                                             style={{ background: 'rgba(199, 90, 90, 0.06)' }}
                                         >
                                             <Trash2 size={12} style={{ color: '#C75A5A' }} />

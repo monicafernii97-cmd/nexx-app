@@ -60,10 +60,12 @@ function DocuVaultPageInner() {
     const generationTokenRef = useRef(0);
     const completedRef = useRef(false);
     const pdfUrlRef = useRef<string | null>(null);
+    const generationAbortRef = useRef<AbortController | null>(null);
 
-    // Revoke blob URL on unmount to prevent memory leaks
+    // Revoke blob URL and abort stream on unmount to prevent leaks
     useEffect(() => {
         return () => {
+            generationAbortRef.current?.abort();
             if (pdfUrlRef.current) {
                 URL.revokeObjectURL(pdfUrlRef.current);
                 pdfUrlRef.current = null;
@@ -80,18 +82,20 @@ function DocuVaultPageInner() {
     useEffect(() => {
         const templateId = searchParams.get('template');
         if (templateId && !initialSelectionDoneRef.current) {
-            initialSelectionDoneRef.current = true;
+            let matched = false;
             // Search all tabs for the matching template
             for (const tab of UI_TABS) {
                 if (tab.id === 'create_own') continue;
                 const tabTemplates = getTemplatesForTab(tab.id);
                 const found = tabTemplates.find((t) => t.id === templateId);
                 if (found) {
+                    matched = true;
                     setActiveTab(tab.id);
                     setSelectedTemplate(found);
                     break;
                 }
             }
+            initialSelectionDoneRef.current = matched;
         }
     }, [searchParams]);
 
@@ -109,6 +113,9 @@ function DocuVaultPageInner() {
 
         // Increment token so stale runs can detect cancellation
         const currentToken = ++generationTokenRef.current;
+        generationAbortRef.current?.abort();
+        const controller = new AbortController();
+        generationAbortRef.current = controller;
 
         setView('working');
         setProgress(0);
@@ -131,6 +138,7 @@ function DocuVaultPageInner() {
 
         try {
             const res = await fetch('/api/documents/generate/stream', {
+                signal: controller.signal,
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -227,6 +235,7 @@ function DocuVaultPageInner() {
                 setView('compose');
             }
         } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
             if (generationTokenRef.current !== currentToken) return;
             console.error('[DocuVault Generation Error]', error);
             setGenerationError(error instanceof Error ? error.message : 'Generation failed');
@@ -238,6 +247,8 @@ function DocuVaultPageInner() {
     const handleNewDocument = useCallback(() => {
         // Increment token to abort any running generation
         generationTokenRef.current++;
+        generationAbortRef.current?.abort();
+        generationAbortRef.current = null;
 
         setView('compose');
         setSelectedTemplate(null);
@@ -351,6 +362,7 @@ function DocuVaultPageInner() {
                                 <div className="flex gap-1">
                                     <button
                                         onClick={() => scrollCarousel('left')}
+                                        aria-label="Scroll templates left"
                                         className="w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer transition-colors"
                                         style={{ background: 'rgba(208, 227, 255, 0.06)' }}
                                     >
@@ -358,6 +370,7 @@ function DocuVaultPageInner() {
                                     </button>
                                     <button
                                         onClick={() => scrollCarousel('right')}
+                                        aria-label="Scroll templates right"
                                         className="w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer transition-colors"
                                         style={{ background: 'rgba(208, 227, 255, 0.06)' }}
                                     >
@@ -369,8 +382,9 @@ function DocuVaultPageInner() {
 
                         {activeTab === 'create_own' ? (
                             /* Blank template card */
-                            <div
-                                className="card-premium p-6 cursor-pointer transition-all hover:scale-[1.01]"
+                            <button
+                                type="button"
+                                className="card-premium p-6 cursor-pointer transition-all hover:scale-[1.01] w-full text-left"
                                 onClick={() => setSelectedTemplate(null)}
                                 style={{
                                     borderColor: 'rgba(208, 227, 255, 0.25)',
@@ -395,7 +409,7 @@ function DocuVaultPageInner() {
                                         </p>
                                     </div>
                                 </div>
-                            </div>
+                            </button>
                         ) : (
                             /* Template cards carousel */
                             <div
@@ -606,6 +620,7 @@ function DocuVaultPageInner() {
                     <div className="flex items-center justify-between mb-8">
                         <button
                             onClick={handleNewDocument}
+                            aria-label="Cancel generation"
                             className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer"
                             style={{ background: 'rgba(208, 227, 255, 0.06)' }}
                         >
@@ -764,6 +779,7 @@ function DocuVaultPageInner() {
                     <div className="flex items-center gap-3 mb-6">
                         <button
                             onClick={handleNewDocument}
+                            aria-label="Back to document composer"
                             className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
                             style={{
                                 background: 'rgba(208, 227, 255, 0.08)',

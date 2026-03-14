@@ -170,6 +170,9 @@ export default function Sidebar() {
                                 {/* Expand/collapse chevron for items with children */}
                                 {hasChildren && !collapsed && (
                                     <button
+                                        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${item.label} submenu`}
+                                        aria-expanded={isExpanded}
+                                        aria-controls={`submenu-${item.href.replace(/\W/g, '-')}`}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             toggleExpand(item.href);
@@ -195,6 +198,7 @@ export default function Sidebar() {
                             <AnimatePresence>
                                 {hasChildren && isExpanded && !collapsed && (
                                     <motion.div
+                                        id={`submenu-${item.href.replace(/\W/g, '-')}`}
                                         initial={{ opacity: 0, height: 0 }}
                                         animate={{ opacity: 1, height: 'auto' }}
                                         exit={{ opacity: 0, height: 0 }}
@@ -245,7 +249,7 @@ export default function Sidebar() {
                 {isLoaded && user ? (
                     /* ─── Authenticated: Clerk UserButton + user info ─── */
                     <div
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-[rgba(208, 227, 255,0.06)] ${collapsed ? 'justify-center' : ''
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-[rgba(208,227,255,0.06)] ${collapsed ? 'justify-center' : ''
                             }`}
                     >
                         <UserButton
@@ -283,7 +287,7 @@ export default function Sidebar() {
                     /* ─── Not authenticated: Sign In link ─── */
                     <Link href="/sign-in" className="no-underline">
                         <div
-                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(208, 227, 255,0.06)] ${collapsed ? 'justify-center' : ''
+                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(208,227,255,0.06)] ${collapsed ? 'justify-center' : ''
                                 }`}
                         >
                             <div
@@ -313,6 +317,7 @@ export default function Sidebar() {
             {/* Collapse Toggle */}
             <button
                 onClick={() => setCollapsed(!collapsed)}
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer
           transition-all duration-200 hover:scale-110"
                 style={{

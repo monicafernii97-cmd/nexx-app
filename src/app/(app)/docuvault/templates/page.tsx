@@ -58,6 +58,7 @@ const CASE_TYPE_LABELS: Record<string, string> = {
     other: 'Other',
 };
 
+/** Template Gallery page — browse, search, filter, preview, and select legal document templates. */
 export default function TemplateGalleryPage() {
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState('');
@@ -98,6 +99,7 @@ export default function TemplateGalleryPage() {
         });
     }, [allTemplates, activeFilter, searchQuery]);
 
+    /** Navigate to the DocuVault generator with the selected template pre-loaded. */
     const handleUseTemplate = (templateId: string) => {
         router.push(`/docuvault?template=${encodeURIComponent(templateId)}`);
     };

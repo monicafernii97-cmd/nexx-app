@@ -57,6 +57,7 @@ const navItems: NavItem[] = [
     { label: 'Settings', href: '/settings', icon: Settings },
 ];
 
+/** Primary sidebar navigation with collapsible layout and expandable sub-items. */
 export default function Sidebar() {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
@@ -76,6 +77,7 @@ export default function Sidebar() {
         return { ...autoExpanded, ...manualExpanded };
     }, [pathname, manualExpanded]);
 
+    /** Toggle the expanded/collapsed state of a parent nav item's children. */
     const toggleExpand = useCallback((href: string) => {
         setManualExpanded((prev) => ({ ...prev, [href]: !expandedItems[href] }));
     }, [expandedItems]);

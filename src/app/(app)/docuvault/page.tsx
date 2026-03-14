@@ -99,7 +99,7 @@ function DocuVaultPageInner() {
         }
     }, [searchParams]);
 
-    // Carousel scroll
+    /** Scroll the template carousel left or right by a fixed amount. */
     const scrollCarousel = (dir: 'left' | 'right') => {
         if (carouselRef.current) {
             const amount = dir === 'left' ? -240 : 240;
@@ -243,7 +243,7 @@ function DocuVaultPageInner() {
         }
     }, [documentContent, selectedTemplate]);
 
-    /** Reset to compose view, aborting any in-flight generation. */
+    /** Reset all state to begin composing a new document, aborting any in-flight generation. */
     const handleNewDocument = useCallback(() => {
         // Increment token to abort any running generation
         generationTokenRef.current++;

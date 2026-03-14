@@ -83,6 +83,13 @@ export async function POST(request: NextRequest) {
   // ── Stream response ──
   const stream = new ReadableStream({
     async start(controller) {
+      // Listen for client disconnect
+      const abortHandler = () => { try { controller.close(); } catch { /* already closed */ } };
+      request.signal.addEventListener('abort', abortHandler);
+
+      /** Check if the client has disconnected. */
+      const isAborted = () => request.signal.aborted;
+
       try {
         // Step 1: Analyzing Legal Frameworks
         controller.enqueue(new TextEncoder().encode(encodeEvent({
@@ -102,6 +109,8 @@ export async function POST(request: NextRequest) {
           })));
           return;  // finally block will close the controller
         }
+
+        if (isAborted()) return;
 
         const normalizedState = titleCase(body.courtSettings.state);
         const normalizedCounty = titleCase(body.courtSettings.county);
@@ -128,6 +137,8 @@ export async function POST(request: NextRequest) {
 
         await sleep(500); // Allow UI to show step
 
+        if (isAborted()) return;
+
         controller.enqueue(new TextEncoder().encode(encodeEvent({
           step: 'drafting',
           message: 'Drafting Document Structure',
@@ -142,6 +153,8 @@ export async function POST(request: NextRequest) {
           progress: 55,
           status: 'active',
         })));
+
+        if (isAborted()) return;
 
         const html = renderDocumentHTML({
           template,
@@ -170,6 +183,8 @@ export async function POST(request: NextRequest) {
           status: 'active',
         })));
 
+        if (isAborted()) return;
+
         const complianceChecks = quickComplianceCheck(html, rules);
 
         controller.enqueue(new TextEncoder().encode(encodeEvent({
@@ -186,6 +201,8 @@ export async function POST(request: NextRequest) {
           progress: 85,
           status: 'active',
         })));
+
+        if (isAborted()) return;
 
         const pdfBytes = await renderHTMLToPDF(html, rules, caption.causeNumber);
         const pdfBase64 = Buffer.from(pdfBytes).toString('base64');
@@ -212,15 +229,19 @@ export async function POST(request: NextRequest) {
           },
         })));
       } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
         console.error('[Stream Generation Error]', error);
-        controller.enqueue(new TextEncoder().encode(encodeEvent({
-          step: 'error',
-          message: 'Document generation failed',
-          progress: 0,
-          status: 'error',
-        })));
+        try {
+          controller.enqueue(new TextEncoder().encode(encodeEvent({
+            step: 'error',
+            message: 'Document generation failed',
+            progress: 0,
+            status: 'error',
+          })));
+        } catch { /* controller may already be closed */ }
       } finally {
-        controller.close();
+        request.signal.removeEventListener('abort', abortHandler);
+        try { controller.close(); } catch { /* already closed */ }
       }
     },
   });
@@ -253,7 +274,9 @@ function buildStreamCaption(
   }
 
   const rightLines = [
-    `IN THE ${courtSettings.courtName?.toUpperCase() ?? 'DISTRICT COURT'}`,
+    courtSettings.courtName?.trim()
+      ? `IN THE ${courtSettings.courtName.toUpperCase()}`
+      : 'IN THE DISTRICT COURT',
     courtSettings.judicialDistrict?.toUpperCase() ?? '',
     `${normalizedCounty.toUpperCase()} COUNTY, ${normalizedState.toUpperCase()}`,
   ].filter(Boolean);

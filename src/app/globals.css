@@ -281,7 +281,7 @@ body {
   border-radius: 10px;
   padding: 12px 16px;
   color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
+  font-family: Inter, sans-serif;
   font-size: 15px;
   transition: all 0.2s;
   outline: none;

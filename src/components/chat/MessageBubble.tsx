@@ -34,7 +34,7 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
             .replace(/>/g, '&gt;');
         // Apply markdown-like transforms on safe escaped content
         const transformed = escaped
-            .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#C58B07">$1</strong>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight:600">$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/🔴/g, '<span>🔴</span>')
             .replace(/\n/g, '<br/>');

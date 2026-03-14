@@ -301,6 +301,8 @@ export default function NexProfilePage() {
                             />
                             <button
                                 onClick={addTrigger}
+                                type="button"
+                                aria-label="Add trigger pattern"
                                 className="px-3 py-2 rounded-lg cursor-pointer transition-colors hover:bg-[rgba(197,139,7,0.15)]"
                                 style={{
                                     background: 'rgba(197, 139, 7, 0.08)',

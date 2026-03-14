@@ -160,7 +160,7 @@ export default function DocuVaultGalleryPage() {
                 </h2>
 
                 {/* Empty State */}
-                {documents.length === 0 && (
+                {filteredDocs.length === 0 && (
                     <div className="card-gilded p-12 text-center">
                         <div
                             className="w-20 h-20 rounded-2xl mx-auto mb-4 flex items-center justify-center"
@@ -172,16 +172,20 @@ export default function DocuVaultGalleryPage() {
                             <FileText size={32} style={{ color: '#5A4A30' }} />
                         </div>
                         <p className="text-sm font-medium mb-2" style={{ color: '#B8A88A' }}>
-                            No documents yet
+                            {documents.length === 0 ? 'No documents yet' : 'No matching documents'}
                         </p>
                         <p className="text-xs mb-6" style={{ color: '#8A7A60' }}>
-                            Generate your first legal document to see it here.
+                            {documents.length === 0
+                                ? 'Generate your first legal document to see it here.'
+                                : 'Try a different search term or filter.'}
                         </p>
-                        <Link href="/docuvault">
-                            <button className="btn-gold text-xs">
-                                Create Document
-                            </button>
-                        </Link>
+                        {documents.length === 0 && (
+                            <Link href="/docuvault">
+                                <button className="btn-gold text-xs">
+                                    Create Document
+                                </button>
+                            </Link>
+                        )}
                     </div>
                 )}
 

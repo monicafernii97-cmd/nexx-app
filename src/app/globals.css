@@ -18,7 +18,7 @@
   /* ── Semantic Aliases ── */
   --base-bg: var(--galaxy-deep);
   --surface-bg: var(--galaxy);
-  --card-bg: var(--sky);               /* Dashboard cards — sky blue */
+  --card-bg: #D2C7B8;               /* Dashboard cards — grey sand */
   --card-bg-warm: var(--milky-way);    /* Warm cards — milky way */
   --chat-bg: var(--meteor);
   --template-bg: var(--universe);      /* Template/muted cards */

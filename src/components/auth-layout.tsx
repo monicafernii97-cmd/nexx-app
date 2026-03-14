@@ -12,7 +12,7 @@ export function AuthPageLayout({
     return (
         <div
             className="min-h-screen flex items-center justify-center relative overflow-hidden"
-            style={{ background: '#0A1E54' }}
+            style={{ background: '#FFF9F0' }}
         >
             {/* Background ambient glow */}
             <div className="absolute inset-0 pointer-events-none">

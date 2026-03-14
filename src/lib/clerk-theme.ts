@@ -5,8 +5,8 @@ export const nexxClerkAppearance = {
     variables: {
         colorPrimary: '#123D7E',
         colorBackground: '#0A1E54',
-        colorInputBackground: '#7096D1',
-        colorInputText: '#F7F2EB',
+        colorInputBackground: '#FFF9F0',
+        colorInputText: '#0A1E54',
         colorText: '#F7F2EB',
         colorTextSecondary: '#D0E3FF',
         borderRadius: '12px',
@@ -28,11 +28,11 @@ export const nexxClerkAppearance = {
         },
         socialButtonsBlockButton: {
             border: '1px solid rgba(208, 227, 255, 0.15)',
-            background: '#7096D1',
-            color: '#F7F2EB',
+            background: '#FFF9F0',
+            color: '#0A1E54',
         },
         socialButtonsBlockButtonText: {
-            color: '#F7F2EB',
+            color: '#0A1E54',
         },
         formFieldLabel: {
             color: '#D0E3FF',
@@ -42,9 +42,9 @@ export const nexxClerkAppearance = {
             fontWeight: '600',
         },
         formFieldInput: {
-            background: '#7096D1',
-            border: '1px solid rgba(208, 227, 255, 0.15)',
-            color: '#F7F2EB',
+            background: '#FFF9F0',
+            border: '1px solid rgba(10, 30, 84, 0.12)',
+            color: '#0A1E54',
         },
         formButtonPrimary: {
             background: 'linear-gradient(135deg, #FFF9F0, #D0E3FF)',

@@ -387,19 +387,20 @@ export default function OnboardingPage() {
                                             onClick={() => toggleArrayItem('nexBehaviors', opt)}
                                             className="text-left px-4 py-3 rounded-xl transition-all text-sm flex items-center gap-3"
                                             style={{
-                                                background: formData.nexBehaviors.includes(opt) ? 'rgba(208, 227, 255, 0.1)' : 'rgba(255, 249, 240, 0.4)',
-                                                border: `1px solid ${formData.nexBehaviors.includes(opt) ? 'rgba(208, 227, 255, 0.25)' : 'rgba(208, 227, 255, 0.06)'}`,
-                                                color: formData.nexBehaviors.includes(opt) ? '#F7F2EB' : '#D0E3FF',
+                                                background: formData.nexBehaviors.includes(opt) ? '#FFF9F0' : 'transparent',
+                                                border: formData.nexBehaviors.includes(opt) ? '1px solid rgba(10, 30, 84, 0.12)' : '1px solid rgba(208, 227, 255, 0.25)',
+                                                backgroundImage: !formData.nexBehaviors.includes(opt) ? 'linear-gradient(135deg, rgba(10, 30, 84, 0.05), rgba(18, 61, 126, 0.1))' : 'none',
+                                                color: formData.nexBehaviors.includes(opt) ? '#7096D1' : '#FFFFFF',
                                             }}
                                         >
                                             <div
                                                 className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
                                                 style={{
-                                                    background: formData.nexBehaviors.includes(opt) ? '#F7F2EB' : 'transparent',
-                                                    border: `1.5px solid ${formData.nexBehaviors.includes(opt) ? '#F7F2EB' : '#FFF9F0'}`,
+                                                    background: formData.nexBehaviors.includes(opt) ? '#7096D1' : '#FFFFFF',
+                                                    border: formData.nexBehaviors.includes(opt) ? '1.5px solid #7096D1' : '1.5px solid rgba(255, 255, 255, 0.6)',
                                                 }}
                                             >
-                                                {formData.nexBehaviors.includes(opt) && <Check size={12} style={{ color: '#F7F2EB' }} />}
+                                                {formData.nexBehaviors.includes(opt) && <Check size={12} style={{ color: '#FFFFFF' }} />}
                                             </div>
                                             {opt}
                                         </button>
@@ -444,14 +445,14 @@ export default function OnboardingPage() {
                                     <FileText size={20} style={{ color: '#F7F2EB' }} />
                                     <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Important Notice</h2>
                                 </div>
-                                <div className="card-premium p-5 space-y-3">
-                                    <p className="text-sm leading-relaxed" style={{ color: '#123D7E' }}>
+                                <div className="p-5 space-y-3 rounded-2xl" style={{ background: '#7096D1', border: '1px solid rgba(208, 227, 255, 0.2)' }}>
+                                    <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
                                         NEXX is an AI-powered tool that provides <strong style={{ color: '#F7F2EB' }}>legal information, strategic guidance, and emotional support</strong>. It is <strong style={{ color: '#F7F2EB' }}>not</strong> a law firm, does not provide legal advice, and is not a substitute for a licensed attorney or therapist.
                                     </p>
-                                    <p className="text-sm leading-relaxed" style={{ color: '#123D7E' }}>
+                                    <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
                                         Information provided by NEXX should be used as a starting point for your own research and decision-making. For specific legal advice regarding your situation, please consult with a licensed attorney in your state.
                                     </p>
-                                    <p className="text-sm leading-relaxed" style={{ color: '#123D7E' }}>
+                                    <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
                                         If you or your children are in immediate danger, please call <strong style={{ color: '#F7F2EB' }}>911</strong> or the National Domestic Violence Hotline at <strong style={{ color: '#F7F2EB' }}>1-800-799-7233</strong>.
                                     </p>
                                 </div>

@@ -80,7 +80,7 @@ export default function IncidentDetailPage() {
                         <motion.div
                             key={j}
                             className="w-2 h-2 rounded-full"
-                            style={{ background: '#C58B07' }}
+                            style={{ background: '#0A1E54' }}
                             animate={{ opacity: [0.3, 1, 0.3] }}
                             transition={{ duration: 1, repeat: Infinity, delay: j * 0.2 }}
                         />
@@ -209,18 +209,18 @@ export default function IncidentDetailPage() {
                     <button
                         className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
                         style={{
-                            background: 'rgba(197, 139, 7, 0.08)',
-                            border: '1px solid rgba(197, 139, 7, 0.15)',
+                            background: 'rgba(10, 30, 84, 0.08)',
+                            border: '1px solid rgba(10, 30, 84, 0.15)',
                         }}
                     >
-                        <ArrowLeft size={16} style={{ color: '#C58B07' }} />
+                        <ArrowLeft size={16} style={{ color: '#0A1E54' }} />
                     </button>
                 </Link>
                 <div className="flex-1">
-                    <h1 className="text-headline text-xl" style={{ color: '#F5EFE0' }}>
+                    <h1 className="text-headline text-xl" style={{ color: '#0A1E54' }}>
                         Incident Record
                     </h1>
-                    <p className="text-xs" style={{ color: '#8A7A60' }}>
+                    <p className="text-xs" style={{ color: '#B39A84' }}>
                         {incidentDate.toLocaleDateString('en-US', {
                             weekday: 'long',
                             month: 'long',
@@ -270,8 +270,8 @@ export default function IncidentDetailPage() {
                 <span
                     className="badge"
                     style={{
-                        background: `${cat?.color || '#C58B07'}20`,
-                        color: cat?.color || '#C58B07',
+                        background: `${cat?.color || '#0A1E54'}20`,
+                        color: cat?.color || '#0A1E54',
                     }}
                 >
                     <Tag size={10} /> {cat?.label || incident.category}
@@ -284,10 +284,10 @@ export default function IncidentDetailPage() {
                         <Check size={10} /> Confirmed
                     </span>
                 )}
-                <span className="badge" style={{ background: 'rgba(138, 122, 96, 0.1)', color: '#8A7A60' }}>
+                <span className="badge" style={{ background: 'rgba(138, 122, 96, 0.1)', color: '#B39A84' }}>
                     <Calendar size={10} /> {incident.date}
                 </span>
-                <span className="badge" style={{ background: 'rgba(138, 122, 96, 0.1)', color: '#8A7A60' }}>
+                <span className="badge" style={{ background: 'rgba(138, 122, 96, 0.1)', color: '#B39A84' }}>
                     <Clock size={10} /> {incident.time}
                 </span>
                 {/* Severity */}
@@ -334,12 +334,12 @@ export default function IncidentDetailPage() {
                     className="flex flex-wrap gap-4 mb-6"
                 >
                     {incident.location && (
-                        <div className="flex items-center gap-2 text-xs" style={{ color: '#8A7A60' }}>
+                        <div className="flex items-center gap-2 text-xs" style={{ color: '#B39A84' }}>
                             <MapPin size={12} /> {incident.location}
                         </div>
                     )}
                     {incident.witnesses && incident.witnesses.length > 0 && (
-                        <div className="flex items-center gap-2 text-xs" style={{ color: '#8A7A60' }}>
+                        <div className="flex items-center gap-2 text-xs" style={{ color: '#B39A84' }}>
                             <Users size={12} /> Witnesses: {incident.witnesses.join(', ')}
                         </div>
                     )}
@@ -355,7 +355,7 @@ export default function IncidentDetailPage() {
             >
                 <h3
                     className="text-sm font-semibold tracking-[0.15em] uppercase mb-3"
-                    style={{ color: '#92783A' }}
+                    style={{ color: '#A0B1DD' }}
                 >
                     Incident Narrative
                 </h3>
@@ -386,7 +386,7 @@ export default function IncidentDetailPage() {
                 <div className="flex items-center justify-between mb-3">
                     <h3
                         className="text-sm font-semibold tracking-[0.15em] uppercase flex items-center gap-2"
-                        style={{ color: '#C58B07' }}
+                        style={{ color: '#0A1E54' }}
                     >
                         <Shield size={14} /> Court-Ready Summary
                     </h3>
@@ -415,9 +415,9 @@ export default function IncidentDetailPage() {
                             animate={{ rotate: 360 }}
                             transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                         >
-                            <Sparkles size={16} style={{ color: '#C58B07' }} />
+                            <Sparkles size={16} style={{ color: '#0A1E54' }} />
                         </motion.div>
-                        <p className="text-sm" style={{ color: '#8A7A60' }}>
+                        <p className="text-sm" style={{ color: '#B39A84' }}>
                             Analyzing incident and generating court-ready summary...
                         </p>
                     </div>

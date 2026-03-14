@@ -147,7 +147,7 @@ export default function ProfilePage() {
     if (!user) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="animate-pulse-primary text-sm" style={{ color: '#8A7A60' }}>Loading profile...</div>
+                <div className="animate-pulse-primary text-sm" style={{ color: '#B39A84' }}>Loading profile...</div>
             </div>
         );
     }
@@ -161,10 +161,10 @@ export default function ProfilePage() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <h1 className="text-3xl font-serif font-bold" style={{ color: '#F5EFE0' }}>
+                        <h1 className="text-3xl font-serif font-bold" style={{ color: '#0A1E54' }}>
                             My Profile
                         </h1>
-                        <p className="text-sm mt-1" style={{ color: '#8A7A60' }}>
+                        <p className="text-sm mt-1" style={{ color: '#B39A84' }}>
                             This information helps NEXX personalize your experience.
                         </p>
                     </div>
@@ -173,8 +173,8 @@ export default function ProfilePage() {
                         disabled={saving}
                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
                         style={{
-                            background: saved ? 'rgba(90, 158, 111, 0.2)' : 'linear-gradient(135deg, #C58B07, #E5B84A)',
-                            color: saved ? '#5A9E6F' : '#02022d',
+                            background: saved ? 'rgba(90, 158, 111, 0.2)' : 'linear-gradient(135deg, #0A1E54, #14518E)',
+                            color: saved ? '#5A9E6F' : '#0A1E54',
                             border: saved ? '1px solid rgba(90, 158, 111, 0.3)' : 'none',
                         }}
                     >
@@ -323,30 +323,30 @@ export default function ProfilePage() {
                     {/* ── Support Team ── */}
                     <Section icon={<Briefcase size={18} />} title="Support Team">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(197,139,7,0.04)]"
-                                style={{ border: '1px solid rgba(197, 139, 7, 0.1)' }}>
+                            <label className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(10, 30, 84,0.04)]"
+                                style={{ border: '1px solid rgba(10, 30, 84, 0.1)' }}>
                                 <input
                                     type="checkbox"
                                     checked={form.hasAttorney}
                                     onChange={(e) => setForm({ ...form, hasAttorney: e.target.checked })}
-                                    className="accent-[#C58B07] w-4 h-4"
+                                    className="accent-[#0A1E54] w-4 h-4"
                                 />
                                 <div>
-                                    <p className="text-sm font-medium" style={{ color: '#F5EFE0' }}>I have an attorney</p>
-                                    <p className="text-xs" style={{ color: '#8A7A60' }}>NEXX will suggest coordinating with counsel</p>
+                                    <p className="text-sm font-medium" style={{ color: '#0A1E54' }}>I have an attorney</p>
+                                    <p className="text-xs" style={{ color: '#B39A84' }}>NEXX will suggest coordinating with counsel</p>
                                 </div>
                             </label>
-                            <label className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(197,139,7,0.04)]"
-                                style={{ border: '1px solid rgba(197, 139, 7, 0.1)' }}>
+                            <label className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(10, 30, 84,0.04)]"
+                                style={{ border: '1px solid rgba(10, 30, 84, 0.1)' }}>
                                 <input
                                     type="checkbox"
                                     checked={form.hasTherapist}
                                     onChange={(e) => setForm({ ...form, hasTherapist: e.target.checked })}
-                                    className="accent-[#C58B07] w-4 h-4"
+                                    className="accent-[#0A1E54] w-4 h-4"
                                 />
                                 <div>
-                                    <p className="text-sm font-medium" style={{ color: '#F5EFE0' }}>I have a therapist</p>
-                                    <p className="text-xs" style={{ color: '#8A7A60' }}>NEXX will suggest discussing emotional impacts</p>
+                                    <p className="text-sm font-medium" style={{ color: '#0A1E54' }}>I have a therapist</p>
+                                    <p className="text-xs" style={{ color: '#B39A84' }}>NEXX will suggest discussing emotional impacts</p>
                                 </div>
                             </label>
                         </div>
@@ -362,12 +362,12 @@ export default function ProfilePage() {
                                         onClick={() => setForm({ ...form, tonePreference: opt.value })}
                                         className="text-left px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer"
                                         style={{
-                                            background: form.tonePreference === opt.value ? 'rgba(197, 139, 7, 0.12)' : 'rgba(197, 139, 7, 0.03)',
-                                            border: `1px solid ${form.tonePreference === opt.value ? 'rgba(197, 139, 7, 0.4)' : 'rgba(197, 139, 7, 0.08)'}`,
+                                            background: form.tonePreference === opt.value ? 'rgba(10, 30, 84, 0.12)' : 'rgba(10, 30, 84, 0.03)',
+                                            border: `1px solid ${form.tonePreference === opt.value ? 'rgba(10, 30, 84, 0.4)' : 'rgba(10, 30, 84, 0.08)'}`,
                                         }}
                                     >
-                                        <p className="text-sm font-medium" style={{ color: form.tonePreference === opt.value ? '#C58B07' : '#F5EFE0' }}>{opt.label}</p>
-                                        <p className="text-xs mt-0.5" style={{ color: '#8A7A60' }}>{opt.description}</p>
+                                        <p className="text-sm font-medium" style={{ color: form.tonePreference === opt.value ? '#0A1E54' : '#0A1E54' }}>{opt.label}</p>
+                                        <p className="text-xs mt-0.5" style={{ color: '#B39A84' }}>{opt.description}</p>
                                     </button>
                                 ))}
                             </div>
@@ -384,12 +384,12 @@ export default function ProfilePage() {
                                         onClick={() => setForm({ ...form, emotionalState: s.value })}
                                         className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 cursor-pointer"
                                         style={{
-                                            background: form.emotionalState === s.value ? 'rgba(197, 139, 7, 0.12)' : 'rgba(197, 139, 7, 0.03)',
-                                            border: `1px solid ${form.emotionalState === s.value ? 'rgba(197, 139, 7, 0.4)' : 'rgba(197, 139, 7, 0.08)'}`,
+                                            background: form.emotionalState === s.value ? 'rgba(10, 30, 84, 0.12)' : 'rgba(10, 30, 84, 0.03)',
+                                            border: `1px solid ${form.emotionalState === s.value ? 'rgba(10, 30, 84, 0.4)' : 'rgba(10, 30, 84, 0.08)'}`,
                                         }}
                                     >
                                         <span>{s.emoji}</span>
-                                        <span className="text-sm" style={{ color: form.emotionalState === s.value ? '#C58B07' : '#B8A88A' }}>{s.label}</span>
+                                        <span className="text-sm" style={{ color: form.emotionalState === s.value ? '#0A1E54' : '#A0B1DD' }}>{s.label}</span>
                                     </button>
                                 ))}
                             </div>
@@ -410,13 +410,13 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
             animate={{ opacity: 1, y: 0 }}
             className="rounded-2xl p-6"
             style={{
-                background: 'rgba(197, 139, 7, 0.02)',
-                border: '1px solid rgba(197, 139, 7, 0.1)',
+                background: 'rgba(10, 30, 84, 0.02)',
+                border: '1px solid rgba(10, 30, 84, 0.1)',
             }}
         >
             <div className="flex items-center gap-2 mb-5">
-                <span style={{ color: '#C58B07' }}>{icon}</span>
-                <h2 className="text-lg font-semibold" style={{ color: '#F5EFE0' }}>{title}</h2>
+                <span style={{ color: '#0A1E54' }}>{icon}</span>
+                <h2 className="text-lg font-semibold" style={{ color: '#0A1E54' }}>{title}</h2>
             </div>
             <div className="space-y-4">{children}</div>
         </motion.div>
@@ -426,7 +426,7 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: '#B8A88A' }}>{label}</label>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: '#A0B1DD' }}>{label}</label>
             {children}
         </div>
     );

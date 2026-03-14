@@ -8,16 +8,16 @@ export default function SettingsPage() {
         <div className="max-w-4xl mx-auto">
             <h1
                 className="text-headline text-3xl mb-2"
-                style={{ color: '#F5EFE0' }}
+                style={{ color: '#0A1E54' }}
             >
                 Settings
             </h1>
-            <p className="text-sm mb-8" style={{ color: '#8A7A60' }}>
+            <p className="text-sm mb-8" style={{ color: '#B39A84' }}>
                 Manage your account, security, and preferences.
             </p>
 
             <div className="rounded-2xl overflow-hidden" style={{
-                border: '1px solid rgba(197, 139, 7, 0.12)',
+                border: '1px solid rgba(10, 30, 84, 0.12)',
             }}>
                 <UserProfile
                     appearance={{
@@ -32,13 +32,13 @@ export default function SettingsPage() {
                                 boxShadow: 'none',
                             },
                             navbar: {
-                                borderRight: '1px solid rgba(197, 139, 7, 0.1)',
+                                borderRight: '1px solid rgba(10, 30, 84, 0.1)',
                             },
                             navbarButton: {
-                                color: '#B8A88A',
+                                color: '#A0B1DD',
                             },
                             navbarButtonIcon: {
-                                color: '#8A7A60',
+                                color: '#B39A84',
                             },
                         },
                     }}

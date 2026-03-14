@@ -19,7 +19,7 @@ import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 
 const quickActions = [
-    { label: 'New Chat', desc: 'Talk to NEXX', href: '/chat', icon: Mic, color: '#C58B07' },
+    { label: 'New Chat', desc: 'Talk to NEXX', href: '/chat', icon: Mic, color: '#0A1E54' },
     { label: 'Log Incident', desc: 'Document an event', href: '/incident-report/new', icon: Plus, color: '#5A9E6F' },
     { label: 'Draft Document', desc: 'Create a legal doc', href: '/docuvault', icon: FileText, color: '#5A8EC9' },
 ];
@@ -35,7 +35,7 @@ export default function DashboardPage() {
     const confirmedCount = incidents?.filter((i) => i.status === 'confirmed').length ?? 0;
 
     const stats = [
-        { label: 'Documented Incidents', value: String(incidentCount), icon: Shield, color: '#C58B07' },
+        { label: 'Documented Incidents', value: String(incidentCount), icon: Shield, color: '#0A1E54' },
         { label: 'Active Conversations', value: String(conversationCount), icon: MessageCircle, color: '#5A9E6F' },
         { label: 'Court-Ready Records', value: String(confirmedCount), icon: FileText, color: '#5A8EC9' },
         { label: 'Pattern Alerts', value: '0', icon: AlertTriangle, color: '#E5A84A' },
@@ -59,10 +59,10 @@ export default function DashboardPage() {
                 transition={{ duration: 0.5 }}
                 className="mb-8"
             >
-                <h1 className="text-headline text-3xl mb-2" style={{ color: '#F5EFE0' }}>
+                <h1 className="text-headline text-3xl mb-2" style={{ color: '#0A1E54' }}>
                     {greeting()}{userName}
                 </h1>
-                <p className="text-sm" style={{ color: '#8A7A60' }}>
+                <p className="text-sm" style={{ color: '#B39A84' }}>
                     Your sanctuary of strategic empowerment.
                 </p>
             </motion.div>
@@ -87,10 +87,10 @@ export default function DashboardPage() {
                                     <Icon size={18} style={{ color: stat.color }} />
                                 </div>
                             </div>
-                            <p className="text-2xl font-bold mb-1" style={{ color: '#F5EFE0' }}>
+                            <p className="text-2xl font-bold mb-1" style={{ color: '#0A1E54' }}>
                                 {stat.value}
                             </p>
-                            <p className="text-xs" style={{ color: '#8A7A60' }}>
+                            <p className="text-xs" style={{ color: '#B39A84' }}>
                                 {stat.label}
                             </p>
                         </motion.div>
@@ -105,7 +105,7 @@ export default function DashboardPage() {
                 transition={{ delay: 0.5, duration: 0.5 }}
                 className="mb-8"
             >
-                <h2 className="text-sm font-semibold tracking-[0.15em] uppercase mb-4" style={{ color: '#92783A' }}>
+                <h2 className="text-sm font-semibold tracking-[0.15em] uppercase mb-4" style={{ color: '#A0B1DD' }}>
                     Quick Actions
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -129,10 +129,10 @@ export default function DashboardPage() {
                                             <Icon size={20} style={{ color: action.color }} />
                                         </div>
                                         <div className="flex-1">
-                                            <p className="font-semibold text-sm mb-0.5" style={{ color: '#F5EFE0' }}>
+                                            <p className="font-semibold text-sm mb-0.5" style={{ color: '#0A1E54' }}>
                                                 {action.label}
                                             </p>
-                                            <p className="text-xs" style={{ color: '#8A7A60' }}>
+                                            <p className="text-xs" style={{ color: '#B39A84' }}>
                                                 {action.desc}
                                             </p>
                                         </div>
@@ -151,7 +151,7 @@ export default function DashboardPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.7, duration: 0.5 }}
             >
-                <h2 className="text-sm font-semibold tracking-[0.15em] uppercase mb-4" style={{ color: '#92783A' }}>
+                <h2 className="text-sm font-semibold tracking-[0.15em] uppercase mb-4" style={{ color: '#A0B1DD' }}>
                     Recent Activity
                 </h2>
 
@@ -159,14 +159,14 @@ export default function DashboardPage() {
                     <div className="card-premium p-8 text-center">
                         <div
                             className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-                            style={{ background: 'rgba(197, 139, 7, 0.08)', border: '1px solid rgba(197, 139, 7, 0.15)' }}
+                            style={{ background: 'rgba(10, 30, 84, 0.08)', border: '1px solid rgba(10, 30, 84, 0.15)' }}
                         >
-                            <Clock size={28} style={{ color: '#775E22' }} />
+                            <Clock size={28} style={{ color: '#B39A84' }} />
                         </div>
-                        <p className="text-sm font-medium mb-2" style={{ color: '#B8A88A' }}>
+                        <p className="text-sm font-medium mb-2" style={{ color: '#A0B1DD' }}>
                             No activity yet
                         </p>
-                        <p className="text-xs mb-5" style={{ color: '#8A7A60' }}>
+                        <p className="text-xs mb-5" style={{ color: '#B39A84' }}>
                             Start a conversation with NEXX or document your first incident to see your activity here.
                         </p>
                         <Link href="/chat">
@@ -183,10 +183,10 @@ export default function DashboardPage() {
                                     <div className="card-premium p-4 group cursor-pointer">
                                         <div className="flex items-center gap-4">
                                             <div className="text-center flex-shrink-0" style={{ minWidth: 45 }}>
-                                                <p className="text-xs font-semibold" style={{ color: '#C58B07' }}>
+                                                <p className="text-xs font-semibold" style={{ color: '#0A1E54' }}>
                                                     {date.toLocaleDateString('en-US', { month: 'short' })}
                                                 </p>
-                                                <p className="text-lg font-bold" style={{ color: '#F5EFE0' }}>
+                                                <p className="text-lg font-bold" style={{ color: '#0A1E54' }}>
                                                     {date.getDate()}
                                                 </p>
                                             </div>
@@ -206,7 +206,7 @@ export default function DashboardPage() {
                                                     {incident.courtSummary || incident.narrative}
                                                 </p>
                                             </div>
-                                            <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: '#C58B07' }} />
+                                            <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: '#0A1E54' }} />
                                         </div>
                                     </div>
                                 </Link>

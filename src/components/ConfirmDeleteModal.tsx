@@ -66,7 +66,7 @@ export function ConfirmDeleteModal({
                         initial={{ scale: 0.95, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0.95, opacity: 0 }}
-                        className="card-gilded p-6 max-w-sm mx-4"
+                        className="card-premium p-6 max-w-sm mx-4"
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby={dialogTitleId}

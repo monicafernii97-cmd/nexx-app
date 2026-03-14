@@ -298,27 +298,27 @@ export default function OnboardingPage() {
                                 </div>
                                 <div>
                                     <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#92783A' }}>Your Name</label>
-                                    <input value={formData.name} onChange={(e) => update('name', e.target.value)} placeholder="First name" className="input-gilded" />
+                                    <input value={formData.name} onChange={(e) => update('name', e.target.value)} placeholder="First name" className="input-premium" />
                                 </div>
                                 <div>
                                     <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#92783A' }}>State</label>
-                                    <select value={formData.state} onChange={(e) => update('state', e.target.value)} className="input-gilded">
+                                    <select value={formData.state} onChange={(e) => update('state', e.target.value)} className="input-premium">
                                         <option value="">Select your state</option>
                                         {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#92783A' }}>County</label>
-                                    <input value={formData.county} onChange={(e) => update('county', e.target.value)} placeholder="e.g. Harris County" className="input-gilded" />
+                                    <input value={formData.county} onChange={(e) => update('county', e.target.value)} placeholder="e.g. Harris County" className="input-premium" />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#92783A' }}>Children</label>
-                                        <input type="number" value={formData.childrenCount} onChange={(e) => update('childrenCount', e.target.value)} placeholder="How many?" className="input-gilded" min="1" />
+                                        <input type="number" value={formData.childrenCount} onChange={(e) => update('childrenCount', e.target.value)} placeholder="How many?" className="input-premium" min="1" />
                                     </div>
                                     <div>
                                         <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#92783A' }}>Ages</label>
-                                        <input value={formData.childrenAges} onChange={(e) => update('childrenAges', e.target.value)} placeholder="e.g. 4, 7" className="input-gilded" />
+                                        <input value={formData.childrenAges} onChange={(e) => update('childrenAges', e.target.value)} placeholder="e.g. 4, 7" className="input-premium" />
                                     </div>
                                 </div>
                             </div>
@@ -444,7 +444,7 @@ export default function OnboardingPage() {
                                     <FileText size={20} style={{ color: '#C58B07' }} />
                                     <h2 className="font-serif text-xl font-semibold" style={{ color: '#F5EFE0' }}>Important Notice</h2>
                                 </div>
-                                <div className="card-gilded p-5 space-y-3">
+                                <div className="card-premium p-5 space-y-3">
                                     <p className="text-sm leading-relaxed" style={{ color: '#D4C9B0' }}>
                                         NEXX is an AI-powered tool that provides <strong style={{ color: '#C58B07' }}>legal information, strategic guidance, and emotional support</strong>. It is <strong style={{ color: '#C58B07' }}>not</strong> a law firm, does not provide legal advice, and is not a substitute for a licensed attorney or therapist.
                                     </p>
@@ -490,7 +490,7 @@ export default function OnboardingPage() {
                     <button
                         onClick={handleNext}
                         disabled={!canProceed() || isSaving || userLoading || (currentStep === ONBOARDING_STEPS.length - 1 && !userId)}
-                        className="btn-gold flex-1 flex items-center justify-center gap-2 disabled:opacity-30"
+                        className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-30"
                     >
                         {currentStep === ONBOARDING_STEPS.length - 1 ? (
                             <>{isSaving ? 'Saving...' : userLoading ? 'Loading...' : 'Enter NEXX'} <Sparkles size={14} /></>

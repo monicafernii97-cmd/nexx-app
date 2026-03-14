@@ -262,7 +262,7 @@ export default function DocuVaultPage() {
                                         value={gallerySearch}
                                         onChange={e => setGallerySearch(e.target.value)}
                                         placeholder="Search templates..."
-                                        className="input-gilded pl-9 text-xs"
+                                        className="input-premium pl-9 text-xs"
                                         style={{ fontSize: '12px' }}
                                         aria-label="Search templates"
                                     />
@@ -462,7 +462,7 @@ export default function DocuVaultPage() {
                         {activeTab === 'create_own' ? (
                             /* Blank template card */
                             <div
-                                className="card-gilded p-6 cursor-pointer transition-all hover:scale-[1.01]"
+                                className="card-premium p-6 cursor-pointer transition-all hover:scale-[1.01]"
                                 onClick={() => setSelectedTemplate(null)}
                                 style={{
                                     borderColor: 'rgba(197, 139, 7, 0.25)',
@@ -584,7 +584,7 @@ export default function DocuVaultPage() {
                             onChange={e => setDocumentContent(e.target.value)}
                             placeholder="Paste your content here or describe the document title, body, and footer verbatim..."
                             rows={8}
-                            className="input-gilded resize-none"
+                            className="input-premium resize-none"
                             style={{ minHeight: '160px' }}
                         />
 
@@ -624,7 +624,7 @@ export default function DocuVaultPage() {
                         <button
                             onClick={handleGenerate}
                             disabled={!documentContent.trim() && !selectedTemplate}
-                            className="btn-gold w-full flex items-center justify-center gap-2 py-3.5 text-sm disabled:opacity-40"
+                            className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 text-sm disabled:opacity-40"
                         >
                             <Sparkles size={16} />
                             Generate
@@ -710,7 +710,7 @@ export default function DocuVaultPage() {
 
                     {/* Document context */}
                     <div
-                        className="card-gilded p-6 mb-8"
+                        className="card-premium p-6 mb-8"
                         style={{ borderColor: 'rgba(197, 139, 7, 0.15)' }}
                     >
                         <p className="text-xs uppercase tracking-[0.15em] mb-2" style={{ color: '#92783A' }}>
@@ -875,7 +875,7 @@ export default function DocuVaultPage() {
                     </div>
 
                     {/* AI Summary */}
-                    <div className="card-gilded p-5 mb-6">
+                    <div className="card-premium p-5 mb-6">
                         <p className="text-xs font-semibold uppercase tracking-[0.15em] mb-2" style={{ color: '#5A8EC9' }}>
                             Intelligence Summary
                         </p>

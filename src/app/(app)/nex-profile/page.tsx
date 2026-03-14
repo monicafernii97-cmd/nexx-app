@@ -170,7 +170,7 @@ export default function NexProfilePage() {
                                     Nickname for your NEX
                                 </label>
                                 <input
-                                    className="input-gilded w-full"
+                                    className="input-premium w-full"
                                     value={form.nickname}
                                     onChange={(e) => setForm({ ...form, nickname: e.target.value })}
                                     placeholder='e.g. "The NEX", a codename'
@@ -182,7 +182,7 @@ export default function NexProfilePage() {
                                     Relationship
                                 </label>
                                 <select
-                                    className="input-gilded w-full"
+                                    className="input-premium w-full"
                                     value={form.relationship}
                                     onChange={(e) => setForm({ ...form, relationship: e.target.value })}
                                 >
@@ -200,7 +200,7 @@ export default function NexProfilePage() {
                                 Brief Description
                             </label>
                             <textarea
-                                className="input-gilded w-full"
+                                className="input-premium w-full"
                                 rows={3}
                                 value={form.description}
                                 onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -293,7 +293,7 @@ export default function NexProfilePage() {
                         </p>
                         <div className="flex gap-2 mb-3">
                             <input
-                                className="input-gilded flex-1"
+                                className="input-premium flex-1"
                                 value={newTrigger}
                                 onChange={(e) => setNewTrigger(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && addTrigger()}

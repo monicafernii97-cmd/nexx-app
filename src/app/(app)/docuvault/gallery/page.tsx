@@ -98,7 +98,7 @@ export default function DocuVaultGalleryPage() {
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         placeholder="Search documents..."
-                        className="input-gilded pl-11"
+                        className="input-premium pl-11"
                     />
                 </div>
             </motion.div>
@@ -161,7 +161,7 @@ export default function DocuVaultGalleryPage() {
 
                 {/* Empty State */}
                 {documents.length === 0 && (
-                    <div className="card-gilded p-12 text-center">
+                    <div className="card-premium p-12 text-center">
                         <div
                             className="w-20 h-20 rounded-2xl mx-auto mb-4 flex items-center justify-center"
                             style={{
@@ -178,7 +178,7 @@ export default function DocuVaultGalleryPage() {
                             Generate your first legal document to see it here.
                         </p>
                         <Link href="/docuvault">
-                            <button className="btn-gold text-xs">
+                            <button className="btn-primary text-xs">
                                 Create Document
                             </button>
                         </Link>
@@ -194,7 +194,7 @@ export default function DocuVaultGalleryPage() {
                                 initial={{ opacity: 0, y: 12 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.05 * i }}
-                                className="card-gilded p-5 group cursor-pointer hover:border-[rgba(197,139,7,0.25)] transition-all"
+                                className="card-premium p-5 group cursor-pointer hover:border-[rgba(197,139,7,0.25)] transition-all"
                             >
                                 <div className="flex items-start gap-4">
                                     {/* Preview thumbnail */}
@@ -263,7 +263,7 @@ export default function DocuVaultGalleryPage() {
                                     initial={{ opacity: 0, y: 8 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.05 * i }}
-                                    className="card-gilded p-4 flex items-center gap-4 cursor-pointer"
+                                    className="card-premium p-4 flex items-center gap-4 cursor-pointer"
                                 >
                                     <div
                                         className="w-10 h-12 rounded-lg flex items-center justify-center flex-shrink-0"

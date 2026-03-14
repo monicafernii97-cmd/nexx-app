@@ -76,7 +76,7 @@ export default function IncidentReportPage() {
                         Sanctuary of Truth and Admissibility — your court-ready incident records.
                     </p>
                 </div>
-                <Link href="/incident-report/new" className="btn-gold text-xs flex items-center gap-2 no-underline">
+                <Link href="/incident-report/new" className="btn-primary text-xs flex items-center gap-2 no-underline">
                     <Plus size={14} /> Log Incident
                 </Link>
             </motion.div>
@@ -95,14 +95,14 @@ export default function IncidentReportPage() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search incidents..."
-                        className="input-gilded pl-11"
+                        className="input-premium pl-11"
                         aria-label="Search incidents"
                     />
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <button
                         onClick={() => setActiveFilter(null)}
-                        className={`badge cursor-pointer transition-all ${!activeFilter ? 'badge-gold' : ''}`}
+                        className={`badge cursor-pointer transition-all ${!activeFilter ? 'badge-primary' : ''}`}
                         style={!activeFilter ? {} : { background: 'rgba(138, 122, 96, 0.1)', color: '#8A7A60' }}
                     >
                         All
@@ -137,7 +137,7 @@ export default function IncidentReportPage() {
                 {isLoading ? (
                     <div className="space-y-4">
                         {[0, 1, 2].map((j) => (
-                            <div key={j} className="card-gilded p-5 animate-pulse">
+                            <div key={j} className="card-premium p-5 animate-pulse">
                                 <div className="flex items-start gap-4 pl-3">
                                     <div className="flex-shrink-0 text-center" style={{ minWidth: 60 }}>
                                         <div className="h-3 w-10 rounded" style={{ background: 'rgba(197, 139, 7, 0.1)' }} />
@@ -155,7 +155,7 @@ export default function IncidentReportPage() {
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="card-gilded p-10 text-center"
+                        className="card-premium p-10 text-center"
                     >
                         <div
                             className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
@@ -169,7 +169,7 @@ export default function IncidentReportPage() {
                         <p className="text-xs mb-5" style={{ color: '#8A7A60' }}>
                             Start documenting incidents to build your court-ready evidence portfolio.
                         </p>
-                        <Link href="/incident-report/new" className="btn-gold text-xs no-underline">
+                        <Link href="/incident-report/new" className="btn-primary text-xs no-underline">
                             Log Your First Incident
                         </Link>
                     </motion.div>
@@ -188,7 +188,7 @@ export default function IncidentReportPage() {
                             >
                                 <div className="flex items-stretch gap-0 group relative">
                                     <Link href={`/incident-report/${incident._id}`} className="flex-1 min-w-0">
-                                        <div className="card-gilded p-5 cursor-pointer relative overflow-hidden hover:border-[rgba(197,139,7,0.3)] transition-all rounded-r-none">
+                                        <div className="card-premium p-5 cursor-pointer relative overflow-hidden hover:border-[rgba(197,139,7,0.3)] transition-all rounded-r-none">
                                             {/* Severity Indicator */}
                                             <div
                                                 className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl"

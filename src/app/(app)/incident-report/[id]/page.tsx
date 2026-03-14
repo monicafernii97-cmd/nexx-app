@@ -240,7 +240,7 @@ export default function IncidentDetailPage() {
                                 <button
                                     onClick={handleSave}
                                     disabled={isSaving}
-                                    className="btn-gold text-xs flex items-center gap-1"
+                                    className="btn-primary text-xs flex items-center gap-1"
                                 >
                                     <Save size={12} /> {isSaving ? 'Saving...' : 'Save'}
                                 </button>
@@ -351,7 +351,7 @@ export default function IncidentDetailPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 }}
-                className="card-gilded p-6 mb-6"
+                className="card-premium p-6 mb-6"
             >
                 <h3
                     className="text-sm font-semibold tracking-[0.15em] uppercase mb-3"
@@ -363,7 +363,7 @@ export default function IncidentDetailPage() {
                     <textarea
                         value={editData.narrative}
                         onChange={(e) => setEditData({ ...editData, narrative: e.target.value })}
-                        className="input-gilded resize-none w-full"
+                        className="input-premium resize-none w-full"
                         rows={6}
                     />
                 ) : (
@@ -381,7 +381,7 @@ export default function IncidentDetailPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="card-gilded p-6 mb-6"
+                className="card-premium p-6 mb-6"
             >
                 <div className="flex items-center justify-between mb-3">
                     <h3
@@ -427,7 +427,7 @@ export default function IncidentDetailPage() {
                         onChange={(e) =>
                             setEditData({ ...editData, courtSummary: e.target.value })
                         }
-                        className="input-gilded resize-none w-full"
+                        className="input-premium resize-none w-full"
                         rows={6}
                         placeholder="Court-ready summary will appear here after AI analysis..."
                     />
@@ -456,7 +456,7 @@ export default function IncidentDetailPage() {
                 <motion.div
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="card-gilded p-6 mb-6"
+                    className="card-premium p-6 mb-6"
                 >
                     <h3
                         className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2"
@@ -477,7 +477,7 @@ export default function IncidentDetailPage() {
                 <motion.div
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="card-gilded p-6 mb-6"
+                    className="card-premium p-6 mb-6"
                 >
                     <h3
                         className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2"
@@ -515,7 +515,7 @@ export default function IncidentDetailPage() {
                         <button
                             onClick={handleConfirm}
                             disabled={isConfirming}
-                            className="btn-gold flex-1 flex items-center justify-center gap-2"
+                            className="btn-primary flex-1 flex items-center justify-center gap-2"
                         >
                             <Check size={14} /> {isConfirming ? 'Confirming...' : 'Confirm & Finalize'}
                         </button>

@@ -77,7 +77,7 @@ export default function DashboardPage() {
                             initial={{ opacity: 0, y: 16 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.1 * i, duration: 0.5 }}
-                            className="card-gilded p-5"
+                            className="card-premium p-5"
                         >
                             <div className="flex items-start justify-between mb-3">
                                 <div
@@ -116,7 +116,7 @@ export default function DashboardPage() {
                                 <motion.div
                                     whileHover={{ scale: 1.02, y: -2 }}
                                     whileTap={{ scale: 0.98 }}
-                                    className="card-gilded p-5 cursor-pointer group"
+                                    className="card-premium p-5 cursor-pointer group"
                                 >
                                     <div className="flex items-center gap-4">
                                         <div
@@ -156,7 +156,7 @@ export default function DashboardPage() {
                 </h2>
 
                 {!incidents || incidents.length === 0 ? (
-                    <div className="card-gilded p-8 text-center">
+                    <div className="card-premium p-8 text-center">
                         <div
                             className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
                             style={{ background: 'rgba(197, 139, 7, 0.08)', border: '1px solid rgba(197, 139, 7, 0.15)' }}
@@ -170,7 +170,7 @@ export default function DashboardPage() {
                             Start a conversation with NEXX or document your first incident to see your activity here.
                         </p>
                         <Link href="/chat">
-                            <button className="btn-gold text-xs">Start Your First Session</button>
+                            <button className="btn-primary text-xs">Start Your First Session</button>
                         </Link>
                     </div>
                 ) : (
@@ -180,7 +180,7 @@ export default function DashboardPage() {
                             const date = new Date(incident.date);
                             return (
                                 <Link key={incident._id} href={`/incident-report/${incident._id}`} className="no-underline block">
-                                    <div className="card-gilded p-4 group cursor-pointer">
+                                    <div className="card-premium p-4 group cursor-pointer">
                                         <div className="flex items-center gap-4">
                                             <div className="text-center flex-shrink-0" style={{ minWidth: 45 }}>
                                                 <p className="text-xs font-semibold" style={{ color: '#C58B07' }}>

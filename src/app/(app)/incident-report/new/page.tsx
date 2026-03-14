@@ -207,7 +207,7 @@ export default function NewIncidentPage() {
                         </p>
                     </div>
 
-                    <div className="gold-divider" />
+                    <div className="primary-divider" />
 
                     {/* Manual Narrative */}
                     <div>
@@ -219,7 +219,7 @@ export default function NewIncidentPage() {
                             onChange={(e) => setNarrative(e.target.value)}
                             placeholder="Describe the incident with precision — what happened, who was present, what was said or done..."
                             rows={6}
-                            className="input-gilded resize-none"
+                            className="input-premium resize-none"
                         />
                         <p className="text-xs mt-1 text-right" style={{ color: narrative.length > 4500 ? '#C75A5A' : '#5A4A30' }}>
                             {narrative.length}/5000
@@ -232,13 +232,13 @@ export default function NewIncidentPage() {
                             <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 flex items-center gap-2 block" style={{ color: '#92783A' }}>
                                 <Calendar size={12} /> Date
                             </label>
-                            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input-gilded" />
+                            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input-premium" />
                         </div>
                         <div>
                             <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 flex items-center gap-2 block" style={{ color: '#92783A' }}>
                                 <Clock size={12} /> Time
                             </label>
-                            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="input-gilded" />
+                            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="input-premium" />
                         </div>
                     </div>
 
@@ -321,7 +321,7 @@ export default function NewIncidentPage() {
                                 value={location}
                                 onChange={(e) => setLocation(e.target.value)}
                                 placeholder="Where did it happen?"
-                                className="input-gilded"
+                                className="input-premium"
                             />
                         </div>
                         <div>
@@ -333,7 +333,7 @@ export default function NewIncidentPage() {
                                 value={witnesses}
                                 onChange={(e) => setWitnesses(e.target.value)}
                                 placeholder="Comma-separated names"
-                                className="input-gilded"
+                                className="input-premium"
                             />
                         </div>
                     </div>
@@ -378,7 +378,7 @@ export default function NewIncidentPage() {
                     <button
                         onClick={handleAnalyze}
                         disabled={!narrative.trim() || isAnalyzing}
-                        className="btn-gold w-full flex items-center justify-center gap-2 disabled:opacity-40"
+                        className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-40"
                     >
                         {isAnalyzing ? (
                             <>
@@ -398,7 +398,7 @@ export default function NewIncidentPage() {
             {step === 'review' && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                     {/* Court Summary */}
-                    <div className="card-gilded p-6">
+                    <div className="card-premium p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-sm font-semibold tracking-[0.15em] uppercase" style={{ color: '#C58B07' }}>
                                 Court-Ready Summary
@@ -414,7 +414,7 @@ export default function NewIncidentPage() {
                             <textarea
                                 value={courtSummary}
                                 onChange={(e) => setCourtSummary(e.target.value)}
-                                className="input-gilded resize-none w-full"
+                                className="input-premium resize-none w-full"
                                 rows={8}
                             />
                         ) : (
@@ -426,7 +426,7 @@ export default function NewIncidentPage() {
 
                     {/* Behavioral Analysis */}
                     {behavioralAnalysis && (
-                        <div className="card-gilded p-6">
+                        <div className="card-premium p-6">
                             <h3 className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2" style={{ color: '#E5A84A' }}>
                                 <Sparkles size={14} /> NPD Behavioral Analysis
                             </h3>
@@ -438,7 +438,7 @@ export default function NewIncidentPage() {
 
                     {/* Strategic Response */}
                     {strategicResponse && (
-                        <div className="card-gilded p-6">
+                        <div className="card-premium p-6">
                             <h3 className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2" style={{ color: '#5A9E6F' }}>
                                 <Check size={14} /> Strategic Response
                             </h3>
@@ -452,7 +452,7 @@ export default function NewIncidentPage() {
                         <button onClick={() => setStep('describe')} className="btn-outline flex-1">
                             Back to Edit
                         </button>
-                        <button onClick={handleConfirm} className="btn-gold flex-1 flex items-center justify-center gap-2">
+                        <button onClick={handleConfirm} className="btn-primary flex-1 flex items-center justify-center gap-2">
                             <Check size={16} /> Confirm & Save
                         </button>
                     </div>
@@ -461,7 +461,7 @@ export default function NewIncidentPage() {
 
             {/* Step: Confirmed */}
             {step === 'confirmed' && (
-                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="card-gilded p-10 text-center">
+                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="card-premium p-10 text-center">
                     <div
                         className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
                         style={{ background: 'rgba(90, 158, 111, 0.15)', border: '1px solid rgba(90, 158, 111, 0.3)' }}
@@ -494,7 +494,7 @@ export default function NewIncidentPage() {
                                 setAnalyzeError(null);
                                 setCreatedId(null);
                             }}
-                            className="btn-gold"
+                            className="btn-primary"
                         >
                             Log Another
                         </button>

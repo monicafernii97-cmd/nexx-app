@@ -277,7 +277,7 @@ export default function ConversationPage() {
                         className="flex gap-3"
                     >
                         <div
-                            className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center animate-pulse-gold"
+                            className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center animate-pulse-primary"
                             style={{
                                 background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
                             }}

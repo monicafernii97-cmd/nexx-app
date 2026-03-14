@@ -183,7 +183,7 @@ export default function CourtSettingsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="card-gilded p-6 mb-6"
+                className="card-premium p-6 mb-6"
             >
                 <div className="flex items-center gap-2 mb-5">
                     <MapPin size={16} style={{ color: '#C58B07' }} />
@@ -364,7 +364,7 @@ export default function CourtSettingsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="card-gilded p-6 mb-6"
+                className="card-premium p-6 mb-6"
             >
                 <div className="flex items-center gap-2 mb-5">
                     <FileText size={16} style={{ color: '#C58B07' }} />
@@ -453,7 +453,7 @@ export default function CourtSettingsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="card-gilded p-6 mb-6"
+                className="card-premium p-6 mb-6"
             >
                 <div className="flex items-center gap-2 mb-4">
                     <Sparkles size={16} style={{ color: '#C58B07' }} />
@@ -474,7 +474,7 @@ export default function CourtSettingsPage() {
                     <button
                         onClick={handleVerify}
                         disabled={!state || !county || verifying}
-                        className="btn-gold text-xs flex items-center gap-2 disabled:opacity-40"
+                        className="btn-primary text-xs flex items-center gap-2 disabled:opacity-40"
                     >
                         {verifying ? (
                             <>
@@ -580,7 +580,7 @@ export default function CourtSettingsPage() {
                 <button
                     onClick={handleSave}
                     disabled={!state || !county || saving}
-                    className="btn-gold text-sm flex items-center gap-2 px-8 py-3 disabled:opacity-40"
+                    className="btn-primary text-sm flex items-center gap-2 px-8 py-3 disabled:opacity-40"
                 >
                     {saving ? (
                         'Saving...'

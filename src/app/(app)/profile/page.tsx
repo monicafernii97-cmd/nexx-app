@@ -147,7 +147,7 @@ export default function ProfilePage() {
     if (!user) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="animate-pulse-gold text-sm" style={{ color: '#8A7A60' }}>Loading profile...</div>
+                <div className="animate-pulse-primary text-sm" style={{ color: '#8A7A60' }}>Loading profile...</div>
             </div>
         );
     }
@@ -192,7 +192,7 @@ export default function ProfilePage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Field label="Full Name">
                                 <input
-                                    className="input-gilded w-full"
+                                    className="input-premium w-full"
                                     value={form.name}
                                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                                     placeholder="Your name"
@@ -200,7 +200,7 @@ export default function ProfilePage() {
                             </Field>
                             <Field label="Email">
                                 <input
-                                    className="input-gilded w-full"
+                                    className="input-premium w-full"
                                     value={user.email || ''}
                                     disabled
                                     style={{ opacity: 0.6 }}
@@ -215,7 +215,7 @@ export default function ProfilePage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Field label="State">
                                 <select
-                                    className="input-gilded w-full"
+                                    className="input-premium w-full"
                                     value={form.state}
                                     onChange={(e) => setForm({ ...form, state: e.target.value })}
                                 >
@@ -227,7 +227,7 @@ export default function ProfilePage() {
                             </Field>
                             <Field label="County">
                                 <input
-                                    className="input-gilded w-full"
+                                    className="input-premium w-full"
                                     value={form.county}
                                     onChange={(e) => setForm({ ...form, county: e.target.value })}
                                     placeholder="e.g. Los Angeles"
@@ -240,7 +240,7 @@ export default function ProfilePage() {
                     <Section icon={<Users size={18} />} title="Children">
                         <Field label="Number of Children">
                             <select
-                                className="input-gilded w-full max-w-[200px]"
+                                className="input-premium w-full max-w-[200px]"
                                 value={form.childrenCount}
                                 onChange={(e) => setForm({ ...form, childrenCount: parseInt(e.target.value) || 0 })}
                             >
@@ -255,7 +255,7 @@ export default function ProfilePage() {
                                     <div key={i} className="grid grid-cols-2 gap-3">
                                         <Field label={`Child ${i + 1} Name`}>
                                             <input
-                                                className="input-gilded w-full"
+                                                className="input-premium w-full"
                                                 value={form.childrenNames[i] || ''}
                                                 onChange={(e) => updateChildName(i, e.target.value)}
                                                 placeholder="First name (optional)"
@@ -263,7 +263,7 @@ export default function ProfilePage() {
                                         </Field>
                                         <Field label="Age">
                                             <input
-                                                className="input-gilded w-full"
+                                                className="input-premium w-full"
                                                 type="number"
                                                 min={0}
                                                 max={18}
@@ -283,7 +283,7 @@ export default function ProfilePage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Field label="Custody Type">
                                 <select
-                                    className="input-gilded w-full"
+                                    className="input-premium w-full"
                                     value={form.custodyType}
                                     onChange={(e) => setForm({ ...form, custodyType: e.target.value as CustodyType })}
                                 >
@@ -298,7 +298,7 @@ export default function ProfilePage() {
                             </Field>
                             <Field label="Court Status">
                                 <select
-                                    className="input-gilded w-full"
+                                    className="input-premium w-full"
                                     value={form.courtStatus}
                                     onChange={(e) => setForm({ ...form, courtStatus: e.target.value as CourtStatus })}
                                 >
@@ -311,7 +311,7 @@ export default function ProfilePage() {
                             </Field>
                             <Field label="Court Case Number (optional)">
                                 <input
-                                    className="input-gilded w-full"
+                                    className="input-premium w-full"
                                     value={form.courtCaseNumber}
                                     onChange={(e) => setForm({ ...form, courtCaseNumber: e.target.value })}
                                     placeholder="e.g. 24-FL-12345"

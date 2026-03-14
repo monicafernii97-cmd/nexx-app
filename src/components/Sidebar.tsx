@@ -78,7 +78,7 @@ export default function Sidebar() {
             </div>
 
             {/* Divider */}
-            <div className="mx-4 gold-divider" />
+            <div className="mx-4 primary-divider" />
 
             {/* Navigation */}
             <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
@@ -125,7 +125,7 @@ export default function Sidebar() {
 
             {/* User Section */}
             <div className="px-3 pb-4 space-y-2">
-                <div className="gold-divider mb-3" />
+                <div className="primary-divider mb-3" />
 
                 {isLoaded && user ? (
                     /* ─── Authenticated: Clerk UserButton + user info ─── */

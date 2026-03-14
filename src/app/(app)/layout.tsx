@@ -7,7 +7,7 @@ import { ReactNode } from 'react';
 export default function AppShellLayout({ children }: { children: ReactNode }) {
     return (
         <UserProvider>
-            <div className="min-h-screen" style={{ background: 'var(--dark-bg)' }}>
+            <div className="min-h-screen" style={{ background: 'var(--base-bg)' }}>
                 <Sidebar />
                 <main
                     className="transition-all duration-300 min-h-screen"

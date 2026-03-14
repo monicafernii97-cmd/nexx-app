@@ -66,11 +66,14 @@ export default function Sidebar() {
 
     // Auto-expand parent items when navigating to a child route
     useEffect(() => {
-        navItems.forEach((item) => {
-            if (item.children && pathname?.startsWith(item.href)) {
-                setExpandedItems((prev) => ({ ...prev, [item.href]: true }));
+        if (!pathname) return;
+        const nextExpanded: Record<string, boolean> = {};
+        for (const item of navItems) {
+            if (item.children && (pathname === item.href || pathname.startsWith(item.href + '/'))) {
+                nextExpanded[item.href] = true;
             }
-        });
+        }
+        setExpandedItems((prev) => ({ ...prev, ...nextExpanded }));
     }, [pathname]);
 
     const toggleExpand = (href: string) => {

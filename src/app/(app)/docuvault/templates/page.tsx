@@ -99,7 +99,7 @@ export default function TemplateGalleryPage() {
     }, [allTemplates, activeFilter, searchQuery]);
 
     const handleUseTemplate = (templateId: string) => {
-        router.push(`/docuvault?template=${templateId}`);
+        router.push(`/docuvault?template=${encodeURIComponent(templateId)}`);
     };
 
     return (
@@ -110,16 +110,16 @@ export default function TemplateGalleryPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-center gap-4 mb-8"
             >
-                <Link href="/docuvault">
-                    <button
-                        className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
-                        style={{
-                            background: 'rgba(208, 227, 255, 0.08)',
-                            border: '1px solid rgba(208, 227, 255, 0.15)',
-                        }}
-                    >
-                        <ArrowLeft size={16} style={{ color: '#F7F2EB' }} />
-                    </button>
+                <Link
+                    href="/docuvault"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors no-underline"
+                    style={{
+                        background: 'rgba(208, 227, 255, 0.08)',
+                        border: '1px solid rgba(208, 227, 255, 0.15)',
+                    }}
+                    aria-label="Back to DocuVault"
+                >
+                    <ArrowLeft size={16} style={{ color: '#F7F2EB' }} />
                 </Link>
                 <div>
                     <h1 className="text-headline text-2xl" style={{ color: '#F7F2EB' }}>
@@ -196,13 +196,14 @@ export default function TemplateGalleryPage() {
             >
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                     {filteredTemplates.map(({ template, tabLabel }, i) => (
-                        <motion.div
+                        <motion.button
+                            type="button"
                             key={template.id}
                             initial={{ opacity: 0, y: 12 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.03 * Math.min(i, 15) }}
                             onClick={() => setPreviewTemplate(template)}
-                            className="group rounded-2xl p-5 cursor-pointer transition-all duration-200 hover:scale-[1.02]"
+                            className="group rounded-2xl p-5 cursor-pointer transition-all duration-200 hover:scale-[1.02] text-left"
                             style={{
                                 background: 'rgba(208, 227, 255, 0.04)',
                                 border: '1px solid rgba(208, 227, 255, 0.1)',
@@ -290,7 +291,7 @@ export default function TemplateGalleryPage() {
                                     </div>
                                 )}
                             </div>
-                        </motion.div>
+                        </motion.button>
                     ))}
 
                     {/* +Create Own card */}
@@ -378,6 +379,9 @@ export default function TemplateGalleryPage() {
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
                             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="template-preview-title"
                         >
                             <div
                                 className="w-full max-w-lg rounded-2xl overflow-hidden pointer-events-auto max-h-[85vh] flex flex-col"
@@ -401,6 +405,7 @@ export default function TemplateGalleryPage() {
                                             {CATEGORY_LABELS[previewTemplate.category] || previewTemplate.category}
                                         </span>
                                         <h2
+                                            id="template-preview-title"
                                             className="text-lg font-serif font-semibold leading-snug"
                                             style={{ color: '#F7F2EB' }}
                                         >
@@ -409,6 +414,7 @@ export default function TemplateGalleryPage() {
                                     </div>
                                     <button
                                         onClick={() => setPreviewTemplate(null)}
+                                        aria-label="Close preview"
                                         className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer flex-shrink-0 ml-4 transition-colors"
                                         style={{
                                             background: 'rgba(208, 227, 255, 0.08)',

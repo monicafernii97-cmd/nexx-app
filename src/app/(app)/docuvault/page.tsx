@@ -62,6 +62,16 @@ function DocuVaultPageInner() {
     const completedRef = useRef(false);
     const pdfUrlRef = useRef<string | null>(null);
 
+    // Revoke blob URL on unmount to prevent memory leaks
+    useEffect(() => {
+        return () => {
+            if (pdfUrlRef.current) {
+                URL.revokeObjectURL(pdfUrlRef.current);
+                pdfUrlRef.current = null;
+            }
+        };
+    }, []);
+
     // Get templates for current tab
     const templates = getTemplatesForTab(activeTab);
 
@@ -192,15 +202,19 @@ function DocuVaultPageInner() {
                     if (event.step === 'complete' && event.result?.pdfBase64) {
                         if (generationTokenRef.current !== currentToken) return;
                         completedRef.current = true;
+                        try {
+                            const bytes = Uint8Array.from(atob(event.result.pdfBase64), c => c.charCodeAt(0));
+                            const blob = new Blob([bytes], { type: 'application/pdf' });
+                            const url = URL.createObjectURL(blob);
 
-                        const bytes = Uint8Array.from(atob(event.result.pdfBase64), c => c.charCodeAt(0));
-                        const blob = new Blob([bytes], { type: 'application/pdf' });
-                        const url = URL.createObjectURL(blob);
-
-                        pdfUrlRef.current = url;
-                        setGeneratedPdfUrl(url);
-                        setCaseNumber(Math.random().toString(36).substr(2, 6).toUpperCase());
-                        setView('result');
+                            pdfUrlRef.current = url;
+                            setGeneratedPdfUrl(url);
+                            setCaseNumber(Math.random().toString(36).substring(2, 8).toUpperCase());
+                            setView('result');
+                        } catch (decodeErr) {
+                            console.error('[DocuVault] Failed to decode PDF:', decodeErr);
+                            throw new Error('Failed to decode generated PDF');
+                        }
                     }
                 }
             }

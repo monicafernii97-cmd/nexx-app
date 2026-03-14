@@ -20,7 +20,7 @@ import {
     LayoutGrid,
     FolderOpen,
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 
@@ -76,9 +76,9 @@ export default function Sidebar() {
         return { ...autoExpanded, ...manualExpanded };
     }, [pathname, manualExpanded]);
 
-    const toggleExpand = (href: string) => {
+    const toggleExpand = useCallback((href: string) => {
         setManualExpanded((prev) => ({ ...prev, [href]: !expandedItems[href] }));
-    };
+    }, [expandedItems]);
 
     return (
         <motion.aside

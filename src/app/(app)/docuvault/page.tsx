@@ -30,7 +30,7 @@ interface ProgressStep {
 /** Wrapper with Suspense boundary for useSearchParams */
 export default function DocuVaultPage() {
     return (
-        <Suspense>
+        <Suspense fallback={<div className="max-w-5xl mx-auto animate-pulse" style={{ color: '#D0E3FF' }}>Loading...</div>}>
             <DocuVaultPageInner />
         </Suspense>
     );
@@ -74,10 +74,13 @@ function DocuVaultPageInner() {
     // Get templates for current tab
     const templates = getTemplatesForTab(activeTab);
 
+    const initialSelectionDoneRef = useRef(false);
+
     // Auto-select template from URL query param (coming from Template Gallery)
     useEffect(() => {
         const templateId = searchParams.get('template');
-        if (templateId && !selectedTemplate) {
+        if (templateId && !initialSelectionDoneRef.current) {
+            initialSelectionDoneRef.current = true;
             // Search all tabs for the matching template
             for (const tab of UI_TABS) {
                 if (tab.id === 'create_own') continue;
@@ -90,7 +93,7 @@ function DocuVaultPageInner() {
                 }
             }
         }
-    }, [searchParams, selectedTemplate]);
+    }, [searchParams]);
 
     // Carousel scroll
     const scrollCarousel = (dir: 'left' | 'right') => {

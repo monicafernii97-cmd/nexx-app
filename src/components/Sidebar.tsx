@@ -10,7 +10,6 @@ import {
     ClipboardList,
     Siren,
     Scale,
-    Gavel,
     BookOpen,
     UserCircle,
     Settings,
@@ -21,7 +20,7 @@ import {
     LayoutGrid,
     FolderOpen,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 
@@ -62,22 +61,23 @@ export default function Sidebar() {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
     const { user, isLoaded } = useUser();
-    const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+    const [manualExpanded, setManualExpanded] = useState<Record<string, boolean>>({});
 
-    // Auto-expand parent items when navigating to a child route
-    useEffect(() => {
-        if (!pathname) return;
-        const nextExpanded: Record<string, boolean> = {};
-        for (const item of navItems) {
-            if (item.children && (pathname === item.href || pathname.startsWith(item.href + '/'))) {
-                nextExpanded[item.href] = true;
+    // Compute expanded items: auto-expand parents whose child route is active
+    const expandedItems = useMemo(() => {
+        const autoExpanded: Record<string, boolean> = {};
+        if (pathname) {
+            for (const item of navItems) {
+                if (item.children && (pathname === item.href || pathname.startsWith(item.href + '/'))) {
+                    autoExpanded[item.href] = true;
+                }
             }
         }
-        setExpandedItems((prev) => ({ ...prev, ...nextExpanded }));
-    }, [pathname]);
+        return { ...autoExpanded, ...manualExpanded };
+    }, [pathname, manualExpanded]);
 
     const toggleExpand = (href: string) => {
-        setExpandedItems((prev) => ({ ...prev, [href]: !prev[href] }));
+        setManualExpanded((prev) => ({ ...prev, [href]: !expandedItems[href] }));
     };
 
     return (

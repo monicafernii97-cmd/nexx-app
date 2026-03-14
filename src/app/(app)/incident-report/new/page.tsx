@@ -418,7 +418,7 @@ export default function NewIncidentPage() {
                                 rows={8}
                             />
                         ) : (
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#D4C9B0' }}>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#123D7E' }}>
                                 {courtSummary}
                             </p>
                         )}
@@ -430,7 +430,7 @@ export default function NewIncidentPage() {
                             <h3 className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2" style={{ color: '#E5A84A' }}>
                                 <Sparkles size={14} /> NPD Behavioral Analysis
                             </h3>
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#D4C9B0' }}>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#123D7E' }}>
                                 {behavioralAnalysis}
                             </p>
                         </div>
@@ -442,7 +442,7 @@ export default function NewIncidentPage() {
                             <h3 className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2" style={{ color: '#5A9E6F' }}>
                                 <Check size={14} /> Strategic Response
                             </h3>
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#D4C9B0' }}>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#123D7E' }}>
                                 {strategicResponse}
                             </p>
                         </div>

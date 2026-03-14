@@ -70,7 +70,7 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
                         : {
                             background: '#F7F2EB',
                             border: '1px solid rgba(208, 227, 255, 0.1)',
-                            color: '#D4C9B0',
+                            color: '#123D7E',
                         }
                 }
             >

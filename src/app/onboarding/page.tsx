@@ -445,13 +445,13 @@ export default function OnboardingPage() {
                                     <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Important Notice</h2>
                                 </div>
                                 <div className="card-premium p-5 space-y-3">
-                                    <p className="text-sm leading-relaxed" style={{ color: '#D4C9B0' }}>
+                                    <p className="text-sm leading-relaxed" style={{ color: '#123D7E' }}>
                                         NEXX is an AI-powered tool that provides <strong style={{ color: '#F7F2EB' }}>legal information, strategic guidance, and emotional support</strong>. It is <strong style={{ color: '#F7F2EB' }}>not</strong> a law firm, does not provide legal advice, and is not a substitute for a licensed attorney or therapist.
                                     </p>
-                                    <p className="text-sm leading-relaxed" style={{ color: '#D4C9B0' }}>
+                                    <p className="text-sm leading-relaxed" style={{ color: '#123D7E' }}>
                                         Information provided by NEXX should be used as a starting point for your own research and decision-making. For specific legal advice regarding your situation, please consult with a licensed attorney in your state.
                                     </p>
-                                    <p className="text-sm leading-relaxed" style={{ color: '#D4C9B0' }}>
+                                    <p className="text-sm leading-relaxed" style={{ color: '#123D7E' }}>
                                         If you or your children are in immediate danger, please call <strong style={{ color: '#F7F2EB' }}>911</strong> or the National Domestic Violence Hotline at <strong style={{ color: '#F7F2EB' }}>1-800-799-7233</strong>.
                                     </p>
                                 </div>

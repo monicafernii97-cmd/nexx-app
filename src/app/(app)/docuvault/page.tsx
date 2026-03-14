@@ -716,7 +716,7 @@ export default function DocuVaultPage() {
                         <p className="text-xs uppercase tracking-[0.15em] mb-2" style={{ color: '#D0E3FF' }}>
                             Document Context
                         </p>
-                        <p className="text-sm italic leading-relaxed" style={{ color: '#D4C9B0' }}>
+                        <p className="text-sm italic leading-relaxed" style={{ color: '#123D7E' }}>
                             &ldquo;{selectedTemplate?.title || (() => {
                                 const text = documentContent;
                                 if (text.length <= 120) return text;
@@ -879,7 +879,7 @@ export default function DocuVaultPage() {
                         <p className="text-xs font-semibold uppercase tracking-[0.15em] mb-2" style={{ color: '#5A8EC9' }}>
                             Intelligence Summary
                         </p>
-                        <p className="text-sm leading-relaxed" style={{ color: '#D4C9B0' }}>
+                        <p className="text-sm leading-relaxed" style={{ color: '#123D7E' }}>
                             I&apos;ve synthesized the provided content into a formal{' '}
                             {selectedTemplate?.title?.toLowerCase() || 'legal document'}.
                             All formatting follows local court standards. The document has been cross-referenced

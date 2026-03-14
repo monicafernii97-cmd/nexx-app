@@ -369,7 +369,7 @@ export default function IncidentDetailPage() {
                 ) : (
                     <p
                         className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#D4C9B0' }}
+                        style={{ color: '#123D7E' }}
                     >
                         {incident.narrative}
                     </p>
@@ -434,7 +434,7 @@ export default function IncidentDetailPage() {
                 ) : incident.courtSummary ? (
                     <p
                         className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#D4C9B0' }}
+                        style={{ color: '#123D7E' }}
                     >
                         {incident.courtSummary}
                     </p>
@@ -466,7 +466,7 @@ export default function IncidentDetailPage() {
                     </h3>
                     <p
                         className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#D4C9B0' }}
+                        style={{ color: '#123D7E' }}
                     >
                         {analysis.behavioralAnalysis}
                     </p>
@@ -487,7 +487,7 @@ export default function IncidentDetailPage() {
                     </h3>
                     <p
                         className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#D4C9B0' }}
+                        style={{ color: '#123D7E' }}
                     >
                         {analysis.strategicResponse}
                     </p>

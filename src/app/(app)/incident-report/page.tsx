@@ -248,7 +248,7 @@ export default function IncidentReportPage() {
                                                             );
                                                         })()}
                                                     </div>
-                                                    <p className="text-sm leading-relaxed line-clamp-2" style={{ color: '#D4C9B0' }}>
+                                                    <p className="text-sm leading-relaxed line-clamp-2" style={{ color: '#123D7E' }}>
                                                         {incident.courtSummary || incident.narrative}
                                                     </p>
                                                 </div>

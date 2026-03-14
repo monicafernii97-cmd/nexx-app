@@ -67,18 +67,18 @@ export default function DocuVaultGalleryPage() {
                     <button
                         className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
                         style={{
-                            background: 'rgba(199, 208, 229, 0.08)',
-                            border: '1px solid rgba(199, 208, 229, 0.15)',
+                            background: 'rgba(208, 227, 255, 0.08)',
+                            border: '1px solid rgba(208, 227, 255, 0.15)',
                         }}
                     >
-                        <ArrowLeft size={16} style={{ color: '#FFFAF3' }} />
+                        <ArrowLeft size={16} style={{ color: '#F7F2EB' }} />
                     </button>
                 </Link>
                 <div>
-                    <h1 className="text-headline text-2xl" style={{ color: '#FFFAF3' }}>
+                    <h1 className="text-headline text-2xl" style={{ color: '#F7F2EB' }}>
                         Document Gallery
                     </h1>
-                    <p className="text-sm" style={{ color: '#E8DDD3' }}>
+                    <p className="text-sm" style={{ color: '#FFF9F0' }}>
                         Your generated and saved legal documents
                     </p>
                 </div>
@@ -92,7 +92,7 @@ export default function DocuVaultGalleryPage() {
                 className="mb-6"
             >
                 <div className="relative">
-                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#E8DDD3' }} />
+                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#FFF9F0' }} />
                     <input
                         type="text"
                         value={searchQuery}
@@ -118,11 +118,11 @@ export default function DocuVaultGalleryPage() {
                             className="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap cursor-pointer transition-all"
                             style={{
                                 background: activeFilter === tab.id
-                                    ? 'rgba(199, 208, 229, 0.12)'
+                                    ? 'rgba(208, 227, 255, 0.12)'
                                     : 'transparent',
-                                color: activeFilter === tab.id ? '#FFFAF3' : '#E8DDD3',
+                                color: activeFilter === tab.id ? '#F7F2EB' : '#FFF9F0',
                                 border: activeFilter === tab.id
-                                    ? '1px solid rgba(199, 208, 229, 0.25)'
+                                    ? '1px solid rgba(208, 227, 255, 0.25)'
                                     : '1px solid rgba(138, 122, 96, 0.08)',
                             }}
                         >
@@ -135,8 +135,8 @@ export default function DocuVaultGalleryPage() {
                     onChange={e => setSortBy(e.target.value as 'newest' | 'oldest' | 'name')}
                     className="text-xs px-3 py-1.5 rounded-lg cursor-pointer appearance-none"
                     style={{
-                        background: 'rgba(232, 221, 211, 0.4)',
-                        color: '#E8DDD3',
+                        background: 'rgba(255, 249, 240, 0.4)',
+                        color: '#FFF9F0',
                         border: '1px solid rgba(138, 122, 96, 0.08)',
                     }}
                 >
@@ -154,7 +154,7 @@ export default function DocuVaultGalleryPage() {
             >
                 <h2
                     className="text-xs font-semibold tracking-[0.15em] uppercase mb-4"
-                    style={{ color: '#C7D0E5' }}
+                    style={{ color: '#D0E3FF' }}
                 >
                     Document Gallery
                 </h2>
@@ -165,16 +165,16 @@ export default function DocuVaultGalleryPage() {
                         <div
                             className="w-20 h-20 rounded-2xl mx-auto mb-4 flex items-center justify-center"
                             style={{
-                                background: 'rgba(199, 208, 229, 0.06)',
-                                border: '1px solid rgba(199, 208, 229, 0.12)',
+                                background: 'rgba(208, 227, 255, 0.06)',
+                                border: '1px solid rgba(208, 227, 255, 0.12)',
                             }}
                         >
                             <FileText size={32} style={{ color: '#5A4A30' }} />
                         </div>
-                        <p className="text-sm font-medium mb-2" style={{ color: '#C7D0E5' }}>
+                        <p className="text-sm font-medium mb-2" style={{ color: '#D0E3FF' }}>
                             No documents yet
                         </p>
-                        <p className="text-xs mb-6" style={{ color: '#E8DDD3' }}>
+                        <p className="text-xs mb-6" style={{ color: '#FFF9F0' }}>
                             Generate your first legal document to see it here.
                         </p>
                         <Link href="/docuvault">
@@ -194,7 +194,7 @@ export default function DocuVaultGalleryPage() {
                                 initial={{ opacity: 0, y: 12 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.05 * i }}
-                                className="card-premium p-5 group cursor-pointer hover:border-[rgba(199, 208, 229,0.25)] transition-all"
+                                className="card-premium p-5 group cursor-pointer hover:border-[rgba(208, 227, 255,0.25)] transition-all"
                             >
                                 <div className="flex items-start gap-4">
                                     {/* Preview thumbnail */}
@@ -205,17 +205,17 @@ export default function DocuVaultGalleryPage() {
                                             border: '1px solid rgba(138, 122, 96, 0.08)',
                                         }}
                                     >
-                                        <FileText size={22} style={{ color: '#E8DDD3' }} />
+                                        <FileText size={22} style={{ color: '#FFF9F0' }} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate mb-1" style={{ color: '#FFFAF3' }}>
+                                        <p className="text-sm font-medium truncate mb-1" style={{ color: '#F7F2EB' }}>
                                             {doc.title}
                                         </p>
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className="badge text-xs">{doc.category}</span>
                                             <span className="text-xs" style={{ color: '#5A4A30' }}>{doc.fileSize}</span>
                                         </div>
-                                        <div className="flex items-center gap-1 text-xs" style={{ color: '#E8DDD3' }}>
+                                        <div className="flex items-center gap-1 text-xs" style={{ color: '#FFF9F0' }}>
                                             <Clock size={10} />
                                             Updated {doc.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                         </div>
@@ -227,9 +227,9 @@ export default function DocuVaultGalleryPage() {
                                             aria-disabled="true"
                                             title="Download not available yet"
                                             className="w-7 h-7 rounded-lg flex items-center justify-center cursor-not-allowed"
-                                            style={{ background: 'rgba(199, 208, 229, 0.06)' }}
+                                            style={{ background: 'rgba(208, 227, 255, 0.06)' }}
                                         >
-                                            <Download size={12} style={{ color: '#FFFAF3' }} />
+                                            <Download size={12} style={{ color: '#F7F2EB' }} />
                                         </button>
                                         <button
                                             disabled
@@ -275,10 +275,10 @@ export default function DocuVaultGalleryPage() {
                                         <FileText size={16} style={{ color: '#E5A84A' }} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate" style={{ color: '#C7D0E5' }}>
+                                        <p className="text-sm font-medium truncate" style={{ color: '#D0E3FF' }}>
                                             {doc.title}
                                         </p>
-                                        <p className="text-xs" style={{ color: '#E8DDD3' }}>Draft</p>
+                                        <p className="text-xs" style={{ color: '#FFF9F0' }}>Draft</p>
                                     </div>
                                 </motion.div>
                             ))}

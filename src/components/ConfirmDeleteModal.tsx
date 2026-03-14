@@ -81,10 +81,10 @@ export function ConfirmDeleteModal({
                                 <AlertTriangle size={18} style={{ color: '#C75A5A' }} />
                             </div>
                             <div>
-                                <h3 id={dialogTitleId} className="text-sm font-semibold" style={{ color: '#FFFAF3' }}>
+                                <h3 id={dialogTitleId} className="text-sm font-semibold" style={{ color: '#F7F2EB' }}>
                                     {title}
                                 </h3>
-                                <p className="text-xs" style={{ color: '#E8DDD3' }}>
+                                <p className="text-xs" style={{ color: '#FFF9F0' }}>
                                     This action cannot be undone.
                                 </p>
                             </div>
@@ -95,11 +95,11 @@ export function ConfirmDeleteModal({
                                     disabled={isDeleting}
                                     aria-label="Close"
                                 >
-                                    <X size={14} style={{ color: '#E8DDD3' }} />
+                                    <X size={14} style={{ color: '#FFF9F0' }} />
                                 </button>
                             )}
                         </div>
-                        <p className="text-sm mb-5" style={{ color: '#C7D0E5' }}>
+                        <p className="text-sm mb-5" style={{ color: '#D0E3FF' }}>
                             {description}
                         </p>
                         {deleteError && (

@@ -62,17 +62,17 @@ export default function IncidentReportPage() {
                         <div
                             className="w-10 h-10 rounded-xl flex items-center justify-center"
                             style={{
-                                background: 'rgba(199, 208, 229, 0.12)',
-                                border: '1px solid rgba(199, 208, 229, 0.25)',
+                                background: 'rgba(208, 227, 255, 0.12)',
+                                border: '1px solid rgba(208, 227, 255, 0.25)',
                             }}
                         >
-                            <ClipboardList size={20} style={{ color: '#FFFAF3' }} />
+                            <ClipboardList size={20} style={{ color: '#F7F2EB' }} />
                         </div>
-                        <h1 className="text-headline text-2xl" style={{ color: '#FFFAF3' }}>
+                        <h1 className="text-headline text-2xl" style={{ color: '#F7F2EB' }}>
                             Incident Report
                         </h1>
                     </div>
-                    <p className="text-sm" style={{ color: '#E8DDD3' }}>
+                    <p className="text-sm" style={{ color: '#FFF9F0' }}>
                         Sanctuary of Truth and Admissibility — your court-ready incident records.
                     </p>
                 </div>
@@ -89,7 +89,7 @@ export default function IncidentReportPage() {
                 className="mb-6 space-y-3"
             >
                 <div className="relative">
-                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#E8DDD3' }} />
+                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#FFF9F0' }} />
                     <input
                         type="text"
                         value={searchQuery}
@@ -103,7 +103,7 @@ export default function IncidentReportPage() {
                     <button
                         onClick={() => setActiveFilter(null)}
                         className={`badge cursor-pointer transition-all ${!activeFilter ? 'badge-primary' : ''}`}
-                        style={!activeFilter ? {} : { background: 'rgba(138, 122, 96, 0.1)', color: '#E8DDD3' }}
+                        style={!activeFilter ? {} : { background: 'rgba(138, 122, 96, 0.1)', color: '#FFF9F0' }}
                     >
                         All
                     </button>
@@ -114,7 +114,7 @@ export default function IncidentReportPage() {
                             className="badge cursor-pointer transition-all"
                             style={{
                                 background: activeFilter === cat.value ? `${cat.color}25` : 'rgba(138, 122, 96, 0.08)',
-                                color: activeFilter === cat.value ? cat.color : '#E8DDD3',
+                                color: activeFilter === cat.value ? cat.color : '#FFF9F0',
                                 border: activeFilter === cat.value ? `1px solid ${cat.color}40` : '1px solid transparent',
                             }}
                         >
@@ -140,8 +140,8 @@ export default function IncidentReportPage() {
                             <div key={j} className="card-premium p-5 animate-pulse">
                                 <div className="flex items-start gap-4 pl-3">
                                     <div className="flex-shrink-0 text-center" style={{ minWidth: 60 }}>
-                                        <div className="h-3 w-10 rounded" style={{ background: 'rgba(199, 208, 229, 0.1)' }} />
-                                        <div className="h-7 w-8 rounded mt-1 mx-auto" style={{ background: 'rgba(199, 208, 229, 0.08)' }} />
+                                        <div className="h-3 w-10 rounded" style={{ background: 'rgba(208, 227, 255, 0.1)' }} />
+                                        <div className="h-7 w-8 rounded mt-1 mx-auto" style={{ background: 'rgba(208, 227, 255, 0.08)' }} />
                                     </div>
                                     <div className="flex-1">
                                         <div className="h-3 w-20 rounded mb-2" style={{ background: 'rgba(138, 122, 96, 0.1)' }} />
@@ -159,14 +159,14 @@ export default function IncidentReportPage() {
                     >
                         <div
                             className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-                            style={{ background: 'rgba(199, 208, 229, 0.08)', border: '1px solid rgba(199, 208, 229, 0.15)' }}
+                            style={{ background: 'rgba(208, 227, 255, 0.08)', border: '1px solid rgba(208, 227, 255, 0.15)' }}
                         >
-                            <ClipboardList size={28} style={{ color: '#E8DDD3' }} />
+                            <ClipboardList size={28} style={{ color: '#FFF9F0' }} />
                         </div>
-                        <p className="text-sm font-medium mb-2" style={{ color: '#C7D0E5' }}>
+                        <p className="text-sm font-medium mb-2" style={{ color: '#D0E3FF' }}>
                             {incidents && incidents.length > 0 ? 'No incidents match your filters.' : 'No incidents documented yet.'}
                         </p>
-                        <p className="text-xs mb-5" style={{ color: '#E8DDD3' }}>
+                        <p className="text-xs mb-5" style={{ color: '#FFF9F0' }}>
                             Start documenting incidents to build your court-ready evidence portfolio.
                         </p>
                         <Link href="/incident-report/new" className="btn-primary text-xs no-underline">
@@ -188,23 +188,23 @@ export default function IncidentReportPage() {
                             >
                                 <div className="flex items-stretch gap-0 group relative">
                                     <Link href={`/incident-report/${incident._id}`} className="flex-1 min-w-0">
-                                        <div className="card-premium p-5 cursor-pointer relative overflow-hidden hover:border-[rgba(199, 208, 229,0.3)] transition-all rounded-r-none">
+                                        <div className="card-premium p-5 cursor-pointer relative overflow-hidden hover:border-[rgba(208, 227, 255,0.3)] transition-all rounded-r-none">
                                             {/* Severity Indicator */}
                                             <div
                                                 className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl"
-                                                style={{ background: cat?.color || '#FFFAF3' }}
+                                                style={{ background: cat?.color || '#F7F2EB' }}
                                             />
 
                                             <div className="flex items-start gap-4 pl-3">
                                                 {/* Date Column */}
                                                 <div className="flex-shrink-0 text-center" style={{ minWidth: 60 }}>
-                                                    <p className="text-xs font-semibold" style={{ color: '#FFFAF3' }}>
+                                                    <p className="text-xs font-semibold" style={{ color: '#F7F2EB' }}>
                                                         {date.toLocaleDateString('en-US', { month: 'short' })}
                                                     </p>
-                                                    <p className="text-2xl font-bold" style={{ color: '#FFFAF3' }}>
+                                                    <p className="text-2xl font-bold" style={{ color: '#F7F2EB' }}>
                                                         {date.getDate()}
                                                     </p>
-                                                    <p className="text-xs" style={{ color: '#E8DDD3' }}>
+                                                    <p className="text-xs" style={{ color: '#FFF9F0' }}>
                                                         {incident.time}
                                                     </p>
                                                 </div>

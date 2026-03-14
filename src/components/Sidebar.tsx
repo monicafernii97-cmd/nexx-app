@@ -45,8 +45,8 @@ export default function Sidebar() {
             transition={{ duration: 0.3, ease: [0.25, 1, 0.5, 1] }}
             className="fixed left-0 top-0 h-screen z-50 flex flex-col"
             style={{
-                background: 'linear-gradient(180deg, #CFC7C8 0%, #D9CBC2 100%)',
-                borderRight: '1px solid rgba(10, 30, 84, 0.12)',
+                background: 'linear-gradient(180deg, #123D7E 0%, #0A1E54 100%)',
+                borderRight: '1px solid rgba(199, 208, 229, 0.12)',
             }}
         >
             {/* Logo */}
@@ -55,8 +55,8 @@ export default function Sidebar() {
                     <div
                         className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                         style={{
-                            background: 'linear-gradient(135deg, #0A1E54, #14518E)',
-                            boxShadow: '0 2px 12px rgba(10, 30, 84, 0.3)',
+                            background: 'linear-gradient(135deg, #E8DDD3, #C7D0E5)',
+                            boxShadow: '0 2px 12px rgba(199, 208, 229, 0.3)',
                         }}
                     >
                         <span className="text-sm font-black" style={{ color: '#0A1E54' }}>N</span>
@@ -68,7 +68,7 @@ export default function Sidebar() {
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: -10 }}
                                 className="text-lg font-serif font-bold tracking-widest"
-                                style={{ color: '#0A1E54' }}
+                                style={{ color: '#FFFAF3' }}
                             >
                                 NEXX
                             </motion.span>
@@ -98,10 +98,10 @@ export default function Sidebar() {
                                     }`}
                                 style={{
                                     background: isActive
-                                        ? '#0A1E54'
+                                        ? 'rgba(232, 221, 211, 0.15)'
                                         : 'transparent',
-                                    color: isActive ? '#0A1E54' : '#A0B1DD',
-                                    borderLeft: isActive ? '3px solid #0A1E54' : '3px solid transparent',
+                                    color: isActive ? '#FFFAF3' : '#C7D0E5',
+                                    borderLeft: isActive ? '3px solid #E8DDD3' : '3px solid transparent',
                                 }}
                             >
                                 <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
@@ -130,7 +130,7 @@ export default function Sidebar() {
                 {isLoaded && user ? (
                     /* ─── Authenticated: Clerk UserButton + user info ─── */
                     <div
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-[rgba(10, 30, 84,0.06)] ${collapsed ? 'justify-center' : ''
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-[rgba(199,208,229,0.06)] ${collapsed ? 'justify-center' : ''
                             }`}
                     >
                         <UserButton
@@ -154,10 +154,10 @@ export default function Sidebar() {
                                     exit={{ opacity: 0 }}
                                     className="flex-1 min-w-0"
                                 >
-                                    <p className="text-sm font-medium truncate" style={{ color: '#0A1E54' }}>
+                                    <p className="text-sm font-medium truncate" style={{ color: '#FFFAF3' }}>
                                         {user.firstName || user.fullName || 'User'}
                                     </p>
-                                    <p className="text-xs truncate" style={{ color: '#B39A84' }}>
+                                    <p className="text-xs truncate" style={{ color: '#E8DDD3' }}>
                                         {user.primaryEmailAddress?.emailAddress || 'Manage Account'}
                                     </p>
                                 </motion.div>
@@ -168,14 +168,14 @@ export default function Sidebar() {
                     /* ─── Not authenticated: Sign In link ─── */
                     <Link href="/sign-in" className="no-underline">
                         <div
-                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(10, 30, 84,0.06)] ${collapsed ? 'justify-center' : ''
+                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(199,208,229,0.06)] ${collapsed ? 'justify-center' : ''
                                 }`}
                         >
                             <div
                                 className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                                style={{ background: 'rgba(10, 30, 84, 0.1)', border: '1px solid rgba(10, 30, 84, 0.25)' }}
+                                style={{ background: 'rgba(199, 208, 229, 0.1)', border: '1px solid rgba(199, 208, 229, 0.25)' }}
                             >
-                                <LogIn size={16} style={{ color: '#0A1E54' }} />
+                                <LogIn size={16} style={{ color: '#FFFAF3' }} />
                             </div>
                             <AnimatePresence>
                                 {!collapsed && (
@@ -184,7 +184,7 @@ export default function Sidebar() {
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}
                                         className="text-sm font-medium"
-                                        style={{ color: '#0A1E54' }}
+                                        style={{ color: '#FFFAF3' }}
                                     >
                                         Sign In
                                     </motion.span>
@@ -201,9 +201,9 @@ export default function Sidebar() {
                 className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer
           transition-all duration-200 hover:scale-110"
                 style={{
-                    background: 'linear-gradient(135deg, #CFC7C8, #D9CBC2)',
-                    border: '1px solid rgba(10, 30, 84, 0.2)',
-                    color: '#0A1E54',
+                    background: 'linear-gradient(135deg, #1D2D44, #123D7E)',
+                    border: '1px solid rgba(199, 208, 229, 0.2)',
+                    color: '#C7D0E5',
                 }}
             >
                 {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}

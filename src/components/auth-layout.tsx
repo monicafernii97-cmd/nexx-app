@@ -12,14 +12,14 @@ export function AuthPageLayout({
     return (
         <div
             className="min-h-screen flex items-center justify-center relative overflow-hidden"
-            style={{ background: '#0E0804' }}
+            style={{ background: '#0A1E54' }}
         >
             {/* Background ambient glow */}
             <div className="absolute inset-0 pointer-events-none">
                 <div
                     className="absolute w-96 h-96 rounded-full blur-3xl"
                     style={{
-                        background: 'radial-gradient(circle, rgba(10, 30, 84, 0.08) 0%, transparent 70%)',
+                        background: 'radial-gradient(circle, rgba(199, 208, 229, 0.08) 0%, transparent 70%)',
                         top: '10%',
                         left: '20%',
                     }}
@@ -27,7 +27,7 @@ export function AuthPageLayout({
                 <div
                     className="absolute w-96 h-96 rounded-full blur-3xl"
                     style={{
-                        background: 'radial-gradient(circle, rgba(10, 30, 84, 0.05) 0%, transparent 70%)',
+                        background: 'radial-gradient(circle, rgba(199, 208, 229, 0.05) 0%, transparent 70%)',
                         bottom: '10%',
                         right: '20%',
                     }}
@@ -38,11 +38,11 @@ export function AuthPageLayout({
                 <div className="text-center mb-8">
                     <h1
                         className="font-serif text-4xl font-bold italic tracking-wide mb-2"
-                        style={{ color: '#0A1E54' }}
+                        style={{ color: '#FFFAF3' }}
                     >
                         <span className="shimmer">NEXX</span>
                     </h1>
-                    <p className="text-sm tracking-[0.2em] uppercase" style={{ color: '#A0B1DD' }}>
+                    <p className="text-sm tracking-[0.2em] uppercase" style={{ color: '#C7D0E5' }}>
                         {subtitle}
                     </p>
                 </div>

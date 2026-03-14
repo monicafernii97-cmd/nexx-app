@@ -38,8 +38,8 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         <div
             className="flex items-end gap-3 rounded-2xl p-3"
             style={{
-                background: '#0A1E54',
-                border: '1px solid rgba(10, 30, 84, 0.15)',
+                background: '#FFFAF3',
+                border: '1px solid rgba(199, 208, 229, 0.15)',
             }}
         >
             <textarea
@@ -51,7 +51,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 rows={1}
                 className="flex-1 bg-transparent border-none outline-none resize-none text-sm"
                 style={{
-                    color: '#0A1E54',
+                    color: '#FFFAF3',
                     minHeight: 24,
                     maxHeight: 120,
                     fontFamily: 'Inter, sans-serif',
@@ -61,9 +61,9 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 <button
                     className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer"
                     style={{
-                        background: 'rgba(10, 30, 84, 0.08)',
-                        border: '1px solid rgba(10, 30, 84, 0.2)',
-                        color: '#A0B1DD',
+                        background: 'rgba(199, 208, 229, 0.08)',
+                        border: '1px solid rgba(199, 208, 229, 0.2)',
+                        color: '#C7D0E5',
                     }}
                     title="Voice input (coming soon)"
                 >
@@ -75,9 +75,9 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                     className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                     style={{
                         background: input.trim()
-                            ? 'linear-gradient(135deg, #0A1E54, #14518E)'
-                            : 'rgba(10, 30, 84, 0.08)',
-                        color: input.trim() ? '#0A1E54' : '#B39A84',
+                            ? 'linear-gradient(135deg, #FFFAF3, #123D7E)'
+                            : 'rgba(199, 208, 229, 0.08)',
+                        color: input.trim() ? '#FFFAF3' : '#E8DDD3',
                     }}
                 >
                     <Send size={16} />

@@ -32,12 +32,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const ensureUser = useMutation(api.users.ensureFromClerk);
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncError, setSyncError] = useState<string | null>(null);
+    const prevClerkId = useRef<string | undefined>(undefined);
     const hasSynced = useRef(false);
-
-    // Reset sync flag when user changes (e.g., account switch)
-    useEffect(() => {
-        hasSynced.current = false;
-    }, [clerkUser?.id]);
 
     // Auth-derived query: no args, server derives clerkId from auth context
     const currentUser = useQuery(
@@ -77,11 +73,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (!clerkUser) {
             setSyncError(null);
             setIsSyncing(false);
+            prevClerkId.current = undefined;
             return;
         }
 
-        // Reset on identity change so the new user gets synced
-        hasSynced.current = false;
+        // Only reset hasSynced when the user identity actually changes
+        if (clerkUser.id !== prevClerkId.current) {
+            hasSynced.current = false;
+            prevClerkId.current = clerkUser.id;
+        }
+
+        // Skip if already synced for this identity
+        if (hasSynced.current) return;
 
         syncUser().then(() => {
             if (!cancelled) {

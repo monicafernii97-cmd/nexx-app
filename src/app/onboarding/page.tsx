@@ -390,7 +390,7 @@ export default function OnboardingPage() {
                                                 background: formData.nexBehaviors.includes(opt) ? '#FFF9F0' : 'transparent',
                                                 border: formData.nexBehaviors.includes(opt) ? '1px solid rgba(10, 30, 84, 0.12)' : '1px solid rgba(208, 227, 255, 0.25)',
                                                 backgroundImage: !formData.nexBehaviors.includes(opt) ? 'linear-gradient(135deg, rgba(10, 30, 84, 0.05), rgba(18, 61, 126, 0.1))' : 'none',
-                                                color: formData.nexBehaviors.includes(opt) ? '#7096D1' : '#FFFFFF',
+                                                color: formData.nexBehaviors.includes(opt) ? '#0A1E54' : '#FFFFFF',
                                             }}
                                         >
                                             <div
@@ -447,13 +447,13 @@ export default function OnboardingPage() {
                                 </div>
                                 <div className="p-5 space-y-3 rounded-2xl" style={{ background: '#7096D1', border: '1px solid rgba(208, 227, 255, 0.2)' }}>
                                     <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
-                                        NEXX is an AI-powered tool that provides <strong style={{ color: '#F7F2EB' }}>legal information, strategic guidance, and emotional support</strong>. It is <strong style={{ color: '#F7F2EB' }}>not</strong> a law firm, does not provide legal advice, and is not a substitute for a licensed attorney or therapist.
+                                        NEXX is an AI-powered tool that provides <strong style={{ color: '#FFFFFF' }}>legal information, strategic guidance, and emotional support</strong>. It is <strong style={{ color: '#FFFFFF' }}>not</strong> a law firm, does not provide legal advice, and is not a substitute for a licensed attorney or therapist.
                                     </p>
                                     <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
                                         Information provided by NEXX should be used as a starting point for your own research and decision-making. For specific legal advice regarding your situation, please consult with a licensed attorney in your state.
                                     </p>
                                     <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
-                                        If you or your children are in immediate danger, please call <strong style={{ color: '#F7F2EB' }}>911</strong> or the National Domestic Violence Hotline at <strong style={{ color: '#F7F2EB' }}>1-800-799-7233</strong>.
+                                        If you or your children are in immediate danger, please call <strong style={{ color: '#FFFFFF' }}>911</strong> or the National Domestic Violence Hotline at <strong style={{ color: '#FFFFFF' }}>1-800-799-7233</strong>.
                                     </p>
                                 </div>
                                 <button
@@ -472,7 +472,7 @@ export default function OnboardingPage() {
                                             border: `1.5px solid ${formData.acceptedDisclaimer ? '#F7F2EB' : '#FFF9F0'}`,
                                         }}
                                     >
-                                        {formData.acceptedDisclaimer && <Check size={12} style={{ color: '#F7F2EB' }} />}
+                                        {formData.acceptedDisclaimer && <Check size={12} style={{ color: '#0A1E54' }} />}
                                     </div>
                                     I understand and acknowledge the above
                                 </button>

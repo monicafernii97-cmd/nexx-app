@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════
-   NEXX — Luxury Deep Blue + Warm Ivory Design System V3
+   NEXX — Luxury Deep Blue + Warm Ivory Design System V4
    Named Palette: Galaxy · Universe · Sky · Milky Way · Meteor
    ═══════════════════════════════════════════ */
 
@@ -9,8 +9,8 @@
   /* ── Named Palette ── */
   --galaxy-deep: #0A1E54;     /* Deepest blue — background */
   --galaxy: #123D7E;          /* Primary blue — sidebar, surfaces */
-  --universe: #7096D1;        /* Mid blue — gradients, template cards, muted elements */
-  --sky: #D0E3FF;             /* Light blue — dashboard cards, highlights */
+  --universe: #7096D1;        /* Mid blue — dashboard cards, template cards, gradients */
+  --sky: #D0E3FF;             /* Light blue — highlights, accents, muted text on dark */
   --milky-way: #FFF9F0;       /* Warm sand — cards, boxes */
   --meteor: #F7F2EB;          /* Warm ivory — light surfaces, chat, text on dark */
   --black: #000000;
@@ -18,7 +18,7 @@
   /* ── Semantic Aliases ── */
   --base-bg: var(--galaxy-deep);
   --surface-bg: var(--galaxy);
-  --card-bg: #D2C7B8;               /* Dashboard cards — grey sand */
+  --card-bg: #F4F1E8;               /* Dashboard cards — warm ivory */
   --card-bg-warm: var(--milky-way);    /* Warm cards — milky way */
   --chat-bg: var(--meteor);
   --template-bg: var(--universe);      /* Template/muted cards */

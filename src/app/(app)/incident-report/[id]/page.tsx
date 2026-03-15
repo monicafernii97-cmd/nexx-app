@@ -439,7 +439,7 @@ export default function IncidentDetailPage() {
                         {incident.courtSummary}
                     </p>
                 ) : (
-                    <p className="text-sm italic" style={{ color: '#5A4A30' }}>
+                    <p className="text-sm italic" style={{ color: '#0A1E54' }}>
                         No court summary generated yet. Click &ldquo;Generate with AI&rdquo; to
                         create a court-ready version of this incident.
                     </p>

@@ -141,16 +141,16 @@ export default function NewIncidentPage() {
                 <Link href="/incident-report">
                     <button
                         className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
-                        style={{ background: 'rgba(208, 227, 255, 0.08)', border: '1px solid rgba(208, 227, 255, 0.15)' }}
+                        style={{ background: 'rgba(197, 139, 7, 0.08)', border: '1px solid rgba(197, 139, 7, 0.15)' }}
                     >
-                        <ArrowLeft size={16} style={{ color: '#F7F2EB' }} />
+                        <ArrowLeft size={16} style={{ color: '#7096D1' }} />
                     </button>
                 </Link>
                 <div>
-                    <h1 className="text-headline text-xl" style={{ color: '#F7F2EB' }}>
+                    <h1 className="text-headline text-xl" style={{ color: '#F5EFE0' }}>
                         Secure Testimony
                     </h1>
-                    <p className="text-xs" style={{ color: '#FFF9F0' }}>
+                    <p className="text-xs" style={{ color: '#123D7E' }}>
                         Sanctuary for Truth and Admissibility
                     </p>
                 </div>
@@ -166,17 +166,17 @@ export default function NewIncidentPage() {
                             <div
                                 className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all"
                                 style={{
-                                    background: isActive ? 'linear-gradient(135deg, #F7F2EB, #123D7E)' : 'rgba(138, 122, 96, 0.1)',
-                                    color: isActive ? '#F7F2EB' : '#FFF9F0',
+                                    background: isActive ? 'linear-gradient(135deg, #7096D1, #5D82BB)' : 'rgba(112, 150, 209, 0.15)',
+                                    color: isActive ? '#02022d' : '#123D7E',
                                 }}
                             >
                                 {steps.indexOf(step) > i ? <Check size={12} /> : i + 1}
                             </div>
-                            <span className="text-xs font-medium" style={{ color: isActive ? '#F7F2EB' : '#FFF9F0' }}>
+                            <span className="text-xs font-medium" style={{ color: isActive ? '#7096D1' : '#123D7E' }}>
                                 {label}
                             </span>
                             {i < 2 && (
-                                <div className="flex-1 h-px" style={{ background: isActive ? 'rgba(208, 227, 255, 0.3)' : 'rgba(138, 122, 96, 0.1)' }} />
+                                <div className="flex-1 h-px" style={{ background: isActive ? 'rgba(197, 139, 7, 0.3)' : 'rgba(112, 150, 209, 0.15)' }} />
                             )}
                         </div>
                     );
@@ -195,23 +195,23 @@ export default function NewIncidentPage() {
                         <button
                             className="w-20 h-20 rounded-full mx-auto flex items-center justify-center cursor-pointer transition-all hover:scale-105"
                             style={{
-                                background: 'linear-gradient(135deg, rgba(208, 227, 255, 0.15), rgba(208, 227, 255, 0.05))',
-                                border: '2px solid rgba(208, 227, 255, 0.3)',
+                                background: 'linear-gradient(135deg, rgba(197, 139, 7, 0.15), rgba(197, 139, 7, 0.05))',
+                                border: '2px solid rgba(197, 139, 7, 0.3)',
                             }}
                             title="Voice recording (coming soon)"
                         >
-                            <Mic size={28} style={{ color: '#F7F2EB' }} />
+                            <Mic size={28} style={{ color: '#7096D1' }} />
                         </button>
-                        <p className="text-xs mt-2" style={{ color: '#FFF9F0' }}>
+                        <p className="text-xs mt-2" style={{ color: '#123D7E' }}>
                             Tap to Record Testimony
                         </p>
                     </div>
 
-                    <div className="primary-divider" />
+                    <div className="gold-divider" />
 
                     {/* Manual Narrative */}
                     <div>
-                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>
+                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#92783A' }}>
                             Manual Narrative
                         </label>
                         <textarea
@@ -221,7 +221,7 @@ export default function NewIncidentPage() {
                             rows={6}
                             className="input-premium resize-none"
                         />
-                        <p className="text-xs mt-1 text-right" style={{ color: narrative.length > 4500 ? '#C75A5A' : '#5A4A30' }}>
+                        <p className="text-xs mt-1 text-right" style={{ color: narrative.length > 4500 ? '#C75A5A' : '#0A1E54' }}>
                             {narrative.length}/5000
                         </p>
                     </div>
@@ -229,13 +229,13 @@ export default function NewIncidentPage() {
                     {/* Date & Time */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 flex items-center gap-2 block" style={{ color: '#D0E3FF' }}>
+                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 flex items-center gap-2 block" style={{ color: '#92783A' }}>
                                 <Calendar size={12} /> Date
                             </label>
                             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input-premium" />
                         </div>
                         <div>
-                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 flex items-center gap-2 block" style={{ color: '#D0E3FF' }}>
+                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 flex items-center gap-2 block" style={{ color: '#92783A' }}>
                                 <Clock size={12} /> Time
                             </label>
                             <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="input-premium" />
@@ -244,7 +244,7 @@ export default function NewIncidentPage() {
 
                     {/* Severity Selector */}
                     <div>
-                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#D0E3FF' }}>
+                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#92783A' }}>
                             Severity Level
                         </label>
                         <div className="flex gap-3">
@@ -256,13 +256,13 @@ export default function NewIncidentPage() {
                                     style={{
                                         background: severity === level
                                             ? `${severityColors[level - 1]}20`
-                                            : 'rgba(255, 249, 240, 0.3)',
+                                            : 'rgba(42, 29, 14, 0.3)',
                                         border: `1px solid ${severity === level
                                             ? `${severityColors[level - 1]}50`
-                                            : 'rgba(138, 122, 96, 0.1)'}`,
+                                            : 'rgba(112, 150, 209, 0.15)'}`,
                                         color: severity === level
                                             ? severityColors[level - 1]
-                                            : '#FFF9F0',
+                                            : '#123D7E',
                                     }}
                                 >
                                     <div className="flex items-center justify-center gap-2">
@@ -289,7 +289,7 @@ export default function NewIncidentPage() {
 
                     {/* Category Tags */}
                     <div>
-                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 flex items-center gap-2 block" style={{ color: '#D0E3FF' }}>
+                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 flex items-center gap-2 block" style={{ color: '#92783A' }}>
                             <Tag size={12} /> Incident Context
                         </label>
                         <div className="flex flex-wrap gap-2">
@@ -299,8 +299,8 @@ export default function NewIncidentPage() {
                                     onClick={() => setCategory(category === cat.value ? '' : cat.value)}
                                     className="badge cursor-pointer transition-all"
                                     style={{
-                                        background: category === cat.value ? `${cat.color}25` : 'rgba(255, 249, 240, 0.4)',
-                                        color: category === cat.value ? cat.color : '#FFF9F0',
+                                        background: category === cat.value ? `${cat.color}25` : 'rgba(42, 29, 14, 0.4)',
+                                        color: category === cat.value ? cat.color : '#123D7E',
                                         border: `1px solid ${category === cat.value ? `${cat.color}40` : 'transparent'}`,
                                     }}
                                 >
@@ -313,7 +313,7 @@ export default function NewIncidentPage() {
                     {/* Additional Details */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 flex items-center gap-2 block" style={{ color: '#D0E3FF' }}>
+                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 flex items-center gap-2 block" style={{ color: '#92783A' }}>
                                 <MapPin size={12} /> Location (optional)
                             </label>
                             <input
@@ -325,7 +325,7 @@ export default function NewIncidentPage() {
                             />
                         </div>
                         <div>
-                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 flex items-center gap-2 block" style={{ color: '#D0E3FF' }}>
+                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 flex items-center gap-2 block" style={{ color: '#92783A' }}>
                                 <Users size={12} /> Witnesses (optional)
                             </label>
                             <input
@@ -342,8 +342,8 @@ export default function NewIncidentPage() {
                     <label
                         className="flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all"
                         style={{
-                            background: childrenInvolved ? 'rgba(229, 168, 74, 0.08)' : 'rgba(255, 249, 240, 0.3)',
-                            border: `1px solid ${childrenInvolved ? 'rgba(229, 168, 74, 0.25)' : 'rgba(138, 122, 96, 0.1)'}`,
+                            background: childrenInvolved ? 'rgba(229, 168, 74, 0.08)' : 'rgba(42, 29, 14, 0.3)',
+                            border: `1px solid ${childrenInvolved ? 'rgba(229, 168, 74, 0.25)' : 'rgba(112, 150, 209, 0.15)'}`,
                         }}
                     >
                         <input
@@ -355,15 +355,15 @@ export default function NewIncidentPage() {
                         <div
                             className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
                             style={{
-                                background: childrenInvolved ? 'rgba(229, 168, 74, 0.25)' : 'rgba(138, 122, 96, 0.1)',
+                                background: childrenInvolved ? 'rgba(229, 168, 74, 0.25)' : 'rgba(112, 150, 209, 0.15)',
                                 border: `1px solid ${childrenInvolved ? '#E5A84A' : 'rgba(138, 122, 96, 0.2)'}`,
                             }}
                         >
                             {childrenInvolved && <Check size={12} style={{ color: '#E5A84A' }} />}
                         </div>
                         <div className="flex items-center gap-2">
-                            <Baby size={14} style={{ color: childrenInvolved ? '#E5A84A' : '#FFF9F0' }} />
-                            <span className="text-sm" style={{ color: childrenInvolved ? '#E5A84A' : '#FFF9F0' }}>
+                            <Baby size={14} style={{ color: childrenInvolved ? '#E5A84A' : '#123D7E' }} />
+                            <span className="text-sm" style={{ color: childrenInvolved ? '#E5A84A' : '#123D7E' }}>
                                 Children were present or involved
                             </span>
                         </div>
@@ -400,7 +400,7 @@ export default function NewIncidentPage() {
                     {/* Court Summary */}
                     <div className="card-premium p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-sm font-semibold tracking-[0.15em] uppercase" style={{ color: '#F7F2EB' }}>
+                            <h3 className="text-sm font-semibold tracking-[0.15em] uppercase" style={{ color: '#7096D1' }}>
                                 Court-Ready Summary
                             </h3>
                             <button
@@ -468,10 +468,10 @@ export default function NewIncidentPage() {
                     >
                         <Check size={28} style={{ color: '#5A9E6F' }} />
                     </div>
-                    <h2 className="font-serif text-xl font-semibold mb-2" style={{ color: '#F7F2EB' }}>
+                    <h2 className="font-serif text-xl font-semibold mb-2" style={{ color: '#F5EFE0' }}>
                         Incident Documented
                     </h2>
-                    <p className="text-sm mb-6" style={{ color: '#FFF9F0' }}>
+                    <p className="text-sm mb-6" style={{ color: '#123D7E' }}>
                         This record has been securely saved and is court-ready.
                     </p>
                     <div className="flex gap-3 justify-center">

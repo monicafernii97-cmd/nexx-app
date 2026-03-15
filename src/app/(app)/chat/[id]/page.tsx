@@ -282,7 +282,7 @@ export default function ConversationPage() {
                                 background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
                             }}
                         >
-                            <Sparkles size={14} style={{ color: '#F7F2EB' }} />
+                            <Sparkles size={14} style={{ color: '#0A1E54' }} />
                         </div>
                         <div
                             className="rounded-2xl rounded-bl-md px-5 py-4"
@@ -296,7 +296,7 @@ export default function ConversationPage() {
                                     <motion.div
                                         key={j}
                                         className="w-2 h-2 rounded-full"
-                                        style={{ background: '#F7F2EB' }}
+                                        style={{ background: '#7096D1' }}
                                         animate={{ opacity: [0.3, 1, 0.3] }}
                                         transition={{
                                             duration: 1,
@@ -322,7 +322,7 @@ export default function ConversationPage() {
                 style={{ borderTop: '1px solid rgba(208, 227, 255, 0.1)' }}
             >
                 <ChatInput onSend={handleSend} disabled={isStreaming || isPending || !isThreadReady} />
-                <p className="text-center text-xs mt-2" style={{ color: '#5A4A30' }}>
+                <p className="text-center text-xs mt-2" style={{ color: '#D0E3FF' }}>
                     NEXX provides legal information and strategic guidance, not legal advice.
                 </p>
             </motion.div>

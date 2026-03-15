@@ -13,18 +13,18 @@ export const INCIDENT_CATEGORIES = [
     { value: 'financial_abuse', label: 'Financial Abuse', color: '#5A8EC9' },
     { value: 'parental_alienation', label: 'Parental Alienation', color: '#7C6FA0' },
     { value: 'custody_violation', label: 'Custody Violation', color: '#E5A84A' },
-    { value: 'harassment', label: 'Harassment', color: '#F7F2EB' },
+    { value: 'harassment', label: 'Harassment', color: '#A85050' },
     { value: 'threats', label: 'Threats', color: '#C75A5A' },
-    { value: 'manipulation', label: 'Manipulation', color: '#D0E3FF' },
+    { value: 'manipulation', label: 'Manipulation', color: '#7096D1' },
     { value: 'neglect', label: 'Neglect', color: '#5A9E6F' },
-    { value: 'other', label: 'Other', color: '#FFF9F0' },
+    { value: 'other', label: 'Other', color: '#7C6FA0' },
 ] as const;
 
 export const MODE_LABELS: Record<string, { label: string; color: string }> = {
     therapeutic: { label: 'Therapeutic', color: '#5A9E6F' },
     legal: { label: 'Legal', color: '#5A8EC9' },
     strategic: { label: 'Strategic', color: '#E5A84A' },
-    general: { label: 'General', color: '#F7F2EB' },
+    general: { label: 'General', color: '#7096D1' },
 };
 
 export const ONBOARDING_STEPS = [

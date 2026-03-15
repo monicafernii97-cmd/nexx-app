@@ -175,7 +175,7 @@ export default function NexProfilePage() {
                                     onChange={(e) => setForm({ ...form, nickname: e.target.value })}
                                     placeholder='e.g. "The NEX", a codename'
                                 />
-                                <p className="text-xs mt-1" style={{ color: '#5A4A30' }}>NEXX will use this term in conversations</p>
+                                <p className="text-xs mt-1" style={{ color: '#0A1E54' }}>NEXX will use this term in conversations</p>
                             </div>
                             <div>
                                 <label className="text-xs font-medium mb-1.5 block" style={{ color: '#D0E3FF' }}>

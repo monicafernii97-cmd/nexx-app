@@ -174,7 +174,7 @@ export default function ProfilePage() {
                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
                         style={{
                             background: saved ? 'rgba(90, 158, 111, 0.2)' : 'linear-gradient(135deg, #F7F2EB, #123D7E)',
-                            color: saved ? '#5A9E6F' : '#F7F2EB',
+                            color: saved ? '#5A9E6F' : '#0A1E54',
                             border: saved ? '1px solid rgba(90, 158, 111, 0.3)' : 'none',
                         }}
                     >
@@ -205,7 +205,7 @@ export default function ProfilePage() {
                                     disabled
                                     style={{ opacity: 0.6 }}
                                 />
-                                <p className="text-xs mt-1" style={{ color: '#5A4A30' }}>Managed by Clerk</p>
+                                <p className="text-xs mt-1" style={{ color: '#0A1E54' }}>Managed by Clerk</p>
                             </Field>
                         </div>
                     </Section>
@@ -374,7 +374,7 @@ export default function ProfilePage() {
                         </Field>
 
                         <Field label="How are you feeling right now?">
-                            <p className="text-xs mb-2" style={{ color: '#5A4A30' }}>
+                            <p className="text-xs mb-2" style={{ color: '#D0E3FF' }}>
                                 This adjusts NEXX&apos;s language style only — never the substance of advice.
                             </p>
                             <div className="flex flex-wrap gap-2 mt-1">

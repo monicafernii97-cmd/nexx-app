@@ -340,7 +340,7 @@ export default function CourtSettingsPage() {
                     {/* Court Name */}
                     <div className="md:col-span-2">
                         <label htmlFor="court-name-input" className="block text-xs font-medium mb-1.5" style={{ color: '#D0E3FF' }}>
-                            Court Name <span className="text-xs" style={{ color: '#5A4A30' }}>(optional)</span>
+                            Court Name <span className="text-xs" style={{ color: '#0A1E54' }}>(optional)</span>
                         </label>
                         <input
                             type="text"
@@ -403,7 +403,7 @@ export default function CourtSettingsPage() {
                             <User
                                 size={14}
                                 className="absolute left-3 top-1/2 -translate-y-1/2"
-                                style={{ color: '#5A4A30' }}
+                                style={{ color: '#0A1E54' }}
                             />
                             <input
                                 type="text"
@@ -428,7 +428,7 @@ export default function CourtSettingsPage() {
                             <Building2
                                 size={14}
                                 className="absolute left-3 top-1/2 -translate-y-1/2"
-                                style={{ color: '#5A4A30' }}
+                                style={{ color: '#0A1E54' }}
                             />
                             <input
                                 type="text"
@@ -532,7 +532,7 @@ export default function CourtSettingsPage() {
                             </div>
                             {verifyResult.sources.length > 0 && (
                                 <div className="mt-2">
-                                    <span className="text-xs" style={{ color: '#5A4A30' }}>Sources:</span>
+                                    <span className="text-xs" style={{ color: '#0A1E54' }}>Sources:</span>
                                     <ul className="mt-1 space-y-1">
                                         {verifyResult.sources.slice(0, 3).map((url) => {
                                             try {
@@ -624,7 +624,7 @@ export default function CourtSettingsPage() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
                 className="text-center text-xs mt-8 mb-4"
-                style={{ color: '#5A4A30' }}
+                style={{ color: '#0A1E54' }}
             >
                 Court settings are used to format legal documents per your local court&apos;s requirements.
             </motion.p>

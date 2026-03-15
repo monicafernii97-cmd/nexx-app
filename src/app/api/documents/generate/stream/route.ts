@@ -276,9 +276,10 @@ function buildStreamCaption(
     leftLines = [`${petitioner.name.toUpperCase()},`, 'Petitioner', '', 'v.', '', `${respondent?.name?.toUpperCase() ?? 'RESPONDENT'},`, 'Respondent'];
   }
 
+  const trimmedCourtName = courtSettings.courtName?.trim();
   const rightLines = [
-    courtSettings.courtName?.trim()
-      ? `IN THE ${courtSettings.courtName.trim().toUpperCase()}`
+    trimmedCourtName
+      ? `IN THE ${trimmedCourtName.toUpperCase()}`
       : 'IN THE DISTRICT COURT',
     courtSettings.judicialDistrict?.toUpperCase() ?? '',
     `${normalizedCounty.toUpperCase()} COUNTY, ${normalizedState.toUpperCase()}`,

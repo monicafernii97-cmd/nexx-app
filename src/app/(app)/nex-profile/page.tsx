@@ -302,7 +302,7 @@ export default function NexProfilePage() {
                             />
                             <button
                                 onClick={addTrigger}
-                                className="px-3 py-2 rounded-lg cursor-pointer transition-colors hover:bg-[rgba(208, 227, 255,0.15)]"
+                                className="px-3 py-2 rounded-lg cursor-pointer transition-colors hover:bg-[rgba(208,227,255,0.15)]"
                                 style={{
                                     background: 'rgba(208, 227, 255, 0.08)',
                                     border: '1px solid rgba(208, 227, 255, 0.15)',

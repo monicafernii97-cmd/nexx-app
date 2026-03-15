@@ -319,9 +319,9 @@ export default function DocuVaultPage() {
                                                         }}
                                                         className="w-full text-left px-3 py-2 rounded-lg text-xs transition-all cursor-pointer"
                                                         style={{
-                                                            color: selectedTemplate?.id === tmpl.id ? '#7096D1' : '#7096D1',
+                                                            color: selectedTemplate?.id === tmpl.id ? '#F5EFE0' : '#7096D1',
                                                             background: selectedTemplate?.id === tmpl.id
-                                                                ? 'rgba(197, 139, 7, 0.08)'
+                                                                ? 'rgba(112, 150, 209, 0.15)'
                                                                 : 'transparent',
                                                         }}
                                                     >

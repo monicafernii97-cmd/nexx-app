@@ -16,10 +16,10 @@ export const INCIDENT_CATEGORIES = [
     { value: 'parental_alienation', label: 'Parental Alienation', color: '#7C6FA0' },
     { value: 'custody_violation', label: 'Custody Violation', color: '#E5A84A' },
     { value: 'harassment', label: 'Harassment', color: '#A85050' },
-    { value: 'threats', label: 'Threats', color: '#C75A5A' },
+    { value: 'threats', label: 'Threats', color: '#B04848' },
     { value: 'manipulation', label: 'Manipulation', color: '#7096D1' },
     { value: 'neglect', label: 'Neglect', color: '#5A9E6F' },
-    { value: 'other', label: 'Other', color: '#7C6FA0' },
+    { value: 'other', label: 'Other', color: '#6B5E8A' },
 ] as const;
 
 /** Display labels and colors for the four conversation modes. */

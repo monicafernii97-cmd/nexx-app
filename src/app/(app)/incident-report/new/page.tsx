@@ -168,7 +168,7 @@ export default function NewIncidentPage() {
                                 className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all"
                                 style={{
                                     background: isActive ? 'linear-gradient(135deg, #7096D1, #5D82BB)' : 'rgba(112, 150, 209, 0.15)',
-                                    color: isActive ? '#02022d' : '#123D7E',
+                                    color: isActive ? '#FFF9F0' : '#123D7E',
                                 }}
                             >
                                 {steps.indexOf(step) > i ? <Check size={12} /> : i + 1}
@@ -453,8 +453,12 @@ export default function NewIncidentPage() {
                         <button onClick={() => setStep('describe')} className="btn-outline flex-1">
                             Back to Edit
                         </button>
-                        <button onClick={handleConfirm} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                            <Check size={16} /> Confirm & Save
+                        <button
+                            onClick={handleConfirm}
+                            disabled={isSaving}
+                            className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-40"
+                        >
+                            <Check size={16} /> {isSaving ? 'Saving...' : 'Confirm & Save'}
                         </button>
                     </div>
                 </motion.div>

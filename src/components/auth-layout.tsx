@@ -39,11 +39,11 @@ export function AuthPageLayout({
                 <div className="text-center mb-8">
                     <h1
                         className="font-serif text-4xl font-bold italic tracking-wide mb-2"
-                        style={{ color: '#F7F2EB' }}
+                        style={{ color: '#123D7E' }}
                     >
                         <span className="shimmer">NEXX</span>
                     </h1>
-                    <p className="text-sm tracking-[0.2em] uppercase" style={{ color: '#D0E3FF' }}>
+                    <p className="text-sm tracking-[0.2em] uppercase" style={{ color: '#5D82BB' }}>
                         {subtitle}
                     </p>
                 </div>

@@ -45,16 +45,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
         clerkUser?.id ? {} : 'skip'
     );
 
+    const clerkId = clerkUser?.id;
+    const clerkName = clerkUser?.firstName || clerkUser?.fullName || 'User';
+    const clerkEmail = clerkUser?.primaryEmailAddress?.emailAddress;
+
     // On Clerk login, ensure our Convex user record exists
     const syncUser = useCallback(async () => {
-        if (!clerkUser) return;
+        if (!clerkId) return;
         setIsSyncing(true);
         setSyncError(null);
         try {
             await ensureUser({
-                clerkId: clerkUser.id,
-                name: clerkUser.firstName || clerkUser.fullName || 'User',
-                email: clerkUser.primaryEmailAddress?.emailAddress,
+                clerkId,
+                name: clerkName,
+                email: clerkEmail,
             });
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
@@ -63,7 +67,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         } finally {
             setIsSyncing(false);
         }
-    }, [clerkUser, ensureUser]);
+    }, [clerkId, clerkName, clerkEmail, ensureUser]);
 
     useEffect(() => {
         if (!clerkLoaded) return;

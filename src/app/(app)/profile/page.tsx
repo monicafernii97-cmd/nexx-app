@@ -174,7 +174,7 @@ export default function ProfilePage() {
                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
                         style={{
                             background: saved ? 'rgba(90, 158, 111, 0.2)' : 'linear-gradient(135deg, #F7F2EB, #123D7E)',
-                            color: saved ? '#5A9E6F' : '#0A1E54',
+                            color: saved ? '#5A9E6F' : '#FFFFFF',
                             border: saved ? '1px solid rgba(90, 158, 111, 0.3)' : 'none',
                         }}
                     >
@@ -366,7 +366,7 @@ export default function ProfilePage() {
                                             border: `1px solid ${form.tonePreference === opt.value ? 'rgba(208, 227, 255, 0.4)' : 'rgba(208, 227, 255, 0.08)'}`,
                                         }}
                                     >
-                                        <p className="text-sm font-medium" style={{ color: form.tonePreference === opt.value ? '#F7F2EB' : '#F7F2EB' }}>{opt.label}</p>
+                                        <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>{opt.label}</p>
                                         <p className="text-xs mt-0.5" style={{ color: '#FFF9F0' }}>{opt.description}</p>
                                     </button>
                                 ))}

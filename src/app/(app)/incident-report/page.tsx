@@ -62,8 +62,8 @@ export default function IncidentReportPage() {
                         <div
                             className="w-10 h-10 rounded-xl flex items-center justify-center"
                             style={{
-                                background: 'rgba(197, 139, 7, 0.12)',
-                                border: '1px solid rgba(197, 139, 7, 0.25)',
+                                background: 'rgba(112, 150, 209, 0.12)',
+                                border: '1px solid rgba(112, 150, 209, 0.25)',
                             }}
                         >
                             <ClipboardList size={20} style={{ color: '#7096D1' }} />
@@ -126,7 +126,7 @@ export default function IncidentReportPage() {
 
             {/* Incident Count */}
             {incidents && incidents.length > 0 && (
-                <p className="text-xs mb-4" style={{ color: '#0A1E54' }}>
+                <p className="text-xs mb-4" style={{ color: '#D0E3FF' }}>
                     {filteredIncidents.length} of {incidents.length} incident{incidents.length !== 1 ? 's' : ''}
                     {activeFilter || searchQuery ? ' (filtered)' : ''}
                 </p>
@@ -140,8 +140,8 @@ export default function IncidentReportPage() {
                             <div key={j} className="card-premium p-5 animate-pulse">
                                 <div className="flex items-start gap-4 pl-3">
                                     <div className="flex-shrink-0 text-center" style={{ minWidth: 60 }}>
-                                        <div className="h-3 w-10 rounded" style={{ background: 'rgba(197, 139, 7, 0.1)' }} />
-                                        <div className="h-7 w-8 rounded mt-1 mx-auto" style={{ background: 'rgba(197, 139, 7, 0.08)' }} />
+                                        <div className="h-3 w-10 rounded" style={{ background: 'rgba(112, 150, 209, 0.1)' }} />
+                                        <div className="h-7 w-8 rounded mt-1 mx-auto" style={{ background: 'rgba(112, 150, 209, 0.08)' }} />
                                     </div>
                                     <div className="flex-1">
                                         <div className="h-3 w-20 rounded mb-2" style={{ background: 'rgba(112, 150, 209, 0.15)' }} />
@@ -159,9 +159,9 @@ export default function IncidentReportPage() {
                     >
                         <div
                             className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-                            style={{ background: 'rgba(197, 139, 7, 0.08)', border: '1px solid rgba(197, 139, 7, 0.15)' }}
+                            style={{ background: 'rgba(112, 150, 209, 0.08)', border: '1px solid rgba(112, 150, 209, 0.15)' }}
                         >
-                            <ClipboardList size={28} style={{ color: '#775E22' }} />
+                            <ClipboardList size={28} style={{ color: '#7096D1' }} />
                         </div>
                         <p className="text-sm font-medium mb-2" style={{ color: '#7096D1' }}>
                             {incidents && incidents.length > 0 ? 'No incidents match your filters.' : 'No incidents documented yet.'}

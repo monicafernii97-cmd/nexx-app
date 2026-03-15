@@ -92,9 +92,9 @@ export default function IncidentDetailPage() {
 
     const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
     const dateParts = incident.date?.split('-').map(Number) ?? [];
-    const incidentDate = dateParts.length === 3
+    const incidentDate = dateParts.length === 3 && !dateParts.some(isNaN)
         ? new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
-        : new Date();
+        : null;
     const severityColors = ['#5A9E6F', '#E5A84A', '#C75A5A'];
     const severityLabels = ['Low', 'Medium', 'High'];
 
@@ -205,28 +205,30 @@ export default function IncidentDetailPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-center gap-4 mb-6"
             >
-                <Link href="/incident-report">
-                    <button
-                        className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
-                        style={{
-                            background: 'rgba(208, 227, 255, 0.08)',
-                            border: '1px solid rgba(208, 227, 255, 0.15)',
-                        }}
-                    >
-                        <ArrowLeft size={16} style={{ color: '#F7F2EB' }} />
-                    </button>
+                <Link
+                    href="/incident-report"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
+                    style={{
+                        background: 'rgba(208, 227, 255, 0.08)',
+                        border: '1px solid rgba(208, 227, 255, 0.15)',
+                    }}
+                    aria-label="Back to incident reports"
+                >
+                    <ArrowLeft size={16} style={{ color: '#F7F2EB' }} />
                 </Link>
                 <div className="flex-1">
                     <h1 className="text-headline text-xl" style={{ color: '#F7F2EB' }}>
                         Incident Record
                     </h1>
                     <p className="text-xs" style={{ color: '#FFF9F0' }}>
-                        {incidentDate.toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric',
-                        })}
+                        {incidentDate
+                            ? incidentDate.toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                month: 'long',
+                                day: 'numeric',
+                                year: 'numeric',
+                            })
+                            : incident.date || 'Unknown date'}
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -439,7 +441,7 @@ export default function IncidentDetailPage() {
                         {incident.courtSummary}
                     </p>
                 ) : (
-                    <p className="text-sm italic" style={{ color: '#0A1E54' }}>
+                    <p className="text-sm italic" style={{ color: '#D0E3FF' }}>
                         No court summary generated yet. Click &ldquo;Generate with AI&rdquo; to
                         create a court-ready version of this incident.
                     </p>

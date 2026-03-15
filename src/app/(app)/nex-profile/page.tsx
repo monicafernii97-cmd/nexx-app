@@ -149,7 +149,7 @@ export default function NexProfilePage() {
                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
                         style={{
                             background: saved ? 'rgba(90, 158, 111, 0.2)' : 'linear-gradient(135deg, #F7F2EB, #123D7E)',
-                            color: saved ? '#5A9E6F' : '#F7F2EB',
+                            color: saved ? '#5A9E6F' : '#FFFFFF',
                             border: saved ? '1px solid rgba(90, 158, 111, 0.3)' : 'none',
                         }}
                     >
@@ -175,7 +175,7 @@ export default function NexProfilePage() {
                                     onChange={(e) => setForm({ ...form, nickname: e.target.value })}
                                     placeholder='e.g. "The NEX", a codename'
                                 />
-                                <p className="text-xs mt-1" style={{ color: '#0A1E54' }}>NEXX will use this term in conversations</p>
+                                <p className="text-xs mt-1" style={{ color: '#D0E3FF' }}>NEXX will use this term in conversations</p>
                             </div>
                             <div>
                                 <label className="text-xs font-medium mb-1.5 block" style={{ color: '#D0E3FF' }}>
@@ -251,7 +251,7 @@ export default function NexProfilePage() {
                                         border: `1px solid ${form.communicationStyle === style.value ? 'rgba(208, 227, 255, 0.4)' : 'rgba(208, 227, 255, 0.08)'}`,
                                     }}
                                 >
-                                    <p className="text-sm font-medium" style={{ color: form.communicationStyle === style.value ? '#F7F2EB' : '#F7F2EB' }}>
+                                    <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>
                                         {style.label}
                                     </p>
                                     <p className="text-xs mt-0.5" style={{ color: '#FFF9F0' }}>{style.description}</p>

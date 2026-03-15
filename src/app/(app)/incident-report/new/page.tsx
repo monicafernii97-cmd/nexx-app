@@ -138,13 +138,13 @@ export default function NewIncidentPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-center gap-4 mb-8"
             >
-                <Link href="/incident-report">
-                    <button
-                        className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
-                        style={{ background: 'rgba(197, 139, 7, 0.08)', border: '1px solid rgba(197, 139, 7, 0.15)' }}
-                    >
-                        <ArrowLeft size={16} style={{ color: '#7096D1' }} />
-                    </button>
+                <Link
+                    href="/incident-report"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
+                    style={{ background: 'rgba(208, 227, 255, 0.08)', border: '1px solid rgba(208, 227, 255, 0.15)' }}
+                    aria-label="Back to incident reports"
+                >
+                    <ArrowLeft size={16} style={{ color: '#7096D1' }} />
                 </Link>
                 <div>
                     <h1 className="text-headline text-xl" style={{ color: '#F5EFE0' }}>
@@ -176,7 +176,7 @@ export default function NewIncidentPage() {
                                 {label}
                             </span>
                             {i < 2 && (
-                                <div className="flex-1 h-px" style={{ background: isActive ? 'rgba(197, 139, 7, 0.3)' : 'rgba(112, 150, 209, 0.15)' }} />
+                                <div className="flex-1 h-px" style={{ background: isActive ? 'rgba(112, 150, 209, 0.3)' : 'rgba(112, 150, 209, 0.15)' }} />
                             )}
                         </div>
                     );
@@ -195,8 +195,8 @@ export default function NewIncidentPage() {
                         <button
                             className="w-20 h-20 rounded-full mx-auto flex items-center justify-center cursor-pointer transition-all hover:scale-105"
                             style={{
-                                background: 'linear-gradient(135deg, rgba(197, 139, 7, 0.15), rgba(197, 139, 7, 0.05))',
-                                border: '2px solid rgba(197, 139, 7, 0.3)',
+                                background: 'linear-gradient(135deg, rgba(112, 150, 209, 0.15), rgba(112, 150, 209, 0.05))',
+                                border: '2px solid rgba(112, 150, 209, 0.3)',
                             }}
                             title="Voice recording (coming soon)"
                         >
@@ -475,8 +475,8 @@ export default function NewIncidentPage() {
                         This record has been securely saved and is court-ready.
                     </p>
                     <div className="flex gap-3 justify-center">
-                        <Link href="/incident-report">
-                            <button className="btn-outline">View All Records</button>
+                        <Link href="/incident-report" className="btn-outline">
+                            View All Records
                         </Link>
                         <button
                             onClick={() => {

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
+import { useUser } from '@/lib/user-context';
 import {
     Landmark,
     ChevronLeft,
@@ -35,6 +36,7 @@ interface ProgressStep {
 export default function DocuVaultPage() {
     // User's court settings from Convex
     const userCourtSettings = useQuery(api.courtSettings.get);
+    const { clerkUser } = useUser();
     // Tab & template state
     const [activeTab, setActiveTab] = useState<UITabCategory>('lead');
     const [selectedTemplate, setSelectedTemplate] = useState<DocumentTemplate | null>(null);
@@ -126,8 +128,8 @@ export default function DocuVaultPage() {
                         courtName: userCourtSettings?.courtName,
                         judicialDistrict: userCourtSettings?.judicialDistrict,
                     },
-                    petitioner: { name: 'Petitioner' },
-                    caseType: 'divorce_no_children',
+                    petitioner: { name: clerkUser?.fullName || clerkUser?.firstName || 'Petitioner' },
+                    caseType: selectedTemplate?.caseTypes?.[0] ?? 'general',
                     bodyContent: documentContent ? [{ heading: 'Content', paragraphs: [documentContent] }] : [],
                 }),
             });
@@ -218,7 +220,7 @@ export default function DocuVaultPage() {
             setGenerationError(error instanceof Error ? error.message : 'Generation failed');
             setView('compose');
         }
-    }, [documentContent, selectedTemplate, userCourtSettings]);
+    }, [documentContent, selectedTemplate, userCourtSettings, clerkUser]);
 
     /** Reset to compose view, aborting any in-flight generation. */
     const handleNewDocument = useCallback(() => {

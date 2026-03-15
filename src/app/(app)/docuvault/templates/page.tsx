@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
     FileText,
     Search,
@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 import { UI_TABS, getTemplatesForTab } from '@/lib/legal/templateCategories';
 import type { UITabCategory } from '@/lib/legal/templateCategories';
 import type { DocumentTemplate } from '@/lib/legal/types';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 /** Human-readable labels for document categories */
 const CATEGORY_LABELS: Record<string, string> = {
@@ -64,6 +65,10 @@ export default function TemplateGalleryPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<string>('all');
     const [previewTemplate, setPreviewTemplate] = useState<DocumentTemplate | null>(null);
+
+    /** Close preview modal (stable ref for focus trap). */
+    const handleClosePreview = useCallback(() => setPreviewTemplate(null), []);
+    const previewDialogRef = useFocusTrap(!!previewTemplate, handleClosePreview);
 
     // Gather all templates across tabs (excluding create_own)
     const allTemplates = useMemo(() => {
@@ -386,11 +391,14 @@ export default function TemplateGalleryPage() {
                             aria-labelledby="template-preview-title"
                         >
                             <div
+                                ref={previewDialogRef}
+                                tabIndex={-1}
                                 className="w-full max-w-lg rounded-2xl overflow-hidden pointer-events-auto max-h-[85vh] flex flex-col"
                                 style={{
                                     background: 'linear-gradient(180deg, #0D2B5E 0%, #0A1E54 100%)',
                                     border: '1px solid rgba(208, 227, 255, 0.15)',
                                     boxShadow: '0 24px 80px rgba(0, 0, 0, 0.5)',
+                                    outline: 'none',
                                 }}
                             >
                                 {/* Modal header */}

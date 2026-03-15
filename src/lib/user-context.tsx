@@ -64,6 +64,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
             const message = err instanceof Error ? err.message : String(err);
             console.error('Failed to sync user to Convex:', err);
             setSyncError(message);
+            throw err; // Re-throw so the effect's .catch() keeps hasSynced false
         } finally {
             setIsSyncing(false);
         }

@@ -57,9 +57,11 @@ export default function DocuVaultPage() {
     const pdfUrlRef = useRef<string | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
-    // Cleanup object URL on unmount
+    // Cleanup on unmount: abort in-flight fetch + revoke object URL
     useEffect(() => {
         return () => {
+            abortControllerRef.current?.abort();
+            abortControllerRef.current = null;
             if (pdfUrlRef.current) {
                 URL.revokeObjectURL(pdfUrlRef.current);
             }
@@ -216,7 +218,7 @@ export default function DocuVaultPage() {
             setGenerationError(error instanceof Error ? error.message : 'Generation failed');
             setView('compose');
         }
-    }, [documentContent, selectedTemplate]);
+    }, [documentContent, selectedTemplate, userCourtSettings]);
 
     /** Reset to compose view, aborting any in-flight generation. */
     const handleNewDocument = useCallback(() => {

@@ -24,6 +24,7 @@ import { INCIDENT_CATEGORIES } from '@/lib/constants';
 
 type Step = 'describe' | 'review' | 'confirmed';
 
+/** New incident logging page — multi-step form with AI analysis and confirmation. */
 export default function NewIncidentPage() {
     const { userId } = useUser();
     const [step, setStep] = useState<Step>('describe');

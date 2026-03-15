@@ -36,6 +36,7 @@ type CourtStatus = 'pending' | 'active' | 'closed' | 'none' | '';
 type TonePreference = 'direct' | 'gentle' | 'strategic' | 'clinical' | '';
 type EmotionalState = 'calm' | 'anxious' | 'angry' | 'overwhelmed' | 'numb' | '';
 
+/** User profile page — personal info, location, children, legal details, and NEXX personalization. */
 export default function ProfilePage() {
     const user = useQuery(api.users.me);
     const updateProfile = useMutation(api.users.updateProfile);
@@ -403,6 +404,7 @@ export default function ProfilePage() {
 
 /* ── Helper Components ── */
 
+/** Collapsible section wrapper with icon header and animated reveal. */
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
     return (
         <motion.div
@@ -423,6 +425,7 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
     );
 }
 
+/** Labeled form field wrapper. */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div>

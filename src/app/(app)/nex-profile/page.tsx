@@ -41,6 +41,7 @@ const COMMUNICATION_STYLES = [
     { value: 'charming', label: 'Charming / Covert', description: 'Appears kind publicly, controlling privately' },
 ];
 
+/** NEX Profile page — manages trigger patterns, coping strategies, and behavioral goals. */
 export default function NexProfilePage() {
     const nexProfile = useQuery(api.nexProfiles.getByUser);
     const createProfile = useMutation(api.nexProfiles.create);
@@ -401,6 +402,7 @@ export default function NexProfilePage() {
 
 /* ── Helper Component ── */
 
+/** Collapsible section wrapper with icon header and animated reveal. */
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
     return (
         <motion.div

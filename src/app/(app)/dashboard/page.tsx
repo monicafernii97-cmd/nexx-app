@@ -24,6 +24,7 @@ const quickActions = [
     { label: 'Draft Document', desc: 'Create a legal doc', href: '/docuvault', icon: FileText, color: '#5A8EC9' },
 ];
 
+/** Dashboard page — overview stats, quick actions, and recent incident activity. */
 export default function DashboardPage() {
     const { userId } = useUser();
     const incidents = useQuery(api.incidents.list);

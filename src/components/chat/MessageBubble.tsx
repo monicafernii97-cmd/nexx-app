@@ -11,6 +11,7 @@ interface MessageBubbleProps {
     isStreaming?: boolean;
 }
 
+/** Chat message bubble — renders user/assistant messages with markdown formatting and copy action. */
 export default function MessageBubble({ role, content, isStreaming }: MessageBubbleProps) {
     const [copied, setCopied] = useState(false);
 

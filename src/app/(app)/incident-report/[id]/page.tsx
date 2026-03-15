@@ -27,6 +27,7 @@ import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 
+/** Incident detail page — shows full record with AI analysis, severity, and delete option. */
 export default function IncidentDetailPage() {
     const params = useParams();
     const router = useRouter();

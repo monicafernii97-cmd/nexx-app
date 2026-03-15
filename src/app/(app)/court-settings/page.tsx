@@ -19,6 +19,7 @@ import {
     Building2,
 } from 'lucide-react';
 
+/** Court settings page — state/county selection, case details, and AI court rules verification. */
 export default function CourtSettingsPage() {
     const existingSettings = useQuery(api.courtSettings.get);
     const upsertSettings = useMutation(api.courtSettings.upsert);
@@ -77,6 +78,7 @@ export default function CourtSettingsPage() {
 
     // Close dropdowns on outside click
     useEffect(() => {
+        /** Close state/county dropdowns when clicking outside their refs. */
         function handleClick(e: MouseEvent) {
             if (countyDropdownRef.current && !countyDropdownRef.current.contains(e.target as Node) &&
                 countyInputRef.current && !countyInputRef.current.contains(e.target as Node)) {

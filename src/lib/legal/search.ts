@@ -101,6 +101,7 @@ export function extractLegalQuery(message: string): string {
  */
 let cachedTavilyClient: ReturnType<typeof tavily> | null = null;
 
+/** Return the singleton Tavily API client, or null if the API key is missing. */
 function getTavilyClient() {
     if (cachedTavilyClient) return cachedTavilyClient;
 

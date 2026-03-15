@@ -24,6 +24,7 @@ const quickActions = [
     { label: 'Draft Document', desc: 'Create a legal doc', href: '/docuvault', icon: FileText, color: '#5A8EC9' },
 ];
 
+/** Main dashboard showing quick actions, recent incidents, and activity overview. */
 export default function DashboardPage() {
     const { userId } = useUser();
     const incidents = useQuery(api.incidents.list);
@@ -169,8 +170,8 @@ export default function DashboardPage() {
                         <p className="text-xs mb-5" style={{ color: '#123D7E' }}>
                             Start a conversation with NEXX or document your first incident to see your activity here.
                         </p>
-                        <Link href="/chat">
-                            <button className="btn-primary text-xs">Start Your First Session</button>
+                        <Link href="/chat" className="btn-primary text-xs inline-block">
+                            Start Your First Session
                         </Link>
                     </div>
                 ) : (

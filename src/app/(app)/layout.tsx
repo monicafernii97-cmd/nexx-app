@@ -4,6 +4,7 @@ import Sidebar from '@/components/Sidebar';
 import { UserProvider } from '@/lib/user-context';
 import { ReactNode } from 'react';
 
+/** Authenticated app shell layout with sidebar and user context provider. */
 export default function AppShellLayout({ children }: { children: ReactNode }) {
     return (
         <UserProvider>

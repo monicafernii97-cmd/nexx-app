@@ -9,6 +9,7 @@ interface ChatInputProps {
     placeholder?: string;
 }
 
+/** Auto-resizing chat input bar with send button and voice input placeholder. */
 export default function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
     const [input, setInput] = useState('');
     const textareaRef = useRef<HTMLTextAreaElement>(null);

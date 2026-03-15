@@ -1,5 +1,6 @@
 import { dark } from '@clerk/themes';
 
+/** NEXX-branded Clerk theme configuration with luxury dark mode styling. */
 export const nexxClerkAppearance = {
     baseTheme: dark,
     variables: {

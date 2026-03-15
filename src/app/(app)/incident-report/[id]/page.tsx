@@ -27,6 +27,7 @@ import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 
+/** Incident detail page showing court summary, behavioral analysis, and strategic response. */
 export default function IncidentDetailPage() {
     const params = useParams();
     const router = useRouter();

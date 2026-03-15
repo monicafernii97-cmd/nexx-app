@@ -11,6 +11,7 @@ interface MessageBubbleProps {
     isStreaming?: boolean;
 }
 
+/** Chat message bubble rendering user or assistant messages with copy-to-clipboard support. */
 export default function MessageBubble({ role, content, isStreaming }: MessageBubbleProps) {
     const [copied, setCopied] = useState(false);
 

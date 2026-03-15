@@ -3,6 +3,7 @@
 import { SignUp } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 
+/** Branded sign-up page with ambient glow background and Clerk SignUp component. */
 export default function SignUpPage() {
     return (
         <div

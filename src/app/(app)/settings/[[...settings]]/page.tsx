@@ -3,6 +3,7 @@
 import { UserProfile } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 
+/** Account settings page embedding the Clerk UserProfile component. */
 export default function SettingsPage() {
     return (
         <div className="max-w-4xl mx-auto">

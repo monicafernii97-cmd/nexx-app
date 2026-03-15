@@ -36,6 +36,7 @@ type CourtStatus = 'pending' | 'active' | 'closed' | 'none' | '';
 type TonePreference = 'direct' | 'gentle' | 'strategic' | 'clinical' | '';
 type EmotionalState = 'calm' | 'anxious' | 'angry' | 'overwhelmed' | 'numb' | '';
 
+/** User profile page for personal details, legal context, and tone preferences. */
 export default function ProfilePage() {
     const user = useQuery(api.users.me);
     const updateProfile = useMutation(api.users.updateProfile);
@@ -423,6 +424,7 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
     );
 }
 
+/** Reusable form field wrapper with a styled label above the input. */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div>

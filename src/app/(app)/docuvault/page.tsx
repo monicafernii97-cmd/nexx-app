@@ -1,7 +1,9 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { useQuery } from 'convex/react';
+import { api } from '../../../../convex/_generated/api';
 import {
     Landmark,
     ChevronLeft,
@@ -31,6 +33,8 @@ interface ProgressStep {
 
 /** DocuVault document generator page with compose, working, and result views. */
 export default function DocuVaultPage() {
+    // User's court settings from Convex
+    const userCourtSettings = useQuery(api.courtSettings.get);
     // Tab & template state
     const [activeTab, setActiveTab] = useState<UITabCategory>('lead');
     const [selectedTemplate, setSelectedTemplate] = useState<DocumentTemplate | null>(null);
@@ -51,6 +55,16 @@ export default function DocuVaultPage() {
     const generationTokenRef = useRef(0);
     const completedRef = useRef(false);
     const pdfUrlRef = useRef<string | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
+
+    // Cleanup object URL on unmount
+    useEffect(() => {
+        return () => {
+            if (pdfUrlRef.current) {
+                URL.revokeObjectURL(pdfUrlRef.current);
+            }
+        };
+    }, []);
 
     // Gallery drawer
     const [showGallery, setShowGallery] = useState(false);
@@ -94,12 +108,22 @@ export default function DocuVaultPage() {
         setProgressSteps(steps);
 
         try {
+            // Abort any previous in-flight generation
+            abortControllerRef.current?.abort();
+            abortControllerRef.current = new AbortController();
+
             const res = await fetch('/api/documents/generate/stream', {
                 method: 'POST',
+                signal: abortControllerRef.current.signal,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     templateId: selectedTemplate?.id ?? 'petition_divorce',
-                    courtSettings: { state: 'Texas', county: 'Fort Bend' },
+                    courtSettings: {
+                        state: userCourtSettings?.state ?? 'Texas',
+                        county: userCourtSettings?.county ?? 'Fort Bend',
+                        courtName: userCourtSettings?.courtName,
+                        judicialDistrict: userCourtSettings?.judicialDistrict,
+                    },
                     petitioner: { name: 'Petitioner' },
                     caseType: 'divorce_no_children',
                     bodyContent: documentContent ? [{ heading: 'Content', paragraphs: [documentContent] }] : [],
@@ -196,7 +220,8 @@ export default function DocuVaultPage() {
 
     /** Reset to compose view, aborting any in-flight generation. */
     const handleNewDocument = useCallback(() => {
-        // Increment token to abort any running generation
+        // Abort the network request and increment token
+        abortControllerRef.current?.abort();
         generationTokenRef.current++;
 
         setView('compose');

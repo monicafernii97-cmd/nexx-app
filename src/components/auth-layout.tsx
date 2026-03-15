@@ -2,6 +2,7 @@
 
 import { ReactNode } from 'react';
 
+/** Shared layout for auth pages (sign-in, sign-up) with ambient glow background and NEXX branding. */
 export function AuthPageLayout({
     children,
     subtitle,

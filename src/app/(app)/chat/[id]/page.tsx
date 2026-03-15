@@ -11,6 +11,7 @@ import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
 import { MODE_LABELS } from '@/lib/constants';
 
+/** Full-screen chat interface for a single NEXX AI conversation. */
 export default function ConversationPage() {
     const params = useParams();
     const router = useRouter();

@@ -21,6 +21,7 @@ export const metadata: Metadata = {
   icons: { icon: '/favicon.ico' },
 };
 
+/** Root HTML layout with Inter and Playfair Display fonts and Convex/Clerk providers. */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} ${playfair.variable}`}>

@@ -1,3 +1,4 @@
+/** Sidebar navigation items mapping labels to route paths and icon names. */
 export const NAV_ITEMS = [
     { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
     { label: 'Chat', href: '/chat', icon: 'MessageCircle' },
@@ -8,6 +9,7 @@ export const NAV_ITEMS = [
     { label: 'Settings', href: '/settings', icon: 'Settings' },
 ] as const;
 
+/** Available incident categories with associated label and display color. */
 export const INCIDENT_CATEGORIES = [
     { value: 'emotional_abuse', label: 'Emotional Abuse', color: '#C75A5A' },
     { value: 'financial_abuse', label: 'Financial Abuse', color: '#5A8EC9' },
@@ -20,6 +22,7 @@ export const INCIDENT_CATEGORIES = [
     { value: 'other', label: 'Other', color: '#7C6FA0' },
 ] as const;
 
+/** Display labels and colors for the four conversation modes. */
 export const MODE_LABELS: Record<string, { label: string; color: string }> = {
     therapeutic: { label: 'Therapeutic', color: '#5A9E6F' },
     legal: { label: 'Legal', color: '#5A8EC9' },
@@ -27,6 +30,7 @@ export const MODE_LABELS: Record<string, { label: string; color: string }> = {
     general: { label: 'General', color: '#7096D1' },
 };
 
+/** Onboarding wizard step definitions with IDs, titles, and descriptions. */
 export const ONBOARDING_STEPS = [
     { id: 'welcome', title: 'Welcome', description: 'Welcome to NEXX' },
     { id: 'about-you', title: 'About You', description: 'Tell us about yourself' },
@@ -36,6 +40,7 @@ export const ONBOARDING_STEPS = [
     { id: 'disclaimer', title: 'Legal Notice', description: 'Important information' },
 ] as const;
 
+/** All 50 US states for jurisdiction dropdown selection. */
 export const US_STATES = [
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut',
     'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa',

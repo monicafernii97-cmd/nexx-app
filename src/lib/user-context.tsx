@@ -21,10 +21,12 @@ const UserContext = createContext<UserContextType>({
     clerkUser: null,
 });
 
+/** Hook providing the current user's Convex ID, loading state, and Clerk user object. */
 export function useUser() {
     return useContext(UserContext);
 }
 
+/** Syncs Clerk authentication with Convex and exposes user state to the component tree. */
 export function UserProvider({ children }: { children: ReactNode }) {
     const { user: clerkUser, isLoaded: clerkLoaded } = useClerkUser();
     const ensureUser = useMutation(api.users.ensureFromClerk);

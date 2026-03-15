@@ -3,6 +3,7 @@
 import { SignIn } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 
+/** Branded sign-in page with ambient glow background and Clerk SignIn component. */
 export default function SignInPage() {
     return (
         <div

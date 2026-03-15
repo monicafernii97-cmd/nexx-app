@@ -34,6 +34,7 @@ const navItems = [
     { label: 'Settings', href: '/settings', icon: Settings },
 ];
 
+/** Collapsible navigation sidebar with branded logo, nav items, user info, and auth state. */
 export default function Sidebar() {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);

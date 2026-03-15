@@ -17,6 +17,7 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { MODE_LABELS } from '@/lib/constants';
 
+/** Conversation list page with mode picker and new-chat creation. */
 export default function ChatListPage() {
     const router = useRouter();
     const conversations = useQuery(api.conversations.list, {});

@@ -41,6 +41,7 @@ const COMMUNICATION_STYLES = [
     { value: 'charming', label: 'Charming / Covert', description: 'Appears kind publicly, controlling privately' },
 ];
 
+/** NEX behavioral profile builder for documenting narcissistic ex-partner patterns. */
 export default function NexProfilePage() {
     const nexProfile = useQuery(api.nexProfiles.getByUser);
     const createProfile = useMutation(api.nexProfiles.create);

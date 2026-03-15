@@ -68,7 +68,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         } finally {
             setIsSyncing(false);
         }
-    }, [clerkId, ensureUser]);
+    }, [clerkId, clerkName, clerkEmail, ensureUser]);
 
     useEffect(() => {
         if (!clerkLoaded) return;
@@ -86,7 +86,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
                 // Leave hasSynced false so future effect runs can retry
             });
         }
-    }, [clerkLoaded, clerkUser?.id, syncUser]);
+    }, [clerkLoaded, clerkUser, syncUser]);
 
     const userId = currentUser?._id ?? null;
     // Stay loading until Clerk loads, sync settles, AND Convex query resolves

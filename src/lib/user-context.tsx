@@ -71,6 +71,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }, [clerkId, clerkName, clerkEmail, ensureUser]);
 
     useEffect(() => {
+        let cancelled = false;
         if (!clerkLoaded) return;
 
         if (!clerkUser) {
@@ -79,13 +80,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        if (!hasSynced.current) {
-            syncUser().then(() => {
+        // Reset on identity change so the new user gets synced
+        hasSynced.current = false;
+
+        syncUser().then(() => {
+            if (!cancelled) {
                 hasSynced.current = true;
-            }).catch(() => {
-                // Leave hasSynced false so future effect runs can retry
-            });
-        }
+            }
+        }).catch(() => {
+            // Leave hasSynced false so future effect runs can retry
+        });
+
+        return () => {
+            cancelled = true;
+        };
     }, [clerkLoaded, clerkUser, syncUser]);
 
     const userId = currentUser?._id ?? null;

@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
 
       /** Check if the client has disconnected. */
       const isAborted = () => request.signal.aborted;
+      if (isAborted()) return;
 
       try {
         // Step 1: Analyzing Legal Frameworks

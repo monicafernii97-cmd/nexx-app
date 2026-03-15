@@ -229,7 +229,10 @@ export async function POST(request: NextRequest) {
           },
         })));
       } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
+        if (
+          request.signal.aborted ||
+          (error instanceof Error && error.name === 'AbortError')
+        ) return;
         console.error('[Stream Generation Error]', error);
         try {
           controller.enqueue(new TextEncoder().encode(encodeEvent({
@@ -275,7 +278,7 @@ function buildStreamCaption(
 
   const rightLines = [
     courtSettings.courtName?.trim()
-      ? `IN THE ${courtSettings.courtName.toUpperCase()}`
+      ? `IN THE ${courtSettings.courtName.trim().toUpperCase()}`
       : 'IN THE DISTRICT COURT',
     courtSettings.judicialDistrict?.toUpperCase() ?? '',
     `${normalizedCounty.toUpperCase()} COUNTY, ${normalizedState.toUpperCase()}`,

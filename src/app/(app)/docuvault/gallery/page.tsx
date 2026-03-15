@@ -63,16 +63,16 @@ export default function DocuVaultGalleryPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-center gap-4 mb-8"
             >
-                <Link href="/docuvault">
-                    <button
-                        className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
-                        style={{
-                            background: 'rgba(197, 139, 7, 0.08)',
-                            border: '1px solid rgba(197, 139, 7, 0.15)',
-                        }}
-                    >
-                        <ArrowLeft size={16} style={{ color: '#C58B07' }} />
-                    </button>
+                <Link
+                    href="/docuvault"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
+                    style={{
+                        background: 'rgba(197, 139, 7, 0.08)',
+                        border: '1px solid rgba(197, 139, 7, 0.15)',
+                    }}
+                    aria-label="Back to DocuVault"
+                >
+                    <ArrowLeft size={16} style={{ color: '#C58B07' }} />
                 </Link>
                 <div>
                     <h1 className="text-headline text-2xl" style={{ color: '#F5EFE0' }}>
@@ -180,10 +180,8 @@ export default function DocuVaultGalleryPage() {
                                 : 'Try a different search term or filter.'}
                         </p>
                         {documents.length === 0 && (
-                            <Link href="/docuvault">
-                                <button className="btn-gold text-xs">
-                                    Create Document
-                                </button>
+                            <Link href="/docuvault" className="btn-gold text-xs inline-flex items-center justify-center">
+                                Create Document
                             </Link>
                         )}
                     </div>

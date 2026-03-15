@@ -27,6 +27,7 @@ import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 
+/** Incident detail page showing court summary, behavioral analysis, and strategic response. */
 export default function IncidentDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -80,7 +81,7 @@ export default function IncidentDetailPage() {
                         <motion.div
                             key={j}
                             className="w-2 h-2 rounded-full"
-                            style={{ background: '#C58B07' }}
+                            style={{ background: '#F7F2EB' }}
                             animate={{ opacity: [0.3, 1, 0.3] }}
                             transition={{ duration: 1, repeat: Infinity, delay: j * 0.2 }}
                         />
@@ -92,9 +93,9 @@ export default function IncidentDetailPage() {
 
     const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
     const dateParts = incident.date?.split('-').map(Number) ?? [];
-    const incidentDate = dateParts.length === 3
+    const incidentDate = dateParts.length === 3 && !dateParts.some(isNaN)
         ? new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
-        : new Date();
+        : null;
     const severityColors = ['#5A9E6F', '#E5A84A', '#C75A5A'];
     const severityLabels = ['Low', 'Medium', 'High'];
 
@@ -205,28 +206,30 @@ export default function IncidentDetailPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-center gap-4 mb-6"
             >
-                <Link href="/incident-report">
-                    <button
-                        className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
-                        style={{
-                            background: 'rgba(197, 139, 7, 0.08)',
-                            border: '1px solid rgba(197, 139, 7, 0.15)',
-                        }}
-                    >
-                        <ArrowLeft size={16} style={{ color: '#C58B07' }} />
-                    </button>
+                <Link
+                    href="/incident-report"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
+                    style={{
+                        background: 'rgba(208, 227, 255, 0.08)',
+                        border: '1px solid rgba(208, 227, 255, 0.15)',
+                    }}
+                    aria-label="Back to incident reports"
+                >
+                    <ArrowLeft size={16} style={{ color: '#F7F2EB' }} />
                 </Link>
                 <div className="flex-1">
-                    <h1 className="text-headline text-xl" style={{ color: '#F5EFE0' }}>
+                    <h1 className="text-headline text-xl" style={{ color: '#F7F2EB' }}>
                         Incident Record
                     </h1>
-                    <p className="text-xs" style={{ color: '#8A7A60' }}>
-                        {incidentDate.toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric',
-                        })}
+                    <p className="text-xs" style={{ color: '#FFF9F0' }}>
+                        {incidentDate
+                            ? incidentDate.toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                month: 'long',
+                                day: 'numeric',
+                                year: 'numeric',
+                            })
+                            : incident.date || 'Unknown date'}
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -240,7 +243,7 @@ export default function IncidentDetailPage() {
                                 <button
                                     onClick={handleSave}
                                     disabled={isSaving}
-                                    className="btn-gold text-xs flex items-center gap-1"
+                                    className="btn-primary text-xs flex items-center gap-1"
                                 >
                                     <Save size={12} /> {isSaving ? 'Saving...' : 'Save'}
                                 </button>
@@ -270,8 +273,8 @@ export default function IncidentDetailPage() {
                 <span
                     className="badge"
                     style={{
-                        background: `${cat?.color || '#C58B07'}20`,
-                        color: cat?.color || '#C58B07',
+                        background: `${cat?.color || '#F7F2EB'}20`,
+                        color: cat?.color || '#F7F2EB',
                     }}
                 >
                     <Tag size={10} /> {cat?.label || incident.category}
@@ -284,10 +287,10 @@ export default function IncidentDetailPage() {
                         <Check size={10} /> Confirmed
                     </span>
                 )}
-                <span className="badge" style={{ background: 'rgba(138, 122, 96, 0.1)', color: '#8A7A60' }}>
+                <span className="badge" style={{ background: 'rgba(138, 122, 96, 0.1)', color: '#FFF9F0' }}>
                     <Calendar size={10} /> {incident.date}
                 </span>
-                <span className="badge" style={{ background: 'rgba(138, 122, 96, 0.1)', color: '#8A7A60' }}>
+                <span className="badge" style={{ background: 'rgba(138, 122, 96, 0.1)', color: '#FFF9F0' }}>
                     <Clock size={10} /> {incident.time}
                 </span>
                 {/* Severity */}
@@ -334,12 +337,12 @@ export default function IncidentDetailPage() {
                     className="flex flex-wrap gap-4 mb-6"
                 >
                     {incident.location && (
-                        <div className="flex items-center gap-2 text-xs" style={{ color: '#8A7A60' }}>
+                        <div className="flex items-center gap-2 text-xs" style={{ color: '#FFF9F0' }}>
                             <MapPin size={12} /> {incident.location}
                         </div>
                     )}
                     {incident.witnesses && incident.witnesses.length > 0 && (
-                        <div className="flex items-center gap-2 text-xs" style={{ color: '#8A7A60' }}>
+                        <div className="flex items-center gap-2 text-xs" style={{ color: '#FFF9F0' }}>
                             <Users size={12} /> Witnesses: {incident.witnesses.join(', ')}
                         </div>
                     )}
@@ -351,11 +354,11 @@ export default function IncidentDetailPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 }}
-                className="card-gilded p-6 mb-6"
+                className="card-premium p-6 mb-6"
             >
                 <h3
                     className="text-sm font-semibold tracking-[0.15em] uppercase mb-3"
-                    style={{ color: '#92783A' }}
+                    style={{ color: '#D0E3FF' }}
                 >
                     Incident Narrative
                 </h3>
@@ -363,13 +366,13 @@ export default function IncidentDetailPage() {
                     <textarea
                         value={editData.narrative}
                         onChange={(e) => setEditData({ ...editData, narrative: e.target.value })}
-                        className="input-gilded resize-none w-full"
+                        className="input-premium resize-none w-full"
                         rows={6}
                     />
                 ) : (
                     <p
                         className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#D4C9B0' }}
+                        style={{ color: '#123D7E' }}
                     >
                         {incident.narrative}
                     </p>
@@ -381,12 +384,12 @@ export default function IncidentDetailPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="card-gilded p-6 mb-6"
+                className="card-premium p-6 mb-6"
             >
                 <div className="flex items-center justify-between mb-3">
                     <h3
                         className="text-sm font-semibold tracking-[0.15em] uppercase flex items-center gap-2"
-                        style={{ color: '#C58B07' }}
+                        style={{ color: '#F7F2EB' }}
                     >
                         <Shield size={14} /> Court-Ready Summary
                     </h3>
@@ -415,9 +418,9 @@ export default function IncidentDetailPage() {
                             animate={{ rotate: 360 }}
                             transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                         >
-                            <Sparkles size={16} style={{ color: '#C58B07' }} />
+                            <Sparkles size={16} style={{ color: '#F7F2EB' }} />
                         </motion.div>
-                        <p className="text-sm" style={{ color: '#8A7A60' }}>
+                        <p className="text-sm" style={{ color: '#FFF9F0' }}>
                             Analyzing incident and generating court-ready summary...
                         </p>
                     </div>
@@ -427,19 +430,19 @@ export default function IncidentDetailPage() {
                         onChange={(e) =>
                             setEditData({ ...editData, courtSummary: e.target.value })
                         }
-                        className="input-gilded resize-none w-full"
+                        className="input-premium resize-none w-full"
                         rows={6}
                         placeholder="Court-ready summary will appear here after AI analysis..."
                     />
                 ) : incident.courtSummary ? (
                     <p
                         className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#D4C9B0' }}
+                        style={{ color: '#123D7E' }}
                     >
                         {incident.courtSummary}
                     </p>
                 ) : (
-                    <p className="text-sm italic" style={{ color: '#5A4A30' }}>
+                    <p className="text-sm italic" style={{ color: '#D0E3FF' }}>
                         No court summary generated yet. Click &ldquo;Generate with AI&rdquo; to
                         create a court-ready version of this incident.
                     </p>
@@ -456,7 +459,7 @@ export default function IncidentDetailPage() {
                 <motion.div
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="card-gilded p-6 mb-6"
+                    className="card-premium p-6 mb-6"
                 >
                     <h3
                         className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2"
@@ -466,7 +469,7 @@ export default function IncidentDetailPage() {
                     </h3>
                     <p
                         className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#D4C9B0' }}
+                        style={{ color: '#123D7E' }}
                     >
                         {analysis.behavioralAnalysis}
                     </p>
@@ -477,7 +480,7 @@ export default function IncidentDetailPage() {
                 <motion.div
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="card-gilded p-6 mb-6"
+                    className="card-premium p-6 mb-6"
                 >
                     <h3
                         className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2"
@@ -487,7 +490,7 @@ export default function IncidentDetailPage() {
                     </h3>
                     <p
                         className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#D4C9B0' }}
+                        style={{ color: '#123D7E' }}
                     >
                         {analysis.strategicResponse}
                     </p>
@@ -515,7 +518,7 @@ export default function IncidentDetailPage() {
                         <button
                             onClick={handleConfirm}
                             disabled={isConfirming}
-                            className="btn-gold flex-1 flex items-center justify-center gap-2"
+                            className="btn-primary flex-1 flex items-center justify-center gap-2"
                         >
                             <Check size={14} /> {isConfirming ? 'Confirming...' : 'Confirm & Finalize'}
                         </button>

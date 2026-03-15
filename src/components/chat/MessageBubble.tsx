@@ -11,6 +11,7 @@ interface MessageBubbleProps {
     isStreaming?: boolean;
 }
 
+/** Chat message bubble rendering user or assistant messages with copy-to-clipboard support. */
 export default function MessageBubble({ role, content, isStreaming }: MessageBubbleProps) {
     const [copied, setCopied] = useState(false);
 
@@ -34,7 +35,7 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
             .replace(/>/g, '&gt;');
         // Apply markdown-like transforms on safe escaped content
         const transformed = escaped
-            .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#C58B07">$1</strong>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong style="color:inherit; font-weight:600">$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/🔴/g, '<span>🔴</span>')
             .replace(/\n/g, '<br/>');
@@ -51,9 +52,9 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
             {role === 'assistant' && (
                 <div
                     className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center mt-1"
-                    style={{ background: 'linear-gradient(135deg, #C58B07, #E5B84A)' }}
+                    style={{ background: 'linear-gradient(135deg, #F7F2EB, #123D7E)' }}
                 >
-                    <Sparkles size={14} style={{ color: '#02022d' }} />
+                    <Sparkles size={14} style={{ color: '#0A1E54' }} />
                 </div>
             )}
 
@@ -63,14 +64,14 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
                 style={
                     role === 'user'
                         ? {
-                            background: 'linear-gradient(135deg, rgba(197, 139, 7, 0.15), rgba(197, 139, 7, 0.08))',
-                            border: '1px solid rgba(197, 139, 7, 0.2)',
-                            color: '#F5EFE0',
+                            background: 'linear-gradient(135deg, rgba(208, 227, 255, 0.15), rgba(208, 227, 255, 0.08))',
+                            border: '1px solid rgba(208, 227, 255, 0.2)',
+                            color: '#F7F2EB',
                         }
                         : {
-                            background: '#02022d',
-                            border: '1px solid rgba(197, 139, 7, 0.1)',
-                            color: '#D4C9B0',
+                            background: '#F7F2EB',
+                            border: '1px solid rgba(208, 227, 255, 0.1)',
+                            color: '#123D7E',
                         }
                 }
             >
@@ -82,7 +83,7 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
                 {role === 'assistant' && !isStreaming && (
                     <div
                         className="flex gap-2 mt-3 pt-2"
-                        style={{ borderTop: '1px solid rgba(197, 139, 7, 0.08)' }}
+                        style={{ borderTop: '1px solid rgba(208, 227, 255, 0.08)' }}
                     >
                         <button
                             className="btn-ghost text-xs flex items-center gap-1 py-1 px-2"
@@ -107,11 +108,11 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
                 <div
                     className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center mt-1"
                     style={{
-                        background: 'rgba(197, 139, 7, 0.12)',
-                        border: '1px solid rgba(197, 139, 7, 0.2)',
+                        background: 'rgba(208, 227, 255, 0.12)',
+                        border: '1px solid rgba(208, 227, 255, 0.2)',
                     }}
                 >
-                    <User size={14} style={{ color: '#C58B07' }} />
+                    <User size={14} style={{ color: '#F7F2EB' }} />
                 </div>
             )}
         </motion.div>

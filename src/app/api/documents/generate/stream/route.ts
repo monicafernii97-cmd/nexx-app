@@ -245,9 +245,14 @@ function buildStreamCaption(
 
   const isSAPCR = ['divorce_with_children', 'custody_establishment', 'custody_modification', 'sapcr', 'child_support', 'child_support_modification', 'visitation', 'relocation'].includes(caseType);
 
+  // Filter to children with valid name strings to prevent runtime crashes
+  const validChildren = (children ?? []).filter(
+    (c): c is { name: string } => typeof c?.name === 'string' && c.name.trim().length > 0
+  );
+
   let leftLines: string[];
-  if (isSAPCR && children && children.length > 0) {
-    leftLines = ['IN THE INTEREST OF', '', ...children.map(c => `${c.name.toUpperCase()},`), '', children.length === 1 ? 'A CHILD' : 'CHILDREN'];
+  if (isSAPCR && validChildren.length > 0) {
+    leftLines = ['IN THE INTEREST OF', '', ...validChildren.map(c => `${c.name.toUpperCase()},`), '', validChildren.length === 1 ? 'A CHILD' : 'CHILDREN'];
   } else {
     leftLines = [`${petitioner.name.toUpperCase()},`, 'Petitioner', '', 'v.', '', `${respondent?.name?.toUpperCase() ?? 'RESPONDENT'},`, 'Respondent'];
   }

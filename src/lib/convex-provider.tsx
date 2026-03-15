@@ -9,6 +9,7 @@ const convex = new ConvexReactClient(
     process.env.NEXT_PUBLIC_CONVEX_URL!
 );
 
+/** Wraps the app in Clerk + Convex providers for auth-aware real-time data access. */
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
     return (
         <ClerkProvider afterSignOutUrl="/">

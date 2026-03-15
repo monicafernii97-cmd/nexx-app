@@ -34,6 +34,7 @@ const navItems = [
     { label: 'Settings', href: '/settings', icon: Settings },
 ];
 
+/** Collapsible navigation sidebar with branded logo, nav items, user info, and auth state. */
 export default function Sidebar() {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
@@ -45,8 +46,8 @@ export default function Sidebar() {
             transition={{ duration: 0.3, ease: [0.25, 1, 0.5, 1] }}
             className="fixed left-0 top-0 h-screen z-50 flex flex-col"
             style={{
-                background: 'linear-gradient(180deg, #211607 0%, #1A1008 100%)',
-                borderRight: '1px solid rgba(197, 139, 7, 0.12)',
+                background: 'linear-gradient(180deg, #123D7E 0%, #0A1E54 100%)',
+                borderRight: '1px solid rgba(208, 227, 255, 0.12)',
             }}
         >
             {/* Logo */}
@@ -55,11 +56,11 @@ export default function Sidebar() {
                     <div
                         className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                         style={{
-                            background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
-                            boxShadow: '0 2px 12px rgba(197, 139, 7, 0.3)',
+                            background: 'linear-gradient(135deg, #FFF9F0, #D0E3FF)',
+                            boxShadow: '0 2px 12px rgba(208, 227, 255, 0.3)',
                         }}
                     >
-                        <span className="text-sm font-black" style={{ color: '#02022d' }}>N</span>
+                        <span className="text-sm font-black" style={{ color: '#0A1E54' }}>N</span>
                     </div>
                     <AnimatePresence>
                         {!collapsed && (
@@ -68,7 +69,7 @@ export default function Sidebar() {
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: -10 }}
                                 className="text-lg font-serif font-bold tracking-widest"
-                                style={{ color: '#C58B07' }}
+                                style={{ color: '#F7F2EB' }}
                             >
                                 NEXX
                             </motion.span>
@@ -78,7 +79,7 @@ export default function Sidebar() {
             </div>
 
             {/* Divider */}
-            <div className="mx-4 gold-divider" />
+            <div className="mx-4 primary-divider" />
 
             {/* Navigation */}
             <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
@@ -98,10 +99,10 @@ export default function Sidebar() {
                                     }`}
                                 style={{
                                     background: isActive
-                                        ? '#02022d'
+                                        ? 'rgba(255, 249, 240, 0.15)'
                                         : 'transparent',
-                                    color: isActive ? '#C58B07' : '#B8A88A',
-                                    borderLeft: isActive ? '3px solid #C58B07' : '3px solid transparent',
+                                    color: isActive ? '#F7F2EB' : '#D0E3FF',
+                                    borderLeft: isActive ? '3px solid #FFF9F0' : '3px solid transparent',
                                 }}
                             >
                                 <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
@@ -125,12 +126,12 @@ export default function Sidebar() {
 
             {/* User Section */}
             <div className="px-3 pb-4 space-y-2">
-                <div className="gold-divider mb-3" />
+                <div className="primary-divider mb-3" />
 
                 {isLoaded && user ? (
                     /* ─── Authenticated: Clerk UserButton + user info ─── */
                     <div
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-[rgba(197,139,7,0.06)] ${collapsed ? 'justify-center' : ''
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-[rgba(208, 227, 255,0.06)] ${collapsed ? 'justify-center' : ''
                             }`}
                     >
                         <UserButton
@@ -154,10 +155,10 @@ export default function Sidebar() {
                                     exit={{ opacity: 0 }}
                                     className="flex-1 min-w-0"
                                 >
-                                    <p className="text-sm font-medium truncate" style={{ color: '#F5EFE0' }}>
+                                    <p className="text-sm font-medium truncate" style={{ color: '#F7F2EB' }}>
                                         {user.firstName || user.fullName || 'User'}
                                     </p>
-                                    <p className="text-xs truncate" style={{ color: '#8A7A60' }}>
+                                    <p className="text-xs truncate" style={{ color: '#FFF9F0' }}>
                                         {user.primaryEmailAddress?.emailAddress || 'Manage Account'}
                                     </p>
                                 </motion.div>
@@ -168,14 +169,14 @@ export default function Sidebar() {
                     /* ─── Not authenticated: Sign In link ─── */
                     <Link href="/sign-in" className="no-underline">
                         <div
-                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(197,139,7,0.06)] ${collapsed ? 'justify-center' : ''
+                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(208, 227, 255,0.06)] ${collapsed ? 'justify-center' : ''
                                 }`}
                         >
                             <div
                                 className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                                style={{ background: 'rgba(197, 139, 7, 0.1)', border: '1px solid rgba(197, 139, 7, 0.25)' }}
+                                style={{ background: 'rgba(208, 227, 255, 0.1)', border: '1px solid rgba(208, 227, 255, 0.25)' }}
                             >
-                                <LogIn size={16} style={{ color: '#C58B07' }} />
+                                <LogIn size={16} style={{ color: '#F7F2EB' }} />
                             </div>
                             <AnimatePresence>
                                 {!collapsed && (
@@ -184,7 +185,7 @@ export default function Sidebar() {
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}
                                         className="text-sm font-medium"
-                                        style={{ color: '#C58B07' }}
+                                        style={{ color: '#F7F2EB' }}
                                     >
                                         Sign In
                                     </motion.span>
@@ -201,9 +202,9 @@ export default function Sidebar() {
                 className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer
           transition-all duration-200 hover:scale-110"
                 style={{
-                    background: 'linear-gradient(135deg, #211607, #1A1008)',
-                    border: '1px solid rgba(197, 139, 7, 0.2)',
-                    color: '#C58B07',
+                    background: 'linear-gradient(135deg, #7096D1, #123D7E)',
+                    border: '1px solid rgba(208, 227, 255, 0.2)',
+                    color: '#D0E3FF',
                 }}
             >
                 {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}

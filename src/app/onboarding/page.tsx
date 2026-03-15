@@ -84,13 +84,13 @@ export default function OnboardingPage() {
                     <div
                         className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
                         style={{
-                            background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
-                            boxShadow: '0 8px 32px rgba(197, 139, 7, 0.3)',
+                            background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
+                            boxShadow: '0 8px 32px rgba(208, 227, 255, 0.3)',
                         }}
                     >
-                        <span className="text-lg font-black" style={{ color: '#02022d' }}>N</span>
+                        <span className="text-lg font-black" style={{ color: '#F7F2EB' }}>N</span>
                     </div>
-                    <p className="text-sm" style={{ color: '#8A7A60' }}>Loading...</p>
+                    <p className="text-sm" style={{ color: '#FFF9F0' }}>Loading...</p>
                 </motion.div>
             </div>
         );
@@ -107,8 +107,8 @@ export default function OnboardingPage() {
                     >
                         <span className="text-lg" style={{ color: '#C75A5A' }}>!</span>
                     </div>
-                    <p className="text-sm font-semibold mb-2" style={{ color: '#F5EFE0' }}>Connection issue</p>
-                    <p className="text-xs mb-5" style={{ color: '#8A7A60' }}>
+                    <p className="text-sm font-semibold mb-2" style={{ color: '#F7F2EB' }}>Connection issue</p>
+                    <p className="text-xs mb-5" style={{ color: '#FFF9F0' }}>
                         We couldn&apos;t sync your session. Please try signing in again.
                     </p>
                     <button onClick={() => signOut({ redirectUrl: '/' })} className="btn-outline text-xs">
@@ -247,7 +247,7 @@ export default function OnboardingPage() {
                             className="flex-1 h-1 rounded-full transition-all duration-500"
                             style={{
                                 background: i <= currentStep
-                                    ? 'linear-gradient(90deg, #C58B07, #E5B84A)'
+                                    ? 'linear-gradient(90deg, #F7F2EB, #123D7E)'
                                     : 'rgba(138, 122, 96, 0.15)',
                             }}
                         />
@@ -271,19 +271,19 @@ export default function OnboardingPage() {
                                     transition={{ delay: 0.2, type: 'spring' }}
                                     className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center"
                                     style={{
-                                        background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
-                                        boxShadow: '0 8px 32px rgba(197, 139, 7, 0.3)',
+                                        background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
+                                        boxShadow: '0 8px 32px rgba(208, 227, 255, 0.3)',
                                     }}
                                 >
-                                    <Sparkles size={28} style={{ color: '#02022d' }} />
+                                    <Sparkles size={28} style={{ color: '#F7F2EB' }} />
                                 </motion.div>
-                                <h1 className="font-serif text-3xl font-bold mb-4" style={{ color: '#F5EFE0' }}>
+                                <h1 className="font-serif text-3xl font-bold mb-4" style={{ color: '#F7F2EB' }}>
                                     Welcome to <span className="shimmer">NEXX</span>
                                 </h1>
-                                <p className="text-sm leading-relaxed mb-2" style={{ color: '#B8A88A' }}>
+                                <p className="text-sm leading-relaxed mb-2" style={{ color: '#D0E3FF' }}>
                                     If you&apos;re here, you already know something isn&apos;t right.
                                 </p>
-                                <p className="text-sm leading-relaxed" style={{ color: '#8A7A60' }}>
+                                <p className="text-sm leading-relaxed" style={{ color: '#FFF9F0' }}>
                                     You&apos;re not crazy, you&apos;re not overreacting, and you&apos;re not alone. Let&apos;s get you set up with the tools, strategy, and support you deserve.
                                 </p>
                             </div>
@@ -293,32 +293,32 @@ export default function OnboardingPage() {
                         {currentStep === 1 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <Users size={20} style={{ color: '#C58B07' }} />
-                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F5EFE0' }}>About You</h2>
+                                    <Users size={20} style={{ color: '#F7F2EB' }} />
+                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>About You</h2>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#92783A' }}>Your Name</label>
-                                    <input value={formData.name} onChange={(e) => update('name', e.target.value)} placeholder="First name" className="input-gilded" />
+                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Your Name</label>
+                                    <input value={formData.name} onChange={(e) => update('name', e.target.value)} placeholder="First name" className="input-premium" />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#92783A' }}>State</label>
-                                    <select value={formData.state} onChange={(e) => update('state', e.target.value)} className="input-gilded">
+                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>State</label>
+                                    <select value={formData.state} onChange={(e) => update('state', e.target.value)} className="input-premium">
                                         <option value="">Select your state</option>
                                         {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#92783A' }}>County</label>
-                                    <input value={formData.county} onChange={(e) => update('county', e.target.value)} placeholder="e.g. Harris County" className="input-gilded" />
+                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>County</label>
+                                    <input value={formData.county} onChange={(e) => update('county', e.target.value)} placeholder="e.g. Harris County" className="input-premium" />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#92783A' }}>Children</label>
-                                        <input type="number" value={formData.childrenCount} onChange={(e) => update('childrenCount', e.target.value)} placeholder="How many?" className="input-gilded" min="1" />
+                                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Children</label>
+                                        <input type="number" value={formData.childrenCount} onChange={(e) => update('childrenCount', e.target.value)} placeholder="How many?" className="input-premium" min="1" />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#92783A' }}>Ages</label>
-                                        <input value={formData.childrenAges} onChange={(e) => update('childrenAges', e.target.value)} placeholder="e.g. 4, 7" className="input-gilded" />
+                                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Ages</label>
+                                        <input value={formData.childrenAges} onChange={(e) => update('childrenAges', e.target.value)} placeholder="e.g. 4, 7" className="input-premium" />
                                     </div>
                                 </div>
                             </div>
@@ -328,20 +328,20 @@ export default function OnboardingPage() {
                         {currentStep === 2 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <MapPin size={20} style={{ color: '#C58B07' }} />
-                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F5EFE0' }}>Your Situation</h2>
+                                    <MapPin size={20} style={{ color: '#F7F2EB' }} />
+                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Your Situation</h2>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#92783A' }}>Custody Arrangement</label>
+                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#D0E3FF' }}>Custody Arrangement</label>
                                     {['Joint / Shared Custody', 'Sole Custody', 'Visitation Only', 'No Order Yet', 'Other'].map((opt) => (
                                         <button
                                             key={opt}
                                             onClick={() => update('custodyType', opt)}
                                             className="w-full text-left px-4 py-3 rounded-xl mb-2 transition-all text-sm"
                                             style={{
-                                                background: formData.custodyType === opt ? 'rgba(197, 139, 7, 0.12)' : 'rgba(42, 29, 14, 0.4)',
-                                                border: `1px solid ${formData.custodyType === opt ? 'rgba(197, 139, 7, 0.3)' : 'rgba(197, 139, 7, 0.08)'}`,
-                                                color: formData.custodyType === opt ? '#C58B07' : '#B8A88A',
+                                                background: formData.custodyType === opt ? 'rgba(208, 227, 255, 0.12)' : 'rgba(255, 249, 240, 0.4)',
+                                                border: `1px solid ${formData.custodyType === opt ? 'rgba(208, 227, 255, 0.3)' : 'rgba(208, 227, 255, 0.08)'}`,
+                                                color: formData.custodyType === opt ? '#F7F2EB' : '#D0E3FF',
                                             }}
                                         >
                                             {opt}
@@ -349,7 +349,7 @@ export default function OnboardingPage() {
                                     ))}
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#92783A' }}>Do you have an attorney?</label>
+                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#D0E3FF' }}>Do you have an attorney?</label>
                                     <div className="flex gap-3">
                                         {['Yes', 'No', 'Looking'].map((opt) => (
                                             <button
@@ -357,9 +357,9 @@ export default function OnboardingPage() {
                                                 onClick={() => update('hasAttorney', opt)}
                                                 className="flex-1 py-3 rounded-xl text-sm font-medium transition-all"
                                                 style={{
-                                                    background: formData.hasAttorney === opt ? 'rgba(197, 139, 7, 0.12)' : 'rgba(42, 29, 14, 0.4)',
-                                                    border: `1px solid ${formData.hasAttorney === opt ? 'rgba(197, 139, 7, 0.3)' : 'rgba(197, 139, 7, 0.08)'}`,
-                                                    color: formData.hasAttorney === opt ? '#C58B07' : '#8A7A60',
+                                                    background: formData.hasAttorney === opt ? 'rgba(208, 227, 255, 0.12)' : 'rgba(255, 249, 240, 0.4)',
+                                                    border: `1px solid ${formData.hasAttorney === opt ? 'rgba(208, 227, 255, 0.3)' : 'rgba(208, 227, 255, 0.08)'}`,
+                                                    color: formData.hasAttorney === opt ? '#F7F2EB' : '#FFF9F0',
                                                 }}
                                             >
                                                 {opt}
@@ -374,10 +374,10 @@ export default function OnboardingPage() {
                         {currentStep === 3 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <Heart size={20} style={{ color: '#C58B07' }} />
-                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F5EFE0' }}>Your NEX</h2>
+                                    <Heart size={20} style={{ color: '#F7F2EB' }} />
+                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Your NEX</h2>
                                 </div>
-                                <p className="text-sm" style={{ color: '#8A7A60' }}>
+                                <p className="text-sm" style={{ color: '#FFF9F0' }}>
                                     Select all behaviors you regularly experience:
                                 </p>
                                 <div className="grid grid-cols-1 gap-2">
@@ -387,19 +387,20 @@ export default function OnboardingPage() {
                                             onClick={() => toggleArrayItem('nexBehaviors', opt)}
                                             className="text-left px-4 py-3 rounded-xl transition-all text-sm flex items-center gap-3"
                                             style={{
-                                                background: formData.nexBehaviors.includes(opt) ? 'rgba(197, 139, 7, 0.1)' : 'rgba(42, 29, 14, 0.4)',
-                                                border: `1px solid ${formData.nexBehaviors.includes(opt) ? 'rgba(197, 139, 7, 0.25)' : 'rgba(197, 139, 7, 0.06)'}`,
-                                                color: formData.nexBehaviors.includes(opt) ? '#C58B07' : '#B8A88A',
+                                                background: formData.nexBehaviors.includes(opt) ? '#FFF9F0' : 'transparent',
+                                                border: formData.nexBehaviors.includes(opt) ? '1px solid rgba(10, 30, 84, 0.12)' : '1px solid rgba(208, 227, 255, 0.25)',
+                                                backgroundImage: !formData.nexBehaviors.includes(opt) ? 'linear-gradient(135deg, rgba(10, 30, 84, 0.05), rgba(18, 61, 126, 0.1))' : 'none',
+                                                color: formData.nexBehaviors.includes(opt) ? '#0A1E54' : '#FFFFFF',
                                             }}
                                         >
                                             <div
                                                 className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
                                                 style={{
-                                                    background: formData.nexBehaviors.includes(opt) ? '#C58B07' : 'transparent',
-                                                    border: `1.5px solid ${formData.nexBehaviors.includes(opt) ? '#C58B07' : '#8A7A60'}`,
+                                                    background: formData.nexBehaviors.includes(opt) ? '#7096D1' : '#FFFFFF',
+                                                    border: formData.nexBehaviors.includes(opt) ? '1.5px solid #7096D1' : '1.5px solid rgba(255, 255, 255, 0.6)',
                                                 }}
                                             >
-                                                {formData.nexBehaviors.includes(opt) && <Check size={12} style={{ color: '#02022d' }} />}
+                                                {formData.nexBehaviors.includes(opt) && <Check size={12} style={{ color: '#FFFFFF' }} />}
                                             </div>
                                             {opt}
                                         </button>
@@ -412,10 +413,10 @@ export default function OnboardingPage() {
                         {currentStep === 4 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <Target size={20} style={{ color: '#C58B07' }} />
-                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F5EFE0' }}>Your Goals</h2>
+                                    <Target size={20} style={{ color: '#F7F2EB' }} />
+                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Your Goals</h2>
                                 </div>
-                                <p className="text-sm" style={{ color: '#8A7A60' }}>
+                                <p className="text-sm" style={{ color: '#FFF9F0' }}>
                                     What do you need the most help with right now?
                                 </p>
                                 <div className="flex flex-wrap gap-2">
@@ -425,9 +426,9 @@ export default function OnboardingPage() {
                                             onClick={() => toggleArrayItem('primaryGoals', opt)}
                                             className="badge cursor-pointer transition-all text-sm py-2 px-4"
                                             style={{
-                                                background: formData.primaryGoals.includes(opt) ? 'rgba(197, 139, 7, 0.15)' : 'rgba(42, 29, 14, 0.5)',
-                                                color: formData.primaryGoals.includes(opt) ? '#C58B07' : '#8A7A60',
-                                                border: `1px solid ${formData.primaryGoals.includes(opt) ? 'rgba(197, 139, 7, 0.3)' : 'rgba(197, 139, 7, 0.06)'}`,
+                                                background: formData.primaryGoals.includes(opt) ? 'rgba(208, 227, 255, 0.15)' : 'rgba(255, 249, 240, 0.5)',
+                                                color: formData.primaryGoals.includes(opt) ? '#F7F2EB' : '#FFF9F0',
+                                                border: `1px solid ${formData.primaryGoals.includes(opt) ? 'rgba(208, 227, 255, 0.3)' : 'rgba(208, 227, 255, 0.06)'}`,
                                             }}
                                         >
                                             {opt}
@@ -441,37 +442,37 @@ export default function OnboardingPage() {
                         {currentStep === 5 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <FileText size={20} style={{ color: '#C58B07' }} />
-                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F5EFE0' }}>Important Notice</h2>
+                                    <FileText size={20} style={{ color: '#F7F2EB' }} />
+                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Important Notice</h2>
                                 </div>
-                                <div className="card-gilded p-5 space-y-3">
-                                    <p className="text-sm leading-relaxed" style={{ color: '#D4C9B0' }}>
-                                        NEXX is an AI-powered tool that provides <strong style={{ color: '#C58B07' }}>legal information, strategic guidance, and emotional support</strong>. It is <strong style={{ color: '#C58B07' }}>not</strong> a law firm, does not provide legal advice, and is not a substitute for a licensed attorney or therapist.
+                                <div className="p-5 space-y-3 rounded-2xl" style={{ background: '#7096D1', border: '1px solid rgba(208, 227, 255, 0.2)' }}>
+                                    <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
+                                        NEXX is an AI-powered tool that provides <strong style={{ color: '#FFFFFF' }}>legal information, strategic guidance, and emotional support</strong>. It is <strong style={{ color: '#FFFFFF' }}>not</strong> a law firm, does not provide legal advice, and is not a substitute for a licensed attorney or therapist.
                                     </p>
-                                    <p className="text-sm leading-relaxed" style={{ color: '#D4C9B0' }}>
+                                    <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
                                         Information provided by NEXX should be used as a starting point for your own research and decision-making. For specific legal advice regarding your situation, please consult with a licensed attorney in your state.
                                     </p>
-                                    <p className="text-sm leading-relaxed" style={{ color: '#D4C9B0' }}>
-                                        If you or your children are in immediate danger, please call <strong style={{ color: '#C58B07' }}>911</strong> or the National Domestic Violence Hotline at <strong style={{ color: '#C58B07' }}>1-800-799-7233</strong>.
+                                    <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
+                                        If you or your children are in immediate danger, please call <strong style={{ color: '#FFFFFF' }}>911</strong> or the National Domestic Violence Hotline at <strong style={{ color: '#FFFFFF' }}>1-800-799-7233</strong>.
                                     </p>
                                 </div>
                                 <button
                                     onClick={() => update('acceptedDisclaimer', !formData.acceptedDisclaimer)}
                                     className="w-full text-left px-4 py-3 rounded-xl transition-all text-sm flex items-center gap-3"
                                     style={{
-                                        background: formData.acceptedDisclaimer ? 'rgba(197, 139, 7, 0.1)' : 'rgba(42, 29, 14, 0.4)',
-                                        border: `1px solid ${formData.acceptedDisclaimer ? 'rgba(197, 139, 7, 0.25)' : 'rgba(197, 139, 7, 0.06)'}`,
-                                        color: formData.acceptedDisclaimer ? '#C58B07' : '#B8A88A',
+                                        background: formData.acceptedDisclaimer ? 'rgba(208, 227, 255, 0.1)' : 'rgba(255, 249, 240, 0.4)',
+                                        border: `1px solid ${formData.acceptedDisclaimer ? 'rgba(208, 227, 255, 0.25)' : 'rgba(208, 227, 255, 0.06)'}`,
+                                        color: formData.acceptedDisclaimer ? '#F7F2EB' : '#D0E3FF',
                                     }}
                                 >
                                     <div
                                         className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
                                         style={{
-                                            background: formData.acceptedDisclaimer ? '#C58B07' : 'transparent',
-                                            border: `1.5px solid ${formData.acceptedDisclaimer ? '#C58B07' : '#8A7A60'}`,
+                                            background: formData.acceptedDisclaimer ? '#F7F2EB' : 'transparent',
+                                            border: `1.5px solid ${formData.acceptedDisclaimer ? '#F7F2EB' : '#FFF9F0'}`,
                                         }}
                                     >
-                                        {formData.acceptedDisclaimer && <Check size={12} style={{ color: '#02022d' }} />}
+                                        {formData.acceptedDisclaimer && <Check size={12} style={{ color: '#0A1E54' }} />}
                                     </div>
                                     I understand and acknowledge the above
                                 </button>
@@ -490,7 +491,7 @@ export default function OnboardingPage() {
                     <button
                         onClick={handleNext}
                         disabled={!canProceed() || isSaving || userLoading || (currentStep === ONBOARDING_STEPS.length - 1 && !userId)}
-                        className="btn-gold flex-1 flex items-center justify-center gap-2 disabled:opacity-30"
+                        className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-30"
                     >
                         {currentStep === ONBOARDING_STEPS.length - 1 ? (
                             <>{isSaving ? 'Saving...' : userLoading ? 'Loading...' : 'Enter NEXX'} <Sparkles size={14} /></>

@@ -66,7 +66,7 @@ export function ConfirmDeleteModal({
                         initial={{ scale: 0.95, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0.95, opacity: 0 }}
-                        className="card-gilded p-6 max-w-sm mx-4"
+                        className="card-premium p-6 max-w-sm mx-4"
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby={dialogTitleId}
@@ -81,10 +81,10 @@ export function ConfirmDeleteModal({
                                 <AlertTriangle size={18} style={{ color: '#C75A5A' }} />
                             </div>
                             <div>
-                                <h3 id={dialogTitleId} className="text-sm font-semibold" style={{ color: '#F5EFE0' }}>
+                                <h3 id={dialogTitleId} className="text-sm font-semibold" style={{ color: '#F7F2EB' }}>
                                     {title}
                                 </h3>
-                                <p className="text-xs" style={{ color: '#8A7A60' }}>
+                                <p className="text-xs" style={{ color: '#FFF9F0' }}>
                                     This action cannot be undone.
                                 </p>
                             </div>
@@ -95,11 +95,11 @@ export function ConfirmDeleteModal({
                                     disabled={isDeleting}
                                     aria-label="Close"
                                 >
-                                    <X size={14} style={{ color: '#8A7A60' }} />
+                                    <X size={14} style={{ color: '#FFF9F0' }} />
                                 </button>
                             )}
                         </div>
-                        <p className="text-sm mb-5" style={{ color: '#B8A88A' }}>
+                        <p className="text-sm mb-5" style={{ color: '#D0E3FF' }}>
                             {description}
                         </p>
                         {deleteError && (

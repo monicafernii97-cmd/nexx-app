@@ -1,7 +1,10 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { useQuery } from 'convex/react';
+import { api } from '../../../../convex/_generated/api';
+import { useUser } from '@/lib/user-context';
 import {
     Landmark,
     ChevronLeft,
@@ -31,6 +34,9 @@ interface ProgressStep {
 
 /** DocuVault document generator page with compose, working, and result views. */
 export default function DocuVaultPage() {
+    // User's court settings from Convex
+    const userCourtSettings = useQuery(api.courtSettings.get);
+    const { clerkUser } = useUser();
     // Tab & template state
     const [activeTab, setActiveTab] = useState<UITabCategory>('lead');
     const [selectedTemplate, setSelectedTemplate] = useState<DocumentTemplate | null>(null);
@@ -51,6 +57,18 @@ export default function DocuVaultPage() {
     const generationTokenRef = useRef(0);
     const completedRef = useRef(false);
     const pdfUrlRef = useRef<string | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
+
+    // Cleanup on unmount: abort in-flight fetch + revoke object URL
+    useEffect(() => {
+        return () => {
+            abortControllerRef.current?.abort();
+            abortControllerRef.current = null;
+            if (pdfUrlRef.current) {
+                URL.revokeObjectURL(pdfUrlRef.current);
+            }
+        };
+    }, []);
 
     // Gallery drawer
     const [showGallery, setShowGallery] = useState(false);
@@ -94,14 +112,24 @@ export default function DocuVaultPage() {
         setProgressSteps(steps);
 
         try {
+            // Abort any previous in-flight generation
+            abortControllerRef.current?.abort();
+            abortControllerRef.current = new AbortController();
+
             const res = await fetch('/api/documents/generate/stream', {
                 method: 'POST',
+                signal: abortControllerRef.current.signal,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     templateId: selectedTemplate?.id ?? 'petition_divorce',
-                    courtSettings: { state: 'Texas', county: 'Fort Bend' },
-                    petitioner: { name: 'Petitioner' },
-                    caseType: 'divorce_no_children',
+                    courtSettings: {
+                        state: userCourtSettings?.state ?? 'Texas',
+                        county: userCourtSettings?.county ?? 'Fort Bend',
+                        courtName: userCourtSettings?.courtName,
+                        judicialDistrict: userCourtSettings?.judicialDistrict,
+                    },
+                    petitioner: { name: clerkUser?.fullName || clerkUser?.firstName || 'Petitioner' },
+                    caseType: selectedTemplate?.caseTypes?.[0] ?? 'general',
                     bodyContent: documentContent ? [{ heading: 'Content', paragraphs: [documentContent] }] : [],
                 }),
             });
@@ -192,11 +220,12 @@ export default function DocuVaultPage() {
             setGenerationError(error instanceof Error ? error.message : 'Generation failed');
             setView('compose');
         }
-    }, [documentContent, selectedTemplate]);
+    }, [documentContent, selectedTemplate, userCourtSettings, clerkUser]);
 
     /** Reset to compose view, aborting any in-flight generation. */
     const handleNewDocument = useCallback(() => {
-        // Increment token to abort any running generation
+        // Abort the network request and increment token
+        abortControllerRef.current?.abort();
         generationTokenRef.current++;
 
         setView('compose');
@@ -250,19 +279,19 @@ export default function DocuVaultPage() {
                                         className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors"
                                         style={{ background: 'rgba(197, 139, 7, 0.08)' }}
                                     >
-                                        <X size={16} style={{ color: '#C58B07' }} />
+                                        <X size={16} style={{ color: '#7096D1' }} />
                                     </button>
                                 </div>
 
                                 {/* Search */}
                                 <div className="relative mb-5">
-                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#5A4A30' }} />
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#0A1E54' }} />
                                     <input
                                         type="text"
                                         value={gallerySearch}
                                         onChange={e => setGallerySearch(e.target.value)}
                                         placeholder="Search templates..."
-                                        className="input-gilded pl-9 text-xs"
+                                        className="input-premium pl-9 text-xs"
                                         style={{ fontSize: '12px' }}
                                         aria-label="Search templates"
                                     />
@@ -279,7 +308,7 @@ export default function DocuVaultPage() {
                                                 style={{ color: '#92783A' }}
                                             >
                                                 {tab.label}
-                                                <span className="ml-2" style={{ color: '#5A4A30' }}>
+                                                <span className="ml-2" style={{ color: '#0A1E54' }}>
                                                     {tabTemplates.length}
                                                 </span>
                                             </h3>
@@ -294,9 +323,9 @@ export default function DocuVaultPage() {
                                                         }}
                                                         className="w-full text-left px-3 py-2 rounded-lg text-xs transition-all cursor-pointer"
                                                         style={{
-                                                            color: selectedTemplate?.id === tmpl.id ? '#C58B07' : '#B8A88A',
+                                                            color: selectedTemplate?.id === tmpl.id ? '#F5EFE0' : '#7096D1',
                                                             background: selectedTemplate?.id === tmpl.id
-                                                                ? 'rgba(197, 139, 7, 0.08)'
+                                                                ? 'rgba(112, 150, 209, 0.15)'
                                                                 : 'transparent',
                                                         }}
                                                     >
@@ -315,16 +344,16 @@ export default function DocuVaultPage() {
                                             className="flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all"
                                             style={{ background: 'rgba(197, 139, 7, 0.05)' }}
                                         >
-                                            <FileText size={16} style={{ color: '#C58B07' }} />
+                                            <FileText size={16} style={{ color: '#7096D1' }} />
                                             <div>
                                                 <p className="text-sm font-medium" style={{ color: '#F5EFE0' }}>
                                                     Saved Documents
                                                 </p>
-                                                <p className="text-xs" style={{ color: '#8A7A60' }}>
+                                                <p className="text-xs" style={{ color: '#123D7E' }}>
                                                     View your document gallery
                                                 </p>
                                             </div>
-                                            <ArrowRight size={14} className="ml-auto" style={{ color: '#C58B07' }} />
+                                            <ArrowRight size={14} className="ml-auto" style={{ color: '#7096D1' }} />
                                         </div>
                                     </Link>
                                 </div>
@@ -359,7 +388,7 @@ export default function DocuVaultPage() {
                                     border: '1px solid rgba(197, 139, 7, 0.2)',
                                 }}
                             >
-                                <Menu size={18} style={{ color: '#C58B07' }} />
+                                <Menu size={18} style={{ color: '#7096D1' }} />
                             </button>
                             <div>
                                 <div className="flex items-center gap-3 mb-1">
@@ -370,13 +399,13 @@ export default function DocuVaultPage() {
                                             border: '1px solid rgba(197, 139, 7, 0.25)',
                                         }}
                                     >
-                                        <Landmark size={20} style={{ color: '#C58B07' }} />
+                                        <Landmark size={20} style={{ color: '#7096D1' }} />
                                     </div>
                                     <h1 className="text-headline text-2xl" style={{ color: '#F5EFE0' }}>
                                         DocuVault
                                     </h1>
                                 </div>
-                                <p className="text-sm" style={{ color: '#8A7A60' }}>
+                                <p className="text-sm" style={{ color: '#123D7E' }}>
                                     Professional Legal Document Generator
                                 </p>
                             </div>
@@ -389,7 +418,7 @@ export default function DocuVaultPage() {
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.1 }}
                         className="text-xs mb-6"
-                        style={{ color: '#5A4A30' }}
+                        style={{ color: '#0A1E54' }}
                     >
                         Generate court-ready PDFs with AI precision. Trustworthy. Semantic. Verbatim.
                     </motion.p>
@@ -412,9 +441,9 @@ export default function DocuVaultPage() {
                                 className="px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
                                 style={{
                                     background: activeTab === tab.id
-                                        ? 'linear-gradient(135deg, #C58B07, #E5B84A)'
+                                        ? 'linear-gradient(135deg, #7096D1, #5D82BB)'
                                         : 'rgba(42, 29, 14, 0.4)',
-                                    color: activeTab === tab.id ? '#02022d' : '#8A7A60',
+                                    color: activeTab === tab.id ? '#02022d' : '#123D7E',
                                     border: activeTab === tab.id
                                         ? 'none'
                                         : '1px solid rgba(138, 122, 96, 0.12)',
@@ -446,14 +475,14 @@ export default function DocuVaultPage() {
                                         className="w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer transition-colors"
                                         style={{ background: 'rgba(197, 139, 7, 0.06)' }}
                                     >
-                                        <ChevronLeft size={14} style={{ color: '#C58B07' }} />
+                                        <ChevronLeft size={14} style={{ color: '#7096D1' }} />
                                     </button>
                                     <button
                                         onClick={() => scrollCarousel('right')}
                                         className="w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer transition-colors"
                                         style={{ background: 'rgba(197, 139, 7, 0.06)' }}
                                     >
-                                        <ChevronRight size={14} style={{ color: '#C58B07' }} />
+                                        <ChevronRight size={14} style={{ color: '#7096D1' }} />
                                     </button>
                                 </div>
                             )}
@@ -462,7 +491,7 @@ export default function DocuVaultPage() {
                         {activeTab === 'create_own' ? (
                             /* Blank template card */
                             <div
-                                className="card-gilded p-6 cursor-pointer transition-all hover:scale-[1.01]"
+                                className="card-premium p-6 cursor-pointer transition-all hover:scale-[1.01]"
                                 onClick={() => setSelectedTemplate(null)}
                                 style={{
                                     borderColor: 'rgba(197, 139, 7, 0.25)',
@@ -476,13 +505,13 @@ export default function DocuVaultPage() {
                                             border: '1px dashed rgba(197, 139, 7, 0.3)',
                                         }}
                                     >
-                                        <Plus size={22} style={{ color: '#C58B07' }} />
+                                        <Plus size={22} style={{ color: '#7096D1' }} />
                                     </div>
                                     <div>
                                         <p className="font-semibold text-sm mb-0.5" style={{ color: '#F5EFE0' }}>
                                             Custom Document
                                         </p>
-                                        <p className="text-xs" style={{ color: '#8A7A60' }}>
+                                        <p className="text-xs" style={{ color: '#123D7E' }}>
                                             Blank template with general court and legal document structure
                                         </p>
                                     </div>
@@ -526,14 +555,14 @@ export default function DocuVaultPage() {
                                                 <FileText
                                                     size={28}
                                                     style={{
-                                                        color: isSelected ? '#C58B07' : '#5A4A30',
+                                                        color: isSelected ? '#7096D1' : '#0A1E54',
                                                     }}
                                                 />
                                             </div>
                                             <p
                                                 className="text-xs font-medium leading-tight line-clamp-2"
                                                 style={{
-                                                    color: isSelected ? '#F5EFE0' : '#B8A88A',
+                                                    color: isSelected ? '#F5EFE0' : '#7096D1',
                                                 }}
                                             >
                                                 {tmpl.title}
@@ -561,10 +590,10 @@ export default function DocuVaultPage() {
                                         border: '1px solid rgba(197, 139, 7, 0.12)',
                                     }}
                                 >
-                                    <p className="text-xs font-semibold mb-1" style={{ color: '#C58B07' }}>
+                                    <p className="text-xs font-semibold mb-1" style={{ color: '#7096D1' }}>
                                         Selected: {selectedTemplate.title}
                                     </p>
-                                    <p className="text-xs" style={{ color: '#8A7A60' }}>
+                                    <p className="text-xs" style={{ color: '#123D7E' }}>
                                         {selectedTemplate.description}
                                     </p>
                                 </div>
@@ -584,7 +613,7 @@ export default function DocuVaultPage() {
                             onChange={e => setDocumentContent(e.target.value)}
                             placeholder="Paste your content here or describe the document title, body, and footer verbatim..."
                             rows={8}
-                            className="input-gilded resize-none"
+                            className="input-premium resize-none"
                             style={{ minHeight: '160px' }}
                         />
 
@@ -595,7 +624,7 @@ export default function DocuVaultPage() {
                                     disabled
                                     title="File attachment coming soon"
                                     className="flex items-center gap-1.5 text-xs transition-colors cursor-not-allowed"
-                                    style={{ color: '#8A7A60', opacity: 0.5 }}
+                                    style={{ color: '#123D7E', opacity: 0.5 }}
                                 >
                                     <Paperclip size={13} /> Attach
                                 </button>
@@ -603,13 +632,13 @@ export default function DocuVaultPage() {
                                     <button
                                         onClick={() => setDocumentContent('')}
                                         className="flex items-center gap-1.5 text-xs cursor-pointer transition-colors"
-                                        style={{ color: '#8A7A60' }}
+                                        style={{ color: '#123D7E' }}
                                     >
                                         <X size={13} /> Clear
                                     </button>
                                 )}
                             </div>
-                            <p className="text-xs" style={{ color: '#5A4A30' }}>
+                            <p className="text-xs" style={{ color: '#0A1E54' }}>
                                 {documentContent.length > 0 ? `${documentContent.length} chars` : ''}
                             </p>
                         </div>
@@ -624,7 +653,7 @@ export default function DocuVaultPage() {
                         <button
                             onClick={handleGenerate}
                             disabled={!documentContent.trim() && !selectedTemplate}
-                            className="btn-gold w-full flex items-center justify-center gap-2 py-3.5 text-sm disabled:opacity-40"
+                            className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 text-sm disabled:opacity-40"
                         >
                             <Sparkles size={16} />
                             Generate
@@ -670,11 +699,11 @@ export default function DocuVaultPage() {
                                             border: '1px solid rgba(197, 139, 7, 0.12)',
                                         }}
                                     >
-                                        <Icon size={16} style={{ color: '#8A7A60' }} />
+                                        <Icon size={16} style={{ color: '#123D7E' }} />
                                     </div>
                                     <p
                                         className="text-xs text-center whitespace-pre-line leading-tight"
-                                        style={{ color: '#5A4A30' }}
+                                        style={{ color: '#0A1E54' }}
                                     >
                                         {item.label}
                                     </p>
@@ -701,22 +730,22 @@ export default function DocuVaultPage() {
                             className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer"
                             style={{ background: 'rgba(197, 139, 7, 0.06)' }}
                         >
-                            <X size={16} style={{ color: '#8A7A60' }} />
+                            <X size={16} style={{ color: '#123D7E' }} />
                         </button>
-                        <p className="text-xs" style={{ color: '#8A7A60' }}>
+                        <p className="text-xs" style={{ color: '#123D7E' }}>
                             Step {Math.min(progressSteps.filter(s => s.status === 'complete').length + 1, progressSteps.length)} of {progressSteps.length}
                         </p>
                     </div>
 
                     {/* Document context */}
                     <div
-                        className="card-gilded p-6 mb-8"
+                        className="card-premium p-6 mb-8"
                         style={{ borderColor: 'rgba(197, 139, 7, 0.15)' }}
                     >
                         <p className="text-xs uppercase tracking-[0.15em] mb-2" style={{ color: '#92783A' }}>
                             Document Context
                         </p>
-                        <p className="text-sm italic leading-relaxed" style={{ color: '#D4C9B0' }}>
+                        <p className="text-sm italic leading-relaxed" style={{ color: '#123D7E' }}>
                             &ldquo;{selectedTemplate?.title || (() => {
                                 const text = documentContent;
                                 if (text.length <= 120) return text;
@@ -741,7 +770,7 @@ export default function DocuVaultPage() {
                                     border: '1px solid rgba(197, 139, 7, 0.2)',
                                 }}
                             >
-                                <Sparkles size={24} style={{ color: '#C58B07' }} />
+                                <Sparkles size={24} style={{ color: '#7096D1' }} />
                             </div>
                         </motion.div>
                         <p className="text-sm font-medium" style={{ color: '#F5EFE0' }}>
@@ -755,17 +784,17 @@ export default function DocuVaultPage() {
                             <p className="text-xs font-semibold tracking-[0.1em] uppercase" style={{ color: '#92783A' }}>
                                 Synthesis
                             </p>
-                            <p className="text-xs font-bold" style={{ color: '#C58B07' }}>
+                            <p className="text-xs font-bold" style={{ color: '#7096D1' }}>
                                 {Math.round(progress)}%
                             </p>
                         </div>
                         <div
                             className="h-1 rounded-full overflow-hidden"
-                            style={{ background: 'rgba(138, 122, 96, 0.1)' }}
+                            style={{ background: 'rgba(112, 150, 209, 0.15)' }}
                         >
                             <motion.div
                                 className="h-full rounded-full"
-                                style={{ background: 'linear-gradient(90deg, #C58B07, #E5B84A)' }}
+                                style={{ background: 'linear-gradient(90deg, #7096D1, #5D82BB)' }}
                                 animate={{ width: `${progress}%` }}
                                 transition={{ duration: 0.5 }}
                             />
@@ -797,7 +826,7 @@ export default function DocuVaultPage() {
                                             className="w-5 h-5 rounded-full flex items-center justify-center"
                                             style={{ background: 'rgba(197, 139, 7, 0.15)' }}
                                         >
-                                            <div className="w-2 h-2 rounded-full" style={{ background: '#C58B07' }} />
+                                            <div className="w-2 h-2 rounded-full" style={{ background: '#7096D1' }} />
                                         </motion.div>
                                     ) : (
                                         <div
@@ -816,7 +845,7 @@ export default function DocuVaultPage() {
                                                 ? '#5A9E6F'
                                                 : step.status === 'active'
                                                     ? '#F5EFE0'
-                                                    : '#5A4A30',
+                                                    : '#0A1E54',
                                         }}
                                     >
                                         {step.label}
@@ -826,7 +855,7 @@ export default function DocuVaultPage() {
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             className="text-xs mt-0.5"
-                                            style={{ color: '#8A7A60' }}
+                                            style={{ color: '#123D7E' }}
                                         >
                                             Processing...
                                         </motion.p>
@@ -862,24 +891,24 @@ export default function DocuVaultPage() {
                                 border: '1px solid rgba(197, 139, 7, 0.15)',
                             }}
                         >
-                            <ChevronLeft size={16} style={{ color: '#C58B07' }} />
+                            <ChevronLeft size={16} style={{ color: '#7096D1' }} />
                         </button>
                         <div>
                             <h1 className="text-headline text-lg" style={{ color: '#F5EFE0' }}>
                                 {selectedTemplate?.title || 'Generated Document'}
                             </h1>
-                            <p className="text-xs" style={{ color: '#8A7A60' }}>
+                            <p className="text-xs" style={{ color: '#123D7E' }}>
                                 Case #{caseNumber ?? '------'}
                             </p>
                         </div>
                     </div>
 
                     {/* AI Summary */}
-                    <div className="card-gilded p-5 mb-6">
+                    <div className="card-premium p-5 mb-6">
                         <p className="text-xs font-semibold uppercase tracking-[0.15em] mb-2" style={{ color: '#5A8EC9' }}>
                             Intelligence Summary
                         </p>
-                        <p className="text-sm leading-relaxed" style={{ color: '#D4C9B0' }}>
+                        <p className="text-sm leading-relaxed" style={{ color: '#123D7E' }}>
                             I&apos;ve synthesized the provided content into a formal{' '}
                             {selectedTemplate?.title?.toLowerCase() || 'legal document'}.
                             All formatting follows local court standards. The document has been cross-referenced
@@ -900,15 +929,15 @@ export default function DocuVaultPage() {
                             className="w-28 h-36 mx-auto rounded-xl mb-4 flex items-center justify-center"
                             style={{
                                 background: 'rgba(245, 239, 224, 0.04)',
-                                border: '1px solid rgba(138, 122, 96, 0.1)',
+                                border: '1px solid rgba(112, 150, 209, 0.15)',
                             }}
                         >
-                            <FileText size={36} style={{ color: '#8A7A60' }} />
+                            <FileText size={36} style={{ color: '#123D7E' }} />
                         </div>
                         <p className="text-sm font-semibold mb-1" style={{ color: '#F5EFE0' }}>
                             {selectedTemplate?.title || 'Legal Document'} v.1
                         </p>
-                        <p className="text-xs" style={{ color: '#8A7A60' }}>
+                        <p className="text-xs" style={{ color: '#123D7E' }}>
                             FORMAL ARCHIVE • ~1.2 MB
                         </p>
 
@@ -930,9 +959,9 @@ export default function DocuVaultPage() {
                                     className="w-10 h-10 rounded-full flex items-center justify-center"
                                     style={{ background: 'rgba(197, 139, 7, 0.06)', border: '1px solid rgba(197, 139, 7, 0.15)' }}
                                 >
-                                    <ArrowRight size={16} className="rotate-90" style={{ color: '#C58B07' }} />
+                                    <ArrowRight size={16} className="rotate-90" style={{ color: '#7096D1' }} />
                                 </div>
-                                <span className="text-xs" style={{ color: '#8A7A60' }}>Download</span>
+                                <span className="text-xs" style={{ color: '#123D7E' }}>Download</span>
                             </button>
                             {/* Print */}
                             <button
@@ -957,9 +986,9 @@ export default function DocuVaultPage() {
                                     className="w-10 h-10 rounded-full flex items-center justify-center"
                                     style={{ background: 'rgba(197, 139, 7, 0.06)', border: '1px solid rgba(197, 139, 7, 0.15)' }}
                                 >
-                                    <FileText size={16} style={{ color: '#C58B07' }} />
+                                    <FileText size={16} style={{ color: '#7096D1' }} />
                                 </div>
-                                <span className="text-xs" style={{ color: '#8A7A60' }}>Print</span>
+                                <span className="text-xs" style={{ color: '#123D7E' }}>Print</span>
                             </button>
                             {/* Save — TODO: wire to Convex backend */}
                             <button
@@ -972,9 +1001,9 @@ export default function DocuVaultPage() {
                                     className="w-10 h-10 rounded-full flex items-center justify-center"
                                     style={{ background: 'rgba(197, 139, 7, 0.06)', border: '1px solid rgba(197, 139, 7, 0.15)' }}
                                 >
-                                    <Landmark size={16} style={{ color: '#C58B07' }} />
+                                    <Landmark size={16} style={{ color: '#7096D1' }} />
                                 </div>
-                                <span className="text-xs" style={{ color: '#8A7A60' }}>Save</span>
+                                <span className="text-xs" style={{ color: '#123D7E' }}>Save</span>
                             </button>
                         </div>
                     </div>
@@ -993,7 +1022,7 @@ export default function DocuVaultPage() {
                                 <p className="text-xs font-semibold" style={{ color: '#5A9E6F' }}>
                                     Rule 3.1 Certified
                                 </p>
-                                <p className="text-xs" style={{ color: '#8A7A60' }}>
+                                <p className="text-xs" style={{ color: '#123D7E' }}>
                                     Formal formatting standards met
                                 </p>
                             </div>
@@ -1010,7 +1039,7 @@ export default function DocuVaultPage() {
                                 <p className="text-xs font-semibold" style={{ color: '#5A9E6F' }}>
                                     Bates Validation
                                 </p>
-                                <p className="text-xs" style={{ color: '#8A7A60' }}>
+                                <p className="text-xs" style={{ color: '#123D7E' }}>
                                     Sequence validated & confirmed
                                 </p>
                             </div>
@@ -1022,16 +1051,16 @@ export default function DocuVaultPage() {
                         className="flex items-center gap-3 px-4 py-3 rounded-xl"
                         style={{
                             background: 'rgba(42, 29, 14, 0.3)',
-                            border: '1px solid rgba(138, 122, 96, 0.1)',
+                            border: '1px solid rgba(112, 150, 209, 0.15)',
                             opacity: 0.5,
                         }}
                     >
-                        <Plus size={16} style={{ color: '#8A7A60' }} />
+                        <Plus size={16} style={{ color: '#123D7E' }} />
                         <input
                             type="text"
                             placeholder="Revision requests coming soon..."
                             className="flex-1 bg-transparent text-sm outline-none"
-                            style={{ color: '#B8A88A' }}
+                            style={{ color: '#7096D1' }}
                             disabled
                             aria-disabled="true"
                         />
@@ -1039,7 +1068,7 @@ export default function DocuVaultPage() {
                             disabled
                             className="w-8 h-8 rounded-full flex items-center justify-center cursor-not-allowed opacity-50"
                             style={{
-                                background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
+                                background: 'linear-gradient(135deg, #7096D1, #5D82BB)',
                             }}
                         >
                             <ArrowRight size={14} style={{ color: '#02022d' }} />

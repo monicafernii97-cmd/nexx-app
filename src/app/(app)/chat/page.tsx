@@ -17,6 +17,7 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { MODE_LABELS } from '@/lib/constants';
 
+/** Conversation list page with mode picker and new-chat creation. */
 export default function ChatListPage() {
     const router = useRouter();
     const conversations = useQuery(api.conversations.list, {});
@@ -56,17 +57,17 @@ export default function ChatListPage() {
                         <div
                             className="w-10 h-10 rounded-xl flex items-center justify-center"
                             style={{
-                                background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
-                                boxShadow: '0 2px 12px rgba(197, 139, 7, 0.25)',
+                                background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
+                                boxShadow: '0 2px 12px rgba(208, 227, 255, 0.25)',
                             }}
                         >
-                            <Sparkles size={18} style={{ color: '#02022d' }} />
+                            <Sparkles size={18} style={{ color: '#F7F2EB' }} />
                         </div>
-                        <h1 className="text-headline text-2xl" style={{ color: '#F5EFE0' }}>
+                        <h1 className="text-headline text-2xl" style={{ color: '#F7F2EB' }}>
                             NEXX Intelligence
                         </h1>
                     </div>
-                    <p className="text-sm" style={{ color: '#8A7A60' }}>
+                    <p className="text-sm" style={{ color: '#FFF9F0' }}>
                         Strategic AI counsel — your conversations are encrypted and private.
                     </p>
                 </div>
@@ -77,11 +78,11 @@ export default function ChatListPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="card-gilded p-6 mb-8"
+                className="card-premium p-6 mb-8"
             >
                 <h2
                     className="text-sm font-semibold tracking-[0.15em] uppercase mb-4"
-                    style={{ color: '#92783A' }}
+                    style={{ color: '#D0E3FF' }}
                 >
                     Start New Session
                 </h2>
@@ -97,7 +98,7 @@ export default function ChatListPage() {
                                     selectedMode === key
                                         ? `${color}25`
                                         : 'rgba(138, 122, 96, 0.08)',
-                                color: selectedMode === key ? color : '#8A7A60',
+                                color: selectedMode === key ? color : '#FFF9F0',
                                 border: `1px solid ${selectedMode === key ? `${color}40` : 'transparent'}`,
                             }}
                         >
@@ -108,7 +109,7 @@ export default function ChatListPage() {
                 <button
                     onClick={handleNewChat}
                     disabled={isCreating}
-                    className="btn-gold text-xs flex items-center gap-2 disabled:opacity-40"
+                    className="btn-primary text-xs flex items-center gap-2 disabled:opacity-40"
                 >
                     <Plus size={14} />
                     {isCreating ? 'Creating...' : 'New Conversation'}
@@ -123,43 +124,43 @@ export default function ChatListPage() {
             >
                 <h2
                     className="text-sm font-semibold tracking-[0.15em] uppercase mb-4"
-                    style={{ color: '#92783A' }}
+                    style={{ color: '#D0E3FF' }}
                 >
                     Active Sessions ({isLoadingConversations ? '…' : activeConversations.length})
                 </h2>
 
                 {isLoadingConversations ? (
-                    <div className="card-gilded p-8 text-center mb-8">
+                    <div className="card-premium p-8 text-center mb-8">
                         <div className="flex gap-1.5 justify-center">
                             {[0, 1, 2].map((j) => (
                                 <motion.div
                                     key={j}
                                     className="w-2 h-2 rounded-full"
-                                    style={{ background: '#C58B07' }}
+                                    style={{ background: '#F7F2EB' }}
                                     animate={{ opacity: [0.3, 1, 0.3] }}
                                     transition={{ duration: 1, repeat: Infinity, delay: j * 0.2 }}
                                 />
                             ))}
                         </div>
-                        <p className="text-sm font-medium mt-3" style={{ color: '#B8A88A' }}>
+                        <p className="text-sm font-medium mt-3" style={{ color: '#D0E3FF' }}>
                             Loading conversations…
                         </p>
                     </div>
                 ) : activeConversations.length === 0 ? (
-                    <div className="card-gilded p-8 text-center mb-8">
+                    <div className="card-premium p-8 text-center mb-8">
                         <div
                             className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
                             style={{
-                                background: 'rgba(197, 139, 7, 0.08)',
-                                border: '1px solid rgba(197, 139, 7, 0.15)',
+                                background: 'rgba(208, 227, 255, 0.08)',
+                                border: '1px solid rgba(208, 227, 255, 0.15)',
                             }}
                         >
-                            <MessageCircle size={28} style={{ color: '#775E22' }} />
+                            <MessageCircle size={28} style={{ color: '#FFF9F0' }} />
                         </div>
-                        <p className="text-sm font-medium mb-2" style={{ color: '#B8A88A' }}>
+                        <p className="text-sm font-medium mb-2" style={{ color: '#D0E3FF' }}>
                             No conversations yet
                         </p>
-                        <p className="text-xs" style={{ color: '#8A7A60' }}>
+                        <p className="text-xs" style={{ color: '#FFF9F0' }}>
                             Start your first session with NEXX to get strategic counsel.
                         </p>
                     </div>
@@ -174,7 +175,7 @@ export default function ChatListPage() {
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.05 * i }}
                                 >
-                                    <Link href={`/chat/${conv._id}`} className="card-gilded p-4 cursor-pointer group block">
+                                    <Link href={`/chat/${conv._id}`} className="card-premium p-4 cursor-pointer group block">
                                         <div className="flex items-center gap-4">
                                             <div
                                                 className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -189,7 +190,7 @@ export default function ChatListPage() {
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <p
                                                         className="text-sm font-semibold truncate"
-                                                        style={{ color: '#F5EFE0' }}
+                                                        style={{ color: '#F7F2EB' }}
                                                     >
                                                         {conv.title}
                                                     </p>
@@ -204,14 +205,14 @@ export default function ChatListPage() {
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <Clock size={10} style={{ color: '#8A7A60' }} />
-                                                    <p className="text-xs" style={{ color: '#8A7A60' }}>
+                                                    <Clock size={10} style={{ color: '#FFF9F0' }} />
+                                                    <p className="text-xs" style={{ color: '#FFF9F0' }}>
                                                         {formatDistanceToNow(conv.lastMessageAt, {
                                                             addSuffix: true,
                                                         })}
                                                     </p>
                                                     {conv.messageCount !== undefined && (
-                                                        <p className="text-xs" style={{ color: '#775E22' }}>
+                                                        <p className="text-xs" style={{ color: '#FFF9F0' }}>
                                                             · {conv.messageCount} messages
                                                         </p>
                                                     )}
@@ -220,7 +221,7 @@ export default function ChatListPage() {
                                             <ChevronRight
                                                 size={14}
                                                 className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                                style={{ color: '#C58B07' }}
+                                                style={{ color: '#F7F2EB' }}
                                             />
                                         </div>
                                     </Link>
@@ -240,7 +241,7 @@ export default function ChatListPage() {
                 >
                     <h2
                         className="text-sm font-semibold tracking-[0.15em] uppercase mb-4 flex items-center gap-2"
-                        style={{ color: '#5A4A30' }}
+                        style={{ color: '#0A1E54' }}
                     >
                         <Archive size={14} /> Archived ({archivedConversations.length})
                     </h2>
@@ -251,10 +252,10 @@ export default function ChatListPage() {
                                 <Link
                                     key={conv._id}
                                     href={`/chat/${conv._id}`}
-                                    className="card-gilded p-3 cursor-pointer block"
+                                    className="card-premium p-3 cursor-pointer block"
                                 >
                                     <div className="flex items-center gap-3">
-                                        <p className="text-sm truncate flex-1" style={{ color: '#B8A88A' }}>
+                                        <p className="text-sm truncate flex-1" style={{ color: '#D0E3FF' }}>
                                             {conv.title}
                                         </p>
                                         <span

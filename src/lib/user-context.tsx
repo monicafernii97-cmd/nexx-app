@@ -34,6 +34,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const [syncError, setSyncError] = useState<string | null>(null);
     const prevClerkId = useRef<string | undefined>(undefined);
     const hasSynced = useRef(false);
+    const syncAttempt = useRef(0);
 
     // Auth-derived query: no args, server derives clerkId from auth context
     const currentUser = useQuery(
@@ -45,9 +46,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const clerkName = clerkUser?.firstName || clerkUser?.fullName || 'User';
     const clerkEmail = clerkUser?.primaryEmailAddress?.emailAddress;
 
-    // On Clerk login, ensure our Convex user record exists
+    // On Clerk login, ensure our Convex user record exists.
+    // Uses an attempt counter so stale completions from a previous identity
+    // cannot corrupt state for the current user.
     const syncUser = useCallback(async () => {
         if (!clerkId) return;
+        const attempt = ++syncAttempt.current;
         setIsSyncing(true);
         setSyncError(null);
         try {
@@ -56,18 +60,24 @@ export function UserProvider({ children }: { children: ReactNode }) {
                 name: clerkName,
                 email: clerkEmail,
             });
+            if (syncAttempt.current === attempt) {
+                hasSynced.current = true;
+            }
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
             console.error('Failed to sync user to Convex:', err);
-            setSyncError(message);
+            if (syncAttempt.current === attempt) {
+                setSyncError(message);
+            }
             throw err; // Re-throw so the effect's .catch() keeps hasSynced false
         } finally {
-            setIsSyncing(false);
+            if (syncAttempt.current === attempt) {
+                setIsSyncing(false);
+            }
         }
     }, [clerkId, clerkName, clerkEmail, ensureUser]);
 
     useEffect(() => {
-        let cancelled = false;
         if (!clerkLoaded) return;
 
         if (!clerkUser) {
@@ -86,17 +96,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
         // Skip if already synced for this identity
         if (hasSynced.current) return;
 
-        syncUser().then(() => {
-            if (!cancelled) {
-                hasSynced.current = true;
-            }
-        }).catch(() => {
+        // syncUser manages hasSynced and state gating via attempt counter
+        syncUser().catch(() => {
             // Leave hasSynced false so future effect runs can retry
         });
-
-        return () => {
-            cancelled = true;
-        };
     }, [clerkLoaded, clerkUser, syncUser]);
 
     const userId = currentUser?._id ?? null;

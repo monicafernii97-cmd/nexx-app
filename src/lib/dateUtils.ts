@@ -8,7 +8,10 @@
  * Falls back to a plain `new Date(dateStr)` if the format is unexpected.
  */
 export function parseLocalDate(dateStr: string): Date {
-    const parts = dateStr?.split('-').map(Number) ?? [];
+    if (!dateStr) {
+        throw new Error('parseLocalDate requires a non-empty date string');
+    }
+    const parts = dateStr.split('-').map(Number);
     if (parts.length === 3 && parts.every((n) => !isNaN(n))) {
         return new Date(parts[0], parts[1] - 1, parts[2]);
     }

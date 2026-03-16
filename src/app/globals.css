@@ -485,6 +485,11 @@ body {
   background: linear-gradient(90deg, transparent, var(--border-primary), transparent);
 }
 
+.gold-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-primary), transparent);
+}
+
 /* Screen-reader only — visually hidden but accessible */
 .sr-only {
   position: absolute;

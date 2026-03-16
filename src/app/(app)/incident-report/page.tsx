@@ -14,6 +14,7 @@ import {
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
+import { parseLocalDate } from '@/lib/dateUtils';
 
 /** Incident Report listing page with search, category filters, and delete functionality. */
 export default function IncidentReportPage() {
@@ -102,6 +103,7 @@ export default function IncidentReportPage() {
                 <div className="flex flex-wrap gap-2">
                     <button
                         onClick={() => setActiveFilter(null)}
+                        aria-pressed={!activeFilter}
                         className={`badge cursor-pointer transition-all ${!activeFilter ? 'badge-primary' : ''}`}
                         style={!activeFilter ? {} : { background: 'rgba(112, 150, 209, 0.15)', color: '#123D7E' }}
                     >
@@ -111,6 +113,7 @@ export default function IncidentReportPage() {
                         <button
                             key={cat.value}
                             onClick={() => setActiveFilter(activeFilter === cat.value ? null : cat.value)}
+                            aria-pressed={activeFilter === cat.value}
                             className="badge cursor-pointer transition-all"
                             style={{
                                 background: activeFilter === cat.value ? `${cat.color}25` : 'rgba(138, 122, 96, 0.08)',
@@ -176,8 +179,7 @@ export default function IncidentReportPage() {
                 ) : (
                     filteredIncidents.map((incident, i) => {
                         const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
-                        const [yr, mo, dy] = incident.date.split('-').map(Number);
-                        const date = new Date(yr, mo - 1, dy);
+                        const date = parseLocalDate(incident.date);
 
                         return (
                             <motion.div

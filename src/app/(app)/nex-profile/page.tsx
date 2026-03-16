@@ -149,7 +149,7 @@ export default function NexProfilePage() {
                         disabled={saving}
                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
                         style={{
-                            background: saved ? 'rgba(90, 158, 111, 0.2)' : 'linear-gradient(135deg, #F7F2EB, #123D7E)',
+                            background: saved ? 'rgba(90, 158, 111, 0.2)' : 'linear-gradient(135deg, #2C5AA0, #123D7E)',
                             color: saved ? '#5A9E6F' : '#FFFFFF',
                             border: saved ? '1px solid rgba(90, 158, 111, 0.3)' : 'none',
                         }}
@@ -222,6 +222,8 @@ export default function NexProfilePage() {
                                     <button
                                         key={behavior}
                                         onClick={() => toggleItem('behaviors', behavior)}
+                                        type="button"
+                                        aria-pressed={selected}
                                         className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-200"
                                         style={{
                                             background: selected ? 'rgba(199, 90, 90, 0.15)' : 'rgba(208, 227, 255, 0.04)',
@@ -246,6 +248,8 @@ export default function NexProfilePage() {
                                 <button
                                     key={style.value}
                                     onClick={() => setForm({ ...form, communicationStyle: style.value })}
+                                    type="button"
+                                    aria-pressed={form.communicationStyle === style.value}
                                     className="text-left px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer"
                                     style={{
                                         background: form.communicationStyle === style.value ? 'rgba(208, 227, 255, 0.12)' : 'rgba(208, 227, 255, 0.03)',
@@ -273,6 +277,8 @@ export default function NexProfilePage() {
                                     <button
                                         key={tactic}
                                         onClick={() => toggleItem('manipulationTactics', tactic)}
+                                        type="button"
+                                        aria-pressed={selected}
                                         className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-200"
                                         style={{
                                             background: selected ? 'rgba(229, 168, 74, 0.15)' : 'rgba(208, 227, 255, 0.04)',
@@ -302,6 +308,8 @@ export default function NexProfilePage() {
                             />
                             <button
                                 onClick={addTrigger}
+                                type="button"
+                                aria-label="Add trigger"
                                 className="px-3 py-2 rounded-lg cursor-pointer transition-colors hover:bg-[rgba(208,227,255,0.15)]"
                                 style={{
                                     background: 'rgba(208, 227, 255, 0.08)',
@@ -326,6 +334,8 @@ export default function NexProfilePage() {
                                         <span className="text-sm" style={{ color: '#D0E3FF' }}>{trigger}</span>
                                         <button
                                             onClick={() => removeTrigger(trigger)}
+                                            type="button"
+                                            aria-label={`Remove trigger: ${trigger}`}
                                             className="cursor-pointer p-1 rounded hover:bg-[rgba(199,90,90,0.1)] transition-colors"
                                         >
                                             <X size={14} style={{ color: '#C75A5A' }} />

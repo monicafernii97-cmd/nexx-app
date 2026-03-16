@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
+import { parseLocalDate } from '@/lib/dateUtils';
 
 const quickActions = [
     { label: 'New Chat', desc: 'Talk to NEXX', href: '/chat', icon: Mic, color: '#F7F2EB' },
@@ -156,7 +157,11 @@ export default function DashboardPage() {
                     Recent Activity
                 </h2>
 
-                {!incidents || incidents.length === 0 ? (
+                {incidents === undefined ? (
+                    <div className="card-premium p-8 text-center">
+                        <p className="text-sm" style={{ color: '#123D7E' }}>Loading activity…</p>
+                    </div>
+                ) : incidents.length === 0 ? (
                     <div className="card-premium p-8 text-center">
                         <div
                             className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
@@ -178,7 +183,7 @@ export default function DashboardPage() {
                     <div className="space-y-3">
                         {incidents.slice(0, 5).map((incident) => {
                             const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
-                            const date = new Date(incident.date);
+                            const date = parseLocalDate(incident.date);
                             return (
                                 <Link key={incident._id} href={`/incident-report/${incident._id}`} className="no-underline block">
                                     <div className="card-premium p-4 group cursor-pointer">

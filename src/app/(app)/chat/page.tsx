@@ -241,7 +241,7 @@ export default function ChatListPage() {
                 >
                     <h2
                         className="text-sm font-semibold tracking-[0.15em] uppercase mb-4 flex items-center gap-2"
-                        style={{ color: '#0A1E54' }}
+                        style={{ color: '#D0E3FF' }}
                     >
                         <Archive size={14} /> Archived ({archivedConversations.length})
                     </h2>

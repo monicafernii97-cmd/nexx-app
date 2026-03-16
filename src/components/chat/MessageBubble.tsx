@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Sparkles, User, Copy, Check } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
 
 interface MessageBubbleProps {
@@ -14,6 +14,13 @@ interface MessageBubbleProps {
 /** Chat message bubble rendering user or assistant messages with copy-to-clipboard support. */
 export default function MessageBubble({ role, content, isStreaming }: MessageBubbleProps) {
     const [copied, setCopied] = useState(false);
+    const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+        };
+    }, []);
 
     const handleCopy = async () => {
         if (!window.isSecureContext || !navigator.clipboard?.writeText) {
@@ -24,7 +31,11 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
         try {
             await navigator.clipboard.writeText(content);
             setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+            copyTimerRef.current = setTimeout(() => {
+                setCopied(false);
+                copyTimerRef.current = null;
+            }, 2000);
         } catch (err) {
             console.error('Failed to copy:', err);
         }

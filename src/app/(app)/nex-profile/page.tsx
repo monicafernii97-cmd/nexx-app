@@ -149,7 +149,7 @@ export default function NexProfilePage() {
                         disabled={saving}
                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
                         style={{
-                            background: saved ? 'rgba(90, 158, 111, 0.2)' : 'linear-gradient(135deg, #F7F2EB, #123D7E)',
+                            background: saved ? 'rgba(90, 158, 111, 0.2)' : 'linear-gradient(135deg, #2C5AA0, #123D7E)',
                             color: saved ? '#5A9E6F' : '#FFFFFF',
                             border: saved ? '1px solid rgba(90, 158, 111, 0.3)' : 'none',
                         }}

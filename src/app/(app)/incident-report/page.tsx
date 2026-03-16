@@ -14,6 +14,7 @@ import {
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
+import { parseLocalDate } from '@/lib/dateUtils';
 
 /** Incident Report listing page with search, category filters, and delete functionality. */
 export default function IncidentReportPage() {
@@ -178,8 +179,7 @@ export default function IncidentReportPage() {
                 ) : (
                     filteredIncidents.map((incident, i) => {
                         const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
-                        const [yr, mo, dy] = incident.date.split('-').map(Number);
-                        const date = new Date(yr, mo - 1, dy);
+                        const date = parseLocalDate(incident.date);
 
                         return (
                             <motion.div

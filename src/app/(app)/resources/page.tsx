@@ -34,6 +34,15 @@ import {
 } from '@/lib/data/resourcesData';
 
 // ═══════════════════════════════════════════
+//  Helpers
+// ═══════════════════════════════════════════
+
+/** True if the string looks like a dialable phone number (digits, spaces, dashes, parens). */
+function isDialable(phone: string): boolean {
+    return /^\+?[\d\s\-()]+$/.test(phone);
+}
+
+// ═══════════════════════════════════════════
 //  Sub-components
 // ═══════════════════════════════════════════
 
@@ -58,14 +67,24 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                     )}
                     <div className="flex flex-wrap items-center gap-3">
                         {resource.phone && (
-                            <a
-                                href={`tel:${resource.phone.replace(/[^\d+]/g, '')}`}
-                                className="flex items-center gap-1 text-xs font-medium no-underline transition-colors hover:opacity-80"
-                                style={{ color: '#5A8EC9' }}
-                            >
-                                <Phone size={11} />
-                                {resource.phone}
-                            </a>
+                            isDialable(resource.phone) ? (
+                                <a
+                                    href={`tel:${resource.phone.replace(/[^\d+]/g, '')}`}
+                                    className="flex items-center gap-1 text-xs font-medium no-underline transition-colors hover:opacity-80"
+                                    style={{ color: '#5A8EC9' }}
+                                >
+                                    <Phone size={11} />
+                                    {resource.phone}
+                                </a>
+                            ) : (
+                                <span
+                                    className="flex items-center gap-1 text-xs font-medium"
+                                    style={{ color: '#5A8EC9' }}
+                                >
+                                    <Phone size={11} />
+                                    {resource.phone}
+                                </span>
+                            )
                         )}
                         {resource.url && (
                             <a
@@ -245,18 +264,12 @@ function CourtResourcesGrid({
 
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {items.map((item) => (
-                <a
-                    key={item.label}
-                    href={item.resource.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="no-underline"
-                >
+            {items.map((item) => {
+                const CardContent = (
                     <motion.div
-                        whileHover={{ scale: 1.02, y: -2 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="card-premium p-4 cursor-pointer group h-full"
+                        whileHover={item.resource.url ? { scale: 1.02, y: -2 } : undefined}
+                        whileTap={item.resource.url ? { scale: 0.98 } : undefined}
+                        className={`card-premium p-4 ${item.resource.url ? 'cursor-pointer' : ''} group h-full`}
                     >
                         <div className="flex items-center gap-3">
                             <div
@@ -276,11 +289,13 @@ function CourtResourcesGrid({
                                     {item.resource.name}
                                 </p>
                             </div>
-                            <ExternalLink
-                                size={13}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                style={{ color: '#7096D1' }}
-                            />
+                            {item.resource.url && (
+                                <ExternalLink
+                                    size={13}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                    style={{ color: '#7096D1' }}
+                                />
+                            )}
                         </div>
                         {item.resource.phone && (
                             <p className="text-xs mt-2 ml-[52px]" style={{ color: '#5A8EC9' }}>
@@ -288,8 +303,24 @@ function CourtResourcesGrid({
                             </p>
                         )}
                     </motion.div>
-                </a>
-            ))}
+                );
+
+                return item.resource.url ? (
+                    <a
+                        key={item.label}
+                        href={item.resource.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="no-underline"
+                    >
+                        {CardContent}
+                    </a>
+                ) : (
+                    <div key={item.label}>
+                        {CardContent}
+                    </div>
+                );
+            })}
         </div>
     );
 }
@@ -374,16 +405,19 @@ export default function ResourcesPage() {
                                 personalized attorney, therapist, and court resources for your area.
                             </p>
                             <div className="flex gap-3">
-                                <Link href="/court-settings" className="no-underline">
-                                    <button className="btn-primary text-xs flex items-center gap-2">
-                                        <Settings size={13} />
-                                        Court Settings
-                                    </button>
+                                <Link
+                                    href="/court-settings"
+                                    className="btn-primary text-xs flex items-center gap-2 no-underline"
+                                >
+                                    <Settings size={13} />
+                                    Court Settings
                                 </Link>
-                                <Link href="/profile" className="no-underline">
-                                    <button className="btn-outline text-xs flex items-center gap-2" style={{ color: '#0A1E54', borderColor: 'rgba(10, 30, 84, 0.2)' }}>
-                                        My Profile
-                                    </button>
+                                <Link
+                                    href="/profile"
+                                    className="btn-outline text-xs flex items-center gap-2 no-underline"
+                                    style={{ color: '#0A1E54', borderColor: 'rgba(10, 30, 84, 0.2)' }}
+                                >
+                                    My Profile
                                 </Link>
                             </div>
                         </div>
@@ -429,7 +463,10 @@ export default function ResourcesPage() {
                     <SectionHeader
                         icon={Landmark}
                         label="Court & County Resources"
-                        subtitle={county ? `${county} County courthouse, clerk, and court information` : 'Your local court resources'}
+                        subtitle={county
+                            ? `${county}${county.toLowerCase().endsWith('county') ? '' : ' County'} courthouse, clerk, and court information`
+                            : 'Your local court resources'
+                        }
                         color="#7096D1"
                     />
                     {stateData ? (
@@ -554,14 +591,24 @@ export default function ResourcesPage() {
                             )}
                             <div className="flex flex-wrap items-center gap-3">
                                 {r.phone && (
-                                    <a
-                                        href={`tel:${r.phone.replace(/[^\d+]/g, '')}`}
-                                        className="flex items-center gap-1 text-xs font-bold no-underline"
-                                        style={{ color: '#F7F2EB' }}
-                                    >
-                                        <Phone size={11} />
-                                        {r.phone}
-                                    </a>
+                                    isDialable(r.phone) ? (
+                                        <a
+                                            href={`tel:${r.phone.replace(/[^\d+]/g, '')}`}
+                                            className="flex items-center gap-1 text-xs font-bold no-underline"
+                                            style={{ color: '#F7F2EB' }}
+                                        >
+                                            <Phone size={11} />
+                                            {r.phone}
+                                        </a>
+                                    ) : (
+                                        <span
+                                            className="flex items-center gap-1 text-xs font-bold"
+                                            style={{ color: '#F7F2EB' }}
+                                        >
+                                            <Phone size={11} />
+                                            {r.phone}
+                                        </span>
+                                    )
                                 )}
                                 {r.url && (
                                     <a

@@ -102,6 +102,7 @@ export default function IncidentReportPage() {
                 <div className="flex flex-wrap gap-2">
                     <button
                         onClick={() => setActiveFilter(null)}
+                        aria-pressed={!activeFilter}
                         className={`badge cursor-pointer transition-all ${!activeFilter ? 'badge-primary' : ''}`}
                         style={!activeFilter ? {} : { background: 'rgba(112, 150, 209, 0.15)', color: '#123D7E' }}
                     >
@@ -111,6 +112,7 @@ export default function IncidentReportPage() {
                         <button
                             key={cat.value}
                             onClick={() => setActiveFilter(activeFilter === cat.value ? null : cat.value)}
+                            aria-pressed={activeFilter === cat.value}
                             className="badge cursor-pointer transition-all"
                             style={{
                                 background: activeFilter === cat.value ? `${cat.color}25` : 'rgba(138, 122, 96, 0.08)',

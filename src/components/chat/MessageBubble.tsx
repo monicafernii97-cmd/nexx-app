@@ -15,15 +15,19 @@ interface MessageBubbleProps {
 export default function MessageBubble({ role, content, isStreaming }: MessageBubbleProps) {
     const [copied, setCopied] = useState(false);
 
-    const handleCopy = () => {
-        navigator.clipboard.writeText(content)
-            .then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-            })
-            .catch((err) => {
-                console.error('Failed to copy:', err);
-            });
+    const handleCopy = async () => {
+        if (!window.isSecureContext || !navigator.clipboard?.writeText) {
+            console.error('Clipboard API unavailable (requires secure context)');
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(content);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+        }
     };
 
     // Simple markdown-like rendering with XSS protection

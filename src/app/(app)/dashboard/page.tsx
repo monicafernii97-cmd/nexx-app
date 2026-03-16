@@ -178,7 +178,8 @@ export default function DashboardPage() {
                     <div className="space-y-3">
                         {incidents.slice(0, 5).map((incident) => {
                             const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
-                            const date = new Date(incident.date);
+                            const [yr, mo, dy] = incident.date.split('-').map(Number);
+                            const date = new Date(yr, mo - 1, dy);
                             return (
                                 <Link key={incident._id} href={`/incident-report/${incident._id}`} className="no-underline block">
                                     <div className="card-premium p-4 group cursor-pointer">

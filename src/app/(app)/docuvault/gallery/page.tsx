@@ -99,6 +99,7 @@ export default function DocuVaultGalleryPage() {
                         onChange={e => setSearchQuery(e.target.value)}
                         placeholder="Search documents..."
                         className="input-premium pl-11"
+                        aria-label="Search documents"
                     />
                 </div>
             </motion.div>
@@ -115,6 +116,7 @@ export default function DocuVaultGalleryPage() {
                         <button
                             key={tab.id}
                             onClick={() => setActiveFilter(tab.id)}
+                            aria-pressed={activeFilter === tab.id}
                             className="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap cursor-pointer transition-all"
                             style={{
                                 background: activeFilter === tab.id
@@ -133,6 +135,7 @@ export default function DocuVaultGalleryPage() {
                 <select
                     value={sortBy}
                     onChange={e => setSortBy(e.target.value as 'newest' | 'oldest' | 'name')}
+                    aria-label="Sort documents"
                     className="text-xs px-3 py-1.5 rounded-lg cursor-pointer appearance-none"
                     style={{
                         background: 'rgba(42, 29, 14, 0.4)',
@@ -192,7 +195,7 @@ export default function DocuVaultGalleryPage() {
                                 initial={{ opacity: 0, y: 12 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.05 * i }}
-                                className="card-premium p-5 group cursor-pointer hover:border-[rgba(112, 150, 209, 0.25)] transition-all"
+                                className="card-premium p-5 group hover:border-[rgba(112,150,209,0.25)] transition-all"
                             >
                                 <div className="flex items-start gap-4">
                                     {/* Preview thumbnail */}
@@ -261,7 +264,7 @@ export default function DocuVaultGalleryPage() {
                                     initial={{ opacity: 0, y: 8 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.05 * i }}
-                                    className="card-premium p-4 flex items-center gap-4 cursor-pointer"
+                                    className="card-premium p-4 flex items-center gap-4"
                                 >
                                     <div
                                         className="w-10 h-12 rounded-lg flex items-center justify-center flex-shrink-0"

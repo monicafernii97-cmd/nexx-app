@@ -217,11 +217,9 @@ function FinderHeroCard({
 
 /** Court & county resources section — link cards in a grid. */
 function CourtResourcesGrid({
-    county,
     stateData,
     countyData,
 }: {
-    county: string;
     stateData: StateResources;
     countyData: CountyResources | null;
 }) {
@@ -436,7 +434,6 @@ export default function ResourcesPage() {
                     />
                     {stateData ? (
                         <CourtResourcesGrid
-                            county={county}
                             stateData={stateData}
                             countyData={countyData}
                         />

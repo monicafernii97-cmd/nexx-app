@@ -495,23 +495,35 @@ const STATE_REGISTRY: Record<string, StateResources> = {
 //  Lookup Helpers
 // ═══════════════════════════════════════════
 
+/**
+ * Case-insensitive key resolver.
+ * Scans own keys of the record and returns the first match, or null.
+ */
+function resolveKey<T>(record: Record<string, T>, key: string): string | null {
+    const lower = key.trim().toLowerCase();
+    return Object.keys(record).find((k) => k.toLowerCase() === lower) ?? null;
+}
+
 /** Look up state-level resources. Returns null if the state is not curated. */
 export function getStateResources(state: string): StateResources | null {
-    return STATE_REGISTRY[state] ?? null;
+    const key = resolveKey(STATE_REGISTRY, state);
+    return key ? STATE_REGISTRY[key] : null;
 }
 
 /** Look up county-level resources within a state. Returns null if not curated. */
 export function getCountyResources(state: string, county: string): CountyResources | null {
-    const stateData = STATE_REGISTRY[state];
-    if (!stateData) return null;
-    // Try exact match first, then strip " County" suffix if present
+    const stateKey = resolveKey(STATE_REGISTRY, state);
+    if (!stateKey) return null;
+    const counties = STATE_REGISTRY[stateKey].counties;
+    // Try direct match first, then strip " County" suffix
     const clean = county.replace(/\s+County$/i, '');
-    return stateData.counties[clean] ?? stateData.counties[county] ?? null;
+    const countyKey = resolveKey(counties, clean) ?? resolveKey(counties, county);
+    return countyKey ? counties[countyKey] : null;
 }
 
 /** Check whether a state has curated data. */
 export function isStateCurated(state: string): boolean {
-    return state in STATE_REGISTRY;
+    return resolveKey(STATE_REGISTRY, state) !== null;
 }
 
 /** Get all curated state names. */

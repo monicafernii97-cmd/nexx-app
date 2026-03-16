@@ -116,6 +116,13 @@ export default function DocuVaultPage() {
             abortControllerRef.current?.abort();
             abortControllerRef.current = new AbortController();
 
+            const petitionerName = clerkUser?.fullName || clerkUser?.firstName;
+            if (!userCourtSettings?.state || !userCourtSettings?.county || !petitionerName) {
+                setGenerationError('Please complete your court settings and profile name before generating a document.');
+                setView('compose');
+                return;
+            }
+
             const res = await fetch('/api/documents/generate/stream', {
                 method: 'POST',
                 signal: abortControllerRef.current.signal,
@@ -123,12 +130,12 @@ export default function DocuVaultPage() {
                 body: JSON.stringify({
                     templateId: selectedTemplate?.id ?? 'petition_divorce',
                     courtSettings: {
-                        state: userCourtSettings?.state ?? 'Texas',
-                        county: userCourtSettings?.county ?? 'Fort Bend',
-                        courtName: userCourtSettings?.courtName,
-                        judicialDistrict: userCourtSettings?.judicialDistrict,
+                        state: userCourtSettings.state,
+                        county: userCourtSettings.county,
+                        courtName: userCourtSettings.courtName,
+                        judicialDistrict: userCourtSettings.judicialDistrict,
                     },
-                    petitioner: { name: clerkUser?.fullName || clerkUser?.firstName || 'Petitioner' },
+                    petitioner: { name: petitionerName },
                     caseType: selectedTemplate?.caseTypes?.[0] ?? 'general',
                     bodyContent: documentContent ? [{ heading: 'Content', paragraphs: [documentContent] }] : [],
                 }),

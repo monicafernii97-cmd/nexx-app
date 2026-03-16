@@ -111,7 +111,7 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                         href={resource.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                        className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 rounded transition-opacity"
                         aria-label={`Open ${resource.name} website`}
                     >
                         <ArrowRight size={14} style={{ color: '#0A1E54' }} />
@@ -268,7 +268,6 @@ function CourtResourcesGrid({
             {items.map((item) => {
                 const CardContent = (
                     <motion.div
-                        key={item.label}
                         whileHover={item.resource.url ? { scale: 1.02, y: -2 } : undefined}
                         whileTap={item.resource.url ? { scale: 0.98 } : undefined}
                         className={`card-premium p-4 ${item.resource.url ? 'cursor-pointer' : ''} group h-full`}

@@ -16,5 +16,9 @@ export function parseLocalDate(dateStr: string): Date {
         return new Date(parts[0], parts[1] - 1, parts[2]);
     }
     // Fallback for non-standard formats
-    return new Date(dateStr);
+    const result = new Date(dateStr);
+    if (isNaN(result.getTime())) {
+        throw new Error(`Invalid date string: ${dateStr}`);
+    }
+    return result;
 }

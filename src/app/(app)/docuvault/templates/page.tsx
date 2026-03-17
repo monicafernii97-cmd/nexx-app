@@ -81,6 +81,7 @@ export default function TemplateGalleryPage() {
         return templates;
     }, []);
 
+    /** Filter tabs including 'All' plus each template category. */
     const filterTabs = [
         { id: 'all', label: 'All' },
         ...UI_TABS.filter((t) => t.id !== 'create_own').map((t) => ({

@@ -73,7 +73,7 @@ function DocuVaultPageInner() {
         };
     }, []);
 
-    // Get templates for current tab
+    /** Templates available for the currently active category tab. */
     const templates = getTemplatesForTab(activeTab);
 
     const initialSelectionDoneRef = useRef(false);

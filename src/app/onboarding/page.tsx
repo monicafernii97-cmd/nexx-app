@@ -69,7 +69,7 @@ export default function OnboardingPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
 
-    // Terminal state: Clerk signed in but Convex auth failed to sync
+    /** Terminal state: Clerk signed in but Convex auth failed to sync. */
     const convexAuthFailed = !convexLoading && !convexReady && !!clerkUser;
 
     // Show loading state while Convex auth is syncing
@@ -212,6 +212,7 @@ export default function OnboardingPage() {
         }
     };
 
+    /** NEX behavior options presented during onboarding step 3. */
     const nexBehaviorOptions = [
         'Threatens contempt / court action',
         'Micromanages my parenting',
@@ -227,6 +228,7 @@ export default function OnboardingPage() {
         'Gaslights or rewrites history',
     ];
 
+    /** Goal options presented during onboarding step 4. */
     const goalOptions = [
         'Respond strategically to my NEX',
         'Document incidents for court',

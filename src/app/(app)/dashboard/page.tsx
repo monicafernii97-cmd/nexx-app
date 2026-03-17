@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { parseLocalDate } from '@/lib/dateUtils';
 
+/** Quick-action cards linking to primary user flows. */
 const quickActions = [
     { label: 'New Chat', desc: 'Talk to NEXX', href: '/chat', icon: Mic, color: '#F7F2EB' },
     { label: 'Log Incident', desc: 'Document an event', href: '/incident-report/new', icon: Plus, color: '#5A9E6F' },
@@ -36,6 +37,7 @@ export default function DashboardPage() {
     const conversationCount = conversations?.length ?? 0;
     const confirmedCount = incidents?.filter((i) => i.status === 'confirmed').length ?? 0;
 
+    /** Summary statistics displayed in the dashboard header grid. */
     const stats = [
         { label: 'Documented Incidents', value: String(incidentCount), icon: Shield, color: '#F7F2EB' },
         { label: 'Active Conversations', value: String(conversationCount), icon: MessageCircle, color: '#5A9E6F' },
@@ -51,6 +53,7 @@ export default function DashboardPage() {
         return 'Good evening';
     };
 
+    /** Formatted display name for the greeting header (empty if unavailable). */
     const userName = user?.name ? `, ${user.name}` : '';
 
     return (

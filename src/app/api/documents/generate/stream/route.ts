@@ -18,6 +18,7 @@ import type { DocumentGenerationRequest, CaptionData } from '@/lib/legal/types';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { titleCase } from '@/lib/utils/stringHelpers';
 
+/** Maximum serverless function duration in seconds (Vercel Pro plan). */
 export const maxDuration = 60;
 
 /** Progress event sent to client */

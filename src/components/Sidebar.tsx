@@ -24,12 +24,14 @@ import { useState, useMemo, useCallback } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 
+/** Child navigation item definition for sidebar sub-menus. */
 interface NavChild {
     label: string;
     href: string;
     icon: React.ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>;
 }
 
+/** Top-level navigation item with optional expandable children. */
 interface NavItem {
     label: string;
     href: string;
@@ -37,6 +39,7 @@ interface NavItem {
     children?: NavChild[];
 }
 
+/** Ordered list of sidebar navigation items with DocuVault sub-routes. */
 const navItems: NavItem[] = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Chat', href: '/chat', icon: MessageCircle },

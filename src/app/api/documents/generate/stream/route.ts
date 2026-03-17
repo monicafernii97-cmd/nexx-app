@@ -82,8 +82,9 @@ export async function POST(request: NextRequest) {
 
   // ── Stream response ──
   const stream = new ReadableStream({
+    /** Start the SSE stream: generate the document in stages and emit progress events. */
     async start(controller) {
-      // Listen for client disconnect
+      /** Close the stream controller when the client disconnects. */
       const abortHandler = () => { try { controller.close(); } catch { /* already closed */ } };
       request.signal.addEventListener('abort', abortHandler);
 

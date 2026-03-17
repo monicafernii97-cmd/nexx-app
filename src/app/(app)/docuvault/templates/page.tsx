@@ -70,7 +70,7 @@ export default function TemplateGalleryPage() {
     const handleClosePreview = useCallback(() => setPreviewTemplate(null), []);
     const previewDialogRef = useFocusTrap(!!previewTemplate, handleClosePreview);
 
-    // Gather all templates across tabs (excluding create_own)
+    /** Aggregate all templates from every tab (excluding 'create_own') into a flat list. */
     const allTemplates = useMemo(() => {
         const templates: { template: DocumentTemplate; tabId: UITabCategory; tabLabel: string }[] = [];
         UI_TABS.filter((t) => t.id !== 'create_own').forEach((tab) => {
@@ -89,7 +89,7 @@ export default function TemplateGalleryPage() {
         })),
     ];
 
-    // Filter & search
+    /** Filter the template list by active tab and free-text search query. */
     const filteredTemplates = useMemo(() => {
         return allTemplates.filter(({ template, tabId }) => {
             if (activeFilter !== 'all' && tabId !== activeFilter) return false;

@@ -64,7 +64,7 @@ export default function Sidebar() {
     const { user, isLoaded } = useUser();
     const [manualExpanded, setManualExpanded] = useState<Record<string, boolean>>({});
 
-    // Compute expanded items: auto-expand parents whose child route is active
+    /** Compute which nav groups are expanded — auto-expand active parent routes, merge manual overrides. */
     const expandedItems = useMemo(() => {
         const autoExpanded: Record<string, boolean> = {};
         if (pathname) {

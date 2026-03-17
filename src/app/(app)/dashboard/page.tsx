@@ -43,6 +43,7 @@ export default function DashboardPage() {
         { label: 'Pattern Alerts', value: '0', icon: AlertTriangle, color: '#E5A84A' },
     ];
 
+    /** Return a time-of-day greeting string (morning, afternoon, or evening). */
     const greeting = () => {
         const hour = new Date().getHours();
         if (hour < 12) return 'Good morning';

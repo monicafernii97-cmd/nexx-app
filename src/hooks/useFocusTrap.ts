@@ -18,6 +18,7 @@ export function useFocusTrap(
     const containerRef = useRef<HTMLDivElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
 
+    /** Query all focusable elements within the trap container. */
     const getFocusableElements = useCallback(() => {
         if (!containerRef.current) return [];
         return Array.from(
@@ -43,6 +44,7 @@ export function useFocusTrap(
             }
         });
 
+        /** Handle Escape to close and Tab/Shift-Tab to cycle focus within the trap. */
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 e.preventDefault();

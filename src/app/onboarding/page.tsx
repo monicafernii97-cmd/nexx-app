@@ -119,10 +119,12 @@ export default function OnboardingPage() {
         );
     }
 
+    /** Update a single field in the onboarding form data. */
     const update = (field: string, value: unknown) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
     };
 
+    /** Toggle an item in a multi-select array field (nexBehaviors or primaryGoals). */
     const toggleArrayItem = (field: 'nexBehaviors' | 'primaryGoals', item: string) => {
         setFormData((prev) => ({
             ...prev,
@@ -132,6 +134,7 @@ export default function OnboardingPage() {
         }));
     };
 
+    /** Check whether the current onboarding step has valid, required data to proceed. */
     const canProceed = () => {
         switch (currentStep) {
             case 0: return true;
@@ -144,6 +147,7 @@ export default function OnboardingPage() {
         }
     };
 
+    /** Advance to the next step or, on the final step, save profile data and redirect. */
     const handleNext = async () => {
         if (currentStep < ONBOARDING_STEPS.length - 1) {
             setCurrentStep((prev) => prev + 1);

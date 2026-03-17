@@ -176,6 +176,7 @@ function DocuVaultPageInner() {
                     if (generationTokenRef.current !== currentToken) return;
                     if (!line.startsWith('data: ')) continue;
 
+                    /** Parse an SSE data line as JSON; warn and return null on failure. */
                     const event = (() => {
                         try {
                             return JSON.parse(line.slice(6));

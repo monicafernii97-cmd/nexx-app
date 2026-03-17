@@ -32,6 +32,7 @@ function formatDateSafe(dateStr: string): string {
     }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
+/** Analyze an incident narrative via OpenAI, returning court summary, behavioral analysis, strategic response, and pattern tags. */
 export async function POST(req: NextRequest) {
     try {
         const { userId } = await auth();

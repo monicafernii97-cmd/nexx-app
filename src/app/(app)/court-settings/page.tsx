@@ -19,7 +19,7 @@ import {
     Building2,
 } from 'lucide-react';
 
-/** Court settings page — state/county selection, case details, and AI court rules verification. */
+/** Court settings page for configuring state, county, judge, and cause number. */
 export default function CourtSettingsPage() {
     const existingSettings = useQuery(api.courtSettings.get);
     const upsertSettings = useMutation(api.courtSettings.upsert);
@@ -78,7 +78,7 @@ export default function CourtSettingsPage() {
 
     // Close dropdowns on outside click
     useEffect(() => {
-        /** Close state/county dropdowns when clicking outside their refs. */
+        /** Close open dropdowns when clicking outside their container. */
         function handleClick(e: MouseEvent) {
             if (countyDropdownRef.current && !countyDropdownRef.current.contains(e.target as Node) &&
                 countyInputRef.current && !countyInputRef.current.contains(e.target as Node)) {
@@ -164,17 +164,17 @@ export default function CourtSettingsPage() {
                         <div
                             className="w-10 h-10 rounded-xl flex items-center justify-center"
                             style={{
-                                background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
-                                boxShadow: '0 2px 12px rgba(197, 139, 7, 0.25)',
+                                background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
+                                boxShadow: '0 2px 12px rgba(208, 227, 255, 0.25)',
                             }}
                         >
-                            <Gavel size={18} style={{ color: '#02022d' }} />
+                            <Gavel size={18} style={{ color: '#F7F2EB' }} />
                         </div>
-                        <h1 className="text-headline text-2xl" style={{ color: '#F5EFE0' }}>
+                        <h1 className="text-headline text-2xl" style={{ color: '#F7F2EB' }}>
                             Court Settings
                         </h1>
                     </div>
-                    <p className="text-sm" style={{ color: '#8A7A60' }}>
+                    <p className="text-sm" style={{ color: '#FFF9F0' }}>
                         Configure your court location and formatting preferences. These settings are used when generating legal documents.
                     </p>
                 </div>
@@ -185,13 +185,13 @@ export default function CourtSettingsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="card-gilded p-6 mb-6"
+                className="card-premium p-6 mb-6"
             >
                 <div className="flex items-center gap-2 mb-5">
-                    <MapPin size={16} style={{ color: '#C58B07' }} />
+                    <MapPin size={16} style={{ color: '#F7F2EB' }} />
                     <h2
                         className="text-sm font-semibold tracking-[0.15em] uppercase"
-                        style={{ color: '#92783A' }}
+                        style={{ color: '#D0E3FF' }}
                     >
                         Court Location
                     </h2>
@@ -200,8 +200,8 @@ export default function CourtSettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* State Dropdown */}
                     <div className="relative">
-                        <label htmlFor="court-state-input" className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
-                            State <span style={{ color: '#C58B07' }}>*</span>
+                        <label htmlFor="court-state-input" className="block text-xs font-medium mb-1.5" style={{ color: '#D0E3FF' }}>
+                            State <span style={{ color: '#F7F2EB' }}>*</span>
                         </label>
                         <div className="relative">
                             <input
@@ -220,15 +220,15 @@ export default function CourtSettingsPage() {
                                 className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-all"
                                 style={{
                                     background: 'rgba(2, 2, 45, 0.6)',
-                                    border: '1px solid rgba(197, 139, 7, 0.15)',
-                                    color: '#F5EFE0',
+                                    border: '1px solid rgba(208, 227, 255, 0.15)',
+                                    color: '#F7F2EB',
                                 }}
                                 id="court-state-input"
                             />
                             <ChevronDown
                                 size={14}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                                style={{ color: '#8A7A60' }}
+                                style={{ color: '#FFF9F0' }}
                             />
                         </div>
                         <AnimatePresence>
@@ -240,8 +240,8 @@ export default function CourtSettingsPage() {
                                     exit={{ opacity: 0, y: -4 }}
                                     className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto rounded-xl"
                                     style={{
-                                        background: '#1A1008',
-                                        border: '1px solid rgba(197, 139, 7, 0.2)',
+                                        background: '#F7F2EB',
+                                        border: '1px solid rgba(208, 227, 255, 0.2)',
                                         boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
                                     }}
                                 >
@@ -255,9 +255,9 @@ export default function CourtSettingsPage() {
                                                 setShowStateDropdown(false);
                                                 setStateQuery('');
                                             }}
-                                            className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-[rgba(197,139,7,0.08)] cursor-pointer"
+                                            className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-[rgba(208,227,255,0.08)] cursor-pointer"
                                             style={{
-                                                color: s === state ? '#C58B07' : '#B8A88A',
+                                                color: s === state ? '#0A1E54' : '#123D7E',
                                                 fontWeight: s === state ? 600 : 400,
                                             }}
                                         >
@@ -271,8 +271,8 @@ export default function CourtSettingsPage() {
 
                     {/* County Typeahead */}
                     <div className="relative">
-                        <label htmlFor="court-county-input" className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
-                            County <span style={{ color: '#C58B07' }}>*</span>
+                        <label htmlFor="court-county-input" className="block text-xs font-medium mb-1.5" style={{ color: '#D0E3FF' }}>
+                            County <span style={{ color: '#F7F2EB' }}>*</span>
                         </label>
                         <div className="relative">
                             <input
@@ -292,15 +292,15 @@ export default function CourtSettingsPage() {
                                 className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-all disabled:opacity-40"
                                 style={{
                                     background: 'rgba(2, 2, 45, 0.6)',
-                                    border: '1px solid rgba(197, 139, 7, 0.15)',
-                                    color: '#F5EFE0',
+                                    border: '1px solid rgba(208, 227, 255, 0.15)',
+                                    color: '#F7F2EB',
                                 }}
                                 id="court-county-input"
                             />
                             <Search
                                 size={14}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                                style={{ color: '#8A7A60' }}
+                                style={{ color: '#FFF9F0' }}
                             />
                         </div>
                         <AnimatePresence>
@@ -312,8 +312,8 @@ export default function CourtSettingsPage() {
                                     exit={{ opacity: 0, y: -4 }}
                                     className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto rounded-xl"
                                     style={{
-                                        background: '#1A1008',
-                                        border: '1px solid rgba(197, 139, 7, 0.2)',
+                                        background: '#F7F2EB',
+                                        border: '1px solid rgba(208, 227, 255, 0.2)',
                                         boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
                                     }}
                                 >
@@ -325,9 +325,9 @@ export default function CourtSettingsPage() {
                                                 setCountyQuery('');
                                                 setShowCountyDropdown(false);
                                             }}
-                                            className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-[rgba(197,139,7,0.08)] cursor-pointer"
+                                            className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-[rgba(208,227,255,0.08)] cursor-pointer"
                                             style={{
-                                                color: c === county ? '#C58B07' : '#B8A88A',
+                                                color: c === county ? '#0A1E54' : '#123D7E',
                                                 fontWeight: c === county ? 600 : 400,
                                             }}
                                         >
@@ -341,8 +341,8 @@ export default function CourtSettingsPage() {
 
                     {/* Court Name */}
                     <div className="md:col-span-2">
-                        <label htmlFor="court-name-input" className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
-                            Court Name <span className="text-xs" style={{ color: '#5A4A30' }}>(optional)</span>
+                        <label htmlFor="court-name-input" className="block text-xs font-medium mb-1.5" style={{ color: '#D0E3FF' }}>
+                            Court Name <span className="text-xs" style={{ color: '#D0E3FF' }}>(optional)</span>
                         </label>
                         <input
                             type="text"
@@ -352,8 +352,8 @@ export default function CourtSettingsPage() {
                             className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-all"
                             style={{
                                 background: 'rgba(2, 2, 45, 0.6)',
-                                border: '1px solid rgba(197, 139, 7, 0.15)',
-                                color: '#F5EFE0',
+                                border: '1px solid rgba(208, 227, 255, 0.15)',
+                                color: '#F7F2EB',
                             }}
                             id="court-name-input"
                         />
@@ -366,13 +366,13 @@ export default function CourtSettingsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="card-gilded p-6 mb-6"
+                className="card-premium p-6 mb-6"
             >
                 <div className="flex items-center gap-2 mb-5">
-                    <FileText size={16} style={{ color: '#C58B07' }} />
+                    <FileText size={16} style={{ color: '#F7F2EB' }} />
                     <h2
                         className="text-sm font-semibold tracking-[0.15em] uppercase"
-                        style={{ color: '#92783A' }}
+                        style={{ color: '#D0E3FF' }}
                     >
                         Case Details
                     </h2>
@@ -380,7 +380,7 @@ export default function CourtSettingsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label htmlFor="cause-number-input" className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
+                        <label htmlFor="cause-number-input" className="block text-xs font-medium mb-1.5" style={{ color: '#D0E3FF' }}>
                             Cause Number
                         </label>
                         <input
@@ -391,21 +391,21 @@ export default function CourtSettingsPage() {
                             className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
                             style={{
                                 background: 'rgba(2, 2, 45, 0.6)',
-                                border: '1px solid rgba(197, 139, 7, 0.15)',
-                                color: '#F5EFE0',
+                                border: '1px solid rgba(208, 227, 255, 0.15)',
+                                color: '#F7F2EB',
                             }}
                             id="cause-number-input"
                         />
                     </div>
                     <div>
-                        <label htmlFor="judge-input" className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
+                        <label htmlFor="judge-input" className="block text-xs font-medium mb-1.5" style={{ color: '#D0E3FF' }}>
                             Assigned Judge
                         </label>
                         <div className="relative">
                             <User
                                 size={14}
                                 className="absolute left-3 top-1/2 -translate-y-1/2"
-                                style={{ color: '#5A4A30' }}
+                                style={{ color: '#D0E3FF' }}
                             />
                             <input
                                 type="text"
@@ -415,22 +415,22 @@ export default function CourtSettingsPage() {
                                 className="w-full pl-8 pr-3 py-2.5 rounded-xl text-sm outline-none"
                                 style={{
                                     background: 'rgba(2, 2, 45, 0.6)',
-                                    border: '1px solid rgba(197, 139, 7, 0.15)',
-                                    color: '#F5EFE0',
+                                    border: '1px solid rgba(208, 227, 255, 0.15)',
+                                    color: '#F7F2EB',
                                 }}
                                 id="judge-input"
                             />
                         </div>
                     </div>
                     <div className="md:col-span-2">
-                        <label htmlFor="judicial-district-input" className="block text-xs font-medium mb-1.5" style={{ color: '#B8A88A' }}>
+                        <label htmlFor="judicial-district-input" className="block text-xs font-medium mb-1.5" style={{ color: '#D0E3FF' }}>
                             Judicial District
                         </label>
                         <div className="relative">
                             <Building2
                                 size={14}
                                 className="absolute left-3 top-1/2 -translate-y-1/2"
-                                style={{ color: '#5A4A30' }}
+                                style={{ color: '#D0E3FF' }}
                             />
                             <input
                                 type="text"
@@ -440,8 +440,8 @@ export default function CourtSettingsPage() {
                                 className="w-full pl-8 pr-3 py-2.5 rounded-xl text-sm outline-none"
                                 style={{
                                     background: 'rgba(2, 2, 45, 0.6)',
-                                    border: '1px solid rgba(197, 139, 7, 0.15)',
-                                    color: '#F5EFE0',
+                                    border: '1px solid rgba(208, 227, 255, 0.15)',
+                                    color: '#F7F2EB',
                                 }}
                                 id="judicial-district-input"
                             />
@@ -455,18 +455,18 @@ export default function CourtSettingsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="card-gilded p-6 mb-6"
+                className="card-premium p-6 mb-6"
             >
                 <div className="flex items-center gap-2 mb-4">
-                    <Sparkles size={16} style={{ color: '#C58B07' }} />
+                    <Sparkles size={16} style={{ color: '#F7F2EB' }} />
                     <h2
                         className="text-sm font-semibold tracking-[0.15em] uppercase"
-                        style={{ color: '#92783A' }}
+                        style={{ color: '#D0E3FF' }}
                     >
                         AI Court Rules Verification
                     </h2>
                 </div>
-                <p className="text-xs mb-4" style={{ color: '#8A7A60' }}>
+                <p className="text-xs mb-4" style={{ color: '#FFF9F0' }}>
                     NEXX AI will search official court websites and local rules to verify formatting
                     requirements for your selected court. This ensures your documents comply with
                     local filing standards.
@@ -476,7 +476,7 @@ export default function CourtSettingsPage() {
                     <button
                         onClick={handleVerify}
                         disabled={!state || !county || verifying}
-                        className="btn-gold text-xs flex items-center gap-2 disabled:opacity-40"
+                        className="btn-primary text-xs flex items-center gap-2 disabled:opacity-40"
                     >
                         {verifying ? (
                             <>
@@ -519,7 +519,7 @@ export default function CourtSettingsPage() {
                             className="mt-4 rounded-xl p-4"
                             style={{
                                 background: 'rgba(2, 2, 45, 0.4)',
-                                border: '1px solid rgba(197, 139, 7, 0.1)',
+                                border: '1px solid rgba(208, 227, 255, 0.1)',
                             }}
                         >
                             <div className="flex items-center gap-2 mb-2">
@@ -528,13 +528,13 @@ export default function CourtSettingsPage() {
                                 ) : (
                                     <AlertTriangle size={14} style={{ color: '#FF9800' }} />
                                 )}
-                                <span className="text-xs font-medium" style={{ color: '#B8A88A' }}>
+                                <span className="text-xs font-medium" style={{ color: '#D0E3FF' }}>
                                     Confidence: {Math.round(verifyResult.confidence * 100)}%
                                 </span>
                             </div>
                             {verifyResult.sources.length > 0 && (
                                 <div className="mt-2">
-                                    <span className="text-xs" style={{ color: '#5A4A30' }}>Sources:</span>
+                                    <span className="text-xs" style={{ color: '#D0E3FF' }}>Sources:</span>
                                     <ul className="mt-1 space-y-1">
                                         {verifyResult.sources.slice(0, 3).map((url) => {
                                             try {
@@ -549,7 +549,7 @@ export default function CourtSettingsPage() {
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="text-xs truncate block hover:underline"
-                                                            style={{ color: '#C58B07' }}
+                                                            style={{ color: '#F7F2EB' }}
                                                         >
                                                             {parsed.hostname}
                                                         </a>
@@ -563,7 +563,7 @@ export default function CourtSettingsPage() {
                                 </div>
                             )}
                             {verifyResult.confidence === 0 && (
-                                <p className="text-xs mt-2" style={{ color: '#8A7A60' }}>
+                                <p className="text-xs mt-2" style={{ color: '#FFF9F0' }}>
                                     No specific formatting rules found for this court. Default state rules will be applied.
                                 </p>
                             )}
@@ -582,7 +582,7 @@ export default function CourtSettingsPage() {
                 <button
                     onClick={handleSave}
                     disabled={!state || !county || saving}
-                    className="btn-gold text-sm flex items-center gap-2 px-8 py-3 disabled:opacity-40"
+                    className="btn-primary text-sm flex items-center gap-2 px-8 py-3 disabled:opacity-40"
                 >
                     {saving ? (
                         'Saving...'
@@ -626,7 +626,7 @@ export default function CourtSettingsPage() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
                 className="text-center text-xs mt-8 mb-4"
-                style={{ color: '#5A4A30' }}
+                style={{ color: '#D0E3FF' }}
             >
                 Court settings are used to format legal documents per your local court&apos;s requirements.
             </motion.p>

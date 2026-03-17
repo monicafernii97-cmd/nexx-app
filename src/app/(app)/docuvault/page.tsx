@@ -308,7 +308,7 @@ function DocuVaultPageInner() {
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.1 }}
                         className="text-xs mb-6"
-                        style={{ color: '#5A4A30' }}
+                        style={{ color: '#0A1E54' }}
                     >
                         Generate court-ready PDFs with AI precision. Trustworthy. Semantic. Verbatim.
                     </motion.p>
@@ -448,7 +448,7 @@ function DocuVaultPageInner() {
                                                 <FileText
                                                     size={28}
                                                     style={{
-                                                        color: isSelected ? '#F7F2EB' : '#5A4A30',
+                                                        color: isSelected ? '#F7F2EB' : '#0A1E54',
                                                     }}
                                                 />
                                             </div>
@@ -531,7 +531,7 @@ function DocuVaultPageInner() {
                                     </button>
                                 )}
                             </div>
-                            <p className="text-xs" style={{ color: '#5A4A30' }}>
+                            <p className="text-xs" style={{ color: '#0A1E54' }}>
                                 {documentContent.length > 0 ? `${documentContent.length} chars` : ''}
                             </p>
                         </div>
@@ -596,7 +596,7 @@ function DocuVaultPageInner() {
                                     </div>
                                     <p
                                         className="text-xs text-center whitespace-pre-line leading-tight"
-                                        style={{ color: '#5A4A30' }}
+                                        style={{ color: '#0A1E54' }}
                                     >
                                         {item.label}
                                     </p>
@@ -739,7 +739,7 @@ function DocuVaultPageInner() {
                                                 ? '#5A9E6F'
                                                 : step.status === 'active'
                                                     ? '#F7F2EB'
-                                                    : '#5A4A30',
+                                                    : '#0A1E54',
                                         }}
                                     >
                                         {step.label}

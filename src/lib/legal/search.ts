@@ -99,15 +99,17 @@ export function extractLegalQuery(message: string): string {
  * Lazily initialised Tavily client (singleton).
  * Returns null if the API key is not configured (graceful degradation).
  */
-let cachedTavilyClient: ReturnType<typeof tavily> | null = null;
+let cachedTavilyClient: ReturnType<typeof tavily> | null | undefined = undefined;
 
+/** Return the singleton Tavily API client, or null if the API key is missing. */
 function getTavilyClient() {
-    if (cachedTavilyClient) return cachedTavilyClient;
+    if (cachedTavilyClient !== undefined) return cachedTavilyClient;
 
     const apiKey = process.env.TAVILY_API_KEY;
     if (!apiKey) {
         console.warn('[legal/search] TAVILY_API_KEY is not set — statute search disabled.');
-        return null;
+        cachedTavilyClient = null;
+        return cachedTavilyClient;
     }
     cachedTavilyClient = tavily({ apiKey });
     return cachedTavilyClient;

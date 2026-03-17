@@ -19,7 +19,7 @@ const MAX_QUERY_LENGTH = 500;
 const MAX_STATE_LENGTH = 50;
 const MAX_COUNTY_LENGTH = 50;
 
-/** Handle POST requests to search legal statutes via Tavily. */
+/** Search for state-specific family law statutes via Tavily and return matching results. */
 export async function POST(req: NextRequest) {
     try {
         const { userId } = await auth();

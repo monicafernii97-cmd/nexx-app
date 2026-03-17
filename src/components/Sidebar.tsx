@@ -57,7 +57,7 @@ const navItems: NavItem[] = [
     { label: 'Settings', href: '/settings', icon: Settings },
 ];
 
-/** Primary sidebar navigation with collapsible layout and expandable sub-items. */
+/** Collapsible navigation sidebar with branded logo, nav items, user info, and auth state. */
 export default function Sidebar() {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);

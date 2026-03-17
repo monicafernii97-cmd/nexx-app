@@ -13,6 +13,7 @@ export default clerkMiddleware(async (auth, req) => {
     }
 });
 
+/** Next.js middleware matcher configuration — runs Clerk on all non-static routes. */
 export const config = {
     matcher: [
         // Skip Next.js internals and all static files

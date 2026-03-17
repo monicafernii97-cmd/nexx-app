@@ -11,6 +11,7 @@ import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
 import { MODE_LABELS } from '@/lib/constants';
 
+/** Full-screen chat interface for a single NEXX AI conversation. */
 export default function ConversationPage() {
     const params = useParams();
     const router = useRouter();
@@ -174,26 +175,26 @@ export default function ConversationPage() {
                 initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-center gap-3 pb-4 mb-4"
-                style={{ borderBottom: '1px solid rgba(197, 139, 7, 0.1)' }}
+                style={{ borderBottom: '1px solid rgba(208, 227, 255, 0.1)' }}
             >
                 <button
                     onClick={() => router.push('/chat')}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(197,139,7,0.08)]"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(208, 227, 255,0.08)]"
                     aria-label="Back to conversations"
                 >
-                    <ArrowLeft size={16} style={{ color: '#C58B07' }} />
+                    <ArrowLeft size={16} style={{ color: '#F7F2EB' }} />
                 </button>
                 <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center"
                     style={{
-                        background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
-                        boxShadow: '0 2px 12px rgba(197, 139, 7, 0.25)',
+                        background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
+                        boxShadow: '0 2px 12px rgba(208, 227, 255, 0.25)',
                     }}
                 >
-                    <Sparkles size={18} style={{ color: '#02022d' }} />
+                    <Sparkles size={18} style={{ color: '#F7F2EB' }} />
                 </div>
                 <div className="flex-1">
-                    <h1 className="text-lg font-semibold" style={{ color: '#F5EFE0' }}>
+                    <h1 className="text-lg font-semibold" style={{ color: '#F7F2EB' }}>
                         {conversation?.title || 'NEXX Strategic AI'}
                     </h1>
                     <div className="flex items-center gap-2">
@@ -206,18 +207,18 @@ export default function ConversationPage() {
                         >
                             {modeInfo.label}
                         </span>
-                        <p className="text-xs" style={{ color: '#92783A' }}>
+                        <p className="text-xs" style={{ color: '#D0E3FF' }}>
                             Executive Intelligence
                         </p>
                     </div>
                 </div>
                 <button
                     onClick={handleArchive}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(197,139,7,0.08)]"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(208, 227, 255,0.08)]"
                     title="Archive conversation"
                     aria-label="Archive conversation"
                 >
-                    <ArchiveIcon size={14} style={{ color: '#8A7A60' }} />
+                    <ArchiveIcon size={14} style={{ color: '#FFF9F0' }} />
                 </button>
             </motion.div>
 
@@ -233,19 +234,19 @@ export default function ConversationPage() {
                         <div
                             className="w-20 h-20 rounded-2xl mb-6 flex items-center justify-center"
                             style={{
-                                background: 'rgba(197, 139, 7, 0.08)',
-                                border: '1px solid rgba(197, 139, 7, 0.15)',
+                                background: 'rgba(208, 227, 255, 0.08)',
+                                border: '1px solid rgba(208, 227, 255, 0.15)',
                             }}
                         >
-                            <Sparkles size={32} style={{ color: '#C58B07' }} />
+                            <Sparkles size={32} style={{ color: '#F7F2EB' }} />
                         </div>
                         <h2
                             className="font-serif text-2xl font-semibold mb-2"
-                            style={{ color: '#F5EFE0' }}
+                            style={{ color: '#F7F2EB' }}
                         >
                             How can I help you today?
                         </h2>
-                        <p className="text-sm max-w-md" style={{ color: '#8A7A60' }}>
+                        <p className="text-sm max-w-md" style={{ color: '#FFF9F0' }}>
                             Share what&apos;s on your mind — an incident, a message from your NEX,
                             a legal question, or just how you&apos;re feeling. I&apos;m here.
                         </p>
@@ -277,18 +278,18 @@ export default function ConversationPage() {
                         className="flex gap-3"
                     >
                         <div
-                            className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center animate-pulse-gold"
+                            className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center animate-pulse-primary"
                             style={{
-                                background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
+                                background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
                             }}
                         >
-                            <Sparkles size={14} style={{ color: '#02022d' }} />
+                            <Sparkles size={14} style={{ color: '#0A1E54' }} />
                         </div>
                         <div
                             className="rounded-2xl rounded-bl-md px-5 py-4"
                             style={{
-                                background: '#02022d',
-                                border: '1px solid rgba(197, 139, 7, 0.1)',
+                                background: '#F7F2EB',
+                                border: '1px solid rgba(208, 227, 255, 0.1)',
                             }}
                         >
                             <div className="flex gap-1.5">
@@ -296,7 +297,7 @@ export default function ConversationPage() {
                                     <motion.div
                                         key={j}
                                         className="w-2 h-2 rounded-full"
-                                        style={{ background: '#C58B07' }}
+                                        style={{ background: '#7096D1' }}
                                         animate={{ opacity: [0.3, 1, 0.3] }}
                                         transition={{
                                             duration: 1,
@@ -319,10 +320,10 @@ export default function ConversationPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
                 className="pt-4"
-                style={{ borderTop: '1px solid rgba(197, 139, 7, 0.1)' }}
+                style={{ borderTop: '1px solid rgba(208, 227, 255, 0.1)' }}
             >
                 <ChatInput onSend={handleSend} disabled={isStreaming || isPending || !isThreadReady} />
-                <p className="text-center text-xs mt-2" style={{ color: '#5A4A30' }}>
+                <p className="text-center text-xs mt-2" style={{ color: '#D0E3FF' }}>
                     NEXX provides legal information and strategic guidance, not legal advice.
                 </p>
             </motion.div>

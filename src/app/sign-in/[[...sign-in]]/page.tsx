@@ -3,6 +3,7 @@
 import { SignIn } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 
+/** Branded sign-in page with ambient glow background and Clerk SignIn component. */
 export default function SignInPage() {
     return (
         <div
@@ -14,7 +15,7 @@ export default function SignInPage() {
                 <div
                     className="absolute w-96 h-96 rounded-full blur-3xl"
                     style={{
-                        background: 'radial-gradient(circle, rgba(197, 139, 7, 0.08) 0%, transparent 70%)',
+                        background: 'radial-gradient(circle, rgba(208, 227, 255, 0.08) 0%, transparent 70%)',
                         top: '10%',
                         left: '20%',
                     }}
@@ -22,7 +23,7 @@ export default function SignInPage() {
                 <div
                     className="absolute w-96 h-96 rounded-full blur-3xl"
                     style={{
-                        background: 'radial-gradient(circle, rgba(197, 139, 7, 0.05) 0%, transparent 70%)',
+                        background: 'radial-gradient(circle, rgba(208, 227, 255, 0.05) 0%, transparent 70%)',
                         bottom: '10%',
                         right: '20%',
                     }}
@@ -33,11 +34,11 @@ export default function SignInPage() {
                 <div className="text-center mb-8">
                     <h1
                         className="font-serif text-4xl font-bold italic tracking-wide mb-2"
-                        style={{ color: '#F5EFE0' }}
+                        style={{ color: '#F7F2EB' }}
                     >
                         <span className="shimmer">NEXX</span>
                     </h1>
-                    <p className="text-sm tracking-[0.2em] uppercase" style={{ color: '#92783A' }}>
+                    <p className="text-sm tracking-[0.2em] uppercase" style={{ color: '#D0E3FF' }}>
                         Your Sanctuary Awaits
                     </p>
                 </div>

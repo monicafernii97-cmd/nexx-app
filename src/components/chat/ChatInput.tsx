@@ -9,6 +9,7 @@ interface ChatInputProps {
     placeholder?: string;
 }
 
+/** Auto-resizing chat input bar with send button and voice input placeholder. */
 export default function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
     const [input, setInput] = useState('');
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -38,8 +39,8 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         <div
             className="flex items-end gap-3 rounded-2xl p-3"
             style={{
-                background: '#02022d',
-                border: '1px solid rgba(197, 139, 7, 0.15)',
+                background: '#F7F2EB',
+                border: '1px solid rgba(208, 227, 255, 0.15)',
             }}
         >
             <textarea
@@ -49,9 +50,10 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder ?? 'Consult NEXX Intelligence...'}
                 rows={1}
-                className="flex-1 bg-transparent border-none outline-none resize-none text-sm"
+                className="flex-1 bg-transparent border-none outline-none resize-none text-sm placeholder:text-[#7096D1]"
                 style={{
-                    color: '#F5EFE0',
+                    color: '#0A1E54',
+                    caretColor: '#0A1E54',
                     minHeight: 24,
                     maxHeight: 120,
                     fontFamily: 'Inter, sans-serif',
@@ -61,9 +63,9 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 <button
                     className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer"
                     style={{
-                        background: 'rgba(197, 139, 7, 0.08)',
-                        border: '1px solid rgba(197, 139, 7, 0.2)',
-                        color: '#92783A',
+                        background: 'rgba(208, 227, 255, 0.08)',
+                        border: '1px solid rgba(208, 227, 255, 0.2)',
+                        color: '#D0E3FF',
                     }}
                     title="Voice input (coming soon)"
                 >
@@ -75,9 +77,9 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                     className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                     style={{
                         background: input.trim()
-                            ? 'linear-gradient(135deg, #C58B07, #E5B84A)'
-                            : 'rgba(197, 139, 7, 0.08)',
-                        color: input.trim() ? '#02022d' : '#8A7A60',
+                            ? 'linear-gradient(135deg, #F7F2EB, #123D7E)'
+                            : 'rgba(208, 227, 255, 0.08)',
+                        color: input.trim() ? '#F7F2EB' : '#FFF9F0',
                     }}
                 >
                     <Send size={16} />

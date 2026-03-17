@@ -629,7 +629,7 @@ const ALLOWED_TAGS = [
 
 const ALLOWED_ATTR: string[] = [];
 
-/** Sanitize AI-generated HTML using DOMPurify with a strict tag allowlist. */
+/** Sanitize AI-generated legal document HTML via DOMPurify, allowing only safe structural tags. */
 function sanitizeTrustedHtml(html: string): string {
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS,

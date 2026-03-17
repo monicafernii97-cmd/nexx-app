@@ -83,10 +83,10 @@ export default function WelcomePage() {
           >
             <span className="text-lg" style={{ color: '#C75A5A' }}>!</span>
           </div>
-          <p className="text-sm font-semibold mb-2" style={{ color: '#F5EFE0' }}>
+          <p className="text-sm font-semibold mb-2" style={{ color: '#F7F2EB' }}>
             Connection issue
           </p>
-          <p className="text-xs mb-5" style={{ color: '#8A7A60' }}>
+          <p className="text-xs mb-5" style={{ color: '#FFF9F0' }}>
             We couldn&apos;t sync your session. Please try signing in again.
           </p>
           <button
@@ -112,13 +112,13 @@ export default function WelcomePage() {
           <div
             className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
             style={{
-              background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
-              boxShadow: '0 8px 32px rgba(197, 139, 7, 0.3)',
+              background: 'linear-gradient(135deg, #FFF9F0, #D0E3FF)',
+              boxShadow: '0 8px 32px rgba(208, 227, 255, 0.3)',
             }}
           >
-            <span className="text-lg font-black" style={{ color: '#02022d' }}>N</span>
+            <span className="text-lg font-black" style={{ color: '#0A1E54' }}>N</span>
           </div>
-          <p className="text-sm" style={{ color: '#8A7A60' }}>Loading...</p>
+          <p className="text-sm" style={{ color: '#FFF9F0' }}>Loading...</p>
         </motion.div>
       </div>
     );
@@ -137,7 +137,7 @@ export default function WelcomePage() {
             style={{
               width: 200 + i * 80,
               height: 200 + i * 80,
-              background: `radial-gradient(circle, rgba(197, 139, 7, ${0.03 + i * 0.01}) 0%, transparent 70%)`,
+              background: `radial-gradient(circle, rgba(208, 227, 255, ${0.03 + i * 0.01}) 0%, transparent 70%)`,
               left: `${10 + i * 15}%`,
               top: `${20 + (i % 3) * 25}%`,
             }}
@@ -169,11 +169,11 @@ export default function WelcomePage() {
           transition={{ duration: 0.8, delay: 0.2, ease: [0.34, 1.56, 0.64, 1] }}
           className="mx-auto mb-8 w-16 h-16 rounded-2xl flex items-center justify-center"
           style={{
-            background: 'linear-gradient(135deg, #C58B07, #E5B84A)',
-            boxShadow: '0 8px 32px rgba(197, 139, 7, 0.3)',
+            background: 'linear-gradient(135deg, #FFF9F0, #D0E3FF)',
+            boxShadow: '0 8px 32px rgba(208, 227, 255, 0.3)',
           }}
         >
-          <span className="text-2xl font-black" style={{ color: '#02022d' }}>N</span>
+          <span className="text-2xl font-black" style={{ color: '#0A1E54' }}>N</span>
         </motion.div>
 
         {/* Title */}
@@ -182,7 +182,7 @@ export default function WelcomePage() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5, duration: 0.8 }}
           className="text-sm font-medium tracking-[0.3em] uppercase mb-4"
-          style={{ color: '#92783A' }}
+          style={{ color: '#D0E3FF' }}
         >
           Welcome to
         </motion.p>
@@ -192,7 +192,7 @@ export default function WelcomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7, duration: 0.8 }}
           className="font-serif text-6xl md:text-7xl font-bold italic tracking-wide mb-6"
-          style={{ color: '#F5EFE0' }}
+          style={{ color: '#F7F2EB' }}
         >
           <span className="shimmer">NEXX</span>
         </motion.h1>
@@ -203,7 +203,7 @@ export default function WelcomePage() {
           animate={{ opacity: 1 }}
           transition={{ delay: 1, duration: 0.8 }}
           className="text-base md:text-lg leading-relaxed mb-10"
-          style={{ color: '#B8A88A' }}
+          style={{ color: '#D0E3FF' }}
         >
           Experience the pinnacle of luxury<br />
           management and refined security.
@@ -220,9 +220,9 @@ export default function WelcomePage() {
             <button
               className="w-full max-w-xs text-sm tracking-[0.15em] uppercase font-semibold py-3 px-7 rounded-lg cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5"
               style={{
-                background: '#02022d',
-                color: '#F5EFE0',
-                border: '1px solid rgba(197, 139, 7, 0.2)',
+                background: '#FFF9F0',
+                color: '#0A1E54',
+                border: '1px solid rgba(208, 227, 255, 0.2)',
               }}
             >
               Begin Your Journey
@@ -245,7 +245,7 @@ export default function WelcomePage() {
         animate={{ opacity: 0.5 }}
         transition={{ delay: 2, duration: 1 }}
         className="absolute bottom-8 text-xs tracking-[0.2em] uppercase font-serif italic"
-        style={{ color: '#775E22' }}
+        style={{ color: '#FFF9F0' }}
       >
         Your Corner. Your Calm. Your Case.
       </motion.p>

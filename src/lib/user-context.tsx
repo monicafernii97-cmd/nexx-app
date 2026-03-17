@@ -21,21 +21,20 @@ const UserContext = createContext<UserContextType>({
     clerkUser: null,
 });
 
+/** Hook providing the current user's Convex ID, loading state, and Clerk user object. */
 export function useUser() {
     return useContext(UserContext);
 }
 
+/** Syncs Clerk authentication with Convex and exposes user state to the component tree. */
 export function UserProvider({ children }: { children: ReactNode }) {
     const { user: clerkUser, isLoaded: clerkLoaded } = useClerkUser();
     const ensureUser = useMutation(api.users.ensureFromClerk);
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncError, setSyncError] = useState<string | null>(null);
+    const prevClerkId = useRef<string | undefined>(undefined);
     const hasSynced = useRef(false);
-
-    // Reset sync flag when user changes (e.g., account switch)
-    useEffect(() => {
-        hasSynced.current = false;
-    }, [clerkUser?.id]);
+    const syncAttempt = useRef(0);
 
     // Auth-derived query: no args, server derives clerkId from auth context
     const currentUser = useQuery(
@@ -43,25 +42,40 @@ export function UserProvider({ children }: { children: ReactNode }) {
         clerkUser?.id ? {} : 'skip'
     );
 
-    // On Clerk login, ensure our Convex user record exists
+    const clerkId = clerkUser?.id;
+    const clerkName = clerkUser?.firstName || clerkUser?.fullName || 'User';
+    const clerkEmail = clerkUser?.primaryEmailAddress?.emailAddress;
+
+    // On Clerk login, ensure our Convex user record exists.
+    // Uses an attempt counter so stale completions from a previous identity
+    // cannot corrupt state for the current user.
     const syncUser = useCallback(async () => {
-        if (!clerkUser) return;
+        if (!clerkId) return;
+        const attempt = ++syncAttempt.current;
         setIsSyncing(true);
         setSyncError(null);
         try {
             await ensureUser({
-                clerkId: clerkUser.id,
-                name: clerkUser.firstName || clerkUser.fullName || 'User',
-                email: clerkUser.primaryEmailAddress?.emailAddress,
+                clerkId,
+                name: clerkName,
+                email: clerkEmail,
             });
+            if (syncAttempt.current === attempt) {
+                hasSynced.current = true;
+            }
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
             console.error('Failed to sync user to Convex:', err);
-            setSyncError(message);
+            if (syncAttempt.current === attempt) {
+                setSyncError(message);
+            }
+            throw err; // Re-throw so the effect's .catch() keeps hasSynced false
         } finally {
-            setIsSyncing(false);
+            if (syncAttempt.current === attempt) {
+                setIsSyncing(false);
+            }
         }
-    }, [clerkUser, ensureUser]);
+    }, [clerkId, clerkName, clerkEmail, ensureUser]);
 
     useEffect(() => {
         if (!clerkLoaded) return;
@@ -69,16 +83,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (!clerkUser) {
             setSyncError(null);
             setIsSyncing(false);
+            prevClerkId.current = undefined;
             return;
         }
 
-        if (!hasSynced.current) {
-            syncUser().then(() => {
-                hasSynced.current = true;
-            }).catch(() => {
-                // Leave hasSynced false so future effect runs can retry
-            });
+        // Only reset hasSynced when the user identity actually changes
+        if (clerkUser.id !== prevClerkId.current) {
+            hasSynced.current = false;
+            prevClerkId.current = clerkUser.id;
         }
+
+        // Skip if already synced for this identity
+        if (hasSynced.current) return;
+
+        // syncUser manages hasSynced and state gating via attempt counter
+        syncUser().catch(() => {
+            // Leave hasSynced false so future effect runs can retry
+        });
     }, [clerkLoaded, clerkUser, syncUser]);
 
     const userId = currentUser?._id ?? null;

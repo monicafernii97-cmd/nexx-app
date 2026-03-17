@@ -66,7 +66,7 @@ export function ConfirmDeleteModal({
                         initial={{ scale: 0.95, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0.95, opacity: 0 }}
-                        className="card-gilded p-6 max-w-sm mx-4"
+                        className="card-premium p-6 max-w-sm mx-4"
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby={dialogTitleId}
@@ -81,25 +81,25 @@ export function ConfirmDeleteModal({
                                 <AlertTriangle size={18} style={{ color: '#C75A5A' }} />
                             </div>
                             <div>
-                                <h3 id={dialogTitleId} className="text-sm font-semibold" style={{ color: '#F5EFE0' }}>
+                                <h3 id={dialogTitleId} className="text-sm font-semibold" style={{ color: 'var(--text-on-dark)' }}>
                                     {title}
                                 </h3>
-                                <p className="text-xs" style={{ color: '#8A7A60' }}>
+                                <p className="text-xs" style={{ color: 'var(--milky-way)' }}>
                                     This action cannot be undone.
                                 </p>
                             </div>
                             {showCloseButton && (
                                 <button
                                     onClick={handleClose}
-                                    className="ml-auto p-1 rounded-lg hover:bg-[rgba(138,122,96,0.1)]"
+                                    className="ml-auto p-1 rounded-lg hover:bg-[rgba(135,177,255,0.12)]"
                                     disabled={isDeleting}
                                     aria-label="Close"
                                 >
-                                    <X size={14} style={{ color: '#8A7A60' }} />
+                                    <X size={14} style={{ color: 'var(--milky-way)' }} />
                                 </button>
                             )}
                         </div>
-                        <p className="text-sm mb-5" style={{ color: '#B8A88A' }}>
+                        <p className="text-sm mb-5" style={{ color: 'var(--sky)' }}>
                             {description}
                         </p>
                         {deleteError && (

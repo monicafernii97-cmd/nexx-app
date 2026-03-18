@@ -236,4 +236,65 @@ export default defineSchema({
         expiresAt: v.number(),
         createdAt: v.number(),
     }).index('by_state_county', ['state', 'county']),
+
+    // ═══ Resources Cache (Dynamic Resource Hub) ═══
+    resourcesCache: defineTable({
+        /** State name (e.g. "Texas") */
+        state: v.string(),
+        /** County name without "County" suffix (e.g. "Harris") */
+        county: v.string(),
+        /** AI-discovered resources structured by category */
+        resources: v.object({
+            courtClerk: v.optional(v.object({
+                name: v.string(),
+                description: v.optional(v.string()),
+                url: v.optional(v.string()),
+                phone: v.optional(v.string()),
+                address: v.optional(v.string()),
+            })),
+            courtsWebsite: v.optional(v.object({
+                name: v.string(),
+                description: v.optional(v.string()),
+                url: v.optional(v.string()),
+            })),
+            familyDivision: v.optional(v.object({
+                name: v.string(),
+                description: v.optional(v.string()),
+                url: v.optional(v.string()),
+                address: v.optional(v.string()),
+            })),
+            localRules: v.optional(v.object({
+                name: v.string(),
+                description: v.optional(v.string()),
+                url: v.optional(v.string()),
+            })),
+            stateFamilyCode: v.optional(v.object({
+                name: v.string(),
+                description: v.optional(v.string()),
+                url: v.optional(v.string()),
+            })),
+            legalAid: v.optional(v.array(v.object({
+                name: v.string(),
+                description: v.optional(v.string()),
+                url: v.optional(v.string()),
+                phone: v.optional(v.string()),
+            }))),
+            nonprofits: v.optional(v.array(v.object({
+                name: v.string(),
+                description: v.optional(v.string()),
+                url: v.optional(v.string()),
+                phone: v.optional(v.string()),
+            }))),
+            /** Public case search portal for this county */
+            caseSearch: v.optional(v.object({
+                name: v.string(),
+                description: v.optional(v.string()),
+                url: v.optional(v.string()),
+            })),
+        }),
+        /** URLs the AI referenced when discovering these resources */
+        sources: v.optional(v.array(v.string())),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    }).index('by_state_county', ['state', 'county']),
 });

@@ -58,6 +58,9 @@ export default function OnboardingPage() {
         hasAttorney: '',
         hasTherapist: '',
         courtStatus: '',
+        hasOpenCase: '',
+        courtName: '',
+        causeNumber: '',
         nexBehaviors: [] as string[],
         nexDescription: '',
         primaryGoals: [] as string[],
@@ -202,6 +205,22 @@ export default function OnboardingPage() {
 
                 // Mark onboarding complete
                 await completeOnboarding({ id: userId });
+
+                // Fire-and-forget: pre-populate the Resources Hub for the user's location.
+                // This runs in the background — failures don't block onboarding.
+                if (formData.state && formData.county) {
+                    fetch('/api/resources/lookup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            state: formData.state,
+                            county: formData.county,
+                            courtName: formData.courtName || undefined,
+                            causeNumber: formData.causeNumber || undefined,
+                            hasOpenCase: formData.hasOpenCase === 'Yes, I have an active case',
+                        }),
+                    }).catch((err) => console.warn('[Onboarding] Resource lookup failed (non-blocking):', err));
+                }
 
                 router.replace('/dashboard');
             } catch (error: unknown) {
@@ -356,6 +375,53 @@ export default function OnboardingPage() {
                                         </button>
                                     ))}
                                 </div>
+                                <div>
+                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#D0E3FF' }}>Do you have a court case currently open?</label>
+                                    <div className="flex gap-3">
+                                        {['Yes, I have an active case', 'No, not yet'].map((opt) => (
+                                            <button
+                                                key={opt}
+                                                onClick={() => {
+                                                    update('hasOpenCase', opt);
+                                                    if (opt === 'No, not yet') {
+                                                        update('courtName', '');
+                                                        update('causeNumber', '');
+                                                    }
+                                                }}
+                                                className="flex-1 py-3 rounded-xl text-sm font-medium transition-all"
+                                                style={{
+                                                    background: formData.hasOpenCase === opt ? 'rgba(208, 227, 255, 0.12)' : 'rgba(255, 249, 240, 0.4)',
+                                                    border: `1px solid ${formData.hasOpenCase === opt ? 'rgba(208, 227, 255, 0.3)' : 'rgba(208, 227, 255, 0.08)'}`,
+                                                    color: formData.hasOpenCase === opt ? '#F7F2EB' : '#FFF9F0',
+                                                }}
+                                            >
+                                                {opt}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                {formData.hasOpenCase === 'Yes, I have an active case' && (
+                                    <div className="space-y-4 pt-1">
+                                        <div>
+                                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Court Name <span className="text-xs normal-case tracking-normal" style={{ color: '#7096D1' }}>(optional)</span></label>
+                                            <input
+                                                value={formData.courtName}
+                                                onChange={(e) => update('courtName', e.target.value)}
+                                                placeholder="e.g. 328th District Court"
+                                                className="input-premium"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Cause Number <span className="text-xs normal-case tracking-normal" style={{ color: '#7096D1' }}>(optional)</span></label>
+                                            <input
+                                                value={formData.causeNumber}
+                                                onChange={(e) => update('causeNumber', e.target.value)}
+                                                placeholder="e.g. 24-DCV-123456"
+                                                className="input-premium"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                                 <div>
                                     <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#D0E3FF' }}>Do you have an attorney?</label>
                                     <div className="flex gap-3">

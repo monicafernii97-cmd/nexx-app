@@ -47,8 +47,9 @@ export default function DashboardPage() {
         { label: 'Pattern Alerts', value: '0', icon: AlertTriangle, color: '#E5A84A' },
     ];
 
-    /** Time-of-day greeting, computed via lazy initializer (suppressHydrationWarning handles SSR drift). */
+    /** Time-of-day greeting, computed client-side only (empty during SSR to avoid hydration mismatch). */
     const [greetingText] = useState(() => {
+        if (typeof window === 'undefined') return '';
         const hour = new Date().getHours();
         return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
     });

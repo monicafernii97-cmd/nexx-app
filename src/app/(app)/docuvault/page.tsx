@@ -68,6 +68,8 @@ function DocuVaultPageInner() {
     const completedRef = useRef(false);
     const pdfUrlRef = useRef<string | null>(null);
     const generationAbortRef = useRef<AbortController | null>(null);
+    /** Tracks the active timeout for the popup-blocked print warning so rapid clicks don't race. */
+    const printWarningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Revoke blob URL and abort stream on unmount to prevent leaks
     useEffect(() => {
@@ -76,6 +78,9 @@ function DocuVaultPageInner() {
             if (pdfUrlRef.current) {
                 URL.revokeObjectURL(pdfUrlRef.current);
                 pdfUrlRef.current = null;
+            }
+            if (printWarningTimeoutRef.current) {
+                clearTimeout(printWarningTimeoutRef.current);
             }
         };
     }, []);
@@ -886,8 +891,9 @@ function DocuVaultPageInner() {
                                         }, 500);
                                     } else {
                                         // Popup blocked — show inline warning instead of blocking alert()
+                                        if (printWarningTimeoutRef.current) clearTimeout(printWarningTimeoutRef.current);
                                         setGenerationError('Please allow popups to print, or use Download instead.');
-                                        setTimeout(() => setGenerationError(null), 5000);
+                                        printWarningTimeoutRef.current = setTimeout(() => setGenerationError(null), 5000);
                                     }
                                 }}
                                 disabled={!generatedPdfUrl}

@@ -110,6 +110,20 @@ export default function CourtSettingsPage() {
             });
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
+
+            // Fire-and-forget: refresh the Resources Hub for the new location.
+            // The API route's upsert handles overwriting any existing cache.
+            fetch('/api/resources/lookup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    state,
+                    county,
+                    courtName: courtName || undefined,
+                    causeNumber: causeNumber || undefined,
+                    hasOpenCase: !!causeNumber,
+                }),
+            }).catch((err) => console.warn('[CourtSettings] Resource lookup failed (non-blocking):', err));
         } catch (error) {
             console.error('Failed to save court settings:', error);
             setSaveError('Failed to save settings. Please try again.');

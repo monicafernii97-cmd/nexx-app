@@ -16,7 +16,8 @@ export type RateLimitFeature =
     | 'document_generation'
     | 'compliance_check'
     | 'chat_message'
-    | 'legal_search';
+    | 'legal_search'
+    | 'resource_lookup';
 
 interface FeatureLimit {
     /** Maximum requests allowed in the window */
@@ -59,6 +60,11 @@ export const FEATURE_LIMITS: Record<RateLimitFeature, FeatureLimit> = {
         maxRequests: 10,
         windowMs: ONE_MONTH_MS,
         label: 'legal statute searches',
+    },
+    resource_lookup: {
+        maxRequests: 5,
+        windowMs: ONE_MONTH_MS,
+        label: 'resource lookups',
     },
 };
 

@@ -47,7 +47,7 @@ export default function DashboardPage() {
         { label: 'Pattern Alerts', value: '0', icon: AlertTriangle, color: '#E5A84A' },
     ];
 
-    /** Time-of-day greeting, computed via lazy initializer to avoid SSR hydration mismatch. */
+    /** Time-of-day greeting, computed via lazy initializer (suppressHydrationWarning handles SSR drift). */
     const [greetingText] = useState(() => {
         const hour = new Date().getHours();
         return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -65,7 +65,7 @@ export default function DashboardPage() {
                 transition={{ duration: 0.5 }}
                 className="mb-8"
             >
-                <h1 className="text-headline text-3xl mb-2" style={{ color: '#F7F2EB' }}>
+                <h1 className="text-headline text-3xl mb-2" style={{ color: '#F7F2EB' }} suppressHydrationWarning>
                     {greetingText}{userName}
                 </h1>
                 <p className="text-sm" style={{ color: '#D0E3FF' }}>

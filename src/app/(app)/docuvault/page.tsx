@@ -44,6 +44,8 @@ function DocuVaultPageInner() {
     const searchParams = useSearchParams();
     const { userId } = useUser();
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
+    /** True while user profile query is in-flight (prevents generation with wrong defaults). */
+    const isUserProfileLoading = Boolean(userId) && user === undefined;
 
     // Tab & template state
     const [activeTab, setActiveTab] = useState<UITabCategory>('lead');
@@ -115,6 +117,10 @@ function DocuVaultPageInner() {
     /** Handle document generation via the streaming API endpoint. */
     const handleGenerate = useCallback(async () => {
         if (!documentContent.trim() && !selectedTemplate) return;
+        if (isUserProfileLoading) {
+            setGenerationError('Loading your profile. Please try again in a moment.');
+            return;
+        }
 
         // Increment token so stale runs can detect cancellation
         const currentToken = ++generationTokenRef.current;
@@ -250,7 +256,7 @@ function DocuVaultPageInner() {
             setGenerationError(error instanceof Error ? error.message : 'Generation failed');
             setView('compose');
         }
-    }, [documentContent, selectedTemplate, user?.state, user?.county, user?.name]);
+    }, [documentContent, selectedTemplate, isUserProfileLoading, user?.state, user?.county, user?.name]);
 
     /** Reset all state to begin composing a new document, aborting any in-flight generation. */
     const handleNewDocument = useCallback(() => {
@@ -554,7 +560,7 @@ function DocuVaultPageInner() {
                     >
                         <button
                             onClick={handleGenerate}
-                            disabled={!documentContent.trim() && !selectedTemplate}
+                            disabled={(!documentContent.trim() && !selectedTemplate) || isUserProfileLoading}
                             className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 text-sm disabled:opacity-40"
                         >
                             <Sparkles size={16} />

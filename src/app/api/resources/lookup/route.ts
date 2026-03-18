@@ -139,10 +139,13 @@ export async function POST(req: NextRequest) {
         // Extract sources array before storing resources
         const rawSources = parsed.sources;
         const sources = Array.isArray(rawSources)
-            ? (rawSources as unknown[]).filter((s): s is string => typeof s === 'string')
+            ? (rawSources as unknown[])
+                .filter((s): s is string => typeof s === 'string')
+                .map((s) => safeUrl(s))
+                .filter((s): s is string => Boolean(s))
             : [];
         if (Array.isArray(rawSources) && sources.length < rawSources.length) {
-            console.warn('[Resource Lookup] Dropped malformed source entries:', rawSources.filter(s => typeof s !== 'string'));
+            console.warn('[Resource Lookup] Dropped malformed/unsafe source entries:', rawSources.length - sources.length);
         }
 
         // Build a clean resources object matching the Convex schema

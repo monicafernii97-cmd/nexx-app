@@ -350,7 +350,15 @@ function CourtResourcesGrid({
         });
     }
 
-    if (items.length === 0) return null;
+    if (items.length === 0) {
+        return (
+            <div className="card-premium p-6 text-center sm:col-span-2 lg:col-span-3">
+                <p className="text-sm" style={{ color: '#123D7E' }}>
+                    Court resources for this location are still being curated. Check back soon.
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

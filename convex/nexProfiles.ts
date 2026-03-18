@@ -18,6 +18,26 @@ export const create = mutation({
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
 
+        // Idempotent: if a profile already exists for this user, update it instead of inserting a duplicate
+        const existing = await ctx.db
+            .query('nexProfiles')
+            .withIndex('by_user', (q) => q.eq('userId', user._id))
+            .first();
+
+        if (existing) {
+            await ctx.db.patch(existing._id, {
+                behaviors: args.behaviors,
+                nickname: args.nickname,
+                relationship: args.relationship,
+                description: args.description,
+                communicationStyle: args.communicationStyle,
+                manipulationTactics: args.manipulationTactics,
+                triggerPatterns: args.triggerPatterns,
+                updatedAt: Date.now(),
+            });
+            return existing._id;
+        }
+
         return await ctx.db.insert('nexProfiles', {
             userId: user._id,
             behaviors: args.behaviors,

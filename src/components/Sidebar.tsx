@@ -212,7 +212,9 @@ export default function Sidebar() {
                                     >
                                         <div className="ml-5 pl-4 mt-1 mb-1 space-y-0.5" style={{ borderLeft: '1px solid rgba(208, 227, 255, 0.1)' }}>
                                             {item.children!.map((child) => {
-                                                const isChildActive = pathname === child.href;
+                                                const isChildActive =
+                                                    pathname === child.href ||
+                                                    pathname?.startsWith(child.href + '/');
                                                 const ChildIcon = child.icon;
                                                 return (
                                                     <Link

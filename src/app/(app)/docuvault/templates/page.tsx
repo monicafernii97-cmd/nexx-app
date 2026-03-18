@@ -157,6 +157,7 @@ export default function TemplateGalleryPage() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search templates..."
+                        aria-label="Search templates"
                         className="input-premium pl-11"
                     />
                 </div>

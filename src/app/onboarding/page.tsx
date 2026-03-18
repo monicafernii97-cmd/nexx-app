@@ -138,7 +138,7 @@ export default function OnboardingPage() {
     const canProceed = () => {
         switch (currentStep) {
             case 0: return true;
-            case 1: return formData.name && formData.state;
+            case 1: return formData.name.trim() && formData.state.trim();
             case 2: return formData.custodyType;
             case 3: return formData.nexBehaviors.length > 0;
             case 4: return formData.primaryGoals.length > 0;
@@ -190,12 +190,18 @@ export default function OnboardingPage() {
                     primaryGoals: formData.primaryGoals.length > 0 ? formData.primaryGoals : undefined,
                 });
 
-                // Create NEX profile with behaviors
+                // Create NEX profile with behaviors (idempotent — skips if profile already exists)
                 if (formData.nexBehaviors.length > 0) {
-                    await createNexProfile({
-                        behaviors: formData.nexBehaviors,
-                        description: formData.nexDescription || undefined,
-                    });
+                    try {
+                        await createNexProfile({
+                            behaviors: formData.nexBehaviors,
+                            description: formData.nexDescription || undefined,
+                        });
+                    } catch (e) {
+                        // If profile already exists from a prior partial save, continue gracefully
+                        const msg = e instanceof Error ? e.message : '';
+                        if (!msg.includes('already exists')) throw e;
+                    }
                 }
 
                 // Mark onboarding complete

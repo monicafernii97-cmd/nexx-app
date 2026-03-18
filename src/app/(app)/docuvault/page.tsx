@@ -145,7 +145,7 @@ function DocuVaultPageInner() {
                     templateId: selectedTemplate?.id ?? 'petition_divorce',
                     courtSettings: { state: 'Texas', county: 'Fort Bend' },
                     petitioner: { name: 'Petitioner' },
-                    caseType: 'divorce_no_children',
+                    caseType: 'divorce_without_children',
                     bodyContent: documentContent ? [{ heading: 'Content', paragraphs: [documentContent] }] : [],
                 }),
             });

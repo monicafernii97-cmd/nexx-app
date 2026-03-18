@@ -140,6 +140,7 @@ export default function Sidebar() {
                             <div className="flex items-center">
                                 <Link
                                     href={item.href}
+                                    aria-current={isActive && !hasChildren ? 'page' : undefined}
                                     className="no-underline flex-1 min-w-0"
                                 >
                                     <motion.div
@@ -220,6 +221,7 @@ export default function Sidebar() {
                                                     <Link
                                                         key={child.href}
                                                         href={child.href}
+                                                        aria-current={isChildActive ? 'page' : undefined}
                                                         className="no-underline"
                                                     >
                                                         <motion.div

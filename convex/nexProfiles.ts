@@ -25,7 +25,7 @@ export const create = mutation({
             .first();
 
         if (existing) {
-            await ctx.db.patch(existing._id, {
+            const maybeUpdates = {
                 behaviors: args.behaviors,
                 nickname: args.nickname,
                 relationship: args.relationship,
@@ -33,6 +33,12 @@ export const create = mutation({
                 communicationStyle: args.communicationStyle,
                 manipulationTactics: args.manipulationTactics,
                 triggerPatterns: args.triggerPatterns,
+            };
+            const filtered = Object.fromEntries(
+                Object.entries(maybeUpdates).filter(([, val]) => val !== undefined)
+            );
+            await ctx.db.patch(existing._id, {
+                ...filtered,
                 updatedAt: Date.now(),
             });
             return existing._id;

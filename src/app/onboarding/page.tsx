@@ -190,18 +190,12 @@ export default function OnboardingPage() {
                     primaryGoals: formData.primaryGoals.length > 0 ? formData.primaryGoals : undefined,
                 });
 
-                // Create NEX profile with behaviors (idempotent — skips if profile already exists)
+                // Create NEX profile with behaviors (backend mutation is idempotent)
                 if (formData.nexBehaviors.length > 0) {
-                    try {
-                        await createNexProfile({
-                            behaviors: formData.nexBehaviors,
-                            description: formData.nexDescription || undefined,
-                        });
-                    } catch (e) {
-                        // If profile already exists from a prior partial save, continue gracefully
-                        const msg = e instanceof Error ? e.message : '';
-                        if (!msg.includes('already exists')) throw e;
-                    }
+                    await createNexProfile({
+                        behaviors: formData.nexBehaviors,
+                        description: formData.nexDescription || undefined,
+                    });
                 }
 
                 // Mark onboarding complete

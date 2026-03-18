@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import { motion } from 'framer-motion';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
@@ -45,13 +47,11 @@ export default function DashboardPage() {
         { label: 'Pattern Alerts', value: '0', icon: AlertTriangle, color: '#E5A84A' },
     ];
 
-    /** Return a time-of-day greeting string (morning, afternoon, or evening). */
-    const greeting = () => {
+    /** Time-of-day greeting, computed via lazy initializer to avoid SSR hydration mismatch. */
+    const [greetingText] = useState(() => {
         const hour = new Date().getHours();
-        if (hour < 12) return 'Good morning';
-        if (hour < 17) return 'Good afternoon';
-        return 'Good evening';
-    };
+        return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    });
 
     /** Formatted display name for the greeting header (empty if unavailable). */
     const userName = user?.name ? `, ${user.name}` : '';
@@ -66,7 +66,7 @@ export default function DashboardPage() {
                 className="mb-8"
             >
                 <h1 className="text-headline text-3xl mb-2" style={{ color: '#F7F2EB' }}>
-                    {greeting()}{userName}
+                    {greetingText}{userName}
                 </h1>
                 <p className="text-sm" style={{ color: '#D0E3FF' }}>
                     Your sanctuary of strategic empowerment.

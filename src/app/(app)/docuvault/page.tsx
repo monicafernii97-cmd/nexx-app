@@ -14,6 +14,9 @@ import {
     ArrowRight,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import { useQuery } from 'convex/react';
+import { api } from '../../../../convex/_generated/api';
+import { useUser } from '@/lib/user-context';
 import { UI_TABS, getTemplatesForTab } from '@/lib/legal/templateCategories';
 import type { UITabCategory } from '@/lib/legal/templateCategories';
 import type { DocumentTemplate } from '@/lib/legal/types';
@@ -39,6 +42,8 @@ export default function DocuVaultPage() {
 /** DocuVault document generator page with compose, working, and result views. */
 function DocuVaultPageInner() {
     const searchParams = useSearchParams();
+    const { userId } = useUser();
+    const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
 
     // Tab & template state
     const [activeTab, setActiveTab] = useState<UITabCategory>('lead');
@@ -143,8 +148,11 @@ function DocuVaultPageInner() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     templateId: selectedTemplate?.id ?? 'petition_divorce',
-                    courtSettings: { state: 'Texas', county: 'Fort Bend' },
-                    petitioner: { name: 'Petitioner' },
+                    courtSettings: {
+                        state: user?.state || 'Texas',
+                        county: user?.county || 'Fort Bend',
+                    },
+                    petitioner: { name: user?.name || 'Petitioner' },
                     caseType: selectedTemplate?.caseTypes?.[0] ?? 'divorce_without_children',
                     bodyContent: documentContent ? [{ heading: 'Content', paragraphs: [documentContent] }] : [],
                 }),
@@ -242,7 +250,7 @@ function DocuVaultPageInner() {
             setGenerationError(error instanceof Error ? error.message : 'Generation failed');
             setView('compose');
         }
-    }, [documentContent, selectedTemplate]);
+    }, [documentContent, selectedTemplate, user?.state, user?.county, user?.name]);
 
     /** Reset all state to begin composing a new document, aborting any in-flight generation. */
     const handleNewDocument = useCallback(() => {

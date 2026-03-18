@@ -18,6 +18,7 @@ import type { DocumentGenerationRequest, CaptionData } from '@/lib/legal/types';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { titleCase } from '@/lib/utils/stringHelpers';
 
+/** Maximum serverless function duration in seconds (Vercel Pro plan). */
 export const maxDuration = 60;
 
 /** Progress event sent to client */
@@ -82,7 +83,20 @@ export async function POST(request: NextRequest) {
 
   // ── Stream response ──
   const stream = new ReadableStream({
+    /** Start the SSE stream: generate the document in stages and emit progress events. */
     async start(controller) {
+      /** Close the stream controller when the client disconnects. */
+      const abortHandler = () => { try { controller.close(); } catch { /* already closed */ } };
+      request.signal.addEventListener('abort', abortHandler);
+
+      /** Check if the client has disconnected. */
+      const isAborted = () => request.signal.aborted;
+      if (isAborted()) {
+        abortHandler();
+        request.signal.removeEventListener('abort', abortHandler);
+        return;
+      }
+
       try {
         // Step 1: Analyzing Legal Frameworks
         controller.enqueue(new TextEncoder().encode(encodeEvent({
@@ -102,6 +116,8 @@ export async function POST(request: NextRequest) {
           })));
           return;  // finally block will close the controller
         }
+
+        if (isAborted()) return;
 
         const normalizedState = titleCase(body.courtSettings.state);
         const normalizedCounty = titleCase(body.courtSettings.county);
@@ -128,6 +144,8 @@ export async function POST(request: NextRequest) {
 
         await sleep(500); // Allow UI to show step
 
+        if (isAborted()) return;
+
         controller.enqueue(new TextEncoder().encode(encodeEvent({
           step: 'drafting',
           message: 'Drafting Document Structure',
@@ -142,6 +160,8 @@ export async function POST(request: NextRequest) {
           progress: 55,
           status: 'active',
         })));
+
+        if (isAborted()) return;
 
         const html = renderDocumentHTML({
           template,
@@ -170,6 +190,8 @@ export async function POST(request: NextRequest) {
           status: 'active',
         })));
 
+        if (isAborted()) return;
+
         const complianceChecks = quickComplianceCheck(html, rules);
 
         controller.enqueue(new TextEncoder().encode(encodeEvent({
@@ -186,6 +208,8 @@ export async function POST(request: NextRequest) {
           progress: 85,
           status: 'active',
         })));
+
+        if (isAborted()) return;
 
         const pdfBytes = await renderHTMLToPDF(html, rules, caption.causeNumber);
         const pdfBase64 = Buffer.from(pdfBytes).toString('base64');
@@ -212,15 +236,22 @@ export async function POST(request: NextRequest) {
           },
         })));
       } catch (error) {
+        if (
+          request.signal.aborted ||
+          (error instanceof Error && error.name === 'AbortError')
+        ) return;
         console.error('[Stream Generation Error]', error);
-        controller.enqueue(new TextEncoder().encode(encodeEvent({
-          step: 'error',
-          message: 'Document generation failed',
-          progress: 0,
-          status: 'error',
-        })));
+        try {
+          controller.enqueue(new TextEncoder().encode(encodeEvent({
+            step: 'error',
+            message: 'Document generation failed',
+            progress: 0,
+            status: 'error',
+          })));
+        } catch { /* controller may already be closed */ }
       } finally {
-        controller.close();
+        request.signal.removeEventListener('abort', abortHandler);
+        try { controller.close(); } catch { /* already closed */ }
       }
     },
   });
@@ -245,7 +276,7 @@ function buildStreamCaption(
 
   const isSAPCR = ['divorce_with_children', 'custody_establishment', 'custody_modification', 'sapcr', 'child_support', 'child_support_modification', 'visitation', 'relocation'].includes(caseType);
 
-  // Filter to children with valid name strings to prevent runtime crashes
+  /** Filter to children with valid name strings to prevent runtime crashes. */
   const validChildren = (children ?? []).filter(
     (c): c is { name: string } => typeof c?.name === 'string' && c.name.trim().length > 0
   );
@@ -257,8 +288,11 @@ function buildStreamCaption(
     leftLines = [`${petitioner.name.toUpperCase()},`, 'Petitioner', '', 'v.', '', `${respondent?.name?.toUpperCase() ?? 'RESPONDENT'},`, 'Respondent'];
   }
 
+  const trimmedCourtName = courtSettings.courtName?.trim();
   const rightLines = [
-    `IN THE ${courtSettings.courtName?.toUpperCase() ?? 'DISTRICT COURT'}`,
+    trimmedCourtName
+      ? `IN THE ${trimmedCourtName.toUpperCase()}`
+      : 'IN THE DISTRICT COURT',
     courtSettings.judicialDistrict?.toUpperCase() ?? '',
     `${normalizedCounty.toUpperCase()} COUNTY, ${normalizedState.toUpperCase()}`,
   ].filter(Boolean);

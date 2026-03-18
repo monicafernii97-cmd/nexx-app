@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import { motion } from 'framer-motion';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
@@ -19,6 +21,7 @@ import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { parseLocalDate } from '@/lib/dateUtils';
 
+/** Quick-action cards linking to primary user flows. */
 const quickActions = [
     { label: 'New Chat', desc: 'Talk to NEXX', href: '/chat', icon: Mic, color: '#F7F2EB' },
     { label: 'Log Incident', desc: 'Document an event', href: '/incident-report/new', icon: Plus, color: '#5A9E6F' },
@@ -36,6 +39,7 @@ export default function DashboardPage() {
     const conversationCount = conversations?.length ?? 0;
     const confirmedCount = incidents?.filter((i) => i.status === 'confirmed').length ?? 0;
 
+    /** Summary statistics displayed in the dashboard header grid. */
     const stats = [
         { label: 'Documented Incidents', value: String(incidentCount), icon: Shield, color: '#F7F2EB' },
         { label: 'Active Conversations', value: String(conversationCount), icon: MessageCircle, color: '#5A9E6F' },
@@ -43,13 +47,13 @@ export default function DashboardPage() {
         { label: 'Pattern Alerts', value: '0', icon: AlertTriangle, color: '#E5A84A' },
     ];
 
-    const greeting = () => {
+    /** Time-of-day greeting, computed via lazy initializer (suppressHydrationWarning handles SSR drift). */
+    const [greetingText] = useState(() => {
         const hour = new Date().getHours();
-        if (hour < 12) return 'Good morning';
-        if (hour < 17) return 'Good afternoon';
-        return 'Good evening';
-    };
+        return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    });
 
+    /** Formatted display name for the greeting header (empty if unavailable). */
     const userName = user?.name ? `, ${user.name}` : '';
 
     return (
@@ -61,8 +65,8 @@ export default function DashboardPage() {
                 transition={{ duration: 0.5 }}
                 className="mb-8"
             >
-                <h1 className="text-headline text-3xl mb-2" style={{ color: '#F7F2EB' }}>
-                    {greeting()}{userName}
+                <h1 className="text-headline text-3xl mb-2" style={{ color: '#F7F2EB' }} suppressHydrationWarning>
+                    {greetingText}{userName}
                 </h1>
                 <p className="text-sm" style={{ color: '#D0E3FF' }}>
                     Your sanctuary of strategic empowerment.

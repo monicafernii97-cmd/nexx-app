@@ -69,7 +69,7 @@ export default function OnboardingPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
 
-    // Terminal state: Clerk signed in but Convex auth failed to sync
+    /** Terminal state: Clerk signed in but Convex auth failed to sync. */
     const convexAuthFailed = !convexLoading && !convexReady && !!clerkUser;
 
     // Show loading state while Convex auth is syncing
@@ -119,10 +119,12 @@ export default function OnboardingPage() {
         );
     }
 
-    const update = (field: string, value: unknown) => {
+    /** Update a single field in the onboarding form data. */
+    const update = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
     };
 
+    /** Toggle an item in a multi-select array field (nexBehaviors or primaryGoals). */
     const toggleArrayItem = (field: 'nexBehaviors' | 'primaryGoals', item: string) => {
         setFormData((prev) => ({
             ...prev,
@@ -132,10 +134,11 @@ export default function OnboardingPage() {
         }));
     };
 
+    /** Check whether the current onboarding step has valid, required data to proceed. */
     const canProceed = () => {
         switch (currentStep) {
             case 0: return true;
-            case 1: return formData.name && formData.state;
+            case 1: return formData.name.trim() && formData.state.trim();
             case 2: return formData.custodyType;
             case 3: return formData.nexBehaviors.length > 0;
             case 4: return formData.primaryGoals.length > 0;
@@ -144,6 +147,7 @@ export default function OnboardingPage() {
         }
     };
 
+    /** Advance to the next step or, on the final step, save profile data and redirect. */
     const handleNext = async () => {
         if (currentStep < ONBOARDING_STEPS.length - 1) {
             setCurrentStep((prev) => prev + 1);
@@ -179,14 +183,16 @@ export default function OnboardingPage() {
                     name: formData.name || undefined,
                     state: formData.state || undefined,
                     county: formData.county || undefined,
-                    childrenCount: formData.childrenCount ? parseInt(formData.childrenCount, 10) : undefined,
+                    childrenCount: formData.childrenCount
+                        ? (Number.isNaN(parseInt(formData.childrenCount, 10)) ? undefined : parseInt(formData.childrenCount, 10))
+                        : undefined,
                     childrenAges: parsedAges && parsedAges.length > 0 ? parsedAges : undefined,
                     custodyType: formData.custodyType ? custodyMap[formData.custodyType] ?? undefined : undefined,
                     hasAttorney: formData.hasAttorney ? formData.hasAttorney === 'Yes' : undefined,
                     primaryGoals: formData.primaryGoals.length > 0 ? formData.primaryGoals : undefined,
                 });
 
-                // Create NEX profile with behaviors
+                // Create NEX profile with behaviors (backend mutation is idempotent)
                 if (formData.nexBehaviors.length > 0) {
                     await createNexProfile({
                         behaviors: formData.nexBehaviors,
@@ -208,6 +214,7 @@ export default function OnboardingPage() {
         }
     };
 
+    /** NEX behavior options presented during onboarding step 3. */
     const nexBehaviorOptions = [
         'Threatens contempt / court action',
         'Micromanages my parenting',
@@ -223,6 +230,7 @@ export default function OnboardingPage() {
         'Gaslights or rewrites history',
     ];
 
+    /** Goal options presented during onboarding step 4. */
     const goalOptions = [
         'Respond strategically to my NEX',
         'Document incidents for court',

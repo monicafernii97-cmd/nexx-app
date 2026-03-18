@@ -10,22 +10,48 @@ import {
     ClipboardList,
     Siren,
     Scale,
-    Gavel,
     BookOpen,
     UserCircle,
     Settings,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
     LogIn,
+    LayoutGrid,
+    FolderOpen,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo, useCallback, type ComponentType, type CSSProperties } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 
-const navItems = [
+/** Child navigation item definition for sidebar sub-menus. */
+interface NavChild {
+    label: string;
+    href: string;
+    icon: ComponentType<{ size?: number; strokeWidth?: number; style?: CSSProperties }>;
+}
+
+/** Top-level navigation item with optional expandable children. */
+interface NavItem {
+    label: string;
+    href: string;
+    icon: ComponentType<{ size?: number; strokeWidth?: number; style?: CSSProperties }>;
+    children?: NavChild[];
+}
+
+/** Ordered list of sidebar navigation items with DocuVault sub-routes. */
+const navItems: NavItem[] = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Chat', href: '/chat', icon: MessageCircle },
-    { label: 'DocuVault', href: '/docuvault', icon: Landmark },
+    {
+        label: 'DocuVault',
+        href: '/docuvault',
+        icon: Landmark,
+        children: [
+            { label: 'Template Gallery', href: '/docuvault/templates', icon: LayoutGrid },
+            { label: 'Saved Documents', href: '/docuvault/gallery', icon: FolderOpen },
+        ],
+    },
     { label: 'Incident Report', href: '/incident-report', icon: ClipboardList },
     { label: 'NEX Profile', href: '/nex-profile', icon: Siren },
     { label: 'Legal Suite', href: '/court-settings', icon: Scale },
@@ -39,6 +65,25 @@ export default function Sidebar() {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
     const { user, isLoaded } = useUser();
+    const [manualExpanded, setManualExpanded] = useState<Record<string, boolean>>({});
+
+    /** Compute which nav groups are expanded — auto-expand active parent routes, merge manual overrides. */
+    const expandedItems = useMemo(() => {
+        const autoExpanded: Record<string, boolean> = {};
+        if (pathname) {
+            for (const item of navItems) {
+                if (item.children && (pathname === item.href || pathname.startsWith(item.href + '/'))) {
+                    autoExpanded[item.href] = true;
+                }
+            }
+        }
+        return { ...autoExpanded, ...manualExpanded };
+    }, [pathname, manualExpanded]);
+
+    /** Toggle the expanded/collapsed state of a parent nav item's children. */
+    const toggleExpand = useCallback((href: string) => {
+        setManualExpanded((prev) => ({ ...prev, [href]: !expandedItems[href] }));
+    }, [expandedItems]);
 
     return (
         <motion.aside
@@ -85,41 +130,123 @@ export default function Sidebar() {
             <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
                 {navItems.map((item) => {
                     const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+                    const hasChildren = item.children && item.children.length > 0;
+                    const isExpanded = expandedItems[item.href] ?? false;
                     const Icon = item.icon;
 
                     return (
-                        <Link
-                            key={item.href}
-                            href={item.href}
-                            className="no-underline"
-                        >
-                            <motion.div
-                                whileHover={{ x: 2 }}
-                                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${collapsed ? 'justify-center' : ''
-                                    }`}
-                                style={{
-                                    background: isActive
-                                        ? 'rgba(255, 249, 240, 0.15)'
-                                        : 'transparent',
-                                    color: isActive ? '#F7F2EB' : '#D0E3FF',
-                                    borderLeft: isActive ? '3px solid #FFF9F0' : '3px solid transparent',
-                                }}
-                            >
-                                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
-                                <AnimatePresence>
-                                    {!collapsed && (
-                                        <motion.span
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            exit={{ opacity: 0 }}
-                                            className="text-sm font-medium whitespace-nowrap"
+                        <div key={item.href}>
+                            {/* Parent nav item */}
+                            <div className="flex items-center">
+                                <Link
+                                    href={item.href}
+                                    aria-current={pathname === item.href ? 'page' : undefined}
+                                    className="no-underline flex-1 min-w-0"
+                                >
+                                    <motion.div
+                                        whileHover={{ x: 2 }}
+                                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${collapsed ? 'justify-center' : ''
+                                            }`}
+                                        style={{
+                                            background: isActive && !hasChildren
+                                                ? 'rgba(255, 249, 240, 0.15)'
+                                                : isActive && hasChildren
+                                                    ? 'rgba(255, 249, 240, 0.08)'
+                                                    : 'transparent',
+                                            color: isActive ? '#F7F2EB' : '#D0E3FF',
+                                            borderLeft: isActive ? '3px solid #FFF9F0' : '3px solid transparent',
+                                        }}
+                                    >
+                                        <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
+                                        <AnimatePresence>
+                                            {!collapsed && (
+                                                <motion.span
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    exit={{ opacity: 0 }}
+                                                    className="text-sm font-medium whitespace-nowrap flex-1"
+                                                >
+                                                    {item.label}
+                                                </motion.span>
+                                            )}
+                                        </AnimatePresence>
+                                    </motion.div>
+                                </Link>
+
+                                {/* Expand/collapse chevron for items with children */}
+                                {hasChildren && !collapsed && (
+                                    <button
+                                        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${item.label} submenu`}
+                                        aria-expanded={isExpanded}
+                                        aria-controls={`submenu-${item.href.replace(/\W/g, '-')}`}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleExpand(item.href);
+                                        }}
+                                        className="w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 flex-shrink-0 mr-1"
+                                        style={{
+                                            background: 'transparent',
+                                            color: '#D0E3FF',
+                                            border: 'none',
+                                        }}
+                                    >
+                                        <motion.div
+                                            animate={{ rotate: isExpanded ? 180 : 0 }}
+                                            transition={{ duration: 0.2 }}
                                         >
-                                            {item.label}
-                                        </motion.span>
-                                    )}
-                                </AnimatePresence>
-                            </motion.div>
-                        </Link>
+                                            <ChevronDown size={14} />
+                                        </motion.div>
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Child nav items */}
+                            <AnimatePresence>
+                                {hasChildren && isExpanded && !collapsed && (
+                                    <motion.div
+                                        id={`submenu-${item.href.replace(/\W/g, '-')}`}
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="ml-5 pl-4 mt-1 mb-1 space-y-0.5" style={{ borderLeft: '1px solid rgba(208, 227, 255, 0.1)' }}>
+                                            {item.children!.map((child) => {
+                                                const isChildActive =
+                                                    pathname === child.href ||
+                                                    pathname?.startsWith(child.href + '/');
+                                                const ChildIcon = child.icon;
+                                                return (
+                                                    <Link
+                                                        key={child.href}
+                                                        href={child.href}
+                                                        aria-current={isChildActive ? 'page' : undefined}
+                                                        className="no-underline"
+                                                    >
+                                                        <motion.div
+                                                            whileHover={{ x: 2 }}
+                                                            className="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-200"
+                                                            style={{
+                                                                background: isChildActive
+                                                                    ? 'rgba(208, 227, 255, 0.12)'
+                                                                    : 'transparent',
+                                                                color: isChildActive ? '#F7F2EB' : '#D0E3FF',
+                                                            }}
+                                                        >
+                                                            <ChildIcon size={15} strokeWidth={isChildActive ? 2.2 : 1.6} />
+                                                            <span className="text-xs font-medium whitespace-nowrap">
+                                                                {child.label}
+                                                            </span>
+                                                        </motion.div>
+                                                    </Link>
+                                                );
+                                            })}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
                     );
                 })}
             </nav>
@@ -131,7 +258,7 @@ export default function Sidebar() {
                 {isLoaded && user ? (
                     /* ─── Authenticated: Clerk UserButton + user info ─── */
                     <div
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-[rgba(208, 227, 255,0.06)] ${collapsed ? 'justify-center' : ''
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-[rgba(208,227,255,0.06)] ${collapsed ? 'justify-center' : ''
                             }`}
                     >
                         <UserButton
@@ -169,7 +296,7 @@ export default function Sidebar() {
                     /* ─── Not authenticated: Sign In link ─── */
                     <Link href="/sign-in" className="no-underline">
                         <div
-                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(208, 227, 255,0.06)] ${collapsed ? 'justify-center' : ''
+                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(208,227,255,0.06)] ${collapsed ? 'justify-center' : ''
                                 }`}
                         >
                             <div
@@ -199,6 +326,7 @@ export default function Sidebar() {
             {/* Collapse Toggle */}
             <button
                 onClick={() => setCollapsed(!collapsed)}
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer
           transition-all duration-200 hover:scale-110"
                 style={{

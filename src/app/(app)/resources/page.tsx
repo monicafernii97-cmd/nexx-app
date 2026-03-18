@@ -545,8 +545,9 @@ export default function ResourcesPage() {
 
     // isLookingUp: true only after cache query has completed (cachedEntry === null
     // indicates a miss; undefined means the query is still loading)
-    const isCacheQueryLoading = Boolean(state && normCounty && cachedEntry === undefined);
-    const isLookingUp = Boolean(state && normCounty && cachedEntry === null && !lookupError);
+    const hasCanonicalLocation = Boolean(normState && normCountyTitle);
+    const isCacheQueryLoading = hasCanonicalLocation && cachedEntry === undefined;
+    const isLookingUp = hasCanonicalLocation && cachedEntry === null && !lookupError;
 
     // Merge legal aid: AI-cached takes priority, curated supplements (deduplicated)
     const legalAidResources = mergeUniqueResourceLists(

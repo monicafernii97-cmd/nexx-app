@@ -276,7 +276,7 @@ function buildStreamCaption(
 
   const isSAPCR = ['divorce_with_children', 'custody_establishment', 'custody_modification', 'sapcr', 'child_support', 'child_support_modification', 'visitation', 'relocation'].includes(caseType);
 
-  // Filter to children with valid name strings to prevent runtime crashes
+  /** Filter to children with valid name strings to prevent runtime crashes. */
   const validChildren = (children ?? []).filter(
     (c): c is { name: string } => typeof c?.name === 'string' && c.name.trim().length > 0
   );

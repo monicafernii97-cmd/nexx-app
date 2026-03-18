@@ -34,7 +34,7 @@ export function useFocusTrap(
         // Save the currently-focused element to restore later
         previousFocusRef.current = document.activeElement as HTMLElement;
 
-        // Move focus into the dialog after a frame (wait for render)
+        /** Schedule focus into the first focusable element after the render frame. */
         const raf = requestAnimationFrame(() => {
             const focusable = getFocusableElements();
             if (focusable.length > 0) {

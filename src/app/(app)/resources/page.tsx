@@ -458,6 +458,8 @@ export default function ResourcesPage() {
     // Normalize casing to match API route's canonical cache key
     const normState = titleCase(state);
     const normCountyTitle = titleCase(normCounty);
+    const normalizedLocationKey =
+        normState && normCountyTitle ? `${normState}::${normCountyTitle}` : '';
 
     // Query curated static data
     const stateData = state ? getStateResources(state) : null;
@@ -490,12 +492,12 @@ export default function ResourcesPage() {
         activeLookupRef.current = null;
         setLookupTriggered(false);
         setLookupError(null);
-    }, [state, normCounty]);
+    }, [normalizedLocationKey]);
 
     /** Trigger an AI resource lookup for the current state + county. */
     const triggerLookup = useCallback(async () => {
-        if (!state || !normCounty || lookupTriggered) return;
-        const requestKey = `${state}::${normCounty}`;
+        if (!normState || !normCountyTitle || lookupTriggered) return;
+        const requestKey = normalizedLocationKey;
         activeLookupRef.current?.controller.abort();
         const controller = new AbortController();
         activeLookupRef.current = { key: requestKey, controller };
@@ -506,7 +508,7 @@ export default function ResourcesPage() {
             const res = await fetch('/api/resources/lookup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ state, county: normCounty }),
+                body: JSON.stringify({ state: normState, county: normCountyTitle }),
                 signal: controller.signal,
             });
             if (!res.ok) {
@@ -519,7 +521,7 @@ export default function ResourcesPage() {
             console.error('[Resources] Lookup failed:', err);
             setLookupError(err instanceof Error ? err.message : 'Resource lookup failed');
         }
-    }, [state, normCounty, lookupTriggered]);
+    }, [normState, normCountyTitle, normalizedLocationKey, lookupTriggered]);
 
     // Auto-trigger lookup on cache miss for any location
     useEffect(() => {
@@ -528,14 +530,14 @@ export default function ResourcesPage() {
         // 2. The cache query has loaded (not undefined) and returned null
         // 3. We haven't already triggered
         if (
-            state &&
-            normCounty &&
+            normState &&
+            normCountyTitle &&
             cachedEntry === null &&
             !lookupTriggered
         ) {
             triggerLookup();
         }
-    }, [state, normCounty, cachedEntry, lookupTriggered, triggerLookup]);
+    }, [normState, normCountyTitle, cachedEntry, lookupTriggered, triggerLookup]);
 
     const locationLabel = county && state
         ? `${county}${county.toLowerCase().endsWith('county') ? '' : ' County'}, ${state}`
@@ -694,7 +696,7 @@ export default function ResourcesPage() {
                 </motion.div>
             )}
             {/* ─── My Case Card ─── */}
-            {showMyCaseCard && (
+            {showMyCaseCard && safeCaseSearchUrl && (
                 <motion.div
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -702,7 +704,7 @@ export default function ResourcesPage() {
                     className="mb-6"
                 >
                     <a
-                        href={safeCaseSearchUrl!}
+                        href={safeCaseSearchUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="no-underline block"
@@ -934,7 +936,9 @@ export default function ResourcesPage() {
                     color="#C75A5A"
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {CRISIS_RESOURCES.map((r) => (
+                    {CRISIS_RESOURCES.map((r) => {
+                        const safeCrisisUrl = toSafeExternalUrl(r.url);
+                        return (
                         <motion.div
                             key={r.name}
                             whileHover={{ scale: 1.01, y: -1 }}
@@ -973,9 +977,9 @@ export default function ResourcesPage() {
                                         </span>
                                     )
                                 )}
-                                {toSafeExternalUrl(r.url) && (
+                                {safeCrisisUrl && (
                                     <a
-                                        href={toSafeExternalUrl(r.url)!}
+                                        href={safeCrisisUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="flex items-center gap-1 text-xs font-medium no-underline"
@@ -987,7 +991,8 @@ export default function ResourcesPage() {
                                 )}
                             </div>
                         </motion.div>
-                    ))}
+                        );
+                    })}
                 </div>
             </motion.div>
 

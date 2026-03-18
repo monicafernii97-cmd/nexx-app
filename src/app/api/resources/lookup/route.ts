@@ -19,6 +19,13 @@ import { titleCase } from '@/lib/utils/stringHelpers';
 /** Maximum state/county string length to prevent abuse. */
 const MAX_INPUT_LEN = 100;
 
+/**
+ * Module-scoped map for coalescing concurrent lookups.
+ * Key: `state::county`, Value: in-flight Promise.
+ * Prevents duplicate OpenAI calls when multiple requests hit the same cache miss.
+ */
+const pendingLookups = new Map<string, Promise<{ resources: Record<string, unknown>; sources: string[] }>>();
+
 const RESOURCE_JSON_SCHEMA = `{
   "courtClerk": { "name": string, "description": string, "url": string, "phone": string, "address": string } | null,
   "courtsWebsite": { "name": string, "description": string, "url": string } | null,
@@ -87,8 +94,19 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(body, { status });
     }
 
-    // ── OpenAI Lookup ──
-    try {
+    // ── Coalesce concurrent lookups for the same location ──
+    const lookupKey = `${normState}::${normCounty}`;
+    if (pendingLookups.has(lookupKey)) {
+        try {
+            const result = await pendingLookups.get(lookupKey)!;
+            return NextResponse.json({ status: 'ok', ...result });
+        } catch {
+            return NextResponse.json({ error: 'Resource lookup failed. Please try again.' }, { status: 500 });
+        }
+    }
+
+    // ── OpenAI Lookup (with coalescing) ──
+    const lookupPromise = (async () => {
         const openai = getOpenAI();
         const abortCtrl = new AbortController();
         const timeoutId = setTimeout(() => abortCtrl.abort(), 30_000);
@@ -112,17 +130,13 @@ export async function POST(req: NextRequest) {
         clearTimeout(timeoutId);
 
         const raw = completion.choices[0]?.message?.content;
-        if (!raw) {
-            console.error('[Resource Lookup] Empty OpenAI response');
-            return NextResponse.json({ error: 'AI returned empty response' }, { status: 502 });
-        }
+        if (!raw) throw new Error('AI returned empty response');
 
         let parsed: Record<string, unknown>;
         try {
             parsed = JSON.parse(raw);
-        } catch (parseErr) {
-            console.error('[Resource Lookup] Failed to parse AI response:', parseErr);
-            return NextResponse.json({ error: 'AI returned invalid JSON' }, { status: 502 });
+        } catch {
+            throw new Error('AI returned invalid JSON');
         }
 
         // Extract sources array before storing resources
@@ -152,25 +166,30 @@ export async function POST(req: NextRequest) {
                 ? sanitizeResourceNoAddr(parsed.caseSearch as Record<string, unknown>) : undefined,
         };
 
-        // ── Store in Convex ──
-        await convex.mutation(api.resourcesCache.upsert, {
+        // ── Store in Convex (via public action wrapper) ──
+        await convex.action(api.resourcesCache.upsertFromServer, {
             state: normState,
             county: normCounty,
             resources,
             sources,
         });
 
-        return NextResponse.json({
-            status: 'ok',
-            resources,
-            sources,
-        });
+        return { resources, sources };
+    })();
+
+    pendingLookups.set(lookupKey, lookupPromise);
+
+    try {
+        const result = await lookupPromise;
+        return NextResponse.json({ status: 'ok', ...result });
     } catch (err) {
         console.error('[Resource Lookup] OpenAI error:', err);
         return NextResponse.json(
             { error: 'Resource lookup failed. Please try again.' },
             { status: 500 },
         );
+    } finally {
+        pendingLookups.delete(lookupKey);
     }
 }
 

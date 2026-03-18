@@ -350,11 +350,12 @@ function CourtResourcesGrid({
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {items.map((item) => {
+                const safeItemUrl = toSafeExternalUrl(item.resource.url);
                 const CardContent = (
                     <motion.div
-                        whileHover={item.resource.url ? { scale: 1.02, y: -2 } : undefined}
-                        whileTap={item.resource.url ? { scale: 0.98 } : undefined}
-                        className={`card-premium p-4 ${item.resource.url ? 'cursor-pointer' : ''} group h-full`}
+                        whileHover={safeItemUrl ? { scale: 1.02, y: -2 } : undefined}
+                        whileTap={safeItemUrl ? { scale: 0.98 } : undefined}
+                        className={`card-premium p-4 ${safeItemUrl ? 'cursor-pointer' : ''} group h-full`}
                     >
                         <div className="flex items-center gap-3">
                             <div
@@ -374,7 +375,7 @@ function CourtResourcesGrid({
                                     {item.resource.name}
                                 </p>
                             </div>
-                            {item.resource.url && (
+                            {safeItemUrl && (
                                 <ExternalLink
                                     size={13}
                                     className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
@@ -389,8 +390,6 @@ function CourtResourcesGrid({
                         )}
                     </motion.div>
                 );
-
-                const safeItemUrl = toSafeExternalUrl(item.resource.url);
                 return safeItemUrl ? (
                     <a
                         key={item.label}
@@ -443,15 +442,19 @@ export default function ResourcesPage() {
     // Normalize county for cache lookup (strip "County" suffix)
     const normCounty = county.replace(/\s+County$/i, '').trim();
 
+    // Normalize casing to match API route's canonical cache key (titleCase)
+    const normState = state.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    const normCountyTitle = normCounty.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+
     // Query curated static data
     const stateData = state ? getStateResources(state) : null;
     const countyData = state && normCounty ? getCountyResources(state, normCounty) : null;
     const hasCuratedData = isStateCurated(state);
 
-    // Query AI-cached resources from Convex
+    // Query AI-cached resources from Convex (using normalized titleCase keys)
     const cachedEntry = useQuery(
         api.resourcesCache.get,
-        state && normCounty ? { state, county: normCounty } : 'skip',
+        normState && normCountyTitle ? { state: normState, county: normCountyTitle } : 'skip',
     );
     const cachedResources: CachedResources | null = cachedEntry?.resources ?? null;
 
@@ -521,21 +524,42 @@ export default function ResourcesPage() {
     // Determine if we're in a loading state for AI resources
     const isLookingUp = state && normCounty && cachedEntry === null && !lookupError;
 
-    // Merge legal aid: AI-cached takes priority, curated supplements
+    // Merge legal aid: AI-cached takes priority, curated supplements (deduplicated)
     const legalAidResources: ResourceEntry[] = [];
+    const seenLegalAidKeys = new Set<string>();
     if (cachedResources?.legalAid) {
-        legalAidResources.push(...cachedResources.legalAid.map(r => toResourceEntry(r, ['legal-aid'])));
+        for (const r of cachedResources.legalAid.map(r => toResourceEntry(r, ['legal-aid']))) {
+            const key = resourceKey(r);
+            if (!seenLegalAidKeys.has(key)) { seenLegalAidKeys.add(key); legalAidResources.push(r); }
+        }
     }
-    if (stateData?.statewideLegalAid) legalAidResources.push(...stateData.statewideLegalAid);
-    if (countyData?.legalAid) legalAidResources.push(...countyData.legalAid);
+    if (stateData?.statewideLegalAid) {
+        for (const r of stateData.statewideLegalAid) {
+            const key = resourceKey(r);
+            if (!seenLegalAidKeys.has(key)) { seenLegalAidKeys.add(key); legalAidResources.push(r); }
+        }
+    }
+    if (countyData?.legalAid) {
+        for (const r of countyData.legalAid) {
+            const key = resourceKey(r);
+            if (!seenLegalAidKeys.has(key)) { seenLegalAidKeys.add(key); legalAidResources.push(r); }
+        }
+    }
 
-    // Merge nonprofits: AI-cached takes priority, curated supplements
+    // Merge nonprofits: AI-cached takes priority, curated supplements (deduplicated)
     const nonprofitResources: ResourceEntry[] = [];
+    const seenNonprofitKeys = new Set<string>();
     if (cachedResources?.nonprofits) {
-        nonprofitResources.push(...cachedResources.nonprofits.map(r => toResourceEntry(r, ['nonprofit'])));
+        for (const r of cachedResources.nonprofits.map(r => toResourceEntry(r, ['nonprofit']))) {
+            const key = resourceKey(r);
+            if (!seenNonprofitKeys.has(key)) { seenNonprofitKeys.add(key); nonprofitResources.push(r); }
+        }
     }
     if (countyData?.nonprofits) {
-        nonprofitResources.push(...countyData.nonprofits);
+        for (const r of countyData.nonprofits) {
+            const key = resourceKey(r);
+            if (!seenNonprofitKeys.has(key)) { seenNonprofitKeys.add(key); nonprofitResources.push(r); }
+        }
     }
 
     return (

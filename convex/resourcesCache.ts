@@ -6,7 +6,8 @@
  * Cache is permanent until the user edits their location, at which point
  * the old entry is invalidated and a fresh AI lookup populates a new one.
  */
-import { mutation, query } from './_generated/server';
+import { action, internalMutation, query } from './_generated/server';
+import { internal } from './_generated/api';
 import { v } from 'convex/values';
 
 // ═══ Shared resource schema for mutations ═══
@@ -70,13 +71,14 @@ export const get = query({
     },
 });
 
-// ═══ Mutations ═══
+// ═══ Internal Mutations (server-only, not callable from clients) ═══
 
 /**
  * Insert or update cached resources for a state + county.
- * Called by the `/api/resources/lookup` route after a successful AI lookup.
+ * Internal mutation — only callable from Convex actions/functions, not from clients.
+ * The `/api/resources/lookup` route calls this via a Convex action wrapper.
  */
-export const upsert = mutation({
+export const upsert = internalMutation({
     args: {
         state: v.string(),
         county: v.string(),
@@ -115,10 +117,11 @@ export const upsert = mutation({
 
 /**
  * Delete cached resources for a state + county.
+ * Internal mutation — only callable from Convex actions/functions, not from clients.
  * Called when a user changes their location so stale data is cleared
  * before a new AI lookup is triggered.
  */
-export const invalidate = mutation({
+export const invalidate = internalMutation({
     args: {
         state: v.string(),
         county: v.string(),
@@ -134,5 +137,25 @@ export const invalidate = mutation({
         if (existing) {
             await ctx.db.delete(existing._id);
         }
+    },
+});
+
+// ═══ Public Action Wrappers (callable from API routes via ConvexHttpClient) ═══
+
+/**
+ * Public action wrapper for `upsert` — callable from API routes.
+ * Forwards arguments to the internal mutation after validating auth identity.
+ */
+export const upsertFromServer = action({
+    args: {
+        state: v.string(),
+        county: v.string(),
+        resources: resourcesObjV,
+        sources: v.optional(v.array(v.string())),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error('Unauthenticated');
+        await ctx.runMutation(internal.resourcesCache.upsert, args);
     },
 });

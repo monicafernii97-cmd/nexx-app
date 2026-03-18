@@ -6,7 +6,7 @@
  * in the Convex `resourcesCache` table.
  *
  * POST /api/resources/lookup
- * Body: { state: string, county: string, courtName?: string, causeNumber?: string, hasOpenCase?: boolean }
+ * Body: { state: string, county: string }
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
@@ -105,23 +105,26 @@ export async function POST(req: NextRequest) {
         const abortCtrl = new AbortController();
         const timeoutId = setTimeout(() => abortCtrl.abort(), 30_000);
 
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            response_format: { type: 'json_object' },
-            temperature: 0.2,
-            messages: [
-                {
-                    role: 'system',
-                    content: `You are a US legal resources researcher. Return ONLY valid JSON matching this schema:\n${RESOURCE_JSON_SCHEMA}\n\nRules:\n- Use official government websites (.gov, .us) when possible.\n- Include real phone numbers and addresses when available.\n- For "sources", list 2-4 URLs you referenced.\n- If a resource doesn't exist for this location, set it to null.\n- For arrays (legalAid, nonprofits), include 1-3 entries each.\n- All URLs must be complete (https://...).\n- Descriptions should be 1-2 sentences max.`,
-                },
-                {
-                    role: 'user',
-                    content: buildUserPrompt(normCounty, normState),
-                },
-            ],
-        }, { signal: abortCtrl.signal });
-
-        clearTimeout(timeoutId);
+        let completion;
+        try {
+            completion = await openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                response_format: { type: 'json_object' },
+                temperature: 0.2,
+                messages: [
+                    {
+                        role: 'system',
+                        content: `You are a US legal resources researcher. Return ONLY valid JSON matching this schema:\n${RESOURCE_JSON_SCHEMA}\n\nRules:\n- Use official government websites (.gov, .us) when possible.\n- Include real phone numbers and addresses when available.\n- For "sources", list 2-4 URLs you referenced.\n- If a resource doesn't exist for this location, set it to null.\n- For arrays (legalAid, nonprofits), include 1-3 entries each.\n- All URLs must be complete (https://...).\n- Descriptions should be 1-2 sentences max.`,
+                    },
+                    {
+                        role: 'user',
+                        content: buildUserPrompt(normCounty, normState),
+                    },
+                ],
+            }, { signal: abortCtrl.signal });
+        } finally {
+            clearTimeout(timeoutId);
+        }
 
         const raw = completion.choices[0]?.message?.content;
         if (!raw) throw new Error('AI returned empty response');
@@ -189,7 +192,7 @@ export async function POST(req: NextRequest) {
 
 // ── Prompt builder ──
 
-/** Build the user message for the OpenAI prompt, optionally enriched with court-specific context. */
+/** Build the user message for the OpenAI prompt. */
 function buildUserPrompt(
     county: string,
     state: string,

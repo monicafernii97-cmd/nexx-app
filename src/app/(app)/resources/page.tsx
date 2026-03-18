@@ -69,6 +69,22 @@ function resourceKey(r: ResourceEntry): string {
     return [r.name, r.url ?? '', r.phone ?? '', r.address ?? ''].join('|');
 }
 
+/** Merge multiple resource lists, deduplicating by resourceKey (first occurrence wins). */
+function mergeUniqueResourceLists(...lists: ResourceEntry[][]): ResourceEntry[] {
+    const out: ResourceEntry[] = [];
+    const seen = new Set<string>();
+    for (const list of lists) {
+        for (const r of list) {
+            const key = resourceKey(r);
+            if (!seen.has(key)) {
+                seen.add(key);
+                out.push(r);
+            }
+        }
+    }
+    return out;
+}
+
 
 
 /** True if the string looks like a dialable phone number (digits, spaces, dashes, parens). */
@@ -519,45 +535,21 @@ export default function ResourcesPage() {
 
     // isLookingUp: true only after cache query has completed (cachedEntry === null
     // indicates a miss; undefined means the query is still loading)
-    const isLookingUp = state && normCounty && cachedEntry === null && !lookupError;
+    const isCacheQueryLoading = Boolean(state && normCounty && cachedEntry === undefined);
+    const isLookingUp = Boolean(state && normCounty && cachedEntry === null && !lookupError);
 
     // Merge legal aid: AI-cached takes priority, curated supplements (deduplicated)
-    const legalAidResources: ResourceEntry[] = [];
-    const seenLegalAidKeys = new Set<string>();
-    if (cachedResources?.legalAid) {
-        for (const r of cachedResources.legalAid.map(r => toResourceEntry(r, ['legal-aid']))) {
-            const key = resourceKey(r);
-            if (!seenLegalAidKeys.has(key)) { seenLegalAidKeys.add(key); legalAidResources.push(r); }
-        }
-    }
-    if (stateData?.statewideLegalAid) {
-        for (const r of stateData.statewideLegalAid) {
-            const key = resourceKey(r);
-            if (!seenLegalAidKeys.has(key)) { seenLegalAidKeys.add(key); legalAidResources.push(r); }
-        }
-    }
-    if (countyData?.legalAid) {
-        for (const r of countyData.legalAid) {
-            const key = resourceKey(r);
-            if (!seenLegalAidKeys.has(key)) { seenLegalAidKeys.add(key); legalAidResources.push(r); }
-        }
-    }
+    const legalAidResources = mergeUniqueResourceLists(
+        cachedResources?.legalAid?.map(r => toResourceEntry(r, ['legal-aid'])) ?? [],
+        stateData?.statewideLegalAid ?? [],
+        countyData?.legalAid ?? [],
+    );
 
     // Merge nonprofits: AI-cached takes priority, curated supplements (deduplicated)
-    const nonprofitResources: ResourceEntry[] = [];
-    const seenNonprofitKeys = new Set<string>();
-    if (cachedResources?.nonprofits) {
-        for (const r of cachedResources.nonprofits.map(r => toResourceEntry(r, ['nonprofit']))) {
-            const key = resourceKey(r);
-            if (!seenNonprofitKeys.has(key)) { seenNonprofitKeys.add(key); nonprofitResources.push(r); }
-        }
-    }
-    if (countyData?.nonprofits) {
-        for (const r of countyData.nonprofits) {
-            const key = resourceKey(r);
-            if (!seenNonprofitKeys.has(key)) { seenNonprofitKeys.add(key); nonprofitResources.push(r); }
-        }
-    }
+    const nonprofitResources = mergeUniqueResourceLists(
+        cachedResources?.nonprofits?.map(r => toResourceEntry(r, ['nonprofit'])) ?? [],
+        countyData?.nonprofits ?? [],
+    );
 
     // My Case card rendering
     const safeCaseSearchUrl = toSafeExternalUrl(cachedResources?.caseSearch?.url);
@@ -642,7 +634,7 @@ export default function ResourcesPage() {
             )}
 
             {/* ─── AI Lookup Loading Banner ─── */}
-            {isLookingUp && (
+            {(isCacheQueryLoading || isLookingUp) && (
                 <motion.div
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -818,7 +810,7 @@ export default function ResourcesPage() {
                         }
                         color="#7096D1"
                     />
-                    {isLookingUp ? (
+                    {isCacheQueryLoading || isLookingUp ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             <ShimmerCard />
                             <ShimmerCard />
@@ -856,7 +848,7 @@ export default function ResourcesPage() {
                     subtitle="Free and low-cost legal help, bar associations, and pro bono programs"
                     color="#E5A84A"
                 />
-                {isLookingUp ? (
+                {isCacheQueryLoading || isLookingUp ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <ShimmerCard />
                         <ShimmerCard />
@@ -899,7 +891,7 @@ export default function ResourcesPage() {
                     subtitle="Shelters, crisis centers, family support, and advocacy groups"
                     color="#C75A5A"
                 />
-                {isLookingUp ? (
+                {isCacheQueryLoading || isLookingUp ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <ShimmerCard />
                         <ShimmerCard />

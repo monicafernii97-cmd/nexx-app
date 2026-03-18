@@ -40,26 +40,14 @@ import {
 //  Types
 // ═══════════════════════════════════════════
 
+/** Derive cache resource types from the Convex schema to prevent drift. */
+import type { Doc } from '../../../../convex/_generated/dataModel';
+
 /** Shape of a single AI-cached resource (court clerk, family division, etc.) */
-interface CachedResource {
-    name: string;
-    description?: string;
-    url?: string;
-    phone?: string;
-    address?: string;
-}
+type CachedResource = NonNullable<Doc<'resourcesCache'>['resources']['courtClerk']>;
 
 /** Shape of the full cached resources object from Convex. */
-interface CachedResources {
-    courtClerk?: CachedResource;
-    courtsWebsite?: CachedResource;
-    familyDivision?: CachedResource;
-    localRules?: CachedResource;
-    stateFamilyCode?: CachedResource;
-    legalAid?: CachedResource[];
-    nonprofits?: CachedResource[];
-    caseSearch?: CachedResource;
-}
+type CachedResources = Doc<'resourcesCache'>['resources'];
 
 // ═══════════════════════════════════════════
 //  Helpers
@@ -463,8 +451,15 @@ export default function ResourcesPage() {
     const [lookupTriggered, setLookupTriggered] = useState(false);
     const [lookupError, setLookupError] = useState<string | null>(null);
 
-    // Reset lookup state and abort in-flight request when location changes
+    // Abort in-flight lookup on component unmount
     const activeLookupRef = useRef<{ key: string; controller: AbortController } | null>(null);
+
+    useEffect(() => {
+        return () => {
+            activeLookupRef.current?.controller.abort();
+            activeLookupRef.current = null;
+        };
+    }, []);
 
     useEffect(() => {
         activeLookupRef.current?.controller.abort();

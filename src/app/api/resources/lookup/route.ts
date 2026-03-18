@@ -48,16 +48,10 @@ export async function POST(req: NextRequest) {
     // ── Parse body ──
     let state: string;
     let county: string;
-    let courtName: string | undefined;
-    let causeNumber: string | undefined;
-    let hasOpenCase = false;
     try {
         const body = await req.json();
         state = typeof body.state === 'string' ? body.state.trim() : '';
         county = typeof body.county === 'string' ? body.county.trim() : '';
-        courtName = typeof body.courtName === 'string' && body.courtName.trim() ? body.courtName.trim() : undefined;
-        causeNumber = typeof body.causeNumber === 'string' && body.causeNumber.trim() ? body.causeNumber.trim() : undefined;
-        hasOpenCase = body.hasOpenCase === true;
     } catch {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
@@ -122,7 +116,7 @@ export async function POST(req: NextRequest) {
                 },
                 {
                     role: 'user',
-                    content: buildUserPrompt(normCounty, normState, courtName, causeNumber, hasOpenCase),
+                    content: buildUserPrompt(normCounty, normState),
                 },
             ],
         }, { signal: abortCtrl.signal });
@@ -199,9 +193,6 @@ export async function POST(req: NextRequest) {
 function buildUserPrompt(
     county: string,
     state: string,
-    courtName?: string,
-    causeNumber?: string,
-    hasOpenCase?: boolean,
 ): string {
     let prompt = `Find the official government and legal resources for ${county} County, ${state}:\n\n`;
     prompt += `1. County Clerk office — name, website, phone, address\n`;
@@ -212,21 +203,6 @@ function buildUserPrompt(
     prompt += `6. Local legal aid organizations (name, website, phone)\n`;
     prompt += `7. Local DV shelters / nonprofits (name, website, phone)\n`;
     prompt += `8. Public case search / records portal — the website where anyone can look up a case by cause number or party name\n`;
-
-    if (hasOpenCase) {
-        prompt += `\nIMPORTANT: The user has an active court case in this county.`;
-        if (courtName) {
-            prompt += ` Their case is in the ${courtName}.`;
-        }
-        if (causeNumber) {
-            prompt += ` Cause number: ${causeNumber}.`;
-        }
-        prompt += `\nFor the courtsWebsite and familyDivision fields, prioritize finding:\n`;
-        prompt += `- The SPECIFIC court page or division page for ${courtName || 'their assigned court'}\n`;
-        prompt += `- The county's online case search / public records portal (where they can look up their case)\n`;
-        prompt += `- The clerk's e-filing portal if one exists\n`;
-    }
-
     prompt += `\nReturn as structured JSON.`;
     return prompt;
 }

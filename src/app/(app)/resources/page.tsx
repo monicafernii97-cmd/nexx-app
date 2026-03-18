@@ -965,9 +965,9 @@ export default function ResourcesPage() {
                                         </span>
                                     )
                                 )}
-                                {r.url && (
+                                {toSafeExternalUrl(r.url) && (
                                     <a
-                                        href={r.url}
+                                        href={toSafeExternalUrl(r.url)!}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="flex items-center gap-1 text-xs font-medium no-underline"

@@ -218,6 +218,17 @@ function str(obj: Record<string, unknown>, key: string): string | undefined {
     return typeof val === 'string' && val.trim() ? val.trim() : undefined;
 }
 
+/** Validate URL is http(s) only — defense-in-depth against malicious AI URLs. */
+function safeUrl(url: string | undefined): string | undefined {
+    if (!url) return undefined;
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? url : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 /** Sanitize a full resource entry (with address). */
 function sanitizeResource(obj: Record<string, unknown>, includeAddress: boolean) {
     const name = str(obj, 'name');
@@ -225,7 +236,7 @@ function sanitizeResource(obj: Record<string, unknown>, includeAddress: boolean)
     return {
         name,
         description: str(obj, 'description'),
-        url: str(obj, 'url'),
+        url: safeUrl(str(obj, 'url')),
         phone: str(obj, 'phone'),
         ...(includeAddress ? { address: str(obj, 'address') } : {}),
     };
@@ -238,7 +249,7 @@ function sanitizeResourceNoAddr(obj: Record<string, unknown>) {
     return {
         name,
         description: str(obj, 'description'),
-        url: str(obj, 'url'),
+        url: safeUrl(str(obj, 'url')),
     };
 }
 
@@ -249,7 +260,7 @@ function sanitizeFamilyDivision(obj: Record<string, unknown>) {
     return {
         name,
         description: str(obj, 'description'),
-        url: str(obj, 'url'),
+        url: safeUrl(str(obj, 'url')),
         address: str(obj, 'address'),
     };
 }
@@ -265,7 +276,7 @@ function sanitizeArray(raw: unknown): { name: string; description?: string; url?
             return {
                 name,
                 description: str(item, 'description'),
-                url: str(item, 'url'),
+                url: safeUrl(str(item, 'url')),
                 phone: str(item, 'phone'),
             };
         })

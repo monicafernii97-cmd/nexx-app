@@ -120,7 +120,7 @@ export default function OnboardingPage() {
     }
 
     /** Update a single field in the onboarding form data. */
-    const update = (field: string, value: unknown) => {
+    const update = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
     };
 

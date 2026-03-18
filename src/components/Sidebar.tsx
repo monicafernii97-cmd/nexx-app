@@ -20,7 +20,7 @@ import {
     LayoutGrid,
     FolderOpen,
 } from 'lucide-react';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, type ComponentType, type CSSProperties } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 
@@ -28,14 +28,14 @@ import { nexxClerkAppearance } from '@/lib/clerk-theme';
 interface NavChild {
     label: string;
     href: string;
-    icon: React.ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>;
+    icon: ComponentType<{ size?: number; strokeWidth?: number; style?: CSSProperties }>;
 }
 
 /** Top-level navigation item with optional expandable children. */
 interface NavItem {
     label: string;
     href: string;
-    icon: React.ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>;
+    icon: ComponentType<{ size?: number; strokeWidth?: number; style?: CSSProperties }>;
     children?: NavChild[];
 }
 
@@ -140,7 +140,7 @@ export default function Sidebar() {
                             <div className="flex items-center">
                                 <Link
                                     href={item.href}
-                                    aria-current={isActive && !hasChildren ? 'page' : undefined}
+                                    aria-current={pathname === item.href ? 'page' : undefined}
                                     className="no-underline flex-1 min-w-0"
                                 >
                                     <motion.div

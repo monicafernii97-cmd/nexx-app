@@ -641,13 +641,13 @@ function DocuVaultPageInner() {
                             Document Context
                         </p>
                         <p className="text-sm italic leading-relaxed" style={{ color: '#123D7E' }}>
-                            &ldquo;{selectedTemplate?.title || (() => {
+                            &ldquo;{selectedTemplate?.title ?? (() => {
                                 const text = documentContent;
                                 if (text.length <= 120) return text;
                                 const truncated = text.slice(0, 120);
                                 const lastSpace = truncated.lastIndexOf(' ');
-                                return lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated;
-                            })()}...&rdquo;
+                                return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated) + '...';
+                            })()}&rdquo;
                         </p>
                     </div>
 
@@ -871,8 +871,9 @@ function DocuVaultPageInner() {
                                             catch { console.warn('Print dialog could not be opened'); }
                                         }, 500);
                                     } else {
-                                        // Popup blocked — inform user
-                                        alert('Please allow popups to print the document, or use Download instead.');
+                                        // Popup blocked — show inline warning instead of blocking alert()
+                                        setGenerationError('Please allow popups to print, or use Download instead.');
+                                        setTimeout(() => setGenerationError(null), 5000);
                                     }
                                 }}
                                 disabled={!generatedPdfUrl}

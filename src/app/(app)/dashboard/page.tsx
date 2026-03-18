@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 import { motion } from 'framer-motion';
 import { useQuery } from 'convex/react';
@@ -47,13 +47,16 @@ export default function DashboardPage() {
         { label: 'Pattern Alerts', value: '0', icon: AlertTriangle, color: '#E5A84A' },
     ];
 
-    /** Time-of-day greeting, computed client-side to avoid SSR/client timezone mismatch. */
-    const [greetingText, setGreetingText] = useState('');
+    /** Whether the component has mounted (used to avoid SSR/client timezone mismatch). */
+    const [hasMounted, setHasMounted] = useState(false);
+    useEffect(() => { setHasMounted(true); }, []);
 
-    useEffect(() => {
+    /** Time-of-day greeting, computed client-side only after mount. */
+    const greetingText = useMemo(() => {
+        if (!hasMounted) return '';
         const hour = new Date().getHours();
-        setGreetingText(hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening');
-    }, []);
+        return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    }, [hasMounted]);
 
     /** Formatted display name for the greeting header (empty if unavailable). */
     const userName = user?.name ? `, ${user.name}` : '';

@@ -75,7 +75,6 @@ export const get = query({
 /**
  * Insert or update cached resources for a state + county.
  * Called by the `/api/resources/lookup` route after a successful AI lookup.
- * Internal mutation — only callable from Convex actions, not from clients.
  */
 export const upsert = mutation({
     args: {

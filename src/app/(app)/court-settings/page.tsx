@@ -116,7 +116,13 @@ export default function CourtSettingsPage() {
             fetch('/api/resources/lookup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ state, county }),
+                body: JSON.stringify({
+                    state,
+                    county,
+                    courtName: courtName || undefined,
+                    causeNumber: causeNumber || undefined,
+                    hasOpenCase: !!causeNumber,
+                }),
             }).catch((err) => console.warn('[CourtSettings] Resource lookup failed (non-blocking):', err));
         } catch (error) {
             console.error('Failed to save court settings:', error);

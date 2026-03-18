@@ -38,13 +38,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    // ── Rate limit ──
-    const rl = checkRateLimit(userId, 'resource_lookup');
-    if (!rl.allowed) {
-        const { body, status } = rateLimitResponse(rl);
-        return NextResponse.json(body, { status });
-    }
-
     // ── Parse body ──
     let state: string;
     let county: string;
@@ -73,7 +66,7 @@ export async function POST(req: NextRequest) {
     const normState = titleCase(state);
     const normCounty = titleCase(county.replace(/\s+County$/i, ''));
 
-    // ── Check existing cache ──
+    // ── Check existing cache (before rate limit so cache hits are free) ──
     const convex = await getAuthenticatedConvexClient();
     const existing = await convex.query(api.resourcesCache.get, {
         state: normState,
@@ -87,9 +80,18 @@ export async function POST(req: NextRequest) {
         });
     }
 
+    // ── Rate limit (only consumed when AI lookup is needed) ──
+    const rl = checkRateLimit(userId, 'resource_lookup');
+    if (!rl.allowed) {
+        const { body, status } = rateLimitResponse(rl);
+        return NextResponse.json(body, { status });
+    }
+
     // ── OpenAI Lookup ──
     try {
         const openai = getOpenAI();
+        const abortCtrl = new AbortController();
+        const timeoutId = setTimeout(() => abortCtrl.abort(), 30_000);
 
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
@@ -105,7 +107,9 @@ export async function POST(req: NextRequest) {
                     content: buildUserPrompt(normCounty, normState, courtName, causeNumber, hasOpenCase),
                 },
             ],
-        });
+        }, { signal: abortCtrl.signal });
+
+        clearTimeout(timeoutId);
 
         const raw = completion.choices[0]?.message?.content;
         if (!raw) {
@@ -122,9 +126,13 @@ export async function POST(req: NextRequest) {
         }
 
         // Extract sources array before storing resources
-        const sources = Array.isArray(parsed.sources)
-            ? (parsed.sources as string[]).filter((s): s is string => typeof s === 'string')
+        const rawSources = parsed.sources;
+        const sources = Array.isArray(rawSources)
+            ? (rawSources as unknown[]).filter((s): s is string => typeof s === 'string')
             : [];
+        if (Array.isArray(rawSources) && sources.length < rawSources.length) {
+            console.warn('[Resource Lookup] Dropped malformed source entries:', rawSources.filter(s => typeof s !== 'string'));
+        }
 
         // Build a clean resources object matching the Convex schema
         const resources = {

@@ -79,6 +79,9 @@ function DocuVaultPageInner() {
                 URL.revokeObjectURL(pdfUrlRef.current);
                 pdfUrlRef.current = null;
             }
+            if (printWarningTimeoutRef.current) {
+                clearTimeout(printWarningTimeoutRef.current);
+            }
         };
     }, []);
 

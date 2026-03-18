@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
@@ -64,6 +64,24 @@ interface CachedResources {
 //  Helpers
 // ═══════════════════════════════════════════
 
+/** Validate a dynamic URL — only allow http(s) to prevent javascript:/data: injection. */
+function toSafeExternalUrl(url?: string): string | null {
+    if (!url) return null;
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.toString() : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Stable unique key for a ResourceEntry to prevent React key collisions. */
+function resourceKey(r: ResourceEntry): string {
+    return [r.name, r.url ?? '', r.phone ?? '', r.address ?? ''].join('|');
+}
+
+
+
 /** True if the string looks like a dialable phone number (digits, spaces, dashes, parens). */
 function isDialable(phone: string): boolean {
     return /^\+?[\d\s\-()]+$/.test(phone) && /\d/.test(phone);
@@ -87,6 +105,7 @@ function toResourceEntry(r: CachedResource, tags: string[]): ResourceEntry {
 
 /** A single clickable resource card with name, description, phone, and link. */
 function ResourceCard({ resource }: { resource: ResourceEntry }) {
+    const safeUrl = toSafeExternalUrl(resource.url);
     return (
         <motion.div
             whileHover={{ scale: 1.01, y: -1 }}
@@ -125,9 +144,9 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                                 </span>
                             )
                         )}
-                        {resource.url && (
+                        {safeUrl && (
                             <a
-                                href={resource.url}
+                                href={safeUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-1 text-xs font-medium no-underline transition-colors hover:opacity-80"
@@ -145,9 +164,9 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                         </p>
                     )}
                 </div>
-                {resource.url && (
+                {safeUrl && (
                     <a
-                        href={resource.url}
+                        href={safeUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 rounded transition-opacity"
@@ -267,7 +286,7 @@ function FinderHeroCard({
             {/* Resources list */}
             <div className="space-y-3">
                 {resources.map((r) => (
-                    <ResourceCard key={r.name} resource={r} />
+                    <ResourceCard key={resourceKey(r)} resource={r} />
                 ))}
             </div>
         </motion.div>
@@ -371,10 +390,11 @@ function CourtResourcesGrid({
                     </motion.div>
                 );
 
-                return item.resource.url ? (
+                const safeItemUrl = toSafeExternalUrl(item.resource.url);
+                return safeItemUrl ? (
                     <a
                         key={item.label}
-                        href={item.resource.url}
+                        href={safeItemUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="no-underline"
@@ -439,8 +459,12 @@ export default function ResourcesPage() {
     const [lookupTriggered, setLookupTriggered] = useState(false);
     const [lookupError, setLookupError] = useState<string | null>(null);
 
-    // Reset lookup state when location changes
+    // Reset lookup state and abort in-flight request when location changes
+    const activeLookupRef = useRef<{ key: string; controller: AbortController } | null>(null);
+
     useEffect(() => {
+        activeLookupRef.current?.controller.abort();
+        activeLookupRef.current = null;
         setLookupTriggered(false);
         setLookupError(null);
     }, [state, normCounty]);
@@ -448,6 +472,11 @@ export default function ResourcesPage() {
     /** Trigger an AI resource lookup for the current state + county. */
     const triggerLookup = useCallback(async () => {
         if (!state || !normCounty || lookupTriggered) return;
+        const requestKey = `${state}::${normCounty}`;
+        activeLookupRef.current?.controller.abort();
+        const controller = new AbortController();
+        activeLookupRef.current = { key: requestKey, controller };
+
         setLookupTriggered(true);
         setLookupError(null);
         try {
@@ -455,12 +484,15 @@ export default function ResourcesPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ state, county: normCounty }),
+                signal: controller.signal,
             });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
                 throw new Error(data.error || `Lookup failed (${res.status})`);
             }
         } catch (err) {
+            if (controller.signal.aborted) return;
+            if (activeLookupRef.current?.key !== requestKey) return;
             console.error('[Resources] Lookup failed:', err);
             setLookupError(err instanceof Error ? err.message : 'Resource lookup failed');
         }
@@ -637,7 +669,9 @@ export default function ResourcesPage() {
                 </motion.div>
             )}
             {/* ─── My Case Card ─── */}
-            {courtSettings?.causeNumber && cachedResources?.caseSearch?.url && (
+            {(() => {
+                const safeCaseSearchUrl = toSafeExternalUrl(cachedResources?.caseSearch?.url);
+                return courtSettings?.causeNumber && safeCaseSearchUrl ? (
                 <motion.div
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -645,7 +679,7 @@ export default function ResourcesPage() {
                     className="mb-6"
                 >
                     <a
-                        href={cachedResources.caseSearch.url}
+                        href={safeCaseSearchUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="no-underline block"
@@ -685,7 +719,7 @@ export default function ResourcesPage() {
                                         </span>
                                     </div>
                                     <p className="text-xs" style={{ color: '#7096D1' }}>
-                                        {cachedResources.caseSearch.description || `Search your case on ${cachedResources.caseSearch.name}`}
+                                        {cachedResources?.caseSearch?.description || `Search your case on ${cachedResources?.caseSearch?.name}`}
                                     </p>
                                     {courtSettings.courtName && (
                                         <p className="text-xs mt-0.5" style={{ color: '#5A8EC9' }}>
@@ -715,7 +749,8 @@ export default function ResourcesPage() {
                         </motion.div>
                     </a>
                 </motion.div>
-            )}
+            ) : null;
+            })()}
 
             {/* ─── Hero Finder Cards ─── */}
             <motion.div
@@ -807,7 +842,7 @@ export default function ResourcesPage() {
                 ) : legalAidResources.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {legalAidResources.map((r) => (
-                            <ResourceCard key={r.name} resource={r} />
+                            <ResourceCard key={resourceKey(r)} resource={r} />
                         ))}
                     </div>
                 ) : (
@@ -850,7 +885,7 @@ export default function ResourcesPage() {
                 ) : nonprofitResources.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {nonprofitResources.map((r) => (
-                            <ResourceCard key={r.name} resource={r} />
+                            <ResourceCard key={resourceKey(r)} resource={r} />
                         ))}
                     </div>
                 ) : (

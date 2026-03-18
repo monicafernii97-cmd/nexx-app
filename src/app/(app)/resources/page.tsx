@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
@@ -19,6 +20,7 @@ import {
     Search,
     AlertTriangle,
     Settings,
+    Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -34,12 +36,49 @@ import {
 } from '@/lib/data/resourcesData';
 
 // ═══════════════════════════════════════════
+//  Types
+// ═══════════════════════════════════════════
+
+/** Shape of a single AI-cached resource (court clerk, family division, etc.) */
+interface CachedResource {
+    name: string;
+    description?: string;
+    url?: string;
+    phone?: string;
+    address?: string;
+}
+
+/** Shape of the full cached resources object from Convex. */
+interface CachedResources {
+    courtClerk?: CachedResource;
+    courtsWebsite?: CachedResource;
+    familyDivision?: CachedResource;
+    localRules?: CachedResource;
+    stateFamilyCode?: CachedResource;
+    legalAid?: CachedResource[];
+    nonprofits?: CachedResource[];
+    caseSearch?: CachedResource;
+}
+
+// ═══════════════════════════════════════════
 //  Helpers
 // ═══════════════════════════════════════════
 
 /** True if the string looks like a dialable phone number (digits, spaces, dashes, parens). */
 function isDialable(phone: string): boolean {
     return /^\+?[\d\s\-()]+$/.test(phone) && /\d/.test(phone);
+}
+
+/** Convert a CachedResource to a ResourceEntry for unified rendering. */
+function toResourceEntry(r: CachedResource, tags: string[]): ResourceEntry {
+    return {
+        name: r.name,
+        description: r.description,
+        url: r.url,
+        phone: r.phone,
+        address: r.address,
+        tags,
+    };
 }
 
 // ═══════════════════════════════════════════
@@ -239,29 +278,55 @@ function FinderHeroCard({
 function CourtResourcesGrid({
     stateData,
     countyData,
+    cachedResources,
 }: {
-    stateData: StateResources;
+    stateData: StateResources | null;
     countyData: CountyResources | null;
+    cachedResources: CachedResources | null;
 }) {
     const items: { label: string; resource: ResourceEntry; icon: typeof Landmark }[] = [];
 
-    if (countyData?.courtClerk) {
+    // AI-cached data takes priority; fall back to curated data
+    if (cachedResources?.courtClerk) {
+        items.push({ label: 'County Clerk', resource: toResourceEntry(cachedResources.courtClerk, ['clerk', 'court']), icon: Landmark });
+    } else if (countyData?.courtClerk) {
         items.push({ label: 'County Clerk', resource: countyData.courtClerk, icon: Landmark });
     }
-    if (countyData?.courtsWebsite) {
+
+    if (cachedResources?.courtsWebsite) {
+        items.push({ label: 'Courts Website', resource: toResourceEntry(cachedResources.courtsWebsite, ['court', 'website']), icon: Scale });
+    } else if (countyData?.courtsWebsite) {
         items.push({ label: 'Courts Website', resource: countyData.courtsWebsite, icon: Scale });
     }
-    if (countyData?.familyDivision) {
+
+    if (cachedResources?.familyDivision) {
+        items.push({ label: 'Family Division', resource: toResourceEntry(cachedResources.familyDivision, ['court', 'family']), icon: Users });
+    } else if (countyData?.familyDivision) {
         items.push({ label: 'Family Division', resource: countyData.familyDivision, icon: Users });
     }
-    if (countyData?.rulesAndProcedures) {
+
+    if (cachedResources?.localRules) {
+        items.push({ label: 'Rules & Procedures', resource: toResourceEntry(cachedResources.localRules, ['rules', 'procedures']), icon: BookOpen });
+    } else if (countyData?.rulesAndProcedures) {
         items.push({ label: 'Rules & Procedures', resource: countyData.rulesAndProcedures, icon: BookOpen });
     }
-    items.push({
-        label: 'State Family Law Code',
-        resource: stateData.stateFamilyCode,
-        icon: Shield,
-    });
+
+    // State family code: AI-cached first, then curated
+    if (cachedResources?.stateFamilyCode) {
+        items.push({
+            label: 'State Family Law Code',
+            resource: toResourceEntry(cachedResources.stateFamilyCode, ['law', 'family-code']),
+            icon: Shield,
+        });
+    } else if (stateData?.stateFamilyCode) {
+        items.push({
+            label: 'State Family Law Code',
+            resource: stateData.stateFamilyCode,
+            icon: Shield,
+        });
+    }
+
+    if (items.length === 0) return null;
 
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -326,6 +391,21 @@ function CourtResourcesGrid({
     );
 }
 
+/** Shimmer card placeholder for loading states. */
+function ShimmerCard() {
+    return (
+        <div className="card-premium p-4 animate-pulse">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: 'rgba(208, 227, 255, 0.08)' }} />
+                <div className="flex-1 space-y-2">
+                    <div className="h-3 rounded-full w-2/3" style={{ background: 'rgba(208, 227, 255, 0.12)' }} />
+                    <div className="h-2.5 rounded-full w-1/2" style={{ background: 'rgba(208, 227, 255, 0.08)' }} />
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ═══════════════════════════════════════════
 //  Main Page
 // ═══════════════════════════════════════════
@@ -340,13 +420,91 @@ export default function ResourcesPage() {
     const state = courtSettings?.state || user?.state || '';
     const county = courtSettings?.county || user?.county || '';
 
+    // Normalize county for cache lookup (strip "County" suffix)
+    const normCounty = county.replace(/\s+County$/i, '').trim();
+
+    // Query curated static data
     const stateData = state ? getStateResources(state) : null;
-    const countyData = state && county ? getCountyResources(state, county) : null;
+    const countyData = state && normCounty ? getCountyResources(state, normCounty) : null;
     const hasCuratedData = isStateCurated(state);
+
+    // Query AI-cached resources from Convex
+    const cachedEntry = useQuery(
+        api.resourcesCache.get,
+        state && normCounty ? { state, county: normCounty } : 'skip',
+    );
+    const cachedResources: CachedResources | null = cachedEntry?.resources ?? null;
+
+    // Auto-fetch state: track whether we've triggered a lookup for current location
+    const [lookupTriggered, setLookupTriggered] = useState(false);
+    const [lookupError, setLookupError] = useState<string | null>(null);
+
+    // Reset lookup state when location changes
+    useEffect(() => {
+        setLookupTriggered(false);
+        setLookupError(null);
+    }, [state, normCounty]);
+
+    /** Trigger an AI resource lookup for the current state + county. */
+    const triggerLookup = useCallback(async () => {
+        if (!state || !normCounty || lookupTriggered) return;
+        setLookupTriggered(true);
+        setLookupError(null);
+        try {
+            const res = await fetch('/api/resources/lookup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ state, county: normCounty }),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || `Lookup failed (${res.status})`);
+            }
+        } catch (err) {
+            console.error('[Resources] Lookup failed:', err);
+            setLookupError(err instanceof Error ? err.message : 'Resource lookup failed');
+        }
+    }, [state, normCounty, lookupTriggered]);
+
+    // Auto-trigger lookup on cache miss for any location
+    useEffect(() => {
+        // Only trigger if:
+        // 1. We have a state and county
+        // 2. The cache query has loaded (not undefined) and returned null
+        // 3. We haven't already triggered
+        if (
+            state &&
+            normCounty &&
+            cachedEntry === null &&
+            !lookupTriggered
+        ) {
+            triggerLookup();
+        }
+    }, [state, normCounty, cachedEntry, lookupTriggered, triggerLookup]);
 
     const locationLabel = county && state
         ? `${county}${county.toLowerCase().endsWith('county') ? '' : ' County'}, ${state}`
         : state || 'your area';
+
+    // Determine if we're in a loading state for AI resources
+    const isLookingUp = state && normCounty && cachedEntry === null && !lookupError;
+
+    // Merge legal aid: AI-cached takes priority, curated supplements
+    const legalAidResources: ResourceEntry[] = [];
+    if (cachedResources?.legalAid) {
+        legalAidResources.push(...cachedResources.legalAid.map(r => toResourceEntry(r, ['legal-aid'])));
+    }
+    if (stateData?.statewideLegalAid) legalAidResources.push(...stateData.statewideLegalAid);
+    if (countyData?.legalAid) legalAidResources.push(...countyData.legalAid);
+
+    // Merge nonprofits: AI-cached takes priority, curated supplements
+    const nonprofitResources: ResourceEntry[] = [];
+    if (cachedResources?.nonprofits) {
+        nonprofitResources.push(...cachedResources.nonprofits.map(r => toResourceEntry(r, ['nonprofit'])));
+    }
+    if (countyData?.nonprofits) {
+        nonprofitResources.push(...countyData.nonprofits);
+    }
 
     return (
         <div className="max-w-6xl mx-auto pb-12">
@@ -426,6 +584,139 @@ export default function ResourcesPage() {
                 </motion.div>
             )}
 
+            {/* ─── AI Lookup Loading Banner ─── */}
+            {isLookingUp && (
+                <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.15 }}
+                    className="card-premium p-5 mb-6"
+                >
+                    <div className="flex items-center gap-3">
+                        <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                        >
+                            <Sparkles size={18} style={{ color: '#F7F2EB' }} />
+                        </motion.div>
+                        <div>
+                            <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>
+                                Discovering resources for {locationLabel}…
+                            </p>
+                            <p className="text-xs" style={{ color: '#D0E3FF' }}>
+                                NEXX AI is finding your local court, legal aid, and support resources.
+                            </p>
+                        </div>
+                    </div>
+                </motion.div>
+            )}
+
+            {/* ─── Lookup Error ─── */}
+            {lookupError && (
+                <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="card-premium p-5 mb-6"
+                    style={{ borderColor: 'rgba(220, 38, 38, 0.2)' }}
+                >
+                    <div className="flex items-center gap-3">
+                        <AlertTriangle size={16} style={{ color: '#DC2626' }} />
+                        <div className="flex-1">
+                            <p className="text-sm" style={{ color: '#DC2626' }}>
+                                {lookupError}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => { setLookupTriggered(false); setLookupError(null); }}
+                            className="text-xs font-medium px-3 py-1 rounded-lg transition-colors cursor-pointer"
+                            style={{ color: '#5A8EC9', background: 'rgba(90, 142, 201, 0.1)' }}
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </motion.div>
+            )}
+            {/* ─── My Case Card ─── */}
+            {courtSettings?.causeNumber && cachedResources?.caseSearch?.url && (
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.18, duration: 0.5 }}
+                    className="mb-6"
+                >
+                    <a
+                        href={cachedResources.caseSearch.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="no-underline block"
+                    >
+                        <motion.div
+                            whileHover={{ scale: 1.01, y: -2 }}
+                            className="rounded-2xl p-5 cursor-pointer group"
+                            style={{
+                                background: 'linear-gradient(135deg, rgba(90, 142, 201, 0.08), rgba(208, 227, 255, 0.04))',
+                                border: '1px solid rgba(208, 227, 255, 0.2)',
+                            }}
+                        >
+                            <div className="flex items-center gap-4">
+                                <div
+                                    className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+                                    style={{
+                                        background: 'linear-gradient(135deg, rgba(208, 227, 255, 0.15), rgba(112, 150, 209, 0.08))',
+                                        border: '1px solid rgba(208, 227, 255, 0.25)',
+                                    }}
+                                >
+                                    <Search size={22} style={{ color: '#D0E3FF' }} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h3 className="font-semibold text-base" style={{ color: '#F7F2EB' }}>
+                                            My Case
+                                        </h3>
+                                        <span
+                                            className="text-xs font-mono px-2 py-0.5 rounded-md"
+                                            style={{
+                                                background: 'rgba(208, 227, 255, 0.1)',
+                                                border: '1px solid rgba(208, 227, 255, 0.15)',
+                                                color: '#D0E3FF',
+                                            }}
+                                        >
+                                            {courtSettings.causeNumber}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs" style={{ color: '#7096D1' }}>
+                                        {cachedResources.caseSearch.description || `Search your case on ${cachedResources.caseSearch.name}`}
+                                    </p>
+                                    {courtSettings.courtName && (
+                                        <p className="text-xs mt-0.5" style={{ color: '#5A8EC9' }}>
+                                            {courtSettings.courtName}
+                                            {courtSettings.assignedJudge ? ` · ${courtSettings.assignedJudge}` : ''}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="flex-shrink-0 flex items-center gap-2">
+                                    <span
+                                        className="text-xs font-medium px-3 py-1.5 rounded-lg transition-all group-hover:scale-105"
+                                        style={{
+                                            background: 'rgba(208, 227, 255, 0.1)',
+                                            border: '1px solid rgba(208, 227, 255, 0.2)',
+                                            color: '#D0E3FF',
+                                        }}
+                                    >
+                                        View Case
+                                    </span>
+                                    <ExternalLink
+                                        size={14}
+                                        className="opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity"
+                                        style={{ color: '#7096D1' }}
+                                    />
+                                </div>
+                            </div>
+                        </motion.div>
+                    </a>
+                </motion.div>
+            )}
+
             {/* ─── Hero Finder Cards ─── */}
             <motion.div
                 initial={{ opacity: 0, y: 16 }}
@@ -454,7 +745,7 @@ export default function ResourcesPage() {
             </motion.div>
 
             {/* ─── Court & County Resources ─── */}
-            {(stateData || state) && (
+            {(stateData || cachedResources || state) && (
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -470,10 +761,17 @@ export default function ResourcesPage() {
                         }
                         color="#7096D1"
                     />
-                    {stateData ? (
+                    {isLookingUp ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <ShimmerCard />
+                            <ShimmerCard />
+                            <ShimmerCard />
+                        </div>
+                    ) : stateData || cachedResources ? (
                         <CourtResourcesGrid
                             stateData={stateData}
                             countyData={countyData}
+                            cachedResources={cachedResources}
                         />
                     ) : (
                         <div className="card-premium p-6 text-center">
@@ -483,6 +781,8 @@ export default function ResourcesPage() {
                             </p>
                         </div>
                     )}
+
+
                 </motion.div>
             )}
 
@@ -499,34 +799,34 @@ export default function ResourcesPage() {
                     subtitle="Free and low-cost legal help, bar associations, and pro bono programs"
                     color="#E5A84A"
                 />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {/* Statewide legal aid */}
-                    {stateData?.statewideLegalAid.map((r) => (
-                        <ResourceCard key={r.name} resource={r} />
-                    ))}
-                    {/* County-specific legal aid */}
-                    {countyData?.legalAid.map((r) => (
-                        <ResourceCard key={r.name} resource={r} />
-                    ))}
-                    {/* If no data at all, show a helpful message */}
-                    {!stateData && !countyData && (
-                        <div className="card-premium p-5 md:col-span-2 text-center">
-                            <p className="text-xs" style={{ color: '#123D7E' }}>
-                                Set your location above to see local legal aid resources, or search&nbsp;
-                                <a
-                                    href="https://www.lsc.gov/about-lsc/what-legal-aid/get-legal-help"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="font-medium no-underline"
-                                    style={{ color: '#5A8EC9' }}
-                                >
-                                    LSC.gov
-                                </a>
-                                &nbsp;for free legal aid programs nationwide.
-                            </p>
-                        </div>
-                    )}
-                </div>
+                {isLookingUp ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <ShimmerCard />
+                        <ShimmerCard />
+                    </div>
+                ) : legalAidResources.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {legalAidResources.map((r) => (
+                            <ResourceCard key={r.name} resource={r} />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="card-premium p-5 md:col-span-2 text-center">
+                        <p className="text-xs" style={{ color: '#123D7E' }}>
+                            Set your location above to see local legal aid resources, or search&nbsp;
+                            <a
+                                href="https://www.lsc.gov/about-lsc/what-legal-aid/get-legal-help"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium no-underline"
+                                style={{ color: '#5A8EC9' }}
+                            >
+                                LSC.gov
+                            </a>
+                            &nbsp;for free legal aid programs nationwide.
+                        </p>
+                    </div>
+                )}
             </motion.div>
 
             {/* ─── Nonprofits & Support Organizations ─── */}
@@ -542,9 +842,14 @@ export default function ResourcesPage() {
                     subtitle="Shelters, crisis centers, family support, and advocacy groups"
                     color="#C75A5A"
                 />
-                {countyData && countyData.nonprofits.length > 0 ? (
+                {isLookingUp ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {countyData.nonprofits.map((r) => (
+                        <ShimmerCard />
+                        <ShimmerCard />
+                    </div>
+                ) : nonprofitResources.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {nonprofitResources.map((r) => (
                             <ResourceCard key={r.name} resource={r} />
                         ))}
                     </div>
@@ -637,7 +942,7 @@ export default function ResourcesPage() {
                 className="mt-10 text-center"
             >
                 <p className="text-xs" style={{ color: '#7096D1' }}>
-                    Resources are curated and verified periodically. If you notice an issue, let us know through Settings.
+                    Resources are curated and verified periodically. AI-discovered resources should be verified independently.
                 </p>
                 <p className="text-xs mt-1" style={{ color: '#7096D1' }}>
                     In future updates, you&apos;ll be able to connect directly with attorneys and therapists

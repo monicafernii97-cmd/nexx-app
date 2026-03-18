@@ -66,7 +66,7 @@ export default function DashboardPage() {
                 transition={{ duration: 0.5 }}
                 className="mb-8"
             >
-                <h1 className="text-headline text-3xl mb-2" style={{ color: '#F7F2EB' }}>
+                <h1 className="text-headline text-3xl mb-2" style={{ color: '#F7F2EB' }} suppressHydrationWarning>
                     {greetingText}{userName}
                 </h1>
                 <p className="text-sm" style={{ color: '#D0E3FF' }}>

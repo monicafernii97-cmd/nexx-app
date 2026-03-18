@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { useUser } from '@/lib/user-context';
+import { titleCase } from '@/lib/utils/stringHelpers';
 import {
     BookOpen,
     Scale,
@@ -442,9 +443,9 @@ export default function ResourcesPage() {
     // Normalize county for cache lookup (strip "County" suffix)
     const normCounty = county.replace(/\s+County$/i, '').trim();
 
-    // Normalize casing to match API route's canonical cache key (titleCase)
-    const normState = state.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
-    const normCountyTitle = normCounty.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    // Normalize casing to match API route's canonical cache key
+    const normState = titleCase(state);
+    const normCountyTitle = titleCase(normCounty);
 
     // Query curated static data
     const stateData = state ? getStateResources(state) : null;
@@ -521,7 +522,8 @@ export default function ResourcesPage() {
         ? `${county}${county.toLowerCase().endsWith('county') ? '' : ' County'}, ${state}`
         : state || 'your area';
 
-    // Determine if we're in a loading state for AI resources
+    // isLookingUp: true only after cache query has completed (cachedEntry === null
+    // indicates a miss; undefined means the query is still loading)
     const isLookingUp = state && normCounty && cachedEntry === null && !lookupError;
 
     // Merge legal aid: AI-cached takes priority, curated supplements (deduplicated)
@@ -561,6 +563,10 @@ export default function ResourcesPage() {
             if (!seenNonprofitKeys.has(key)) { seenNonprofitKeys.add(key); nonprofitResources.push(r); }
         }
     }
+
+    // My Case card rendering
+    const safeCaseSearchUrl = toSafeExternalUrl(cachedResources?.caseSearch?.url);
+    const showMyCaseCard = courtSettings?.causeNumber && safeCaseSearchUrl;
 
     return (
         <div className="max-w-6xl mx-auto pb-12">
@@ -693,9 +699,7 @@ export default function ResourcesPage() {
                 </motion.div>
             )}
             {/* ─── My Case Card ─── */}
-            {(() => {
-                const safeCaseSearchUrl = toSafeExternalUrl(cachedResources?.caseSearch?.url);
-                return courtSettings?.causeNumber && safeCaseSearchUrl ? (
+            {showMyCaseCard && (
                 <motion.div
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -703,7 +707,7 @@ export default function ResourcesPage() {
                     className="mb-6"
                 >
                     <a
-                        href={safeCaseSearchUrl}
+                        href={safeCaseSearchUrl!}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="no-underline block"
@@ -773,8 +777,7 @@ export default function ResourcesPage() {
                         </motion.div>
                     </a>
                 </motion.div>
-            ) : null;
-            })()}
+            )}
 
             {/* ─── Hero Finder Cards ─── */}
             <motion.div

@@ -87,14 +87,7 @@ export async function POST(req: NextRequest) {
         });
     }
 
-    // ── Rate limit (only consumed when AI lookup is needed) ──
-    const rl = checkRateLimit(userId, 'resource_lookup');
-    if (!rl.allowed) {
-        const { body, status } = rateLimitResponse(rl);
-        return NextResponse.json(body, { status });
-    }
-
-    // ── Coalesce concurrent lookups for the same location ──
+    // ── Coalesce concurrent lookups (before rate limit so waiters are free) ──
     const lookupKey = `${normState}::${normCounty}`;
     if (pendingLookups.has(lookupKey)) {
         try {
@@ -103,6 +96,13 @@ export async function POST(req: NextRequest) {
         } catch {
             return NextResponse.json({ error: 'Resource lookup failed. Please try again.' }, { status: 500 });
         }
+    }
+
+    // ── Rate limit (only consumed when AI lookup is actually needed) ──
+    const rl = checkRateLimit(userId, 'resource_lookup');
+    if (!rl.allowed) {
+        const { body, status } = rateLimitResponse(rl);
+        return NextResponse.json(body, { status });
     }
 
     // ── OpenAI Lookup (with coalescing) ──

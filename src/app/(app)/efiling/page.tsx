@@ -6,6 +6,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { useUser } from '@/lib/user-context';
+import { titleCase } from '@/lib/utils/stringHelpers';
 import {
     FileUp,
     ExternalLink,
@@ -199,18 +200,21 @@ export default function EFilingPage() {
     const courtSettings = useQuery(api.courtSettings.get);
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
 
-    // Location
-    const state = courtSettings?.state || user?.state || '';
-    const county = courtSettings?.county || user?.county || '';
+    // Location — normalize with titleCase to match the cache keys written by the API route
+    const rawState = courtSettings?.state || user?.state || '';
+    const rawCounty = courtSettings?.county || user?.county || '';
+    const state = titleCase(rawState);
+    const county = titleCase(rawCounty);
     const locationLabel = county && state
         ? `${county}${county.toLowerCase().endsWith('county') ? '' : ' County'}, ${state}`
         : state || 'your area';
 
-    // Resources cache
-    const normCounty = county.replace(/\s+County$/i, '').trim();
+    // Resources cache — normalize county (strip "County" suffix) to match lookup route
+    const normCounty = titleCase(rawCounty.replace(/\s+County$/i, '').trim());
+    const hasCanonicalLocation = Boolean(state && normCounty);
     const cachedEntry = useQuery(
         api.resourcesCache.get,
-        state && normCounty ? { state, county: normCounty } : 'skip',
+        hasCanonicalLocation ? { state, county: normCounty } : 'skip',
     );
     const cachedResources: CachedResources | null = cachedEntry?.resources ?? null;
     const eFilingPortal = cachedResources?.eFilingPortal ?? null;
@@ -221,14 +225,19 @@ export default function EFilingPage() {
     const filedDocs = useQuery(api.generatedDocuments.list, { status: 'filed' }) ?? [];
     const updateStatus = useMutation(api.generatedDocuments.updateStatus);
 
-    // Mark as filed handler
+    // Mark as filed handler with inline error feedback
     const [filingId, setFilingId] = useState<string | null>(null);
+    const [filingError, setFilingError] = useState<string | null>(null);
     const handleMarkAsFiled = useCallback(async (docId: Id<'generatedDocuments'>) => {
         setFilingId(docId);
+        setFilingError(null);
         try {
             await updateStatus({ id: docId, status: 'filed' });
         } catch (err) {
             console.error('[eFiling] Failed to mark as filed:', err);
+            setFilingError(err instanceof Error ? err.message : 'Failed to mark as filed. Please try again.');
+            // Auto-dismiss error after 5 seconds
+            setTimeout(() => setFilingError(null), 5000);
         } finally {
             setFilingId(null);
         }
@@ -240,8 +249,9 @@ export default function EFilingPage() {
     const hasCourtName = Boolean(courtSettings?.courtName);
     const hasFinalDocs = finalDocs.length > 0;
 
-    // Loading states
-    const isCacheLoading = state && normCounty && cachedEntry === undefined;
+    // Loading states — cachedEntry is undefined while query is loading, null on cache miss
+    const isCacheLoading = hasCanonicalLocation && cachedEntry === undefined;
+    const isCacheMiss = hasCanonicalLocation && cachedEntry === null;
 
     // Quick links from cached resources
     const clerkUrl = toSafeExternalUrl(cachedResources?.courtClerk?.url);
@@ -294,7 +304,7 @@ export default function EFilingPage() {
             </motion.div>
 
             {/* ─── No Location Set ─── */}
-            {!state && (
+            {!hasCourtSettings && (
                 <motion.div
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -334,8 +344,8 @@ export default function EFilingPage() {
                 transition={{ delay: 0.1, duration: 0.5 }}
                 className="mb-6"
             >
-                {isCacheLoading ? (
-                    /* Shimmer loading state */
+                {(isCacheLoading || isCacheMiss) ? (
+                    /* Shimmer loading state — shown while cache query is in-flight OR while AI lookup is running */
                     <div className="card-premium p-8 animate-pulse">
                         <div className="flex items-center gap-4">
                             <div className="w-16 h-16 rounded-2xl" style={{ background: 'rgba(208, 227, 255, 0.08)' }} />
@@ -400,8 +410,8 @@ export default function EFilingPage() {
                             </div>
                         </div>
                     </div>
-                ) : state ? (
-                    /* No eFiling portal found — File in Person fallback */
+                ) : hasCourtSettings && cachedEntry && !eFilingPortal ? (
+                    /* Lookup completed but no eFiling portal found — File in Person fallback */
                     <div
                         className="rounded-2xl p-6"
                         style={{
@@ -601,7 +611,7 @@ export default function EFilingPage() {
                                             }}
                                             onClick={() => {
                                                 // Download PDF via Convex storage URL
-                                                window.open(`${process.env.NEXT_PUBLIC_CONVEX_SITE_URL}/api/storage/${doc.storageId}`, '_blank');
+                                                window.open(`${process.env.NEXT_PUBLIC_CONVEX_URL?.replace('.cloud', '.site')}/api/storage/${doc.storageId}`, '_blank');
                                             }}
                                         >
                                             <Download size={12} />
@@ -621,6 +631,18 @@ export default function EFilingPage() {
                                         <CheckCircle2 size={12} />
                                         {filingId === doc._id ? 'Marking…' : 'Mark as Filed'}
                                     </button>
+                                    {/* Inline error for this card */}
+                                    {filingError && (
+                                        <motion.p
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            className="text-xs mt-1.5 flex items-center gap-1 col-span-full"
+                                            style={{ color: '#DC2626' }}
+                                        >
+                                            <AlertTriangle size={10} />
+                                            {filingError}
+                                        </motion.p>
+                                    )}
                                 </div>
                             </motion.div>
                         ))}

@@ -260,14 +260,59 @@ function sanitizeResourceNoAddr(obj: Record<string, unknown>) {
     };
 }
 
-/** Sanitize an eFiling portal entry (with provider). */
+/**
+ * Known eFiling vendor domains.
+ * URLs whose host doesn't match any of these are treated as unverified
+ * and suppressed (the CTA won't render) to avoid sending users to
+ * hallucinated or attacker-controlled sites.
+ */
+const TRUSTED_EFILING_HOSTS = [
+    'efiletexas.gov',
+    'www.efiletexas.gov',
+    'odysseyfileandserve.com',
+    'www.odysseyfileandserve.com',
+    'fileandservexpress.com',
+    'www.fileandservexpress.com',
+    'turbocourt.com',
+    'www.turbocourt.com',
+    'mycase.com',
+    'www.mycase.com',
+    'odysseyefileca.tylerhost.net',
+    'efiling.courts.ca.gov',
+    'efile.txcourts.gov',
+    'www.efile.txcourts.gov',
+    'efileil.com',
+    'www.efileil.com',
+    'efilingportal.com',
+    'www.efilingportal.com',
+    'ifile.flclerks.com',
+    'www.ifile.flclerks.com',
+    'myflcourtaccess.com',
+    'www.myflcourtaccess.com',
+];
+
+/** Sanitize an eFiling portal entry — verify URL against known vendor domains. */
 function sanitizeEFilingPortal(obj: Record<string, unknown>) {
     const name = str(obj, 'name');
     if (!name) return undefined;
+
+    let verifiedUrl = safeUrl(str(obj, 'url'));
+    if (verifiedUrl) {
+        try {
+            const host = new URL(verifiedUrl).hostname.toLowerCase();
+            if (!TRUSTED_EFILING_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) {
+                console.warn(`[Resource Lookup] eFiling portal URL host "${host}" is not on the trusted vendor list — suppressing CTA`);
+                verifiedUrl = undefined;
+            }
+        } catch {
+            verifiedUrl = undefined;
+        }
+    }
+
     return {
         name,
         description: str(obj, 'description'),
-        url: safeUrl(str(obj, 'url')),
+        url: verifiedUrl,
         provider: str(obj, 'provider'),
     };
 }

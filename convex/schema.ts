@@ -291,6 +291,13 @@ export default defineSchema({
                 description: v.optional(v.string()),
                 url: v.optional(v.string()),
             })),
+            /** eFiling portal for this county (e.g., eFileTexas, TurboCourt) */
+            eFilingPortal: v.optional(v.object({
+                name: v.string(),
+                description: v.optional(v.string()),
+                url: v.optional(v.string()),
+                provider: v.optional(v.string()),
+            })),
         }),
         /** URLs the AI referenced when discovering these resources */
         sources: v.optional(v.array(v.string())),

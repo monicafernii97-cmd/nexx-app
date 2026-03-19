@@ -19,6 +19,7 @@ import {
     LogIn,
     LayoutGrid,
     FolderOpen,
+    FileUp,
 } from 'lucide-react';
 import { useState, useMemo, useCallback, type ComponentType, type CSSProperties } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
@@ -55,6 +56,7 @@ const navItems: NavItem[] = [
     { label: 'Incident Report', href: '/incident-report', icon: ClipboardList },
     { label: 'NEX Profile', href: '/nex-profile', icon: Siren },
     { label: 'Legal Suite', href: '/court-settings', icon: Scale },
+    { label: 'eFiling', href: '/efiling', icon: FileUp },
     { label: 'Resources', href: '/resources', icon: BookOpen },
     { label: 'My Profile', href: '/profile', icon: UserCircle },
     { label: 'Settings', href: '/settings', icon: Settings },

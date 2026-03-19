@@ -51,6 +51,12 @@ const resourcesObjV = v.object({
     legalAid: v.optional(v.array(resourceArrayEntryV)),
     nonprofits: v.optional(v.array(resourceArrayEntryV)),
     caseSearch: v.optional(resourceEntryNoAddrV),
+    eFilingPortal: v.optional(v.object({
+        name: v.string(),
+        description: v.optional(v.string()),
+        url: v.optional(v.string()),
+        provider: v.optional(v.string()),
+    })),
 });
 
 // ═══ Queries ═══

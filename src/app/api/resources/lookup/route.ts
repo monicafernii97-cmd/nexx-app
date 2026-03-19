@@ -35,6 +35,7 @@ const RESOURCE_JSON_SCHEMA = `{
   "legalAid": [{ "name": string, "description": string, "url": string, "phone": string }],
   "nonprofits": [{ "name": string, "description": string, "url": string, "phone": string }],
   "caseSearch": { "name": string, "description": string, "url": string } | null,
+  "eFilingPortal": { "name": string, "description": string, "url": string, "provider": string } | null,
   "sources": [string]
 }`;
 
@@ -164,6 +165,8 @@ export async function POST(req: NextRequest) {
             nonprofits: sanitizeArray(parsed.nonprofits),
             caseSearch: parsed.caseSearch && typeof parsed.caseSearch === 'object'
                 ? sanitizeResourceNoAddr(parsed.caseSearch as Record<string, unknown>) : undefined,
+            eFilingPortal: parsed.eFilingPortal && typeof parsed.eFilingPortal === 'object'
+                ? sanitizeEFilingPortal(parsed.eFilingPortal as Record<string, unknown>) : undefined,
         };
 
         // ── Store in Convex (via public action wrapper) ──
@@ -209,6 +212,7 @@ function buildUserPrompt(
     prompt += `6. Local legal aid organizations (name, website, phone)\n`;
     prompt += `7. Local DV shelters / nonprofits (name, website, phone)\n`;
     prompt += `8. Public case search / records portal — the website where anyone can look up a case by cause number or party name\n`;
+    prompt += `9. eFiling portal — the official electronic filing system for this county (e.g., eFileTexas.gov, TurboCourt, File & ServeXpress, Odyssey, etc.). Include the provider/vendor name.\n`;
     prompt += `\nReturn as structured JSON.`;
     return prompt;
 }
@@ -253,6 +257,63 @@ function sanitizeResourceNoAddr(obj: Record<string, unknown>) {
         name,
         description: str(obj, 'description'),
         url: safeUrl(str(obj, 'url')),
+    };
+}
+
+/**
+ * Known eFiling vendor domains.
+ * URLs whose host doesn't match any of these are treated as unverified
+ * and suppressed (the CTA won't render) to avoid sending users to
+ * hallucinated or attacker-controlled sites.
+ */
+const TRUSTED_EFILING_HOSTS = [
+    'efiletexas.gov',
+    'www.efiletexas.gov',
+    'odysseyfileandserve.com',
+    'www.odysseyfileandserve.com',
+    'fileandservexpress.com',
+    'www.fileandservexpress.com',
+    'turbocourt.com',
+    'www.turbocourt.com',
+    'mycase.com',
+    'www.mycase.com',
+    'odysseyefileca.tylerhost.net',
+    'efiling.courts.ca.gov',
+    'efile.txcourts.gov',
+    'www.efile.txcourts.gov',
+    'efileil.com',
+    'www.efileil.com',
+    'efilingportal.com',
+    'www.efilingportal.com',
+    'ifile.flclerks.com',
+    'www.ifile.flclerks.com',
+    'myflcourtaccess.com',
+    'www.myflcourtaccess.com',
+];
+
+/** Sanitize an eFiling portal entry — verify URL against known vendor domains. */
+function sanitizeEFilingPortal(obj: Record<string, unknown>) {
+    const name = str(obj, 'name');
+    if (!name) return undefined;
+
+    let verifiedUrl = safeUrl(str(obj, 'url'));
+    if (verifiedUrl) {
+        try {
+            const host = new URL(verifiedUrl).hostname.toLowerCase();
+            if (!TRUSTED_EFILING_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) {
+                console.warn(`[Resource Lookup] eFiling portal URL host "${host}" is not on the trusted vendor list — suppressing CTA`);
+                verifiedUrl = undefined;
+            }
+        } catch {
+            verifiedUrl = undefined;
+        }
+    }
+
+    return {
+        name,
+        description: str(obj, 'description'),
+        url: verifiedUrl,
+        provider: str(obj, 'provider'),
     };
 }
 

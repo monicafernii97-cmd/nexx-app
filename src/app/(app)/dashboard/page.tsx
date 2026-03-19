@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { motion } from 'framer-motion';
 import { useQuery } from 'convex/react';
@@ -47,12 +47,12 @@ export default function DashboardPage() {
         { label: 'Pattern Alerts', value: '0', icon: AlertTriangle, color: '#E5A84A' },
     ];
 
-    /** Time-of-day greeting, computed client-side only (empty during SSR to avoid hydration mismatch). */
-    const [greetingText] = useState(() => {
-        if (typeof window === 'undefined') return '';
+    /** Time-of-day greeting, set client-side only to avoid hydration mismatch. */
+    const [greetingText, setGreetingText] = useState('');
+    useEffect(() => {
         const hour = new Date().getHours();
-        return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-    });
+        setGreetingText(hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening');
+    }, []);
 
     /** Formatted display name for the greeting header (empty if unavailable). */
     const userName = user?.name ? `, ${user.name}` : '';

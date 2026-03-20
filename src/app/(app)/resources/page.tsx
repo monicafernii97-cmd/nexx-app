@@ -186,34 +186,31 @@ function SectionHeader({
 }) {
     let iconColor = '#60A5FA';
     let iconBg = 'rgba(255,255,255,0.05)';
-    let titleColor = 'text-[#60A5FA]';
     const weight: IconWeight = "duotone";
 
     if (colorMode === 'rose') {
         iconColor = '#F43F5E';
         iconBg = 'rgba(244,63,94,0.1)';
-        titleColor = 'text-[#F43F5E]';
     } else if (colorMode === 'warning') {
         iconColor = '#FBBF24';
         iconBg = 'rgba(251,191,36,0.1)';
-        titleColor = 'text-[#FBBF24]';
     }
 
     return (
         <div className="mb-6">
-            <div className="flex items-center gap-3 mb-1">
+            <div className="flex items-center gap-4 mb-2">
                 <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] backdrop-blur-xl border border-white/20"
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-xl border border-white/20 shrink-0"
                     style={{ background: iconBg }}
                 >
                     <Icon size={24} weight={weight} style={{ color: iconColor }} className="drop-shadow-md" />
                 </div>
-                <h2 className={`text-[15px] font-bold tracking-[0.2em] uppercase ${titleColor}`}>
+                <h2 className="text-[15px] font-bold tracking-[0.2em] uppercase text-white drop-shadow-sm">
                     {label}
                 </h2>
             </div>
             {subtitle && (
-                <p className="text-[14px] font-medium text-white/70 ml-[60px]">
+                <p className="text-[14px] font-medium text-white drop-shadow-sm ml-[64px]">
                     {subtitle}
                 </p>
             )}

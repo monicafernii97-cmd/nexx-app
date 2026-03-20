@@ -176,7 +176,7 @@ export default function NexProfilePage() {
                                     Nickname for your NEX
                                 </label>
                                 <input
-                                    className="w-full text-base p-3 rounded-xl bg-[#F8F5EE] text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
+                                    className="w-full text-base p-3 rounded-xl bg-white text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
                                     value={form.nickname}
                                     onChange={(e) => setForm({ ...form, nickname: e.target.value })}
                                     placeholder='e.g. "The NEX", a codename'
@@ -188,7 +188,7 @@ export default function NexProfilePage() {
                                     Relationship
                                 </label>
                                 <select
-                                    className="w-full text-base p-3 rounded-xl bg-[#F8F5EE] text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
+                                    className="w-full text-base p-3 rounded-xl bg-white text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
                                     value={form.relationship}
                                     onChange={(e) => setForm({ ...form, relationship: e.target.value })}
                                 >
@@ -207,7 +207,7 @@ export default function NexProfilePage() {
                                 Brief Description
                             </label>
                             <textarea
-                                className="w-full text-base p-3 rounded-xl bg-[#F8F5EE] text-[#0A1128] resize-none focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
+                                className="w-full text-base p-3 rounded-xl bg-white text-[#0A1128] resize-none focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
                                 rows={3}
                                 value={form.description}
                                 onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -308,7 +308,7 @@ export default function NexProfilePage() {
                             <div className="flex-1 relative">
                                 <Lightning size={16} weight="bold" className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1A4B9B]" />
                                 <input
-                                    className="w-full text-base p-3 !pl-11 rounded-xl bg-[#F8F5EE] text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
+                                    className="w-full text-base p-3 !pl-11 rounded-xl bg-white text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
                                     value={newTrigger}
                                     onChange={(e) => setNewTrigger(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && addTrigger()}

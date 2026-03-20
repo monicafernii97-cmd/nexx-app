@@ -157,32 +157,28 @@ export default function Sidebar() {
                                     className="no-underline flex-1 min-w-0"
                                 >
                                     <motion.div
-                                        whileHover={{ scale: 0.98, backgroundColor: 'rgba(255,255,255,0.4)' }}
                                         whileTap={{ scale: 0.96 }}
-                                        className={`relative flex items-center gap-3.5 px-3.5 py-3 rounded-2xl transition-all duration-300 ${collapsed ? 'justify-center' : ''}`}
+                                        className={`group relative flex items-center gap-3.5 px-3.5 py-3 rounded-2xl transition-all duration-300 hover:bg-white/10 ${collapsed ? 'justify-center' : ''}`}
                                         style={{
                                             background: isActive && !hasChildren
-                                                ? 'var(--white)'
+                                                ? 'linear-gradient(135deg,rgba(255,255,255,0.15),rgba(255,255,255,0.05))'
                                                 : isActive && hasChildren
-                                                    ? 'rgba(255, 255, 255, 0.4)'
+                                                    ? 'rgba(255, 255, 255, 0.1)'
                                                     : 'transparent',
-                                            boxShadow: isActive && !hasChildren ? '0 4px 12px rgba(10,22,41,0.03)' : 'none',
-                                            border: isActive && !hasChildren ? '1px solid rgba(10,22,41,0.05)' : '1px solid transparent',
+                                            boxShadow: isActive && !hasChildren ? '0 4px 12px rgba(0,0,0,0.2)' : 'none',
+                                            border: isActive && !hasChildren ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
                                         }}
                                     >
-                                        <Icon 
-                                            size={20} 
-                                            weight={isActive ? "fill" : "regular"}
-                                            style={{ color: isActive ? 'var(--champagne)' : 'var(--sapphire-muted)' }}
-                                        />
+                                        <div className={`transition-colors duration-300 flex items-center justify-center ${isActive ? 'text-white' : 'text-[#94A3B8] group-hover:text-white'}`}>
+                                            <Icon size={20} weight={isActive ? "fill" : "regular"} style={{ color: 'currentColor' }} />
+                                        </div>
                                         <AnimatePresence mode="popLayout">
                                             {!collapsed && (
                                                 <motion.span
                                                     initial={{ opacity: 0, width: 0 }}
                                                     animate={{ opacity: 1, width: 'auto' }}
                                                     exit={{ opacity: 0, width: 0 }}
-                                                    className="text-[14px] font-medium whitespace-nowrap flex-1"
-                                                    style={{ color: isActive ? 'var(--sapphire)' : 'var(--sapphire-muted)' }}
+                                                    className={`text-[14px] font-medium whitespace-nowrap flex-1 transition-colors duration-300 ${isActive ? 'text-white' : 'text-white/70 group-hover:text-white'}`}
                                                 >
                                                     {item.label}
                                                 </motion.span>
@@ -229,15 +225,17 @@ export default function Sidebar() {
                                                 return (
                                                     <Link key={child.href} href={child.href} className="no-underline block">
                                                         <motion.div
-                                                            whileHover={{ x: 4, backgroundColor: 'rgba(255,255,255,0.5)' }}
-                                                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors"
+                                                            whileHover={{ x: 4 }}
+                                                            className="group flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all duration-300 hover:bg-white/10"
                                                             style={{
-                                                                background: isChildActive ? 'var(--white)' : 'transparent',
-                                                                boxShadow: isChildActive ? '0 2px 8px rgba(10,22,41,0.02)' : 'none',
+                                                                background: isChildActive ? 'rgba(255,255,255,0.15)' : 'transparent',
+                                                                border: isChildActive ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
                                                             }}
                                                         >
-                                                            <ChildIcon size={16} weight={isChildActive ? "fill" : "regular"} style={{ color: isChildActive ? 'var(--champagne)' : '#94A3B8' }} />
-                                                            <span className="text-[13px] font-medium" style={{ color: isChildActive ? 'var(--sapphire)' : 'var(--sapphire-muted)' }}>
+                                                            <div className={`transition-colors duration-300 flex items-center justify-center ${isChildActive ? 'text-[var(--champagne)]' : 'text-[#94A3B8] group-hover:text-white'}`}>
+                                                                <ChildIcon size={16} weight={isChildActive ? "fill" : "regular"} style={{ color: 'currentColor' }} />
+                                                            </div>
+                                                            <span className={`text-[13px] font-medium transition-colors duration-300 ${isChildActive ? 'text-white' : 'text-white/70 group-hover:text-white'}`}>
                                                                 {child.label}
                                                             </span>
                                                         </motion.div>

@@ -8,7 +8,7 @@ import {
     User,
     MapPin,
     Users,
-    Scale,
+    Scales,
     Briefcase,
     FloppyDisk,
     Check,
@@ -280,7 +280,7 @@ export default function ProfilePage() {
                     </Section>
 
                     {/* ── Legal ── */}
-                    <Section icon={<Scale size={18} />} title="Legal Situation">
+                    <Section icon={<Scales size={18} />} title="Legal Situation">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Field label="Custody Type">
                                 <select

@@ -9,7 +9,7 @@ import {
     ArrowRight,
     X,
     Plus,
-    Scale,
+    Scales,
     Shield,
     Paperclip,
     CheckCircle,
@@ -285,7 +285,7 @@ export default function TemplateGalleryPage() {
                                         className="flex items-center gap-1"
                                         title="Requires Proposed Order"
                                     >
-                                        <Scale size={10} style={{ color: 'var(--zinc-400)', opacity: 0.5 }} />
+                                        <Scales size={10} style={{ color: 'var(--zinc-400)', opacity: 0.5 }} />
                                         <span className="text-[10px]" style={{ color: 'var(--zinc-400)', opacity: 0.5 }}>
                                             Order
                                         </span>
@@ -472,7 +472,7 @@ export default function TemplateGalleryPage() {
                                                     color: 'var(--zinc-400)',
                                                 }}
                                             >
-                                                <Scale size={12} />
+                                                <Scales size={12} />
                                                 Requires Proposed Order
                                             </div>
                                         )}

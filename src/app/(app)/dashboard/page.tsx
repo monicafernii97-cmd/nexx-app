@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
@@ -38,7 +38,7 @@ const stagger = {
 
 const fadeUp = {
     hidden: { opacity: 0, y: 12 },
-    visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 200, damping: 20 } },
+    visible: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 200, damping: 20 } },
 };
 
 /** Main dashboard showing quick actions, recent incidents, and activity overview. */
@@ -61,11 +61,11 @@ export default function DashboardPage() {
     ];
 
     /** Time-of-day greeting, set client-side only to avoid hydration mismatch. */
-    const [greetingText, setGreetingText] = useState('');
-    useEffect(() => {
+    const [greetingText] = useState(() => {
+        if (typeof window === 'undefined') return '';
         const hour = new Date().getHours();
-        setGreetingText(hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening');
-    }, []);
+        return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    });
 
     const userName = user?.name ? `, ${user.name}` : '';
 

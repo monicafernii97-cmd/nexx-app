@@ -21,7 +21,7 @@ import {
     MagnifyingGlass,
     BookOpen,
     FileText,
-    Scale,
+    Scales,
     Shield,
     Clock,
     Building,
@@ -329,7 +329,7 @@ export default function EFilingPage() {
                                 Configure your state and county in Court Settings to discover your local eFiling portal and filing resources.
                             </p>
                             <Link href="/court-settings" className="btn-primary text-xs inline-flex items-center gap-2 no-underline">
-                                <Scale size={13} />
+                                <Scales size={13} />
                                 Court Settings
                             </Link>
                         </div>

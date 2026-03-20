@@ -8,7 +8,7 @@ import { useUser } from '@/lib/user-context';
 import { titleCase } from '@/lib/utils/stringHelpers';
 import {
     BookOpen,
-    Scale,
+    Scales,
     Heart,
     Bank,
     HandHeart,
@@ -235,7 +235,7 @@ function FinderHeroCard({
     hasLocalData,
     accentColor,
 }: {
-    icon: typeof Scale;
+    icon: typeof Scales;
     title: string;
     description: string;
     localResources: ResourceEntry[];
@@ -318,9 +318,9 @@ function CourtResourcesGrid({
     }
 
     if (cachedResources?.courtsWebsite) {
-        items.push({ label: 'Courts Website', resource: toResourceEntry(cachedResources.courtsWebsite, ['court', 'website']), icon: Scale });
+        items.push({ label: 'Courts Website', resource: toResourceEntry(cachedResources.courtsWebsite, ['court', 'website']), icon: Scales });
     } else if (countyData?.courtsWebsite) {
-        items.push({ label: 'Courts Website', resource: countyData.courtsWebsite, icon: Scale });
+        items.push({ label: 'Courts Website', resource: countyData.courtsWebsite, icon: Scales });
     }
 
     if (cachedResources?.familyDivision) {
@@ -785,7 +785,7 @@ export default function ResourcesPage() {
                 className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8"
             >
                 <FinderHeroCard
-                    icon={Scale}
+                    icon={Scales}
                     title="Find an Attorney Near Me"
                     description={`Browse family law attorneys in ${locationLabel}`}
                     localResources={countyData?.attorneys ?? []}

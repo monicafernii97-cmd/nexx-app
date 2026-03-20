@@ -174,10 +174,10 @@ export default function ProfilePage() {
                         <button
                             onClick={handleSave}
                             disabled={saving}
-                            className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl text-[14px] font-semibold cursor-pointer transition-all duration-300 shadow-md border ${
+                            className={`flex items-center gap-2.5 px-6 py-3 rounded-[9999px] text-[14px] font-semibold cursor-pointer transition-all duration-300 shadow-md border ${
                                 saved 
                                 ? 'bg-emerald text-white border-transparent' 
-                                : 'bg-sapphire text-white hover:bg-[#0F223D] border-transparent hover:shadow-lg hover:-translate-y-0.5'
+                                : 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:shadow-[0_12px_25px_rgba(26,75,155,0.6)] hover:-translate-y-0.5'
                             }`}
                         >
                             {saved ? <Check size={18} weight="bold" /> : <FloppyDisk size={18} weight={saving ? "duotone" : "bold"} className={saving ? "animate-pulse" : ""} />}
@@ -285,7 +285,7 @@ export default function ProfilePage() {
 
                         <Section icon={<Briefcase size={20} weight="duotone" />} title="Support Infrastructure">
                             <div className="space-y-4">
-                                <label className="flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-colors bg-white hover:bg-cloud border border-transparent hover:border-[rgba(10,22,41,0.06)] shadow-sm">
+                                <label className="flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-300 bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] shadow-sm hover:shadow-md">
                                     <div className="flex-shrink-0 relative">
                                         <input
                                             type="checkbox"
@@ -293,17 +293,17 @@ export default function ProfilePage() {
                                             onChange={(e) => setForm({ ...form, hasAttorney: e.target.checked })}
                                             className="peer sr-only"
                                         />
-                                        <div className="w-6 h-6 rounded-md border-2 border-[rgba(10,22,41,0.2)] peer-checked:bg-sapphire peer-checked:border-sapphire transition-all flex items-center justify-center">
-                                            {form.hasAttorney && <Check size={14} weight="bold" className="text-white" />}
+                                        <div className="w-6 h-6 rounded-md border-2 border-[rgba(255,255,255,0.4)] peer-checked:bg-white peer-checked:border-white transition-all flex items-center justify-center">
+                                            {form.hasAttorney && <Check size={14} weight="bold" className="text-[#123D7E]" />}
                                         </div>
                                     </div>
                                     <div>
-                                        <p className="text-[15px] font-semibold text-sapphire">Active Legal Counsel</p>
-                                        <p className="text-[13px] font-medium text-sapphire-muted">NEXX will format exports for attorney use</p>
+                                        <p className="text-[15px] font-semibold text-white">Active Legal Counsel</p>
+                                        <p className="text-[13px] font-medium text-white/80">NEXX will format exports for attorney use</p>
                                     </div>
                                 </label>
                                 
-                                <label className="flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-colors bg-white hover:bg-cloud border border-transparent hover:border-[rgba(10,22,41,0.06)] shadow-sm">
+                                <label className="flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-300 bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] shadow-sm hover:shadow-md">
                                     <div className="flex-shrink-0 relative">
                                         <input
                                             type="checkbox"
@@ -311,13 +311,13 @@ export default function ProfilePage() {
                                             onChange={(e) => setForm({ ...form, hasTherapist: e.target.checked })}
                                             className="peer sr-only"
                                         />
-                                        <div className="w-6 h-6 rounded-md border-2 border-[rgba(10,22,41,0.2)] peer-checked:bg-sapphire peer-checked:border-sapphire transition-all flex items-center justify-center">
-                                            {form.hasTherapist && <Check size={14} weight="bold" className="text-white" />}
+                                        <div className="w-6 h-6 rounded-md border-2 border-[rgba(255,255,255,0.4)] peer-checked:bg-white peer-checked:border-white transition-all flex items-center justify-center">
+                                            {form.hasTherapist && <Check size={14} weight="bold" className="text-[#123D7E]" />}
                                         </div>
                                     </div>
                                     <div>
-                                        <p className="text-[15px] font-semibold text-sapphire">Therapeutic Support</p>
-                                        <p className="text-[13px] font-medium text-sapphire-muted">NEXX will consider emotional state in guidance</p>
+                                        <p className="text-[15px] font-semibold text-white">Therapeutic Support</p>
+                                        <p className="text-[13px] font-medium text-white/80">NEXX will consider emotional state in guidance</p>
                                     </div>
                                 </label>
                             </div>
@@ -377,7 +377,7 @@ export default function ProfilePage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
                             <div>
                                 <Field label="Communication Preference">
-                                    <p className="text-[13px] font-medium text-sapphire-muted mb-4 leading-relaxed">
+                                    <p className="text-[13px] font-medium text-white/70 mb-4 leading-relaxed">
                                         Select the linguistic tone NEXX should employ when generating documents and responses.
                                     </p>
                                     <div className="flex flex-col gap-3">
@@ -387,12 +387,12 @@ export default function ProfilePage() {
                                                 onClick={() => setForm({ ...form, tonePreference: opt.value })}
                                                 className={`text-left p-4 rounded-2xl transition-all duration-300 cursor-pointer border ${
                                                     form.tonePreference === opt.value
-                                                    ? 'bg-sapphire text-white shadow-md border-transparent scale-[1.01]'
-                                                    : 'bg-white hover:bg-cloud border-[rgba(10,22,41,0.05)] shadow-sm hover:shadow text-sapphire'
+                                                    ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white shadow-[0_8px_20px_rgba(18,61,126,0.5)] border-[rgba(255,255,255,0.3)] scale-[1.02]'
+                                                    : 'bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.1)] shadow-sm hover:shadow-md text-white'
                                                 }`}
                                             >
                                                 <p className="text-[15px] font-bold mb-1">{opt.label}</p>
-                                                <p className={`text-[13px] font-medium ${form.tonePreference === opt.value ? 'text-white/80' : 'text-sapphire-muted'}`}>
+                                                <p className={`text-[13px] font-medium ${form.tonePreference === opt.value ? 'text-white/90' : 'text-white/60'}`}>
                                                     {opt.description}
                                                 </p>
                                             </button>

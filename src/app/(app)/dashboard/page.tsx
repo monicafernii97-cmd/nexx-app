@@ -180,8 +180,8 @@ export default function DashboardPage() {
                             </div>
                         ) : incidents.length === 0 ? (
                             <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-white/30 rounded-2xl border border-white/40 border-dashed">
-                                <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-white/50 border border-white shadow-sm">
-                                    <Clock size={24} className="text-sapphire-muted" />
+                                <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-white border border-[rgba(10,22,41,0.1)] shadow-sm">
+                                    <Clock size={24} className="text-[#0A1128]" />
                                 </div>
                                 <p className="text-[15px] font-bold text-sapphire mb-1">
                                     Pristine Record

@@ -229,9 +229,9 @@ body {
 }
 
 /* ═══ Inputs ═══ */
-/* Restoring the light inputs so text contract is strict black/dark blue on light cream/white */
+/* Restoring the light inputs so text contract is strict black/dark blue on pure white */
 .input-premium {
-  background: #FFF9ED !important; /* Cream light color from screenshot */
+  background: #FFFFFF !important; /* Pure white requested by user */
   border: 1px solid rgba(10, 17, 40, 0.15) !important;
   color: #0A1128 !important; /* Dark text for contrast */
   font-family: var(--font-sans), sans-serif;

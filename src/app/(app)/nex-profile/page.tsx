@@ -141,7 +141,7 @@ export default function NexProfilePage() {
                             <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white shadow-sm border border-[var(--cloud-light)]">
                                 <Siren size={28} className="text-[var(--error)]" weight="duotone" />
                             </div>
-                            <h1 className="text-4xl font-light tracking-tight text-[var(--sapphire-dark)]">
+                            <h1 className="text-4xl font-serif text-headline text-white mb-2">
                                 NEX Target Profile
                             </h1>
                         </div>
@@ -262,19 +262,19 @@ export default function NexProfilePage() {
                                     aria-pressed={form.communicationStyle === style.value}
                                     className={`text-left p-5 rounded-2xl transition-all duration-300 border ${
                                         form.communicationStyle === style.value 
-                                            ? 'bg-gradient-to-br from-white to-[var(--pearl)] border-[var(--sapphire-base)]/40 shadow-md ring-1 ring-[var(--sapphire-base)]/10 scale-[1.02]' 
-                                            : 'bg-white/60 border-[var(--cloud-light)] hover:bg-white hover:border-[var(--sapphire-light)] shadow-sm hover:shadow-md'
+                                            ? 'bg-[#FFFFFF] border-[#123D7E] shadow-[0_4px_15px_rgba(18,61,126,0.2)] ring-1 ring-[#123D7E]/20 scale-[1.02]' 
+                                            : 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border-transparent hover:shadow-[0_8px_20px_rgba(18,61,126,0.4)] shadow-sm'
                                     }`}
                                 >
                                     <div className="flex items-center justify-between mb-1.5">
-                                        <p className={`text-sm font-bold tracking-wide uppercase ${form.communicationStyle === style.value ? 'text-[var(--sapphire-dark)]' : 'text-[var(--sapphire-base)]'}`}>
+                                        <p className={`text-sm font-bold tracking-wide uppercase ${form.communicationStyle === style.value ? 'text-[#0A1128]' : 'text-white'}`}>
                                             {style.label}
                                         </p>
                                         {form.communicationStyle === style.value && (
-                                            <Check size={16} weight="bold" className="text-[var(--champagne)]" />
+                                            <Check size={16} weight="bold" className="text-[#1A4B9B]" />
                                         )}
                                     </div>
-                                    <p className={`text-xs font-medium leading-relaxed ${form.communicationStyle === style.value ? 'text-[var(--sapphire-dark)]' : 'text-[var(--sapphire-light)]'}`}>
+                                    <p className={`text-[12px] font-medium leading-relaxed ${form.communicationStyle === style.value ? 'text-[#0A1128]/80' : 'text-white/80'}`}>
                                         {style.description}
                                     </p>
                                 </button>
@@ -296,10 +296,10 @@ export default function NexProfilePage() {
                                         onClick={() => toggleItem('manipulationTactics', tactic)}
                                         type="button"
                                         aria-pressed={selected}
-                                        className={`px-4 py-2 rounded-full text-xs font-semibold tracking-wide uppercase transition-all duration-300 border shadow-sm ${
+                                        className={`px-4 py-2.5 rounded-[9999px] text-[11px] font-bold tracking-wider uppercase transition-all duration-300 border shadow-sm ${
                                             selected 
-                                                ? 'bg-gradient-to-r from-[var(--error)]/10 to-[var(--error)]/5 border-[var(--error)] text-[#A72B2B] shadow-[0_2px_10px_rgba(200,60,60,0.1)]' 
-                                                : 'bg-white border-[var(--cloud-light)] text-[var(--sapphire-base)] hover:border-[var(--sapphire-light)] hover:text-[#A72B2B]'
+                                                ? 'bg-[#123D7E] border-transparent text-[#FFFFFF] shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
+                                                : 'bg-[#0A1128] border border-[rgba(255,255,255,0.2)] text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.4)] hover:text-white'
                                         }`}
                                     >
                                         {tactic}
@@ -343,14 +343,14 @@ export default function NexProfilePage() {
                                         <motion.div
                                             initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: i * 0.05 }}
                                             key={trigger}
-                                            className="group flex items-center justify-between px-4 py-3 rounded-xl bg-white border border-[var(--cloud-light)] shadow-sm hover:shadow-md transition-all hover:border-[var(--sapphire-light)]"
+                                            className="group flex items-center justify-between px-4 py-3 rounded-2xl bg-[#0A1128] border border-[rgba(255,255,255,0.15)] shadow-sm transition-all"
                                         >
-                                            <span className="text-sm font-medium text-[var(--sapphire-dark)] break-words pr-4">{trigger}</span>
+                                            <span className="text-sm font-semibold text-white break-words pr-4">{trigger}</span>
                                             <button
                                                 onClick={() => removeTrigger(trigger)}
                                                 type="button"
                                                 aria-label={`Remove trigger pattern`}
-                                                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--cloud)]/50 group-hover:bg-[var(--error)]/10 text-[var(--sapphire-base)] group-hover:text-[var(--error)] transition-colors"
+                                                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[rgba(255,255,255,0.1)] group-hover:bg-[#ef4444] text-[rgba(255,255,255,0.7)] group-hover:text-white transition-colors"
                                             >
                                                 <X size={14} weight="bold" />
                                             </button>

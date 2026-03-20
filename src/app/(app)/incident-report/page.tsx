@@ -155,9 +155,9 @@ export default function IncidentReportPage() {
                         className="glass-ethereal p-12 text-center rounded-[2rem] border-white"
                     >
                         <div className="w-20 h-20 rounded-3xl mx-auto mb-6 flex items-center justify-center bg-white shadow-sm border border-[rgba(10,22,41,0.05)]">
-                            <ClipboardText size={32} weight="duotone" className="text-sapphire" />
+                            <ClipboardText size={32} weight="duotone" className="text-[#0A1128]" />
                         </div>
-                        <h2 className="text-xl font-bold text-sapphire mb-2">
+                        <h2 className="text-xl font-serif font-bold text-white mb-2">
                             {incidents && incidents.length > 0 ? 'No exact matches found.' : 'Your record is pristine.'}
                         </h2>
                         <p className="text-sm font-medium text-sapphire-muted max-w-md mx-auto mb-8">

@@ -53,7 +53,7 @@ export const nexxClerkAppearance = {
             fontWeight: '700',
         },
         formFieldInput: {
-            background: '#FFF9ED',
+            background: '#FFFFFF',
             border: '1px solid rgba(10, 17, 40, 0.15)',
             color: '#0A1128',
             boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.05)',

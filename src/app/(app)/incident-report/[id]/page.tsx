@@ -15,7 +15,7 @@ import {
     PencilSimple,
     Check,
     WarningCircle,
-    Sparkle,
+    Lightning,
     FloppyDisk,
     Trash,
     MapPin,
@@ -386,7 +386,7 @@ export default function IncidentDetailPage() {
                                     onClick={handleAnalyze}
                                     className="px-4 py-2 rounded-xl bg-champagne hover:bg-[#C59B27] text-white text-[11px] font-bold uppercase tracking-widest shadow-md flex items-center gap-1.5 transition-colors"
                                 >
-                                    <Sparkle size={14} weight="fill" /> Generate with AI
+                                    <Lightning size={14} weight="fill" /> Generate with AI
                                 </button>
                             )}
                         </div>
@@ -394,7 +394,7 @@ export default function IncidentDetailPage() {
                     {isAnalyzing ? (
                         <div className="flex flex-col items-center justify-center gap-4 py-8 opacity-60">
                             <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}>
-                                <Sparkle size={32} weight="duotone" className="text-champagne" />
+                                <Lightning size={32} weight="duotone" className="text-champagne" />
                             </motion.div>
                             <p className="text-[13px] font-bold uppercase tracking-widest text-sapphire">
                                 Generating encrypted court summary...
@@ -477,7 +477,7 @@ export default function IncidentDetailPage() {
                                 disabled={isAnalyzing}
                                 className="btn-secondary flex-1 bg-white hover:bg-cloud shadow-sm text-[13px] uppercase tracking-widest py-4 border-transparent flex items-center justify-center gap-2"
                             >
-                                <Sparkle size={16} className="text-champagne" /> Analyze with AI
+                                <Lightning size={16} className="text-champagne" /> Analyze with AI
                             </button>
                         )}
                         <button

@@ -10,7 +10,6 @@ import { useClerk } from '@clerk/nextjs';
 import {
     ChevronRight,
     ChevronLeft,
-    Sparkles,
     MapPin,
     Users,
     Heart,
@@ -298,13 +297,12 @@ export default function OnboardingPage() {
                                     initial={{ scale: 0.8, opacity: 0 }}
                                     animate={{ scale: 1, opacity: 1 }}
                                     transition={{ delay: 0.2, type: 'spring' }}
-                                    className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center"
-                                    style={{
-                                        background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
-                                        boxShadow: '0 8px 32px rgba(208, 227, 255, 0.3)',
-                                    }}
+                                    className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#60A5FA,#2563EB)] shadow-[0_8px_32px_rgba(96,165,250,0.4)] border border-white/20 relative overflow-hidden"
                                 >
-                                    <Sparkles size={28} style={{ color: '#F7F2EB' }} />
+                                    <div className="absolute inset-0 bg-white/10" />
+                                    <span className="text-white font-serif font-bold text-3xl drop-shadow-sm relative z-10 mt-1">
+                                        <i>N</i>
+                                    </span>
                                 </motion.div>
                                 <h1 className="font-serif text-3xl font-bold mb-4" style={{ color: '#F7F2EB' }}>
                                     Welcome to <span className="shimmer">NEXX</span>
@@ -570,7 +568,7 @@ export default function OnboardingPage() {
                         }`}
                     >
                         {currentStep === ONBOARDING_STEPS.length - 1 ? (
-                            <>{isSaving ? 'Saving...' : userLoading ? 'Loading...' : 'ENTER NEXX'} <Sparkles size={16} strokeWidth={2.5} /></>
+                            <>{isSaving ? 'Saving...' : userLoading ? 'Loading...' : 'ENTER NEXX'} <ChevronRight size={16} strokeWidth={2.5} /></>
                         ) : (
                             <>Continue <ChevronRight size={16} strokeWidth={2.5} /></>
                         )}

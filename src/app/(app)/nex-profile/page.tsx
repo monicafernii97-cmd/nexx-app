@@ -12,7 +12,7 @@ import {
     FloppyDisk,
     Check,
     Warning,
-    Sparkle,
+    Lightning,
     Plus,
     X,
 } from '@phosphor-icons/react';
@@ -352,7 +352,7 @@ export default function NexProfilePage() {
 
                     {/* ── AI Insights (read-only) ── */}
                     {nexProfile?.aiInsights && (
-                        <Section icon={<Sparkle size={20} className="text-[#3b82f6]" weight="fill" />} title="AI Threat Analysis Summary">
+                        <Section icon={<Lightning size={20} className="text-[#3b82f6]" weight="fill" />} title="AI Threat Analysis Summary">
                             <div className="card-premium p-6 border border-[#3b82f6]/20 bg-gradient-to-br from-white to-[#eff6ff] shadow-sm ml-1">
                                 <p className="text-sm leading-relaxed whitespace-pre-wrap text-[var(--sapphire-dark)] font-medium">
                                     {nexProfile.aiInsights}

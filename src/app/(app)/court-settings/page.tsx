@@ -9,7 +9,7 @@ import {
     Gavel,
     MapPin,
     FloppyDisk,
-    Sparkle,
+    Lightning,
     Check,
     Warning,
     CaretDown,
@@ -426,7 +426,7 @@ export default function CourtSettingsPage() {
             >
                 <div className="flex items-center gap-3 mb-4">
                     <div className="w-8 h-8 rounded-full bg-[var(--champagne)]/10 flex items-center justify-center">
-                        <Sparkle size={16} className="text-[var(--champagne)]" weight="duotone" />
+                        <Lightning size={16} className="text-[var(--champagne)]" weight="duotone" />
                     </div>
                     <h2 className="text-sm font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
                         AI Court Rules Verification
@@ -450,13 +450,13 @@ export default function CourtSettingsPage() {
                                     animate={{ rotate: 360 }}
                                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                                 >
-                                    <Sparkle size={16} className="text-[var(--champagne)]" weight="fill" />
+                                    <Lightning size={16} className="text-[var(--champagne)]" weight="fill" />
                                 </motion.div>
                                 Verifying Framework...
                             </>
                         ) : (
                             <>
-                                <Sparkle size={16} className="text-[var(--champagne)] group-hover:scale-110 transition-transform" weight="fill" />
+                                <Lightning size={16} className="text-[var(--champagne)] group-hover:scale-110 transition-transform" weight="fill" />
                                 Verify with AI
                             </>
                         )}

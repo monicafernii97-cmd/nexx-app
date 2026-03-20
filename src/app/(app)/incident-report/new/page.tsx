@@ -9,7 +9,7 @@ import { useUser } from '@/lib/user-context';
 import {
     Microphone,
     ArrowLeft,
-    Sparkle,
+    Lightning,
     Check,
     PencilSimple,
     CalendarBlank,
@@ -142,16 +142,16 @@ export default function NewIncidentPage() {
             >
                 <Link
                     href="/incident-report"
-                    className="w-11 h-11 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-105 bg-white shadow-sm border border-[rgba(10,22,41,0.05)] hover:shadow"
+                    className="w-11 h-11 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-105 bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-md border border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)]"
                     aria-label="Back to incident reports"
                 >
-                    <ArrowLeft size={20} weight="bold" className="text-sapphire" />
+                    <ArrowLeft size={20} weight="bold" className="text-white" />
                 </Link>
                 <div>
-                    <h1 className="text-3xl text-headline text-sapphire m-0">
-                        Secure <span className="text-editorial shimmer">Testimony</span>
+                    <h1 className="text-3xl font-serif font-bold text-white m-0">
+                        Secure <span className="text-white shimmer">Testimony</span>
                     </h1>
-                    <p className="text-[14px] font-medium text-sapphire-muted mt-1">
+                    <p className="text-[14px] font-medium text-white opacity-90 mt-1">
                         Sanctuary for Truth and Admissibility
                     </p>
                 </div>
@@ -168,13 +168,13 @@ export default function NewIncidentPage() {
                             <div
                                 className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold transition-all duration-500 shrink-0 shadow-sm ${
                                     isActive 
-                                    ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white scale-110 shadow-[0_4px_12px_rgba(18,61,126,0.3)] border border-transparent' 
+                                    ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white scale-110 shadow-[0_4px_12px_rgba(18,61,126,0.3)] border border-[rgba(255,255,255,0.3)]' 
                                     : 'bg-[#0A1128] text-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.2)]'
                                 }`}
                             >
                                 {isPast ? <Check size={14} weight="bold" /> : i + 1}
                             </div>
-                            <span className={`text-[13px] tracking-wide font-bold uppercase whitespace-nowrap ${isActive ? 'text-[#FFFFFF]' : 'text-[#FFFFFF]/50'}`}>
+                            <span className={`text-[13px] tracking-wide font-bold uppercase whitespace-nowrap ${isActive ? 'text-[#FFFFFF]' : 'text-white/60'}`}>
                                 {label}
                             </span>
                             {i < 2 && (
@@ -200,13 +200,13 @@ export default function NewIncidentPage() {
                         {/* Voice Record Button (Placeholder) */}
                         <div className="text-center">
                             <button
-                                className="w-24 h-24 rounded-full mx-auto flex items-center justify-center cursor-pointer transition-all hover:scale-105 bg-white shadow-lg border-[4px] border-cloud group relative overflow-hidden"
+                                className="w-24 h-24 rounded-full mx-auto flex items-center justify-center cursor-pointer transition-all hover:scale-105 bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_8px_32px_rgba(26,75,155,0.5)] border-[4px] border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.3)] group relative overflow-hidden"
                                 title="Voice recording (coming soon)"
                             >
-                                <div className="absolute inset-0 bg-champagne/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <Microphone size={36} weight="duotone" className="text-sapphire group-hover:text-champagne transition-colors" />
+                                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <Microphone size={36} weight="duotone" className="text-white group-hover:scale-110 transition-all drop-shadow-md" />
                             </button>
-                            <p className="text-[13px] font-bold tracking-widest uppercase mt-4 text-sapphire-muted">
+                            <p className="text-[13px] font-bold tracking-widest uppercase mt-4 text-white">
                                 Tap to Record Testimony
                             </p>
                         </div>
@@ -215,7 +215,7 @@ export default function NewIncidentPage() {
 
                         {/* Manual Narrative */}
                         <div>
-                            <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-sapphire-muted">
+                            <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
                                 <PencilSimple size={14} /> Manual Narrative
                             </label>
                             <div className="relative">
@@ -224,9 +224,9 @@ export default function NewIncidentPage() {
                                     onChange={(e) => setNarrative(e.target.value)}
                                     placeholder="Describe the incident with precision — what happened, who was present, what was said or done..."
                                     rows={6}
-                                    className="input-premium resize-none w-full bg-white/60 focus:bg-white text-[15px] leading-relaxed"
+                                    className="input-premium resize-none w-full bg-white text-[#0A1128] placeholder:text-[#0A1128]/50 text-[15px] leading-relaxed rounded-[1.5rem] focus:ring-2 focus:ring-[#1A4B9B] border-none shadow-inner"
                                 />
-                                <p className={`absolute bottom-3 right-4 text-[11px] font-bold ${narrative.length > 4500 ? 'text-rose' : 'text-sapphire-muted/50'}`}>
+                                <p className={`absolute bottom-3 right-4 text-[11px] font-bold ${narrative.length > 4500 ? 'text-rose' : 'text-[#0A1128]/40'}`}>
                                     {narrative.length}/5000
                                 </p>
                             </div>
@@ -235,22 +235,22 @@ export default function NewIncidentPage() {
                         {/* Date & Time */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
-                                <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-sapphire-muted">
+                                <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
                                     <CalendarBlank size={14} /> Date
                                 </label>
-                                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input-premium bg-white/60 focus:bg-white w-full" />
+                                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input-premium bg-white text-[#0A1128] w-full rounded-[1.5rem] border-none shadow-inner focus:ring-2 focus:ring-[#1A4B9B]" />
                             </div>
                             <div>
-                                <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-sapphire-muted">
+                                <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
                                     <Clock size={14} /> Time
                                 </label>
-                                <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="input-premium bg-white/60 focus:bg-white w-full" />
+                                <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="input-premium bg-white text-[#0A1128] w-full rounded-[1.5rem] border-none shadow-inner focus:ring-2 focus:ring-[#1A4B9B]" />
                             </div>
                         </div>
 
                         {/* Severity Selector */}
                         <div>
-                            <label className="text-[12px] font-bold tracking-widest uppercase mb-4 block text-sapphire-muted">
+                            <label className="text-[12px] font-bold tracking-widest uppercase mb-4 block text-white">
                                 Severity Level
                             </label>
                             <div className="flex gap-3">
@@ -258,22 +258,21 @@ export default function NewIncidentPage() {
                                     <button
                                         key={level}
                                         onClick={() => setSeverity(level)}
-                                        className="flex-1 py-4 rounded-2xl text-[14px] font-semibold transition-all cursor-pointer shadow-sm border border-[rgba(10,22,41,0.04)]"
-                                        style={{
-                                            background: severity === level ? `color-mix(in srgb, ${severityColors[level - 1]} 10%, white)` : 'white',
-                                            borderColor: severity === level ? severityColors[level - 1] : 'transparent',
-                                            color: severity === level ? severityColors[level - 1] : 'var(--sapphire-muted)',
-                                        }}
+                                        className={`flex-1 py-4 rounded-[1.5rem] text-[14px] font-bold transition-all duration-300 cursor-pointer backdrop-blur-sm border ${
+                                            severity === level
+                                            ? 'bg-[linear-gradient(135deg,rgba(255,255,255,0.15),rgba(255,255,255,0.05))] border-[rgba(255,255,255,0.4)] shadow-[0_8px_24px_rgba(255,255,255,0.15)] text-white scale-[1.02] -translate-y-1'
+                                            : 'bg-[rgba(10,22,41,0.4)] border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.3)] text-white/50 hover:text-white'
+                                        }`}
                                     >
                                         <div className="flex items-center justify-center gap-2.5">
                                             <div className="flex gap-1">
                                                 {[1, 2, 3].map((bar) => (
                                                     <div
                                                         key={bar}
-                                                        className="w-1.5 h-4 rounded-sm transition-all duration-300"
+                                                        className="w-1.5 h-4 rounded-full transition-all duration-300"
                                                         style={{
-                                                            background: bar <= level ? severityColors[level - 1] : 'var(--cloud)',
-                                                            opacity: severity === level ? 1 : 0.5,
+                                                            background: bar <= level ? (severity === level ? severityColors[level - 1] : 'white') : 'rgba(255,255,255,0.1)',
+                                                            opacity: severity === level ? 1 : 0.6,
                                                         }}
                                                     />
                                                 ))}
@@ -287,7 +286,7 @@ export default function NewIncidentPage() {
 
                         {/* Category Tags */}
                         <div>
-                            <label className="text-[12px] font-bold tracking-widest uppercase mb-4 flex items-center gap-2 text-sapphire-muted">
+                            <label className="text-[12px] font-bold tracking-widest uppercase mb-4 flex items-center gap-2 text-white">
                                 <Tag size={14} /> Incident Context
                             </label>
                             <div className="flex flex-wrap gap-2.5">
@@ -295,12 +294,11 @@ export default function NewIncidentPage() {
                                     <button
                                         key={cat.value}
                                         onClick={() => setCategory(category === cat.value ? '' : cat.value)}
-                                        className="badge cursor-pointer transition-all px-4 py-2 border shadow-sm"
-                                        style={{
-                                            background: category === cat.value ? `color-mix(in srgb, ${cat.color} 15%, white)` : 'white',
-                                            color: category === cat.value ? cat.color : 'var(--sapphire)',
-                                            borderColor: category === cat.value ? `color-mix(in srgb, ${cat.color} 50%, transparent)` : 'transparent',
-                                        }}
+                                        className={`cursor-pointer transition-all px-5 py-2.5 rounded-full border text-[13px] font-bold backdrop-blur-sm ${
+                                            category === cat.value
+                                            ? 'bg-[linear-gradient(135deg,rgba(255,255,255,0.15),rgba(255,255,255,0.05))] border-white shadow-[0_4px_16px_rgba(255,255,255,0.15)] text-white'
+                                            : 'bg-[rgba(10,22,41,0.4)] border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.3)] text-white/60 hover:text-white'
+                                        }`}
                                     >
                                         {cat.label}
                                     </button>
@@ -311,7 +309,7 @@ export default function NewIncidentPage() {
                         {/* Additional Details */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
-                                <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-sapphire-muted">
+                                <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
                                     <MapPin size={14} /> Location (optional)
                                 </label>
                                 <input
@@ -319,11 +317,11 @@ export default function NewIncidentPage() {
                                     value={location}
                                     onChange={(e) => setLocation(e.target.value)}
                                     placeholder="Where did it happen?"
-                                    className="input-premium bg-white/60 focus:bg-white w-full"
+                                    className="input-premium bg-white text-[#0A1128] placeholder:text-[#0A1128]/50 w-full rounded-[1.5rem] focus:ring-2 focus:ring-[#1A4B9B] border-none shadow-inner"
                                 />
                             </div>
                             <div>
-                                <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-sapphire-muted">
+                                <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
                                     <Users size={14} /> Witnesses (optional)
                                 </label>
                                 <input
@@ -331,42 +329,41 @@ export default function NewIncidentPage() {
                                     value={witnesses}
                                     onChange={(e) => setWitnesses(e.target.value)}
                                     placeholder="Comma-separated names"
-                                    className="input-premium bg-white/60 focus:bg-white w-full"
+                                    className="input-premium bg-white text-[#0A1128] placeholder:text-[#0A1128]/50 w-full rounded-[1.5rem] focus:ring-2 focus:ring-[#1A4B9B] border-none shadow-inner"
                                 />
                             </div>
                         </div>
 
                         {/* Children Involved */}
                         <label
-                            className="flex items-center gap-4 p-5 rounded-2xl cursor-pointer transition-all shadow-sm border"
-                            style={{
-                                background: childrenInvolved ? 'color-mix(in srgb, var(--warning) 8%, white)' : 'white',
-                                borderColor: childrenInvolved ? 'var(--warning)' : 'transparent',
-                            }}
+                            className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-[1.5rem] cursor-pointer transition-all duration-300 border backdrop-blur-sm shadow-sm hover:shadow-md ${
+                                childrenInvolved
+                                ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border-[rgba(255,255,255,0.4)] shadow-[0_8px_24px_rgba(26,75,155,0.5)]'
+                                : 'bg-[rgba(10,22,41,0.4)] border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.3)]'
+                            }`}
                         >
-                            <input
-                                type="checkbox"
-                                checked={childrenInvolved}
-                                onChange={(e) => setChildrenInvolved(e.target.checked)}
-                                className="peer sr-only"
-                            />
-                            <div
-                                className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-colors"
-                                style={{
-                                    background: childrenInvolved ? 'var(--warning)' : 'var(--cloud)',
-                                }}
-                            >
-                                {childrenInvolved && <Check size={14} weight="bold" className="text-white" />}
-                            </div>
-                            <div className="flex items-center gap-2.5">
-                                <Baby size={18} weight={childrenInvolved ? "fill" : "regular"} className={childrenInvolved ? "text-warning" : "text-sapphire"} />
-                                <div>
-                                    <p className={`text-[15px] font-semibold ${childrenInvolved ? 'text-warning' : 'text-sapphire'}`}>
-                                        Children Involved
-                                    </p>
-                                    <p className="text-[12px] font-medium text-sapphire-muted">
-                                        Check if minors were present during the event
-                                    </p>
+                            <div className="flex items-center gap-4">
+                                <div className="relative flex-shrink-0">
+                                    <input
+                                        type="checkbox"
+                                        checked={childrenInvolved}
+                                        onChange={(e) => setChildrenInvolved(e.target.checked)}
+                                        className="peer sr-only"
+                                    />
+                                    <div className="w-6 h-6 rounded-md border-2 border-[rgba(255,255,255,0.4)] peer-checked:bg-white peer-checked:border-white transition-all flex items-center justify-center">
+                                        {childrenInvolved && <Check size={14} weight="bold" className="text-[#123D7E]" />}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Baby size={20} weight={childrenInvolved ? "fill" : "duotone"} className={childrenInvolved ? "text-white" : "text-white/60"} />
+                                    <div>
+                                        <p className="text-[15px] font-bold text-white tracking-wide">
+                                            Children Present
+                                        </p>
+                                        <p className="text-[12px] font-medium text-white/70">
+                                            Flag this incident for custody impact analysis
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </label>
@@ -374,7 +371,7 @@ export default function NewIncidentPage() {
                         {/* Error */}
                         {analyzeError && (
                             <div className="p-4 rounded-xl bg-rose/10 border border-rose/20 text-rose text-[13px] font-semibold flex items-center gap-2">
-                                <Sparkle size={16} /> {analyzeError}
+                                <Lightning size={16} /> {analyzeError}
                             </div>
                         )}
 
@@ -383,17 +380,17 @@ export default function NewIncidentPage() {
                             <button
                                 onClick={handleAnalyze}
                                 disabled={!narrative.trim() || isAnalyzing}
-                                className="btn-primary w-full flex items-center justify-center gap-2.5 shadow-lg shadow-sapphire/20 disabled:scale-100 disabled:opacity-50 py-4 text-[15px]"
+                                className="w-full flex items-center justify-center gap-2.5 rounded-[2rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,255,255,0.02))] border border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.5)] hover:-translate-y-1 transition-all disabled:scale-100 disabled:opacity-50 py-5 text-[15px] text-white font-bold tracking-wide backdrop-blur-md cursor-pointer group"
                             >
                                 {isAnalyzing ? (
                                     <>
                                         <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}>
-                                            <Sparkle size={20} weight="fill" className="text-champagne" />
+                                            <Lightning size={20} weight="fill" className="text-white" />
                                         </motion.div>
                                         Analyzing Dynamics securely...
                                     </>
                                 ) : (
-                                    <><Sparkle size={20} weight="duotone" className="text-champagne" /> Generate Court-Ready Summary</>
+                                    <><Lightning size={20} weight="duotone" className="text-white group-hover:animate-pulse" /> Generate Court-Ready Summary</>
                                 )}
                             </button>
                         </div>
@@ -407,7 +404,7 @@ export default function NewIncidentPage() {
                         <div className="card-premium p-6 md:p-8">
                             <div className="flex items-center justify-between mb-5 border-b border-[rgba(10,22,41,0.04)] pb-4">
                                 <h3 className="text-[13px] font-bold tracking-[0.2em] uppercase text-sapphire flex items-center gap-2">
-                                    <Sparkle size={16} weight="duotone" className="text-champagne" /> Court-Ready Summary
+                                    <Lightning size={16} weight="duotone" className="text-champagne" /> Court-Ready Summary
                                 </h3>
                                 <button
                                     onClick={() => setIsEditing(!isEditing)}
@@ -435,7 +432,7 @@ export default function NewIncidentPage() {
                             {behavioralAnalysis && (
                                 <div className="card-premium p-6">
                                     <h3 className="text-[12px] font-bold tracking-[0.15em] uppercase mb-4 flex items-center gap-2 text-warning">
-                                        <Sparkle size={16} weight="duotone" /> Behavioral Analysis
+                                        <Lightning size={16} weight="duotone" /> Behavioral Analysis
                                     </h3>
                                     <p className="text-[14px] leading-relaxed whitespace-pre-wrap text-sapphire">
                                         {behavioralAnalysis}

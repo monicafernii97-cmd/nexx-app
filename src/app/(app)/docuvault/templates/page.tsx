@@ -484,9 +484,9 @@ export default function TemplateGalleryPage() {
                                                 {Object.entries(previewTemplate.stateVariants).map(([state, name]) => (
                                                     <div
                                                         key={state}
-                                                        className="flex items-center gap-3 text-[14px]"
+                                                        className="flex flex-col sm:flex-row sm:items-start sm:gap-3 text-[14px]"
                                                     >
-                                                        <span className="font-bold text-white w-8">
+                                                        <span className="font-bold text-white shrink-0 min-w-[120px]">
                                                             {state}:
                                                         </span>
                                                         <span className="font-medium text-white/90">{name}</span>

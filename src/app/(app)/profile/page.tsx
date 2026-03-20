@@ -12,7 +12,7 @@ import {
     Briefcase,
     FloppyDisk,
     Check,
-    Sparkle,
+    Lightning,
 } from '@phosphor-icons/react';
 import { US_STATES } from '@/lib/constants';
 
@@ -379,7 +379,7 @@ export default function ProfilePage() {
                     </Section>
 
                     {/* ── NEXX Personalization ── */}
-                    <Section icon={<Sparkle size={20} weight="duotone" className="text-champagne" />} title="NEXX A.I. Dynamics">
+                    <Section icon={<Lightning size={20} weight="duotone" className="text-champagne" />} title="NEXX A.I. Dynamics">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
                             <div>
                                 <Field label="Communication Preference">

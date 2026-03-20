@@ -247,7 +247,7 @@ function FinderHeroCard({
                 <div
                     className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white shadow-md border border-[rgba(10,22,41,0.04)]"
                 >
-                    <Icon size={28} weight="duotone" className="text-champagne" />
+                    <Icon size={28} weight="duotone" className="text-[#0A1128]" />
                 </div>
                 <div>
                     <h3 className="font-serif font-bold text-xl text-sapphire mb-1">
@@ -676,7 +676,7 @@ export default function ResourcesPage() {
                         >
                             <div className="flex flex-col md:flex-row md:items-center gap-6">
                                 <div
-                                    className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 bg-white shadow-sm border border-champagne/20 group-hover:bg-champagne group-hover:text-white transition-colors text-champagne"
+                                    className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 bg-white shadow-sm border border-[rgba(10,17,40,0.1)] group-hover:bg-[#0A1128] group-hover:text-white transition-colors text-[#0A1128]"
                                 >
                                     <MagnifyingGlass size={32} weight="duotone" />
                                 </div>

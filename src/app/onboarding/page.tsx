@@ -445,7 +445,7 @@ export default function OnboardingPage() {
                         {currentStep === 3 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <Heart size={20} weight="fill" className="text-white" />
+                                    <Heart size={20} className="text-white" />
                                     <h2 className="font-serif text-xl font-bold text-white">Your NEX</h2>
                                 </div>
                                 <p className="text-sm text-[rgba(255,255,255,0.8)]">
@@ -482,7 +482,7 @@ export default function OnboardingPage() {
                         {currentStep === 4 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <Target size={20} weight="fill" className="text-white" />
+                                    <Target size={20} className="text-white" />
                                     <h2 className="font-serif text-xl font-bold text-white">Your Goals</h2>
                                 </div>
                                 <p className="text-sm text-[rgba(255,255,255,0.8)] pb-2">
@@ -510,7 +510,7 @@ export default function OnboardingPage() {
                         {currentStep === 5 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <FileText size={20} weight="fill" className="text-white" />
+                                    <FileText size={20} className="text-white" />
                                     <h2 className="font-serif text-xl font-bold text-white">Important Notice</h2>
                                 </div>
                                 <div className="p-6 space-y-4 rounded-[2rem] bg-[rgba(10,17,40,0.5)] border border-[rgba(255,255,255,0.1)]">

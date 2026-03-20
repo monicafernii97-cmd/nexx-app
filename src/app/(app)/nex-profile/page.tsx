@@ -137,16 +137,11 @@ export default function NexProfilePage() {
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
                     <div>
-                        <div className="flex items-center gap-4 mb-3">
-                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white shadow-sm border border-[var(--cloud-light)]">
-                                <Siren size={28} className="text-[var(--error)]" weight="duotone" />
-                            </div>
-                            <h1 className="text-4xl font-serif text-headline text-white mb-2">
-                                NEX Target Profile
-                            </h1>
-                        </div>
-                        <p className="text-base text-[var(--sapphire-base)] max-w-2xl leading-relaxed">
-                            Document your high-conflict individual&apos;s behavioral patterns. This structural mapping enables NEXX to decode and proactively intercept tactical manipulation sequences.
+                        <h1 className="text-4xl font-serif font-bold text-white mb-1">
+                            NEX Profile
+                        </h1>
+                        <p className="text-[15px] text-[rgba(255,255,255,0.9)] max-w-2xl leading-relaxed">
+                            Document your NEX's behavioral patterns. This helps NEXX proactively identify tactics.
                         </p>
                     </div>
 
@@ -154,10 +149,10 @@ export default function NexProfilePage() {
                         <button
                             onClick={handleSave}
                             disabled={saving}
-                            className="btn-primary w-full md:w-auto px-8 py-3.5 text-sm flex items-center justify-center gap-3 shadow-md hover:shadow-lg disabled:opacity-50 transition-all font-semibold uppercase tracking-wider group"
+                            className="bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white rounded-xl px-6 py-2.5 text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 transition-all font-medium"
                         >
-                            {saved ? <Check size={18} weight="bold" /> : <FloppyDisk size={18} weight="bold" className="group-hover:scale-110 transition-transform" />}
-                            {saving ? 'Saving...' : saved ? 'Saved Successfully' : 'Save Archetype'}
+                            {saved ? <Check size={18} weight="bold" /> : <FloppyDisk size={18} weight="bold" />}
+                            {saving ? 'Saving...' : saved ? 'Saved Successfully' : 'Save Profile'}
                         </button>
                         <AnimatePresence>
                             {error && (
@@ -174,30 +169,30 @@ export default function NexProfilePage() {
 
                 <div className="space-y-6">
                     {/* ── NEX Overview ── */}
-                    <Section icon={<Siren size={20} className="text-[var(--sapphire-base)]" weight="duotone" />} title="Archetype Definition">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pl-1">
+                    <Section icon={<Siren size={20} className="text-white" weight="bold" />} title="NEX Overview">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
-                                <label className="text-xs font-semibold mb-2 block text-[var(--sapphire-base)] uppercase tracking-wide">
-                                    Target Alias / Codename
+                                <label className="text-sm text-white mb-2 block">
+                                    Nickname for your NEX
                                 </label>
                                 <input
-                                    className="input-premium w-full text-sm placeholder:text-[var(--sapphire-light)] text-[var(--sapphire-dark)]"
+                                    className="w-full text-base p-3 rounded-xl bg-[#F8F5EE] text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
                                     value={form.nickname}
                                     onChange={(e) => setForm({ ...form, nickname: e.target.value })}
-                                    placeholder='e.g. "The Narc", "Voldemort"'
+                                    placeholder='e.g. "The NEX", a codename'
                                 />
-                                <p className="text-xs font-medium text-[var(--sapphire-light)] mt-1.5">NEXX uses this alias in chat interfaces.</p>
+                                <p className="text-xs text-[rgba(255,255,255,0.7)] mt-1.5">NEXX will use this term in conversations</p>
                             </div>
                             <div>
-                                <label className="text-xs font-semibold mb-2 block text-[var(--sapphire-base)] uppercase tracking-wide">
-                                    Relationship Vector
+                                <label className="text-sm text-white mb-2 block">
+                                    Relationship
                                 </label>
                                 <select
-                                    className="input-premium w-full text-sm text-[var(--sapphire-dark)] bg-white/80 focus:bg-white"
+                                    className="w-full text-base p-3 rounded-xl bg-[#F8F5EE] text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
                                     value={form.relationship}
                                     onChange={(e) => setForm({ ...form, relationship: e.target.value })}
                                 >
-                                    <option value="" disabled>Select Role Dynamics</option>
+                                    <option value="" disabled>Select</option>
                                     <option value="ex-spouse">Ex-Spouse</option>
                                     <option value="ex-partner">Ex-Partner</option>
                                     <option value="co-parent">Co-Parent</option>
@@ -207,26 +202,26 @@ export default function NexProfilePage() {
                                 </select>
                             </div>
                         </div>
-                        <div className="mt-5 pl-1">
-                            <label className="text-xs font-semibold mb-2 block text-[var(--sapphire-base)] uppercase tracking-wide">
-                                Operational Baseline
+                        <div className="mt-5">
+                            <label className="text-sm text-white mb-2 block">
+                                Brief Description
                             </label>
                             <textarea
-                                className="input-premium w-full text-sm placeholder:text-[var(--sapphire-light)] text-[var(--sapphire-dark)] resize-none"
+                                className="w-full text-base p-3 rounded-xl bg-[#F8F5EE] text-[#0A1128] resize-none focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
                                 rows={3}
                                 value={form.description}
                                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                placeholder="Summarize the core conflict dynamic: e.g., 'Utilizes silent treatments followed by intense financial control threats. Highly litigious.'"
+                                placeholder="Briefly describe your NEX's personality and the dynamic..."
                             />
                         </div>
                     </Section>
 
                     {/* ── Behavioral Patterns ── */}
-                    <Section icon={<Brain size={20} className="text-[var(--champagne)]" weight="duotone" />} title="Symptomatic Behaviors">
-                        <p className="text-sm mb-4 text-[var(--sapphire-base)] pl-1">
-                            Select all observed mechanisms of control. NEXX utilizes this index to anticipate behavioral pivots during correspondence logic mapping.
+                    <Section icon={<Brain size={20} className="text-white" weight="bold" />} title="Behavioral Patterns">
+                        <p className="text-[13px] text-white/90 mb-4">
+                            Select all behaviors you've observed. NEXX will flag these proactively in conversations.
                         </p>
-                        <div className="flex flex-wrap gap-2.5 pl-1">
+                        <div className="flex flex-wrap gap-3">
                             {BEHAVIOR_OPTIONS.map((behavior) => {
                                 const selected = form.behaviors.includes(behavior);
                                 return (
@@ -235,10 +230,10 @@ export default function NexProfilePage() {
                                         onClick={() => toggleItem('behaviors', behavior)}
                                         type="button"
                                         aria-pressed={selected}
-                                        className={`px-4 py-2 rounded-full text-xs font-semibold tracking-wide uppercase transition-all duration-300 border shadow-sm ${
+                                        className={`px-4 py-2 rounded-[6px] text-[13px] font-medium transition-all border ${
                                             selected 
-                                                ? 'bg-gradient-to-r from-[var(--champagne)]/20 to-[var(--champagne)]/5 border-[var(--champagne)] text-[var(--sapphire-dark)] shadow-[0_2px_10px_rgba(229,168,74,0.15)]' 
-                                                : 'bg-white border-[var(--cloud-light)] text-[var(--sapphire-base)] hover:border-[var(--sapphire-light)] hover:text-[var(--sapphire-dark)]'
+                                                ? 'bg-[#123D7E] text-white border-transparent' 
+                                                : 'bg-transparent border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.8)] hover:bg-[#123D7E]/20 hover:text-white'
                                         }`}
                                     >
                                         {behavior}
@@ -249,32 +244,27 @@ export default function NexProfilePage() {
                     </Section>
 
                     {/* ── Communication Style ── */}
-                    <Section icon={<ChatTeardropText size={20} className="text-[#3b82f6]" weight="duotone" />} title="Linguistic Footprint">
-                        <p className="text-sm mb-4 text-[var(--sapphire-base)] pl-1">
-                            Identify the primary dialect framework of their communication.
+                    <Section icon={<ChatTeardropText size={20} className="text-white" weight="bold" />} title="Communication Style">
+                        <p className="text-[13px] text-white/90 mb-4">
+                            How does your NEX typically communicate?
                         </p>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pl-1">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {COMMUNICATION_STYLES.map((style) => (
                                 <button
                                     key={style.value}
                                     onClick={() => setForm({ ...form, communicationStyle: style.value })}
                                     type="button"
                                     aria-pressed={form.communicationStyle === style.value}
-                                    className={`text-left p-5 rounded-2xl transition-all duration-300 border ${
+                                    className={`text-left p-4 rounded-xl transition-all border ${
                                         form.communicationStyle === style.value 
-                                            ? 'bg-[#FFFFFF] border-[#123D7E] shadow-[0_4px_15px_rgba(18,61,126,0.2)] ring-1 ring-[#123D7E]/20 scale-[1.02]' 
-                                            : 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border-transparent hover:shadow-[0_8px_20px_rgba(18,61,126,0.4)] shadow-sm'
+                                            ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border-transparent' 
+                                            : 'bg-[#0A1128] border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.25)]'
                                     }`}
                                 >
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <p className={`text-sm font-bold tracking-wide uppercase ${form.communicationStyle === style.value ? 'text-[#0A1128]' : 'text-white'}`}>
-                                            {style.label}
-                                        </p>
-                                        {form.communicationStyle === style.value && (
-                                            <Check size={16} weight="bold" className="text-[#1A4B9B]" />
-                                        )}
-                                    </div>
-                                    <p className={`text-[12px] font-medium leading-relaxed ${form.communicationStyle === style.value ? 'text-[#0A1128]/80' : 'text-white/80'}`}>
+                                    <p className="text-sm font-semibold text-white mb-1">
+                                        {style.label}
+                                    </p>
+                                    <p className="text-[13px] text-white/80">
                                         {style.description}
                                     </p>
                                 </button>
@@ -283,11 +273,11 @@ export default function NexProfilePage() {
                     </Section>
 
                     {/* ── Manipulation Tactics ── */}
-                    <Section icon={<Warning size={20} className="text-[var(--error)]" weight="duotone" />} title="Known Manipulation Vectors">
-                        <p className="text-sm mb-4 text-[var(--sapphire-base)] pl-1">
-                            Select tactics historically deployed against you. NEXX scans messages specifically for these tactical signatures.
+                    <Section icon={<Warning size={20} className="text-white" weight="bold" />} title="Known Manipulation Tactics">
+                        <p className="text-[13px] text-white/90 mb-4">
+                            Select tactics your NEX uses. NEXX will watch for these in your descriptions.
                         </p>
-                        <div className="flex flex-wrap gap-2.5 pl-1">
+                        <div className="flex flex-wrap gap-3">
                             {MANIPULATION_OPTIONS.map((tactic) => {
                                 const selected = form.manipulationTactics.includes(tactic);
                                 return (
@@ -296,10 +286,10 @@ export default function NexProfilePage() {
                                         onClick={() => toggleItem('manipulationTactics', tactic)}
                                         type="button"
                                         aria-pressed={selected}
-                                        className={`px-4 py-2.5 rounded-[9999px] text-[11px] font-bold tracking-wider uppercase transition-all duration-300 border shadow-sm ${
+                                        className={`px-4 py-2 rounded-[6px] text-[13px] font-medium transition-all border ${
                                             selected 
-                                                ? 'bg-[#123D7E] border-transparent text-[#FFFFFF] shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
-                                                : 'bg-[#0A1128] border border-[rgba(255,255,255,0.2)] text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.4)] hover:text-white'
+                                                ? 'bg-[#123D7E] text-white border-transparent' 
+                                                : 'bg-transparent border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.8)] hover:bg-[#123D7E]/20 hover:text-white'
                                         }`}
                                     >
                                         {tactic}
@@ -310,19 +300,19 @@ export default function NexProfilePage() {
                     </Section>
 
                     {/* ── Trigger Patterns ── */}
-                    <Section icon={<Lightning size={20} className="text-[#a855f7]" weight="duotone" />} title="Escalation Triggers">
-                        <p className="text-sm mb-4 text-[var(--sapphire-base)] pl-1">
-                            What specific catalysts provoke narcissistic injury and rage? Document known flashpoints.
+                    <Section icon={<Lightning size={20} className="text-white" weight="bold" />} title="Trigger Patterns">
+                        <p className="text-[13px] text-white/90 mb-4">
+                            What sets your NEX off? Add specific patterns you've noticed.
                         </p>
-                        <div className="flex flex-col sm:flex-row gap-3 mb-4 pl-1">
-                            <div className="relative flex-1">
-                                <Lightning size={16} weight="duotone" className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--sapphire-light)]" />
+                        <div className="flex gap-3 mb-4">
+                            <div className="flex-1 relative">
+                                <Lightning size={16} weight="bold" className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1A4B9B]" />
                                 <input
-                                    className="input-premium pl-10 w-full text-sm placeholder:text-[var(--sapphire-light)] text-[var(--sapphire-dark)]"
+                                    className="w-full text-base p-3 !pl-11 rounded-xl bg-[#F8F5EE] text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
                                     value={newTrigger}
                                     onChange={(e) => setNewTrigger(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && addTrigger()}
-                                    placeholder="e.g. 'Setting boundaries around scheduling'"
+                                    placeholder="e.g. 'When I set boundaries around pickup times'"
                                 />
                             </div>
                             <button
@@ -330,10 +320,9 @@ export default function NexProfilePage() {
                                 type="button"
                                 disabled={!newTrigger.trim()}
                                 aria-label="Add trigger vector"
-                                className="btn-outline flex items-center justify-center gap-2 py-3 px-6 text-sm disabled:opacity-50"
+                                className="w-12 h-[50px] rounded-xl flex items-center justify-center shrink-0 border border-[rgba(255,255,255,0.2)] text-[rgba(255,255,255,0.8)] hover:bg-[rgba(255,255,255,0.1)] hover:text-white transition-colors disabled:opacity-50"
                             >
-                                <Plus size={16} weight="bold" />
-                                <span className="sm:hidden lg:inline">Add Vector</span>
+                                <Plus size={18} weight="bold" />
                             </button>
                         </div>
                         <AnimatePresence>
@@ -427,14 +416,11 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
         <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="card-premium p-7 border border-[var(--cloud-light)] bg-white/60 relative overflow-hidden group"
+            className="p-7 border border-[rgba(255,255,255,0.1)] rounded-[1.5rem] bg-[#0A1128]/80 relative overflow-hidden"
         >
-            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[var(--champagne)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 rounded-xl bg-[var(--cloud)] shadow-inner">
-                    {icon}
-                </div>
-                <h2 className="text-lg font-bold tracking-tight text-[var(--sapphire-dark)]">{title}</h2>
+                {icon}
+                <h2 className="text-lg font-bold tracking-tight text-white">{title}</h2>
             </div>
             <div className="space-y-4 relative z-10">{children}</div>
         </motion.div>

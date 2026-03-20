@@ -388,7 +388,7 @@ export default function CourtSettingsPage() {
                                 value={assignedJudge}
                                 onChange={(e) => setAssignedJudge(e.target.value)}
                                 placeholder="e.g. Hon. Jane Smith"
-                                className="input-premium w-full pl-10 pr-4 text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
+                                className="input-premium w-full !pl-10 pr-4 text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
                                 id="judge-input"
                             />
                         </div>
@@ -408,7 +408,7 @@ export default function CourtSettingsPage() {
                                 value={judicialDistrict}
                                 onChange={(e) => setJudicialDistrict(e.target.value)}
                                 placeholder="e.g. 328th Judicial District"
-                                className="input-premium w-full pl-10 pr-4 text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
+                                className="input-premium w-full !pl-10 pr-4 text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
                                 id="judicial-district-input"
                             />
                         </div>

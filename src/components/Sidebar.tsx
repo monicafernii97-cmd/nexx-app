@@ -91,10 +91,13 @@ export default function Sidebar() {
         <motion.aside
             animate={{ width: collapsed ? 72 : 260 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed left-0 top-0 h-screen z-50 flex flex-col"
+            className="fixed left-4 top-4 bottom-4 z-50 flex flex-col rounded-[2rem] overflow-hidden"
             style={{
-                background: 'var(--zinc-900)',
-                borderRight: '1px solid rgba(63, 63, 70, 0.4)',
+                background: 'rgba(255, 255, 255, 0.02)',
+                backdropFilter: 'blur(40px)',
+                WebkitBackdropFilter: 'blur(40px)',
+                border: '1px solid var(--hairline)',
+                boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.1), 0 20px 40px -15px rgba(0, 0, 0, 0.5)',
             }}
         >
             {/* Logo */}
@@ -126,8 +129,8 @@ export default function Sidebar() {
                 </Link>
             </div>
 
-            {/* Divider */}
-            <div className="mx-5 divider" />
+            {/* Gap instead of divider to breathe */}
+            <div className="h-2" />
 
             {/* Navigation */}
             <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
@@ -147,18 +150,25 @@ export default function Sidebar() {
                                     className="no-underline flex-1 min-w-0"
                                 >
                                     <motion.div
-                                        whileHover={{ x: 2 }}
+                                        whileHover={{ x: 4, scale: 0.98 }}
+                                        whileTap={{ scale: 0.95 }}
                                         transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${collapsed ? 'justify-center' : ''
-                                            }`}
+                                        className={`flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all duration-300 group ${collapsed ? 'justify-center' : ''}`}
                                         style={{
-                                            background: isActive
-                                                ? 'rgba(16, 185, 129, 0.1)'
-                                                : 'transparent',
-                                            color: isActive ? 'var(--emerald-400)' : 'var(--zinc-400)',
+                                            background: isActive ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                                            color: isActive ? 'var(--zinc-100)' : 'var(--zinc-400)',
+                                            boxShadow: isActive ? 'inset 0 1px 1px rgba(255, 255, 255, 0.1)' : 'none'
                                         }}
                                     >
-                                        <Icon size={20} weight={isActive ? 'fill' : 'regular'} />
+                                        <div className="relative text-inherit transition-colors group-hover:text-zinc-100">
+                                            <Icon size={20} weight={isActive ? 'regular' : 'light'} />
+                                            {isActive && (
+                                                <motion.div 
+                                                    layoutId="active-indicator"
+                                                    className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-3 rounded-full bg-zinc-100" 
+                                                />
+                                            )}
+                                        </div>
                                         <AnimatePresence>
                                             {!collapsed && (
                                                 <motion.span
@@ -288,10 +298,10 @@ export default function Sidebar() {
                                     className="flex-1 min-w-0"
                                 >
                                     <p className="text-sm font-medium truncate" style={{ color: 'var(--zinc-200)' }}>
-                                        {user.firstName || user.fullName || 'User'}
+                                        {user?.firstName || user?.fullName || 'User'}
                                     </p>
                                     <p className="text-xs truncate" style={{ color: 'var(--zinc-500)' }}>
-                                        {user.primaryEmailAddress?.emailAddress || 'Manage Account'}
+                                        {user?.primaryEmailAddress?.emailAddress || 'Manage Account'}
                                     </p>
                                 </motion.div>
                             )}

@@ -37,10 +37,13 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
 
     return (
         <div
-            className="flex items-end gap-3 rounded-2xl p-3"
+            className="flex items-end gap-3 rounded-3xl p-3 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] transition-all duration-300"
             style={{
-                background: 'var(--zinc-50)',
-                border: '1px solid var(--zinc-200)',
+                background: 'rgba(255, 255, 255, 0.03)',
+                backdropFilter: 'blur(32px)',
+                WebkitBackdropFilter: 'blur(32px)',
+                border: '1px solid var(--hairline)',
+                boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.05)',
             }}
         >
             <textarea
@@ -50,10 +53,10 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder ?? 'Ask NEXX anything...'}
                 rows={1}
-                className="flex-1 bg-transparent border-none outline-none resize-none text-sm"
+                className="flex-1 bg-transparent border-none outline-none resize-none text-sm placeholder:text-zinc-600 px-2 font-light"
                 style={{
-                    color: 'var(--zinc-900)',
-                    caretColor: 'var(--emerald-600)',
+                    color: 'var(--zinc-100)',
+                    caretColor: 'var(--emerald-500)',
                     minHeight: 24,
                     maxHeight: 120,
                     fontFamily: "'Outfit', system-ui, sans-serif",
@@ -61,27 +64,27 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
             />
             <div className="flex items-center gap-2 flex-shrink-0">
                 <button
-                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer"
+                    className="w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-300 hover:scale-105 cursor-pointer"
                     style={{
-                        background: 'rgba(161, 161, 170, 0.08)',
-                        border: '1px solid var(--zinc-200)',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid var(--hairline)',
                         color: 'var(--zinc-400)',
                     }}
                     title="Voice input (coming soon)"
                 >
-                    <Microphone size={16} />
+                    <Microphone size={18} weight="light" />
                 </button>
                 <button
                     onClick={handleSend}
                     disabled={!input.trim() || disabled}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed group"
                     style={{
                         background: input.trim()
                             ? 'var(--emerald-600)'
-                            : 'rgba(161, 161, 170, 0.08)',
-                        color: input.trim() ? '#ffffff' : 'var(--zinc-400)',
-                        border: input.trim() ? 'none' : '1px solid var(--zinc-200)',
-                        boxShadow: input.trim() ? '0 4px 12px rgba(5, 150, 105, 0.2)' : 'none',
+                            : 'rgba(255, 255, 255, 0.03)',
+                        color: input.trim() ? '#ffffff' : 'var(--zinc-500)',
+                        border: input.trim() ? 'none' : '1px solid var(--hairline)',
+                        boxShadow: input.trim() ? '0 8px 16px rgba(16, 185, 129, 0.25), inset 0 1px 1px rgba(255,255,255,0.2)' : 'none',
                     }}
                 >
                     <PaperPlaneRight size={16} weight={input.trim() ? 'fill' : 'regular'} />

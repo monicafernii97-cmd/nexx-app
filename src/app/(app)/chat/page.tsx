@@ -104,14 +104,14 @@ export default function ChatListPage() {
                             key={key}
                             onClick={() => setSelectedMode(key as typeof selectedMode)}
                             aria-pressed={selectedMode === key}
-                            className="badge cursor-pointer transition-all"
+                            className="badge cursor-pointer transition-all backdrop-blur-md"
                             style={{
                                 background:
                                     selectedMode === key
                                         ? `${color}18`
-                                        : 'rgba(244, 244, 245, 0.6)',
-                                color: selectedMode === key ? color : 'var(--zinc-500)',
-                                border: `1px solid ${selectedMode === key ? `${color}30` : 'transparent'}`,
+                                        : 'rgba(255, 255, 255, 0.03)',
+                                color: selectedMode === key ? color : 'var(--zinc-400)',
+                                border: `1px solid ${selectedMode === key ? `${color}30` : 'rgba(255,255,255,0.05)'}`,
                             }}
                         >
                             {label}
@@ -121,10 +121,12 @@ export default function ChatListPage() {
                 <button
                     onClick={handleNewChat}
                     disabled={isCreating}
-                    className="btn-primary text-xs flex items-center gap-2 disabled:opacity-40"
+                    className="btn-primary flex items-center gap-3 disabled:opacity-40 group px-5 py-2.5"
                 >
-                    <Plus size={14} weight="bold" />
-                    {isCreating ? 'Creating...' : 'New Conversation'}
+                    <span className="text-sm tracking-wide">{isCreating ? 'Creating...' : 'New Session'}</span>
+                    <div className="w-8 h-8 rounded-full bg-black/10 flex items-center justify-center transition-transform group-hover:rotate-90 group-hover:scale-105">
+                        <Plus size={14} weight="bold" />
+                    </div>
                 </button>
             </motion.div>
 
@@ -181,14 +183,14 @@ export default function ChatListPage() {
                         variants={stagger}
                         initial="hidden"
                         animate="visible"
-                        className="card-premium overflow-hidden divide-y divide-zinc-100 mb-8"
+                        className="card-premium overflow-hidden divide-y divide-white/5 mb-8"
                     >
                         {activeConversations.map((conv) => {
                             const modeInfo = MODE_LABELS[conv.mode] || MODE_LABELS.general;
                             return (
                                 <motion.div key={conv._id} variants={fadeUp}>
                                     <Link href={`/chat/${conv._id}`} className="block no-underline">
-                                        <div className="px-6 py-4 group cursor-pointer hover:bg-zinc-50/50 transition-colors duration-200">
+                                        <div className="px-6 py-4 group cursor-pointer hover:bg-white/[0.03] transition-colors duration-200">
                                             <div className="flex items-center gap-4">
                                                 <div
                                                     className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -201,7 +203,7 @@ export default function ChatListPage() {
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--zinc-900)' }}>
+                                                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--zinc-100)' }}>
                                                             {conv.title}
                                                         </p>
                                                         <span
@@ -256,7 +258,7 @@ export default function ChatListPage() {
                     >
                         <Archive size={14} /> Archived ({archivedConversations.length})
                     </h2>
-                    <div className="card-premium overflow-hidden divide-y divide-zinc-100 opacity-60">
+                    <div className="card-premium overflow-hidden divide-y divide-white/5 opacity-60">
                         {archivedConversations.map((conv) => {
                             const modeInfo = MODE_LABELS[conv.mode] || MODE_LABELS.general;
                             return (
@@ -265,7 +267,7 @@ export default function ChatListPage() {
                                     href={`/chat/${conv._id}`}
                                     className="block no-underline"
                                 >
-                                    <div className="px-6 py-3 hover:bg-zinc-50/50 transition-colors duration-200">
+                                    <div className="px-6 py-3 hover:bg-white/[0.03] transition-colors duration-200">
                                         <div className="flex items-center gap-3">
                                             <p className="text-sm truncate flex-1" style={{ color: 'var(--zinc-500)' }}>
                                                 {conv.title}

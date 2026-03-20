@@ -1,35 +1,35 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════
-   NEXX — Premium Neutral + Emerald Design System
-   Taste-Skill Engineered · Zero Clutter
+   NEXX — Ethereal Glass Aesthetic
+   Taste-Skill Engineered · Premium $150k Agency Look
    ═══════════════════════════════════════════ */
 
 :root {
-  /* ── Core Neutrals ── */
-  --zinc-950: #09090b;
-  --zinc-900: #18181b;
-  --zinc-800: #27272a;
-  --zinc-700: #3f3f46;
-  --zinc-600: #52525b;
-  --zinc-500: #71717a;
-  --zinc-400: #a1a1aa;
-  --zinc-300: #d4d4d8;
-  --zinc-200: #e4e4e7;
-  --zinc-100: #f4f4f5;
+  /* ── Core Ethereal Neutrals ── */
+  --zinc-950: #050505;
+  --zinc-900: #121212;
+  --zinc-800: #1a1a1a;
+  --zinc-700: #2d2d2d;
+  --zinc-600: #3f3f3f;
+  --zinc-500: #6b6b6b;
+  --zinc-400: #a1a1a1;
+  --zinc-300: #d4d4d4;
+  --zinc-200: #e5e5e5;
+  --zinc-100: #f5f5f5;
   --zinc-50: #fafafa;
 
-  /* ── Accent: Emerald (desaturated) ── */
+  /* ── Accent: De-saturated Emerald ── */
   --emerald-600: #059669;
   --emerald-500: #10b981;
   --emerald-400: #34d399;
   --emerald-100: #d1fae5;
 
-  /* ── Semantic Aliases ── */
+  /* ── Semantic Aliases & Glassmorphism ── */
   --base-bg: var(--zinc-950);
-  --surface-bg: var(--zinc-900);
-  --card-bg: #ffffff;
-  --card-border: rgba(228, 228, 231, 0.7);
+  --surface-bg: rgba(255, 255, 255, 0.02);
+  --card-bg: rgba(255, 255, 255, 0.02);
+  --card-border: rgba(255, 255, 255, 0.08);
 
   /* ── Text ── */
   --text-primary: var(--zinc-100);
@@ -37,6 +37,10 @@
   --text-muted: var(--zinc-500);
   --text-on-light: var(--zinc-900);
   --text-on-light-muted: var(--zinc-500);
+
+  /* ── Line & Border Control ── */
+  --hairline: rgba(255, 255, 255, 0.1);
+  --shimmer-glow: rgba(255, 255, 255, 0.05);
 
   /* ── Status ── */
   --success: #22c55e;
@@ -48,15 +52,11 @@
   --sidebar-width: 260px;
   --sidebar-collapsed: 72px;
 
-  /* ── Transitions ── */
-  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  /* ── Custom Physics (Taste Skill) ── */
+  --ease-exquisite: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@theme inline {
-  --color-background: var(--base-bg);
-  --color-foreground: var(--zinc-100);
-  --font-sans: var(--font-outfit), 'Outfit', system-ui, sans-serif;
+  --transition-slow: 700ms var(--ease-exquisite);
+  --transition-standard: 400ms var(--ease-exquisite);
 }
 
 /* ═══ Base ═══ */

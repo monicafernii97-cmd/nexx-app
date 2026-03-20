@@ -7,7 +7,7 @@ import { useQuery, useConvexAuth } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { WarningCircle } from '@phosphor-icons/react';
+import { WarningCircle, ArrowRight } from '@phosphor-icons/react';
 
 /**
  * Welcome / landing page and auth-aware router.
@@ -105,32 +105,31 @@ export default function WelcomePage() {
     );
   }
 
-  // Welcome page for unauthenticated users — asymmetric split layout
+  // Welcome page for unauthenticated users — Ethereal Glass Split Layout
   return (
-    <div className="min-h-[100dvh] flex flex-col relative overflow-hidden" style={{ background: 'var(--zinc-950)' }}>
-      {/* Subtle ambient mesh gradient */}
+    <div className="min-h-[100dvh] flex flex-col relative overflow-hidden" style={{ background: 'var(--base-bg)' }}>
+      {/* Subtle Ethereal Glass Radial Mesh Gradient */}
       <div className="absolute inset-0 pointer-events-none">
         <div
-          className="absolute w-[600px] h-[600px] rounded-full blur-[120px]"
+          className="absolute w-[800px] h-[800px] rounded-full blur-[140px]"
           style={{
-            background: 'radial-gradient(circle, rgba(5, 150, 105, 0.08) 0%, transparent 70%)',
-            top: '10%',
-            right: '5%',
+            background: 'radial-gradient(circle, rgba(5, 150, 105, 0.05) 0%, transparent 70%)',
+            top: '-10%',
+            right: '-10%',
           }}
         />
         <div
-          className="absolute w-[400px] h-[400px] rounded-full blur-[100px]"
+          className="absolute w-[600px] h-[600px] rounded-full blur-[120px]"
           style={{
-            background: 'radial-gradient(circle, rgba(63, 63, 70, 0.3) 0%, transparent 70%)',
-            bottom: '20%',
-            left: '10%',
+            background: 'radial-gradient(circle, rgba(255, 255, 255, 0.02) 0%, transparent 60%)',
+            bottom: '-20%',
+            left: '5%',
           }}
         />
       </div>
 
       {/* Main content — left-aligned, asymmetric */}
-      <div className="flex-1 flex items-center relative z-10">
-        <div className="w-full max-w-7xl mx-auto px-8 md:px-16 lg:px-24">
+      <div className="flex-1 flex items-center relative z-10 w-full max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24 py-24">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-12 items-center">
             {/* Left: Content — takes 3/5 */}
             <motion.div
@@ -154,63 +153,81 @@ export default function WelcomePage() {
               </motion.div>
 
               {/* Eyebrow */}
-              <motion.p
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.3, duration: 0.6 }}
-                className="text-xs font-semibold tracking-[0.25em] uppercase mb-5"
-                style={{ color: 'var(--emerald-500)' }}
+                className="mb-8"
               >
-                Welcome to NEXX
-              </motion.p>
+                <span className="rounded-full px-4 py-1.5 text-[10px] uppercase tracking-[0.2em] font-medium border border-white/10" style={{ color: 'var(--zinc-400)', background: 'rgba(255,255,255,0.03)' }}>
+                  A Premium Standard
+                </span>
+              </motion.div>
 
               {/* Headline */}
               <motion.h1
-                initial={{ opacity: 0, y: 12 }}
+                initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, duration: 0.7 }}
-                className="text-headline text-4xl md:text-6xl mb-6"
-                style={{ color: 'var(--zinc-100)' }}
+                transition={{ delay: 0.5, duration: 0.8, ease: [0.32, 0.72, 0, 1] }}
+                className="text-headline text-5xl md:text-7xl mb-8 tracking-tighter"
+                style={{ color: 'var(--zinc-100)', letterSpacing: '-0.04em' }}
               >
                 Your corner.<br />
                 Your calm.<br />
-                <span style={{ color: 'var(--zinc-500)' }}>Your case.</span>
+                <span style={{ color: 'var(--zinc-600)' }}>Your case.</span>
               </motion.h1>
 
               {/* Subtitle */}
               <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.8, duration: 0.6 }}
-                className="text-base leading-relaxed mb-10 max-w-[50ch]"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8, duration: 0.8, ease: [0.32, 0.72, 0, 1] }}
+                className="text-lg md:text-xl leading-relaxed mb-12 max-w-[45ch] font-light"
                 style={{ color: 'var(--zinc-400)' }}
               >
                 Strategic empowerment and refined counsel,
-                designed for parents who need clarity, documentation, and peace of mind.
+                designed for parents who need absolute clarity, documentation, and peace of mind.
               </motion.p>
 
-              {/* CTA Buttons */}
+              {/* CTA Buttons — Nested Button Architecture */}
               <motion.div
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.1, duration: 0.5 }}
-                className="flex flex-wrap gap-4"
+                transition={{ delay: 1.1, duration: 0.6 }}
+                className="flex flex-wrap gap-5 items-center"
               >
-                <Link href="/sign-up">
-                  <button className="btn-primary text-sm tracking-wide px-8 py-3.5">
-                    Get Started
+                <Link href="/sign-up" className="no-underline">
+                  <button className="btn-primary pl-6 pr-2 py-2 flex items-center gap-4 group">
+                    <span className="text-sm tracking-wide">Get Started</span>
+                    <div className="w-8 h-8 rounded-full bg-black/10 flex items-center justify-center transition-transform group-hover:translate-x-1 group-hover:-translate-y-[1px] group-hover:scale-105">
+                      <ArrowRight size={14} weight="bold" />
+                    </div>
                   </button>
                 </Link>
-                <Link href="/sign-in">
-                  <button className="btn-outline text-sm px-8 py-3.5">
+                <Link href="/sign-in" className="no-underline">
+                  <button className="btn-ghost px-6 py-3.5" style={{ color: 'var(--zinc-400)' }}>
                     Sign In
                   </button>
                 </Link>
               </motion.div>
             </motion.div>
 
-            {/* Right: Empty space / visual breathing room — 2/5 */}
-            <div className="hidden md:block md:col-span-2" />
+            {/* Right: Floating Ethereal Glass Panel */}
+            <div className="hidden md:block md:col-span-2 relative">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9, rotate: -2 }}
+                    animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                    transition={{ type: 'spring', stiffness: 80, damping: 20, delay: 0.8 }}
+                    className="aspect-[4/5] w-full rounded-[2.5rem] card-premium flex flex-col justify-end p-8"
+                    style={{
+                        background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
+                        boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.1), 0 40px 80px -20px rgba(0,0,0,0.8)'
+                    }}
+                >
+                    <div className="w-full h-px bg-white/10 mb-6" />
+                    <p className="text-sm tracking-widest uppercase font-medium" style={{ color: 'var(--zinc-500)' }}>Secure Vault</p>
+                    <p className="text-2xl font-light mt-2 tracking-tight">AES-256 Encrypted.</p>
+                </motion.div>
           </div>
         </div>
       </div>

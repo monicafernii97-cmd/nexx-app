@@ -79,14 +79,19 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
                 style={
                     role === 'user'
                         ? {
-                            background: 'rgba(63, 63, 70, 0.3)',
-                            border: '1px solid rgba(63, 63, 70, 0.5)',
-                            color: 'var(--zinc-200)',
+                            background: 'rgba(255, 255, 255, 0.08)',
+                            backdropFilter: 'blur(20px)',
+                            WebkitBackdropFilter: 'blur(20px)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            color: 'var(--zinc-100)',
                         }
                         : {
-                            background: 'var(--zinc-50)',
-                            border: '1px solid var(--zinc-200)',
-                            color: 'var(--zinc-700)',
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            backdropFilter: 'blur(20px)',
+                            WebkitBackdropFilter: 'blur(20px)',
+                            border: '1px solid var(--hairline)',
+                            color: 'var(--zinc-300)',
+                            boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.05)',
                         }
                 }
             >

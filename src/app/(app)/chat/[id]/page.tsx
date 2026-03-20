@@ -167,11 +167,11 @@ export default function ConversationPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                 className="flex items-center gap-3 pb-4 mb-4"
-                style={{ borderBottom: '1px solid rgba(63, 63, 70, 0.3)' }}
+                style={{ borderBottom: '1px solid var(--hairline)' }}
             >
                 <button
                     onClick={() => router.push('/chat')}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(63,63,70,0.3)]"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-white/5"
                     aria-label="Back to conversations"
                 >
                     <ArrowLeft size={16} style={{ color: 'var(--zinc-400)' }} />
@@ -206,7 +206,7 @@ export default function ConversationPage() {
                 </div>
                 <button
                     onClick={handleArchive}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(63,63,70,0.3)]"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-white/5"
                     title="Archive conversation"
                     aria-label="Archive conversation"
                 >
@@ -281,8 +281,11 @@ export default function ConversationPage() {
                         <div
                             className="rounded-2xl rounded-bl-md px-5 py-4"
                             style={{
-                                background: 'var(--zinc-50)',
-                                border: '1px solid var(--zinc-200)',
+                                background: 'rgba(255, 255, 255, 0.02)',
+                                backdropFilter: 'blur(20px)',
+                                WebkitBackdropFilter: 'blur(20px)',
+                                border: '1px solid var(--hairline)',
+                                boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.05)',
                             }}
                         >
                             <div className="flex gap-1.5">
@@ -313,7 +316,7 @@ export default function ConversationPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, type: 'spring', stiffness: 300, damping: 25 }}
                 className="pt-4"
-                style={{ borderTop: '1px solid rgba(63, 63, 70, 0.3)' }}
+                style={{ borderTop: '1px solid var(--hairline)' }}
             >
                 <ChatInput onSend={handleSend} disabled={isStreaming || isPending || !isThreadReady} />
                 <p className="text-center text-xs mt-2" style={{ color: 'var(--zinc-500)' }}>

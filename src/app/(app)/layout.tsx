@@ -8,13 +8,13 @@ import { ReactNode } from 'react';
 export default function AppShellLayout({ children }: { children: ReactNode }) {
     return (
         <UserProvider>
-            <div className="min-h-screen" style={{ background: 'var(--base-bg)' }}>
+            <div className="min-h-[100dvh]" style={{ background: 'var(--base-bg)' }}>
                 <Sidebar />
                 <main
-                    className="transition-all duration-300 min-h-screen"
-                    style={{ marginLeft: 260, padding: '32px 40px' }}
+                    className="transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] min-h-[100dvh]"
+                    style={{ marginLeft: 280, padding: '48px 64px' }}
                 >
-                    <div className="max-w-7xl mx-auto">
+                    <div className="max-w-[1400px] mx-auto w-full">
                         {children}
                     </div>
                 </main>

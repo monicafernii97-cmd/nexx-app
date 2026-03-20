@@ -100,7 +100,7 @@ function CollapsibleSection({
 
     return (
         <div
-            className="rounded-2xl overflow-hidden bg-[rgba(255,255,255,0.05)] backdrop-blur-md border border-[rgba(255,255,255,0.15)] shadow-sm transition-all duration-300"
+            className="rounded-2xl overflow-hidden bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-300"
         >
             <button
                 onClick={() => setIsOpen(!isOpen)}
@@ -145,15 +145,16 @@ function ReadinessItem({
 }) {
     const content = (
         <div
-            className={`flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-300 ${href && !isReady ? 'cursor-pointer hover:shadow-md hover:bg-white/10' : 'shadow-sm'} bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] backdrop-blur-md`}
+            className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 ${href && !isReady ? 'cursor-pointer hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-0.5 hover:bg-white/10' : 'shadow-[0_8px_32px_rgba(0,0,0,0.2)]'} bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]`}
         >
             {isReady ? (
-                <div className="bg-[var(--success)]/20 p-2 rounded-full border border-[var(--success)]/30">
-                    <CheckCircle size={20} className="text-[var(--success)] drop-shadow-sm" weight="fill" />
+                <div className="bg-[linear-gradient(135deg,#10B981,#047857)] p-2 rounded-xl border border-[rgba(255,255,255,0.3)] shadow-[0_4px_15px_rgba(16,185,129,0.4)] relative overflow-hidden">
+                    <div className="absolute inset-0 bg-white/10" />
+                    <CheckCircle size={22} className="text-white relative z-10 drop-shadow-md" weight="fill" />
                 </div>
             ) : (
-                <div className="bg-[#B38644]/20 p-2 rounded-full border border-[#B38644]/30">
-                    <Circle size={20} className="text-[#E5A84A] drop-shadow-sm" weight="fill" />
+                <div className="bg-white/10 p-2 rounded-xl border border-white/20 shadow-[inset_0_1px_2px_rgba(255,255,255,0.3)] backdrop-blur-md">
+                    <Circle size={22} className="text-white/90 drop-shadow-sm" weight="bold" />
                 </div>
             )}
             <div className="flex-1 min-w-0">
@@ -161,7 +162,7 @@ function ReadinessItem({
                     {label}
                 </p>
                 {detail && (
-                    <p className="text-sm mt-1 text-white font-medium m-0">
+                    <p className="text-[13px] mt-1 text-white/90 font-medium m-0">
                         {detail}
                     </p>
                 )}
@@ -169,7 +170,7 @@ function ReadinessItem({
             {href && !isReady && (
                 <ArrowRight
                     size={16}
-                    className="text-[var(--sapphire-base)] transition-transform group-hover:translate-x-1"
+                    className="text-white/60 transition-all group-hover:text-white group-hover:translate-x-1"
                     weight="bold"
                 />
             )}
@@ -438,7 +439,7 @@ export default function EFilingPage() {
                                 <div className="absolute inset-0 bg-white/10" />
                                 <ShieldCheck size={24} className="text-white relative z-10 drop-shadow-md" weight="fill" />
                             </div>
-                            <h2 className="text-lg font-bold tracking-widest uppercase text-white m-0">
+                            <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
                                 Filing Readiness
                             </h2>
                         </div>
@@ -483,7 +484,7 @@ export default function EFilingPage() {
                                         <div className="absolute inset-0 bg-white/10" />
                                         <FileText size={24} className="text-white relative z-10 drop-shadow-md" weight="fill" />
                                     </div>
-                                    <h2 className="text-lg font-bold tracking-widest uppercase text-white m-0">
+                                    <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
                                         Ready to File
                                     </h2>
                                 </div>
@@ -573,7 +574,7 @@ export default function EFilingPage() {
                                 <div className="absolute inset-0 bg-white/10" />
                                 <Info size={24} className="text-white relative z-10 drop-shadow-md" weight="fill" />
                             </div>
-                            <h2 className="text-lg font-bold tracking-widest uppercase text-white m-0">
+                            <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
                                 Filing Guide
                             </h2>
                         </div>

@@ -14,12 +14,12 @@ import {
     UserCircle,
     Gear,
     CaretLeft,
-    CaretRight,
     CaretDown,
     SignIn,
     GridFour,
     FolderOpen,
     FileArrowUp,
+    IconWeight,
 } from '@phosphor-icons/react';
 import { useState, useMemo, useCallback, type ComponentType, type CSSProperties } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
@@ -29,14 +29,14 @@ import { nexxClerkAppearance } from '@/lib/clerk-theme';
 interface NavChild {
     label: string;
     href: string;
-    icon: ComponentType<{ size?: number; weight?: string; style?: CSSProperties }>;
+    icon: ComponentType<{ size?: number; weight?: IconWeight; style?: CSSProperties }>;
 }
 
 /** Top-level navigation item with optional expandable children. */
 interface NavItem {
     label: string;
     href: string;
-    icon: ComponentType<{ size?: number; weight?: string; style?: CSSProperties }>;
+    icon: ComponentType<{ size?: number; weight?: IconWeight; style?: CSSProperties }>;
     children?: NavChild[];
 }
 

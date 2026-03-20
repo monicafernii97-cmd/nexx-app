@@ -13,6 +13,7 @@ import {
     X,
     ArrowRight,
     CheckCircle,
+    DownloadSimple,
 } from '@phosphor-icons/react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from 'convex/react';

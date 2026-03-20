@@ -50,6 +50,7 @@ export default function DashboardPage() {
     const [greetingText, setGreetingText] = useState('');
     useEffect(() => {
         const hour = new Date().getHours();
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setGreetingText(hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening');
     }, []);
 

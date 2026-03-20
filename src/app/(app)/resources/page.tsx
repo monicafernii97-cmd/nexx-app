@@ -16,12 +16,13 @@ import {
     Phone,
     ArrowUpRight,
     MapPin,
-    ArrowRight,
     Shield,
     MagnifyingGlass,
     WarningCircle,
     Gear,
     Sparkle,
+    type Icon,
+    type IconWeight,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import {
@@ -178,14 +179,14 @@ function SectionHeader({
     subtitle,
     colorMode = 'default',
 }: {
-    icon: any;
+    icon: Icon;
     label: string;
     subtitle?: string;
     colorMode?: 'default' | 'rose' | 'warning';
 }) {
     let iconColor = 'var(--sapphire)';
     let iconBg = 'var(--cloud)';
-    let IconWeight = "duotone";
+    const weight: IconWeight = "duotone";
 
     if (colorMode === 'rose') {
         iconColor = 'var(--rose)';
@@ -202,7 +203,7 @@ function SectionHeader({
                     className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm"
                     style={{ background: iconBg }}
                 >
-                    <Icon size={20} weight={IconWeight as any} style={{ color: iconColor }} />
+                    <Icon size={20} weight={weight} style={{ color: iconColor }} />
                 </div>
                 <h2 className="text-[14px] font-bold tracking-[0.2em] uppercase text-sapphire">
                     {label}
@@ -226,7 +227,7 @@ function FinderHeroCard({
     fallbackResources,
     hasLocalData,
 }: {
-    icon: any;
+    icon: Icon;
     title: string;
     description: string;
     localResources: ResourceEntry[];
@@ -290,7 +291,7 @@ function CourtResourcesGrid({
     countyData: CountyResources | null;
     cachedResources: CachedResources | null;
 }) {
-    const items: { label: string; resource: ResourceEntry; icon: any }[] = [];
+    const items: { label: string; resource: ResourceEntry; icon: Icon }[] = [];
 
     // AI-cached data takes priority; fall back to curated data
     if (cachedResources?.courtClerk) {

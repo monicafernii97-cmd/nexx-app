@@ -332,7 +332,7 @@ export default function ProfilePage() {
                                     className="input-premium w-full max-w-[240px] appearance-none bg-white font-semibold"
                                     value={form.childrenCount}
                                     onChange={(e) => setForm({ ...form, childrenCount: parseInt(e.target.value) || 0 })}
-                                />
+                                >
                                     {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                                         <option key={n} value={n}>{n} {n === 1 ? 'Child' : 'Children'}</option>
                                     ))}

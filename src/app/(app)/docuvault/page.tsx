@@ -504,10 +504,10 @@ function DocuVaultPageInner() {
                         <button
                             onClick={handleGenerate}
                             disabled={(!documentContent.trim() && !selectedTemplate) || isUserProfileLoading}
-                            className="w-full flex items-center justify-center gap-3 py-5 rounded-[2rem] text-[16px] font-bold bg-[linear-gradient(135deg,#60A5FA,#2563EB)] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_8px_24px_rgba(37,99,235,0.5)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_12px_32px_rgba(37,99,235,0.6)] transition-all disabled:opacity-50 disabled:grayscale group hover:-translate-y-1 tracking-wide"
+                            className="w-full flex items-center justify-center gap-4 py-6 rounded-[2rem] text-[15px] font-bold tracking-[0.2em] uppercase text-white transition-all border border-white/20 bg-white/5 backdrop-blur-3xl shadow-[inset_0_1px_2px_rgba(255,255,255,0.2),0_12px_40px_rgba(0,0,0,0.4)] hover:bg-white/10 hover:border-white/30 hover:shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_16px_48px_rgba(0,0,0,0.5)] disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed group hover:-translate-y-1"
                         >
-                            <Sparkle size={24} weight="fill" className="text-white drop-shadow-md group-hover:scale-110 transition-transform" />
-                            Generate Formal Document
+                            <Sparkle size={26} weight="duotone" className="text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.8)] group-hover:scale-110 transition-transform duration-300" />
+                            <span className="drop-shadow-sm">Generate Formal Document</span>
                         </button>
                     </motion.div>
 

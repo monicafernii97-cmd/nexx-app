@@ -469,7 +469,7 @@ export default function OnboardingPage() {
                                                     : 'bg-transparent border-[rgba(255,255,255,0.3)]'
                                                 }`}
                                             >
-                                                {formData.nexBehaviors.includes(opt) && <Check size={14} weight="bold" className="text-[#1A4B9B]" />}
+                                                {formData.nexBehaviors.includes(opt) && <Check size={14} strokeWidth={3} className="text-[#1A4B9B]" />}
                                             </div>
                                             {opt}
                                         </button>

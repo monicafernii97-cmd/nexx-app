@@ -4,13 +4,13 @@ import { dark } from '@clerk/themes';
 export const nexxClerkAppearance = {
     baseTheme: dark,
     variables: {
-        colorPrimary: '#1E3A8A',          /* galaxy-blue */
-        colorBackground: '#020617',       /* universe-dark */
-        colorInputBackground: 'rgba(10, 17, 40, 0.4)', /* translucent universe blue */
+        colorPrimary: '#60A5FA',          /* neon-blue for primary actions */
+        colorBackground: 'transparent',   /* enforce true transparency for parent glass wrappers */
+        colorInputBackground: 'rgba(255, 255, 255, 0.05)', /* true glass inputs */
         colorInputText: '#FFFFFF',        /* pure-white */
         colorText: '#FFFFFF',             /* pure-white for high legibility */
-        colorTextSecondary: '#E2E8F0',    /* metallic-silver */
-        borderRadius: '12px',
+        colorTextSecondary: '#FFFFFF',    /* GUARANTEE pure white */
+        borderRadius: '16px',
         fontFamily: 'Inter, system-ui, sans-serif', /* robust sans-serif instead of skinny */
         colorSuccess: '#10B981',
         colorDanger: '#F43F5E',
@@ -32,8 +32,8 @@ export const nexxClerkAppearance = {
             letterSpacing: '-0.02em',
         },
         headerSubtitle: {
-            color: '#E2E8F0',
-            fontWeight: '500',
+            color: '#FFFFFF',
+            fontWeight: '600',
         },
         socialButtonsBlockButton: {
             border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -46,49 +46,78 @@ export const nexxClerkAppearance = {
             fontWeight: '600',
         },
         formFieldLabel: {
-            color: '#E2E8F0',
+            color: '#FFFFFF',
             textTransform: 'uppercase' as const,
             fontSize: '11px',
             letterSpacing: '0.05em',
             fontWeight: '700',
         },
         formFieldInput: {
-            background: '#FFFFFF',
-            border: '1px solid rgba(10, 17, 40, 0.15)',
-            color: '#0A1128',
-            boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.05)',
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            color: '#FFFFFF',
+            boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.05)',
         },
         formButtonPrimary: {
-            background: 'linear-gradient(135deg, #1A4B9B, #123D7E)',
+            background: 'linear-gradient(135deg, #60A5FA, #2563EB)',
             color: '#FFFFFF',
             fontWeight: '700',
             letterSpacing: '0.04em',
             textTransform: 'uppercase' as const,
-            boxShadow: '0 8px 20px rgba(18, 61, 126, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.4)',
-            border: '1px solid rgba(255, 255, 255, 0.25)',
-            borderTop: '1px solid rgba(255, 255, 255, 0.4)',
+            boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 8px 16px rgba(37, 99, 235, 0.4)',
+            border: 'none',
         },
         footerActionLink: {
-            color: '#E2E8F0',
+            color: '#60A5FA',
             fontWeight: '600',
         },
         dividerLine: {
             background: 'rgba(255, 255, 255, 0.1)',
         },
         dividerText: {
-            color: '#94A3B8',
+            color: '#FFFFFF',
             fontWeight: '600',
         },
         profileSectionTitleText: {
             color: '#FFFFFF',
-            fontWeight: '700',
+            fontWeight: '800',
             borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
             paddingBottom: '8px',
         },
         profileSectionPrimaryButton: {
-            color: '#E2E8F0',
+            color: '#60A5FA',
+            fontWeight: '700',
         },
         accordionTriggerButton: {
+            color: '#FFFFFF',
+        },
+        userPreviewMainIdentifier: {
+            color: '#FFFFFF',
+            fontWeight: '700',
+        },
+        userPreviewSecondaryIdentifier: {
+            color: '#FFFFFF',
+        },
+        breadcrumbsItem: {
+            color: '#FFFFFF',
+            fontWeight: '600',
+        },
+        breadcrumbsItemDivider: {
+            color: '#FFFFFF',
+        },
+        badge: {
+            background: 'rgba(255,255,255,0.1)',
+            color: '#FFFFFF',
+            border: '1px solid rgba(255,255,255,0.2)',
+        },
+        menuButton: {
+            color: '#FFFFFF',
+        },
+        navbarButton: {
+            color: '#FFFFFF',
+            fontWeight: '600',
+        },
+        navbarButtonIcon: {
             color: '#FFFFFF',
         },
     },

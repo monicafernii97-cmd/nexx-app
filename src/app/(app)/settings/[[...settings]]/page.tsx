@@ -13,19 +13,18 @@ export default function SettingsPage() {
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-start justify-between mb-8"
+                className="flex items-start justify-between mb-10"
             >
                 <div>
                     <div className="flex items-center gap-4 mb-3">
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] relative overflow-hidden">
-                            <div className="absolute inset-0 bg-white/10" />
-                            <Gear size={28} className="text-white relative z-10 drop-shadow-md" weight="fill" />
+                        <div className="w-12 h-12 rounded-2xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-[#60A5FA]/50 shadow-[0_8px_24px_rgba(96,165,250,0.3)] flex items-center justify-center translate-y-[-2px]">
+                            <Gear size={24} className="text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]" weight="fill" />
                         </div>
-                        <h1 className="text-4xl font-serif font-bold text-white tracking-tight m-0">
+                        <h1 className="text-4xl font-serif font-bold tracking-tight text-white drop-shadow-sm m-0">
                             Account Settings
                         </h1>
                     </div>
-                    <p className="text-[15px] font-medium text-white max-w-2xl leading-relaxed">
+                    <p className="text-[16px] font-medium text-white max-w-2xl mt-2 drop-shadow-sm">
                         Manage your NEXX profile authentication, security preferences, and subscription details.
                     </p>
                 </div>
@@ -35,7 +34,7 @@ export default function SettingsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="card-premium overflow-hidden border border-[var(--cloud-light)] bg-white/60 shadow-lg"
+                className="overflow-hidden rounded-[2rem] border border-white/20 bg-white/5 backdrop-blur-3xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_24px_64px_rgba(0,0,0,0.6)]"
             >
                 <UserProfile
                     appearance={{
@@ -51,15 +50,21 @@ export default function SettingsPage() {
                                 background: 'transparent',
                             },
                             navbar: {
-                                borderRight: '1px solid var(--cloud-light)',
-                                background: 'transparent',
+                                borderRight: '1px solid rgba(255,255,255,0.1)',
+                                background: 'linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.05))',
                             },
                             navbarButton: {
-                                color: 'var(--sapphire-base)',
+                                color: 'rgba(255,255,255,0.8)',
                             },
                             navbarButtonIcon: {
-                                color: 'var(--sapphire-base)',
+                                color: 'rgba(255,255,255,0.8)',
                             },
+                            scrollBox: {
+                                background: 'transparent',
+                            },
+                            pageScrollBox: {
+                                background: 'transparent',
+                            }
                         },
                     }}
                 />

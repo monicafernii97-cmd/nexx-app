@@ -453,25 +453,25 @@ export default function OnboardingPage() {
                                 <p className="text-sm text-[rgba(255,255,255,0.8)]">
                                     Select all behaviors you regularly experience:
                                 </p>
-                                <div className="flex flex-wrap gap-2.5">
+                                <div className="flex flex-col gap-3">
                                     {nexBehaviorOptions.map((opt) => (
                                         <button
                                             key={opt}
                                             onClick={() => toggleArrayItem('nexBehaviors', opt)}
-                                            className={`text-left px-4 py-2.5 rounded-xl transition-all text-[13px] font-semibold flex items-center gap-2.5 border shadow-sm ${
+                                            className={`w-full text-left px-5 py-3.5 rounded-[14px] transition-all text-[15px] flex items-center gap-4 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
                                                 formData.nexBehaviors.includes(opt)
-                                                ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
-                                                : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
+                                                ? 'bg-white/10 text-white border-white/30 backdrop-blur-md'
+                                                : 'bg-[rgba(255,255,255,0.04)] text-white/90 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
                                             }`}
                                         >
                                             <div
-                                                className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-colors border-2 ${
+                                                className={`w-[22px] h-[22px] rounded-md flex items-center justify-center flex-shrink-0 transition-all ${
                                                     formData.nexBehaviors.includes(opt)
-                                                    ? 'bg-white border-white'
-                                                    : 'bg-transparent border-[rgba(255,255,255,0.3)]'
+                                                    ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]'
+                                                    : 'bg-white'
                                                 }`}
                                             >
-                                                {formData.nexBehaviors.includes(opt) && <Check size={12} strokeWidth={3} className="text-[#1A4B9B]" />}
+                                                {formData.nexBehaviors.includes(opt) && <Check size={16} strokeWidth={4} className="text-[#1A4B9B]" />}
                                             </div>
                                             {opt}
                                         </button>
@@ -490,17 +490,26 @@ export default function OnboardingPage() {
                                 <p className="text-sm text-[rgba(255,255,255,0.8)] pb-2">
                                     What do you need the most help with right now?
                                 </p>
-                                <div className="flex flex-wrap gap-2.5">
+                                <div className="flex flex-col gap-3">
                                     {goalOptions.map((opt) => (
                                         <button
                                             key={opt}
                                             onClick={() => toggleArrayItem('primaryGoals', opt)}
-                                            className={`cursor-pointer transition-all text-[13px] py-2 px-4 rounded-xl font-semibold border shadow-sm ${
+                                            className={`w-full text-left px-5 py-3.5 rounded-[14px] transition-all text-[15px] flex items-center gap-4 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
                                                 formData.primaryGoals.includes(opt)
-                                                ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
-                                                : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
+                                                ? 'bg-white/10 text-white border-white/30 backdrop-blur-md'
+                                                : 'bg-[rgba(255,255,255,0.04)] text-white/90 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
                                             }`}
                                         >
+                                            <div
+                                                className={`w-[22px] h-[22px] rounded-md flex items-center justify-center flex-shrink-0 transition-all ${
+                                                    formData.primaryGoals.includes(opt)
+                                                    ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]'
+                                                    : 'bg-white'
+                                                }`}
+                                            >
+                                                {formData.primaryGoals.includes(opt) && <Check size={16} strokeWidth={4} className="text-[#1A4B9B]" />}
+                                            </div>
                                             {opt}
                                         </button>
                                     ))}

@@ -524,33 +524,33 @@ export default function OnboardingPage() {
                                     <FileText size={20} className="text-white" />
                                     <h2 className="font-serif text-xl font-bold text-white">Important Notice</h2>
                                 </div>
-                                <div className="p-6 space-y-4 rounded-[2rem] bg-[#123D7E] border border-[rgba(255,255,255,0.15)] shadow-xl">
-                                    <p className="text-sm leading-relaxed text-white">
-                                        NEXX is an AI-powered tool that provides <strong>legal information, strategic guidance, and emotional support</strong>. It is <strong>not</strong> a law firm, does not provide legal advice, and is not a substitute for a licensed attorney or therapist.
+                                <div className="p-6 md:p-8 space-y-4 rounded-[1.5rem] bg-[linear-gradient(135deg,rgba(110,150,230,0.5),rgba(40,80,165,0.7))] border border-[rgba(255,255,255,0.2)] shadow-[0_16px_40px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.3)] backdrop-blur-xl">
+                                    <p className="text-[15px] leading-relaxed text-[#0A1128] font-medium drop-shadow-sm">
+                                        NEXX is an AI-powered tool that provides <strong className="font-bold text-[#F8FAFC] tracking-wide">legal information, strategic guidance, and emotional support</strong>. It is <strong className="font-bold text-[#F8FAFC] tracking-wide">not</strong> a law firm, does not provide legal advice, and is not a substitute for a licensed attorney or therapist.
                                     </p>
-                                    <p className="text-sm leading-relaxed text-white">
+                                    <p className="text-[15px] leading-relaxed text-[#0A1128] font-medium drop-shadow-sm">
                                         Information provided by NEXX should be used as a starting point for your own research and decision-making. For specific legal advice regarding your situation, please consult with a licensed attorney in your state.
                                     </p>
-                                    <p className="text-sm leading-relaxed text-white">
-                                        If you or your children are in immediate danger, please call <strong className="p-1 bg-[#C75A5A] rounded px-2 ml-1 text-white">911</strong> or the National Domestic Violence Hotline at <strong className="font-bold ml-1 text-white">1-800-799-7233</strong>.
+                                    <p className="text-[15px] leading-relaxed text-[#0A1128] font-medium drop-shadow-sm">
+                                        If you or your children are in immediate danger, please call <strong className="font-bold text-[#F8FAFC]">911</strong> or the National Domestic Violence Hotline at <strong className="font-bold text-[#F8FAFC]">1-800-799-7233</strong>.
                                     </p>
                                 </div>
                                 <button
                                     onClick={() => update('acceptedDisclaimer', !formData.acceptedDisclaimer)}
-                                    className={`w-full text-left px-6 py-4 rounded-xl transition-all text-[15px] font-semibold flex items-center gap-4 border mt-6 shadow-sm ${
+                                    className={`w-full text-left px-5 py-3.5 rounded-[14px] transition-all text-[15px] flex items-center gap-4 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] mt-4 ${
                                         formData.acceptedDisclaimer
-                                        ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
-                                        : 'bg-[#0A1128] text-white border-[rgba(255,255,255,0.3)] hover:border-[rgba(255,255,255,0.6)]'
+                                        ? 'bg-white/10 text-white border-white/30 backdrop-blur-md'
+                                        : 'bg-[rgba(255,255,255,0.04)] text-white/90 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
                                     }`}
                                 >
                                     <div
-                                        className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-colors border-2 ${
+                                        className={`w-[22px] h-[22px] rounded-md flex items-center justify-center flex-shrink-0 transition-all ${
                                             formData.acceptedDisclaimer
-                                            ? 'bg-white border-white'
-                                            : 'bg-transparent border-[rgba(255,255,255,0.3)]'
+                                            ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]'
+                                            : 'bg-white'
                                         }`}
                                     >
-                                        {formData.acceptedDisclaimer && <Check size={14} strokeWidth={3} className="text-[#1A4B9B]" />}
+                                        {formData.acceptedDisclaimer && <Check size={16} strokeWidth={4} className="text-[#1A4B9B]" />}
                                     </div>
                                     I understand and acknowledge the above
                                 </button>
@@ -560,21 +560,28 @@ export default function OnboardingPage() {
                 </AnimatePresence>
 
                 {/* Navigation Buttons */}
-                <div className="flex items-center gap-3 mt-8">
+                <div className="flex items-center gap-3 mt-10">
                     {currentStep > 0 && (
-                        <button onClick={() => setCurrentStep((prev) => prev - 1)} className="btn-outline flex items-center gap-2">
+                        <button 
+                            onClick={() => setCurrentStep((prev) => prev - 1)} 
+                            className="bg-transparent border border-[rgba(255,255,255,0.2)] text-white hover:bg-[rgba(255,255,255,0.05)] transition-colors px-6 py-3.5 rounded-[12px] font-semibold text-[14px] flex items-center gap-2 shadow-sm"
+                        >
                             <ChevronLeft size={14} /> Back
                         </button>
                     )}
                     <button
                         onClick={handleNext}
                         disabled={!canProceed() || isSaving || userLoading || (currentStep === ONBOARDING_STEPS.length - 1 && !userId)}
-                        className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-30"
+                        className={`flex-1 flex items-center justify-center gap-2 transition-transform disabled:opacity-40 disabled:scale-100 ${
+                            currentStep === ONBOARDING_STEPS.length - 1
+                            ? 'bg-[#FFF9F0] text-[#0A1128] font-bold tracking-widest uppercase rounded-[12px] py-3.5 shadow-[0_0_20px_rgba(255,249,240,0.3)] hover:scale-[1.02]'
+                            : 'bg-[linear-gradient(135deg,#60A5FA,#2563EB)] text-white font-bold tracking-widest uppercase rounded-[12px] py-3.5 shadow-[0_4px_16px_rgba(37,99,235,0.4)] hover:scale-[1.02]'
+                        }`}
                     >
                         {currentStep === ONBOARDING_STEPS.length - 1 ? (
-                            <>{isSaving ? 'Saving...' : userLoading ? 'Loading...' : 'Enter NEXX'} <Sparkles size={14} /></>
+                            <>{isSaving ? 'Saving...' : userLoading ? 'Loading...' : 'ENTER NEXX'} <Sparkles size={16} strokeWidth={2.5} /></>
                         ) : (
-                            <>Continue <ChevronRight size={14} /></>
+                            <>Continue <ChevronRight size={16} strokeWidth={2.5} /></>
                         )}
                     </button>
                 </div>

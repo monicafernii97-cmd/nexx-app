@@ -264,7 +264,12 @@ export default function OnboardingPage() {
     ];
 
     return (
-        <div className="silk-bg min-h-screen flex items-center justify-center relative overflow-hidden">
+        <div 
+            className="min-h-screen flex items-center justify-center relative overflow-hidden"
+            style={{ 
+                background: `repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 8px), linear-gradient(135deg, #2E5C9A 0%, #123D7E 40%, #0A1128 100%)` 
+            }}
+        >
             <div className="w-full max-w-lg mx-auto px-6 py-10 relative z-10">
                 {/* Progress Bar */}
                 <div className="flex items-center gap-1 mb-8">
@@ -427,7 +432,7 @@ export default function OnboardingPage() {
                                             <button
                                                 key={opt}
                                                 onClick={() => update('hasAttorney', opt)}
-                                                className={`flex-1 py-4 px-6 rounded-[9999px] text-[14px] font-semibold transition-all border shadow-sm ${
+                                                className={`flex-1 py-2.5 px-5 rounded-[9999px] text-[13px] font-semibold transition-all border shadow-sm ${
                                                     formData.hasAttorney === opt 
                                                     ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
                                                     : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
@@ -451,25 +456,25 @@ export default function OnboardingPage() {
                                 <p className="text-sm text-[rgba(255,255,255,0.8)]">
                                     Select all behaviors you regularly experience:
                                 </p>
-                                <div className="grid grid-cols-1 gap-3">
+                                <div className="flex flex-wrap gap-2.5">
                                     {nexBehaviorOptions.map((opt) => (
                                         <button
                                             key={opt}
                                             onClick={() => toggleArrayItem('nexBehaviors', opt)}
-                                            className={`text-left px-5 py-4 rounded-[9999px] transition-all text-[15px] font-semibold flex items-center gap-4 border shadow-sm ${
+                                            className={`text-left px-4 py-2.5 rounded-[9999px] transition-all text-[13px] font-semibold flex items-center gap-2.5 border shadow-sm ${
                                                 formData.nexBehaviors.includes(opt)
                                                 ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
                                                 : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
                                             }`}
                                         >
                                             <div
-                                                className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-colors border-2 ${
+                                                className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-colors border-2 ${
                                                     formData.nexBehaviors.includes(opt)
                                                     ? 'bg-white border-white'
                                                     : 'bg-transparent border-[rgba(255,255,255,0.3)]'
                                                 }`}
                                             >
-                                                {formData.nexBehaviors.includes(opt) && <Check size={14} strokeWidth={3} className="text-[#1A4B9B]" />}
+                                                {formData.nexBehaviors.includes(opt) && <Check size={12} strokeWidth={3} className="text-[#1A4B9B]" />}
                                             </div>
                                             {opt}
                                         </button>
@@ -488,12 +493,12 @@ export default function OnboardingPage() {
                                 <p className="text-sm text-[rgba(255,255,255,0.8)] pb-2">
                                     What do you need the most help with right now?
                                 </p>
-                                <div className="flex flex-wrap gap-3">
+                                <div className="flex flex-wrap gap-2.5">
                                     {goalOptions.map((opt) => (
                                         <button
                                             key={opt}
                                             onClick={() => toggleArrayItem('primaryGoals', opt)}
-                                            className={`cursor-pointer transition-all text-[14px] py-3 px-6 rounded-[9999px] font-semibold border shadow-sm ${
+                                            className={`cursor-pointer transition-all text-[13px] py-2 px-4 rounded-[9999px] font-semibold border shadow-sm ${
                                                 formData.primaryGoals.includes(opt)
                                                 ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
                                                 : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
@@ -513,15 +518,15 @@ export default function OnboardingPage() {
                                     <FileText size={20} className="text-white" />
                                     <h2 className="font-serif text-xl font-bold text-white">Important Notice</h2>
                                 </div>
-                                <div className="p-6 space-y-4 rounded-[2rem] bg-[rgba(10,17,40,0.5)] border border-[rgba(255,255,255,0.1)]">
-                                    <p className="text-sm leading-relaxed text-[rgba(255,255,255,0.85)]">
-                                        NEXX is an AI-powered tool that provides <strong className="text-white">legal information, strategic guidance, and emotional support</strong>. It is <strong className="text-white">not</strong> a law firm, does not provide legal advice, and is not a substitute for a licensed attorney or therapist.
+                                <div className="p-6 space-y-4 rounded-[2rem] bg-[#123D7E] border border-[rgba(255,255,255,0.15)] shadow-xl">
+                                    <p className="text-sm leading-relaxed text-white">
+                                        NEXX is an AI-powered tool that provides <strong>legal information, strategic guidance, and emotional support</strong>. It is <strong>not</strong> a law firm, does not provide legal advice, and is not a substitute for a licensed attorney or therapist.
                                     </p>
-                                    <p className="text-sm leading-relaxed text-[rgba(255,255,255,0.85)]">
+                                    <p className="text-sm leading-relaxed text-white">
                                         Information provided by NEXX should be used as a starting point for your own research and decision-making. For specific legal advice regarding your situation, please consult with a licensed attorney in your state.
                                     </p>
-                                    <p className="text-sm leading-relaxed text-[rgba(255,255,255,0.85)]">
-                                        If you or your children are in immediate danger, please call <strong className="text-white p-1 bg-[#C75A5A] rounded px-2 ml-1">911</strong> or the National Domestic Violence Hotline at <strong className="text-white font-bold ml-1">1-800-799-7233</strong>.
+                                    <p className="text-sm leading-relaxed text-white">
+                                        If you or your children are in immediate danger, please call <strong className="p-1 bg-[#C75A5A] rounded px-2 ml-1 text-white">911</strong> or the National Domestic Violence Hotline at <strong className="font-bold ml-1 text-white">1-800-799-7233</strong>.
                                     </p>
                                 </div>
                                 <button
@@ -529,7 +534,7 @@ export default function OnboardingPage() {
                                     className={`w-full text-left px-6 py-4 rounded-[9999px] transition-all text-[15px] font-semibold flex items-center gap-4 border mt-6 shadow-sm ${
                                         formData.acceptedDisclaimer
                                         ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
-                                        : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
+                                        : 'bg-[#0A1128] text-white border-[rgba(255,255,255,0.3)] hover:border-[rgba(255,255,255,0.6)]'
                                     }`}
                                 >
                                     <div

@@ -8,26 +8,26 @@ import { Id } from '../../../../../convex/_generated/dataModel';
 import { useParams, useRouter } from 'next/navigation';
 import {
     ArrowLeft,
-    Calendar,
+    CalendarBlank,
     Clock,
     Tag,
-    Shield,
-    Pencil,
+    ShieldCheck,
+    PencilSimple,
     Check,
-    AlertTriangle,
-    Sparkles,
-    Save,
-    Trash2,
+    WarningCircle,
+    Sparkle,
+    FloppyDisk,
+    Trash,
     MapPin,
     Users,
     Baby,
-    RefreshCw,
-} from 'lucide-react';
+    ArrowsClockwise,
+} from '@phosphor-icons/react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 
-/** Incident detail page showing court summary, behavioral analysis, and strategic response. */
+/** Incident detail page showing court summary, behavioral analysis, and strategic response in Ethereal theme. */
 export default function IncidentDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -76,17 +76,7 @@ export default function IncidentDetailPage() {
     if (!incident) {
         return (
             <div className="max-w-3xl mx-auto flex items-center justify-center h-64">
-                <div className="flex gap-1.5">
-                    {[0, 1, 2].map((j) => (
-                        <motion.div
-                            key={j}
-                            className="w-2 h-2 rounded-full"
-                            style={{ background: '#F7F2EB' }}
-                            animate={{ opacity: [0.3, 1, 0.3] }}
-                            transition={{ duration: 1, repeat: Infinity, delay: j * 0.2 }}
-                        />
-                    ))}
-                </div>
+                <div className="w-10 h-10 rounded-full border-2 border-sapphire border-t-transparent animate-spin" />
             </div>
         );
     }
@@ -103,7 +93,7 @@ export default function IncidentDetailPage() {
             ? candidate
             : null;
     })();
-    const severityColors = ['#5A9E6F', '#E5A84A', '#C75A5A'];
+    const severityColors = ['var(--emerald)', 'var(--warning)', 'var(--rose)'];
     const severityLabels = ['Low', 'Medium', 'High'];
 
     const startEditing = () => {
@@ -206,121 +196,117 @@ export default function IncidentDetailPage() {
     };
 
     return (
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-4xl mx-auto pb-16 w-full px-2">
             {/* Header */}
             <motion.div
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-4 mb-6"
+                transition={{ duration: 0.5 }}
+                className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 pt-4"
             >
-                <Link
-                    href="/incident-report"
-                    className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
-                    style={{
-                        background: 'rgba(208, 227, 255, 0.08)',
-                        border: '1px solid rgba(208, 227, 255, 0.15)',
-                    }}
-                    aria-label="Back to incident reports"
-                >
-                    <ArrowLeft size={16} style={{ color: '#F7F2EB' }} />
-                </Link>
-                <div className="flex-1">
-                    <h1 className="text-headline text-xl" style={{ color: '#F7F2EB' }}>
-                        Incident Record
-                    </h1>
-                    <p className="text-xs" style={{ color: '#FFF9F0' }}>
-                        {incidentDate
-                            ? incidentDate.toLocaleDateString('en-US', {
-                                weekday: 'long',
-                                month: 'long',
-                                day: 'numeric',
-                                year: 'numeric',
-                            })
-                            : incident.date || 'Unknown date'}
-                    </p>
+                <div className="flex items-start gap-4">
+                    <Link
+                        href="/incident-report"
+                        className="w-11 h-11 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-105 bg-white shadow-sm border border-[rgba(10,22,41,0.05)] hover:shadow shrink-0"
+                        aria-label="Back to incident reports"
+                    >
+                        <ArrowLeft size={20} weight="bold" className="text-sapphire" />
+                    </Link>
+                    <div>
+                        <h1 className="text-3xl font-serif font-bold text-sapphire mb-1 leading-tight">
+                            Incident Record
+                        </h1>
+                        <p className="text-[14px] font-medium text-sapphire-muted">
+                            {incidentDate
+                                ? incidentDate.toLocaleDateString('en-US', {
+                                    weekday: 'long',
+                                    month: 'long',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                })
+                                : incident.date || 'Unknown date'}
+                        </p>
+                    </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                     {incident.status === 'draft' && (
                         <>
                             {!isEditing ? (
-                                <button onClick={startEditing} className="btn-outline text-xs flex items-center gap-1">
-                                    <Pencil size={12} /> Edit
+                                <button onClick={startEditing} className="px-5 py-2.5 rounded-xl bg-white border border-[rgba(10,22,41,0.05)] text-sapphire text-[13px] font-bold uppercase tracking-widest shadow-sm hover:shadow transition-all flex items-center gap-2">
+                                    <PencilSimple size={16} /> Edit
                                 </button>
                             ) : (
                                 <button
                                     onClick={handleSave}
                                     disabled={isSaving}
-                                    className="btn-primary text-xs flex items-center gap-1"
+                                    className="px-5 py-2.5 rounded-xl bg-sapphire text-white text-[13px] font-bold uppercase tracking-widest shadow-md hover:bg-[#0F223D] transition-all flex items-center gap-2"
                                 >
-                                    <Save size={12} /> {isSaving ? 'Saving...' : 'Save'}
+                                    <FloppyDisk size={16} className={isSaving ? "animate-pulse" : ""} /> {isSaving ? 'Saving...' : 'Save'}
                                 </button>
                             )}
                         </>
                     )}
                     <button
                         onClick={() => setShowDeleteConfirm(true)}
-                        className="btn-outline text-xs flex items-center gap-1"
-                        style={{ borderColor: 'rgba(199, 90, 90, 0.2)', color: '#C75A5A' }}
+                        className="px-5 py-2.5 rounded-xl bg-rose/10 hover:bg-rose text-rose hover:text-white border border-rose/20 text-[13px] font-bold uppercase tracking-widest shadow-sm transition-all flex items-center gap-2"
                     >
-                        <Trash2 size={12} /> Delete
+                        <Trash size={16} /> Delete
                     </button>
                 </div>
                 {saveError && (
-                    <p className="text-xs mt-1" style={{ color: '#C75A5A' }}>{saveError}</p>
+                    <p className="text-xs font-semibold text-rose mt-1 w-full md:w-auto text-right">{saveError}</p>
                 )}
             </motion.div>
 
-            {/* Status & Meta */}
+            {/* Status & Meta (Glass Pill Container) */}
             <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="flex flex-wrap items-center gap-3 mb-6"
+                className="flex flex-wrap items-center gap-3 mb-8 p-3 rounded-2xl bg-white/50 border border-[rgba(10,22,41,0.03)] backdrop-blur-md"
             >
                 <span
-                    className="badge"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase border border-transparent shadow-sm"
                     style={{
-                        background: `${cat?.color || '#F7F2EB'}20`,
-                        color: cat?.color || '#F7F2EB',
+                        background: cat?.color ? `color-mix(in srgb, ${cat.color} 15%, white)` : 'var(--white)',
+                        color: cat?.color || 'var(--sapphire)',
+                        borderColor: cat?.color ? `color-mix(in srgb, ${cat.color} 30%, transparent)` : 'transparent',
                     }}
                 >
-                    <Tag size={10} /> {cat?.label || incident.category}
+                    <Tag size={14} weight="fill" /> {cat?.label || incident.category}
                 </span>
+                
                 {incident.status === 'draft' && (
-                    <span className="badge badge-warning">Draft</span>
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-warning/15 text-warning">Draft</span>
                 )}
+                
                 {incident.status === 'confirmed' && (
-                    <span className="badge badge-success">
-                        <Check size={10} /> Confirmed
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-emerald/15 text-emerald shadow-sm">
+                        <Check size={14} weight="bold" /> Confirmed
                     </span>
                 )}
-                <span className="badge" style={{ background: 'rgba(138, 122, 96, 0.1)', color: '#FFF9F0' }}>
-                    <Calendar size={10} /> {incident.date}
+                
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-cloud text-sapphire shadow-sm">
+                    <CalendarBlank size={14} /> {incident.date}
                 </span>
-                <span className="badge" style={{ background: 'rgba(138, 122, 96, 0.1)', color: '#FFF9F0' }}>
-                    <Clock size={10} /> {incident.time}
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-cloud text-sapphire shadow-sm">
+                    <Clock size={14} /> {incident.time}
                 </span>
+                
                 {/* Severity */}
                 {(() => {
                     const sev = Math.max(1, Math.min(3, incident.severity ?? 2));
                     return (
                         <span
-                            className="badge"
-                            style={{
-                                background: `${severityColors[sev - 1]}15`,
-                                color: severityColors[sev - 1],
-                            }}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-white border shadow-sm"
+                            style={{ borderColor: severityColors[sev - 1], color: severityColors[sev - 1] }}
                         >
-                            <span className="flex gap-0.5 mr-1" aria-hidden="true">
+                            <span className="flex gap-0.5" aria-hidden="true">
                                 {[1, 2, 3].map((level) => (
                                     <span
                                         key={level}
                                         className="w-1.5 h-3 rounded-sm inline-block"
-                                        style={{
-                                            background: level <= sev
-                                                ? severityColors[sev - 1]
-                                                : 'rgba(138, 122, 96, 0.15)',
-                                        }}
+                                        style={{ background: level <= sev ? severityColors[sev - 1] : 'var(--cloud)' }}
                                     />
                                 ))}
                             </span>
@@ -328,213 +314,185 @@ export default function IncidentDetailPage() {
                         </span>
                     );
                 })()}
+
                 {incident.childrenInvolved && (
-                    <span className="badge" style={{ background: 'rgba(229, 168, 74, 0.12)', color: '#E5A84A' }}>
-                        <Baby size={10} /> Children Involved
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-warning/15 text-warning shadow-sm">
+                        <Baby size={14} weight="fill" /> Children Involved
+                    </span>
+                )}
+                
+                {/* Location & Witnesses inline if any */}
+                {incident.location && (
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-cloud text-sapphire shadow-sm">
+                        <MapPin size={14} /> {incident.location}
+                    </span>
+                )}
+                {incident.witnesses && incident.witnesses.length > 0 && (
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-cloud text-sapphire shadow-sm">
+                        <Users size={14} /> {incident.witnesses.length} {incident.witnesses.length === 1 ? 'Witness' : 'Witnesses'}
                     </span>
                 )}
             </motion.div>
 
-            {/* Location & Witnesses (if present) */}
-            {(incident.location || (incident.witnesses && incident.witnesses.length > 0)) && (
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 gap-6">
+                
+                {/* Narrative */}
                 <motion.div
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.12 }}
-                    className="flex flex-wrap gap-4 mb-6"
+                    transition={{ delay: 0.15 }}
+                    className="card-premium p-6 md:p-8"
                 >
-                    {incident.location && (
-                        <div className="flex items-center gap-2 text-xs" style={{ color: '#FFF9F0' }}>
-                            <MapPin size={12} /> {incident.location}
-                        </div>
-                    )}
-                    {incident.witnesses && incident.witnesses.length > 0 && (
-                        <div className="flex items-center gap-2 text-xs" style={{ color: '#FFF9F0' }}>
-                            <Users size={12} /> Witnesses: {incident.witnesses.join(', ')}
-                        </div>
-                    )}
-                </motion.div>
-            )}
-
-            {/* Narrative */}
-            <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-                className="card-premium p-6 mb-6"
-            >
-                <h3
-                    className="text-sm font-semibold tracking-[0.15em] uppercase mb-3"
-                    style={{ color: '#D0E3FF' }}
-                >
-                    Incident Narrative
-                </h3>
-                {isEditing && editData ? (
-                    <textarea
-                        value={editData.narrative}
-                        onChange={(e) => setEditData({ ...editData, narrative: e.target.value })}
-                        className="input-premium resize-none w-full"
-                        rows={6}
-                    />
-                ) : (
-                    <p
-                        className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#123D7E' }}
-                    >
-                        {incident.narrative}
-                    </p>
-                )}
-            </motion.div>
-
-            {/* Court-Ready Summary */}
-            <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="card-premium p-6 mb-6"
-            >
-                <div className="flex items-center justify-between mb-3">
-                    <h3
-                        className="text-sm font-semibold tracking-[0.15em] uppercase flex items-center gap-2"
-                        style={{ color: '#F7F2EB' }}
-                    >
-                        <Shield size={14} /> Court-Ready Summary
+                    <h3 className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 text-sapphire flex items-center gap-2 border-b border-[rgba(10,22,41,0.04)] pb-4">
+                        <PencilSimple size={16} className="text-sapphire-muted" /> Original Narrative
                     </h3>
-                    <div className="flex gap-2">
-                        {incident.courtSummary && !isAnalyzing && !isEditing && (
-                            <button
-                                onClick={handleAnalyze}
-                                className="btn-ghost text-xs flex items-center gap-1"
-                            >
-                                <RefreshCw size={12} /> Re-generate
-                            </button>
-                        )}
-                        {!incident.courtSummary && !isAnalyzing && !isEditing && (
-                            <button
-                                onClick={handleAnalyze}
-                                className="btn-outline text-xs flex items-center gap-1"
-                            >
-                                <Sparkles size={12} /> Generate with AI
-                            </button>
-                        )}
-                    </div>
-                </div>
-                {isAnalyzing ? (
-                    <div className="flex items-center gap-3 py-4">
-                        <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                        >
-                            <Sparkles size={16} style={{ color: '#F7F2EB' }} />
-                        </motion.div>
-                        <p className="text-sm" style={{ color: '#FFF9F0' }}>
-                            Analyzing incident and generating court-ready summary...
+                    {isEditing && editData ? (
+                        <textarea
+                            value={editData.narrative}
+                            onChange={(e) => setEditData({ ...editData, narrative: e.target.value })}
+                            className="input-premium resize-none w-full bg-white/50 focus:bg-white text-[15px] leading-relaxed"
+                            rows={6}
+                        />
+                    ) : (
+                        <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-sapphire font-medium">
+                            {incident.narrative}
                         </p>
+                    )}
+                </motion.div>
+
+                {/* Court-Ready Summary */}
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="card-premium p-6 md:p-8"
+                >
+                    <div className="flex items-center justify-between mb-4 border-b border-[rgba(10,22,41,0.04)] pb-4">
+                        <h3 className="text-[13px] font-bold tracking-[0.2em] uppercase flex items-center gap-2 text-sapphire">
+                            <ShieldCheck size={18} weight="duotone" className="text-champagne" /> Court-Ready Summary
+                        </h3>
+                        <div className="flex gap-2">
+                            {incident.courtSummary && !isAnalyzing && !isEditing && (
+                                <button
+                                    onClick={handleAnalyze}
+                                    className="px-3 py-1.5 rounded-lg bg-cloud hover:bg-[rgba(10,22,41,0.08)] text-sapphire text-[11px] font-bold uppercase tracking-widest flex items-center gap-1.5 transition-colors"
+                                >
+                                    <ArrowsClockwise size={14} /> Re-generate
+                                </button>
+                            )}
+                            {!incident.courtSummary && !isAnalyzing && !isEditing && (
+                                <button
+                                    onClick={handleAnalyze}
+                                    className="px-4 py-2 rounded-xl bg-champagne hover:bg-[#C59B27] text-white text-[11px] font-bold uppercase tracking-widest shadow-md flex items-center gap-1.5 transition-colors"
+                                >
+                                    <Sparkle size={14} weight="fill" /> Generate with AI
+                                </button>
+                            )}
+                        </div>
                     </div>
-                ) : isEditing && editData ? (
-                    <textarea
-                        value={editData.courtSummary}
-                        onChange={(e) =>
-                            setEditData({ ...editData, courtSummary: e.target.value })
-                        }
-                        className="input-premium resize-none w-full"
-                        rows={6}
-                        placeholder="Court-ready summary will appear here after AI analysis..."
-                    />
-                ) : incident.courtSummary ? (
-                    <p
-                        className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#123D7E' }}
-                    >
-                        {incident.courtSummary}
-                    </p>
-                ) : (
-                    <p className="text-sm italic" style={{ color: '#D0E3FF' }}>
-                        No court summary generated yet. Click &ldquo;Generate with AI&rdquo; to
-                        create a court-ready version of this incident.
-                    </p>
+                    {isAnalyzing ? (
+                        <div className="flex flex-col items-center justify-center gap-4 py-8 opacity-60">
+                            <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}>
+                                <Sparkle size={32} weight="duotone" className="text-champagne" />
+                            </motion.div>
+                            <p className="text-[13px] font-bold uppercase tracking-widest text-sapphire">
+                                Generating encrypted court summary...
+                            </p>
+                        </div>
+                    ) : isEditing && editData ? (
+                        <textarea
+                            value={editData.courtSummary}
+                            onChange={(e) =>
+                                setEditData({ ...editData, courtSummary: e.target.value })
+                            }
+                            className="input-premium resize-none w-full bg-white/50 focus:bg-white text-[15px] leading-relaxed"
+                            rows={6}
+                            placeholder="Court-ready summary will appear here after AI analysis..."
+                        />
+                    ) : incident.courtSummary ? (
+                        <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-sapphire">
+                            {incident.courtSummary}
+                        </p>
+                    ) : (
+                        <div className="py-6 text-center bg-cloud/50 rounded-xl border border-[rgba(10,22,41,0.04)] border-dashed">
+                            <p className="text-[14px] font-medium text-sapphire-muted italic">
+                                No court summary generated yet. Click generate to create a highly-structured output.
+                            </p>
+                        </div>
+                    )}
+                </motion.div>
+
+                {/* Analysis error */}
+                {analysisError && (
+                    <div className="p-4 rounded-xl bg-rose/10 border border-rose/20 text-rose text-[13px] font-semibold flex items-center gap-2">
+                        <WarningCircle size={16} /> {analysisError}
+                    </div>
                 )}
-            </motion.div>
 
-            {/* Analysis error */}
-            {analysisError && (
-                <p className="text-sm mb-4 px-1" style={{ color: '#C75A5A' }}>{analysisError}</p>
-            )}
+                {/* AI Analysis Grid (if available) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {analysis?.behavioralAnalysis && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="card-premium p-6"
+                        >
+                            <h3 className="text-[12px] font-bold tracking-[0.15em] uppercase mb-4 flex items-center gap-2 text-warning pb-3 border-b border-[rgba(10,22,41,0.04)]">
+                                <WarningCircle size={16} weight="duotone" /> NPD Behavioral Analysis
+                            </h3>
+                            <p className="text-[14px] leading-relaxed whitespace-pre-wrap text-sapphire font-medium">
+                                {analysis.behavioralAnalysis}
+                            </p>
+                        </motion.div>
+                    )}
 
-            {/* AI Analysis (if available) */}
-            {analysis?.behavioralAnalysis && (
-                <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="card-premium p-6 mb-6"
-                >
-                    <h3
-                        className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2"
-                        style={{ color: '#E5A84A' }}
-                    >
-                        <AlertTriangle size={14} /> NPD Behavioral Analysis
-                    </h3>
-                    <p
-                        className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#123D7E' }}
-                    >
-                        {analysis.behavioralAnalysis}
-                    </p>
-                </motion.div>
-            )}
+                    {analysis?.strategicResponse && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="card-premium p-6"
+                        >
+                            <h3 className="text-[12px] font-bold tracking-[0.15em] uppercase mb-4 flex items-center gap-2 text-emerald pb-3 border-b border-[rgba(10,22,41,0.04)]">
+                                <ShieldCheck size={16} weight="duotone" /> Strategic Response
+                            </h3>
+                            <p className="text-[14px] leading-relaxed whitespace-pre-wrap text-sapphire font-medium">
+                                {analysis.strategicResponse}
+                            </p>
+                        </motion.div>
+                    )}
+                </div>
 
-            {analysis?.strategicResponse && (
-                <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="card-premium p-6 mb-6"
-                >
-                    <h3
-                        className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2"
-                        style={{ color: '#5A9E6F' }}
-                    >
-                        <Shield size={14} /> Strategic Response
-                    </h3>
-                    <p
-                        className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#123D7E' }}
-                    >
-                        {analysis.strategicResponse}
-                    </p>
-                </motion.div>
-            )}
-
-            {/* Actions */}
-            {incident.status === 'draft' && !isEditing && (
-                <>
+                {/* Finalize Actions */}
+                {incident.status === 'draft' && !isEditing && (
                     <motion.div
-                        initial={{ opacity: 0, y: 8 }}
+                        initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3 }}
-                        className="flex gap-3"
+                        className="flex gap-4 pt-4"
                     >
                         {!incident.courtSummary && (
                             <button
                                 onClick={handleAnalyze}
                                 disabled={isAnalyzing}
-                                className="btn-outline flex-1 flex items-center justify-center gap-2"
+                                className="btn-secondary flex-1 bg-white hover:bg-cloud shadow-sm text-[13px] uppercase tracking-widest py-4 border-transparent flex items-center justify-center gap-2"
                             >
-                                <Sparkles size={14} /> Analyze with AI
+                                <Sparkle size={16} className="text-champagne" /> Analyze with AI
                             </button>
                         )}
                         <button
                             onClick={handleConfirm}
                             disabled={isConfirming}
-                            className="btn-primary flex-1 flex items-center justify-center gap-2"
+                            className="btn-primary flex-1 shadow-md text-[13px] uppercase tracking-widest py-4 flex items-center justify-center gap-2"
                         >
-                            <Check size={14} /> {isConfirming ? 'Confirming...' : 'Confirm & Finalize'}
+                            <Check size={16} weight="bold" /> {isConfirming ? 'Finalizing...' : 'Confirm & Lock'}
                         </button>
                     </motion.div>
-                    {confirmError && (
-                        <p className="text-sm mt-2" style={{ color: '#C75A5A' }}>{confirmError}</p>
-                    )}
-                </>
-            )}
+                )}
+                {confirmError && (
+                    <p className="text-[13px] font-semibold text-rose text-center mt-2">{confirmError}</p>
+                )}
+            </div>
 
             {/* Delete Confirmation Modal */}
             <ConfirmDeleteModal

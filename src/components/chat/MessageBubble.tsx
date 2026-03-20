@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Sparkles, User, Copy, Check } from 'lucide-react';
+import { Sparkle, User, Copy, Check } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
 
@@ -11,7 +11,7 @@ interface MessageBubbleProps {
     isStreaming?: boolean;
 }
 
-/** Chat message bubble rendering user or assistant messages with copy-to-clipboard support. */
+/** Ethereal Chat message bubble rendering user or assistant messages with copy-to-clipboard support. */
 export default function MessageBubble({ role, content, isStreaming }: MessageBubbleProps) {
     const [copied, setCopied] = useState(false);
     const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -50,9 +50,9 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
             .replace(/>/g, '&gt;');
         // Apply markdown-like transforms on safe escaped content
         const transformed = escaped
-            .replace(/\*\*(.*?)\*\*/g, '<strong style="color:inherit; font-weight:600">$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            .replace(/🔴/g, '<span>🔴</span>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong style="color:inherit; font-weight:700">$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em style="font-style:italic">$1</em>')
+            .replace(/🔴/g, '<span style="color:var(--rose)">🔴</span>')
             .replace(/\n/g, '<br/>');
         return DOMPurify.sanitize(transformed);
     };
@@ -62,56 +62,58 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className={`flex gap-3 ${role === 'user' ? 'justify-end' : ''}`}
+            className={`flex gap-3 w-full ${role === 'user' ? 'justify-end pl-12' : 'justify-start pr-12'}`}
         >
             {role === 'assistant' && (
                 <div
-                    className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center mt-1"
-                    style={{ background: 'linear-gradient(135deg, #F7F2EB, #123D7E)' }}
+                    className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center mt-1 bg-white shadow-sm border border-[rgba(10,22,41,0.04)]"
                 >
-                    <Sparkles size={14} style={{ color: '#0A1E54' }} />
+                    <Sparkle size={18} weight="duotone" className="text-champagne" />
                 </div>
             )}
 
             <div
-                className={`max-w-[80%] rounded-2xl px-5 py-4 ${role === 'user' ? 'rounded-br-md' : 'rounded-bl-md'
-                    }`}
+                className={`max-w-[100%] rounded-[1.5rem] px-6 py-4 shadow-sm border ${
+                    role === 'user' ? 'rounded-br-sm' : 'rounded-tl-sm'
+                }`}
                 style={
                     role === 'user'
                         ? {
-                            background: 'linear-gradient(135deg, rgba(208, 227, 255, 0.15), rgba(208, 227, 255, 0.08))',
-                            border: '1px solid rgba(208, 227, 255, 0.2)',
-                            color: '#F7F2EB',
+                            background: 'var(--sapphire)',
+                            borderColor: 'transparent',
+                            color: 'white',
                         }
                         : {
-                            background: '#F7F2EB',
-                            border: '1px solid rgba(208, 227, 255, 0.1)',
-                            color: '#123D7E',
+                            background: 'rgba(255, 255, 255, 0.7)',
+                            backdropFilter: 'blur(12px)',
+                            WebkitBackdropFilter: 'blur(12px)',
+                            borderColor: 'rgba(255, 255, 255, 0.8)',
+                            color: 'var(--sapphire)',
                         }
                 }
             >
                 <div
-                    className="text-sm leading-relaxed whitespace-pre-wrap"
+                    className={`text-[15px] leading-relaxed whitespace-pre-wrap font-medium ${role === 'user' ? 'text-white' : 'text-sapphire'}`}
                     dangerouslySetInnerHTML={{ __html: renderContent(content) }}
                 />
 
                 {role === 'assistant' && !isStreaming && (
                     <div
-                        className="flex gap-2 mt-3 pt-2"
-                        style={{ borderTop: '1px solid rgba(208, 227, 255, 0.08)' }}
+                        className="flex justify-end gap-2 mt-3 pt-2"
+                        style={{ borderTop: '1px solid rgba(10, 22, 41, 0.04)' }}
                     >
                         <button
-                            className="btn-ghost text-xs flex items-center gap-1 py-1 px-2"
+                            className="bg-cloud hover:bg-[rgba(10,22,41,0.06)] text-sapphire-muted hover:text-sapphire transition-colors text-[11px] font-bold uppercase tracking-widest flex items-center gap-1.5 py-1.5 px-3 rounded-lg"
                             onClick={handleCopy}
                             aria-label={copied ? 'Copied to clipboard' : 'Copy message to clipboard'}
                         >
                             {copied ? (
                                 <>
-                                    <Check size={12} /> Copied
+                                    <Check size={14} weight="bold" /> Copied
                                 </>
                             ) : (
                                 <>
-                                    <Copy size={12} /> Copy
+                                    <Copy size={14} weight="duotone" /> Copy
                                 </>
                             )}
                         </button>
@@ -121,13 +123,9 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
 
             {role === 'user' && (
                 <div
-                    className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center mt-1"
-                    style={{
-                        background: 'rgba(208, 227, 255, 0.12)',
-                        border: '1px solid rgba(208, 227, 255, 0.2)',
-                    }}
+                    className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center mt-1 bg-white shadow-sm border border-[rgba(10,22,41,0.04)]"
                 >
-                    <User size={14} style={{ color: '#F7F2EB' }} />
+                    <User size={16} weight="duotone" className="text-sapphire" />
                 </div>
             )}
         </motion.div>

@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import { Inter, Playfair_Display } from 'next/font/google';
+import { Outfit, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { ConvexClientProvider } from '@/lib/convex-provider';
 
-const inter = Inter({
+const outfit = Outfit({
   subsets: ['latin'],
-  variable: '--font-inter',
+  variable: '--font-outfit',
   display: 'swap',
 });
 
@@ -21,10 +21,10 @@ export const metadata: Metadata = {
   icons: { icon: '/favicon.ico' },
 };
 
-/** Root HTML layout with Inter and Playfair Display fonts and Convex/Clerk providers. */
+/** Root HTML layout with Outfit and Playfair Display fonts and Convex/Clerk providers. */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
+    <html lang="en" className={`${outfit.variable} ${playfair.variable}`}>
       <body className="antialiased">
         <ConvexClientProvider>
           {children}

@@ -3,16 +3,17 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useRef, useCallback, useEffect, Suspense } from 'react';
 import {
-    Landmark,
-    ChevronLeft,
-    ChevronRight,
+    Bank,
+    CaretLeft,
+    CaretRight,
     FileText,
-    Sparkles,
+    Sparkle,
     Plus,
     Paperclip,
     X,
     ArrowRight,
-} from 'lucide-react';
+    CheckCircle,
+} from '@phosphor-icons/react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
@@ -33,7 +34,7 @@ interface ProgressStep {
 /** Wrapper with Suspense boundary for useSearchParams */
 export default function DocuVaultPage() {
     return (
-        <Suspense fallback={<div className="max-w-5xl mx-auto animate-pulse" style={{ color: '#D0E3FF' }}>Loading...</div>}>
+        <Suspense fallback={<div className="max-w-5xl mx-auto flex items-center justify-center min-h-[50vh]"><div className="w-8 h-8 rounded-full border-2 border-[var(--champagne)] border-t-transparent animate-spin" /></div>}>
             <DocuVaultPageInner />
         </Suspense>
     );
@@ -114,7 +115,7 @@ function DocuVaultPageInner() {
     /** Scroll the template carousel left or right by a fixed amount. */
     const scrollCarousel = (dir: 'left' | 'right') => {
         if (carouselRef.current) {
-            const amount = dir === 'left' ? -240 : 240;
+            const amount = dir === 'left' ? -280 : 280;
             carouselRef.current.scrollBy({ left: amount, behavior: 'smooth' });
         }
     };
@@ -283,7 +284,7 @@ function DocuVaultPageInner() {
     }, []);
 
     return (
-        <div className="max-w-5xl mx-auto relative">
+        <div className="max-w-5xl mx-auto relative pb-20">
             {/* ═══════════════════════════════════════════════════
                 VIEW: COMPOSE (Main Generator)
                ═══════════════════════════════════════════════════ */}
@@ -292,53 +293,35 @@ function DocuVaultPageInner() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
+                    className="space-y-8"
                 >
                     {/* Header */}
                     <motion.div
                         initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="flex items-start justify-between mb-8"
+                        transition={{ duration: 0.5, ease: 'easeOut' }}
                     >
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-4 mb-3">
+                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white shadow-sm border border-[var(--cloud-light)]">
+                                <Bank size={28} className="text-[var(--champagne)]" weight="duotone" />
+                            </div>
                             <div>
-                                <div className="flex items-center gap-3 mb-1">
-                                    <div
-                                        className="w-10 h-10 rounded-xl flex items-center justify-center"
-                                        style={{
-                                            background: 'rgba(208, 227, 255, 0.12)',
-                                            border: '1px solid rgba(208, 227, 255, 0.25)',
-                                        }}
-                                    >
-                                        <Landmark size={20} style={{ color: '#F7F2EB' }} />
-                                    </div>
-                                    <h1 className="text-headline text-2xl" style={{ color: '#F7F2EB' }}>
-                                        DocuVault
-                                    </h1>
-                                </div>
-                                <p className="text-sm" style={{ color: '#FFF9F0' }}>
-                                    Professional Legal Document Generator
-                                </p>
+                                <h1 className="text-4xl font-light tracking-tight text-[var(--sapphire-dark)]">
+                                    DocuVault
+                                </h1>
                             </div>
                         </div>
+                        <p className="text-base text-[var(--sapphire-base)] max-w-2xl leading-relaxed">
+                            Professional Legal Document Generator. Trustworthy. Semantic. Verbatim. Generate court-ready PDFs with AI precision.
+                        </p>
                     </motion.div>
-
-                    {/* Subtitle */}
-                    <motion.p
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.1 }}
-                        className="text-xs mb-6"
-                        style={{ color: '#0A1E54' }}
-                    >
-                        Generate court-ready PDFs with AI precision. Trustworthy. Semantic. Verbatim.
-                    </motion.p>
 
                     {/* ── Category Tabs ── */}
                     <motion.div
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.15 }}
-                        className="flex gap-2 mb-6 overflow-x-auto pb-1"
+                        className="flex gap-2 overflow-x-auto pb-2 scrollbar-none snap-x"
                         style={{ scrollbarWidth: 'none' }}
                     >
                         {UI_TABS.map(tab => (
@@ -348,15 +331,16 @@ function DocuVaultPageInner() {
                                     setActiveTab(tab.id);
                                     setSelectedTemplate(null);
                                 }}
-                                className="px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
+                                className="px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 snap-center shadow-sm"
                                 style={{
                                     background: activeTab === tab.id
-                                        ? 'linear-gradient(135deg, #F7F2EB, #123D7E)'
-                                        : 'rgba(255, 249, 240, 0.4)',
-                                    color: activeTab === tab.id ? '#F7F2EB' : '#FFF9F0',
+                                        ? 'var(--sapphire-dark)'
+                                        : 'rgba(255, 255, 255, 0.6)',
+                                    color: activeTab === tab.id ? 'white' : 'var(--sapphire-base)',
                                     border: activeTab === tab.id
-                                        ? 'none'
-                                        : '1px solid rgba(138, 122, 96, 0.12)',
+                                        ? '1px solid var(--sapphire-dark)'
+                                        : '1px solid var(--cloud-light)',
+                                    backdropFilter: activeTab === tab.id ? 'none' : 'blur(8px)',
                                 }}
                             >
                                 {tab.label}
@@ -369,32 +353,26 @@ function DocuVaultPageInner() {
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
-                        className="mb-8"
                     >
-                        <div className="flex items-center justify-between mb-3">
-                            <h2
-                                className="text-xs font-semibold tracking-[0.15em] uppercase"
-                                style={{ color: '#D0E3FF' }}
-                            >
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-sm font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
                                 Templates
                             </h2>
                             {templates.length > 3 && (
-                                <div className="flex gap-1">
+                                <div className="flex gap-2">
                                     <button
                                         onClick={() => scrollCarousel('left')}
                                         aria-label="Scroll templates left"
-                                        className="w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer transition-colors"
-                                        style={{ background: 'rgba(208, 227, 255, 0.06)' }}
+                                        className="w-8 h-8 rounded-full flex items-center justify-center bg-white shadow-sm border border-[var(--cloud-light)] hover:shadow-md transition-all text-[var(--sapphire-base)] hover:text-[var(--sapphire-dark)]"
                                     >
-                                        <ChevronLeft size={14} style={{ color: '#F7F2EB' }} />
+                                        <CaretLeft size={16} weight="bold" />
                                     </button>
                                     <button
                                         onClick={() => scrollCarousel('right')}
                                         aria-label="Scroll templates right"
-                                        className="w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer transition-colors"
-                                        style={{ background: 'rgba(208, 227, 255, 0.06)' }}
+                                        className="w-8 h-8 rounded-full flex items-center justify-center bg-white shadow-sm border border-[var(--cloud-light)] hover:shadow-md transition-all text-[var(--sapphire-base)] hover:text-[var(--sapphire-dark)]"
                                     >
-                                        <ChevronRight size={14} style={{ color: '#F7F2EB' }} />
+                                        <CaretRight size={16} weight="bold" />
                                     </button>
                                 </div>
                             )}
@@ -404,28 +382,19 @@ function DocuVaultPageInner() {
                             /* Blank template card */
                             <button
                                 type="button"
-                                className="card-premium p-6 cursor-pointer transition-all hover:scale-[1.01] w-full text-left"
+                                className="card-premium p-6 cursor-pointer hover:shadow-lg transition-all w-full text-left border border-[var(--cloud-light)] bg-white/60 hover:bg-white"
                                 onClick={() => setSelectedTemplate(null)}
-                                style={{
-                                    borderColor: 'rgba(208, 227, 255, 0.25)',
-                                }}
                             >
-                                <div className="flex items-center gap-4">
-                                    <div
-                                        className="w-14 h-14 rounded-xl flex items-center justify-center"
-                                        style={{
-                                            background: 'rgba(208, 227, 255, 0.08)',
-                                            border: '1px dashed rgba(208, 227, 255, 0.3)',
-                                        }}
-                                    >
-                                        <Plus size={22} style={{ color: '#F7F2EB' }} />
+                                <div className="flex items-center gap-5">
+                                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-[var(--cloud)] border-2 border-dashed border-[var(--sapphire-light)]/40">
+                                        <Plus size={28} className="text-[var(--sapphire-base)]" weight="bold" />
                                     </div>
                                     <div>
-                                        <p className="font-semibold text-sm mb-0.5" style={{ color: '#F7F2EB' }}>
+                                        <p className="text-lg font-medium text-[var(--sapphire-dark)] mb-1">
                                             Custom Document
                                         </p>
-                                        <p className="text-xs" style={{ color: '#FFF9F0' }}>
-                                            Blank template with general court and legal document structure
+                                        <p className="text-sm text-[var(--sapphire-base)]">
+                                            Start with a blank template utilizing general court and legal structuring.
                                         </p>
                                     </div>
                                 </div>
@@ -434,7 +403,7 @@ function DocuVaultPageInner() {
                             /* Template cards carousel */
                             <div
                                 ref={carouselRef}
-                                className="flex gap-3 overflow-x-auto pb-2"
+                                className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-none"
                                 style={{ scrollbarWidth: 'none' }}
                             >
                                 {templates.map(tmpl => {
@@ -443,41 +412,33 @@ function DocuVaultPageInner() {
                                         <motion.button
                                             key={tmpl.id}
                                             onClick={() => setSelectedTemplate(isSelected ? null : tmpl)}
-                                            whileHover={{ y: -2 }}
+                                            whileHover={{ y: -4 }}
                                             whileTap={{ scale: 0.98 }}
-                                            className="flex-shrink-0 w-44 rounded-2xl p-4 text-left transition-all cursor-pointer"
+                                            className="flex-shrink-0 w-56 rounded-3xl p-5 text-left transition-all cursor-pointer snap-start"
                                             style={{
                                                 background: isSelected
-                                                    ? 'rgba(208, 227, 255, 0.08)'
-                                                    : 'rgba(255, 249, 240, 0.3)',
+                                                    ? 'var(--pearl)'
+                                                    : 'rgba(255, 255, 255, 0.7)',
                                                 border: isSelected
-                                                    ? '1px solid rgba(208, 227, 255, 0.35)'
-                                                    : '1px solid rgba(138, 122, 96, 0.08)',
+                                                    ? '2px solid var(--champagne)'
+                                                    : '1px solid var(--cloud-light)',
+                                                boxShadow: isSelected 
+                                                    ? '0 12px 24px -10px rgba(138, 122, 96, 0.2)' 
+                                                    : '0 4px 12px -5px rgba(10, 30, 84, 0.05)',
                                             }}
                                         >
-                                            {/* Document preview icon */}
-                                            <div
-                                                className="w-full h-24 rounded-xl mb-3 flex items-center justify-center"
-                                                style={{
-                                                    background: isSelected
-                                                        ? 'rgba(208, 227, 255, 0.06)'
-                                                        : 'rgba(26, 16, 8, 0.5)',
-                                                    border: '1px solid rgba(138, 122, 96, 0.06)',
-                                                }}
-                                            >
+                                            <div className={`w-full h-28 rounded-2xl mb-4 flex items-center justify-center relative overflow-hidden transition-all ${isSelected ? 'bg-gradient-to-br from-white to-[var(--pearl)] shadow-inner' : 'bg-white shadow-sm border border-[var(--cloud-light)]'}`}>
+                                                {/* Subtle document graphic */}
+                                                <div className="absolute top-3 left-3 w-12 h-2 rounded bg-[var(--sapphire-light)]/10" />
+                                                <div className="absolute top-7 left-3 w-20 h-2 rounded bg-[var(--sapphire-light)]/10" />
+                                                <div className="absolute top-11 left-3 w-16 h-2 rounded bg-[var(--sapphire-light)]/10" />
                                                 <FileText
-                                                    size={28}
-                                                    style={{
-                                                        color: isSelected ? '#F7F2EB' : '#0A1E54',
-                                                    }}
+                                                    size={40}
+                                                    weight={isSelected ? "duotone" : "regular"}
+                                                    className={`relative z-10 ${isSelected ? 'text-[var(--champagne)] drop-shadow-sm' : 'text-[var(--sapphire-light)]'}`}
                                                 />
                                             </div>
-                                            <p
-                                                className="text-xs font-medium leading-tight line-clamp-2"
-                                                style={{
-                                                    color: isSelected ? '#F7F2EB' : '#D0E3FF',
-                                                }}
-                                            >
+                                            <p className={`text-sm font-semibold leading-snug line-clamp-2 ${isSelected ? 'text-[var(--sapphire-dark)]' : 'text-[var(--sapphire-base)]'}`}>
                                                 {tmpl.title}
                                             </p>
                                         </motion.button>
@@ -491,22 +452,16 @@ function DocuVaultPageInner() {
                     <AnimatePresence>
                         {selectedTemplate && (
                             <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="mb-6 overflow-hidden"
+                                initial={{ opacity: 0, height: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, height: 'auto', scale: 1 }}
+                                exit={{ opacity: 0, height: 0, scale: 0.95 }}
+                                className="overflow-hidden"
                             >
-                                <div
-                                    className="px-4 py-3 rounded-xl"
-                                    style={{
-                                        background: 'rgba(208, 227, 255, 0.04)',
-                                        border: '1px solid rgba(208, 227, 255, 0.12)',
-                                    }}
-                                >
-                                    <p className="text-xs font-semibold mb-1" style={{ color: '#F7F2EB' }}>
-                                        Selected: {selectedTemplate.title}
+                                <div className="card-premium p-5 border-l-4 border-l-[var(--champagne)] bg-gradient-to-r from-[var(--champagne)]/5 to-white/50">
+                                    <p className="text-sm font-semibold tracking-wide text-[var(--sapphire-dark)] mb-1">
+                                        {selectedTemplate.title}
                                     </p>
-                                    <p className="text-xs" style={{ color: '#FFF9F0' }}>
+                                    <p className="text-sm text-[var(--sapphire-base)] leading-relaxed">
                                         {selectedTemplate.description}
                                     </p>
                                 </div>
@@ -519,41 +474,44 @@ function DocuVaultPageInner() {
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.25 }}
-                        className="mb-6"
                     >
-                        <textarea
-                            value={documentContent}
-                            onChange={e => setDocumentContent(e.target.value)}
-                            placeholder="Paste your content here or describe the document title, body, and footer verbatim..."
-                            rows={8}
-                            className="input-premium resize-none"
-                            style={{ minHeight: '160px' }}
-                        />
+                        <h2 className="text-sm font-semibold tracking-widest uppercase text-[var(--sapphire-dark)] mb-3">
+                            Document Content
+                        </h2>
+                        <div className="relative group">
+                            <textarea
+                                value={documentContent}
+                                onChange={e => setDocumentContent(e.target.value)}
+                                placeholder="Paste your content here or describe the document title, body, and footer verbatim. The AI will perfectly structure and format it."
+                                rows={8}
+                                className="input-premium resize-none w-full min-h-[220px] pb-14 text-[var(--sapphire-dark)] bg-white/80 focus:bg-white placeholder:text-[var(--sapphire-light)]"
+                            />
 
-                        {/* Bottom bar */}
-                        <div className="flex items-center justify-between mt-3">
-                            <div className="flex gap-3">
-                                <button
-                                    disabled
-                                    title="File attachment coming soon"
-                                    className="flex items-center gap-1.5 text-xs transition-colors cursor-not-allowed"
-                                    style={{ color: '#FFF9F0', opacity: 0.5 }}
-                                >
-                                    <Paperclip size={13} /> Attach
-                                </button>
-                                {documentContent && (
+                            {/* Bottom bar overlay */}
+                            <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between pt-3 border-t border-[var(--cloud-light)]">
+                                <div className="flex gap-4">
                                     <button
-                                        onClick={() => setDocumentContent('')}
-                                        className="flex items-center gap-1.5 text-xs cursor-pointer transition-colors"
-                                        style={{ color: '#FFF9F0' }}
+                                        disabled
+                                        title="File attachment coming soon"
+                                        className="flex items-center gap-2 text-sm font-medium transition-colors cursor-not-allowed opacity-50 text-[var(--sapphire-base)]"
                                     >
-                                        <X size={13} /> Clear
+                                        <Paperclip size={16} weight="bold" /> 
+                                        <span>Attach File</span>
                                     </button>
-                                )}
+                                    {documentContent && (
+                                        <button
+                                            onClick={() => setDocumentContent('')}
+                                            className="flex items-center gap-2 text-sm font-medium cursor-pointer transition-colors text-[var(--error)] hover:text-[#B91C1C]"
+                                        >
+                                            <X size={16} weight="bold" /> 
+                                            <span>Clear</span>
+                                        </button>
+                                    )}
+                                </div>
+                                <p className="text-xs font-semibold text-[var(--sapphire-light)]">
+                                    {documentContent.length > 0 ? `${documentContent.length.toLocaleString()} characters` : ''}
+                                </p>
                             </div>
-                            <p className="text-xs" style={{ color: '#0A1E54' }}>
-                                {documentContent.length > 0 ? `${documentContent.length} chars` : ''}
-                            </p>
                         </div>
                     </motion.div>
 
@@ -566,58 +524,51 @@ function DocuVaultPageInner() {
                         <button
                             onClick={handleGenerate}
                             disabled={(!documentContent.trim() && !selectedTemplate) || isUserProfileLoading}
-                            className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 text-sm disabled:opacity-40"
+                            className="btn-primary w-full flex items-center justify-center gap-3 py-4 text-base shadow-lg shadow-[var(--sapphire-dark)]/10 hover:shadow-xl transition-all disabled:opacity-50 group hover:-translate-y-0.5"
                         >
-                            <Sparkles size={16} />
-                            Generate
+                            <Sparkle size={20} weight="fill" className="text-[var(--champagne)] drop-shadow-sm group-hover:scale-110 transition-transform" />
+                            Generate Formal Document
                         </button>
                     </motion.div>
 
                     {/* ── Error Message ── */}
-                    {generationError && (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="mt-4 px-4 py-3 rounded-xl"
-                            style={{
-                                background: 'rgba(220, 38, 38, 0.08)',
-                                border: '1px solid rgba(220, 38, 38, 0.2)',
-                            }}
-                        >
-                            <p className="text-sm" style={{ color: '#DC2626' }}>
-                                {generationError}
-                            </p>
-                        </motion.div>
-                    )}
+                    <AnimatePresence>
+                        {generationError && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="overflow-hidden"
+                            >
+                                <div className="mt-4 px-5 py-4 rounded-xl bg-[var(--error)]/5 border border-[var(--error)]/20 shadow-sm flex items-start gap-3">
+                                    <X size={20} weight="bold" className="text-[var(--error)] shrink-0 mt-0.5" />
+                                    <p className="text-sm font-medium text-[var(--error)]">
+                                        {generationError}
+                                    </p>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
                     {/* ── Bottom Flow Icons ── */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.4 }}
-                        className="flex items-center justify-center gap-8 mt-8"
+                        className="flex items-center justify-center gap-10 mt-12 py-8 border-t border-[var(--cloud-light)]"
                     >
                         {[
-                            { label: 'Describe\nDocument', icon: FileText },
-                            { label: 'AI Generated\nDraft', icon: Sparkles },
-                            { label: 'Download\n& Export', icon: ArrowRight },
+                            { label: 'Describe\nContext', icon: FileText, color: 'text-[var(--sapphire-base)]' },
+                            { label: 'AI Generates\nDraft', icon: Sparkle, color: 'text-[var(--champagne)]' },
+                            { label: 'Download\n& File', icon: ArrowRight, color: 'text-[var(--sapphire-base)]' },
                         ].map((item, i) => {
                             const Icon = item.icon;
                             return (
-                                <div key={i} className="flex flex-col items-center gap-2">
-                                    <div
-                                        className="w-10 h-10 rounded-full flex items-center justify-center"
-                                        style={{
-                                            background: 'rgba(208, 227, 255, 0.06)',
-                                            border: '1px solid rgba(208, 227, 255, 0.12)',
-                                        }}
-                                    >
-                                        <Icon size={16} style={{ color: '#FFF9F0' }} />
+                                <div key={i} className="flex flex-col items-center gap-3 relative">
+                                    <div className="w-14 h-14 rounded-full flex items-center justify-center bg-white border border-[var(--cloud-light)] shadow-sm">
+                                        <Icon size={24} weight="duotone" className={item.color} />
                                     </div>
-                                    <p
-                                        className="text-xs text-center whitespace-pre-line leading-tight"
-                                        style={{ color: '#0A1E54' }}
-                                    >
+                                    <p className="text-xs text-center font-medium whitespace-pre-line leading-tight text-[var(--sapphire-dark)]">
                                         {item.label}
                                     </p>
                                 </div>
@@ -632,156 +583,115 @@ function DocuVaultPageInner() {
                ═══════════════════════════════════════════════════ */}
             {view === 'working' && (
                 <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="max-w-lg mx-auto"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="max-w-xl mx-auto py-8"
                 >
                     {/* Close / Step indicator */}
-                    <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center justify-between mb-10">
                         <button
                             onClick={handleNewDocument}
                             aria-label="Cancel generation"
-                            className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer"
-                            style={{ background: 'rgba(208, 227, 255, 0.06)' }}
+                            className="w-10 h-10 rounded-full flex items-center justify-center bg-white shadow-sm border border-[var(--cloud-light)] hover:bg-[var(--error)]/5 hover:text-[var(--error)] text-[var(--sapphire-base)] transition-colors"
                         >
-                            <X size={16} style={{ color: '#FFF9F0' }} />
+                            <X size={18} weight="bold" />
                         </button>
-                        <p className="text-xs" style={{ color: '#FFF9F0' }}>
+                        <span className="text-sm font-medium px-4 py-1.5 rounded-full bg-[var(--sapphire-light)]/10 text-[var(--sapphire-dark)]">
                             Step {Math.min(progressSteps.filter(s => s.status === 'complete').length + 1, progressSteps.length)} of {progressSteps.length}
-                        </p>
-                    </div>
-
-                    {/* Document context */}
-                    <div
-                        className="card-premium p-6 mb-8"
-                        style={{ borderColor: 'rgba(208, 227, 255, 0.15)' }}
-                    >
-                        <p className="text-xs uppercase tracking-[0.15em] mb-2" style={{ color: '#D0E3FF' }}>
-                            Document Context
-                        </p>
-                        <p className="text-sm italic leading-relaxed" style={{ color: '#123D7E' }}>
-                            &ldquo;{selectedTemplate?.title ?? (() => {
-                                const text = documentContent;
-                                if (text.length <= 120) return text;
-                                const truncated = text.slice(0, 120);
-                                const lastSpace = truncated.lastIndexOf(' ');
-                                return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated) + '...';
-                            })()}&rdquo;
-                        </p>
+                        </span>
                     </div>
 
                     {/* Working animation */}
-                    <div className="text-center mb-8">
+                    <div className="text-center mb-10">
                         <motion.div
                             animate={{ rotate: 360 }}
-                            transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-                            className="inline-block mb-4"
+                            transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+                            className="inline-block mb-6 relative"
                         >
-                            <div
-                                className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                                style={{
-                                    background: 'linear-gradient(135deg, rgba(208, 227, 255, 0.12), rgba(208, 227, 255, 0.04))',
-                                    border: '1px solid rgba(208, 227, 255, 0.2)',
-                                }}
-                            >
-                                <Sparkles size={24} style={{ color: '#F7F2EB' }} />
+                            <div className="absolute inset-0 rounded-full blur-2xl bg-[var(--champagne)]/30 scale-150 pointer-events-none" />
+                            <div className="w-24 h-24 rounded-full flex items-center justify-center bg-gradient-to-br from-white to-[var(--pearl)] border flex-shrink-0 border-white shadow-[0_8px_32px_rgba(10,30,84,0.1)] relative z-10">
+                                <Sparkle size={40} weight="duotone" className="text-[var(--champagne)]" />
                             </div>
                         </motion.div>
-                        <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>
-                            DocuVault AI is working...
+                        <h3 className="text-2xl font-light text-[var(--sapphire-dark)] tracking-tight">
+                            DocuVault AI is drafting...
+                        </h3>
+                        <p className="text-sm text-[var(--sapphire-base)] mt-2">
+                            Structuring verbatim into local court format
                         </p>
                     </div>
 
                     {/* Progress bar */}
-                    <div className="mb-8">
-                        <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold tracking-[0.1em] uppercase" style={{ color: '#D0E3FF' }}>
-                                Synthesis
+                    <div className="card-premium p-6 mb-8 border border-[var(--cloud-light)] bg-white/60">
+                        <div className="flex items-center justify-between mb-3">
+                            <p className="text-xs font-semibold tracking-widest uppercase text-[var(--sapphire-base)]">
+                                Synthesis Progress
                             </p>
-                            <p className="text-xs font-bold" style={{ color: '#F7F2EB' }}>
+                            <p className="text-sm font-bold text-[var(--sapphire-dark)]">
                                 {Math.round(progress)}%
                             </p>
                         </div>
-                        <div
-                            className="h-1 rounded-full overflow-hidden"
-                            style={{ background: 'rgba(138, 122, 96, 0.1)' }}
-                        >
+                        <div className="h-2 rounded-full overflow-hidden bg-[var(--cloud)] shadow-inner">
                             <motion.div
-                                className="h-full rounded-full"
-                                style={{ background: 'linear-gradient(90deg, #F7F2EB, #123D7E)' }}
+                                className="h-full rounded-full bg-gradient-to-r from-[var(--sapphire-base)] to-[var(--champagne)] shadow-[0_0_10px_rgba(229,168,74,0.5)]"
                                 animate={{ width: `${progress}%` }}
-                                transition={{ duration: 0.5 }}
+                                transition={{ duration: 0.5, ease: 'easeOut' }}
                             />
+                        </div>
+                        
+                        {/* Document context */}
+                        <div className="mt-6 pt-5 border-t border-[var(--cloud-light)]">
+                            <p className="text-[10px] uppercase font-bold text-[var(--sapphire-light)] tracking-widest mb-2">
+                                Context
+                            </p>
+                            <p className="text-sm italic leading-relaxed text-[var(--sapphire-dark)] border-l-2 border-[var(--champagne)] pl-3">
+                                &ldquo;{selectedTemplate?.title ?? (() => {
+                                    const text = documentContent;
+                                    if (text.length <= 100) return text;
+                                    const truncated = text.slice(0, 100);
+                                    const lastSpace = truncated.lastIndexOf(' ');
+                                    return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated) + '...';
+                                })()}&rdquo;
+                            </p>
                         </div>
                     </div>
 
                     {/* Step-by-step progress */}
-                    <div className="space-y-3">
+                    <div className="space-y-4 px-2">
                         {progressSteps.map((step, i) => (
                             <motion.div
                                 key={i}
-                                initial={{ opacity: 0, x: -8 }}
+                                initial={{ opacity: 0, x: -10 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: i * 0.1 }}
-                                className="flex items-start gap-3"
+                                className="flex items-center gap-4"
                             >
-                                <div className="mt-0.5">
+                                <div className="shrink-0 flex items-center justify-center w-8">
                                     {step.status === 'complete' ? (
-                                        <div
-                                            className="w-5 h-5 rounded-full flex items-center justify-center"
-                                            style={{ background: 'rgba(90, 158, 111, 0.15)' }}
-                                        >
-                                            <div className="w-2 h-2 rounded-full" style={{ background: '#5A9E6F' }} />
-                                        </div>
+                                        <CheckCircle size={24} weight="fill" className="text-[var(--success)] drop-shadow-sm" />
                                     ) : step.status === 'active' ? (
                                         <motion.div
                                             animate={{ scale: [1, 1.2, 1] }}
                                             transition={{ duration: 1.5, repeat: Infinity }}
-                                            className="w-5 h-5 rounded-full flex items-center justify-center"
-                                            style={{ background: 'rgba(208, 227, 255, 0.15)' }}
-                                        >
-                                            <div className="w-2 h-2 rounded-full" style={{ background: '#F7F2EB' }} />
-                                        </motion.div>
+                                            className="w-4 h-4 rounded-full bg-[var(--champagne)] shadow-[0_0_8px_rgba(229,168,74,0.6)]"
+                                        />
                                     ) : (
-                                        <div
-                                            className="w-5 h-5 rounded-full flex items-center justify-center"
-                                            style={{ background: 'rgba(138, 122, 96, 0.08)' }}
-                                        >
-                                            <div className="w-2 h-2 rounded-full" style={{ background: 'rgba(138, 122, 96, 0.3)' }} />
-                                        </div>
+                                        <div className="w-2.5 h-2.5 rounded-full bg-[var(--cloud-light)]" />
                                     )}
                                 </div>
-                                <div>
-                                    <p
-                                        className="text-sm font-medium"
-                                        style={{
-                                            color: step.status === 'complete'
-                                                ? '#5A9E6F'
-                                                : step.status === 'active'
-                                                    ? '#F7F2EB'
-                                                    : '#0A1E54',
-                                        }}
-                                    >
+                                <div className="flex-1">
+                                    <p className={`text-sm font-medium transition-colors ${step.status === 'complete' ? 'text-[var(--sapphire-dark)]' : step.status === 'active' ? 'text-[var(--sapphire-base)] font-semibold' : 'text-[var(--sapphire-light)]'}`}>
                                         {step.label}
                                     </p>
-                                    {step.status === 'active' && (
-                                        <motion.p
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            className="text-xs mt-0.5"
-                                            style={{ color: '#FFF9F0' }}
-                                        >
-                                            Processing...
-                                        </motion.p>
-                                    )}
                                 </div>
                             </motion.div>
                         ))}
                     </div>
 
                     {/* Disclaimer */}
-                    <p className="text-xs text-center mt-8" style={{ color: '#3A3020' }}>
-                        AI results may produce inaccurate information. Large documents usually take 45-60 seconds to generate.
+                    <p className="text-[11px] font-medium text-center mt-10 text-[var(--sapphire-light)] px-8 leading-relaxed">
+                        Large documents usually take 45-60 seconds to securely generate and process formatting.
                     </p>
                 </motion.div>
             )}
@@ -791,211 +701,171 @@ function DocuVaultPageInner() {
                ═══════════════════════════════════════════════════ */}
             {view === 'result' && (
                 <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="max-w-2xl mx-auto"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="max-w-3xl mx-auto py-6"
                 >
                     {/* Header */}
-                    <div className="flex items-center gap-3 mb-6">
+                    <div className="flex items-center gap-4 mb-8">
                         <button
                             onClick={handleNewDocument}
                             aria-label="Back to document composer"
-                            className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
-                            style={{
-                                background: 'rgba(208, 227, 255, 0.08)',
-                                border: '1px solid rgba(208, 227, 255, 0.15)',
-                            }}
+                            className="w-12 h-12 rounded-full flex items-center justify-center bg-white shadow-sm border border-[var(--cloud-light)] hover:shadow-md transition-all text-[var(--sapphire-base)] hover:text-[var(--sapphire-dark)] shrink-0"
                         >
-                            <ChevronLeft size={16} style={{ color: '#F7F2EB' }} />
+                            <CaretLeft size={20} weight="bold" />
                         </button>
                         <div>
-                            <h1 className="text-headline text-lg" style={{ color: '#F7F2EB' }}>
+                            <h1 className="text-2xl font-semibold tracking-tight text-[var(--sapphire-dark)]">
                                 {selectedTemplate?.title || 'Generated Document'}
                             </h1>
-                            <p className="text-xs" style={{ color: '#FFF9F0' }}>
-                                Case #{caseNumber ?? '------'}
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-[var(--sapphire-light)]/10 text-[var(--sapphire-base)] uppercase tracking-wider">
+                                    Case #{caseNumber ?? '------'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                        {/* Document Overview & Badges (Left) */}
+                        <div className="md:col-span-2 space-y-4">
+                            {/* PDF Preview Card */}
+                            <div className="card-premium p-6 text-center border border-[var(--cloud-light)] bg-gradient-to-br from-white to-[var(--pearl)] shadow-md">
+                                <div className="w-32 h-40 mx-auto rounded-xl flex items-center justify-center bg-white shadow-[0_4px_24px_rgba(10,30,84,0.08)] border border-[var(--cloud-light)] mb-5 relative overflow-hidden group">
+                                    {/* Abstract doc lines */}
+                                    <div className="absolute top-6 left-5 right-5 h-2 bg-[var(--cloud)] rounded-full" />
+                                    <div className="absolute top-11 left-5 right-10 h-2 bg-[var(--cloud)] rounded-full" />
+                                    <div className="absolute top-16 left-5 right-5 h-2 bg-[var(--cloud)] rounded-full" />
+                                    <div className="absolute top-21 left-5 right-14 h-2 bg-[var(--cloud)] rounded-full" />
+                                    <div className="absolute bottom-6 right-5 w-8 h-8 rounded-full border-4 border-[var(--champagne)] opacity-30 group-hover:opacity-60 transition-opacity" />
+                                    
+                                    <FileText size={48} weight="duotone" className="text-[var(--sapphire-base)] z-10 drop-shadow-sm" />
+                                </div>
+                                <p className="text-sm font-semibold text-[var(--sapphire-dark)] mb-1">
+                                    {selectedTemplate?.title || 'Legal Document'}
+                                </p>
+                                <p className="text-xs font-medium text-[var(--sapphire-light)] uppercase tracking-widest">
+                                    Final Draft • PDF
+                                </p>
+                            </div>
+
+                            {/* NEXXverification Badges */}
+                            <div className="space-y-3">
+                                <div className="card-premium p-4 flex items-start gap-4 border border-[var(--success)]/30 bg-[var(--success)]/5">
+                                    <div className="w-8 h-8 rounded-full bg-[var(--success)] flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+                                        <CheckCircle size={16} weight="bold" className="text-white" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-[var(--success)] tracking-wide">
+                                            Rule 3.1 Certified
+                                        </p>
+                                        <p className="text-[11px] font-medium text-[var(--sapphire-base)] mt-0.5">
+                                            Adheres to formal court formatting standards.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="card-premium p-4 flex items-start gap-4 border border-[var(--success)]/30 bg-[var(--success)]/5">
+                                    <div className="w-8 h-8 rounded-full bg-[var(--success)] flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+                                        <CheckCircle size={16} weight="bold" className="text-white" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-[var(--success)] tracking-wide">
+                                            Bates Validation
+                                        </p>
+                                        <p className="text-[11px] font-medium text-[var(--sapphire-base)] mt-0.5">
+                                            Pagination sequence validated & confirmed.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Actions (Right) */}
+                        <div className="md:col-span-3 space-y-6">
+                            {/* AI Summary */}
+                            <div className="card-premium py-6 px-8 border border-[var(--cloud-light)] shadow-sm bg-white/80">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <Sparkle size={20} weight="duotone" className="text-[var(--champagne)]" />
+                                    <h3 className="text-sm font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
+                                        Intelligence Summary
+                                    </h3>
+                                </div>
+                                <p className="text-base text-[var(--sapphire-base)] leading-relaxed">
+                                    The provided context has been successfully synthesized into a formal <span className="font-semibold text-[var(--sapphire-dark)]">{selectedTemplate?.title?.toLowerCase() || 'legal document'}</span>. 
+                                    All formatting, spacing, and legal headings follow precision local court standards. The document has been cross-referenced for procedural alignment.
+                                </p>
+                            </div>
+
+                            {/* Action Menu */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    onClick={() => {
+                                        if (!generatedPdfUrl) return;
+                                        const a = document.createElement('a');
+                                        a.href = generatedPdfUrl;
+                                        a.download = `${selectedTemplate?.id ?? 'document'}_${Date.now()}.pdf`;
+                                        a.click();
+                                    }}
+                                    disabled={!generatedPdfUrl}
+                                    className="btn-primary flex items-center justify-center gap-3 py-4 text-base shadow-md disabled:opacity-50 h-full"
+                                >
+                                    <DownloadSimple size={20} weight="bold" />
+                                    Download PDF
+                                </button>
+                                
+                                <div className="grid grid-rows-2 gap-3">
+                                    <button
+                                        onClick={() => {
+                                            if (!generatedPdfUrl) return;
+                                            const win = window.open(generatedPdfUrl, '_blank');
+                                            if (win) {
+                                                setTimeout(() => {
+                                                    try { win.print(); }
+                                                    catch { console.warn('Print dialog could not be opened'); }
+                                                }, 500);
+                                            } else {
+                                                if (printWarningTimeoutRef.current) clearTimeout(printWarningTimeoutRef.current);
+                                                setGenerationError('Please allow popups to print, or use Download instead.');
+                                                printWarningTimeoutRef.current = setTimeout(() => setGenerationError(null), 5000);
+                                            }
+                                        }}
+                                        disabled={!generatedPdfUrl}
+                                        className="btn-outline flex items-center justify-center gap-2 py-3 text-sm disabled:opacity-50"
+                                    >
+                                        <FileText size={18} weight="bold" />
+                                        Print Document
+                                    </button>
+                                    <button
+                                        disabled
+                                        className="card-premium flex items-center justify-center gap-2 py-3 text-sm font-medium border border-[var(--cloud-light)] bg-[var(--cloud)]/30 text-[var(--sapphire-light)] cursor-not-allowed opacity-60"
+                                    >
+                                        <Bank size={18} weight="duotone" />
+                                        Save to Vault
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* Revision Input - To Be Implemented */}
+                            <div className="relative mt-2">
+                                <input
+                                    type="text"
+                                    placeholder="Request an AI revision (e.g., 'Make the tone more aggressive')..."
+                                    className="input-premium w-full pl-12 pr-14 py-4 cursor-not-allowed opacity-60 bg-[var(--cloud)]/30 border-dashed border-[var(--sapphire-light)]"
+                                    disabled
+                                />
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40">
+                                    <Sparkle size={20} weight="duotone" className="text-[var(--sapphire-base)]" />
+                                </div>
+                                <button disabled className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-[var(--sapphire-light)]/20 flex items-center justify-center cursor-not-allowed opacity-50">
+                                    <ArrowRight size={16} weight="bold" className="text-[var(--sapphire-dark)]" />
+                                </button>
+                            </div>
+                            
+                            <p className="text-[11px] font-medium text-center text-[var(--sapphire-light)]">
+                                Verification is recommended. Verify legal citations and personal information independently.
                             </p>
                         </div>
                     </div>
-
-                    {/* AI Summary */}
-                    <div className="card-premium p-5 mb-6">
-                        <p className="text-xs font-semibold uppercase tracking-[0.15em] mb-2" style={{ color: '#5A8EC9' }}>
-                            Intelligence Summary
-                        </p>
-                        <p className="text-sm leading-relaxed" style={{ color: '#123D7E' }}>
-                            I&apos;ve synthesized the provided content into a formal{' '}
-                            {selectedTemplate?.title?.toLowerCase() || 'legal document'}.
-                            All formatting follows local court standards. The document has been cross-referenced
-                            for procedural alignment.
-                        </p>
-                    </div>
-
-                    {/* PDF Preview Card */}
-                    <div
-                        className="rounded-2xl p-6 mb-6 text-center"
-                        style={{
-                            background: 'rgba(245, 239, 224, 0.03)',
-                            border: '1px solid rgba(208, 227, 255, 0.15)',
-                        }}
-                    >
-                        {/* PDF Icon */}
-                        <div
-                            className="w-28 h-36 mx-auto rounded-xl mb-4 flex items-center justify-center"
-                            style={{
-                                background: 'rgba(245, 239, 224, 0.04)',
-                                border: '1px solid rgba(138, 122, 96, 0.1)',
-                            }}
-                        >
-                            <FileText size={36} style={{ color: '#FFF9F0' }} />
-                        </div>
-                        <p className="text-sm font-semibold mb-1" style={{ color: '#F7F2EB' }}>
-                            {selectedTemplate?.title || 'Legal Document'} v.1
-                        </p>
-                        <p className="text-xs" style={{ color: '#FFF9F0' }}>
-                            FORMAL ARCHIVE • ~1.2 MB
-                        </p>
-
-                        {/* Action Buttons */}
-                        <div className="flex items-center justify-center gap-6 mt-5">
-                            {/* Download */}
-                            <button
-                                onClick={() => {
-                                    if (!generatedPdfUrl) return;
-                                    const a = document.createElement('a');
-                                    a.href = generatedPdfUrl;
-                                    a.download = `${selectedTemplate?.id ?? 'document'}_${Date.now()}.pdf`;
-                                    a.click();
-                                }}
-                                disabled={!generatedPdfUrl}
-                                className="flex flex-col items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                <div
-                                    className="w-10 h-10 rounded-full flex items-center justify-center"
-                                    style={{ background: 'rgba(208, 227, 255, 0.06)', border: '1px solid rgba(208, 227, 255, 0.15)' }}
-                                >
-                                    <ArrowRight size={16} className="rotate-90" style={{ color: '#F7F2EB' }} />
-                                </div>
-                                <span className="text-xs" style={{ color: '#FFF9F0' }}>Download</span>
-                            </button>
-                            {/* Print */}
-                            <button
-                                onClick={() => {
-                                    if (!generatedPdfUrl) return;
-                                    const win = window.open(generatedPdfUrl, '_blank');
-                                    if (win) {
-                                        // Give the PDF time to render before printing
-                                        setTimeout(() => {
-                                            try { win.print(); }
-                                            catch { console.warn('Print dialog could not be opened'); }
-                                        }, 500);
-                                    } else {
-                                        // Popup blocked — show inline warning instead of blocking alert()
-                                        if (printWarningTimeoutRef.current) clearTimeout(printWarningTimeoutRef.current);
-                                        setGenerationError('Please allow popups to print, or use Download instead.');
-                                        printWarningTimeoutRef.current = setTimeout(() => setGenerationError(null), 5000);
-                                    }
-                                }}
-                                disabled={!generatedPdfUrl}
-                                className="flex flex-col items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                <div
-                                    className="w-10 h-10 rounded-full flex items-center justify-center"
-                                    style={{ background: 'rgba(208, 227, 255, 0.06)', border: '1px solid rgba(208, 227, 255, 0.15)' }}
-                                >
-                                    <FileText size={16} style={{ color: '#F7F2EB' }} />
-                                </div>
-                                <span className="text-xs" style={{ color: '#FFF9F0' }}>Print</span>
-                            </button>
-                            {/* Save — TODO: wire to Convex backend */}
-                            <button
-                                disabled
-                                aria-disabled="true"
-                                title="Save to DocuVault coming soon"
-                                className="flex flex-col items-center gap-1.5 transition-colors opacity-40 cursor-not-allowed"
-                            >
-                                <div
-                                    className="w-10 h-10 rounded-full flex items-center justify-center"
-                                    style={{ background: 'rgba(208, 227, 255, 0.06)', border: '1px solid rgba(208, 227, 255, 0.15)' }}
-                                >
-                                    <Landmark size={16} style={{ color: '#F7F2EB' }} />
-                                </div>
-                                <span className="text-xs" style={{ color: '#FFF9F0' }}>Save</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* NEXXverification Badges */}
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                        <div
-                            className="px-4 py-3 rounded-xl flex items-start gap-3"
-                            style={{
-                                background: 'rgba(90, 158, 111, 0.06)',
-                                border: '1px solid rgba(90, 158, 111, 0.15)',
-                            }}
-                        >
-                            <div className="w-2 h-2 rounded-full mt-1.5" style={{ background: '#5A9E6F' }} />
-                            <div>
-                                <p className="text-xs font-semibold" style={{ color: '#5A9E6F' }}>
-                                    Rule 3.1 Certified
-                                </p>
-                                <p className="text-xs" style={{ color: '#FFF9F0' }}>
-                                    Formal formatting standards met
-                                </p>
-                            </div>
-                        </div>
-                        <div
-                            className="px-4 py-3 rounded-xl flex items-start gap-3"
-                            style={{
-                                background: 'rgba(90, 158, 111, 0.06)',
-                                border: '1px solid rgba(90, 158, 111, 0.15)',
-                            }}
-                        >
-                            <div className="w-2 h-2 rounded-full mt-1.5" style={{ background: '#5A9E6F' }} />
-                            <div>
-                                <p className="text-xs font-semibold" style={{ color: '#5A9E6F' }}>
-                                    Bates Validation
-                                </p>
-                                <p className="text-xs" style={{ color: '#FFF9F0' }}>
-                                    Sequence validated & confirmed
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Revision Input — TODO: wire to re-generation API */}
-                    <div
-                        className="flex items-center gap-3 px-4 py-3 rounded-xl"
-                        style={{
-                            background: 'rgba(255, 249, 240, 0.3)',
-                            border: '1px solid rgba(138, 122, 96, 0.1)',
-                            opacity: 0.5,
-                        }}
-                    >
-                        <Plus size={16} style={{ color: '#FFF9F0' }} />
-                        <input
-                            type="text"
-                            placeholder="Revision requests coming soon..."
-                            className="flex-1 bg-transparent text-sm outline-none"
-                            style={{ color: '#D0E3FF' }}
-                            disabled
-                            aria-disabled="true"
-                        />
-                        <button
-                            disabled
-                            className="w-8 h-8 rounded-full flex items-center justify-center cursor-not-allowed opacity-50"
-                            style={{
-                                background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
-                            }}
-                        >
-                            <ArrowRight size={14} style={{ color: '#F7F2EB' }} />
-                        </button>
-                    </div>
-
-                    {/* Disclaimer */}
-                    <p className="text-xs text-center mt-4" style={{ color: '#3A3020' }}>
-                        AI may make mistakes. Verify legal citations independently.
-                    </p>
                 </motion.div>
             )}
         </div>

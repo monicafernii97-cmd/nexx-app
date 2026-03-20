@@ -8,12 +8,12 @@ import {
     User,
     MapPin,
     Users,
-    Scale,
+    Scales,
     Briefcase,
-    Save,
+    FloppyDisk,
     Check,
-    Sparkles,
-} from 'lucide-react';
+    Sparkle,
+} from '@phosphor-icons/react';
 import { US_STATES } from '@/lib/constants';
 
 const TONE_OPTIONS = [
@@ -36,7 +36,7 @@ type CourtStatus = 'pending' | 'active' | 'closed' | 'none' | '';
 type TonePreference = 'direct' | 'gentle' | 'strategic' | 'clinical' | '';
 type EmotionalState = 'calm' | 'anxious' | 'angry' | 'overwhelmed' | 'numb' | '';
 
-/** User profile page for personal details, legal context, and tone preferences. */
+/** Ethereal User profile page for personal details, legal context, and tone preferences. */
 export default function ProfilePage() {
     const user = useQuery(api.users.me);
     const updateProfile = useMutation(api.users.updateProfile);
@@ -60,7 +60,6 @@ export default function ProfilePage() {
         emotionalState: '' as EmotionalState,
     });
 
-    // Sync form with loaded user data
     useEffect(() => {
         if (user) {
             setForm({
@@ -125,7 +124,6 @@ export default function ProfilePage() {
     };
 
     useEffect(() => {
-        // Sync arrays when childrenCount changes
         setForm(prev => {
             const count = prev.childrenCount;
             if (count > prev.childrenNames.length) {
@@ -147,76 +145,79 @@ export default function ProfilePage() {
 
     if (!user) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="animate-pulse-primary text-sm" style={{ color: '#FFF9F0' }}>Loading profile...</div>
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                <div className="w-10 h-10 rounded-full border-2 border-sapphire border-t-transparent animate-spin" />
+                <div className="text-sm font-semibold tracking-widest uppercase text-sapphire animate-pulse">Loading Profile</div>
             </div>
         );
     }
 
     return (
-        <div className="max-w-3xl mx-auto pb-12">
+        <div className="max-w-4xl mx-auto pb-16 w-full px-2 mt-4">
             <motion.div
-                initial={{ opacity: 0, y: 12 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between mb-8">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
                     <div>
-                        <h1 className="text-3xl font-serif font-bold" style={{ color: '#F7F2EB' }}>
-                            My Profile
+                        <h1 className="text-4xl text-headline text-sapphire mb-2">
+                            Personal <span className="text-editorial shimmer">Profile</span>
                         </h1>
-                        <p className="text-sm mt-1" style={{ color: '#FFF9F0' }}>
-                            This information helps NEXX personalize your experience.
+                        <p className="text-[15px] font-medium text-sapphire-muted max-w-lg">
+                            This baseline context empowers NEXX to tailor communication and legal strategy to your exact situation.
                         </p>
                     </div>
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
-                        style={{
-                            background: saved ? 'rgba(90, 158, 111, 0.2)' : 'linear-gradient(135deg, #F7F2EB, #123D7E)',
-                            color: saved ? '#5A9E6F' : '#FFFFFF',
-                            border: saved ? '1px solid rgba(90, 158, 111, 0.3)' : 'none',
-                        }}
-                    >
-                        {saved ? <Check size={16} /> : <Save size={16} />}
-                        {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Changes'}
-                    </button>
-                    {error && (
-                        <p className="text-xs mt-1" style={{ color: '#C75A5A' }}>{error}</p>
-                    )}
+                    
+                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        <button
+                            onClick={handleSave}
+                            disabled={saving}
+                            className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl text-[14px] font-semibold cursor-pointer transition-all duration-300 shadow-md border ${
+                                saved 
+                                ? 'bg-emerald text-white border-transparent' 
+                                : 'bg-sapphire text-white hover:bg-[#0F223D] border-transparent hover:shadow-lg hover:-translate-y-0.5'
+                            }`}
+                        >
+                            {saved ? <Check size={18} weight="bold" /> : <FloppyDisk size={18} weight={saving ? "duotone" : "bold"} className={saving ? "animate-pulse" : ""} />}
+                            {saving ? 'Syncing...' : saved ? 'Synced' : 'Save Changes'}
+                        </button>
+                        {error && (
+                            <p className="text-xs font-semibold text-rose">{error}</p>
+                        )}
+                    </div>
                 </div>
 
-                <div className="space-y-6">
+                <div className="grid grid-cols-1 gap-6">
                     {/* ── Personal Info ── */}
-                    <Section icon={<User size={18} />} title="Personal Information">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Field label="Full Name">
+                    <Section icon={<User size={20} weight="duotone" />} title="Personal Information">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <Field label="Full Legal Name">
                                 <input
-                                    className="input-premium w-full"
+                                    className="input-premium"
                                     value={form.name}
                                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                    placeholder="Your name"
+                                    placeholder="Your legal name"
                                 />
                             </Field>
-                            <Field label="Email">
+                            <Field label="Email Address">
                                 <input
-                                    className="input-premium w-full"
+                                    className="input-premium bg-cloud opacity-80 cursor-not-allowed"
                                     value={user.email || ''}
                                     disabled
-                                    style={{ opacity: 0.6 }}
                                 />
-                                <p className="text-xs mt-1" style={{ color: '#0A1E54' }}>Managed by Clerk</p>
+                                <p className="text-[11px] font-bold uppercase tracking-wider mt-2 text-sapphire-muted text-right">Managed securely via Clerk</p>
                             </Field>
                         </div>
                     </Section>
 
                     {/* ── Location ── */}
-                    <Section icon={<MapPin size={18} />} title="Location">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Field label="State">
+                    <Section icon={<MapPin size={20} weight="duotone" />} title="Jurisdiction">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <Field label="State of Filing">
                                 <select
-                                    className="input-premium w-full"
+                                    className="input-premium appearance-none bg-white"
                                     value={form.state}
                                     onChange={(e) => setForm({ ...form, state: e.target.value })}
                                 >
@@ -228,7 +229,7 @@ export default function ProfilePage() {
                             </Field>
                             <Field label="County">
                                 <input
-                                    className="input-premium w-full"
+                                    className="input-premium"
                                     value={form.county}
                                     onChange={(e) => setForm({ ...form, county: e.target.value })}
                                     placeholder="e.g. Los Angeles"
@@ -237,164 +238,195 @@ export default function ProfilePage() {
                         </div>
                     </Section>
 
+                    {/* ── Legal & Support (Bento Row) ── */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+                        <Section icon={<Scales size={20} weight="duotone" />} title="Legal Overview">
+                            <div className="space-y-5">
+                                <Field label="Custody Arrangement">
+                                    <select
+                                        className="input-premium appearance-none bg-white"
+                                        value={form.custodyType}
+                                        onChange={(e) => setForm({ ...form, custodyType: e.target.value as CustodyType })}
+                                    >
+                                        <option value="">Select current status</option>
+                                        <option value="sole">Sole Physical & Legal Custody</option>
+                                        <option value="joint">Joint Custody</option>
+                                        <option value="split">Split Custody</option>
+                                        <option value="visitation">Visitation Rights Only</option>
+                                        <option value="pending">Custody Pending</option>
+                                        <option value="none">No Custody Order</option>
+                                    </select>
+                                </Field>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Field label="Court Status">
+                                        <select
+                                            className="input-premium appearance-none bg-white"
+                                            value={form.courtStatus}
+                                            onChange={(e) => setForm({ ...form, courtStatus: e.target.value as CourtStatus })}
+                                        >
+                                            <option value="">Select status</option>
+                                            <option value="active">Active Litigation</option>
+                                            <option value="pending">Pending</option>
+                                            <option value="closed">Case Closed</option>
+                                            <option value="none">No Court Case</option>
+                                        </select>
+                                    </Field>
+                                    <Field label="Court Case No.">
+                                        <input
+                                            className="input-premium"
+                                            value={form.courtCaseNumber}
+                                            onChange={(e) => setForm({ ...form, courtCaseNumber: e.target.value })}
+                                            placeholder="Optional"
+                                        />
+                                    </Field>
+                                </div>
+                            </div>
+                        </Section>
+
+                        <Section icon={<Briefcase size={20} weight="duotone" />} title="Support Infrastructure">
+                            <div className="space-y-4">
+                                <label className="flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-colors bg-white hover:bg-cloud border border-transparent hover:border-[rgba(10,22,41,0.06)] shadow-sm">
+                                    <div className="flex-shrink-0 relative">
+                                        <input
+                                            type="checkbox"
+                                            checked={form.hasAttorney}
+                                            onChange={(e) => setForm({ ...form, hasAttorney: e.target.checked })}
+                                            className="peer sr-only"
+                                        />
+                                        <div className="w-6 h-6 rounded-md border-2 border-[rgba(10,22,41,0.2)] peer-checked:bg-sapphire peer-checked:border-sapphire transition-all flex items-center justify-center">
+                                            {form.hasAttorney && <Check size={14} weight="bold" className="text-white" />}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[15px] font-semibold text-sapphire">Active Legal Counsel</p>
+                                        <p className="text-[13px] font-medium text-sapphire-muted">NEXX will format exports for attorney use</p>
+                                    </div>
+                                </label>
+                                
+                                <label className="flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-colors bg-white hover:bg-cloud border border-transparent hover:border-[rgba(10,22,41,0.06)] shadow-sm">
+                                    <div className="flex-shrink-0 relative">
+                                        <input
+                                            type="checkbox"
+                                            checked={form.hasTherapist}
+                                            onChange={(e) => setForm({ ...form, hasTherapist: e.target.checked })}
+                                            className="peer sr-only"
+                                        />
+                                        <div className="w-6 h-6 rounded-md border-2 border-[rgba(10,22,41,0.2)] peer-checked:bg-sapphire peer-checked:border-sapphire transition-all flex items-center justify-center">
+                                            {form.hasTherapist && <Check size={14} weight="bold" className="text-white" />}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[15px] font-semibold text-sapphire">Therapeutic Support</p>
+                                        <p className="text-[13px] font-medium text-sapphire-muted">NEXX will consider emotional state in guidance</p>
+                                    </div>
+                                </label>
+                            </div>
+                        </Section>
+                    </div>
+
                     {/* ── Children ── */}
-                    <Section icon={<Users size={18} />} title="Children">
-                        <Field label="Number of Children">
-                            <select
-                                className="input-premium w-full max-w-[200px]"
-                                value={form.childrenCount}
-                                onChange={(e) => setForm({ ...form, childrenCount: parseInt(e.target.value) || 0 })}
-                            >
-                                {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                                    <option key={n} value={n}>{n}</option>
-                                ))}
-                            </select>
-                        </Field>
+                    <Section icon={<Users size={20} weight="duotone" />} title="Children Information">
+                        <div className="mb-6">
+                            <Field label="Total Number of Children Involved">
+                                <select
+                                    className="input-premium w-full max-w-[240px] appearance-none bg-white font-semibold"
+                                    value={form.childrenCount}
+                                    onChange={(e) => setForm({ ...form, childrenCount: parseInt(e.target.value) || 0 })}
+                                />
+                                    {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                                        <option key={n} value={n}>{n} {n === 1 ? 'Child' : 'Children'}</option>
+                                    ))}
+                                </select>
+                            </Field>
+                        </div>
                         {form.childrenCount > 0 && (
-                            <div className="mt-4 space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {Array.from({ length: form.childrenCount }).map((_, i) => (
-                                    <div key={i} className="grid grid-cols-2 gap-3">
-                                        <Field label={`Child ${i + 1} Name`}>
-                                            <input
-                                                className="input-premium w-full"
-                                                value={form.childrenNames[i] || ''}
-                                                onChange={(e) => updateChildName(i, e.target.value)}
-                                                placeholder="First name (optional)"
-                                            />
-                                        </Field>
-                                        <Field label="Age">
-                                            <input
-                                                className="input-premium w-full"
-                                                type="number"
-                                                min={0}
-                                                max={18}
-                                                value={form.childrenAges[i] ?? ''}
-                                                onChange={(e) => updateChildAge(i, parseInt(e.target.value) || 0)}
-                                                placeholder="Age"
-                                            />
-                                        </Field>
+                                    <div key={i} className="flex gap-4 p-4 rounded-2xl bg-cloud/50 border border-[rgba(10,22,41,0.03)]">
+                                        <div className="flex-1">
+                                            <Field label={`Child ${i + 1} Name`}>
+                                                <input
+                                                    className="input-premium bg-white"
+                                                    value={form.childrenNames[i] || ''}
+                                                    onChange={(e) => updateChildName(i, e.target.value)}
+                                                    placeholder="Name/Initial"
+                                                />
+                                            </Field>
+                                        </div>
+                                        <div className="w-24">
+                                            <Field label="Age">
+                                                <input
+                                                    className="input-premium bg-white text-center"
+                                                    type="number"
+                                                    min={0}
+                                                    max={25}
+                                                    value={form.childrenAges[i] ?? ''}
+                                                    onChange={(e) => updateChildAge(i, parseInt(e.target.value) || 0)}
+                                                    placeholder="Age"
+                                                />
+                                            </Field>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         )}
                     </Section>
 
-                    {/* ── Legal ── */}
-                    <Section icon={<Scale size={18} />} title="Legal Situation">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Field label="Custody Type">
-                                <select
-                                    className="input-premium w-full"
-                                    value={form.custodyType}
-                                    onChange={(e) => setForm({ ...form, custodyType: e.target.value as CustodyType })}
-                                >
-                                    <option value="">Select</option>
-                                    <option value="sole">Sole Custody</option>
-                                    <option value="joint">Joint Custody</option>
-                                    <option value="split">Split Custody</option>
-                                    <option value="visitation">Visitation Only</option>
-                                    <option value="pending">Pending</option>
-                                    <option value="none">No Custody Order</option>
-                                </select>
-                            </Field>
-                            <Field label="Court Status">
-                                <select
-                                    className="input-premium w-full"
-                                    value={form.courtStatus}
-                                    onChange={(e) => setForm({ ...form, courtStatus: e.target.value as CourtStatus })}
-                                >
-                                    <option value="">Select</option>
-                                    <option value="active">Active Case</option>
-                                    <option value="pending">Pending</option>
-                                    <option value="closed">Closed</option>
-                                    <option value="none">No Court Case</option>
-                                </select>
-                            </Field>
-                            <Field label="Court Case Number (optional)">
-                                <input
-                                    className="input-premium w-full"
-                                    value={form.courtCaseNumber}
-                                    onChange={(e) => setForm({ ...form, courtCaseNumber: e.target.value })}
-                                    placeholder="e.g. 24-FL-12345"
-                                />
-                            </Field>
-                        </div>
-                    </Section>
-
-                    {/* ── Support Team ── */}
-                    <Section icon={<Briefcase size={18} />} title="Support Team">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(208, 227, 255,0.04)]"
-                                style={{ border: '1px solid rgba(208, 227, 255, 0.1)' }}>
-                                <input
-                                    type="checkbox"
-                                    checked={form.hasAttorney}
-                                    onChange={(e) => setForm({ ...form, hasAttorney: e.target.checked })}
-                                    className="accent-[#F7F2EB] w-4 h-4"
-                                />
-                                <div>
-                                    <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>I have an attorney</p>
-                                    <p className="text-xs" style={{ color: '#FFF9F0' }}>NEXX will suggest coordinating with counsel</p>
-                                </div>
-                            </label>
-                            <label className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(208, 227, 255,0.04)]"
-                                style={{ border: '1px solid rgba(208, 227, 255, 0.1)' }}>
-                                <input
-                                    type="checkbox"
-                                    checked={form.hasTherapist}
-                                    onChange={(e) => setForm({ ...form, hasTherapist: e.target.checked })}
-                                    className="accent-[#F7F2EB] w-4 h-4"
-                                />
-                                <div>
-                                    <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>I have a therapist</p>
-                                    <p className="text-xs" style={{ color: '#FFF9F0' }}>NEXX will suggest discussing emotional impacts</p>
-                                </div>
-                            </label>
-                        </div>
-                    </Section>
-
                     {/* ── NEXX Personalization ── */}
-                    <Section icon={<Sparkles size={18} />} title="NEXX Personalization">
-                        <Field label="How should NEXX speak to you?">
-                            <div className="grid grid-cols-2 gap-3 mt-1">
-                                {TONE_OPTIONS.map((opt) => (
-                                    <button
-                                        key={opt.value}
-                                        onClick={() => setForm({ ...form, tonePreference: opt.value })}
-                                        className="text-left px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer"
-                                        style={{
-                                            background: form.tonePreference === opt.value ? 'rgba(208, 227, 255, 0.12)' : 'rgba(208, 227, 255, 0.03)',
-                                            border: `1px solid ${form.tonePreference === opt.value ? 'rgba(208, 227, 255, 0.4)' : 'rgba(208, 227, 255, 0.08)'}`,
-                                        }}
-                                    >
-                                        <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>{opt.label}</p>
-                                        <p className="text-xs mt-0.5" style={{ color: '#FFF9F0' }}>{opt.description}</p>
-                                    </button>
-                                ))}
+                    <Section icon={<Sparkle size={20} weight="duotone" className="text-champagne" />} title="NEXX A.I. Dynamics">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+                            <div>
+                                <Field label="Communication Preference">
+                                    <p className="text-[13px] font-medium text-sapphire-muted mb-4 leading-relaxed">
+                                        Select the linguistic tone NEXX should employ when generating documents and responses.
+                                    </p>
+                                    <div className="flex flex-col gap-3">
+                                        {TONE_OPTIONS.map((opt) => (
+                                            <button
+                                                key={opt.value}
+                                                onClick={() => setForm({ ...form, tonePreference: opt.value })}
+                                                className={`text-left p-4 rounded-2xl transition-all duration-300 cursor-pointer border ${
+                                                    form.tonePreference === opt.value
+                                                    ? 'bg-sapphire text-white shadow-md border-transparent scale-[1.01]'
+                                                    : 'bg-white hover:bg-cloud border-[rgba(10,22,41,0.05)] shadow-sm hover:shadow text-sapphire'
+                                                }`}
+                                            >
+                                                <p className="text-[15px] font-bold mb-1">{opt.label}</p>
+                                                <p className={`text-[13px] font-medium ${form.tonePreference === opt.value ? 'text-white/80' : 'text-sapphire-muted'}`}>
+                                                    {opt.description}
+                                                </p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </Field>
                             </div>
-                        </Field>
 
-                        <Field label="How are you feeling right now?">
-                            <p className="text-xs mb-2" style={{ color: '#D0E3FF' }}>
-                                This adjusts NEXX&apos;s language style only — never the substance of advice.
-                            </p>
-                            <div className="flex flex-wrap gap-2 mt-1">
-                                {EMOTIONAL_STATES.map((s) => (
-                                    <button
-                                        key={s.value}
-                                        onClick={() => setForm({ ...form, emotionalState: s.value })}
-                                        className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 cursor-pointer"
-                                        style={{
-                                            background: form.emotionalState === s.value ? 'rgba(208, 227, 255, 0.12)' : 'rgba(208, 227, 255, 0.03)',
-                                            border: `1px solid ${form.emotionalState === s.value ? 'rgba(208, 227, 255, 0.4)' : 'rgba(208, 227, 255, 0.08)'}`,
-                                        }}
-                                    >
-                                        <span>{s.emoji}</span>
-                                        <span className="text-sm" style={{ color: form.emotionalState === s.value ? '#F7F2EB' : '#D0E3FF' }}>{s.label}</span>
-                                    </button>
-                                ))}
+                            <div>
+                                <Field label="Current Emotional State">
+                                    <p className="text-[13px] font-medium text-sapphire-muted mb-4 leading-relaxed">
+                                        How are you navigating this moment? NEXX will tailor advice framing to support you best.
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {EMOTIONAL_STATES.map((s) => (
+                                            <button
+                                                key={s.value}
+                                                onClick={() => setForm({ ...form, emotionalState: s.value })}
+                                                className={`flex items-center gap-3 p-3 rounded-2xl transition-all duration-300 cursor-pointer border ${
+                                                    form.emotionalState === s.value
+                                                    ? 'bg-white border-champagne shadow-[0_4px_16px_rgba(212,175,55,0.15)] ring-1 ring-champagne scale-[1.02]'
+                                                    : 'bg-cloud/50 border-[rgba(10,22,41,0.04)] hover:bg-white hover:shadow-sm'
+                                                }`}
+                                            >
+                                                <span className="text-2xl">{s.emoji}</span>
+                                                <span className={`text-[14px] font-semibold ${form.emotionalState === s.value ? 'text-sapphire' : 'text-sapphire-muted'}`}>
+                                                    {s.label}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </Field>
                             </div>
-                        </Field>
+                        </div>
                     </Section>
                 </div>
             </motion.div>
@@ -406,29 +438,25 @@ export default function ProfilePage() {
 
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl p-6"
-            style={{
-                background: 'rgba(208, 227, 255, 0.02)',
-                border: '1px solid rgba(208, 227, 255, 0.1)',
-            }}
-        >
-            <div className="flex items-center gap-2 mb-5">
-                <span style={{ color: '#F7F2EB' }}>{icon}</span>
-                <h2 className="text-lg font-semibold" style={{ color: '#F7F2EB' }}>{title}</h2>
+        <div className="glass-ethereal rounded-[2rem] p-6 md:p-8 bg-white/70 border-white shadow-sm">
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[rgba(10,22,41,0.04)]">
+                <div className="w-10 h-10 rounded-xl bg-cloud flex items-center justify-center shadow-inner text-sapphire">
+                    {icon}
+                </div>
+                <h2 className="text-xl font-bold text-sapphire tracking-tight">{title}</h2>
             </div>
-            <div className="space-y-4">{children}</div>
-        </motion.div>
+            <div>{children}</div>
+        </div>
     );
 }
 
-/** Reusable form field wrapper with a styled label above the input. */
+/** Reusable form field wrapper */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
-        <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: '#D0E3FF' }}>{label}</label>
+        <div className="flex flex-col w-full group">
+            <label className="text-[12px] font-bold tracking-widest uppercase mb-2 text-sapphire-muted group-focus-within:text-champagne transition-colors">
+                {label}
+            </label>
             {children}
         </div>
     );

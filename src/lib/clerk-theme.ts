@@ -1,66 +1,85 @@
-import { dark } from '@clerk/themes';
-
-/** NEXX-branded Clerk theme configuration with luxury dark mode styling. */
+/** NEXX-branded Clerk theme configuration with Ethereal luxury light mode styling. */
 export const nexxClerkAppearance = {
-    baseTheme: dark,
     variables: {
-        colorPrimary: '#123D7E',
-        colorBackground: '#0A1E54',
-        colorInputBackground: '#FFF9F0',
-        colorInputText: '#0A1E54',
-        colorText: '#F7F2EB',
-        colorTextSecondary: '#D0E3FF',
+        colorPrimary: '#8a7a60',          // champagne
+        colorBackground: 'transparent',
+        colorInputBackground: '#ffffff',
+        colorInputText: '#0a1e54',        // sapphire-dark
+        colorText: '#0a1e54',             // sapphire-dark
+        colorTextSecondary: '#4a6094',    // sapphire-base
         borderRadius: '12px',
         fontFamily: 'Inter, sans-serif',
+        colorSuccess: '#10b981',
+        colorDanger: '#ef4444',
+        colorWarning: '#f59e0b',
     },
     elements: {
         card: {
-            background: '#0A1E54',
-            border: '1px solid rgba(208, 227, 255, 0.15)',
+            background: 'transparent',
+            border: 'none',
             borderRadius: '16px',
-            boxShadow: '0 16px 64px rgba(0, 0, 0, 0.4)',
+            boxShadow: 'none',
         },
         headerTitle: {
-            color: '#F7F2EB',
+            color: '#0a1e54',             // sapphire-dark
             fontFamily: "'Playfair Display', serif",
+            fontWeight: '600',
         },
         headerSubtitle: {
-            color: '#D0E3FF',
+            color: '#4a6094',             // sapphire-base
         },
         socialButtonsBlockButton: {
-            border: '1px solid rgba(208, 227, 255, 0.15)',
-            background: '#FFF9F0',
-            color: '#0A1E54',
+            border: '1px solid #d0e3ff',  // cloud-light
+            background: '#ffffff',
+            color: '#0a1e54',             // sapphire-dark
+            boxShadow: '0 1px 2px rgba(10, 30, 84, 0.05)',
         },
         socialButtonsBlockButtonText: {
-            color: '#0A1E54',
+            color: '#0a1e54',             // sapphire-dark
+            fontWeight: '600',
         },
         formFieldLabel: {
-            color: '#D0E3FF',
+            color: '#4a6094',             // sapphire-base
             textTransform: 'uppercase' as const,
             fontSize: '11px',
             letterSpacing: '0.1em',
             fontWeight: '600',
         },
         formFieldInput: {
-            background: '#FFF9F0',
-            border: '1px solid rgba(10, 30, 84, 0.12)',
-            color: '#0A1E54',
+            background: '#ffffff',
+            border: '1px solid #d0e3ff',  // cloud-light
+            color: '#0a1e54',             // sapphire-dark
+            boxShadow: 'inset 0 1px 3px rgba(10, 30, 84, 0.02)',
         },
         formButtonPrimary: {
-            background: 'linear-gradient(135deg, #FFF9F0, #D0E3FF)',
-            color: '#0A1E54',
+            background: 'linear-gradient(135deg, #0a1e54, #123d7e)',
+            color: '#ffffff',
             fontWeight: '600',
             letterSpacing: '0.05em',
+            boxShadow: '0 4px 12px rgba(10, 30, 84, 0.15)',
+            border: 'none',
         },
         footerActionLink: {
-            color: '#D0E3FF',
+            color: '#123d7e',             // sapphire-light mapping approx
+            fontWeight: '600',
         },
         dividerLine: {
-            background: 'rgba(208, 227, 255, 0.15)',
+            background: '#d0e3ff',        // cloud-light
         },
         dividerText: {
-            color: '#D0E3FF',
+            color: '#4a6094',             // sapphire-base
+        },
+        profileSectionTitleText: {
+            color: '#0a1e54',             // sapphire-dark
+            fontWeight: '600',
+            borderBottom: '1px solid #d0e3ff',
+            paddingBottom: '8px',
+        },
+        profileSectionPrimaryButton: {
+            color: '#123d7e',
+        },
+        accordionTriggerButton: {
+            color: '#0a1e54',
         },
     },
 } as const;

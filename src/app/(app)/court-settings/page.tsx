@@ -8,16 +8,16 @@ import { US_STATES, searchCounties } from '@/lib/data/usCounties';
 import {
     Gavel,
     MapPin,
-    Save,
-    Sparkles,
+    FloppyDisk,
+    Sparkle,
     Check,
-    AlertTriangle,
-    ChevronDown,
-    Search,
+    Warning,
+    CaretDown,
+    MagnifyingGlass,
     FileText,
     User,
-    Building2,
-} from 'lucide-react';
+    Buildings,
+} from '@phosphor-icons/react';
 
 /** Court settings page for configuring state, county, judge, and cause number. */
 export default function CourtSettingsPage() {
@@ -166,7 +166,7 @@ export default function CourtSettingsPage() {
     }, [state, county, courtName, existingSettings]);
 
     return (
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl mx-auto pb-20">
             {/* Header */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
@@ -174,21 +174,15 @@ export default function CourtSettingsPage() {
                 className="flex items-start justify-between mb-8"
             >
                 <div>
-                    <div className="flex items-center gap-3 mb-2">
-                        <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center"
-                            style={{
-                                background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
-                                boxShadow: '0 2px 12px rgba(208, 227, 255, 0.25)',
-                            }}
-                        >
-                            <Gavel size={18} style={{ color: '#F7F2EB' }} />
+                    <div className="flex items-center gap-4 mb-3">
+                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white shadow-sm border border-[var(--cloud-light)]">
+                            <Gavel size={28} className="text-[var(--champagne)]" weight="duotone" />
                         </div>
-                        <h1 className="text-headline text-2xl" style={{ color: '#F7F2EB' }}>
+                        <h1 className="text-4xl font-light tracking-tight text-[var(--sapphire-dark)]">
                             Court Settings
                         </h1>
                     </div>
-                    <p className="text-sm" style={{ color: '#FFF9F0' }}>
+                    <p className="text-base text-[var(--sapphire-base)] max-w-2xl leading-relaxed">
                         Configure your court location and formatting preferences. These settings are used when generating legal documents.
                     </p>
                 </div>
@@ -199,23 +193,22 @@ export default function CourtSettingsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="card-premium p-6 mb-6"
+                className="card-premium p-6 mb-8 border border-[var(--cloud-light)] bg-white/60"
             >
-                <div className="flex items-center gap-2 mb-5">
-                    <MapPin size={16} style={{ color: '#F7F2EB' }} />
-                    <h2
-                        className="text-sm font-semibold tracking-[0.15em] uppercase"
-                        style={{ color: '#D0E3FF' }}
-                    >
-                        Court Location
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-8 h-8 rounded-full bg-[var(--cloud)] flex items-center justify-center">
+                        <MapPin size={16} className="text-[var(--champagne)]" weight="bold" />
+                    </div>
+                    <h2 className="text-sm font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
+                        Jurisdiction Setup
                     </h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pl-2">
                     {/* State Dropdown */}
                     <div className="relative">
-                        <label htmlFor="court-state-input" className="block text-xs font-medium mb-1.5" style={{ color: '#D0E3FF' }}>
-                            State <span style={{ color: '#F7F2EB' }}>*</span>
+                        <label htmlFor="court-state-input" className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
+                            State <span className="text-[var(--champagne)]">*</span>
                         </label>
                         <div className="relative">
                             <input
@@ -231,18 +224,13 @@ export default function CourtSettingsPage() {
                                     setStateQuery('');
                                 }}
                                 placeholder="Select state..."
-                                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-all"
-                                style={{
-                                    background: 'rgba(2, 2, 45, 0.6)',
-                                    border: '1px solid rgba(208, 227, 255, 0.15)',
-                                    color: '#F7F2EB',
-                                }}
+                                className="input-premium w-full text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
                                 id="court-state-input"
                             />
-                            <ChevronDown
+                            <CaretDown
                                 size={14}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                                style={{ color: '#FFF9F0' }}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--sapphire-base)]"
+                                weight="bold"
                             />
                         </div>
                         <AnimatePresence>
@@ -252,12 +240,7 @@ export default function CourtSettingsPage() {
                                     initial={{ opacity: 0, y: -4 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -4 }}
-                                    className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto rounded-xl"
-                                    style={{
-                                        background: '#F7F2EB',
-                                        border: '1px solid rgba(208, 227, 255, 0.2)',
-                                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
-                                    }}
+                                    className="absolute z-50 w-full mt-2 max-h-48 overflow-y-auto rounded-xl shadow-lg border border-[var(--cloud-light)] bg-white/95 backdrop-blur-md"
                                 >
                                     {filteredStates.map((s) => (
                                         <button
@@ -269,9 +252,9 @@ export default function CourtSettingsPage() {
                                                 setShowStateDropdown(false);
                                                 setStateQuery('');
                                             }}
-                                            className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-[rgba(208,227,255,0.08)] cursor-pointer"
+                                            className="w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-[var(--cloud)] cursor-pointer"
                                             style={{
-                                                color: s === state ? '#0A1E54' : '#123D7E',
+                                                color: s === state ? 'var(--sapphire-dark)' : 'var(--sapphire-base)',
                                                 fontWeight: s === state ? 600 : 400,
                                             }}
                                         >
@@ -285,8 +268,8 @@ export default function CourtSettingsPage() {
 
                     {/* County Typeahead */}
                     <div className="relative">
-                        <label htmlFor="court-county-input" className="block text-xs font-medium mb-1.5" style={{ color: '#D0E3FF' }}>
-                            County <span style={{ color: '#F7F2EB' }}>*</span>
+                        <label htmlFor="court-county-input" className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
+                            County <span className="text-[var(--champagne)]">*</span>
                         </label>
                         <div className="relative">
                             <input
@@ -303,18 +286,13 @@ export default function CourtSettingsPage() {
                                 }}
                                 placeholder={state ? 'Start typing county...' : 'Select state first'}
                                 disabled={!state}
-                                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-all disabled:opacity-40"
-                                style={{
-                                    background: 'rgba(2, 2, 45, 0.6)',
-                                    border: '1px solid rgba(208, 227, 255, 0.15)',
-                                    color: '#F7F2EB',
-                                }}
+                                className="input-premium w-full text-sm disabled:opacity-50 disabled:cursor-not-allowed bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
                                 id="court-county-input"
                             />
-                            <Search
+                            <MagnifyingGlass
                                 size={14}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                                style={{ color: '#FFF9F0' }}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--sapphire-base)]"
+                                weight="bold"
                             />
                         </div>
                         <AnimatePresence>
@@ -324,12 +302,7 @@ export default function CourtSettingsPage() {
                                     initial={{ opacity: 0, y: -4 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -4 }}
-                                    className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto rounded-xl"
-                                    style={{
-                                        background: '#F7F2EB',
-                                        border: '1px solid rgba(208, 227, 255, 0.2)',
-                                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
-                                    }}
+                                    className="absolute z-50 w-full mt-2 max-h-48 overflow-y-auto rounded-xl shadow-lg border border-[var(--cloud-light)] bg-white/95 backdrop-blur-md"
                                 >
                                     {filteredCounties.map((c) => (
                                         <button
@@ -339,9 +312,9 @@ export default function CourtSettingsPage() {
                                                 setCountyQuery('');
                                                 setShowCountyDropdown(false);
                                             }}
-                                            className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-[rgba(208,227,255,0.08)] cursor-pointer"
+                                            className="w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-[var(--cloud)] cursor-pointer"
                                             style={{
-                                                color: c === county ? '#0A1E54' : '#123D7E',
+                                                color: c === county ? 'var(--sapphire-dark)' : 'var(--sapphire-base)',
                                                 fontWeight: c === county ? 600 : 400,
                                             }}
                                         >
@@ -355,20 +328,15 @@ export default function CourtSettingsPage() {
 
                     {/* Court Name */}
                     <div className="md:col-span-2">
-                        <label htmlFor="court-name-input" className="block text-xs font-medium mb-1.5" style={{ color: '#D0E3FF' }}>
-                            Court Name <span className="text-xs" style={{ color: '#D0E3FF' }}>(optional)</span>
+                        <label htmlFor="court-name-input" className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
+                            Court Name <span className="text-[var(--sapphire-light)] font-normal text-[10px] ml-1">(Optional)</span>
                         </label>
                         <input
                             type="text"
                             value={courtName}
                             onChange={(e) => setCourtName(e.target.value)}
                             placeholder="e.g. 328th District Court"
-                            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-all"
-                            style={{
-                                background: 'rgba(2, 2, 45, 0.6)',
-                                border: '1px solid rgba(208, 227, 255, 0.15)',
-                                color: '#F7F2EB',
-                            }}
+                            className="input-premium w-full text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
                             id="court-name-input"
                         />
                     </div>
@@ -380,21 +348,20 @@ export default function CourtSettingsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="card-premium p-6 mb-6"
+                className="card-premium p-6 mb-8 border border-[var(--cloud-light)] bg-white/60"
             >
-                <div className="flex items-center gap-2 mb-5">
-                    <FileText size={16} style={{ color: '#F7F2EB' }} />
-                    <h2
-                        className="text-sm font-semibold tracking-[0.15em] uppercase"
-                        style={{ color: '#D0E3FF' }}
-                    >
-                        Case Details
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-8 h-8 rounded-full bg-[var(--cloud)] flex items-center justify-center">
+                        <FileText size={16} className="text-[var(--champagne)]" weight="bold" />
+                    </div>
+                    <h2 className="text-sm font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
+                        Case Specifics
                     </h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pl-2">
                     <div>
-                        <label htmlFor="cause-number-input" className="block text-xs font-medium mb-1.5" style={{ color: '#D0E3FF' }}>
+                        <label htmlFor="cause-number-input" className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
                             Cause Number
                         </label>
                         <input
@@ -402,61 +369,46 @@ export default function CourtSettingsPage() {
                             value={causeNumber}
                             onChange={(e) => setCauseNumber(e.target.value)}
                             placeholder="e.g. 24-DCV-123456"
-                            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                            style={{
-                                background: 'rgba(2, 2, 45, 0.6)',
-                                border: '1px solid rgba(208, 227, 255, 0.15)',
-                                color: '#F7F2EB',
-                            }}
+                            className="input-premium w-full text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
                             id="cause-number-input"
                         />
                     </div>
                     <div>
-                        <label htmlFor="judge-input" className="block text-xs font-medium mb-1.5" style={{ color: '#D0E3FF' }}>
+                        <label htmlFor="judge-input" className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
                             Assigned Judge
                         </label>
                         <div className="relative">
                             <User
-                                size={14}
-                                className="absolute left-3 top-1/2 -translate-y-1/2"
-                                style={{ color: '#D0E3FF' }}
+                                size={16}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sapphire-light)]"
+                                weight="bold"
                             />
                             <input
                                 type="text"
                                 value={assignedJudge}
                                 onChange={(e) => setAssignedJudge(e.target.value)}
                                 placeholder="e.g. Hon. Jane Smith"
-                                className="w-full pl-8 pr-3 py-2.5 rounded-xl text-sm outline-none"
-                                style={{
-                                    background: 'rgba(2, 2, 45, 0.6)',
-                                    border: '1px solid rgba(208, 227, 255, 0.15)',
-                                    color: '#F7F2EB',
-                                }}
+                                className="input-premium w-full pl-10 pr-4 text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
                                 id="judge-input"
                             />
                         </div>
                     </div>
                     <div className="md:col-span-2">
-                        <label htmlFor="judicial-district-input" className="block text-xs font-medium mb-1.5" style={{ color: '#D0E3FF' }}>
+                        <label htmlFor="judicial-district-input" className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
                             Judicial District
                         </label>
                         <div className="relative">
-                            <Building2
-                                size={14}
-                                className="absolute left-3 top-1/2 -translate-y-1/2"
-                                style={{ color: '#D0E3FF' }}
+                            <Buildings
+                                size={16}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sapphire-light)]"
+                                weight="bold"
                             />
                             <input
                                 type="text"
                                 value={judicialDistrict}
                                 onChange={(e) => setJudicialDistrict(e.target.value)}
                                 placeholder="e.g. 328th Judicial District"
-                                className="w-full pl-8 pr-3 py-2.5 rounded-xl text-sm outline-none"
-                                style={{
-                                    background: 'rgba(2, 2, 45, 0.6)',
-                                    border: '1px solid rgba(208, 227, 255, 0.15)',
-                                    color: '#F7F2EB',
-                                }}
+                                className="input-premium w-full pl-10 pr-4 text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
                                 id="judicial-district-input"
                             />
                         </div>
@@ -469,28 +421,27 @@ export default function CourtSettingsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="card-premium p-6 mb-6"
+                className="card-premium p-6 mb-8 border border-[var(--champagne)]/30 bg-gradient-to-br from-white to-[var(--pearl)] shadow-sm"
             >
-                <div className="flex items-center gap-2 mb-4">
-                    <Sparkles size={16} style={{ color: '#F7F2EB' }} />
-                    <h2
-                        className="text-sm font-semibold tracking-[0.15em] uppercase"
-                        style={{ color: '#D0E3FF' }}
-                    >
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-full bg-[var(--champagne)]/10 flex items-center justify-center">
+                        <Sparkle size={16} className="text-[var(--champagne)]" weight="duotone" />
+                    </div>
+                    <h2 className="text-sm font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
                         AI Court Rules Verification
                     </h2>
                 </div>
-                <p className="text-xs mb-4" style={{ color: '#FFF9F0' }}>
+                <p className="text-sm mb-6 text-[var(--sapphire-base)] leading-relaxed pl-2">
                     NEXX AI will search official court websites and local rules to verify formatting
                     requirements for your selected court. This ensures your documents comply with
                     local filing standards.
                 </p>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4 pl-2">
                     <button
                         onClick={handleVerify}
                         disabled={!state || !county || verifying}
-                        className="btn-primary text-xs flex items-center gap-2 disabled:opacity-40"
+                        className="btn-outline text-sm flex items-center gap-2 group hover:shadow-md disabled:opacity-50"
                     >
                         {verifying ? (
                             <>
@@ -498,27 +449,27 @@ export default function CourtSettingsPage() {
                                     animate={{ rotate: 360 }}
                                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                                 >
-                                    <Sparkles size={14} />
+                                    <Sparkle size={16} className="text-[var(--champagne)]" weight="fill" />
                                 </motion.div>
-                                Verifying...
+                                Verifying Framework...
                             </>
                         ) : (
                             <>
-                                <Sparkles size={14} />
+                                <Sparkle size={16} className="text-[var(--champagne)] group-hover:scale-110 transition-transform" weight="fill" />
                                 Verify with AI
                             </>
                         )}
                     </button>
 
                     {existingSettings?.aiVerified && (
-                        <span className="flex items-center gap-1.5 text-xs" style={{ color: '#4CAF50' }}>
-                            <Check size={12} /> AI Verified
+                        <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--success)] bg-[var(--success)]/10 px-3 py-1.5 rounded-full border border-[var(--success)]/20">
+                            <Check size={14} weight="bold" /> AI Verified
                         </span>
                     )}
 
                     {verifyError && (
-                        <span className="flex items-center gap-1.5 text-xs" style={{ color: '#EF4444' }}>
-                            <AlertTriangle size={12} /> {verifyError}
+                        <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--error)] bg-[var(--error)]/10 px-3 py-1.5 rounded-full border border-[var(--error)]/20">
+                            <Warning size={14} weight="bold" /> {verifyError}
                         </span>
                     )}
                 </div>
@@ -530,57 +481,54 @@ export default function CourtSettingsPage() {
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="mt-4 rounded-xl p-4"
-                            style={{
-                                background: 'rgba(2, 2, 45, 0.4)',
-                                border: '1px solid rgba(208, 227, 255, 0.1)',
-                            }}
+                            className="overflow-hidden"
                         >
-                            <div className="flex items-center gap-2 mb-2">
-                                {verifyResult.confidence > 0.5 ? (
-                                    <Check size={14} style={{ color: '#4CAF50' }} />
-                                ) : (
-                                    <AlertTriangle size={14} style={{ color: '#FF9800' }} />
-                                )}
-                                <span className="text-xs font-medium" style={{ color: '#D0E3FF' }}>
-                                    Confidence: {Math.round(verifyResult.confidence * 100)}%
-                                </span>
-                            </div>
-                            {verifyResult.sources.length > 0 && (
-                                <div className="mt-2">
-                                    <span className="text-xs" style={{ color: '#D0E3FF' }}>Sources:</span>
-                                    <ul className="mt-1 space-y-1">
-                                        {verifyResult.sources.slice(0, 3).map((url) => {
-                                            try {
-                                                const parsed = new URL(url);
-                                                if (!['http:', 'https:'].includes(parsed.protocol)) {
+                            <div className="mt-6 rounded-xl p-5 border border-[var(--cloud-light)] bg-white/80 shadow-inner">
+                                <div className="flex items-center gap-2 mb-3">
+                                    {verifyResult.confidence > 0.5 ? (
+                                        <Check size={18} className="text-[var(--success)]" weight="bold" />
+                                    ) : (
+                                        <Warning size={18} className="text-[#FF9800]" weight="bold" />
+                                    )}
+                                    <span className="text-sm font-semibold text-[var(--sapphire-dark)]">
+                                        Confidence: {Math.round(verifyResult.confidence * 100)}%
+                                    </span>
+                                </div>
+                                {verifyResult.sources.length > 0 && (
+                                    <div className="mt-3">
+                                        <span className="text-xs font-bold uppercase tracking-widest text-[var(--sapphire-light)]">Sources:</span>
+                                        <ul className="mt-2 space-y-1.5 pl-1">
+                                            {verifyResult.sources.slice(0, 3).map((url) => {
+                                                try {
+                                                    const parsed = new URL(url);
+                                                    if (!['http:', 'https:'].includes(parsed.protocol)) {
+                                                        return null;
+                                                    }
+                                                    return (
+                                                        <li key={parsed.href}>
+                                                            <a
+                                                                href={parsed.href}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-sm truncate block hover:underline text-[var(--sapphire-base)] hover:text-[var(--sapphire-dark)]"
+                                                            >
+                                                                {parsed.hostname}
+                                                            </a>
+                                                        </li>
+                                                    );
+                                                } catch {
                                                     return null;
                                                 }
-                                                return (
-                                                    <li key={parsed.href}>
-                                                        <a
-                                                            href={parsed.href}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="text-xs truncate block hover:underline"
-                                                            style={{ color: '#F7F2EB' }}
-                                                        >
-                                                            {parsed.hostname}
-                                                        </a>
-                                                    </li>
-                                                );
-                                            } catch {
-                                                return null;
-                                            }
-                                        })}
-                                    </ul>
-                                </div>
-                            )}
-                            {verifyResult.confidence === 0 && (
-                                <p className="text-xs mt-2" style={{ color: '#FFF9F0' }}>
-                                    No specific formatting rules found for this court. Default state rules will be applied.
-                                </p>
-                            )}
+                                            })}
+                                        </ul>
+                                    </div>
+                                )}
+                                {verifyResult.confidence === 0 && (
+                                    <p className="text-sm mt-3 text-[var(--sapphire-base)] italic">
+                                        No specific formatting rules found for this court. Default state rules will be applied.
+                                    </p>
+                                )}
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
@@ -596,42 +544,34 @@ export default function CourtSettingsPage() {
                 <button
                     onClick={handleSave}
                     disabled={!state || !county || saving}
-                    className="btn-primary text-sm flex items-center gap-2 px-8 py-3 disabled:opacity-40"
+                    className="btn-primary flex items-center gap-3 px-8 py-4 text-base shadow-md disabled:opacity-50"
                 >
                     {saving ? (
-                        'Saving...'
+                        'Saving Configuration...'
                     ) : saved ? (
                         <>
-                            <Check size={16} /> Saved
+                            <Check size={20} weight="bold" /> Configuration Saved
                         </>
                     ) : (
                         <>
-                            <Save size={16} /> Save Court Settings
+                            <FloppyDisk size={20} weight="bold" /> Save Court Settings
                         </>
                     )}
                 </button>
 
-                {saved && (
-                    <motion.span
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="text-xs"
-                        style={{ color: '#4CAF50' }}
-                    >
-                        Settings saved successfully
-                    </motion.span>
-                )}
-
-                {saveError && (
-                    <motion.span
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="text-xs"
-                        style={{ color: '#EF4444' }}
-                    >
-                        {saveError}
-                    </motion.span>
-                )}
+                <AnimatePresence>
+                    {saveError && (
+                        <motion.span
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -10 }}
+                            className="text-sm font-medium text-[var(--error)] flex items-center gap-1.5"
+                        >
+                            <Warning size={16} weight="bold" />
+                            {saveError}
+                        </motion.span>
+                    )}
+                </AnimatePresence>
             </motion.div>
 
             {/* Info Footer */}
@@ -639,10 +579,9 @@ export default function CourtSettingsPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
-                className="text-center text-xs mt-8 mb-4"
-                style={{ color: '#D0E3FF' }}
+                className="text-center text-xs mt-10 text-[var(--sapphire-light)] font-medium"
             >
-                Court settings are used to format legal documents per your local court&apos;s requirements.
+                Court settings directly inform NEXX AI for precision formatting of generated legal filings.
             </motion.p>
         </div>
     );

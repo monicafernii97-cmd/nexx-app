@@ -46,17 +46,16 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder ?? 'Consult NEXX Intelligence...'}
                 rows={1}
-                className="flex-1 bg-transparent border-none outline-none resize-none text-[15px] font-medium placeholder:text-sapphire-muted/60 pl-2 pt-2 pb-1"
+                className="flex-1 bg-transparent border-none outline-none resize-none text-[15px] font-bold placeholder:text-[#0A1128]/40 text-[#0A1128] pl-2 pt-2 pb-1"
                 style={{
-                    color: 'var(--sapphire)',
-                    caretColor: 'var(--champagne)',
+                    caretColor: '#2563EB',
                     minHeight: 24,
                     maxHeight: 120,
                 }}
             />
             <div className="flex items-center gap-2 flex-shrink-0">
                 <button
-                    className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer bg-cloud hover:bg-[rgba(10,22,41,0.06)] text-sapphire-muted hover:text-sapphire"
+                    className="w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#0A1128]/50 hover:text-[#0A1128]"
                     title="Voice input (coming soon)"
                 >
                     <Microphone size={18} weight="duotone" />
@@ -64,10 +63,10 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 <button
                     onClick={handleSend}
                     disabled={!input.trim() || disabled}
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm ${
+                    className={`w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-300 shadow-sm ${
                         input.trim() && !disabled
-                            ? 'bg-sapphire hover:bg-[#0A1629] text-white hover:scale-105 hover:shadow-md cursor-pointer'
-                            : 'bg-cloud text-sapphire-muted/30 cursor-not-allowed'
+                            ? 'bg-[linear-gradient(135deg,#60A5FA,#2563EB)] text-white hover:scale-105 hover:shadow-lg cursor-pointer'
+                            : 'bg-[#F1F5F9] text-[#0A1128]/30 cursor-not-allowed'
                     }`}
                 >
                     <PaperPlaneRight size={18} weight={input.trim() && !disabled ? "fill" : "regular"} />

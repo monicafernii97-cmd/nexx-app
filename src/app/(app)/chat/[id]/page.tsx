@@ -6,7 +6,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
 import { Id } from '../../../../../convex/_generated/dataModel';
 import { useParams, useRouter } from 'next/navigation';
-import { Sparkle, ArrowLeft, Archive, FlowArrow } from '@phosphor-icons/react';
+import { ArrowLeft, Archive, FlowArrow } from '@phosphor-icons/react';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
 import { MODE_LABELS } from '@/lib/constants';
@@ -183,9 +183,9 @@ export default function ConversationPage() {
                 </button>
                 
                 <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center bg-white shadow-[0_8px_30px_rgba(208,227,255,0.4)] border border-[rgba(10,22,41,0.04)]"
+                    className="w-12 h-12 rounded-[14px] flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_16px_rgba(18,61,126,0.3)] border border-white/10"
                 >
-                    <Sparkle size={24} weight="duotone" className="text-champagne" />
+                    <span className="text-white font-serif font-bold text-[22px] drop-shadow-sm pb-1"><i>N</i></span>
                 </div>
                 
                 <div className="flex-1 min-w-0">
@@ -232,9 +232,9 @@ export default function ConversationPage() {
                         className="flex flex-col items-center justify-center m-auto text-center px-6 py-12 card-premium max-w-md w-full"
                     >
                         <div
-                            className="w-20 h-20 rounded-3xl mb-6 flex items-center justify-center bg-white shadow-[0_8px_30px_rgba(208,227,255,0.4)] border border-[rgba(10,22,41,0.04)]"
+                            className="w-20 h-20 rounded-[24px] mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_8px_32px_rgba(18,61,126,0.3)] border border-white/10"
                         >
-                            <Sparkle size={40} weight="duotone" className="text-champagne" />
+                            <span className="text-white font-serif font-bold text-[40px] drop-shadow-sm pb-2"><i>N</i></span>
                         </div>
                         <h2 className="font-serif text-2xl font-bold mb-3 text-sapphire">
                             Secure Counsel Authorized
@@ -243,8 +243,8 @@ export default function ConversationPage() {
                             Share what&apos;s on your mind — an incident, a message from your NEX,
                             a legal concern, or your emotional state.
                         </p>
-                        <div className="flex items-center gap-2 text-[12px] font-bold tracking-widest uppercase text-champagne bg-champagne/10 px-4 py-2 rounded-full border border-champagne/20">
-                            <Sparkle size={14} weight="fill" /> Ready to Analyze
+                        <div className="flex items-center justify-center text-[12px] font-bold tracking-[0.2em] uppercase text-white bg-[linear-gradient(135deg,#60A5FA,#2563EB)] px-5 py-2.5 rounded-full shadow-md">
+                            Ready to Analyze
                         </div>
                     </motion.div>
                 )}
@@ -274,8 +274,8 @@ export default function ConversationPage() {
                         className="flex w-full justify-start pl-2"
                     >
                         <div className="flex max-w-[85%] lg:max-w-[75%] gap-4">
-                            <div className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center bg-white shadow-md border border-cloud sticky top-2 z-10">
-                                <Sparkle size={20} weight="duotone" className="text-champagne animate-pulse" />
+                            <div className="w-10 h-10 rounded-[12px] flex-shrink-0 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-md sticky top-2 z-10 border border-white/10">
+                                <span className="text-white font-serif font-bold text-[18px] drop-shadow-sm mb-0.5 animate-pulse"><i>N</i></span>
                             </div>
                             <div className="card-premium p-5 rounded-tl-sm flex items-center gap-3 w-32 border-white bg-white/60">
                                 {[0, 1, 2].map((j) => (
@@ -310,8 +310,7 @@ export default function ConversationPage() {
                 <div className="glass-ethereal rounded-[2rem] p-2 shadow-lg border-white">
                     <ChatInput onSend={handleSend} disabled={isStreaming || isPending || !isThreadReady} />
                 </div>
-                <p className="text-center text-[11px] font-bold tracking-widest uppercase mt-4 text-sapphire-muted/60 flex items-center justify-center gap-2">
-                    <Sparkle size={12} weight="fill" />
+                <p className="text-center text-[10px] font-bold tracking-[0.15em] uppercase mt-4 text-[#0A1128]/50 flex items-center justify-center">
                     NEXX provides strategic guidance, not formal legal advice.
                 </p>
             </motion.div>

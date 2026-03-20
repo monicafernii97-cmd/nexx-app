@@ -127,127 +127,99 @@ export default function WelcomePage() {
 
   // Only render welcome page for unauthenticated users
   return (
-    <div className="silk-bg min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
-      {/* Ambient Gold Particles */}
-      <div className="absolute inset-0 pointer-events-none">
-        {[...Array(6)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute rounded-full"
-            style={{
-              width: 200 + i * 80,
-              height: 200 + i * 80,
-              background: `radial-gradient(circle, rgba(208, 227, 255, ${0.03 + i * 0.01}) 0%, transparent 70%)`,
-              left: `${10 + i * 15}%`,
-              top: `${20 + (i % 3) * 25}%`,
-            }}
-            animate={{
-              x: [0, 20, -10, 0],
-              y: [0, -15, 10, 0],
-              scale: [1, 1.05, 0.98, 1],
-            }}
-            transition={{
-              duration: 8 + i * 2,
-              repeat: Infinity,
-              ease: 'easeInOut',
-            }}
-          />
-        ))}
+    <div className="bg-[#0A1128] min-h-screen flex flex-col justify-center relative overflow-hidden font-sans">
+      {/* Jumbo Background NEXX Shimmer */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden opacity-5">
+        <motion.div
+           initial={{ x: '-100%' }}
+           animate={{ x: '100%' }}
+           transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+           className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 skew-x-12"
+        />
+        <h1 className="text-[25vw] font-black font-serif tracking-tighter text-white whitespace-nowrap select-none">
+          NEXX
+        </h1>
       </div>
 
-      {/* Content */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, ease: [0.25, 1, 0.5, 1] }}
-        className="text-center z-10 px-6 max-w-lg"
-      >
+      {/* Ambient Radial Gradients */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[var(--sapphire-base)]/20 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[50%] bg-[#1A4B9B]/20 rounded-full blur-[100px]" />
+      </div>
+
+      <div className="w-full max-w-7xl mx-auto px-6 md:px-12 xl:px-24 z-10 relative mt-[-10vh]">
+        
         {/* Logo Mark */}
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.2, ease: [0.34, 1.56, 0.64, 1] }}
-          className="mx-auto mb-8 w-16 h-16 rounded-2xl flex items-center justify-center"
-          style={{
-            background: 'linear-gradient(135deg, #FFF9F0, #D0E3FF)',
-            boxShadow: '0 8px 32px rgba(208, 227, 255, 0.3)',
-          }}
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          className="w-14 h-14 rounded-2xl flex items-center justify-center mb-10 shadow-[0_4px_20px_rgba(229,168,74,0.15)] border border-[rgba(229,168,74,0.3)] bg-gradient-to-br from-[#123D7E] to-[#0A1128]"
         >
-          <span className="text-2xl font-black" style={{ color: '#0A1E54' }}>N</span>
+          <span className="text-2xl font-black text-[var(--champagne)]">N</span>
         </motion.div>
 
-        {/* Title */}
+        {/* WELCOME TO NEXX */}
         <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5, duration: 0.8 }}
-          className="text-sm font-medium tracking-[0.3em] uppercase mb-4"
-          style={{ color: '#D0E3FF' }}
-        >
-          Welcome to
-        </motion.p>
-
-        <motion.h1
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7, duration: 0.8 }}
-          className="font-serif text-6xl md:text-7xl font-bold italic tracking-wide mb-6"
-          style={{ color: '#F7F2EB' }}
+          transition={{ delay: 0.2, duration: 0.8 }}
+          className="text-[11px] md:text-xs font-bold tracking-[0.25em] uppercase text-[var(--champagne)] mb-5"
         >
-          <span className="shimmer">NEXX</span>
-        </motion.h1>
+          Welcome to NEXX
+        </motion.p>
+
+        {/* Huge Headlines */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.8 }}
+          className="font-serif font-bold italic tracking-tight mb-8"
+        >
+          <h2 className="text-6xl md:text-7xl lg:text-[5.5rem] leading-[1.05] text-white">Your corner.</h2>
+          <h2 className="text-6xl md:text-7xl lg:text-[5.5rem] leading-[1.05] text-white">Your calm.</h2>
+          <h2 className="text-6xl md:text-7xl lg:text-[5.5rem] leading-[1.05] text-[rgba(255,255,255,0.4)]">Your case.</h2>
+        </motion.div>
 
         {/* Subtitle */}
         <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1, duration: 0.8 }}
-          className="text-base md:text-lg leading-relaxed mb-10"
-          style={{ color: '#D0E3FF' }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.8 }}
+          className="text-base md:text-[17px] text-[rgba(255,255,255,0.7)] max-w-xl leading-[1.6] mb-12 font-medium"
         >
-          Experience the pinnacle of luxury<br />
-          management and refined security.
+          Strategic empowerment and refined counsel, designed for parents who need clarity, documentation, and peace of mind.
         </motion.p>
 
         {/* CTA Buttons */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.3, duration: 0.6 }}
-          className="space-y-4"
+          transition={{ delay: 0.7, duration: 0.8 }}
+          className="flex flex-col sm:flex-row items-start gap-4"
         >
           <Link href="/sign-up">
-            <button
-              className="w-full max-w-xs text-sm tracking-[0.15em] uppercase font-semibold py-3 px-7 rounded-lg cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5"
-              style={{
-                background: '#FFF9F0',
-                color: '#0A1E54',
-                border: '1px solid rgba(208, 227, 255, 0.2)',
-              }}
-            >
-              Begin Your Journey
+            <button className="btn-primary w-full sm:w-auto px-8 py-3.5 text-[13px]">
+              Get Started
             </button>
           </Link>
-
-          <div className="pt-2">
-            <Link href="/sign-in">
-              <button className="btn-outline w-full max-w-xs text-sm tracking-[0.1em]">
-                Sign In
-              </button>
-            </Link>
-          </div>
+          <Link href="/sign-in">
+            <button className="btn-outline w-full sm:w-auto px-8 py-3.5 text-[13px] hover:bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.9)] hover:border-[rgba(255,255,255,0.3)]">
+              Sign In
+            </button>
+          </Link>
         </motion.div>
-      </motion.div>
 
-      {/* Bottom Tagline */}
+      </div>
+
+      {/* Bottom Footer Text */}
       <motion.p
         initial={{ opacity: 0 }}
-        animate={{ opacity: 0.5 }}
-        transition={{ delay: 2, duration: 1 }}
-        className="absolute bottom-8 text-xs tracking-[0.2em] uppercase font-serif italic"
-        style={{ color: '#FFF9F0' }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.2, duration: 1 }}
+        className="absolute bottom-8 left-0 right-0 text-center text-[10px] md:text-xs tracking-[0.25em] font-semibold text-[rgba(255,255,255,0.3)] uppercase"
       >
-        Your Corner. Your Calm. Your Case.
+        Secure. Private. Empowering.
       </motion.p>
     </div>
   );

@@ -539,7 +539,7 @@ export default function OnboardingPage() {
                                             : 'bg-transparent border-[rgba(255,255,255,0.3)]'
                                         }`}
                                     >
-                                        {formData.acceptedDisclaimer && <Check size={14} weight="bold" className="text-[#1A4B9B]" />}
+                                        {formData.acceptedDisclaimer && <Check size={14} strokeWidth={3} className="text-[#1A4B9B]" />}
                                     </div>
                                     I understand and acknowledge the above
                                 </button>

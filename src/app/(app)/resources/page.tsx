@@ -114,16 +114,16 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
     const safeUrl = toSafeExternalUrl(resource.url);
     return (
         <motion.div
-            whileHover={{ scale: 1.01, y: -2 }}
-            className="card-premium p-5 group flex flex-col justify-between h-full bg-white hover:border-sapphire/20 transition-all shadow-sm hover:shadow-md"
+            whileHover={{ scale: 1.02, y: -4 }}
+            className="p-5 group flex flex-col justify-between h-full bg-white/5 backdrop-blur-3xl border border-white/20 hover:border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_16px_48px_rgba(0,0,0,0.5)] transition-all duration-300 rounded-2xl relative overflow-hidden"
         >
             <div className="flex items-start justify-between gap-3 mb-4">
                 <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-[15px] text-sapphire mb-1 truncate group-hover:text-champagne transition-colors">
+                    <h4 className="font-bold text-[15px] text-white mb-1 truncate group-hover:text-[#60A5FA] transition-colors drop-shadow-sm">
                         {resource.name}
                     </h4>
                     {resource.description && (
-                        <p className="text-[13px] text-sapphire-muted line-clamp-2 leading-relaxed font-medium">
+                        <p className="text-[13px] text-white/80 line-clamp-2 leading-relaxed font-medium">
                             {resource.description}
                         </p>
                     )}
@@ -133,7 +133,7 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                         href={safeUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-shrink-0 w-8 h-8 rounded-full bg-cloud flex items-center justify-center text-sapphire opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all hover:bg-champagne hover:text-white"
+                        className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white/80 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all hover:bg-[#123D7E] hover:text-white"
                         aria-label={`Open ${resource.name} website`}
                     >
                         <ArrowUpRight size={14} weight="bold" />
@@ -141,19 +141,19 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                 )}
             </div>
             
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 border-t border-[rgba(10,22,41,0.04)]">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 border-t border-white/10">
                 {resource.phone && (
                     isDialable(resource.phone) ? (
                         <a
                             href={`tel:${resource.phone.replace(/[^\d+]/g, '')}`}
-                            className="flex items-center gap-1.5 text-[12px] font-bold no-underline transition-colors hover:opacity-80 text-[#5A8EC9]"
+                            className="flex items-center gap-1.5 text-[12px] font-bold no-underline transition-colors hover:text-white text-[#60A5FA]"
                         >
                             <Phone size={14} weight="fill" />
                             {resource.phone}
                         </a>
                     ) : (
                         <span
-                            className="flex items-center gap-1.5 text-[12px] font-bold text-[#5A8EC9]"
+                            className="flex items-center gap-1.5 text-[12px] font-bold text-[#60A5FA]"
                         >
                             <Phone size={14} weight="fill" />
                             {resource.phone}
@@ -162,7 +162,7 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                 )}
                 
                 {resource.address && (
-                    <p className="flex items-center gap-1.5 text-[12px] font-medium text-sapphire-muted ml-auto">
+                    <p className="flex items-center gap-1.5 text-[12px] font-medium text-white/70 ml-auto">
                         <MapPin size={14} weight="fill" />
                         <span className="truncate max-w-[120px]">{resource.address}</span>
                     </p>
@@ -184,33 +184,36 @@ function SectionHeader({
     subtitle?: string;
     colorMode?: 'default' | 'rose' | 'warning';
 }) {
-    let iconColor = 'var(--sapphire)';
-    let iconBg = 'var(--cloud)';
+    let iconColor = '#60A5FA';
+    let iconBg = 'rgba(255,255,255,0.05)';
+    let titleColor = 'text-[#60A5FA]';
     const weight: IconWeight = "duotone";
 
     if (colorMode === 'rose') {
-        iconColor = 'var(--rose)';
-        iconBg = 'color-mix(in srgb, var(--rose) 10%, white)';
+        iconColor = '#F43F5E';
+        iconBg = 'rgba(244,63,94,0.1)';
+        titleColor = 'text-[#F43F5E]';
     } else if (colorMode === 'warning') {
-        iconColor = 'var(--warning)';
-        iconBg = 'color-mix(in srgb, var(--warning) 10%, white)';
+        iconColor = '#FBBF24';
+        iconBg = 'rgba(251,191,36,0.1)';
+        titleColor = 'text-[#FBBF24]';
     }
 
     return (
         <div className="mb-6">
             <div className="flex items-center gap-3 mb-1">
                 <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm"
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] backdrop-blur-xl border border-white/20"
                     style={{ background: iconBg }}
                 >
-                    <Icon size={20} weight={weight} style={{ color: iconColor }} />
+                    <Icon size={24} weight={weight} style={{ color: iconColor }} className="drop-shadow-md" />
                 </div>
-                <h2 className="text-[14px] font-bold tracking-[0.2em] uppercase text-sapphire">
+                <h2 className={`text-[15px] font-bold tracking-[0.2em] uppercase ${titleColor}`}>
                     {label}
                 </h2>
             </div>
             {subtitle && (
-                <p className="text-[13px] font-medium text-sapphire-muted ml-[52px]">
+                <p className="text-[14px] font-medium text-white/70 ml-[60px]">
                     {subtitle}
                 </p>
             )}
@@ -240,20 +243,22 @@ function FinderHeroCard({
     return (
         <motion.div
             whileHover={{ y: -4 }}
-            className="glass-ethereal p-6 md:p-8 h-full rounded-[2rem] border-white shadow-sm hover:shadow-lg transition-all"
+            className="p-6 md:p-8 h-full rounded-[2rem] bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_12px_40px_rgba(0,0,0,0.4)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_20px_60px_rgba(0,0,0,0.6)] transition-all duration-300 relative overflow-hidden group"
         >
+            <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-[100px] pointer-events-none opacity-20 transition-opacity duration-500 group-hover:opacity-40 ${title.includes('Attorney') ? 'bg-[#60A5FA]' : 'bg-[#10B981]'}`} />
+            
             {/* Header */}
-            <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center gap-4 mb-6 relative z-10">
                 <div
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[#0A1128] shadow-md border border-[rgba(255,255,255,0.1)]"
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white/10 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)] border border-white/30"
                 >
-                    <Icon size={28} weight="duotone" className="text-champagne" />
+                    <Icon size={28} weight="duotone" className={title.includes('Attorney') ? 'text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]' : 'text-[#10B981] drop-shadow-[0_2px_8px_rgba(16,185,129,0.8)]'} />
                 </div>
                 <div>
-                    <h3 className="font-serif font-bold text-xl text-sapphire mb-1">
+                    <h3 className="font-serif font-bold text-2xl text-white mb-1 tracking-tight">
                         {title}
                     </h3>
-                    <p className="text-[13px] font-medium text-sapphire-muted">
+                    <p className="text-[14px] font-medium text-white/80">
                         {description}
                     </p>
                 </div>
@@ -262,10 +267,10 @@ function FinderHeroCard({
             {/* Fallback badge */}
             {showFallbackNotice && (
                 <div
-                    className="flex items-center gap-2.5 rounded-xl px-4 py-3 mb-6 bg-warning/10 border border-warning/20 shadow-sm"
+                    className="flex items-center gap-2.5 rounded-xl px-4 py-3 mb-6 bg-white/10 border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] relative z-10"
                 >
-                    <MagnifyingGlass size={16} weight="bold" className="text-warning" />
-                    <span className="text-[12px] font-bold uppercase tracking-widest text-warning">
+                    <MagnifyingGlass size={16} weight="bold" className="text-white" />
+                    <span className="text-[12px] font-bold uppercase tracking-widest text-[#E5A84A]">
                         Use directories to search locally
                     </span>
                 </div>
@@ -348,21 +353,21 @@ function CourtResourcesGrid({
                 const safeItemUrl = toSafeExternalUrl(item.resource.url);
                 const CardContent = (
                     <motion.div
-                        whileHover={safeItemUrl ? { scale: 1.02, y: -2 } : undefined}
+                        whileHover={safeItemUrl ? { scale: 1.02, y: -4 } : undefined}
                         whileTap={safeItemUrl ? { scale: 0.98 } : undefined}
-                        className={`card-premium p-5 ${safeItemUrl ? 'cursor-pointer hover:border-sapphire/20 shadow-sm hover:shadow-md' : ''} group h-full flex flex-col justify-between`}
+                        className={`p-5 bg-white/5 backdrop-blur-2xl border border-white/20 rounded-2xl ${safeItemUrl ? 'cursor-pointer hover:border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_16px_48px_rgba(0,0,0,0.5)]' : 'shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_16px_rgba(0,0,0,0.2)]'} group h-full flex flex-col justify-between transition-all duration-300`}
                     >
                         <div className="flex items-start gap-4 mb-3">
                             <div
-                                className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-cloud text-sapphire group-hover:bg-champagne group-hover:text-white transition-colors"
+                                className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-white/10 border border-white/20 text-[#60A5FA] group-hover:bg-[#123D7E] group-hover:text-white transition-colors"
                             >
-                                <item.icon size={20} weight="duotone" />
+                                <item.icon size={22} weight="duotone" className="drop-shadow-sm" />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-[14px] font-bold truncate text-sapphire mb-0.5">
+                                <p className="text-[15px] font-bold truncate text-white mb-0.5">
                                     {item.label}
                                 </p>
-                                <p className="text-[12px] font-medium text-sapphire-muted line-clamp-2 leading-snug">
+                                <p className="text-[13px] font-medium text-white/80 line-clamp-2 leading-snug">
                                     {item.resource.name}
                                 </p>
                             </div>
@@ -370,7 +375,7 @@ function CourtResourcesGrid({
                                 <ArrowUpRight
                                     size={16}
                                     weight="bold"
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 text-champagne relative top-1"
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 text-white relative top-1"
                                 />
                             )}
                         </div>
@@ -547,19 +552,19 @@ export default function ResourcesPage() {
                 transition={{ duration: 0.5 }}
                 className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6"
             >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-5">
                     <div
-                        className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white shadow-[0_8px_30px_rgba(208,227,255,0.4)] border border-[rgba(10,22,41,0.04)]"
+                        className="w-16 h-16 rounded-3xl flex items-center justify-center bg-white/5 backdrop-blur-3xl shadow-[inset_0_1px_2px_rgba(255,255,255,0.5),0_12px_40px_rgba(0,0,0,0.6)] border border-white/30 shrink-0"
                     >
-                        <BookOpenText size={28} weight="duotone" className="text-sapphire" />
+                        <BookOpenText size={32} weight="duotone" className="text-white drop-shadow-[0_4px_12px_rgba(255,255,255,0.8)]" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-serif font-bold text-sapphire mb-1 leading-tight">
-                            Resources <span className="shimmer text-champagne font-light">Hub</span>
+                        <h1 className="text-4xl lg:text-5xl font-serif font-bold text-white mb-2 leading-tight tracking-tight drop-shadow-sm">
+                            Resources Hub
                         </h1>
-                        <p className="text-[14px] font-medium text-sapphire-muted">
+                        <p className="text-[15px] font-medium text-white drop-shadow-sm">
                             {state
-                                ? <>Your personalized directory of legal &amp; support resources in <strong className="text-sapphire">{locationLabel}</strong></>
+                                ? <>Your personalized directory of legal &amp; support resources in <strong className="text-white font-bold">{locationLabel}</strong></>
                                 : 'Discover attorneys, therapists, legal aid, and community resources near you.'
                             }
                         </p>
@@ -573,19 +578,19 @@ export default function ResourcesPage() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
-                    className="glass-ethereal p-6 md:p-8 mb-8 rounded-[2rem] border-warning/20 shadow-sm"
+                    className="p-6 md:p-8 mb-8 rounded-[2rem] border border-[#E5A84A]/30 bg-white/5 backdrop-blur-3xl shadow-[0_8px_32px_rgba(0,0,0,0.3)]"
                 >
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                         <div
-                            className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 bg-warning/10 border border-warning/20"
+                            className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 bg-white/10 border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]"
                         >
-                            <MapPin size={24} weight="duotone" className="text-warning" />
+                            <MapPin size={24} weight="duotone" className="text-[#E5A84A] drop-shadow-md" />
                         </div>
                         <div className="flex-1">
-                            <h3 className="font-bold text-[16px] text-sapphire mb-1">
+                            <h3 className="font-bold text-[16px] text-white mb-1">
                                 Set your location to see local resources
                             </h3>
-                            <p className="text-[14px] font-medium text-sapphire-muted leading-relaxed max-w-2xl">
+                            <p className="text-[14px] font-medium text-white/80 leading-relaxed max-w-2xl">
                                 Configure your state and county in Court Settings or your Profile to unlock
                                 personalized attorney, therapist, and court resources for your area.
                             </p>
@@ -593,7 +598,7 @@ export default function ResourcesPage() {
                         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mt-2 md:mt-0">
                             <Link
                                 href="/court-settings"
-                                className="btn-primary text-[12px] flex items-center justify-center gap-2 uppercase tracking-widest px-6 py-3.5 shadow-md flex-1 whitespace-nowrap"
+                                className="btn-primary text-[12px] flex items-center justify-center gap-2 uppercase tracking-widest px-6 py-3.5 shadow-[0_4px_15px_rgba(255,255,255,0.1)] flex-1 whitespace-nowrap"
                             >
                                 <Gear size={16} weight="bold" />
                                 Court Settings

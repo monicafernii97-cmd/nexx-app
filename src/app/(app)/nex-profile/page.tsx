@@ -141,7 +141,7 @@ export default function NexProfilePage() {
                             NEX Profile
                         </h1>
                         <p className="text-[15px] text-[rgba(255,255,255,0.9)] max-w-2xl leading-relaxed">
-                            Document your NEX's behavioral patterns. This helps NEXX proactively identify tactics.
+                            Document your NEX&apos;s behavioral patterns. This helps NEXX proactively identify tactics.
                         </p>
                     </div>
 
@@ -219,7 +219,7 @@ export default function NexProfilePage() {
                     {/* ── Behavioral Patterns ── */}
                     <Section icon={<Brain size={20} className="text-white" weight="bold" />} title="Behavioral Patterns">
                         <p className="text-[13px] text-white/90 mb-4">
-                            Select all behaviors you've observed. NEXX will flag these proactively in conversations.
+                            Select all behaviors you&apos;ve observed. NEXX will flag these proactively in conversations.
                         </p>
                         <div className="flex flex-wrap gap-3">
                             {BEHAVIOR_OPTIONS.map((behavior) => {
@@ -302,7 +302,7 @@ export default function NexProfilePage() {
                     {/* ── Trigger Patterns ── */}
                     <Section icon={<Lightning size={20} className="text-white" weight="bold" />} title="Trigger Patterns">
                         <p className="text-[13px] text-white/90 mb-4">
-                            What sets your NEX off? Add specific patterns you've noticed.
+                            What sets your NEX off? Add specific patterns you&apos;ve noticed.
                         </p>
                         <div className="flex gap-3 mb-4">
                             <div className="flex-1 relative">

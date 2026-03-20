@@ -104,7 +104,7 @@ export default function ConversationPage() {
 
                 if (!response.ok) {
                     const errorText = await response.text().catch(() => '');
-                    throw new Error(`Failed to get AI response: \${response.status} \${errorText}`);
+                    throw new Error(`Failed to get AI response: ${response.status} ${errorText}`);
                 }
 
                 const reader = response.body?.getReader();

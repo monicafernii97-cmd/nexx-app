@@ -88,14 +88,15 @@ export default function ChatListPage() {
                                     key={key}
                                     onClick={() => setSelectedMode(key as typeof selectedMode)}
                                     aria-pressed={selectedMode === key}
-                                    className="badge cursor-pointer transition-all px-4 py-2 border shadow-sm text-[12px]"
+                                    className={`relative px-5 py-2.5 rounded-xl cursor-pointer font-bold tracking-wide transition-all duration-300 overflow-hidden active:scale-95 border backdrop-blur-xl hover:-translate-y-0.5 z-10`}
                                     style={{
-                                        background: selectedMode === key ? `color-mix(in srgb, ${color} 15%, white)` : 'white',
-                                        color: selectedMode === key ? color : 'var(--sapphire-muted)',
-                                        borderColor: selectedMode === key ? `color-mix(in srgb, ${color} 40%, transparent)` : 'transparent',
+                                        background: selectedMode === key ? `color-mix(in srgb, ${color} 40%, rgba(255,255,255,0.15))` : 'rgba(255,255,255,0.03)',
+                                        color: selectedMode === key ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
+                                        borderColor: selectedMode === key ? `rgba(255,255,255,0.4)` : 'rgba(255,255,255,0.1)',
+                                        boxShadow: selectedMode === key ? `inset 0 4px 15px rgba(255,255,255,0.1), inset 0 -4px 15px rgba(0,0,0,0.1), 0 8px 20px rgba(0,0,0,0.3)` : 'inset 0 2px 4px rgba(255,255,255,0.05), 0 4px 10px rgba(0,0,0,0.1)',
                                     }}
                                 >
-                                    {label}
+                                    <span className="relative z-20 drop-shadow-md">{label}</span>
                                 </button>
                             ))}
                         </div>
@@ -137,9 +138,10 @@ export default function ChatListPage() {
                 ) : activeConversations.length === 0 ? (
                     <div className="card-premium p-12 text-center mb-8 flex flex-col items-center justify-center border-dashed">
                         <div
-                            className="w-20 h-20 rounded-2xl mx-auto mb-6 flex items-center justify-center bg-white shadow-[0_8px_30px_rgba(208,227,255,0.4)] border border-[rgba(10,22,41,0.04)]"
+                            className="w-20 h-20 rounded-[2rem] mx-auto mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_25px_rgba(18,61,126,0.4)] border border-[rgba(255,255,255,0.1)] relative overflow-hidden"
                         >
-                            <ChatCircleDots size={32} weight="duotone" className="text-sapphire" />
+                            <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity" />
+                            <ChatCircleDots size={36} weight="duotone" className="text-white relative z-10" />
                         </div>
                         <p className="text-[16px] font-bold mb-2 text-sapphire">
                             No conversations yet

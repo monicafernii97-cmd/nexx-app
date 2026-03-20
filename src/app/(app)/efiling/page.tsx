@@ -148,21 +148,20 @@ function ReadinessItem({
             className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 ${href && !isReady ? 'cursor-pointer hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-0.5 hover:bg-white/10' : 'shadow-[0_8px_32px_rgba(0,0,0,0.2)]'} bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]`}
         >
             {isReady ? (
-                <div className="bg-[linear-gradient(135deg,#10B981,#047857)] p-2 rounded-xl border border-[rgba(255,255,255,0.3)] shadow-[0_4px_15px_rgba(16,185,129,0.4)] relative overflow-hidden">
-                    <div className="absolute inset-0 bg-white/10" />
-                    <CheckCircle size={22} className="text-white relative z-10 drop-shadow-md" weight="fill" />
+                <div className="bg-white/10 p-2 rounded-xl border border-[#10B981]/40 shadow-[inset_0_1px_2px_rgba(16,185,129,0.3)] backdrop-blur-md">
+                    <CheckCircle size={22} className="text-[#10B981] drop-shadow-[0_2px_8px_rgba(16,185,129,0.8)]" weight="fill" />
                 </div>
             ) : (
-                <div className="bg-white/10 p-2 rounded-xl border border-white/20 shadow-[inset_0_1px_2px_rgba(255,255,255,0.3)] backdrop-blur-md">
-                    <Circle size={22} className="text-white/90 drop-shadow-sm" weight="bold" />
+                <div className="bg-white/10 p-2 rounded-xl border border-[#E5A84A]/40 shadow-[inset_0_1px_2px_rgba(229,168,74,0.3)] backdrop-blur-md">
+                    <Circle size={22} className="text-[#E5A84A] drop-shadow-[0_2px_8px_rgba(229,168,74,0.8)]" weight="bold" />
                 </div>
             )}
             <div className="flex-1 min-w-0">
-                <p className={`text-[15px] tracking-wide font-bold text-white m-0`}>
+                <p className={`text-[15px] tracking-wide font-bold m-0 ${isReady ? 'text-[#10B981] drop-shadow-sm' : 'text-[#E5A84A] drop-shadow-sm'}`}>
                     {label}
                 </p>
                 {detail && (
-                    <p className="text-[13px] mt-1 text-white/90 font-medium m-0">
+                    <p className={`text-[13px] mt-1 font-medium m-0 ${isReady ? 'text-[#10B981]/80' : 'text-[#E5A84A]/80'}`}>
                         {detail}
                     </p>
                 )}
@@ -170,7 +169,7 @@ function ReadinessItem({
             {href && !isReady && (
                 <ArrowRight
                     size={16}
-                    className="text-white/60 transition-all group-hover:text-white group-hover:translate-x-1"
+                    className="text-[#E5A84A]/60 transition-all group-hover:text-[#E5A84A] group-hover:translate-x-1"
                     weight="bold"
                 />
             )}
@@ -263,9 +262,8 @@ export default function EFilingPage() {
                 transition={{ duration: 0.5, ease: 'easeOut' }}
             >
                 <div className="flex items-center gap-4 mb-3">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] relative overflow-hidden">
-                        <div className="absolute inset-0 bg-white/10" />
-                        <FileArrowUp size={28} className="text-white relative z-10 drop-shadow-md" weight="fill" />
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white/5 backdrop-blur-2xl border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_32px_rgba(0,0,0,0.4)] relative overflow-hidden shrink-0">
+                        <FileArrowUp size={28} className="text-[#60A5FA] relative z-10 drop-shadow-[0_2px_10px_rgba(96,165,250,0.6)]" weight="duotone" />
                     </div>
                     <div>
                         <h1 className="text-4xl font-serif font-bold text-white tracking-tight m-0">
@@ -435,9 +433,8 @@ export default function EFilingPage() {
                         transition={{ delay: 0.2, duration: 0.5 }}
                     >
                         <div className="flex items-center gap-4 mb-5">
-                            <div className="w-12 h-12 rounded-2xl bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] flex items-center justify-center relative overflow-hidden shrink-0">
-                                <div className="absolute inset-0 bg-white/10" />
-                                <ShieldCheck size={24} className="text-white relative z-10 drop-shadow-md" weight="fill" />
+                            <div className="w-12 h-12 rounded-2xl bg-white/5 backdrop-blur-2xl border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-center relative overflow-hidden shrink-0">
+                                <ShieldCheck size={24} className="text-[#60A5FA] relative z-10 drop-shadow-[0_2px_10px_rgba(96,165,250,0.6)]" weight="duotone" />
                             </div>
                             <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
                                 Filing Readiness
@@ -480,9 +477,8 @@ export default function EFilingPage() {
                         >
                             <div className="flex items-center justify-between mb-5">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] flex items-center justify-center relative overflow-hidden shrink-0">
-                                        <div className="absolute inset-0 bg-white/10" />
-                                        <FileText size={24} className="text-white relative z-10 drop-shadow-md" weight="fill" />
+                                    <div className="w-12 h-12 rounded-2xl bg-white/5 backdrop-blur-2xl border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-center relative overflow-hidden shrink-0">
+                                        <FileText size={24} className="text-[#E5A84A] relative z-10 drop-shadow-[0_2px_10px_rgba(229,168,74,0.6)]" weight="duotone" />
                                     </div>
                                     <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
                                         Ready to File
@@ -570,9 +566,8 @@ export default function EFilingPage() {
                         transition={{ delay: 0.3, duration: 0.5 }}
                     >
                         <div className="flex items-center gap-4 mb-5">
-                            <div className="w-12 h-12 rounded-2xl bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] flex items-center justify-center relative overflow-hidden shrink-0">
-                                <div className="absolute inset-0 bg-white/10" />
-                                <Info size={24} className="text-white relative z-10 drop-shadow-md" weight="fill" />
+                            <div className="w-12 h-12 rounded-2xl bg-white/5 backdrop-blur-2xl border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-center relative overflow-hidden shrink-0">
+                                <Info size={24} className="text-[#10B981] relative z-10 drop-shadow-[0_2px_10px_rgba(16,185,129,0.6)]" weight="duotone" />
                             </div>
                             <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
                                 Filing Guide

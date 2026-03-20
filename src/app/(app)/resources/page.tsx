@@ -10,19 +10,19 @@ import {
     BookOpen,
     Scale,
     Heart,
-    Landmark,
-    HandHelping,
+    Bank,
+    HandHeart,
     Users,
     Phone,
-    ExternalLink,
+    ArrowSquareOut,
     MapPin,
     ArrowRight,
     Shield,
-    Search,
-    AlertTriangle,
-    Settings,
-    Sparkles,
-} from 'lucide-react';
+    MagnifyingGlass,
+    Warning,
+    Gear,
+    Sparkle,
+} from '@phosphor-icons/react';
 import Link from 'next/link';
 import {
     getStateResources,
@@ -119,12 +119,12 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
             <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold text-sm truncate" style={{ color: '#0A1E54' }}>
+                        <p className="font-semibold text-sm truncate" style={{ color: 'var(--zinc-900)' }}>
                             {resource.name}
                         </p>
                     </div>
                     {resource.description && (
-                        <p className="text-xs mb-2 line-clamp-2" style={{ color: '#123D7E' }}>
+                        <p className="text-xs mb-2 line-clamp-2" style={{ color: 'var(--zinc-700)' }}>
                             {resource.description}
                         </p>
                     )}
@@ -134,7 +134,7 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                                 <a
                                     href={`tel:${resource.phone.replace(/[^\d+]/g, '')}`}
                                     className="flex items-center gap-1 text-xs font-medium no-underline transition-colors hover:opacity-80"
-                                    style={{ color: '#5A8EC9' }}
+                                    style={{ color: 'var(--info)' }}
                                 >
                                     <Phone size={11} />
                                     {resource.phone}
@@ -142,7 +142,7 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                             ) : (
                                 <span
                                     className="flex items-center gap-1 text-xs font-medium"
-                                    style={{ color: '#5A8EC9' }}
+                                    style={{ color: 'var(--info)' }}
                                 >
                                     <Phone size={11} />
                                     {resource.phone}
@@ -155,15 +155,15 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-1 text-xs font-medium no-underline transition-colors hover:opacity-80"
-                                style={{ color: '#5A9E6F' }}
+                                style={{ color: 'var(--success)' }}
                             >
-                                <ExternalLink size={11} />
+                                <ArrowSquareOut size={11} />
                                 Visit Website
                             </a>
                         )}
                     </div>
                     {resource.address && (
-                        <p className="flex items-center gap-1 text-xs mt-1.5" style={{ color: '#7096D1' }}>
+                        <p className="flex items-center gap-1 text-xs mt-1.5" style={{ color: 'var(--zinc-400)' }}>
                             <MapPin size={10} />
                             {resource.address}
                         </p>
@@ -177,7 +177,7 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                         className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 rounded transition-opacity"
                         aria-label={`Open ${resource.name} website`}
                     >
-                        <ArrowRight size={14} style={{ color: '#0A1E54' }} />
+                        <ArrowRight size={14} style={{ color: 'var(--zinc-900)' }} />
                     </a>
                 )}
             </div>
@@ -190,7 +190,7 @@ function SectionHeader({
     icon: Icon,
     label,
     subtitle,
-    color = '#D0E3FF',
+    color = 'var(--zinc-400)',
 }: {
     icon: typeof BookOpen;
     label: string;
@@ -211,13 +211,13 @@ function SectionHeader({
                 </div>
                 <h2
                     className="text-sm font-semibold tracking-[0.15em] uppercase"
-                    style={{ color: '#D0E3FF' }}
+                    style={{ color: 'var(--zinc-400)' }}
                 >
                     {label}
                 </h2>
             </div>
             {subtitle && (
-                <p className="text-xs ml-10" style={{ color: '#7096D1' }}>
+                <p className="text-xs ml-10" style={{ color: 'var(--zinc-400)' }}>
                     {subtitle}
                 </p>
             )}
@@ -263,10 +263,10 @@ function FinderHeroCard({
                     <Icon size={22} style={{ color: accentColor }} />
                 </div>
                 <div>
-                    <h3 className="font-semibold text-base" style={{ color: '#0A1E54' }}>
+                    <h3 className="font-semibold text-base" style={{ color: 'var(--zinc-900)' }}>
                         {title}
                     </h3>
-                    <p className="text-xs" style={{ color: '#123D7E' }}>
+                    <p className="text-xs" style={{ color: 'var(--zinc-700)' }}>
                         {description}
                     </p>
                 </div>
@@ -281,8 +281,8 @@ function FinderHeroCard({
                         border: '1px solid rgba(229, 168, 74, 0.2)',
                     }}
                 >
-                    <Search size={12} style={{ color: '#E5A84A' }} />
-                    <span className="text-xs" style={{ color: '#E5A84A' }}>
+                    <MagnifyingGlass size={12} style={{ color: 'var(--warning)' }} />
+                    <span className="text-xs" style={{ color: 'var(--warning)' }}>
                         Use these directories to search in your area
                     </span>
                 </div>
@@ -308,13 +308,13 @@ function CourtResourcesGrid({
     countyData: CountyResources | null;
     cachedResources: CachedResources | null;
 }) {
-    const items: { label: string; resource: ResourceEntry; icon: typeof Landmark }[] = [];
+    const items: { label: string; resource: ResourceEntry; icon: typeof Bank }[] = [];
 
     // AI-cached data takes priority; fall back to curated data
     if (cachedResources?.courtClerk) {
-        items.push({ label: 'County Clerk', resource: toResourceEntry(cachedResources.courtClerk, ['clerk', 'court']), icon: Landmark });
+        items.push({ label: 'County Clerk', resource: toResourceEntry(cachedResources.courtClerk, ['clerk', 'court']), icon: Bank });
     } else if (countyData?.courtClerk) {
-        items.push({ label: 'County Clerk', resource: countyData.courtClerk, icon: Landmark });
+        items.push({ label: 'County Clerk', resource: countyData.courtClerk, icon: Bank });
     }
 
     if (cachedResources?.courtsWebsite) {
@@ -353,7 +353,7 @@ function CourtResourcesGrid({
     if (items.length === 0) {
         return (
             <div className="card-premium p-6 text-center sm:col-span-2 lg:col-span-3">
-                <p className="text-sm" style={{ color: '#123D7E' }}>
+                <p className="text-sm" style={{ color: 'var(--zinc-700)' }}>
                     Court resources for this location are still being curated. Check back soon.
                 </p>
             </div>
@@ -374,30 +374,30 @@ function CourtResourcesGrid({
                             <div
                                 className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                                 style={{
-                                    background: 'rgba(112, 150, 209, 0.1)',
-                                    border: '1px solid rgba(112, 150, 209, 0.25)',
+                                    background: 'rgba(16, 185, 129, 0.1)',
+                                    border: '1px solid rgba(16, 185, 129, 0.25)',
                                 }}
                             >
-                                <item.icon size={16} style={{ color: '#7096D1' }} />
+                                <item.icon size={16} style={{ color: 'var(--zinc-400)' }} />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold truncate" style={{ color: '#0A1E54' }}>
+                                <p className="text-sm font-semibold truncate" style={{ color: 'var(--zinc-900)' }}>
                                     {item.label}
                                 </p>
-                                <p className="text-xs truncate" style={{ color: '#123D7E' }}>
+                                <p className="text-xs truncate" style={{ color: 'var(--zinc-700)' }}>
                                     {item.resource.name}
                                 </p>
                             </div>
                             {safeItemUrl && (
-                                <ExternalLink
+                                <ArrowSquareOut
                                     size={13}
                                     className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                    style={{ color: '#7096D1' }}
+                                    style={{ color: 'var(--zinc-400)' }}
                                 />
                             )}
                         </div>
                         {item.resource.phone && (
-                            <p className="text-xs mt-2 ml-[52px]" style={{ color: '#5A8EC9' }}>
+                            <p className="text-xs mt-2 ml-[52px]" style={{ color: 'var(--info)' }}>
                                 {item.resource.phone}
                             </p>
                         )}
@@ -428,10 +428,10 @@ function ShimmerCard() {
     return (
         <div className="card-premium p-4 animate-pulse">
             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: 'rgba(208, 227, 255, 0.08)' }} />
+                <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: 'rgba(63, 63, 70, 0.08)' }} />
                 <div className="flex-1 space-y-2">
-                    <div className="h-3 rounded-full w-2/3" style={{ background: 'rgba(208, 227, 255, 0.12)' }} />
-                    <div className="h-2.5 rounded-full w-1/2" style={{ background: 'rgba(208, 227, 255, 0.08)' }} />
+                    <div className="h-3 rounded-full w-2/3" style={{ background: 'rgba(63, 63, 70, 0.12)' }} />
+                    <div className="h-2.5 rounded-full w-1/2" style={{ background: 'rgba(63, 63, 70, 0.08)' }} />
                 </div>
             </div>
         </div>
@@ -579,19 +579,19 @@ export default function ResourcesPage() {
                     <div
                         className="w-10 h-10 rounded-xl flex items-center justify-center"
                         style={{
-                            background: 'linear-gradient(135deg, #FFF9F0, #D0E3FF)',
-                            boxShadow: '0 2px 12px rgba(208, 227, 255, 0.3)',
+                            background: 'linear-gradient(135deg, var(--zinc-100), var(--zinc-400))',
+                            boxShadow: '0 2px 12px rgba(63, 63, 70, 0.3)',
                         }}
                     >
-                        <BookOpen size={18} style={{ color: '#0A1E54' }} />
+                        <BookOpen size={18} style={{ color: 'var(--zinc-900)' }} />
                     </div>
-                    <h1 className="text-headline text-3xl" style={{ color: '#F7F2EB' }}>
+                    <h1 className="text-headline text-3xl" style={{ color: 'var(--zinc-100)' }}>
                         Resources Hub
                     </h1>
                 </div>
-                <p className="text-sm" style={{ color: '#D0E3FF' }}>
+                <p className="text-sm" style={{ color: 'var(--zinc-400)' }}>
                     {state
-                        ? <>Your personalized directory of legal &amp; support resources in <strong style={{ color: '#F7F2EB' }}>{locationLabel}</strong></>
+                        ? <>Your personalized directory of legal &amp; support resources in <strong style={{ color: 'var(--zinc-100)' }}>{locationLabel}</strong></>
                         : 'Discover attorneys, therapists, legal aid, and community resources near you.'
                     }
                 </p>
@@ -613,13 +613,13 @@ export default function ResourcesPage() {
                                 border: '1px solid rgba(229, 168, 74, 0.3)',
                             }}
                         >
-                            <MapPin size={20} style={{ color: '#E5A84A' }} />
+                            <MapPin size={20} style={{ color: 'var(--warning)' }} />
                         </div>
                         <div className="flex-1">
-                            <p className="font-semibold text-sm mb-1" style={{ color: '#0A1E54' }}>
+                            <p className="font-semibold text-sm mb-1" style={{ color: 'var(--zinc-900)' }}>
                                 Set your location to see local resources
                             </p>
-                            <p className="text-xs mb-3" style={{ color: '#123D7E' }}>
+                            <p className="text-xs mb-3" style={{ color: 'var(--zinc-700)' }}>
                                 Configure your state and county in Court Settings or your Profile to unlock
                                 personalized attorney, therapist, and court resources for your area.
                             </p>
@@ -628,13 +628,13 @@ export default function ResourcesPage() {
                                     href="/court-settings"
                                     className="btn-primary text-xs flex items-center gap-2 no-underline"
                                 >
-                                    <Settings size={13} />
+                                    <Gear size={13} />
                                     Court Settings
                                 </Link>
                                 <Link
                                     href="/profile"
                                     className="btn-outline text-xs flex items-center gap-2 no-underline"
-                                    style={{ color: '#0A1E54', borderColor: 'rgba(10, 30, 84, 0.2)' }}
+                                    style={{ color: 'var(--zinc-900)', borderColor: 'rgba(9, 9, 11, 0.2)' }}
                                 >
                                     My Profile
                                 </Link>
@@ -657,13 +657,13 @@ export default function ResourcesPage() {
                             animate={{ rotate: 360 }}
                             transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                         >
-                            <Sparkles size={18} style={{ color: '#F7F2EB' }} />
+                            <Sparkle size={18} style={{ color: 'var(--zinc-100)' }} />
                         </motion.div>
                         <div>
-                            <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>
+                            <p className="text-sm font-medium" style={{ color: 'var(--zinc-100)' }}>
                                 Discovering resources for {locationLabel}…
                             </p>
-                            <p className="text-xs" style={{ color: '#D0E3FF' }}>
+                            <p className="text-xs" style={{ color: 'var(--zinc-400)' }}>
                                 NEXX AI is finding your local court, legal aid, and support resources.
                             </p>
                         </div>
@@ -680,7 +680,7 @@ export default function ResourcesPage() {
                     style={{ borderColor: 'rgba(220, 38, 38, 0.2)' }}
                 >
                     <div className="flex items-center gap-3">
-                        <AlertTriangle size={16} style={{ color: '#DC2626' }} />
+                        <Warning size={16} style={{ color: '#DC2626' }} />
                         <div className="flex-1">
                             <p className="text-sm" style={{ color: '#DC2626' }}>
                                 {lookupError}
@@ -689,7 +689,7 @@ export default function ResourcesPage() {
                         <button
                             onClick={() => { setLookupTriggered(false); setLookupError(null); }}
                             className="text-xs font-medium px-3 py-1 rounded-lg transition-colors cursor-pointer"
-                            style={{ color: '#5A8EC9', background: 'rgba(90, 142, 201, 0.1)' }}
+                            style={{ color: 'var(--info)', background: 'rgba(90, 142, 201, 0.1)' }}
                         >
                             Retry
                         </button>
@@ -714,41 +714,41 @@ export default function ResourcesPage() {
                             whileHover={{ scale: 1.01, y: -2 }}
                             className="rounded-2xl p-5 cursor-pointer group"
                             style={{
-                                background: 'linear-gradient(135deg, rgba(90, 142, 201, 0.08), rgba(208, 227, 255, 0.04))',
-                                border: '1px solid rgba(208, 227, 255, 0.2)',
+                                background: 'linear-gradient(135deg, rgba(90, 142, 201, 0.08), rgba(63, 63, 70, 0.04))',
+                                border: '1px solid rgba(63, 63, 70, 0.2)',
                             }}
                         >
                             <div className="flex items-center gap-4">
                                 <div
                                     className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
                                     style={{
-                                        background: 'linear-gradient(135deg, rgba(208, 227, 255, 0.15), rgba(112, 150, 209, 0.08))',
-                                        border: '1px solid rgba(208, 227, 255, 0.25)',
+                                        background: 'linear-gradient(135deg, rgba(63, 63, 70, 0.15), rgba(16, 185, 129, 0.08))',
+                                        border: '1px solid rgba(63, 63, 70, 0.25)',
                                     }}
                                 >
-                                    <Search size={22} style={{ color: '#D0E3FF' }} />
+                                    <MagnifyingGlass size={22} style={{ color: 'var(--zinc-400)' }} />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="font-semibold text-base" style={{ color: '#F7F2EB' }}>
+                                        <h3 className="font-semibold text-base" style={{ color: 'var(--zinc-100)' }}>
                                             My Case
                                         </h3>
                                         <span
                                             className="text-xs font-mono px-2 py-0.5 rounded-md"
                                             style={{
-                                                background: 'rgba(208, 227, 255, 0.1)',
-                                                border: '1px solid rgba(208, 227, 255, 0.15)',
-                                                color: '#D0E3FF',
+                                                background: 'rgba(63, 63, 70, 0.1)',
+                                                border: '1px solid rgba(63, 63, 70, 0.15)',
+                                                color: 'var(--zinc-400)',
                                             }}
                                         >
                                             {courtSettings.causeNumber}
                                         </span>
                                     </div>
-                                    <p className="text-xs" style={{ color: '#7096D1' }}>
+                                    <p className="text-xs" style={{ color: 'var(--zinc-400)' }}>
                                         {cachedResources?.caseSearch?.description || `Search your case on ${cachedResources?.caseSearch?.name}`}
                                     </p>
                                     {courtSettings.courtName && (
-                                        <p className="text-xs mt-0.5" style={{ color: '#5A8EC9' }}>
+                                        <p className="text-xs mt-0.5" style={{ color: 'var(--info)' }}>
                                             {courtSettings.courtName}
                                             {courtSettings.assignedJudge ? ` · ${courtSettings.assignedJudge}` : ''}
                                         </p>
@@ -758,17 +758,17 @@ export default function ResourcesPage() {
                                     <span
                                         className="text-xs font-medium px-3 py-1.5 rounded-lg transition-all group-hover:scale-105"
                                         style={{
-                                            background: 'rgba(208, 227, 255, 0.1)',
-                                            border: '1px solid rgba(208, 227, 255, 0.2)',
-                                            color: '#D0E3FF',
+                                            background: 'rgba(63, 63, 70, 0.1)',
+                                            border: '1px solid rgba(63, 63, 70, 0.2)',
+                                            color: 'var(--zinc-400)',
                                         }}
                                     >
                                         View Case
                                     </span>
-                                    <ExternalLink
+                                    <ArrowSquareOut
                                         size={14}
                                         className="opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity"
-                                        style={{ color: '#7096D1' }}
+                                        style={{ color: 'var(--zinc-400)' }}
                                     />
                                 </div>
                             </div>
@@ -791,7 +791,7 @@ export default function ResourcesPage() {
                     localResources={countyData?.attorneys ?? []}
                     fallbackResources={NATIONAL_ATTORNEY_DIRECTORIES}
                     hasLocalData={hasCuratedData}
-                    accentColor="#5A8EC9"
+                    accentColor="var(--info)"
                 />
                 <FinderHeroCard
                     icon={Heart}
@@ -800,7 +800,7 @@ export default function ResourcesPage() {
                     localResources={countyData?.therapists ?? []}
                     fallbackResources={NATIONAL_THERAPIST_DIRECTORIES}
                     hasLocalData={hasCuratedData}
-                    accentColor="#5A9E6F"
+                    accentColor="var(--success)"
                 />
             </motion.div>
 
@@ -813,13 +813,13 @@ export default function ResourcesPage() {
                     className="mb-8"
                 >
                     <SectionHeader
-                        icon={Landmark}
+                        icon={Bank}
                         label="Court & County Resources"
                         subtitle={county
                             ? `${county}${county.toLowerCase().endsWith('county') ? '' : ' County'} courthouse, clerk, and court information`
                             : 'Your local court resources'
                         }
-                        color="#7096D1"
+                        color="var(--zinc-400)"
                     />
                     {isCacheQueryLoading || isLookingUp ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -835,7 +835,7 @@ export default function ResourcesPage() {
                         />
                     ) : (
                         <div className="card-premium p-6 text-center">
-                            <p className="text-sm" style={{ color: '#123D7E' }}>
+                            <p className="text-sm" style={{ color: 'var(--zinc-700)' }}>
                                 Court resources for <strong>{state}</strong> are coming soon.
                                 Check back as we expand our coverage.
                             </p>
@@ -854,10 +854,10 @@ export default function ResourcesPage() {
                 className="mb-8"
             >
                 <SectionHeader
-                    icon={HandHelping}
+                    icon={HandHeart}
                     label="Legal Aid & Assistance"
                     subtitle="Free and low-cost legal help, bar associations, and pro bono programs"
-                    color="#E5A84A"
+                    color="var(--warning)"
                 />
                 {isCacheQueryLoading || isLookingUp ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -872,14 +872,14 @@ export default function ResourcesPage() {
                     </div>
                 ) : (
                     <div className="card-premium p-5 md:col-span-2 text-center">
-                        <p className="text-xs" style={{ color: '#123D7E' }}>
+                        <p className="text-xs" style={{ color: 'var(--zinc-700)' }}>
                             Set your location above to see local legal aid resources, or search&nbsp;
                             <a
                                 href="https://www.lsc.gov/about-lsc/what-legal-aid/get-legal-help"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="font-medium no-underline"
-                                style={{ color: '#5A8EC9' }}
+                                style={{ color: 'var(--info)' }}
                             >
                                 LSC.gov
                             </a>
@@ -900,7 +900,7 @@ export default function ResourcesPage() {
                     icon={Users}
                     label="Nonprofits & Support Organizations"
                     subtitle="Shelters, crisis centers, family support, and advocacy groups"
-                    color="#C75A5A"
+                    color="var(--danger)"
                 />
                 {isCacheQueryLoading || isLookingUp ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -915,7 +915,7 @@ export default function ResourcesPage() {
                     </div>
                 ) : (
                     <div className="card-premium p-5 text-center">
-                        <p className="text-xs" style={{ color: '#123D7E' }}>
+                        <p className="text-xs" style={{ color: 'var(--zinc-700)' }}>
                             {state
                                 ? `Local nonprofit data for ${locationLabel} is being curated. Check back soon.`
                                 : 'Set your location to discover local support organizations.'}
@@ -931,10 +931,10 @@ export default function ResourcesPage() {
                 transition={{ delay: 0.7, duration: 0.5 }}
             >
                 <SectionHeader
-                    icon={AlertTriangle}
+                    icon={Warning}
                     label="Crisis & Safety"
                     subtitle="Immediate help — available 24/7, nationwide"
-                    color="#C75A5A"
+                    color="var(--danger)"
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {CRISIS_RESOURCES.map((r) => {
@@ -945,15 +945,15 @@ export default function ResourcesPage() {
                             whileHover={{ scale: 1.01, y: -1 }}
                             className="rounded-2xl p-4 group"
                             style={{
-                                background: 'linear-gradient(135deg, rgba(199, 90, 90, 0.06), rgba(199, 90, 90, 0.02))',
-                                border: '1px solid rgba(199, 90, 90, 0.15)',
+                                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.06), rgba(239, 68, 68, 0.02))',
+                                border: '1px solid rgba(239, 68, 68, 0.15)',
                             }}
                         >
-                            <p className="font-semibold text-sm mb-1" style={{ color: '#F7F2EB' }}>
+                            <p className="font-semibold text-sm mb-1" style={{ color: 'var(--zinc-100)' }}>
                                 {r.name}
                             </p>
                             {r.description && (
-                                <p className="text-xs mb-2" style={{ color: '#D0E3FF' }}>
+                                <p className="text-xs mb-2" style={{ color: 'var(--zinc-400)' }}>
                                     {r.description}
                                 </p>
                             )}
@@ -963,7 +963,7 @@ export default function ResourcesPage() {
                                         <a
                                             href={`tel:${r.phone.replace(/[^\d+]/g, '')}`}
                                             className="flex items-center gap-1 text-xs font-bold no-underline"
-                                            style={{ color: '#F7F2EB' }}
+                                            style={{ color: 'var(--zinc-100)' }}
                                         >
                                             <Phone size={11} />
                                             {r.phone}
@@ -971,7 +971,7 @@ export default function ResourcesPage() {
                                     ) : (
                                         <span
                                             className="flex items-center gap-1 text-xs font-bold"
-                                            style={{ color: '#F7F2EB' }}
+                                            style={{ color: 'var(--zinc-100)' }}
                                         >
                                             <Phone size={11} />
                                             {r.phone}
@@ -984,9 +984,9 @@ export default function ResourcesPage() {
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="flex items-center gap-1 text-xs font-medium no-underline"
-                                        style={{ color: '#D0E3FF' }}
+                                        style={{ color: 'var(--zinc-400)' }}
                                     >
-                                        <ExternalLink size={11} />
+                                        <ArrowSquareOut size={11} />
                                         Website
                                     </a>
                                 )}
@@ -1004,10 +1004,10 @@ export default function ResourcesPage() {
                 transition={{ delay: 0.9 }}
                 className="mt-10 text-center"
             >
-                <p className="text-xs" style={{ color: '#7096D1' }}>
+                <p className="text-xs" style={{ color: 'var(--zinc-400)' }}>
                     Resources are curated and verified periodically. AI-discovered resources should be verified independently.
                 </p>
-                <p className="text-xs mt-1" style={{ color: '#7096D1' }}>
+                <p className="text-xs mt-1" style={{ color: 'var(--zinc-400)' }}>
                     In future updates, you&apos;ll be able to connect directly with attorneys and therapists
                     through NEXX — share documents, get feedback, and manage your care team.
                 </p>

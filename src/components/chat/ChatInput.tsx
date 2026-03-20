@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Mic } from 'lucide-react';
+import { PaperPlaneRight, Microphone } from '@phosphor-icons/react';
 
 interface ChatInputProps {
     onSend: (message: string) => void;
@@ -39,8 +39,8 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         <div
             className="flex items-end gap-3 rounded-2xl p-3"
             style={{
-                background: '#F7F2EB',
-                border: '1px solid rgba(208, 227, 255, 0.15)',
+                background: 'var(--zinc-50)',
+                border: '1px solid var(--zinc-200)',
             }}
         >
             <textarea
@@ -48,41 +48,43 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={placeholder ?? 'Consult NEXX Intelligence...'}
+                placeholder={placeholder ?? 'Ask NEXX anything...'}
                 rows={1}
-                className="flex-1 bg-transparent border-none outline-none resize-none text-sm placeholder:text-[#7096D1]"
+                className="flex-1 bg-transparent border-none outline-none resize-none text-sm"
                 style={{
-                    color: '#0A1E54',
-                    caretColor: '#0A1E54',
+                    color: 'var(--zinc-900)',
+                    caretColor: 'var(--emerald-600)',
                     minHeight: 24,
                     maxHeight: 120,
-                    fontFamily: 'Inter, sans-serif',
+                    fontFamily: "'Outfit', system-ui, sans-serif",
                 }}
             />
             <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                     className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer"
                     style={{
-                        background: 'rgba(208, 227, 255, 0.08)',
-                        border: '1px solid rgba(208, 227, 255, 0.2)',
-                        color: '#D0E3FF',
+                        background: 'rgba(161, 161, 170, 0.08)',
+                        border: '1px solid var(--zinc-200)',
+                        color: 'var(--zinc-400)',
                     }}
                     title="Voice input (coming soon)"
                 >
-                    <Mic size={16} />
+                    <Microphone size={16} />
                 </button>
                 <button
                     onClick={handleSend}
                     disabled={!input.trim() || disabled}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                     style={{
                         background: input.trim()
-                            ? 'linear-gradient(135deg, #F7F2EB, #123D7E)'
-                            : 'rgba(208, 227, 255, 0.08)',
-                        color: input.trim() ? '#F7F2EB' : '#FFF9F0',
+                            ? 'var(--emerald-600)'
+                            : 'rgba(161, 161, 170, 0.08)',
+                        color: input.trim() ? '#ffffff' : 'var(--zinc-400)',
+                        border: input.trim() ? 'none' : '1px solid var(--zinc-200)',
+                        boxShadow: input.trim() ? '0 4px 12px rgba(5, 150, 105, 0.2)' : 'none',
                     }}
                 >
-                    <Send size={16} />
+                    <PaperPlaneRight size={16} weight={input.trim() ? 'fill' : 'regular'} />
                 </button>
             </div>
         </div>

@@ -12,9 +12,11 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
                 <Sidebar />
                 <main
                     className="transition-all duration-300 min-h-screen"
-                    style={{ marginLeft: 260, padding: '24px 32px' }}
+                    style={{ marginLeft: 260, padding: '32px 40px' }}
                 >
-                    {children}
+                    <div className="max-w-7xl mx-auto">
+                        {children}
+                    </div>
                 </main>
             </div>
         </UserProvider>

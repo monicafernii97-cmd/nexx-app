@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useMemo, useCallback } from 'react';
 import {
     FileText,
-    Search,
+    MagnifyingGlass,
     ArrowLeft,
     ArrowRight,
     X,
@@ -12,8 +12,8 @@ import {
     Scale,
     Shield,
     Paperclip,
-    CheckCircle2,
-} from 'lucide-react';
+    CheckCircle,
+} from '@phosphor-icons/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { UI_TABS, getTemplatesForTab } from '@/lib/legal/templateCategories';
@@ -122,18 +122,18 @@ export default function TemplateGalleryPage() {
                     href="/docuvault"
                     className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors no-underline"
                     style={{
-                        background: 'rgba(208, 227, 255, 0.08)',
-                        border: '1px solid rgba(208, 227, 255, 0.15)',
+                        background: 'rgba(63, 63, 70, 0.08)',
+                        border: '1px solid rgba(63, 63, 70, 0.15)',
                     }}
                     aria-label="Back to DocuVault"
                 >
-                    <ArrowLeft size={16} style={{ color: '#F7F2EB' }} />
+                    <ArrowLeft size={16} style={{ color: 'var(--zinc-100)' }} />
                 </Link>
                 <div>
-                    <h1 className="text-headline text-2xl" style={{ color: '#F7F2EB' }}>
+                    <h1 className="text-headline text-2xl" style={{ color: 'var(--zinc-100)' }}>
                         Template Gallery
                     </h1>
-                    <p className="text-sm" style={{ color: '#FFF9F0' }}>
+                    <p className="text-sm" style={{ color: 'var(--zinc-100)' }}>
                         Browse and preview legal document templates
                     </p>
                 </div>
@@ -147,10 +147,10 @@ export default function TemplateGalleryPage() {
                 className="mb-6"
             >
                 <div className="relative">
-                    <Search
+                    <MagnifyingGlass
                         size={16}
                         className="absolute left-4 top-1/2 -translate-y-1/2"
-                        style={{ color: '#FFF9F0' }}
+                        style={{ color: 'var(--zinc-100)' }}
                     />
                     <input
                         type="text"
@@ -179,20 +179,20 @@ export default function TemplateGalleryPage() {
                             style={{
                                 background:
                                     activeFilter === tab.id
-                                        ? 'rgba(208, 227, 255, 0.12)'
+                                        ? 'rgba(63, 63, 70, 0.12)'
                                         : 'transparent',
-                                color: activeFilter === tab.id ? '#F7F2EB' : '#FFF9F0',
+                                color: activeFilter === tab.id ? 'var(--zinc-100)' : 'var(--zinc-100)',
                                 border:
                                     activeFilter === tab.id
-                                        ? '1px solid rgba(208, 227, 255, 0.25)'
-                                        : '1px solid rgba(138, 122, 96, 0.08)',
+                                        ? '1px solid rgba(63, 63, 70, 0.25)'
+                                        : '1px solid rgba(161, 161, 170, 0.08)',
                             }}
                         >
                             {tab.label}
                         </button>
                     ))}
                 </div>
-                <p className="text-xs flex-shrink-0 ml-4" style={{ color: '#D0E3FF' }}>
+                <p className="text-xs flex-shrink-0 ml-4" style={{ color: 'var(--zinc-400)' }}>
                     {filteredTemplates.length} template{filteredTemplates.length !== 1 ? 's' : ''}
                 </p>
             </motion.div>
@@ -214,27 +214,27 @@ export default function TemplateGalleryPage() {
                             onClick={() => setPreviewTemplate(template)}
                             className="group rounded-2xl p-5 cursor-pointer transition-all duration-200 hover:scale-[1.02] text-left"
                             style={{
-                                background: 'rgba(208, 227, 255, 0.04)',
-                                border: '1px solid rgba(208, 227, 255, 0.1)',
+                                background: 'rgba(63, 63, 70, 0.04)',
+                                border: '1px solid rgba(63, 63, 70, 0.1)',
                             }}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.borderColor = 'rgba(208, 227, 255, 0.25)';
-                                e.currentTarget.style.background = 'rgba(208, 227, 255, 0.08)';
+                                e.currentTarget.style.borderColor = 'rgba(63, 63, 70, 0.25)';
+                                e.currentTarget.style.background = 'rgba(63, 63, 70, 0.08)';
                             }}
                             onMouseLeave={(e) => {
-                                e.currentTarget.style.borderColor = 'rgba(208, 227, 255, 0.1)';
-                                e.currentTarget.style.background = 'rgba(208, 227, 255, 0.04)';
+                                e.currentTarget.style.borderColor = 'rgba(63, 63, 70, 0.1)';
+                                e.currentTarget.style.background = 'rgba(63, 63, 70, 0.04)';
                             }}
                         >
                             {/* Document preview icon */}
                             <div
                                 className="w-full h-28 rounded-xl mb-4 flex items-center justify-center"
                                 style={{
-                                    background: 'rgba(10, 30, 84, 0.4)',
-                                    border: '1px solid rgba(208, 227, 255, 0.08)',
+                                    background: 'rgba(9, 9, 11, 0.4)',
+                                    border: '1px solid rgba(63, 63, 70, 0.08)',
                                 }}
                             >
-                                <FileText size={32} style={{ color: '#D0E3FF', opacity: 0.6 }} />
+                                <FileText size={32} style={{ color: 'var(--zinc-400)', opacity: 0.6 }} />
                             </div>
 
                             {/* Category badge */}
@@ -242,9 +242,9 @@ export default function TemplateGalleryPage() {
                                 <span
                                     className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full"
                                     style={{
-                                        background: 'rgba(208, 227, 255, 0.08)',
-                                        color: '#D0E3FF',
-                                        border: '1px solid rgba(208, 227, 255, 0.12)',
+                                        background: 'rgba(63, 63, 70, 0.08)',
+                                        color: 'var(--zinc-400)',
+                                        border: '1px solid rgba(63, 63, 70, 0.12)',
                                     }}
                                 >
                                     {tabLabel}
@@ -254,7 +254,7 @@ export default function TemplateGalleryPage() {
                             {/* Title */}
                             <p
                                 className="text-sm font-medium leading-snug mb-2 line-clamp-2"
-                                style={{ color: '#F7F2EB' }}
+                                style={{ color: 'var(--zinc-100)' }}
                             >
                                 {template.title}
                             </p>
@@ -262,7 +262,7 @@ export default function TemplateGalleryPage() {
                             {/* Description */}
                             <p
                                 className="text-xs leading-relaxed line-clamp-2"
-                                style={{ color: '#FFF9F0', opacity: 0.7 }}
+                                style={{ color: 'var(--zinc-100)', opacity: 0.7 }}
                             >
                                 {template.description}
                             </p>
@@ -274,8 +274,8 @@ export default function TemplateGalleryPage() {
                                         className="flex items-center gap-1"
                                         title="Requires Declaration"
                                     >
-                                        <Shield size={10} style={{ color: '#D0E3FF', opacity: 0.5 }} />
-                                        <span className="text-[10px]" style={{ color: '#D0E3FF', opacity: 0.5 }}>
+                                        <Shield size={10} style={{ color: 'var(--zinc-400)', opacity: 0.5 }} />
+                                        <span className="text-[10px]" style={{ color: 'var(--zinc-400)', opacity: 0.5 }}>
                                             Decl.
                                         </span>
                                     </div>
@@ -285,16 +285,16 @@ export default function TemplateGalleryPage() {
                                         className="flex items-center gap-1"
                                         title="Requires Proposed Order"
                                     >
-                                        <Scale size={10} style={{ color: '#D0E3FF', opacity: 0.5 }} />
-                                        <span className="text-[10px]" style={{ color: '#D0E3FF', opacity: 0.5 }}>
+                                        <Scale size={10} style={{ color: 'var(--zinc-400)', opacity: 0.5 }} />
+                                        <span className="text-[10px]" style={{ color: 'var(--zinc-400)', opacity: 0.5 }}>
                                             Order
                                         </span>
                                     </div>
                                 )}
                                 {template.supportsExhibits && (
                                     <div className="flex items-center gap-1" title="Supports Exhibits">
-                                        <Paperclip size={10} style={{ color: '#D0E3FF', opacity: 0.5 }} />
-                                        <span className="text-[10px]" style={{ color: '#D0E3FF', opacity: 0.5 }}>
+                                        <Paperclip size={10} style={{ color: 'var(--zinc-400)', opacity: 0.5 }} />
+                                        <span className="text-[10px]" style={{ color: 'var(--zinc-400)', opacity: 0.5 }}>
                                             Exhibits
                                         </span>
                                     </div>
@@ -313,26 +313,26 @@ export default function TemplateGalleryPage() {
                             <div
                                 className="rounded-2xl p-5 cursor-pointer transition-all duration-200 hover:scale-[1.02] h-full flex flex-col items-center justify-center min-h-[220px]"
                                 style={{
-                                    background: 'rgba(208, 227, 255, 0.02)',
-                                    border: '1px dashed rgba(208, 227, 255, 0.2)',
+                                    background: 'rgba(63, 63, 70, 0.02)',
+                                    border: '1px dashed rgba(63, 63, 70, 0.2)',
                                 }}
                             >
                                 <div
                                     className="w-14 h-14 rounded-xl flex items-center justify-center mb-4"
                                     style={{
-                                        background: 'rgba(208, 227, 255, 0.06)',
-                                        border: '1px dashed rgba(208, 227, 255, 0.2)',
+                                        background: 'rgba(63, 63, 70, 0.06)',
+                                        border: '1px dashed rgba(63, 63, 70, 0.2)',
                                     }}
                                 >
-                                    <Plus size={24} style={{ color: '#D0E3FF' }} />
+                                    <Plus size={24} style={{ color: 'var(--zinc-400)' }} />
                                 </div>
                                 <p
                                     className="text-sm font-semibold mb-1"
-                                    style={{ color: '#F7F2EB' }}
+                                    style={{ color: 'var(--zinc-100)' }}
                                 >
                                     Create Your Own
                                 </p>
-                                <p className="text-xs text-center" style={{ color: '#FFF9F0', opacity: 0.6 }}>
+                                <p className="text-xs text-center" style={{ color: 'var(--zinc-100)', opacity: 0.6 }}>
                                     Start with a blank template
                                 </p>
                             </div>
@@ -346,9 +346,9 @@ export default function TemplateGalleryPage() {
                         <FileText
                             size={32}
                             className="mx-auto mb-3"
-                            style={{ color: '#D0E3FF', opacity: 0.3 }}
+                            style={{ color: 'var(--zinc-400)', opacity: 0.3 }}
                         />
-                        <p className="text-sm" style={{ color: '#D0E3FF' }}>
+                        <p className="text-sm" style={{ color: 'var(--zinc-400)' }}>
                             No templates match your search.
                         </p>
                         <button
@@ -357,7 +357,7 @@ export default function TemplateGalleryPage() {
                                 setActiveFilter('all');
                             }}
                             className="text-xs mt-2 cursor-pointer underline"
-                            style={{ color: '#FFF9F0', background: 'none', border: 'none' }}
+                            style={{ color: 'var(--zinc-100)', background: 'none', border: 'none' }}
                         >
                             Clear filters
                         </button>
@@ -397,8 +397,8 @@ export default function TemplateGalleryPage() {
                                 tabIndex={-1}
                                 className="w-full max-w-lg rounded-2xl overflow-hidden pointer-events-auto max-h-[85vh] flex flex-col"
                                 style={{
-                                    background: 'linear-gradient(180deg, #0D2B5E 0%, #0A1E54 100%)',
-                                    border: '1px solid rgba(208, 227, 255, 0.15)',
+                                    background: 'linear-gradient(180deg, #0D2B5E 0%, var(--zinc-900) 100%)',
+                                    border: '1px solid rgba(63, 63, 70, 0.15)',
                                     boxShadow: '0 24px 80px rgba(0, 0, 0, 0.5)',
                                     outline: 'none',
                                 }}
@@ -409,17 +409,17 @@ export default function TemplateGalleryPage() {
                                         <span
                                             className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full inline-block mb-3"
                                             style={{
-                                                background: 'rgba(208, 227, 255, 0.08)',
-                                                color: '#D0E3FF',
-                                                border: '1px solid rgba(208, 227, 255, 0.15)',
+                                                background: 'rgba(63, 63, 70, 0.08)',
+                                                color: 'var(--zinc-400)',
+                                                border: '1px solid rgba(63, 63, 70, 0.15)',
                                             }}
                                         >
                                             {CATEGORY_LABELS[previewTemplate.category] || previewTemplate.category}
                                         </span>
                                         <h2
                                             id="template-preview-title"
-                                            className="text-lg font-serif font-semibold leading-snug"
-                                            style={{ color: '#F7F2EB' }}
+                                            className="text-lg font-semibold leading-snug"
+                                            style={{ color: 'var(--zinc-100)' }}
                                         >
                                             {previewTemplate.title}
                                         </h2>
@@ -429,9 +429,9 @@ export default function TemplateGalleryPage() {
                                         aria-label="Close preview"
                                         className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer flex-shrink-0 ml-4 transition-colors"
                                         style={{
-                                            background: 'rgba(208, 227, 255, 0.08)',
+                                            background: 'rgba(63, 63, 70, 0.08)',
                                             border: 'none',
-                                            color: '#D0E3FF',
+                                            color: 'var(--zinc-400)',
                                         }}
                                     >
                                         <X size={16} />
@@ -443,7 +443,7 @@ export default function TemplateGalleryPage() {
                                     {/* Description */}
                                     <p
                                         className="text-sm leading-relaxed mb-5"
-                                        style={{ color: '#FFF9F0' }}
+                                        style={{ color: 'var(--zinc-100)' }}
                                     >
                                         {previewTemplate.description}
                                     </p>
@@ -456,7 +456,7 @@ export default function TemplateGalleryPage() {
                                                 style={{
                                                     background: 'rgba(229, 168, 74, 0.08)',
                                                     border: '1px solid rgba(229, 168, 74, 0.2)',
-                                                    color: '#E5A84A',
+                                                    color: 'var(--warning)',
                                                 }}
                                             >
                                                 <Shield size={12} />
@@ -467,9 +467,9 @@ export default function TemplateGalleryPage() {
                                             <div
                                                 className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg"
                                                 style={{
-                                                    background: 'rgba(112, 150, 209, 0.08)',
-                                                    border: '1px solid rgba(112, 150, 209, 0.2)',
-                                                    color: '#7096D1',
+                                                    background: 'rgba(16, 185, 129, 0.08)',
+                                                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                                                    color: 'var(--zinc-400)',
                                                 }}
                                             >
                                                 <Scale size={12} />
@@ -482,7 +482,7 @@ export default function TemplateGalleryPage() {
                                                 style={{
                                                     background: 'rgba(90, 158, 111, 0.08)',
                                                     border: '1px solid rgba(90, 158, 111, 0.2)',
-                                                    color: '#5A9E6F',
+                                                    color: 'var(--success)',
                                                 }}
                                             >
                                                 <Paperclip size={12} />
@@ -495,7 +495,7 @@ export default function TemplateGalleryPage() {
                                     <div className="mb-5">
                                         <h3
                                             className="text-xs font-semibold tracking-[0.15em] uppercase mb-2"
-                                            style={{ color: '#D0E3FF' }}
+                                            style={{ color: 'var(--zinc-400)' }}
                                         >
                                             Applicable Case Types
                                         </h3>
@@ -505,9 +505,9 @@ export default function TemplateGalleryPage() {
                                                     key={ct}
                                                     className="text-[11px] px-2 py-1 rounded-md"
                                                     style={{
-                                                        background: 'rgba(208, 227, 255, 0.06)',
-                                                        color: '#D0E3FF',
-                                                        border: '1px solid rgba(208, 227, 255, 0.1)',
+                                                        background: 'rgba(63, 63, 70, 0.06)',
+                                                        color: 'var(--zinc-400)',
+                                                        border: '1px solid rgba(63, 63, 70, 0.1)',
                                                     }}
                                                 >
                                                     {CASE_TYPE_LABELS[ct] || ct}
@@ -520,7 +520,7 @@ export default function TemplateGalleryPage() {
                                     <div className="mb-5">
                                         <h3
                                             className="text-xs font-semibold tracking-[0.15em] uppercase mb-2"
-                                            style={{ color: '#D0E3FF' }}
+                                            style={{ color: 'var(--zinc-400)' }}
                                         >
                                             Document Structure
                                         </h3>
@@ -530,22 +530,22 @@ export default function TemplateGalleryPage() {
                                                     key={`${section.id}-${idx}`}
                                                     className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
                                                     style={{
-                                                        background: 'rgba(208, 227, 255, 0.03)',
-                                                        border: '1px solid rgba(208, 227, 255, 0.06)',
+                                                        background: 'rgba(63, 63, 70, 0.03)',
+                                                        border: '1px solid rgba(63, 63, 70, 0.06)',
                                                     }}
                                                 >
-                                                    <CheckCircle2
+                                                    <CheckCircle
                                                         size={12}
                                                         style={{
-                                                            color: section.required ? '#5A9E6F' : '#D0E3FF',
+                                                            color: section.required ? 'var(--success)' : 'var(--zinc-400)',
                                                             opacity: section.required ? 1 : 0.4,
                                                         }}
                                                     />
-                                                    <span style={{ color: '#F7F2EB' }}>
+                                                    <span style={{ color: 'var(--zinc-100)' }}>
                                                         {section.title || section.type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                                     </span>
                                                     {!section.required && (
-                                                        <span className="ml-auto text-[10px]" style={{ color: '#D0E3FF', opacity: 0.4 }}>
+                                                        <span className="ml-auto text-[10px]" style={{ color: 'var(--zinc-400)', opacity: 0.4 }}>
                                                             Optional
                                                         </span>
                                                     )}
@@ -559,7 +559,7 @@ export default function TemplateGalleryPage() {
                                         <div className="mb-5">
                                             <h3
                                                 className="text-xs font-semibold tracking-[0.15em] uppercase mb-2"
-                                                style={{ color: '#D0E3FF' }}
+                                                style={{ color: 'var(--zinc-400)' }}
                                             >
                                                 State Variants
                                             </h3>
@@ -568,9 +568,9 @@ export default function TemplateGalleryPage() {
                                                     <div
                                                         key={state}
                                                         className="flex items-center gap-2 text-xs"
-                                                        style={{ color: '#FFF9F0', opacity: 0.7 }}
+                                                        style={{ color: 'var(--zinc-100)', opacity: 0.7 }}
                                                     >
-                                                        <span className="font-medium" style={{ color: '#D0E3FF' }}>
+                                                        <span className="font-medium" style={{ color: 'var(--zinc-400)' }}>
                                                             {state}:
                                                         </span>
                                                         <span>{name}</span>
@@ -584,15 +584,15 @@ export default function TemplateGalleryPage() {
                                 {/* Modal footer */}
                                 <div
                                     className="p-6 pt-4 flex items-center gap-3"
-                                    style={{ borderTop: '1px solid rgba(208, 227, 255, 0.08)' }}
+                                    style={{ borderTop: '1px solid rgba(63, 63, 70, 0.08)' }}
                                 >
                                     <button
                                         onClick={() => setPreviewTemplate(null)}
                                         className="flex-1 py-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all"
                                         style={{
-                                            background: 'rgba(208, 227, 255, 0.06)',
-                                            border: '1px solid rgba(208, 227, 255, 0.15)',
-                                            color: '#D0E3FF',
+                                            background: 'rgba(63, 63, 70, 0.06)',
+                                            border: '1px solid rgba(63, 63, 70, 0.15)',
+                                            color: 'var(--zinc-400)',
                                         }}
                                     >
                                         Back
@@ -601,9 +601,9 @@ export default function TemplateGalleryPage() {
                                         onClick={() => handleUseTemplate(previewTemplate.id)}
                                         className="flex-[2] py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all flex items-center justify-center gap-2"
                                         style={{
-                                            background: 'linear-gradient(135deg, #F7F2EB, #D0E3FF)',
+                                            background: 'linear-gradient(135deg, var(--zinc-100), var(--zinc-400))',
                                             border: 'none',
-                                            color: '#0A1E54',
+                                            color: 'var(--zinc-900)',
                                         }}
                                     >
                                         Use This Template

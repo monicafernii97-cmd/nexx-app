@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCallback } from 'react';
-import { AlertTriangle, X } from 'lucide-react';
+import { Warning, X } from '@phosphor-icons/react';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface ConfirmDeleteModalProps {
@@ -58,7 +58,7 @@ export function ConfirmDeleteModal({
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     className="fixed inset-0 z-50 flex items-center justify-center"
-                    style={{ background: 'rgba(2, 2, 45, 0.8)' }}
+                    style={{ background: 'rgba(9, 9, 11, 0.8)' }}
                     onClick={handleClose}
                 >
                     <motion.div
@@ -66,6 +66,7 @@ export function ConfirmDeleteModal({
                         initial={{ scale: 0.95, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0.95, opacity: 0 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                         className="card-premium p-6 max-w-sm mx-4"
                         role="dialog"
                         aria-modal="true"
@@ -76,44 +77,60 @@ export function ConfirmDeleteModal({
                         <div className="flex items-center gap-3 mb-4">
                             <div
                                 className="w-10 h-10 rounded-xl flex items-center justify-center"
-                                style={{ background: 'rgba(199, 90, 90, 0.12)', border: '1px solid rgba(199, 90, 90, 0.25)' }}
+                                style={{
+                                    background: 'rgba(239, 68, 68, 0.08)',
+                                    border: '1px solid rgba(239, 68, 68, 0.15)',
+                                }}
                             >
-                                <AlertTriangle size={18} style={{ color: '#C75A5A' }} />
+                                <Warning size={18} weight="fill" style={{ color: 'var(--danger)' }} />
                             </div>
                             <div>
-                                <h3 id={dialogTitleId} className="text-sm font-semibold" style={{ color: 'var(--text-on-dark)' }}>
+                                <h3 id={dialogTitleId} className="text-sm font-semibold" style={{ color: 'var(--zinc-900)' }}>
                                     {title}
                                 </h3>
-                                <p className="text-xs" style={{ color: 'var(--milky-way)' }}>
+                                <p className="text-xs" style={{ color: 'var(--zinc-400)' }}>
                                     This action cannot be undone.
                                 </p>
                             </div>
                             {showCloseButton && (
                                 <button
                                     onClick={handleClose}
-                                    className="ml-auto p-1 rounded-lg hover:bg-[rgba(135,177,255,0.12)]"
+                                    className="ml-auto p-1.5 rounded-lg hover:bg-zinc-100 transition-colors"
                                     disabled={isDeleting}
                                     aria-label="Close"
                                 >
-                                    <X size={14} style={{ color: 'var(--milky-way)' }} />
+                                    <X size={14} style={{ color: 'var(--zinc-400)' }} />
                                 </button>
                             )}
                         </div>
-                        <p className="text-sm mb-5" style={{ color: 'var(--sky)' }}>
+                        <p className="text-sm mb-5" style={{ color: 'var(--zinc-500)' }}>
                             {description}
                         </p>
                         {deleteError && (
-                            <p className="text-xs mb-3" style={{ color: '#C75A5A' }}>{deleteError}</p>
+                            <p className="text-xs mb-3" style={{ color: 'var(--danger)' }}>{deleteError}</p>
                         )}
                         <div className="flex gap-3">
-                            <button onClick={handleClose} disabled={isDeleting} className="btn-outline flex-1">
+                            <button
+                                onClick={handleClose}
+                                disabled={isDeleting}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                                style={{
+                                    background: 'var(--zinc-100)',
+                                    color: 'var(--zinc-600)',
+                                    border: '1px solid var(--zinc-200)',
+                                }}
+                            >
                                 Cancel
                             </button>
                             <button
                                 onClick={onDelete}
                                 disabled={isDeleting}
-                                className="flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all"
-                                style={{ background: 'rgba(199, 90, 90, 0.15)', border: '1px solid rgba(199, 90, 90, 0.3)', color: '#C75A5A' }}
+                                className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer active:scale-[0.98]"
+                                style={{
+                                    background: 'rgba(239, 68, 68, 0.08)',
+                                    border: '1px solid rgba(239, 68, 68, 0.15)',
+                                    color: 'var(--danger)',
+                                }}
                             >
                                 {isDeleting ? 'Deleting...' : confirmLabel}
                             </button>

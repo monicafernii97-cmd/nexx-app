@@ -10,10 +10,10 @@ import {
     Users,
     Scale,
     Briefcase,
-    Save,
+    FloppyDisk,
     Check,
-    Sparkles,
-} from 'lucide-react';
+    Sparkle,
+} from '@phosphor-icons/react';
 import { US_STATES } from '@/lib/constants';
 
 const TONE_OPTIONS = [
@@ -148,7 +148,7 @@ export default function ProfilePage() {
     if (!user) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="animate-pulse-primary text-sm" style={{ color: '#FFF9F0' }}>Loading profile...</div>
+                <div className="animate-pulse-primary text-sm" style={{ color: 'var(--zinc-100)' }}>Loading profile...</div>
             </div>
         );
     }
@@ -162,10 +162,10 @@ export default function ProfilePage() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <h1 className="text-3xl font-serif font-bold" style={{ color: '#F7F2EB' }}>
+                        <h1 className="text-3xl font-bold" style={{ color: 'var(--zinc-100)' }}>
                             My Profile
                         </h1>
-                        <p className="text-sm mt-1" style={{ color: '#FFF9F0' }}>
+                        <p className="text-sm mt-1" style={{ color: 'var(--zinc-100)' }}>
                             This information helps NEXX personalize your experience.
                         </p>
                     </div>
@@ -174,16 +174,16 @@ export default function ProfilePage() {
                         disabled={saving}
                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
                         style={{
-                            background: saved ? 'rgba(90, 158, 111, 0.2)' : 'linear-gradient(135deg, #F7F2EB, #123D7E)',
-                            color: saved ? '#5A9E6F' : '#FFFFFF',
+                            background: saved ? 'rgba(90, 158, 111, 0.2)' : 'var(--emerald-600)',
+                            color: saved ? 'var(--success)' : '#FFFFFF',
                             border: saved ? '1px solid rgba(90, 158, 111, 0.3)' : 'none',
                         }}
                     >
-                        {saved ? <Check size={16} /> : <Save size={16} />}
+                        {saved ? <Check size={16} /> : <FloppyDisk size={16} />}
                         {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Changes'}
                     </button>
                     {error && (
-                        <p className="text-xs mt-1" style={{ color: '#C75A5A' }}>{error}</p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--danger)' }}>{error}</p>
                     )}
                 </div>
 
@@ -206,7 +206,7 @@ export default function ProfilePage() {
                                     disabled
                                     style={{ opacity: 0.6 }}
                                 />
-                                <p className="text-xs mt-1" style={{ color: '#0A1E54' }}>Managed by Clerk</p>
+                                <p className="text-xs mt-1" style={{ color: 'var(--zinc-900)' }}>Managed by Clerk</p>
                             </Field>
                         </div>
                     </Section>
@@ -324,37 +324,37 @@ export default function ProfilePage() {
                     {/* ── Support Team ── */}
                     <Section icon={<Briefcase size={18} />} title="Support Team">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(208, 227, 255,0.04)]"
-                                style={{ border: '1px solid rgba(208, 227, 255, 0.1)' }}>
+                            <label className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(63, 63, 70,0.04)]"
+                                style={{ border: '1px solid rgba(63, 63, 70, 0.1)' }}>
                                 <input
                                     type="checkbox"
                                     checked={form.hasAttorney}
                                     onChange={(e) => setForm({ ...form, hasAttorney: e.target.checked })}
-                                    className="accent-[#F7F2EB] w-4 h-4"
+                                    className="accent-[var(--zinc-100)] w-4 h-4"
                                 />
                                 <div>
-                                    <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>I have an attorney</p>
-                                    <p className="text-xs" style={{ color: '#FFF9F0' }}>NEXX will suggest coordinating with counsel</p>
+                                    <p className="text-sm font-medium" style={{ color: 'var(--zinc-100)' }}>I have an attorney</p>
+                                    <p className="text-xs" style={{ color: 'var(--zinc-100)' }}>NEXX will suggest coordinating with counsel</p>
                                 </div>
                             </label>
-                            <label className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(208, 227, 255,0.04)]"
-                                style={{ border: '1px solid rgba(208, 227, 255, 0.1)' }}>
+                            <label className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(63, 63, 70,0.04)]"
+                                style={{ border: '1px solid rgba(63, 63, 70, 0.1)' }}>
                                 <input
                                     type="checkbox"
                                     checked={form.hasTherapist}
                                     onChange={(e) => setForm({ ...form, hasTherapist: e.target.checked })}
-                                    className="accent-[#F7F2EB] w-4 h-4"
+                                    className="accent-[var(--zinc-100)] w-4 h-4"
                                 />
                                 <div>
-                                    <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>I have a therapist</p>
-                                    <p className="text-xs" style={{ color: '#FFF9F0' }}>NEXX will suggest discussing emotional impacts</p>
+                                    <p className="text-sm font-medium" style={{ color: 'var(--zinc-100)' }}>I have a therapist</p>
+                                    <p className="text-xs" style={{ color: 'var(--zinc-100)' }}>NEXX will suggest discussing emotional impacts</p>
                                 </div>
                             </label>
                         </div>
                     </Section>
 
                     {/* ── NEXX Personalization ── */}
-                    <Section icon={<Sparkles size={18} />} title="NEXX Personalization">
+                    <Section icon={<Sparkle size={18} />} title="NEXX Personalization">
                         <Field label="How should NEXX speak to you?">
                             <div className="grid grid-cols-2 gap-3 mt-1">
                                 {TONE_OPTIONS.map((opt) => (
@@ -363,19 +363,19 @@ export default function ProfilePage() {
                                         onClick={() => setForm({ ...form, tonePreference: opt.value })}
                                         className="text-left px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer"
                                         style={{
-                                            background: form.tonePreference === opt.value ? 'rgba(208, 227, 255, 0.12)' : 'rgba(208, 227, 255, 0.03)',
-                                            border: `1px solid ${form.tonePreference === opt.value ? 'rgba(208, 227, 255, 0.4)' : 'rgba(208, 227, 255, 0.08)'}`,
+                                            background: form.tonePreference === opt.value ? 'rgba(63, 63, 70, 0.12)' : 'rgba(63, 63, 70, 0.03)',
+                                            border: `1px solid ${form.tonePreference === opt.value ? 'rgba(63, 63, 70, 0.4)' : 'rgba(63, 63, 70, 0.08)'}`,
                                         }}
                                     >
-                                        <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>{opt.label}</p>
-                                        <p className="text-xs mt-0.5" style={{ color: '#FFF9F0' }}>{opt.description}</p>
+                                        <p className="text-sm font-medium" style={{ color: 'var(--zinc-100)' }}>{opt.label}</p>
+                                        <p className="text-xs mt-0.5" style={{ color: 'var(--zinc-100)' }}>{opt.description}</p>
                                     </button>
                                 ))}
                             </div>
                         </Field>
 
                         <Field label="How are you feeling right now?">
-                            <p className="text-xs mb-2" style={{ color: '#D0E3FF' }}>
+                            <p className="text-xs mb-2" style={{ color: 'var(--zinc-400)' }}>
                                 This adjusts NEXX&apos;s language style only — never the substance of advice.
                             </p>
                             <div className="flex flex-wrap gap-2 mt-1">
@@ -385,12 +385,12 @@ export default function ProfilePage() {
                                         onClick={() => setForm({ ...form, emotionalState: s.value })}
                                         className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 cursor-pointer"
                                         style={{
-                                            background: form.emotionalState === s.value ? 'rgba(208, 227, 255, 0.12)' : 'rgba(208, 227, 255, 0.03)',
-                                            border: `1px solid ${form.emotionalState === s.value ? 'rgba(208, 227, 255, 0.4)' : 'rgba(208, 227, 255, 0.08)'}`,
+                                            background: form.emotionalState === s.value ? 'rgba(63, 63, 70, 0.12)' : 'rgba(63, 63, 70, 0.03)',
+                                            border: `1px solid ${form.emotionalState === s.value ? 'rgba(63, 63, 70, 0.4)' : 'rgba(63, 63, 70, 0.08)'}`,
                                         }}
                                     >
                                         <span>{s.emoji}</span>
-                                        <span className="text-sm" style={{ color: form.emotionalState === s.value ? '#F7F2EB' : '#D0E3FF' }}>{s.label}</span>
+                                        <span className="text-sm" style={{ color: form.emotionalState === s.value ? 'var(--zinc-100)' : 'var(--zinc-400)' }}>{s.label}</span>
                                     </button>
                                 ))}
                             </div>
@@ -411,13 +411,13 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
             animate={{ opacity: 1, y: 0 }}
             className="rounded-2xl p-6"
             style={{
-                background: 'rgba(208, 227, 255, 0.02)',
-                border: '1px solid rgba(208, 227, 255, 0.1)',
+                background: 'rgba(63, 63, 70, 0.02)',
+                border: '1px solid rgba(63, 63, 70, 0.1)',
             }}
         >
             <div className="flex items-center gap-2 mb-5">
-                <span style={{ color: '#F7F2EB' }}>{icon}</span>
-                <h2 className="text-lg font-semibold" style={{ color: '#F7F2EB' }}>{title}</h2>
+                <span style={{ color: 'var(--zinc-100)' }}>{icon}</span>
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--zinc-100)' }}>{title}</h2>
             </div>
             <div className="space-y-4">{children}</div>
         </motion.div>
@@ -428,7 +428,7 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: '#D0E3FF' }}>{label}</label>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--zinc-400)' }}>{label}</label>
             {children}
         </div>
     );

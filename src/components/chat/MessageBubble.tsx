@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Sparkles, User, Copy, Check } from 'lucide-react';
+import { Lightning, User, Copy, Check } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
 
@@ -43,33 +43,33 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
 
     // Simple markdown-like rendering with XSS protection
     const renderContent = (text: string) => {
-        // Escape HTML first to prevent XSS
         const escaped = text
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
-        // Apply markdown-like transforms on safe escaped content
         const transformed = escaped
             .replace(/\*\*(.*?)\*\*/g, '<strong style="color:inherit; font-weight:600">$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            .replace(/🔴/g, '<span>🔴</span>')
             .replace(/\n/g, '<br/>');
         return DOMPurify.sanitize(transformed);
     };
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
             className={`flex gap-3 ${role === 'user' ? 'justify-end' : ''}`}
         >
             {role === 'assistant' && (
                 <div
                     className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center mt-1"
-                    style={{ background: 'linear-gradient(135deg, #F7F2EB, #123D7E)' }}
+                    style={{
+                        background: 'var(--emerald-600)',
+                        boxShadow: '0 2px 8px rgba(5, 150, 105, 0.2)',
+                    }}
                 >
-                    <Sparkles size={14} style={{ color: '#0A1E54' }} />
+                    <Lightning size={14} weight="fill" style={{ color: '#ffffff' }} />
                 </div>
             )}
 
@@ -79,14 +79,14 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
                 style={
                     role === 'user'
                         ? {
-                            background: 'linear-gradient(135deg, rgba(208, 227, 255, 0.15), rgba(208, 227, 255, 0.08))',
-                            border: '1px solid rgba(208, 227, 255, 0.2)',
-                            color: '#F7F2EB',
+                            background: 'rgba(63, 63, 70, 0.3)',
+                            border: '1px solid rgba(63, 63, 70, 0.5)',
+                            color: 'var(--zinc-200)',
                         }
                         : {
-                            background: '#F7F2EB',
-                            border: '1px solid rgba(208, 227, 255, 0.1)',
-                            color: '#123D7E',
+                            background: 'var(--zinc-50)',
+                            border: '1px solid var(--zinc-200)',
+                            color: 'var(--zinc-700)',
                         }
                 }
             >
@@ -98,16 +98,17 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
                 {role === 'assistant' && !isStreaming && (
                     <div
                         className="flex gap-2 mt-3 pt-2"
-                        style={{ borderTop: '1px solid rgba(208, 227, 255, 0.08)' }}
+                        style={{ borderTop: '1px solid var(--zinc-200)' }}
                     >
                         <button
                             className="btn-ghost text-xs flex items-center gap-1 py-1 px-2"
                             onClick={handleCopy}
                             aria-label={copied ? 'Copied to clipboard' : 'Copy message to clipboard'}
+                            style={{ color: 'var(--zinc-400)' }}
                         >
                             {copied ? (
                                 <>
-                                    <Check size={12} /> Copied
+                                    <Check size={12} weight="bold" /> Copied
                                 </>
                             ) : (
                                 <>
@@ -123,11 +124,11 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
                 <div
                     className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center mt-1"
                     style={{
-                        background: 'rgba(208, 227, 255, 0.12)',
-                        border: '1px solid rgba(208, 227, 255, 0.2)',
+                        background: 'rgba(63, 63, 70, 0.3)',
+                        border: '1px solid rgba(63, 63, 70, 0.5)',
                     }}
                 >
-                    <User size={14} style={{ color: '#F7F2EB' }} />
+                    <User size={14} style={{ color: 'var(--zinc-300)' }} />
                 </div>
             )}
         </motion.div>

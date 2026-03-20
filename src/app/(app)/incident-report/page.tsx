@@ -6,11 +6,11 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { Id } from '../../../../convex/_generated/dataModel';
 import {
-    ClipboardList,
+    ClipboardText,
     Plus,
-    Search,
-    Trash2,
-} from 'lucide-react';
+    MagnifyingGlass,
+    Trash,
+} from '@phosphor-icons/react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
@@ -63,17 +63,17 @@ export default function IncidentReportPage() {
                         <div
                             className="w-10 h-10 rounded-xl flex items-center justify-center"
                             style={{
-                                background: 'rgba(112, 150, 209, 0.12)',
-                                border: '1px solid rgba(112, 150, 209, 0.25)',
+                                background: 'rgba(16, 185, 129, 0.12)',
+                                border: '1px solid rgba(16, 185, 129, 0.25)',
                             }}
                         >
-                            <ClipboardList size={20} style={{ color: '#7096D1' }} />
+                            <ClipboardText size={20} style={{ color: 'var(--zinc-400)' }} />
                         </div>
-                        <h1 className="text-headline text-2xl" style={{ color: '#F5EFE0' }}>
+                        <h1 className="text-headline text-2xl" style={{ color: 'var(--zinc-100)' }}>
                             Incident Report
                         </h1>
                     </div>
-                    <p className="text-sm" style={{ color: '#123D7E' }}>
+                    <p className="text-sm" style={{ color: 'var(--zinc-700)' }}>
                         Sanctuary of Truth and Admissibility — your court-ready incident records.
                     </p>
                 </div>
@@ -90,7 +90,7 @@ export default function IncidentReportPage() {
                 className="mb-6 space-y-3"
             >
                 <div className="relative">
-                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#123D7E' }} />
+                    <MagnifyingGlass size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'var(--zinc-700)' }} />
                     <input
                         type="text"
                         value={searchQuery}
@@ -105,7 +105,7 @@ export default function IncidentReportPage() {
                         onClick={() => setActiveFilter(null)}
                         aria-pressed={!activeFilter}
                         className={`badge cursor-pointer transition-all ${!activeFilter ? 'badge-primary' : ''}`}
-                        style={!activeFilter ? {} : { background: 'rgba(112, 150, 209, 0.15)', color: '#123D7E' }}
+                        style={!activeFilter ? {} : { background: 'rgba(16, 185, 129, 0.15)', color: 'var(--zinc-700)' }}
                     >
                         All
                     </button>
@@ -116,8 +116,8 @@ export default function IncidentReportPage() {
                             aria-pressed={activeFilter === cat.value}
                             className="badge cursor-pointer transition-all"
                             style={{
-                                background: activeFilter === cat.value ? `${cat.color}25` : 'rgba(138, 122, 96, 0.08)',
-                                color: activeFilter === cat.value ? cat.color : '#123D7E',
+                                background: activeFilter === cat.value ? `${cat.color}25` : 'rgba(161, 161, 170, 0.08)',
+                                color: activeFilter === cat.value ? cat.color : 'var(--zinc-700)',
                                 border: activeFilter === cat.value ? `1px solid ${cat.color}40` : '1px solid transparent',
                             }}
                         >
@@ -129,7 +129,7 @@ export default function IncidentReportPage() {
 
             {/* Incident Count */}
             {incidents && incidents.length > 0 && (
-                <p className="text-xs mb-4" style={{ color: '#D0E3FF' }}>
+                <p className="text-xs mb-4" style={{ color: 'var(--zinc-400)' }}>
                     {filteredIncidents.length} of {incidents.length} incident{incidents.length !== 1 ? 's' : ''}
                     {activeFilter || searchQuery ? ' (filtered)' : ''}
                 </p>
@@ -143,12 +143,12 @@ export default function IncidentReportPage() {
                             <div key={j} className="card-premium p-5 animate-pulse">
                                 <div className="flex items-start gap-4 pl-3">
                                     <div className="flex-shrink-0 text-center" style={{ minWidth: 60 }}>
-                                        <div className="h-3 w-10 rounded" style={{ background: 'rgba(112, 150, 209, 0.1)' }} />
-                                        <div className="h-7 w-8 rounded mt-1 mx-auto" style={{ background: 'rgba(112, 150, 209, 0.08)' }} />
+                                        <div className="h-3 w-10 rounded" style={{ background: 'rgba(16, 185, 129, 0.1)' }} />
+                                        <div className="h-7 w-8 rounded mt-1 mx-auto" style={{ background: 'rgba(16, 185, 129, 0.08)' }} />
                                     </div>
                                     <div className="flex-1">
-                                        <div className="h-3 w-20 rounded mb-2" style={{ background: 'rgba(112, 150, 209, 0.15)' }} />
-                                        <div className="h-3 w-full rounded" style={{ background: 'rgba(138, 122, 96, 0.06)' }} />
+                                        <div className="h-3 w-20 rounded mb-2" style={{ background: 'rgba(16, 185, 129, 0.15)' }} />
+                                        <div className="h-3 w-full rounded" style={{ background: 'rgba(161, 161, 170, 0.06)' }} />
                                     </div>
                                 </div>
                             </div>
@@ -162,14 +162,14 @@ export default function IncidentReportPage() {
                     >
                         <div
                             className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-                            style={{ background: 'rgba(112, 150, 209, 0.08)', border: '1px solid rgba(112, 150, 209, 0.15)' }}
+                            style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.15)' }}
                         >
-                            <ClipboardList size={28} style={{ color: '#7096D1' }} />
+                            <ClipboardText size={28} style={{ color: 'var(--zinc-400)' }} />
                         </div>
-                        <p className="text-sm font-medium mb-2" style={{ color: '#7096D1' }}>
+                        <p className="text-sm font-medium mb-2" style={{ color: 'var(--zinc-400)' }}>
                             {incidents && incidents.length > 0 ? 'No incidents match your filters.' : 'No incidents documented yet.'}
                         </p>
-                        <p className="text-xs mb-5" style={{ color: '#123D7E' }}>
+                        <p className="text-xs mb-5" style={{ color: 'var(--zinc-700)' }}>
                             Start documenting incidents to build your court-ready evidence portfolio.
                         </p>
                         <Link href="/incident-report/new" className="btn-primary text-xs no-underline">
@@ -190,23 +190,23 @@ export default function IncidentReportPage() {
                             >
                                 <div className="flex items-stretch gap-0 group relative">
                                     <Link href={`/incident-report/${incident._id}`} className="flex-1 min-w-0">
-                                        <div className="card-premium p-5 cursor-pointer relative overflow-hidden hover:border-[rgba(112, 150, 209, 0.3)] transition-all rounded-r-none">
+                                        <div className="card-premium p-5 cursor-pointer relative overflow-hidden hover:border-[rgba(16, 185, 129, 0.3)] transition-all rounded-r-none">
                                             {/* Severity Indicator */}
                                             <div
                                                 className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl"
-                                                style={{ background: cat?.color || '#7096D1' }}
+                                                style={{ background: cat?.color || 'var(--zinc-400)' }}
                                             />
 
                                             <div className="flex items-start gap-4 pl-3">
                                                 {/* Date Column */}
                                                 <div className="flex-shrink-0 text-center" style={{ minWidth: 60 }}>
-                                                    <p className="text-xs font-semibold" style={{ color: '#7096D1' }}>
+                                                    <p className="text-xs font-semibold" style={{ color: 'var(--zinc-400)' }}>
                                                         {date.toLocaleDateString('en-US', { month: 'short' })}
                                                     </p>
-                                                    <p className="text-2xl font-bold" style={{ color: '#F5EFE0' }}>
+                                                    <p className="text-2xl font-bold" style={{ color: 'var(--zinc-100)' }}>
                                                         {date.getDate()}
                                                     </p>
-                                                    <p className="text-xs" style={{ color: '#123D7E' }}>
+                                                    <p className="text-xs" style={{ color: 'var(--zinc-700)' }}>
                                                         {incident.time}
                                                     </p>
                                                 </div>
@@ -227,7 +227,7 @@ export default function IncidentReportPage() {
                                                             <span className="badge badge-success text-xs">Confirmed</span>
                                                         )}
                                                         {incident.childrenInvolved && (
-                                                            <span className="badge text-xs" style={{ background: 'rgba(229, 168, 74, 0.15)', color: '#E5A84A' }}>
+                                                            <span className="badge text-xs" style={{ background: 'rgba(229, 168, 74, 0.15)', color: 'var(--warning)' }}>
                                                                 Children
                                                             </span>
                                                         )}
@@ -242,7 +242,7 @@ export default function IncidentReportPage() {
                                                                             style={{
                                                                                 background: level <= sev
                                                                                     ? cat?.color
-                                                                                    : 'rgba(138, 122, 96, 0.15)',
+                                                                                    : 'rgba(161, 161, 170, 0.15)',
                                                                             }}
                                                                         />
                                                                     ))}
@@ -250,7 +250,7 @@ export default function IncidentReportPage() {
                                                             );
                                                         })()}
                                                     </div>
-                                                    <p className="text-sm leading-relaxed line-clamp-2" style={{ color: '#123D7E' }}>
+                                                    <p className="text-sm leading-relaxed line-clamp-2" style={{ color: 'var(--zinc-700)' }}>
                                                         {incident.courtSummary || incident.narrative}
                                                     </p>
                                                 </div>
@@ -262,11 +262,11 @@ export default function IncidentReportPage() {
                                     <button
                                         onClick={() => setDeleteId(incident._id)}
                                         className="opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity flex-shrink-0 px-3 flex items-center rounded-r-2xl hover:bg-[rgba(199,90,90,0.1)]"
-                                        style={{ border: '1px solid rgba(138, 122, 96, 0.08)', borderLeft: 'none' }}
+                                        style={{ border: '1px solid rgba(161, 161, 170, 0.08)', borderLeft: 'none' }}
                                         title="Delete incident"
                                         aria-label="Delete incident"
                                     >
-                                        <Trash2 size={14} style={{ color: '#C75A5A' }} />
+                                        <Trash size={14} style={{ color: 'var(--danger)' }} />
                                     </button>
                                 </div>
                             </motion.div>

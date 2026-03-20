@@ -8,16 +8,16 @@ import { api } from '../../../convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import { useClerk } from '@clerk/nextjs';
 import {
-    ChevronRight,
-    ChevronLeft,
-    Sparkles,
+    CaretRight,
+    CaretLeft,
+    Sparkle,
     MapPin,
     Users,
     Heart,
-    Target,
+    Crosshair,
     FileText,
     Check,
-} from 'lucide-react';
+} from '@phosphor-icons/react';
 import { US_STATES, ONBOARDING_STEPS } from '@/lib/constants';
 
 /**
@@ -82,18 +82,18 @@ export default function OnboardingPage() {
         currentUser?.onboardingComplete
     ) {
         return (
-            <div className="silk-bg min-h-screen flex items-center justify-center">
+            <div className="min-h-[100dvh] min-h-screen flex items-center justify-center">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
                     <div
                         className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
                         style={{
-                            background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
-                            boxShadow: '0 8px 32px rgba(208, 227, 255, 0.3)',
+                            background: 'var(--emerald-600)',
+                            boxShadow: '0 8px 32px rgba(63, 63, 70, 0.3)',
                         }}
                     >
-                        <span className="text-lg font-black" style={{ color: '#F7F2EB' }}>N</span>
+                        <span className="text-lg font-black" style={{ color: 'var(--zinc-100)' }}>N</span>
                     </div>
-                    <p className="text-sm" style={{ color: '#FFF9F0' }}>Loading...</p>
+                    <p className="text-sm" style={{ color: 'var(--zinc-100)' }}>Loading...</p>
                 </motion.div>
             </div>
         );
@@ -102,16 +102,16 @@ export default function OnboardingPage() {
     // Terminal auth error: Clerk signed in but Convex token sync failed
     if (convexAuthFailed) {
         return (
-            <div className="silk-bg min-h-screen flex items-center justify-center">
+            <div className="min-h-[100dvh] min-h-screen flex items-center justify-center">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center max-w-sm px-6">
                     <div
                         className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
-                        style={{ background: 'rgba(199, 90, 90, 0.15)', border: '1px solid rgba(199, 90, 90, 0.3)' }}
+                        style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)' }}
                     >
-                        <span className="text-lg" style={{ color: '#C75A5A' }}>!</span>
+                        <span className="text-lg" style={{ color: 'var(--danger)' }}>!</span>
                     </div>
-                    <p className="text-sm font-semibold mb-2" style={{ color: '#F7F2EB' }}>Connection issue</p>
-                    <p className="text-xs mb-5" style={{ color: '#FFF9F0' }}>
+                    <p className="text-sm font-semibold mb-2" style={{ color: 'var(--zinc-100)' }}>Connection issue</p>
+                    <p className="text-xs mb-5" style={{ color: 'var(--zinc-100)' }}>
                         We couldn&apos;t sync your session. Please try signing in again.
                     </p>
                     <button onClick={() => signOut({ redirectUrl: '/' })} className="btn-outline text-xs">
@@ -264,7 +264,7 @@ export default function OnboardingPage() {
     ];
 
     return (
-        <div className="silk-bg min-h-screen flex items-center justify-center relative overflow-hidden">
+        <div className="min-h-[100dvh] min-h-screen flex items-center justify-center relative overflow-hidden">
             <div className="w-full max-w-lg mx-auto px-6 py-10 relative z-10">
                 {/* Progress Bar */}
                 <div className="flex items-center gap-1 mb-8">
@@ -274,8 +274,8 @@ export default function OnboardingPage() {
                             className="flex-1 h-1 rounded-full transition-all duration-500"
                             style={{
                                 background: i <= currentStep
-                                    ? 'linear-gradient(90deg, #F7F2EB, #123D7E)'
-                                    : 'rgba(138, 122, 96, 0.15)',
+                                    ? 'linear-gradient(90deg, var(--zinc-100), var(--zinc-700))'
+                                    : 'rgba(161, 161, 170, 0.15)',
                             }}
                         />
                     ))}
@@ -298,19 +298,19 @@ export default function OnboardingPage() {
                                     transition={{ delay: 0.2, type: 'spring' }}
                                     className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center"
                                     style={{
-                                        background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
-                                        boxShadow: '0 8px 32px rgba(208, 227, 255, 0.3)',
+                                        background: 'var(--emerald-600)',
+                                        boxShadow: '0 8px 32px rgba(63, 63, 70, 0.3)',
                                     }}
                                 >
-                                    <Sparkles size={28} style={{ color: '#F7F2EB' }} />
+                                    <Sparkle size={28} style={{ color: 'var(--zinc-100)' }} />
                                 </motion.div>
-                                <h1 className="font-serif text-3xl font-bold mb-4" style={{ color: '#F7F2EB' }}>
-                                    Welcome to <span className="shimmer">NEXX</span>
+                                <h1 className="text-3xl font-bold mb-4" style={{ color: 'var(--zinc-100)' }}>
+                                    Welcome to NEXX
                                 </h1>
-                                <p className="text-sm leading-relaxed mb-2" style={{ color: '#D0E3FF' }}>
+                                <p className="text-sm leading-relaxed mb-2" style={{ color: 'var(--zinc-400)' }}>
                                     If you&apos;re here, you already know something isn&apos;t right.
                                 </p>
-                                <p className="text-sm leading-relaxed" style={{ color: '#FFF9F0' }}>
+                                <p className="text-sm leading-relaxed" style={{ color: 'var(--zinc-100)' }}>
                                     You&apos;re not crazy, you&apos;re not overreacting, and you&apos;re not alone. Let&apos;s get you set up with the tools, strategy, and support you deserve.
                                 </p>
                             </div>
@@ -320,31 +320,31 @@ export default function OnboardingPage() {
                         {currentStep === 1 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <Users size={20} style={{ color: '#F7F2EB' }} />
-                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>About You</h2>
+                                    <Users size={20} style={{ color: 'var(--zinc-100)' }} />
+                                    <h2 className="text-xl font-semibold" style={{ color: 'var(--zinc-100)' }}>About You</h2>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Your Name</label>
+                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: 'var(--zinc-400)' }}>Your Name</label>
                                     <input value={formData.name} onChange={(e) => update('name', e.target.value)} placeholder="First name" className="input-premium" />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>State</label>
+                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: 'var(--zinc-400)' }}>State</label>
                                     <select value={formData.state} onChange={(e) => update('state', e.target.value)} className="input-premium">
                                         <option value="">Select your state</option>
                                         {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>County</label>
+                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: 'var(--zinc-400)' }}>County</label>
                                     <input value={formData.county} onChange={(e) => update('county', e.target.value)} placeholder="e.g. Harris County" className="input-premium" />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Children</label>
+                                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: 'var(--zinc-400)' }}>Children</label>
                                         <input type="number" value={formData.childrenCount} onChange={(e) => update('childrenCount', e.target.value)} placeholder="How many?" className="input-premium" min="1" />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Ages</label>
+                                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: 'var(--zinc-400)' }}>Ages</label>
                                         <input value={formData.childrenAges} onChange={(e) => update('childrenAges', e.target.value)} placeholder="e.g. 4, 7" className="input-premium" />
                                     </div>
                                 </div>
@@ -355,20 +355,20 @@ export default function OnboardingPage() {
                         {currentStep === 2 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <MapPin size={20} style={{ color: '#F7F2EB' }} />
-                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Your Situation</h2>
+                                    <MapPin size={20} style={{ color: 'var(--zinc-100)' }} />
+                                    <h2 className="text-xl font-semibold" style={{ color: 'var(--zinc-100)' }}>Your Situation</h2>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#D0E3FF' }}>Custody Arrangement</label>
+                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: 'var(--zinc-400)' }}>Custody Arrangement</label>
                                     {['Joint / Shared Custody', 'Sole Custody', 'Visitation Only', 'No Order Yet', 'Other'].map((opt) => (
                                         <button
                                             key={opt}
                                             onClick={() => update('custodyType', opt)}
                                             className="w-full text-left px-4 py-3 rounded-xl mb-2 transition-all text-sm"
                                             style={{
-                                                background: formData.custodyType === opt ? 'rgba(208, 227, 255, 0.12)' : 'rgba(255, 249, 240, 0.4)',
-                                                border: `1px solid ${formData.custodyType === opt ? 'rgba(208, 227, 255, 0.3)' : 'rgba(208, 227, 255, 0.08)'}`,
-                                                color: formData.custodyType === opt ? '#F7F2EB' : '#D0E3FF',
+                                                background: formData.custodyType === opt ? 'rgba(63, 63, 70, 0.12)' : 'rgba(244, 244, 245, 0.4)',
+                                                border: `1px solid ${formData.custodyType === opt ? 'rgba(63, 63, 70, 0.3)' : 'rgba(63, 63, 70, 0.08)'}`,
+                                                color: formData.custodyType === opt ? 'var(--zinc-100)' : 'var(--zinc-400)',
                                             }}
                                         >
                                             {opt}
@@ -376,7 +376,7 @@ export default function OnboardingPage() {
                                     ))}
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#D0E3FF' }}>Do you have a court case currently open?</label>
+                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: 'var(--zinc-400)' }}>Do you have a court case currently open?</label>
                                     <div className="flex gap-3">
                                         {['Yes, I have an active case', 'No, not yet'].map((opt) => (
                                             <button
@@ -390,9 +390,9 @@ export default function OnboardingPage() {
                                                 }}
                                                 className="flex-1 py-3 rounded-xl text-sm font-medium transition-all"
                                                 style={{
-                                                    background: formData.hasOpenCase === opt ? 'rgba(208, 227, 255, 0.12)' : 'rgba(255, 249, 240, 0.4)',
-                                                    border: `1px solid ${formData.hasOpenCase === opt ? 'rgba(208, 227, 255, 0.3)' : 'rgba(208, 227, 255, 0.08)'}`,
-                                                    color: formData.hasOpenCase === opt ? '#F7F2EB' : '#FFF9F0',
+                                                    background: formData.hasOpenCase === opt ? 'rgba(63, 63, 70, 0.12)' : 'rgba(244, 244, 245, 0.4)',
+                                                    border: `1px solid ${formData.hasOpenCase === opt ? 'rgba(63, 63, 70, 0.3)' : 'rgba(63, 63, 70, 0.08)'}`,
+                                                    color: formData.hasOpenCase === opt ? 'var(--zinc-100)' : 'var(--zinc-100)',
                                                 }}
                                             >
                                                 {opt}
@@ -403,7 +403,7 @@ export default function OnboardingPage() {
                                 {formData.hasOpenCase === 'Yes, I have an active case' && (
                                     <div className="space-y-4 pt-1">
                                         <div>
-                                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Court Name <span className="text-xs normal-case tracking-normal" style={{ color: '#7096D1' }}>(optional)</span></label>
+                                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: 'var(--zinc-400)' }}>Court Name <span className="text-xs normal-case tracking-normal" style={{ color: 'var(--zinc-400)' }}>(optional)</span></label>
                                             <input
                                                 value={formData.courtName}
                                                 onChange={(e) => update('courtName', e.target.value)}
@@ -412,7 +412,7 @@ export default function OnboardingPage() {
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Cause Number <span className="text-xs normal-case tracking-normal" style={{ color: '#7096D1' }}>(optional)</span></label>
+                                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: 'var(--zinc-400)' }}>Cause Number <span className="text-xs normal-case tracking-normal" style={{ color: 'var(--zinc-400)' }}>(optional)</span></label>
                                             <input
                                                 value={formData.causeNumber}
                                                 onChange={(e) => update('causeNumber', e.target.value)}
@@ -423,7 +423,7 @@ export default function OnboardingPage() {
                                     </div>
                                 )}
                                 <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#D0E3FF' }}>Do you have an attorney?</label>
+                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: 'var(--zinc-400)' }}>Do you have an attorney?</label>
                                     <div className="flex gap-3">
                                         {['Yes', 'No', 'Looking'].map((opt) => (
                                             <button
@@ -431,9 +431,9 @@ export default function OnboardingPage() {
                                                 onClick={() => update('hasAttorney', opt)}
                                                 className="flex-1 py-3 rounded-xl text-sm font-medium transition-all"
                                                 style={{
-                                                    background: formData.hasAttorney === opt ? 'rgba(208, 227, 255, 0.12)' : 'rgba(255, 249, 240, 0.4)',
-                                                    border: `1px solid ${formData.hasAttorney === opt ? 'rgba(208, 227, 255, 0.3)' : 'rgba(208, 227, 255, 0.08)'}`,
-                                                    color: formData.hasAttorney === opt ? '#F7F2EB' : '#FFF9F0',
+                                                    background: formData.hasAttorney === opt ? 'rgba(63, 63, 70, 0.12)' : 'rgba(244, 244, 245, 0.4)',
+                                                    border: `1px solid ${formData.hasAttorney === opt ? 'rgba(63, 63, 70, 0.3)' : 'rgba(63, 63, 70, 0.08)'}`,
+                                                    color: formData.hasAttorney === opt ? 'var(--zinc-100)' : 'var(--zinc-100)',
                                                 }}
                                             >
                                                 {opt}
@@ -448,10 +448,10 @@ export default function OnboardingPage() {
                         {currentStep === 3 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <Heart size={20} style={{ color: '#F7F2EB' }} />
-                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Your NEX</h2>
+                                    <Heart size={20} style={{ color: 'var(--zinc-100)' }} />
+                                    <h2 className="text-xl font-semibold" style={{ color: 'var(--zinc-100)' }}>Your NEX</h2>
                                 </div>
-                                <p className="text-sm" style={{ color: '#FFF9F0' }}>
+                                <p className="text-sm" style={{ color: 'var(--zinc-100)' }}>
                                     Select all behaviors you regularly experience:
                                 </p>
                                 <div className="grid grid-cols-1 gap-2">
@@ -461,17 +461,17 @@ export default function OnboardingPage() {
                                             onClick={() => toggleArrayItem('nexBehaviors', opt)}
                                             className="text-left px-4 py-3 rounded-xl transition-all text-sm flex items-center gap-3"
                                             style={{
-                                                background: formData.nexBehaviors.includes(opt) ? '#FFF9F0' : 'transparent',
-                                                border: formData.nexBehaviors.includes(opt) ? '1px solid rgba(10, 30, 84, 0.12)' : '1px solid rgba(208, 227, 255, 0.25)',
-                                                backgroundImage: !formData.nexBehaviors.includes(opt) ? 'linear-gradient(135deg, rgba(10, 30, 84, 0.05), rgba(18, 61, 126, 0.1))' : 'none',
-                                                color: formData.nexBehaviors.includes(opt) ? '#0A1E54' : '#FFFFFF',
+                                                background: formData.nexBehaviors.includes(opt) ? 'var(--zinc-100)' : 'transparent',
+                                                border: formData.nexBehaviors.includes(opt) ? '1px solid rgba(9, 9, 11, 0.12)' : '1px solid rgba(63, 63, 70, 0.25)',
+                                                backgroundImage: !formData.nexBehaviors.includes(opt) ? 'linear-gradient(135deg, rgba(9, 9, 11, 0.05), rgba(16, 185, 129, 0.1))' : 'none',
+                                                color: formData.nexBehaviors.includes(opt) ? 'var(--zinc-900)' : '#FFFFFF',
                                             }}
                                         >
                                             <div
                                                 className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
                                                 style={{
-                                                    background: formData.nexBehaviors.includes(opt) ? '#7096D1' : '#FFFFFF',
-                                                    border: formData.nexBehaviors.includes(opt) ? '1.5px solid #7096D1' : '1.5px solid rgba(255, 255, 255, 0.6)',
+                                                    background: formData.nexBehaviors.includes(opt) ? 'var(--zinc-400)' : '#FFFFFF',
+                                                    border: formData.nexBehaviors.includes(opt) ? '1.5px solid var(--zinc-400)' : '1.5px solid rgba(255, 255, 255, 0.6)',
                                                 }}
                                             >
                                                 {formData.nexBehaviors.includes(opt) && <Check size={12} style={{ color: '#FFFFFF' }} />}
@@ -487,10 +487,10 @@ export default function OnboardingPage() {
                         {currentStep === 4 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <Target size={20} style={{ color: '#F7F2EB' }} />
-                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Your Goals</h2>
+                                    <Crosshair size={20} style={{ color: 'var(--zinc-100)' }} />
+                                    <h2 className="text-xl font-semibold" style={{ color: 'var(--zinc-100)' }}>Your Goals</h2>
                                 </div>
-                                <p className="text-sm" style={{ color: '#FFF9F0' }}>
+                                <p className="text-sm" style={{ color: 'var(--zinc-100)' }}>
                                     What do you need the most help with right now?
                                 </p>
                                 <div className="flex flex-wrap gap-2">
@@ -500,9 +500,9 @@ export default function OnboardingPage() {
                                             onClick={() => toggleArrayItem('primaryGoals', opt)}
                                             className="badge cursor-pointer transition-all text-sm py-2 px-4"
                                             style={{
-                                                background: formData.primaryGoals.includes(opt) ? 'rgba(208, 227, 255, 0.15)' : 'rgba(255, 249, 240, 0.5)',
-                                                color: formData.primaryGoals.includes(opt) ? '#F7F2EB' : '#FFF9F0',
-                                                border: `1px solid ${formData.primaryGoals.includes(opt) ? 'rgba(208, 227, 255, 0.3)' : 'rgba(208, 227, 255, 0.06)'}`,
+                                                background: formData.primaryGoals.includes(opt) ? 'rgba(63, 63, 70, 0.15)' : 'rgba(244, 244, 245, 0.5)',
+                                                color: formData.primaryGoals.includes(opt) ? 'var(--zinc-100)' : 'var(--zinc-100)',
+                                                border: `1px solid ${formData.primaryGoals.includes(opt) ? 'rgba(63, 63, 70, 0.3)' : 'rgba(63, 63, 70, 0.06)'}`,
                                             }}
                                         >
                                             {opt}
@@ -516,17 +516,17 @@ export default function OnboardingPage() {
                         {currentStep === 5 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <FileText size={20} style={{ color: '#F7F2EB' }} />
-                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Important Notice</h2>
+                                    <FileText size={20} style={{ color: 'var(--zinc-100)' }} />
+                                    <h2 className="text-xl font-semibold" style={{ color: 'var(--zinc-100)' }}>Important Notice</h2>
                                 </div>
-                                <div className="p-5 space-y-3 rounded-2xl" style={{ background: '#7096D1', border: '1px solid rgba(208, 227, 255, 0.2)' }}>
-                                    <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
+                                <div className="p-5 space-y-3 rounded-2xl" style={{ background: 'var(--zinc-400)', border: '1px solid rgba(63, 63, 70, 0.2)' }}>
+                                    <p className="text-sm leading-relaxed" style={{ color: 'var(--zinc-900)' }}>
                                         NEXX is an AI-powered tool that provides <strong style={{ color: '#FFFFFF' }}>legal information, strategic guidance, and emotional support</strong>. It is <strong style={{ color: '#FFFFFF' }}>not</strong> a law firm, does not provide legal advice, and is not a substitute for a licensed attorney or therapist.
                                     </p>
-                                    <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
+                                    <p className="text-sm leading-relaxed" style={{ color: 'var(--zinc-900)' }}>
                                         Information provided by NEXX should be used as a starting point for your own research and decision-making. For specific legal advice regarding your situation, please consult with a licensed attorney in your state.
                                     </p>
-                                    <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
+                                    <p className="text-sm leading-relaxed" style={{ color: 'var(--zinc-900)' }}>
                                         If you or your children are in immediate danger, please call <strong style={{ color: '#FFFFFF' }}>911</strong> or the National Domestic Violence Hotline at <strong style={{ color: '#FFFFFF' }}>1-800-799-7233</strong>.
                                     </p>
                                 </div>
@@ -534,19 +534,19 @@ export default function OnboardingPage() {
                                     onClick={() => update('acceptedDisclaimer', !formData.acceptedDisclaimer)}
                                     className="w-full text-left px-4 py-3 rounded-xl transition-all text-sm flex items-center gap-3"
                                     style={{
-                                        background: formData.acceptedDisclaimer ? 'rgba(208, 227, 255, 0.1)' : 'rgba(255, 249, 240, 0.4)',
-                                        border: `1px solid ${formData.acceptedDisclaimer ? 'rgba(208, 227, 255, 0.25)' : 'rgba(208, 227, 255, 0.06)'}`,
-                                        color: formData.acceptedDisclaimer ? '#F7F2EB' : '#D0E3FF',
+                                        background: formData.acceptedDisclaimer ? 'rgba(63, 63, 70, 0.1)' : 'rgba(244, 244, 245, 0.4)',
+                                        border: `1px solid ${formData.acceptedDisclaimer ? 'rgba(63, 63, 70, 0.25)' : 'rgba(63, 63, 70, 0.06)'}`,
+                                        color: formData.acceptedDisclaimer ? 'var(--zinc-100)' : 'var(--zinc-400)',
                                     }}
                                 >
                                     <div
                                         className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
                                         style={{
-                                            background: formData.acceptedDisclaimer ? '#F7F2EB' : 'transparent',
-                                            border: `1.5px solid ${formData.acceptedDisclaimer ? '#F7F2EB' : '#FFF9F0'}`,
+                                            background: formData.acceptedDisclaimer ? 'var(--zinc-100)' : 'transparent',
+                                            border: `1.5px solid ${formData.acceptedDisclaimer ? 'var(--zinc-100)' : 'var(--zinc-100)'}`,
                                         }}
                                     >
-                                        {formData.acceptedDisclaimer && <Check size={12} style={{ color: '#0A1E54' }} />}
+                                        {formData.acceptedDisclaimer && <Check size={12} style={{ color: 'var(--zinc-900)' }} />}
                                     </div>
                                     I understand and acknowledge the above
                                 </button>
@@ -559,7 +559,7 @@ export default function OnboardingPage() {
                 <div className="flex items-center gap-3 mt-8">
                     {currentStep > 0 && (
                         <button onClick={() => setCurrentStep((prev) => prev - 1)} className="btn-outline flex items-center gap-2">
-                            <ChevronLeft size={14} /> Back
+                            <CaretLeft size={14} /> Back
                         </button>
                     )}
                     <button
@@ -568,9 +568,9 @@ export default function OnboardingPage() {
                         className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-30"
                     >
                         {currentStep === ONBOARDING_STEPS.length - 1 ? (
-                            <>{isSaving ? 'Saving...' : userLoading ? 'Loading...' : 'Enter NEXX'} <Sparkles size={14} /></>
+                            <>{isSaving ? 'Saving...' : userLoading ? 'Loading...' : 'Enter NEXX'} <Sparkle size={14} /></>
                         ) : (
-                            <>Continue <ChevronRight size={14} /></>
+                            <>Continue <CaretRight size={14} /></>
                         )}
                     </button>
                 </div>

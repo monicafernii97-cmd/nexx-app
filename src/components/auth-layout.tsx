@@ -2,7 +2,7 @@
 
 import { ReactNode } from 'react';
 
-/** Shared layout for auth pages (sign-in, sign-up) with ambient glow background and NEXX branding. */
+/** Shared layout for auth pages (sign-in, sign-up) with clean neutral background and NEXX branding. */
 export function AuthPageLayout({
     children,
     subtitle,
@@ -12,23 +12,23 @@ export function AuthPageLayout({
 }) {
     return (
         <div
-            className="min-h-screen flex items-center justify-center relative overflow-hidden"
-            style={{ background: '#FFF9F0' }}
+            className="min-h-[100dvh] flex items-center justify-center relative overflow-hidden"
+            style={{ background: 'var(--zinc-50)' }}
         >
-            {/* Background ambient glow */}
+            {/* Subtle ambient glow */}
             <div className="absolute inset-0 pointer-events-none">
                 <div
-                    className="absolute w-96 h-96 rounded-full blur-3xl"
+                    className="absolute w-[500px] h-[500px] rounded-full blur-[120px]"
                     style={{
-                        background: 'radial-gradient(circle, rgba(208, 227, 255, 0.08) 0%, transparent 70%)',
+                        background: 'radial-gradient(circle, rgba(5, 150, 105, 0.04) 0%, transparent 70%)',
                         top: '10%',
                         left: '20%',
                     }}
                 />
                 <div
-                    className="absolute w-96 h-96 rounded-full blur-3xl"
+                    className="absolute w-[400px] h-[400px] rounded-full blur-[100px]"
                     style={{
-                        background: 'radial-gradient(circle, rgba(208, 227, 255, 0.05) 0%, transparent 70%)',
+                        background: 'radial-gradient(circle, rgba(161, 161, 170, 0.06) 0%, transparent 70%)',
                         bottom: '10%',
                         right: '20%',
                     }}
@@ -37,13 +37,22 @@ export function AuthPageLayout({
 
             <div className="relative z-10">
                 <div className="text-center mb-8">
-                    <h1
-                        className="font-serif text-4xl font-bold italic tracking-wide mb-2"
-                        style={{ color: '#123D7E' }}
+                    <div
+                        className="w-11 h-11 rounded-xl mx-auto mb-4 flex items-center justify-center"
+                        style={{
+                            background: 'var(--emerald-600)',
+                            boxShadow: '0 4px 16px rgba(5, 150, 105, 0.2)',
+                        }}
                     >
-                        <span className="shimmer">NEXX</span>
+                        <span className="text-base font-bold text-white">N</span>
+                    </div>
+                    <h1
+                        className="text-headline text-3xl mb-2"
+                        style={{ color: 'var(--zinc-900)' }}
+                    >
+                        NEXX
                     </h1>
-                    <p className="text-sm tracking-[0.2em] uppercase" style={{ color: '#5D82BB' }}>
+                    <p className="text-xs tracking-[0.15em] uppercase font-medium" style={{ color: 'var(--zinc-400)' }}>
                         {subtitle}
                     </p>
                 </div>

@@ -7,9 +7,9 @@ import { api } from '../../../../../convex/_generated/api';
 import { Id } from '../../../../../convex/_generated/dataModel';
 import { useUser } from '@/lib/user-context';
 import {
-    Mic,
+    Microphone,
     ArrowLeft,
-    Sparkles,
+    Sparkle,
     Check,
     Pencil,
     Calendar,
@@ -18,7 +18,7 @@ import {
     MapPin,
     Users,
     Baby,
-} from 'lucide-react';
+} from '@phosphor-icons/react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 
@@ -129,7 +129,7 @@ export default function NewIncidentPage() {
     };
 
     const severityLabels = ['Low', 'Medium', 'High'];
-    const severityColors = ['#5A9E6F', '#E5A84A', '#C75A5A'];
+    const severityColors = ['var(--success)', 'var(--warning)', 'var(--danger)'];
 
     return (
         <div className="max-w-3xl mx-auto">
@@ -142,16 +142,16 @@ export default function NewIncidentPage() {
                 <Link
                     href="/incident-report"
                     className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
-                    style={{ background: 'rgba(208, 227, 255, 0.08)', border: '1px solid rgba(208, 227, 255, 0.15)' }}
+                    style={{ background: 'rgba(63, 63, 70, 0.08)', border: '1px solid rgba(63, 63, 70, 0.15)' }}
                     aria-label="Back to incident reports"
                 >
-                    <ArrowLeft size={16} style={{ color: '#7096D1' }} />
+                    <ArrowLeft size={16} style={{ color: 'var(--zinc-400)' }} />
                 </Link>
                 <div>
-                    <h1 className="text-headline text-xl" style={{ color: '#F5EFE0' }}>
+                    <h1 className="text-headline text-xl" style={{ color: 'var(--zinc-100)' }}>
                         Secure Testimony
                     </h1>
-                    <p className="text-xs" style={{ color: '#123D7E' }}>
+                    <p className="text-xs" style={{ color: 'var(--zinc-700)' }}>
                         Sanctuary for Truth and Admissibility
                     </p>
                 </div>
@@ -167,17 +167,17 @@ export default function NewIncidentPage() {
                             <div
                                 className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all"
                                 style={{
-                                    background: isActive ? 'linear-gradient(135deg, #7096D1, #5D82BB)' : 'rgba(112, 150, 209, 0.15)',
-                                    color: isActive ? '#FFF9F0' : '#123D7E',
+                                    background: isActive ? 'linear-gradient(135deg, var(--zinc-400), var(--zinc-500))' : 'rgba(16, 185, 129, 0.15)',
+                                    color: isActive ? 'var(--zinc-100)' : 'var(--zinc-700)',
                                 }}
                             >
                                 {steps.indexOf(step) > i ? <Check size={12} /> : i + 1}
                             </div>
-                            <span className="text-xs font-medium" style={{ color: isActive ? '#7096D1' : '#123D7E' }}>
+                            <span className="text-xs font-medium" style={{ color: isActive ? 'var(--zinc-400)' : 'var(--zinc-700)' }}>
                                 {label}
                             </span>
                             {i < 2 && (
-                                <div className="flex-1 h-px" style={{ background: isActive ? 'rgba(112, 150, 209, 0.3)' : 'rgba(112, 150, 209, 0.15)' }} />
+                                <div className="flex-1 h-px" style={{ background: isActive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.15)' }} />
                             )}
                         </div>
                     );
@@ -196,19 +196,19 @@ export default function NewIncidentPage() {
                         <button
                             className="w-20 h-20 rounded-full mx-auto flex items-center justify-center cursor-pointer transition-all hover:scale-105"
                             style={{
-                                background: 'linear-gradient(135deg, rgba(112, 150, 209, 0.15), rgba(112, 150, 209, 0.05))',
-                                border: '2px solid rgba(112, 150, 209, 0.3)',
+                                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05))',
+                                border: '2px solid rgba(16, 185, 129, 0.3)',
                             }}
                             title="Voice recording (coming soon)"
                         >
-                            <Mic size={28} style={{ color: '#7096D1' }} />
+                            <Microphone size={28} style={{ color: 'var(--zinc-400)' }} />
                         </button>
-                        <p className="text-xs mt-2" style={{ color: '#123D7E' }}>
+                        <p className="text-xs mt-2" style={{ color: 'var(--zinc-700)' }}>
                             Tap to Record Testimony
                         </p>
                     </div>
 
-                    <div className="gold-divider" />
+                    <div className="divider" />
 
                     {/* Manual Narrative */}
                     <div>
@@ -222,7 +222,7 @@ export default function NewIncidentPage() {
                             rows={6}
                             className="input-premium resize-none"
                         />
-                        <p className="text-xs mt-1 text-right" style={{ color: narrative.length > 4500 ? '#C75A5A' : '#0A1E54' }}>
+                        <p className="text-xs mt-1 text-right" style={{ color: narrative.length > 4500 ? 'var(--danger)' : 'var(--zinc-900)' }}>
                             {narrative.length}/5000
                         </p>
                     </div>
@@ -260,10 +260,10 @@ export default function NewIncidentPage() {
                                             : 'rgba(42, 29, 14, 0.3)',
                                         border: `1px solid ${severity === level
                                             ? `${severityColors[level - 1]}50`
-                                            : 'rgba(112, 150, 209, 0.15)'}`,
+                                            : 'rgba(16, 185, 129, 0.15)'}`,
                                         color: severity === level
                                             ? severityColors[level - 1]
-                                            : '#123D7E',
+                                            : 'var(--zinc-700)',
                                     }}
                                 >
                                     <div className="flex items-center justify-center gap-2">
@@ -275,7 +275,7 @@ export default function NewIncidentPage() {
                                                     style={{
                                                         background: bar <= level
                                                             ? severityColors[level - 1]
-                                                            : 'rgba(138, 122, 96, 0.15)',
+                                                            : 'rgba(161, 161, 170, 0.15)',
                                                         opacity: severity === level ? 1 : 0.4,
                                                     }}
                                                 />
@@ -301,7 +301,7 @@ export default function NewIncidentPage() {
                                     className="badge cursor-pointer transition-all"
                                     style={{
                                         background: category === cat.value ? `${cat.color}25` : 'rgba(42, 29, 14, 0.4)',
-                                        color: category === cat.value ? cat.color : '#123D7E',
+                                        color: category === cat.value ? cat.color : 'var(--zinc-700)',
                                         border: `1px solid ${category === cat.value ? `${cat.color}40` : 'transparent'}`,
                                     }}
                                 >
@@ -344,7 +344,7 @@ export default function NewIncidentPage() {
                         className="flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all"
                         style={{
                             background: childrenInvolved ? 'rgba(229, 168, 74, 0.08)' : 'rgba(42, 29, 14, 0.3)',
-                            border: `1px solid ${childrenInvolved ? 'rgba(229, 168, 74, 0.25)' : 'rgba(112, 150, 209, 0.15)'}`,
+                            border: `1px solid ${childrenInvolved ? 'rgba(229, 168, 74, 0.25)' : 'rgba(16, 185, 129, 0.15)'}`,
                         }}
                     >
                         <input
@@ -356,15 +356,15 @@ export default function NewIncidentPage() {
                         <div
                             className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
                             style={{
-                                background: childrenInvolved ? 'rgba(229, 168, 74, 0.25)' : 'rgba(112, 150, 209, 0.15)',
-                                border: `1px solid ${childrenInvolved ? '#E5A84A' : 'rgba(138, 122, 96, 0.2)'}`,
+                                background: childrenInvolved ? 'rgba(229, 168, 74, 0.25)' : 'rgba(16, 185, 129, 0.15)',
+                                border: `1px solid ${childrenInvolved ? 'var(--warning)' : 'rgba(161, 161, 170, 0.2)'}`,
                             }}
                         >
-                            {childrenInvolved && <Check size={12} style={{ color: '#E5A84A' }} />}
+                            {childrenInvolved && <Check size={12} style={{ color: 'var(--warning)' }} />}
                         </div>
                         <div className="flex items-center gap-2">
-                            <Baby size={14} style={{ color: childrenInvolved ? '#E5A84A' : '#123D7E' }} />
-                            <span className="text-sm" style={{ color: childrenInvolved ? '#E5A84A' : '#123D7E' }}>
+                            <Baby size={14} style={{ color: childrenInvolved ? 'var(--warning)' : 'var(--zinc-700)' }} />
+                            <span className="text-sm" style={{ color: childrenInvolved ? 'var(--warning)' : 'var(--zinc-700)' }}>
                                 Children were present or involved
                             </span>
                         </div>
@@ -372,7 +372,7 @@ export default function NewIncidentPage() {
 
                     {/* Error */}
                     {analyzeError && (
-                        <p className="text-sm px-1" style={{ color: '#C75A5A' }}>{analyzeError}</p>
+                        <p className="text-sm px-1" style={{ color: 'var(--danger)' }}>{analyzeError}</p>
                     )}
 
                     {/* Submit */}
@@ -384,12 +384,12 @@ export default function NewIncidentPage() {
                         {isAnalyzing ? (
                             <>
                                 <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
-                                    <Sparkles size={16} />
+                                    <Sparkle size={16} />
                                 </motion.div>
                                 Analyzing with AI...
                             </>
                         ) : (
-                            <><Sparkles size={16} /> Generate Court-Ready Summary</>
+                            <><Sparkle size={16} /> Generate Court-Ready Summary</>
                         )}
                     </button>
                 </motion.div>
@@ -401,7 +401,7 @@ export default function NewIncidentPage() {
                     {/* Court Summary */}
                     <div className="card-premium p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-sm font-semibold tracking-[0.15em] uppercase" style={{ color: '#7096D1' }}>
+                            <h3 className="text-sm font-semibold tracking-[0.15em] uppercase" style={{ color: 'var(--zinc-400)' }}>
                                 Court-Ready Summary
                             </h3>
                             <button
@@ -419,7 +419,7 @@ export default function NewIncidentPage() {
                                 rows={8}
                             />
                         ) : (
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#123D7E' }}>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--zinc-700)' }}>
                                 {courtSummary}
                             </p>
                         )}
@@ -428,10 +428,10 @@ export default function NewIncidentPage() {
                     {/* Behavioral Analysis */}
                     {behavioralAnalysis && (
                         <div className="card-premium p-6">
-                            <h3 className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2" style={{ color: '#E5A84A' }}>
-                                <Sparkles size={14} /> NPD Behavioral Analysis
+                            <h3 className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2" style={{ color: 'var(--warning)' }}>
+                                <Sparkle size={14} /> NPD Behavioral Analysis
                             </h3>
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#123D7E' }}>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--zinc-700)' }}>
                                 {behavioralAnalysis}
                             </p>
                         </div>
@@ -440,10 +440,10 @@ export default function NewIncidentPage() {
                     {/* Strategic Response */}
                     {strategicResponse && (
                         <div className="card-premium p-6">
-                            <h3 className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2" style={{ color: '#5A9E6F' }}>
+                            <h3 className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2" style={{ color: 'var(--success)' }}>
                                 <Check size={14} /> Strategic Response
                             </h3>
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: '#123D7E' }}>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--zinc-700)' }}>
                                 {strategicResponse}
                             </p>
                         </div>
@@ -471,12 +471,12 @@ export default function NewIncidentPage() {
                         className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
                         style={{ background: 'rgba(90, 158, 111, 0.15)', border: '1px solid rgba(90, 158, 111, 0.3)' }}
                     >
-                        <Check size={28} style={{ color: '#5A9E6F' }} />
+                        <Check size={28} style={{ color: 'var(--success)' }} />
                     </div>
-                    <h2 className="font-serif text-xl font-semibold mb-2" style={{ color: '#F5EFE0' }}>
+                    <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--zinc-100)' }}>
                         Incident Documented
                     </h2>
-                    <p className="text-sm mb-6" style={{ color: '#123D7E' }}>
+                    <p className="text-sm mb-6" style={{ color: 'var(--zinc-700)' }}>
                         This record has been securely saved and is court-ready.
                     </p>
                     <div className="flex gap-3 justify-center">

@@ -3,16 +3,16 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useRef, useCallback, useEffect, Suspense } from 'react';
 import {
-    Landmark,
-    ChevronLeft,
-    ChevronRight,
+    Bank,
+    CaretLeft,
+    CaretRight,
     FileText,
-    Sparkles,
+    Sparkle,
     Plus,
     Paperclip,
     X,
     ArrowRight,
-} from 'lucide-react';
+} from '@phosphor-icons/react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
@@ -33,7 +33,7 @@ interface ProgressStep {
 /** Wrapper with Suspense boundary for useSearchParams */
 export default function DocuVaultPage() {
     return (
-        <Suspense fallback={<div className="max-w-5xl mx-auto animate-pulse" style={{ color: '#D0E3FF' }}>Loading...</div>}>
+        <Suspense fallback={<div className="max-w-5xl mx-auto animate-pulse" style={{ color: 'var(--zinc-400)' }}>Loading...</div>}>
             <DocuVaultPageInner />
         </Suspense>
     );
@@ -305,17 +305,17 @@ function DocuVaultPageInner() {
                                     <div
                                         className="w-10 h-10 rounded-xl flex items-center justify-center"
                                         style={{
-                                            background: 'rgba(208, 227, 255, 0.12)',
-                                            border: '1px solid rgba(208, 227, 255, 0.25)',
+                                            background: 'rgba(63, 63, 70, 0.12)',
+                                            border: '1px solid rgba(63, 63, 70, 0.25)',
                                         }}
                                     >
-                                        <Landmark size={20} style={{ color: '#F7F2EB' }} />
+                                        <Bank size={20} style={{ color: 'var(--zinc-100)' }} />
                                     </div>
-                                    <h1 className="text-headline text-2xl" style={{ color: '#F7F2EB' }}>
+                                    <h1 className="text-headline text-2xl" style={{ color: 'var(--zinc-100)' }}>
                                         DocuVault
                                     </h1>
                                 </div>
-                                <p className="text-sm" style={{ color: '#FFF9F0' }}>
+                                <p className="text-sm" style={{ color: 'var(--zinc-100)' }}>
                                     Professional Legal Document Generator
                                 </p>
                             </div>
@@ -328,7 +328,7 @@ function DocuVaultPageInner() {
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.1 }}
                         className="text-xs mb-6"
-                        style={{ color: '#0A1E54' }}
+                        style={{ color: 'var(--zinc-900)' }}
                     >
                         Generate court-ready PDFs with AI precision. Trustworthy. Semantic. Verbatim.
                     </motion.p>
@@ -351,12 +351,12 @@ function DocuVaultPageInner() {
                                 className="px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
                                 style={{
                                     background: activeTab === tab.id
-                                        ? 'linear-gradient(135deg, #F7F2EB, #123D7E)'
-                                        : 'rgba(255, 249, 240, 0.4)',
-                                    color: activeTab === tab.id ? '#F7F2EB' : '#FFF9F0',
+                                        ? 'var(--emerald-600)'
+                                        : 'rgba(244, 244, 245, 0.4)',
+                                    color: activeTab === tab.id ? 'var(--zinc-100)' : 'var(--zinc-100)',
                                     border: activeTab === tab.id
                                         ? 'none'
-                                        : '1px solid rgba(138, 122, 96, 0.12)',
+                                        : '1px solid rgba(161, 161, 170, 0.12)',
                                 }}
                             >
                                 {tab.label}
@@ -374,7 +374,7 @@ function DocuVaultPageInner() {
                         <div className="flex items-center justify-between mb-3">
                             <h2
                                 className="text-xs font-semibold tracking-[0.15em] uppercase"
-                                style={{ color: '#D0E3FF' }}
+                                style={{ color: 'var(--zinc-400)' }}
                             >
                                 Templates
                             </h2>
@@ -384,17 +384,17 @@ function DocuVaultPageInner() {
                                         onClick={() => scrollCarousel('left')}
                                         aria-label="Scroll templates left"
                                         className="w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer transition-colors"
-                                        style={{ background: 'rgba(208, 227, 255, 0.06)' }}
+                                        style={{ background: 'rgba(63, 63, 70, 0.06)' }}
                                     >
-                                        <ChevronLeft size={14} style={{ color: '#F7F2EB' }} />
+                                        <CaretLeft size={14} style={{ color: 'var(--zinc-100)' }} />
                                     </button>
                                     <button
                                         onClick={() => scrollCarousel('right')}
                                         aria-label="Scroll templates right"
                                         className="w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer transition-colors"
-                                        style={{ background: 'rgba(208, 227, 255, 0.06)' }}
+                                        style={{ background: 'rgba(63, 63, 70, 0.06)' }}
                                     >
-                                        <ChevronRight size={14} style={{ color: '#F7F2EB' }} />
+                                        <CaretRight size={14} style={{ color: 'var(--zinc-100)' }} />
                                     </button>
                                 </div>
                             )}
@@ -407,24 +407,24 @@ function DocuVaultPageInner() {
                                 className="card-premium p-6 cursor-pointer transition-all hover:scale-[1.01] w-full text-left"
                                 onClick={() => setSelectedTemplate(null)}
                                 style={{
-                                    borderColor: 'rgba(208, 227, 255, 0.25)',
+                                    borderColor: 'rgba(63, 63, 70, 0.25)',
                                 }}
                             >
                                 <div className="flex items-center gap-4">
                                     <div
                                         className="w-14 h-14 rounded-xl flex items-center justify-center"
                                         style={{
-                                            background: 'rgba(208, 227, 255, 0.08)',
-                                            border: '1px dashed rgba(208, 227, 255, 0.3)',
+                                            background: 'rgba(63, 63, 70, 0.08)',
+                                            border: '1px dashed rgba(63, 63, 70, 0.3)',
                                         }}
                                     >
-                                        <Plus size={22} style={{ color: '#F7F2EB' }} />
+                                        <Plus size={22} style={{ color: 'var(--zinc-100)' }} />
                                     </div>
                                     <div>
-                                        <p className="font-semibold text-sm mb-0.5" style={{ color: '#F7F2EB' }}>
+                                        <p className="font-semibold text-sm mb-0.5" style={{ color: 'var(--zinc-100)' }}>
                                             Custom Document
                                         </p>
-                                        <p className="text-xs" style={{ color: '#FFF9F0' }}>
+                                        <p className="text-xs" style={{ color: 'var(--zinc-100)' }}>
                                             Blank template with general court and legal document structure
                                         </p>
                                     </div>
@@ -448,11 +448,11 @@ function DocuVaultPageInner() {
                                             className="flex-shrink-0 w-44 rounded-2xl p-4 text-left transition-all cursor-pointer"
                                             style={{
                                                 background: isSelected
-                                                    ? 'rgba(208, 227, 255, 0.08)'
-                                                    : 'rgba(255, 249, 240, 0.3)',
+                                                    ? 'rgba(63, 63, 70, 0.08)'
+                                                    : 'rgba(244, 244, 245, 0.3)',
                                                 border: isSelected
-                                                    ? '1px solid rgba(208, 227, 255, 0.35)'
-                                                    : '1px solid rgba(138, 122, 96, 0.08)',
+                                                    ? '1px solid rgba(63, 63, 70, 0.35)'
+                                                    : '1px solid rgba(161, 161, 170, 0.08)',
                                             }}
                                         >
                                             {/* Document preview icon */}
@@ -460,22 +460,22 @@ function DocuVaultPageInner() {
                                                 className="w-full h-24 rounded-xl mb-3 flex items-center justify-center"
                                                 style={{
                                                     background: isSelected
-                                                        ? 'rgba(208, 227, 255, 0.06)'
+                                                        ? 'rgba(63, 63, 70, 0.06)'
                                                         : 'rgba(26, 16, 8, 0.5)',
-                                                    border: '1px solid rgba(138, 122, 96, 0.06)',
+                                                    border: '1px solid rgba(161, 161, 170, 0.06)',
                                                 }}
                                             >
                                                 <FileText
                                                     size={28}
                                                     style={{
-                                                        color: isSelected ? '#F7F2EB' : '#0A1E54',
+                                                        color: isSelected ? 'var(--zinc-100)' : 'var(--zinc-900)',
                                                     }}
                                                 />
                                             </div>
                                             <p
                                                 className="text-xs font-medium leading-tight line-clamp-2"
                                                 style={{
-                                                    color: isSelected ? '#F7F2EB' : '#D0E3FF',
+                                                    color: isSelected ? 'var(--zinc-100)' : 'var(--zinc-400)',
                                                 }}
                                             >
                                                 {tmpl.title}
@@ -499,14 +499,14 @@ function DocuVaultPageInner() {
                                 <div
                                     className="px-4 py-3 rounded-xl"
                                     style={{
-                                        background: 'rgba(208, 227, 255, 0.04)',
-                                        border: '1px solid rgba(208, 227, 255, 0.12)',
+                                        background: 'rgba(63, 63, 70, 0.04)',
+                                        border: '1px solid rgba(63, 63, 70, 0.12)',
                                     }}
                                 >
-                                    <p className="text-xs font-semibold mb-1" style={{ color: '#F7F2EB' }}>
+                                    <p className="text-xs font-semibold mb-1" style={{ color: 'var(--zinc-100)' }}>
                                         Selected: {selectedTemplate.title}
                                     </p>
-                                    <p className="text-xs" style={{ color: '#FFF9F0' }}>
+                                    <p className="text-xs" style={{ color: 'var(--zinc-100)' }}>
                                         {selectedTemplate.description}
                                     </p>
                                 </div>
@@ -537,7 +537,7 @@ function DocuVaultPageInner() {
                                     disabled
                                     title="File attachment coming soon"
                                     className="flex items-center gap-1.5 text-xs transition-colors cursor-not-allowed"
-                                    style={{ color: '#FFF9F0', opacity: 0.5 }}
+                                    style={{ color: 'var(--zinc-100)', opacity: 0.5 }}
                                 >
                                     <Paperclip size={13} /> Attach
                                 </button>
@@ -545,13 +545,13 @@ function DocuVaultPageInner() {
                                     <button
                                         onClick={() => setDocumentContent('')}
                                         className="flex items-center gap-1.5 text-xs cursor-pointer transition-colors"
-                                        style={{ color: '#FFF9F0' }}
+                                        style={{ color: 'var(--zinc-100)' }}
                                     >
                                         <X size={13} /> Clear
                                     </button>
                                 )}
                             </div>
-                            <p className="text-xs" style={{ color: '#0A1E54' }}>
+                            <p className="text-xs" style={{ color: 'var(--zinc-900)' }}>
                                 {documentContent.length > 0 ? `${documentContent.length} chars` : ''}
                             </p>
                         </div>
@@ -568,7 +568,7 @@ function DocuVaultPageInner() {
                             disabled={(!documentContent.trim() && !selectedTemplate) || isUserProfileLoading}
                             className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 text-sm disabled:opacity-40"
                         >
-                            <Sparkles size={16} />
+                            <Sparkle size={16} />
                             Generate
                         </button>
                     </motion.div>
@@ -599,7 +599,7 @@ function DocuVaultPageInner() {
                     >
                         {[
                             { label: 'Describe\nDocument', icon: FileText },
-                            { label: 'AI Generated\nDraft', icon: Sparkles },
+                            { label: 'AI Generated\nDraft', icon: Sparkle },
                             { label: 'Download\n& Export', icon: ArrowRight },
                         ].map((item, i) => {
                             const Icon = item.icon;
@@ -608,15 +608,15 @@ function DocuVaultPageInner() {
                                     <div
                                         className="w-10 h-10 rounded-full flex items-center justify-center"
                                         style={{
-                                            background: 'rgba(208, 227, 255, 0.06)',
-                                            border: '1px solid rgba(208, 227, 255, 0.12)',
+                                            background: 'rgba(63, 63, 70, 0.06)',
+                                            border: '1px solid rgba(63, 63, 70, 0.12)',
                                         }}
                                     >
-                                        <Icon size={16} style={{ color: '#FFF9F0' }} />
+                                        <Icon size={16} style={{ color: 'var(--zinc-100)' }} />
                                     </div>
                                     <p
                                         className="text-xs text-center whitespace-pre-line leading-tight"
-                                        style={{ color: '#0A1E54' }}
+                                        style={{ color: 'var(--zinc-900)' }}
                                     >
                                         {item.label}
                                     </p>
@@ -642,11 +642,11 @@ function DocuVaultPageInner() {
                             onClick={handleNewDocument}
                             aria-label="Cancel generation"
                             className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer"
-                            style={{ background: 'rgba(208, 227, 255, 0.06)' }}
+                            style={{ background: 'rgba(63, 63, 70, 0.06)' }}
                         >
-                            <X size={16} style={{ color: '#FFF9F0' }} />
+                            <X size={16} style={{ color: 'var(--zinc-100)' }} />
                         </button>
-                        <p className="text-xs" style={{ color: '#FFF9F0' }}>
+                        <p className="text-xs" style={{ color: 'var(--zinc-100)' }}>
                             Step {Math.min(progressSteps.filter(s => s.status === 'complete').length + 1, progressSteps.length)} of {progressSteps.length}
                         </p>
                     </div>
@@ -654,12 +654,12 @@ function DocuVaultPageInner() {
                     {/* Document context */}
                     <div
                         className="card-premium p-6 mb-8"
-                        style={{ borderColor: 'rgba(208, 227, 255, 0.15)' }}
+                        style={{ borderColor: 'rgba(63, 63, 70, 0.15)' }}
                     >
-                        <p className="text-xs uppercase tracking-[0.15em] mb-2" style={{ color: '#D0E3FF' }}>
+                        <p className="text-xs uppercase tracking-[0.15em] mb-2" style={{ color: 'var(--zinc-400)' }}>
                             Document Context
                         </p>
-                        <p className="text-sm italic leading-relaxed" style={{ color: '#123D7E' }}>
+                        <p className="text-sm italic leading-relaxed" style={{ color: 'var(--zinc-700)' }}>
                             &ldquo;{selectedTemplate?.title ?? (() => {
                                 const text = documentContent;
                                 if (text.length <= 120) return text;
@@ -680,14 +680,14 @@ function DocuVaultPageInner() {
                             <div
                                 className="w-16 h-16 rounded-2xl flex items-center justify-center"
                                 style={{
-                                    background: 'linear-gradient(135deg, rgba(208, 227, 255, 0.12), rgba(208, 227, 255, 0.04))',
-                                    border: '1px solid rgba(208, 227, 255, 0.2)',
+                                    background: 'linear-gradient(135deg, rgba(63, 63, 70, 0.12), rgba(63, 63, 70, 0.04))',
+                                    border: '1px solid rgba(63, 63, 70, 0.2)',
                                 }}
                             >
-                                <Sparkles size={24} style={{ color: '#F7F2EB' }} />
+                                <Sparkle size={24} style={{ color: 'var(--zinc-100)' }} />
                             </div>
                         </motion.div>
-                        <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>
+                        <p className="text-sm font-medium" style={{ color: 'var(--zinc-100)' }}>
                             DocuVault AI is working...
                         </p>
                     </div>
@@ -695,20 +695,20 @@ function DocuVaultPageInner() {
                     {/* Progress bar */}
                     <div className="mb-8">
                         <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold tracking-[0.1em] uppercase" style={{ color: '#D0E3FF' }}>
+                            <p className="text-xs font-semibold tracking-[0.1em] uppercase" style={{ color: 'var(--zinc-400)' }}>
                                 Synthesis
                             </p>
-                            <p className="text-xs font-bold" style={{ color: '#F7F2EB' }}>
+                            <p className="text-xs font-bold" style={{ color: 'var(--zinc-100)' }}>
                                 {Math.round(progress)}%
                             </p>
                         </div>
                         <div
                             className="h-1 rounded-full overflow-hidden"
-                            style={{ background: 'rgba(138, 122, 96, 0.1)' }}
+                            style={{ background: 'rgba(161, 161, 170, 0.1)' }}
                         >
                             <motion.div
                                 className="h-full rounded-full"
-                                style={{ background: 'linear-gradient(90deg, #F7F2EB, #123D7E)' }}
+                                style={{ background: 'linear-gradient(90deg, var(--zinc-100), var(--zinc-700))' }}
                                 animate={{ width: `${progress}%` }}
                                 transition={{ duration: 0.5 }}
                             />
@@ -731,23 +731,23 @@ function DocuVaultPageInner() {
                                             className="w-5 h-5 rounded-full flex items-center justify-center"
                                             style={{ background: 'rgba(90, 158, 111, 0.15)' }}
                                         >
-                                            <div className="w-2 h-2 rounded-full" style={{ background: '#5A9E6F' }} />
+                                            <div className="w-2 h-2 rounded-full" style={{ background: 'var(--success)' }} />
                                         </div>
                                     ) : step.status === 'active' ? (
                                         <motion.div
                                             animate={{ scale: [1, 1.2, 1] }}
                                             transition={{ duration: 1.5, repeat: Infinity }}
                                             className="w-5 h-5 rounded-full flex items-center justify-center"
-                                            style={{ background: 'rgba(208, 227, 255, 0.15)' }}
+                                            style={{ background: 'rgba(63, 63, 70, 0.15)' }}
                                         >
-                                            <div className="w-2 h-2 rounded-full" style={{ background: '#F7F2EB' }} />
+                                            <div className="w-2 h-2 rounded-full" style={{ background: 'var(--zinc-100)' }} />
                                         </motion.div>
                                     ) : (
                                         <div
                                             className="w-5 h-5 rounded-full flex items-center justify-center"
-                                            style={{ background: 'rgba(138, 122, 96, 0.08)' }}
+                                            style={{ background: 'rgba(161, 161, 170, 0.08)' }}
                                         >
-                                            <div className="w-2 h-2 rounded-full" style={{ background: 'rgba(138, 122, 96, 0.3)' }} />
+                                            <div className="w-2 h-2 rounded-full" style={{ background: 'rgba(161, 161, 170, 0.3)' }} />
                                         </div>
                                     )}
                                 </div>
@@ -756,10 +756,10 @@ function DocuVaultPageInner() {
                                         className="text-sm font-medium"
                                         style={{
                                             color: step.status === 'complete'
-                                                ? '#5A9E6F'
+                                                ? 'var(--success)'
                                                 : step.status === 'active'
-                                                    ? '#F7F2EB'
-                                                    : '#0A1E54',
+                                                    ? 'var(--zinc-100)'
+                                                    : 'var(--zinc-900)',
                                         }}
                                     >
                                         {step.label}
@@ -769,7 +769,7 @@ function DocuVaultPageInner() {
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             className="text-xs mt-0.5"
-                                            style={{ color: '#FFF9F0' }}
+                                            style={{ color: 'var(--zinc-100)' }}
                                         >
                                             Processing...
                                         </motion.p>
@@ -802,17 +802,17 @@ function DocuVaultPageInner() {
                             aria-label="Back to document composer"
                             className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
                             style={{
-                                background: 'rgba(208, 227, 255, 0.08)',
-                                border: '1px solid rgba(208, 227, 255, 0.15)',
+                                background: 'rgba(63, 63, 70, 0.08)',
+                                border: '1px solid rgba(63, 63, 70, 0.15)',
                             }}
                         >
-                            <ChevronLeft size={16} style={{ color: '#F7F2EB' }} />
+                            <CaretLeft size={16} style={{ color: 'var(--zinc-100)' }} />
                         </button>
                         <div>
-                            <h1 className="text-headline text-lg" style={{ color: '#F7F2EB' }}>
+                            <h1 className="text-headline text-lg" style={{ color: 'var(--zinc-100)' }}>
                                 {selectedTemplate?.title || 'Generated Document'}
                             </h1>
-                            <p className="text-xs" style={{ color: '#FFF9F0' }}>
+                            <p className="text-xs" style={{ color: 'var(--zinc-100)' }}>
                                 Case #{caseNumber ?? '------'}
                             </p>
                         </div>
@@ -820,10 +820,10 @@ function DocuVaultPageInner() {
 
                     {/* AI Summary */}
                     <div className="card-premium p-5 mb-6">
-                        <p className="text-xs font-semibold uppercase tracking-[0.15em] mb-2" style={{ color: '#5A8EC9' }}>
+                        <p className="text-xs font-semibold uppercase tracking-[0.15em] mb-2" style={{ color: 'var(--info)' }}>
                             Intelligence Summary
                         </p>
-                        <p className="text-sm leading-relaxed" style={{ color: '#123D7E' }}>
+                        <p className="text-sm leading-relaxed" style={{ color: 'var(--zinc-700)' }}>
                             I&apos;ve synthesized the provided content into a formal{' '}
                             {selectedTemplate?.title?.toLowerCase() || 'legal document'}.
                             All formatting follows local court standards. The document has been cross-referenced
@@ -836,7 +836,7 @@ function DocuVaultPageInner() {
                         className="rounded-2xl p-6 mb-6 text-center"
                         style={{
                             background: 'rgba(245, 239, 224, 0.03)',
-                            border: '1px solid rgba(208, 227, 255, 0.15)',
+                            border: '1px solid rgba(63, 63, 70, 0.15)',
                         }}
                     >
                         {/* PDF Icon */}
@@ -844,15 +844,15 @@ function DocuVaultPageInner() {
                             className="w-28 h-36 mx-auto rounded-xl mb-4 flex items-center justify-center"
                             style={{
                                 background: 'rgba(245, 239, 224, 0.04)',
-                                border: '1px solid rgba(138, 122, 96, 0.1)',
+                                border: '1px solid rgba(161, 161, 170, 0.1)',
                             }}
                         >
-                            <FileText size={36} style={{ color: '#FFF9F0' }} />
+                            <FileText size={36} style={{ color: 'var(--zinc-100)' }} />
                         </div>
-                        <p className="text-sm font-semibold mb-1" style={{ color: '#F7F2EB' }}>
+                        <p className="text-sm font-semibold mb-1" style={{ color: 'var(--zinc-100)' }}>
                             {selectedTemplate?.title || 'Legal Document'} v.1
                         </p>
-                        <p className="text-xs" style={{ color: '#FFF9F0' }}>
+                        <p className="text-xs" style={{ color: 'var(--zinc-100)' }}>
                             FORMAL ARCHIVE • ~1.2 MB
                         </p>
 
@@ -872,11 +872,11 @@ function DocuVaultPageInner() {
                             >
                                 <div
                                     className="w-10 h-10 rounded-full flex items-center justify-center"
-                                    style={{ background: 'rgba(208, 227, 255, 0.06)', border: '1px solid rgba(208, 227, 255, 0.15)' }}
+                                    style={{ background: 'rgba(63, 63, 70, 0.06)', border: '1px solid rgba(63, 63, 70, 0.15)' }}
                                 >
-                                    <ArrowRight size={16} className="rotate-90" style={{ color: '#F7F2EB' }} />
+                                    <ArrowRight size={16} className="rotate-90" style={{ color: 'var(--zinc-100)' }} />
                                 </div>
-                                <span className="text-xs" style={{ color: '#FFF9F0' }}>Download</span>
+                                <span className="text-xs" style={{ color: 'var(--zinc-100)' }}>Download</span>
                             </button>
                             {/* Print */}
                             <button
@@ -901,11 +901,11 @@ function DocuVaultPageInner() {
                             >
                                 <div
                                     className="w-10 h-10 rounded-full flex items-center justify-center"
-                                    style={{ background: 'rgba(208, 227, 255, 0.06)', border: '1px solid rgba(208, 227, 255, 0.15)' }}
+                                    style={{ background: 'rgba(63, 63, 70, 0.06)', border: '1px solid rgba(63, 63, 70, 0.15)' }}
                                 >
-                                    <FileText size={16} style={{ color: '#F7F2EB' }} />
+                                    <FileText size={16} style={{ color: 'var(--zinc-100)' }} />
                                 </div>
-                                <span className="text-xs" style={{ color: '#FFF9F0' }}>Print</span>
+                                <span className="text-xs" style={{ color: 'var(--zinc-100)' }}>Print</span>
                             </button>
                             {/* Save — TODO: wire to Convex backend */}
                             <button
@@ -916,11 +916,11 @@ function DocuVaultPageInner() {
                             >
                                 <div
                                     className="w-10 h-10 rounded-full flex items-center justify-center"
-                                    style={{ background: 'rgba(208, 227, 255, 0.06)', border: '1px solid rgba(208, 227, 255, 0.15)' }}
+                                    style={{ background: 'rgba(63, 63, 70, 0.06)', border: '1px solid rgba(63, 63, 70, 0.15)' }}
                                 >
-                                    <Landmark size={16} style={{ color: '#F7F2EB' }} />
+                                    <Bank size={16} style={{ color: 'var(--zinc-100)' }} />
                                 </div>
-                                <span className="text-xs" style={{ color: '#FFF9F0' }}>Save</span>
+                                <span className="text-xs" style={{ color: 'var(--zinc-100)' }}>Save</span>
                             </button>
                         </div>
                     </div>
@@ -934,12 +934,12 @@ function DocuVaultPageInner() {
                                 border: '1px solid rgba(90, 158, 111, 0.15)',
                             }}
                         >
-                            <div className="w-2 h-2 rounded-full mt-1.5" style={{ background: '#5A9E6F' }} />
+                            <div className="w-2 h-2 rounded-full mt-1.5" style={{ background: 'var(--success)' }} />
                             <div>
-                                <p className="text-xs font-semibold" style={{ color: '#5A9E6F' }}>
+                                <p className="text-xs font-semibold" style={{ color: 'var(--success)' }}>
                                     Rule 3.1 Certified
                                 </p>
-                                <p className="text-xs" style={{ color: '#FFF9F0' }}>
+                                <p className="text-xs" style={{ color: 'var(--zinc-100)' }}>
                                     Formal formatting standards met
                                 </p>
                             </div>
@@ -951,12 +951,12 @@ function DocuVaultPageInner() {
                                 border: '1px solid rgba(90, 158, 111, 0.15)',
                             }}
                         >
-                            <div className="w-2 h-2 rounded-full mt-1.5" style={{ background: '#5A9E6F' }} />
+                            <div className="w-2 h-2 rounded-full mt-1.5" style={{ background: 'var(--success)' }} />
                             <div>
-                                <p className="text-xs font-semibold" style={{ color: '#5A9E6F' }}>
+                                <p className="text-xs font-semibold" style={{ color: 'var(--success)' }}>
                                     Bates Validation
                                 </p>
-                                <p className="text-xs" style={{ color: '#FFF9F0' }}>
+                                <p className="text-xs" style={{ color: 'var(--zinc-100)' }}>
                                     Sequence validated & confirmed
                                 </p>
                             </div>
@@ -967,17 +967,17 @@ function DocuVaultPageInner() {
                     <div
                         className="flex items-center gap-3 px-4 py-3 rounded-xl"
                         style={{
-                            background: 'rgba(255, 249, 240, 0.3)',
-                            border: '1px solid rgba(138, 122, 96, 0.1)',
+                            background: 'rgba(244, 244, 245, 0.3)',
+                            border: '1px solid rgba(161, 161, 170, 0.1)',
                             opacity: 0.5,
                         }}
                     >
-                        <Plus size={16} style={{ color: '#FFF9F0' }} />
+                        <Plus size={16} style={{ color: 'var(--zinc-100)' }} />
                         <input
                             type="text"
                             placeholder="Revision requests coming soon..."
                             className="flex-1 bg-transparent text-sm outline-none"
-                            style={{ color: '#D0E3FF' }}
+                            style={{ color: 'var(--zinc-400)' }}
                             disabled
                             aria-disabled="true"
                         />
@@ -985,10 +985,10 @@ function DocuVaultPageInner() {
                             disabled
                             className="w-8 h-8 rounded-full flex items-center justify-center cursor-not-allowed opacity-50"
                             style={{
-                                background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
+                                background: 'var(--emerald-600)',
                             }}
                         >
-                            <ArrowRight size={14} style={{ color: '#F7F2EB' }} />
+                            <ArrowRight size={14} style={{ color: 'var(--zinc-100)' }} />
                         </button>
                     </div>
 

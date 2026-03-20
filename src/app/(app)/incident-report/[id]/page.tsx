@@ -14,15 +14,15 @@ import {
     Shield,
     Pencil,
     Check,
-    AlertTriangle,
-    Sparkles,
-    Save,
-    Trash2,
+    Warning,
+    Sparkle,
+    FloppyDisk,
+    Trash,
     MapPin,
     Users,
     Baby,
-    RefreshCw,
-} from 'lucide-react';
+    ArrowsClockwise,
+} from '@phosphor-icons/react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
@@ -81,7 +81,7 @@ export default function IncidentDetailPage() {
                         <motion.div
                             key={j}
                             className="w-2 h-2 rounded-full"
-                            style={{ background: '#F7F2EB' }}
+                            style={{ background: 'var(--zinc-100)' }}
                             animate={{ opacity: [0.3, 1, 0.3] }}
                             transition={{ duration: 1, repeat: Infinity, delay: j * 0.2 }}
                         />
@@ -103,7 +103,7 @@ export default function IncidentDetailPage() {
             ? candidate
             : null;
     })();
-    const severityColors = ['#5A9E6F', '#E5A84A', '#C75A5A'];
+    const severityColors = ['var(--success)', 'var(--warning)', 'var(--danger)'];
     const severityLabels = ['Low', 'Medium', 'High'];
 
     const startEditing = () => {
@@ -217,18 +217,18 @@ export default function IncidentDetailPage() {
                     href="/incident-report"
                     className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
                     style={{
-                        background: 'rgba(208, 227, 255, 0.08)',
-                        border: '1px solid rgba(208, 227, 255, 0.15)',
+                        background: 'rgba(63, 63, 70, 0.08)',
+                        border: '1px solid rgba(63, 63, 70, 0.15)',
                     }}
                     aria-label="Back to incident reports"
                 >
-                    <ArrowLeft size={16} style={{ color: '#F7F2EB' }} />
+                    <ArrowLeft size={16} style={{ color: 'var(--zinc-100)' }} />
                 </Link>
                 <div className="flex-1">
-                    <h1 className="text-headline text-xl" style={{ color: '#F7F2EB' }}>
+                    <h1 className="text-headline text-xl" style={{ color: 'var(--zinc-100)' }}>
                         Incident Record
                     </h1>
-                    <p className="text-xs" style={{ color: '#FFF9F0' }}>
+                    <p className="text-xs" style={{ color: 'var(--zinc-100)' }}>
                         {incidentDate
                             ? incidentDate.toLocaleDateString('en-US', {
                                 weekday: 'long',
@@ -252,7 +252,7 @@ export default function IncidentDetailPage() {
                                     disabled={isSaving}
                                     className="btn-primary text-xs flex items-center gap-1"
                                 >
-                                    <Save size={12} /> {isSaving ? 'Saving...' : 'Save'}
+                                    <FloppyDisk size={12} /> {isSaving ? 'Saving...' : 'Save'}
                                 </button>
                             )}
                         </>
@@ -260,13 +260,13 @@ export default function IncidentDetailPage() {
                     <button
                         onClick={() => setShowDeleteConfirm(true)}
                         className="btn-outline text-xs flex items-center gap-1"
-                        style={{ borderColor: 'rgba(199, 90, 90, 0.2)', color: '#C75A5A' }}
+                        style={{ borderColor: 'rgba(239, 68, 68, 0.2)', color: 'var(--danger)' }}
                     >
-                        <Trash2 size={12} /> Delete
+                        <Trash size={12} /> Delete
                     </button>
                 </div>
                 {saveError && (
-                    <p className="text-xs mt-1" style={{ color: '#C75A5A' }}>{saveError}</p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--danger)' }}>{saveError}</p>
                 )}
             </motion.div>
 
@@ -280,8 +280,8 @@ export default function IncidentDetailPage() {
                 <span
                     className="badge"
                     style={{
-                        background: `${cat?.color || '#F7F2EB'}20`,
-                        color: cat?.color || '#F7F2EB',
+                        background: `${cat?.color || 'var(--zinc-100)'}20`,
+                        color: cat?.color || 'var(--zinc-100)',
                     }}
                 >
                     <Tag size={10} /> {cat?.label || incident.category}
@@ -294,10 +294,10 @@ export default function IncidentDetailPage() {
                         <Check size={10} /> Confirmed
                     </span>
                 )}
-                <span className="badge" style={{ background: 'rgba(138, 122, 96, 0.1)', color: '#FFF9F0' }}>
+                <span className="badge" style={{ background: 'rgba(161, 161, 170, 0.1)', color: 'var(--zinc-100)' }}>
                     <Calendar size={10} /> {incident.date}
                 </span>
-                <span className="badge" style={{ background: 'rgba(138, 122, 96, 0.1)', color: '#FFF9F0' }}>
+                <span className="badge" style={{ background: 'rgba(161, 161, 170, 0.1)', color: 'var(--zinc-100)' }}>
                     <Clock size={10} /> {incident.time}
                 </span>
                 {/* Severity */}
@@ -319,7 +319,7 @@ export default function IncidentDetailPage() {
                                         style={{
                                             background: level <= sev
                                                 ? severityColors[sev - 1]
-                                                : 'rgba(138, 122, 96, 0.15)',
+                                                : 'rgba(161, 161, 170, 0.15)',
                                         }}
                                     />
                                 ))}
@@ -329,7 +329,7 @@ export default function IncidentDetailPage() {
                     );
                 })()}
                 {incident.childrenInvolved && (
-                    <span className="badge" style={{ background: 'rgba(229, 168, 74, 0.12)', color: '#E5A84A' }}>
+                    <span className="badge" style={{ background: 'rgba(229, 168, 74, 0.12)', color: 'var(--warning)' }}>
                         <Baby size={10} /> Children Involved
                     </span>
                 )}
@@ -344,12 +344,12 @@ export default function IncidentDetailPage() {
                     className="flex flex-wrap gap-4 mb-6"
                 >
                     {incident.location && (
-                        <div className="flex items-center gap-2 text-xs" style={{ color: '#FFF9F0' }}>
+                        <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--zinc-100)' }}>
                             <MapPin size={12} /> {incident.location}
                         </div>
                     )}
                     {incident.witnesses && incident.witnesses.length > 0 && (
-                        <div className="flex items-center gap-2 text-xs" style={{ color: '#FFF9F0' }}>
+                        <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--zinc-100)' }}>
                             <Users size={12} /> Witnesses: {incident.witnesses.join(', ')}
                         </div>
                     )}
@@ -365,7 +365,7 @@ export default function IncidentDetailPage() {
             >
                 <h3
                     className="text-sm font-semibold tracking-[0.15em] uppercase mb-3"
-                    style={{ color: '#D0E3FF' }}
+                    style={{ color: 'var(--zinc-400)' }}
                 >
                     Incident Narrative
                 </h3>
@@ -379,7 +379,7 @@ export default function IncidentDetailPage() {
                 ) : (
                     <p
                         className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#123D7E' }}
+                        style={{ color: 'var(--zinc-700)' }}
                     >
                         {incident.narrative}
                     </p>
@@ -396,7 +396,7 @@ export default function IncidentDetailPage() {
                 <div className="flex items-center justify-between mb-3">
                     <h3
                         className="text-sm font-semibold tracking-[0.15em] uppercase flex items-center gap-2"
-                        style={{ color: '#F7F2EB' }}
+                        style={{ color: 'var(--zinc-100)' }}
                     >
                         <Shield size={14} /> Court-Ready Summary
                     </h3>
@@ -406,7 +406,7 @@ export default function IncidentDetailPage() {
                                 onClick={handleAnalyze}
                                 className="btn-ghost text-xs flex items-center gap-1"
                             >
-                                <RefreshCw size={12} /> Re-generate
+                                <ArrowsClockwise size={12} /> Re-generate
                             </button>
                         )}
                         {!incident.courtSummary && !isAnalyzing && !isEditing && (
@@ -414,7 +414,7 @@ export default function IncidentDetailPage() {
                                 onClick={handleAnalyze}
                                 className="btn-outline text-xs flex items-center gap-1"
                             >
-                                <Sparkles size={12} /> Generate with AI
+                                <Sparkle size={12} /> Generate with AI
                             </button>
                         )}
                     </div>
@@ -425,9 +425,9 @@ export default function IncidentDetailPage() {
                             animate={{ rotate: 360 }}
                             transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                         >
-                            <Sparkles size={16} style={{ color: '#F7F2EB' }} />
+                            <Sparkle size={16} style={{ color: 'var(--zinc-100)' }} />
                         </motion.div>
-                        <p className="text-sm" style={{ color: '#FFF9F0' }}>
+                        <p className="text-sm" style={{ color: 'var(--zinc-100)' }}>
                             Analyzing incident and generating court-ready summary...
                         </p>
                     </div>
@@ -444,12 +444,12 @@ export default function IncidentDetailPage() {
                 ) : incident.courtSummary ? (
                     <p
                         className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#123D7E' }}
+                        style={{ color: 'var(--zinc-700)' }}
                     >
                         {incident.courtSummary}
                     </p>
                 ) : (
-                    <p className="text-sm italic" style={{ color: '#D0E3FF' }}>
+                    <p className="text-sm italic" style={{ color: 'var(--zinc-400)' }}>
                         No court summary generated yet. Click &ldquo;Generate with AI&rdquo; to
                         create a court-ready version of this incident.
                     </p>
@@ -458,7 +458,7 @@ export default function IncidentDetailPage() {
 
             {/* Analysis error */}
             {analysisError && (
-                <p className="text-sm mb-4 px-1" style={{ color: '#C75A5A' }}>{analysisError}</p>
+                <p className="text-sm mb-4 px-1" style={{ color: 'var(--danger)' }}>{analysisError}</p>
             )}
 
             {/* AI Analysis (if available) */}
@@ -470,13 +470,13 @@ export default function IncidentDetailPage() {
                 >
                     <h3
                         className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2"
-                        style={{ color: '#E5A84A' }}
+                        style={{ color: 'var(--warning)' }}
                     >
-                        <AlertTriangle size={14} /> NPD Behavioral Analysis
+                        <Warning size={14} /> NPD Behavioral Analysis
                     </h3>
                     <p
                         className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#123D7E' }}
+                        style={{ color: 'var(--zinc-700)' }}
                     >
                         {analysis.behavioralAnalysis}
                     </p>
@@ -491,13 +491,13 @@ export default function IncidentDetailPage() {
                 >
                     <h3
                         className="text-sm font-semibold tracking-[0.15em] uppercase mb-3 flex items-center gap-2"
-                        style={{ color: '#5A9E6F' }}
+                        style={{ color: 'var(--success)' }}
                     >
                         <Shield size={14} /> Strategic Response
                     </h3>
                     <p
                         className="text-sm leading-relaxed whitespace-pre-wrap"
-                        style={{ color: '#123D7E' }}
+                        style={{ color: 'var(--zinc-700)' }}
                     >
                         {analysis.strategicResponse}
                     </p>
@@ -519,7 +519,7 @@ export default function IncidentDetailPage() {
                                 disabled={isAnalyzing}
                                 className="btn-outline flex-1 flex items-center justify-center gap-2"
                             >
-                                <Sparkles size={14} /> Analyze with AI
+                                <Sparkle size={14} /> Analyze with AI
                             </button>
                         )}
                         <button
@@ -531,7 +531,7 @@ export default function IncidentDetailPage() {
                         </button>
                     </motion.div>
                     {confirmError && (
-                        <p className="text-sm mt-2" style={{ color: '#C75A5A' }}>{confirmError}</p>
+                        <p className="text-sm mt-2" style={{ color: 'var(--danger)' }}>{confirmError}</p>
                     )}
                 </>
             )}

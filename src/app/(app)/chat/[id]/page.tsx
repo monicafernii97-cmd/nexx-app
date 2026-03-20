@@ -6,7 +6,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
 import { Id } from '../../../../../convex/_generated/dataModel';
 import { useParams, useRouter } from 'next/navigation';
-import { Sparkles, ArrowLeft, Archive as ArchiveIcon } from 'lucide-react';
+import { Lightning, ArrowLeft, Archive } from '@phosphor-icons/react';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
 import { MODE_LABELS } from '@/lib/constants';
@@ -50,24 +50,18 @@ export default function ConversationPage() {
         async (input: string) => {
             if (isStreaming || isPending || !isThreadReady) return;
 
-            // Set pending immediately to prevent double-submit
             setIsPending(true);
 
             try {
-                // Save user message inside try so failures are caught
                 await sendMessage({
                     conversationId,
                     role: 'user',
                     content: input,
                 });
 
-                // Stream AI response
                 setIsStreaming(true);
                 setStreamingContent('');
 
-                // Build message history for the API
-                // Note: `messages` from useQuery won't include the just-saved user message yet,
-                // so we append the current input manually below to ensure the API gets the full history.
                 const history = (messages ?? []).map((m) => ({
                     role: m.role as 'user' | 'assistant',
                     content: m.content,
@@ -121,12 +115,10 @@ export default function ConversationPage() {
                         fullContent += chunk;
                         setStreamingContent(fullContent);
                     }
-                    // Flush any remaining bytes from incomplete multi-byte sequences
                     fullContent += decoder.decode();
                     setStreamingContent(fullContent);
                 }
 
-                // Save the full AI response to Convex
                 if (fullContent) {
                     await sendMessage({
                         conversationId,
@@ -136,13 +128,12 @@ export default function ConversationPage() {
                 }
             } catch (error) {
                 console.error('Streaming error:', error);
-                // Save error message as fallback
                 await sendMessage({
                     conversationId,
                     role: 'assistant',
                     content:
                         "I apologize, but I'm unable to respond right now. Please try again in a moment. If this issue persists, check that the OpenAI API key is configured correctly.",
-                }).catch(() => { }); // Don't throw if fallback also fails
+                }).catch(() => { });
             } finally {
                 setIsStreaming(false);
                 setIsPending(false);
@@ -169,56 +160,57 @@ export default function ConversationPage() {
     const modeInfo = MODE_LABELS[conversation?.mode ?? 'general'] ?? MODE_LABELS.general;
 
     return (
-        <div className="flex flex-col h-[calc(100vh-48px)] max-w-4xl mx-auto">
+        <div className="flex flex-col h-[calc(100vh-48px)] max-w-4xl">
             {/* Header */}
             <motion.div
                 initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                 className="flex items-center gap-3 pb-4 mb-4"
-                style={{ borderBottom: '1px solid rgba(208, 227, 255, 0.1)' }}
+                style={{ borderBottom: '1px solid rgba(63, 63, 70, 0.3)' }}
             >
                 <button
                     onClick={() => router.push('/chat')}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(208, 227, 255,0.08)]"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(63,63,70,0.3)]"
                     aria-label="Back to conversations"
                 >
-                    <ArrowLeft size={16} style={{ color: '#F7F2EB' }} />
+                    <ArrowLeft size={16} style={{ color: 'var(--zinc-400)' }} />
                 </button>
                 <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center"
                     style={{
-                        background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
-                        boxShadow: '0 2px 12px rgba(208, 227, 255, 0.25)',
+                        background: 'var(--emerald-600)',
+                        boxShadow: '0 4px 12px rgba(5, 150, 105, 0.25)',
                     }}
                 >
-                    <Sparkles size={18} style={{ color: '#F7F2EB' }} />
+                    <Lightning size={18} weight="fill" style={{ color: '#ffffff' }} />
                 </div>
                 <div className="flex-1">
-                    <h1 className="text-lg font-semibold" style={{ color: '#F7F2EB' }}>
-                        {conversation?.title || 'NEXX Strategic AI'}
+                    <h1 className="text-lg font-semibold" style={{ color: 'var(--zinc-100)' }}>
+                        {conversation?.title || 'NEXX Intelligence'}
                     </h1>
                     <div className="flex items-center gap-2">
                         <span
                             className="badge text-xs"
                             style={{
-                                background: `${modeInfo.color}20`,
+                                background: `${modeInfo.color}18`,
                                 color: modeInfo.color,
                             }}
                         >
                             {modeInfo.label}
                         </span>
-                        <p className="text-xs" style={{ color: '#D0E3FF' }}>
-                            Executive Intelligence
+                        <p className="text-xs" style={{ color: 'var(--zinc-500)' }}>
+                            Strategic Counsel
                         </p>
                     </div>
                 </div>
                 <button
                     onClick={handleArchive}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(208, 227, 255,0.08)]"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(63,63,70,0.3)]"
                     title="Archive conversation"
                     aria-label="Archive conversation"
                 >
-                    <ArchiveIcon size={14} style={{ color: '#FFF9F0' }} />
+                    <Archive size={14} style={{ color: 'var(--zinc-400)' }} />
                 </button>
             </motion.div>
 
@@ -228,25 +220,25 @@ export default function ConversationPage() {
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 }}
+                        transition={{ delay: 0.3, type: 'spring', stiffness: 200, damping: 20 }}
                         className="flex flex-col items-center justify-center h-full text-center px-4"
                     >
                         <div
-                            className="w-20 h-20 rounded-2xl mb-6 flex items-center justify-center"
+                            className="w-16 h-16 rounded-2xl mb-6 flex items-center justify-center"
                             style={{
-                                background: 'rgba(208, 227, 255, 0.08)',
-                                border: '1px solid rgba(208, 227, 255, 0.15)',
+                                background: 'rgba(16, 185, 129, 0.08)',
+                                border: '1px solid rgba(16, 185, 129, 0.12)',
                             }}
                         >
-                            <Sparkles size={32} style={{ color: '#F7F2EB' }} />
+                            <Lightning size={28} weight="duotone" style={{ color: 'var(--emerald-500)' }} />
                         </div>
                         <h2
-                            className="font-serif text-2xl font-semibold mb-2"
-                            style={{ color: '#F7F2EB' }}
+                            className="text-headline text-2xl mb-2"
+                            style={{ color: 'var(--zinc-100)' }}
                         >
                             How can I help you today?
                         </h2>
-                        <p className="text-sm max-w-md" style={{ color: '#FFF9F0' }}>
+                        <p className="text-sm max-w-md" style={{ color: 'var(--zinc-500)' }}>
                             Share what&apos;s on your mind — an incident, a message from your NEX,
                             a legal question, or just how you&apos;re feeling. I&apos;m here.
                         </p>
@@ -278,31 +270,32 @@ export default function ConversationPage() {
                         className="flex gap-3"
                     >
                         <div
-                            className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center animate-pulse-primary"
+                            className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center"
                             style={{
-                                background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
+                                background: 'var(--emerald-600)',
+                                boxShadow: '0 2px 8px rgba(5, 150, 105, 0.2)',
                             }}
                         >
-                            <Sparkles size={14} style={{ color: '#0A1E54' }} />
+                            <Lightning size={14} weight="fill" style={{ color: '#ffffff' }} />
                         </div>
                         <div
                             className="rounded-2xl rounded-bl-md px-5 py-4"
                             style={{
-                                background: '#F7F2EB',
-                                border: '1px solid rgba(208, 227, 255, 0.1)',
+                                background: 'var(--zinc-50)',
+                                border: '1px solid var(--zinc-200)',
                             }}
                         >
                             <div className="flex gap-1.5">
                                 {[0, 1, 2].map((j) => (
                                     <motion.div
                                         key={j}
-                                        className="w-2 h-2 rounded-full"
-                                        style={{ background: '#7096D1' }}
+                                        className="w-1.5 h-1.5 rounded-full"
+                                        style={{ background: 'var(--zinc-300)' }}
                                         animate={{ opacity: [0.3, 1, 0.3] }}
                                         transition={{
                                             duration: 1,
                                             repeat: Infinity,
-                                            delay: j * 0.2,
+                                            delay: j * 0.15,
                                         }}
                                     />
                                 ))}
@@ -318,12 +311,12 @@ export default function ConversationPage() {
             <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
+                transition={{ delay: 0.2, type: 'spring', stiffness: 300, damping: 25 }}
                 className="pt-4"
-                style={{ borderTop: '1px solid rgba(208, 227, 255, 0.1)' }}
+                style={{ borderTop: '1px solid rgba(63, 63, 70, 0.3)' }}
             >
                 <ChatInput onSend={handleSend} disabled={isStreaming || isPending || !isThreadReady} />
-                <p className="text-center text-xs mt-2" style={{ color: '#D0E3FF' }}>
+                <p className="text-center text-xs mt-2" style={{ color: 'var(--zinc-500)' }}>
                     NEXX provides legal information and strategic guidance, not legal advice.
                 </p>
             </motion.div>

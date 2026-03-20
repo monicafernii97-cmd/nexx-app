@@ -1,32 +1,45 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
 import { motion } from 'framer-motion';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import {
     Shield,
-    MessageCircle,
+    ChatCircle,
     FileText,
     Plus,
-    AlertTriangle,
     Clock,
     ArrowRight,
-    Mic,
-    ChevronRight,
-} from 'lucide-react';
+    Microphone,
+    CaretRight,
+    Warning,
+} from '@phosphor-icons/react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { parseLocalDate } from '@/lib/dateUtils';
 
 /** Quick-action cards linking to primary user flows. */
 const quickActions = [
-    { label: 'New Chat', desc: 'Talk to NEXX', href: '/chat', icon: Mic, color: '#F7F2EB' },
-    { label: 'Log Incident', desc: 'Document an event', href: '/incident-report/new', icon: Plus, color: '#5A9E6F' },
-    { label: 'Draft Document', desc: 'Create a legal doc', href: '/docuvault', icon: FileText, color: '#5A8EC9' },
+    { label: 'New Chat', desc: 'Talk to NEXX', href: '/chat', icon: Microphone },
+    { label: 'Log Incident', desc: 'Document an event', href: '/incident-report/new', icon: Plus },
+    { label: 'Draft Document', desc: 'Create a legal doc', href: '/docuvault', icon: FileText },
 ];
+
+/** Stagger animation for list items. */
+const stagger = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: { staggerChildren: 0.08 },
+    },
+};
+
+const fadeUp = {
+    hidden: { opacity: 0, y: 12 },
+    visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 200, damping: 20 } },
+};
 
 /** Main dashboard showing quick actions, recent incidents, and activity overview. */
 export default function DashboardPage() {
@@ -39,12 +52,12 @@ export default function DashboardPage() {
     const conversationCount = conversations?.length ?? 0;
     const confirmedCount = incidents?.filter((i) => i.status === 'confirmed').length ?? 0;
 
-    /** Summary statistics displayed in the dashboard header grid. */
+    /** Summary statistics displayed in the dashboard header. */
     const stats = [
-        { label: 'Documented Incidents', value: String(incidentCount), icon: Shield, color: '#F7F2EB' },
-        { label: 'Active Conversations', value: String(conversationCount), icon: MessageCircle, color: '#5A9E6F' },
-        { label: 'Court-Ready Records', value: String(confirmedCount), icon: FileText, color: '#5A8EC9' },
-        { label: 'Pattern Alerts', value: '0', icon: AlertTriangle, color: '#E5A84A' },
+        { label: 'Documented Incidents', value: String(incidentCount), icon: Shield },
+        { label: 'Active Conversations', value: String(conversationCount), icon: ChatCircle },
+        { label: 'Court-Ready Records', value: String(confirmedCount), icon: FileText },
+        { label: 'Pattern Alerts', value: '0', icon: Warning },
     ];
 
     /** Time-of-day greeting, set client-side only to avoid hydration mismatch. */
@@ -54,65 +67,70 @@ export default function DashboardPage() {
         setGreetingText(hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening');
     }, []);
 
-    /** Formatted display name for the greeting header (empty if unavailable). */
     const userName = user?.name ? `, ${user.name}` : '';
 
     return (
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-6xl">
             {/* Header */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="mb-8"
+                transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                className="mb-10"
             >
-                <h1 className="text-headline text-3xl mb-2" style={{ color: '#F7F2EB' }} suppressHydrationWarning>
+                <h1 className="text-headline text-3xl mb-2" style={{ color: 'var(--zinc-100)' }} suppressHydrationWarning>
                     {greetingText}{userName}
                 </h1>
-                <p className="text-sm" style={{ color: '#D0E3FF' }}>
-                    Your sanctuary of strategic empowerment.
+                <p className="text-sm" style={{ color: 'var(--zinc-500)' }}>
+                    Your command center for strategic empowerment.
                 </p>
             </motion.div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                {stats.map((stat, i) => {
+            {/* Stats — 2-col asymmetric grid */}
+            <motion.div
+                variants={stagger}
+                initial="hidden"
+                animate="visible"
+                className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-10"
+            >
+                {stats.map((stat) => {
                     const Icon = stat.icon;
                     return (
                         <motion.div
                             key={stat.label}
-                            initial={{ opacity: 0, y: 16 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.1 * i, duration: 0.5 }}
-                            className="card-premium p-5"
+                            variants={fadeUp}
+                            className="card-premium p-6"
                         >
-                            <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3 mb-4">
                                 <div
                                     className="w-10 h-10 rounded-xl flex items-center justify-center"
-                                    style={{ background: `${stat.color}15`, border: `1px solid ${stat.color}30` }}
+                                    style={{
+                                        background: 'rgba(16, 185, 129, 0.08)',
+                                        border: '1px solid rgba(16, 185, 129, 0.12)',
+                                    }}
                                 >
-                                    <Icon size={18} style={{ color: stat.color }} />
+                                    <Icon size={18} weight="duotone" style={{ color: 'var(--emerald-500)' }} />
                                 </div>
                             </div>
-                            <p className="text-2xl font-bold mb-1" style={{ color: '#0A1E54' }}>
+                            <p className="text-3xl font-bold tracking-tight mb-1" style={{ color: 'var(--zinc-900)' }}>
                                 {stat.value}
                             </p>
-                            <p className="text-xs" style={{ color: '#123D7E' }}>
+                            <p className="text-xs font-medium" style={{ color: 'var(--zinc-400)' }}>
                                 {stat.label}
                             </p>
                         </motion.div>
                     );
                 })}
-            </div>
+            </motion.div>
 
-            {/* Quick Actions */}
+            {/* Quick Actions — horizontal strip */}
             <motion.div
-                initial={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, duration: 0.5 }}
-                className="mb-8"
+                transition={{ delay: 0.3, type: 'spring', stiffness: 200, damping: 20 }}
+                className="mb-10"
             >
-                <h2 className="text-sm font-semibold tracking-[0.15em] uppercase mb-4" style={{ color: '#D0E3FF' }}>
+                <h2 className="text-xs font-semibold tracking-[0.15em] uppercase mb-4" style={{ color: 'var(--zinc-500)' }}>
                     Quick Actions
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -121,29 +139,34 @@ export default function DashboardPage() {
                         return (
                             <Link key={action.label} href={action.href} className="no-underline">
                                 <motion.div
-                                    whileHover={{ scale: 1.02, y: -2 }}
+                                    whileHover={{ y: -2 }}
                                     whileTap={{ scale: 0.98 }}
+                                    transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                                     className="card-premium p-5 cursor-pointer group"
                                 >
                                     <div className="flex items-center gap-4">
                                         <div
-                                            className="w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:shadow-lg"
+                                            className="w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300"
                                             style={{
-                                                background: `linear-gradient(135deg, ${action.color}20, ${action.color}08)`,
-                                                border: `1px solid ${action.color}40`,
+                                                background: 'rgba(16, 185, 129, 0.06)',
+                                                border: '1px solid rgba(16, 185, 129, 0.1)',
                                             }}
                                         >
-                                            <Icon size={20} style={{ color: action.color }} />
+                                            <Icon size={20} weight="duotone" style={{ color: 'var(--emerald-500)' }} />
                                         </div>
                                         <div className="flex-1">
-                                            <p className="font-semibold text-sm mb-0.5" style={{ color: '#0A1E54' }}>
+                                            <p className="font-semibold text-sm mb-0.5" style={{ color: 'var(--zinc-900)' }}>
                                                 {action.label}
                                             </p>
-                                            <p className="text-xs" style={{ color: '#123D7E' }}>
+                                            <p className="text-xs" style={{ color: 'var(--zinc-400)' }}>
                                                 {action.desc}
                                             </p>
                                         </div>
-                                        <ArrowRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: action.color }} />
+                                        <ArrowRight
+                                            size={16}
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                                            style={{ color: 'var(--emerald-500)' }}
+                                        />
                                     </div>
                                 </motion.div>
                             </Link>
@@ -152,32 +175,35 @@ export default function DashboardPage() {
                 </div>
             </motion.div>
 
-            {/* Recent Incidents */}
+            {/* Recent Activity — clean list with divide-y */}
             <motion.div
-                initial={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7, duration: 0.5 }}
+                transition={{ delay: 0.5, type: 'spring', stiffness: 200, damping: 20 }}
             >
-                <h2 className="text-sm font-semibold tracking-[0.15em] uppercase mb-4" style={{ color: '#D0E3FF' }}>
+                <h2 className="text-xs font-semibold tracking-[0.15em] uppercase mb-4" style={{ color: 'var(--zinc-500)' }}>
                     Recent Activity
                 </h2>
 
                 {incidents === undefined ? (
                     <div className="card-premium p-8 text-center">
-                        <p className="text-sm" style={{ color: '#123D7E' }}>Loading activity…</p>
+                        <p className="text-sm" style={{ color: 'var(--zinc-400)' }}>Loading activity...</p>
                     </div>
                 ) : incidents.length === 0 ? (
-                    <div className="card-premium p-8 text-center">
+                    <div className="card-premium p-10 text-center">
                         <div
-                            className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-                            style={{ background: 'rgba(208, 227, 255, 0.08)', border: '1px solid rgba(208, 227, 255, 0.15)' }}
+                            className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+                            style={{
+                                background: 'rgba(16, 185, 129, 0.06)',
+                                border: '1px solid rgba(16, 185, 129, 0.1)',
+                            }}
                         >
-                            <Clock size={28} style={{ color: '#123D7E' }} />
+                            <Clock size={24} weight="duotone" style={{ color: 'var(--emerald-500)' }} />
                         </div>
-                        <p className="text-sm font-medium mb-2" style={{ color: '#0A1E54' }}>
+                        <p className="text-sm font-medium mb-2" style={{ color: 'var(--zinc-700)' }}>
                             No activity yet
                         </p>
-                        <p className="text-xs mb-5" style={{ color: '#123D7E' }}>
+                        <p className="text-xs mb-5 max-w-[40ch] mx-auto" style={{ color: 'var(--zinc-400)' }}>
                             Start a conversation with NEXX or document your first incident to see your activity here.
                         </p>
                         <Link href="/chat" className="btn-primary text-xs inline-block">
@@ -185,19 +211,19 @@ export default function DashboardPage() {
                         </Link>
                     </div>
                 ) : (
-                    <div className="space-y-3">
+                    <div className="card-premium overflow-hidden divide-y divide-zinc-100">
                         {incidents.slice(0, 5).map((incident) => {
                             const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
                             const date = parseLocalDate(incident.date);
                             return (
                                 <Link key={incident._id} href={`/incident-report/${incident._id}`} className="no-underline block">
-                                    <div className="card-premium p-4 group cursor-pointer">
+                                    <div className="px-6 py-4 group cursor-pointer hover:bg-zinc-50/50 transition-colors duration-200">
                                         <div className="flex items-center gap-4">
                                             <div className="text-center flex-shrink-0" style={{ minWidth: 45 }}>
-                                                <p className="text-xs font-semibold" style={{ color: '#0A1E54' }}>
+                                                <p className="text-xs font-semibold" style={{ color: 'var(--zinc-400)' }}>
                                                     {date.toLocaleDateString('en-US', { month: 'short' })}
                                                 </p>
-                                                <p className="text-lg font-bold" style={{ color: '#0A1E54' }}>
+                                                <p className="text-lg font-bold" style={{ color: 'var(--zinc-900)' }}>
                                                     {date.getDate()}
                                                 </p>
                                             </div>
@@ -205,7 +231,7 @@ export default function DashboardPage() {
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span
                                                         className="badge text-xs"
-                                                        style={{ background: `${cat?.color}20`, color: cat?.color }}
+                                                        style={{ background: `${cat?.color}15`, color: cat?.color }}
                                                     >
                                                         {cat?.label || incident.category}
                                                     </span>
@@ -213,11 +239,15 @@ export default function DashboardPage() {
                                                         <span className="badge badge-warning text-xs">Draft</span>
                                                     )}
                                                 </div>
-                                                <p className="text-sm truncate" style={{ color: '#123D7E' }}>
+                                                <p className="text-sm truncate" style={{ color: 'var(--zinc-500)' }}>
                                                     {incident.courtSummary || incident.narrative}
                                                 </p>
                                             </div>
-                                            <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: '#0A1E54' }} />
+                                            <CaretRight
+                                                size={14}
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                                                style={{ color: 'var(--zinc-400)' }}
+                                            />
                                         </div>
                                     </div>
                                 </Link>

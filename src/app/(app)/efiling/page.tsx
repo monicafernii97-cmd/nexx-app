@@ -8,17 +8,17 @@ import type { Id } from '../../../../convex/_generated/dataModel';
 import { useUser } from '@/lib/user-context';
 import { titleCase } from '@/lib/utils/stringHelpers';
 import {
-    FileUp,
-    ExternalLink,
+    FileArrowUp,
+    ArrowSquareOut,
     MapPin,
-    CheckCircle2,
+    CheckCircle,
     Circle,
     Download,
     ArrowRight,
-    ChevronDown,
-    AlertTriangle,
-    Landmark,
-    Search,
+    CaretDown,
+    Warning,
+    Bank,
+    MagnifyingGlass,
     BookOpen,
     FileText,
     Scale,
@@ -27,7 +27,7 @@ import {
     Building,
     Phone,
     Info,
-} from 'lucide-react';
+} from '@phosphor-icons/react';
 import Link from 'next/link';
 
 // ═══════════════════════════════════════════
@@ -70,8 +70,8 @@ function formatDate(ts: number): string {
 /** Status pill for document lifecycle — Draft → Final → Filed. */
 function StatusPill({ status }: { status: 'draft' | 'final' | 'filed' }) {
     const config = {
-        draft: { label: 'Draft', bg: 'rgba(229, 168, 74, 0.1)', border: 'rgba(229, 168, 74, 0.25)', color: '#E5A84A' },
-        final: { label: 'Final', bg: 'rgba(90, 142, 201, 0.1)', border: 'rgba(90, 142, 201, 0.25)', color: '#5A8EC9' },
+        draft: { label: 'Draft', bg: 'rgba(229, 168, 74, 0.1)', border: 'rgba(229, 168, 74, 0.25)', color: 'var(--warning)' },
+        final: { label: 'Final', bg: 'rgba(90, 142, 201, 0.1)', border: 'rgba(90, 142, 201, 0.25)', color: 'var(--info)' },
         filed: { label: 'Filed', bg: 'rgba(74, 163, 100, 0.1)', border: 'rgba(74, 163, 100, 0.25)', color: '#4AA364' },
     }[status];
 
@@ -80,7 +80,7 @@ function StatusPill({ status }: { status: 'draft' | 'final' | 'filed' }) {
             className="text-xs font-medium px-2.5 py-0.5 rounded-full inline-flex items-center gap-1"
             style={{ background: config.bg, border: `1px solid ${config.border}`, color: config.color }}
         >
-            {status === 'filed' && <CheckCircle2 size={10} />}
+            {status === 'filed' && <CheckCircle size={10} />}
             {config.label}
         </span>
     );
@@ -102,19 +102,19 @@ function CollapsibleSection({
         <div
             className="rounded-xl overflow-hidden"
             style={{
-                background: 'rgba(10, 30, 84, 0.25)',
-                border: '1px solid rgba(208, 227, 255, 0.08)',
+                background: 'rgba(9, 9, 11, 0.25)',
+                border: '1px solid rgba(63, 63, 70, 0.08)',
             }}
         >
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full flex items-center justify-between px-5 py-3.5 cursor-pointer text-left"
-                style={{ background: 'transparent', border: 'none', color: '#F7F2EB' }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--zinc-100)' }}
                 aria-expanded={isOpen}
             >
                 <span className="text-sm font-medium">{title}</span>
                 <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                    <ChevronDown size={16} style={{ color: '#7096D1' }} />
+                    <CaretDown size={16} style={{ color: 'var(--zinc-400)' }} />
                 </motion.div>
             </button>
             <AnimatePresence>
@@ -126,7 +126,7 @@ function CollapsibleSection({
                         transition={{ duration: 0.25 }}
                         className="overflow-hidden"
                     >
-                        <div className="px-5 pb-4 text-xs leading-relaxed" style={{ color: '#D0E3FF' }}>
+                        <div className="px-5 pb-4 text-xs leading-relaxed" style={{ color: 'var(--zinc-400)' }}>
                             {children}
                         </div>
                     </motion.div>
@@ -157,16 +157,16 @@ function ReadinessItem({
             }}
         >
             {isReady ? (
-                <CheckCircle2 size={16} style={{ color: '#4AA364' }} />
+                <CheckCircle size={16} style={{ color: '#4AA364' }} />
             ) : (
-                <Circle size={16} style={{ color: '#E5A84A' }} />
+                <Circle size={16} style={{ color: 'var(--warning)' }} />
             )}
             <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium" style={{ color: isReady ? '#4AA364' : '#F7F2EB' }}>
+                <p className="text-sm font-medium" style={{ color: isReady ? '#4AA364' : 'var(--zinc-100)' }}>
                     {label}
                 </p>
                 {detail && (
-                    <p className="text-xs mt-0.5" style={{ color: '#7096D1' }}>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--zinc-400)' }}>
                         {detail}
                     </p>
                 )}
@@ -175,7 +175,7 @@ function ReadinessItem({
                 <ArrowRight
                     size={14}
                     className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ color: '#7096D1' }}
+                    style={{ color: 'var(--zinc-400)' }}
                 />
             )}
         </div>
@@ -271,29 +271,29 @@ export default function EFilingPage() {
                     <div
                         className="w-10 h-10 rounded-xl flex items-center justify-center"
                         style={{
-                            background: 'linear-gradient(135deg, #FFF9F0, #D0E3FF)',
-                            boxShadow: '0 2px 12px rgba(208, 227, 255, 0.3)',
+                            background: 'linear-gradient(135deg, var(--zinc-100), var(--zinc-400))',
+                            boxShadow: '0 2px 12px rgba(63, 63, 70, 0.3)',
                         }}
                     >
-                        <FileUp size={18} style={{ color: '#0A1E54' }} />
+                        <FileArrowUp size={18} style={{ color: 'var(--zinc-900)' }} />
                     </div>
                     <div>
-                        <h1 className="text-headline text-3xl" style={{ color: '#F7F2EB' }}>
+                        <h1 className="text-headline text-3xl" style={{ color: 'var(--zinc-100)' }}>
                             eFiling Hub
                         </h1>
                     </div>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                    <p className="text-sm" style={{ color: '#D0E3FF' }}>
+                    <p className="text-sm" style={{ color: 'var(--zinc-400)' }}>
                         Prepare and file your court documents electronically
                     </p>
                     {state && (
                         <span
                             className="text-xs font-medium px-2.5 py-0.5 rounded-full inline-flex items-center gap-1"
                             style={{
-                                background: 'rgba(112, 150, 209, 0.1)',
-                                border: '1px solid rgba(112, 150, 209, 0.2)',
-                                color: '#D0E3FF',
+                                background: 'rgba(16, 185, 129, 0.1)',
+                                border: '1px solid rgba(16, 185, 129, 0.2)',
+                                color: 'var(--zinc-400)',
                             }}
                         >
                             <MapPin size={10} />
@@ -319,13 +319,13 @@ export default function EFilingPage() {
                                 border: '1px solid rgba(229, 168, 74, 0.3)',
                             }}
                         >
-                            <MapPin size={20} style={{ color: '#E5A84A' }} />
+                            <MapPin size={20} style={{ color: 'var(--warning)' }} />
                         </div>
                         <div className="flex-1">
-                            <p className="font-semibold text-sm mb-1" style={{ color: '#0A1E54' }}>
+                            <p className="font-semibold text-sm mb-1" style={{ color: 'var(--zinc-900)' }}>
                                 Set your court location first
                             </p>
-                            <p className="text-xs mb-3" style={{ color: '#123D7E' }}>
+                            <p className="text-xs mb-3" style={{ color: 'var(--zinc-700)' }}>
                                 Configure your state and county in Court Settings to discover your local eFiling portal and filing resources.
                             </p>
                             <Link href="/court-settings" className="btn-primary text-xs inline-flex items-center gap-2 no-underline">
@@ -348,10 +348,10 @@ export default function EFilingPage() {
                     /* Shimmer loading state — shown while cache query is in-flight OR while AI lookup is running */
                     <div className="card-premium p-8 animate-pulse">
                         <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-2xl" style={{ background: 'rgba(208, 227, 255, 0.08)' }} />
+                            <div className="w-16 h-16 rounded-2xl" style={{ background: 'rgba(63, 63, 70, 0.08)' }} />
                             <div className="flex-1 space-y-3">
-                                <div className="h-4 rounded-full w-1/3" style={{ background: 'rgba(208, 227, 255, 0.12)' }} />
-                                <div className="h-3 rounded-full w-2/3" style={{ background: 'rgba(208, 227, 255, 0.08)' }} />
+                                <div className="h-4 rounded-full w-1/3" style={{ background: 'rgba(63, 63, 70, 0.12)' }} />
+                                <div className="h-3 rounded-full w-2/3" style={{ background: 'rgba(63, 63, 70, 0.08)' }} />
                             </div>
                         </div>
                     </div>
@@ -360,36 +360,36 @@ export default function EFilingPage() {
                     <div
                         className="rounded-2xl p-6 relative overflow-hidden"
                         style={{
-                            background: 'linear-gradient(135deg, rgba(90, 142, 201, 0.12), rgba(208, 227, 255, 0.05))',
-                            border: '1px solid rgba(208, 227, 255, 0.2)',
+                            background: 'linear-gradient(135deg, rgba(90, 142, 201, 0.12), rgba(63, 63, 70, 0.05))',
+                            border: '1px solid rgba(63, 63, 70, 0.2)',
                         }}
                     >
                         {/* Decorative gradient orb */}
                         <div
                             className="absolute -top-12 -right-12 w-40 h-40 rounded-full opacity-20 pointer-events-none"
-                            style={{ background: 'radial-gradient(circle, #D0E3FF, transparent)' }}
+                            style={{ background: 'radial-gradient(circle, var(--zinc-400), transparent)' }}
                         />
                         <div className="relative flex items-start gap-5">
                             <div
                                 className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
                                 style={{
-                                    background: 'linear-gradient(135deg, rgba(208, 227, 255, 0.15), rgba(112, 150, 209, 0.08))',
-                                    border: '1px solid rgba(208, 227, 255, 0.25)',
+                                    background: 'linear-gradient(135deg, rgba(63, 63, 70, 0.15), rgba(16, 185, 129, 0.08))',
+                                    border: '1px solid rgba(63, 63, 70, 0.25)',
                                 }}
                             >
-                                <FileUp size={28} style={{ color: '#D0E3FF' }} />
+                                <FileArrowUp size={28} style={{ color: 'var(--zinc-400)' }} />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <h2 className="font-semibold text-lg mb-1" style={{ color: '#F7F2EB' }}>
+                                <h2 className="font-semibold text-lg mb-1" style={{ color: 'var(--zinc-100)' }}>
                                     {eFilingPortal.name}
                                 </h2>
                                 {eFilingPortal.provider && (
-                                    <p className="text-xs mb-1.5" style={{ color: '#7096D1' }}>
+                                    <p className="text-xs mb-1.5" style={{ color: 'var(--zinc-400)' }}>
                                         Powered by {eFilingPortal.provider}
                                     </p>
                                 )}
                                 {eFilingPortal.description && (
-                                    <p className="text-sm mb-4" style={{ color: '#D0E3FF' }}>
+                                    <p className="text-sm mb-4" style={{ color: 'var(--zinc-400)' }}>
                                         {eFilingPortal.description}
                                     </p>
                                 )}
@@ -399,12 +399,12 @@ export default function EFilingPage() {
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold no-underline transition-all hover:scale-[1.02] active:scale-[0.98]"
                                     style={{
-                                        background: 'linear-gradient(135deg, #D0E3FF, #7096D1)',
-                                        color: '#0A1E54',
-                                        boxShadow: '0 4px 16px rgba(208, 227, 255, 0.25)',
+                                        background: 'linear-gradient(135deg, var(--zinc-400), var(--zinc-400))',
+                                        color: 'var(--zinc-900)',
+                                        boxShadow: '0 4px 16px rgba(63, 63, 70, 0.25)',
                                     }}
                                 >
-                                    <ExternalLink size={15} />
+                                    <ArrowSquareOut size={15} />
                                     Launch eFiling Portal
                                 </a>
                             </div>
@@ -415,8 +415,8 @@ export default function EFilingPage() {
                     <div
                         className="rounded-2xl p-6"
                         style={{
-                            background: 'rgba(10, 30, 84, 0.3)',
-                            border: '1px solid rgba(208, 227, 255, 0.1)',
+                            background: 'rgba(9, 9, 11, 0.3)',
+                            border: '1px solid rgba(63, 63, 70, 0.1)',
                         }}
                     >
                         <div className="flex items-start gap-4">
@@ -427,34 +427,34 @@ export default function EFilingPage() {
                                     border: '1px solid rgba(229, 168, 74, 0.2)',
                                 }}
                             >
-                                <Building size={24} style={{ color: '#E5A84A' }} />
+                                <Building size={24} style={{ color: 'var(--warning)' }} />
                             </div>
                             <div className="flex-1">
-                                <h2 className="font-semibold text-base mb-1" style={{ color: '#F7F2EB' }}>
+                                <h2 className="font-semibold text-base mb-1" style={{ color: 'var(--zinc-100)' }}>
                                     File in Person
                                 </h2>
-                                <p className="text-sm mb-3" style={{ color: '#D0E3FF' }}>
+                                <p className="text-sm mb-3" style={{ color: 'var(--zinc-400)' }}>
                                     No eFiling portal was found for {locationLabel}. You can file your documents in person at the county clerk&apos;s office.
                                 </p>
                                 {cachedResources?.courtClerk && (
                                     <div
                                         className="rounded-xl px-4 py-3"
                                         style={{
-                                            background: 'rgba(208, 227, 255, 0.04)',
-                                            border: '1px solid rgba(208, 227, 255, 0.1)',
+                                            background: 'rgba(63, 63, 70, 0.04)',
+                                            border: '1px solid rgba(63, 63, 70, 0.1)',
                                         }}
                                     >
-                                        <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>
+                                        <p className="text-sm font-medium" style={{ color: 'var(--zinc-100)' }}>
                                             {cachedResources.courtClerk.name}
                                         </p>
                                         {cachedResources.courtClerk.phone && (
-                                            <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#5A8EC9' }}>
+                                            <p className="text-xs mt-1 flex items-center gap-1" style={{ color: 'var(--info)' }}>
                                                 <Phone size={10} />
                                                 {cachedResources.courtClerk.phone}
                                             </p>
                                         )}
                                         {cachedResources.courtClerk.address && (
-                                            <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#7096D1' }}>
+                                            <p className="text-xs mt-1 flex items-center gap-1" style={{ color: 'var(--zinc-400)' }}>
                                                 <MapPin size={10} />
                                                 {cachedResources.courtClerk.address}
                                             </p>
@@ -465,9 +465,9 @@ export default function EFilingPage() {
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="text-xs mt-2 inline-flex items-center gap-1 no-underline"
-                                                style={{ color: '#5A8EC9' }}
+                                                style={{ color: 'var(--info)' }}
                                             >
-                                                <ExternalLink size={10} />
+                                                <ArrowSquareOut size={10} />
                                                 Visit Website
                                             </a>
                                         )}
@@ -490,15 +490,15 @@ export default function EFilingPage() {
                     <div
                         className="w-8 h-8 rounded-lg flex items-center justify-center"
                         style={{
-                            background: 'rgba(208, 227, 255, 0.06)',
-                            border: '1px solid rgba(208, 227, 255, 0.12)',
+                            background: 'rgba(63, 63, 70, 0.06)',
+                            border: '1px solid rgba(63, 63, 70, 0.12)',
                         }}
                     >
-                        <Shield size={15} style={{ color: '#D0E3FF' }} />
+                        <Shield size={15} style={{ color: 'var(--zinc-400)' }} />
                     </div>
                     <h2
                         className="text-sm font-semibold tracking-[0.15em] uppercase"
-                        style={{ color: '#D0E3FF' }}
+                        style={{ color: 'var(--zinc-400)' }}
                     >
                         Filing Readiness
                     </h2>
@@ -547,11 +547,11 @@ export default function EFilingPage() {
                                 border: '1px solid rgba(90, 142, 201, 0.15)',
                             }}
                         >
-                            <FileText size={15} style={{ color: '#5A8EC9' }} />
+                            <FileText size={15} style={{ color: 'var(--info)' }} />
                         </div>
                         <h2
                             className="text-sm font-semibold tracking-[0.15em] uppercase"
-                            style={{ color: '#D0E3FF' }}
+                            style={{ color: 'var(--zinc-400)' }}
                         >
                             Documents Ready to File
                         </h2>
@@ -559,7 +559,7 @@ export default function EFilingPage() {
                             className="text-xs font-medium px-2 py-0.5 rounded-full"
                             style={{
                                 background: 'rgba(90, 142, 201, 0.1)',
-                                color: '#5A8EC9',
+                                color: 'var(--info)',
                             }}
                         >
                             {finalDocs.length}
@@ -582,32 +582,32 @@ export default function EFilingPage() {
                                             border: '1px solid rgba(90, 142, 201, 0.12)',
                                         }}
                                     >
-                                        <FileText size={18} style={{ color: '#5A8EC9' }} />
+                                        <FileText size={18} style={{ color: 'var(--info)' }} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate mb-1" style={{ color: '#F7F2EB' }}>
+                                        <p className="text-sm font-medium truncate mb-1" style={{ color: 'var(--zinc-100)' }}>
                                             {doc.templateTitle}
                                         </p>
                                         <div className="flex items-center gap-2 mb-2">
                                             <StatusPill status="final" />
-                                            <span className="text-xs" style={{ color: '#7096D1' }}>
+                                            <span className="text-xs" style={{ color: 'var(--zinc-400)' }}>
                                                 {doc.courtState} · {doc.courtCounty}
                                             </span>
                                         </div>
-                                        <div className="flex items-center gap-1 text-xs" style={{ color: '#5A8EC9' }}>
+                                        <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--info)' }}>
                                             <Clock size={10} />
                                             {formatDate(doc.createdAt)}
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2 mt-3 pt-3" style={{ borderTop: '1px solid rgba(208, 227, 255, 0.06)' }}>
+                                <div className="flex items-center gap-2 mt-3 pt-3" style={{ borderTop: '1px solid rgba(63, 63, 70, 0.06)' }}>
                                     {doc.storageId && (
                                         <button
                                             className="flex-1 text-xs font-medium py-2 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all hover:opacity-80"
                                             style={{
-                                                background: 'rgba(208, 227, 255, 0.06)',
-                                                border: '1px solid rgba(208, 227, 255, 0.12)',
-                                                color: '#D0E3FF',
+                                                background: 'rgba(63, 63, 70, 0.06)',
+                                                border: '1px solid rgba(63, 63, 70, 0.12)',
+                                                color: 'var(--zinc-400)',
                                             }}
                                             onClick={() => {
                                                 // Download PDF via Convex storage URL
@@ -628,7 +628,7 @@ export default function EFilingPage() {
                                         onClick={() => handleMarkAsFiled(doc._id)}
                                         disabled={filingId === doc._id}
                                     >
-                                        <CheckCircle2 size={12} />
+                                        <CheckCircle size={12} />
                                         {filingId === doc._id ? 'Marking…' : 'Mark as Filed'}
                                     </button>
                                     {/* Inline error for this card */}
@@ -639,7 +639,7 @@ export default function EFilingPage() {
                                             className="text-xs mt-1.5 flex items-center gap-1 col-span-full"
                                             style={{ color: '#DC2626' }}
                                         >
-                                            <AlertTriangle size={10} />
+                                            <Warning size={10} />
                                             {filingError}
                                         </motion.p>
                                     )}
@@ -666,7 +666,7 @@ export default function EFilingPage() {
                                 border: '1px solid rgba(74, 163, 100, 0.12)',
                             }}
                         >
-                            <CheckCircle2 size={15} style={{ color: '#4AA364' }} />
+                            <CheckCircle size={15} style={{ color: '#4AA364' }} />
                         </div>
                         <h2
                             className="text-sm font-semibold tracking-[0.15em] uppercase"
@@ -691,12 +691,12 @@ export default function EFilingPage() {
                                     <FileText size={16} style={{ color: '#4AA364' }} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate" style={{ color: '#F7F2EB' }}>
+                                    <p className="text-sm font-medium truncate" style={{ color: 'var(--zinc-100)' }}>
                                         {doc.templateTitle}
                                     </p>
                                     <div className="flex items-center gap-2 mt-0.5">
                                         <StatusPill status="filed" />
-                                        <span className="text-xs" style={{ color: '#7096D1' }}>
+                                        <span className="text-xs" style={{ color: 'var(--zinc-400)' }}>
                                             {formatDate(doc.updatedAt)}
                                         </span>
                                     </div>
@@ -718,15 +718,15 @@ export default function EFilingPage() {
                     <div
                         className="w-8 h-8 rounded-lg flex items-center justify-center"
                         style={{
-                            background: 'rgba(208, 227, 255, 0.06)',
-                            border: '1px solid rgba(208, 227, 255, 0.12)',
+                            background: 'rgba(63, 63, 70, 0.06)',
+                            border: '1px solid rgba(63, 63, 70, 0.12)',
                         }}
                     >
-                        <Info size={15} style={{ color: '#D0E3FF' }} />
+                        <Info size={15} style={{ color: 'var(--zinc-400)' }} />
                     </div>
                     <h2
                         className="text-sm font-semibold tracking-[0.15em] uppercase"
-                        style={{ color: '#D0E3FF' }}
+                        style={{ color: 'var(--zinc-400)' }}
                     >
                         Filing Guide
                     </h2>
@@ -735,7 +735,7 @@ export default function EFilingPage() {
                     <CollapsibleSection title="What is eFiling?" defaultOpen>
                         <p className="mb-2">
                             eFiling (electronic filing) allows you to submit court documents online instead of
-                            filing them in person at the courthouse. Most Texas counties use <strong style={{ color: '#F7F2EB' }}>eFileTexas.gov</strong>,
+                            filing them in person at the courthouse. Most Texas counties use <strong style={{ color: 'var(--zinc-100)' }}>eFileTexas.gov</strong>,
                             while other states may use systems like TurboCourt, File &amp; ServeXpress, or Odyssey.
                         </p>
                         <p>
@@ -746,8 +746,8 @@ export default function EFilingPage() {
 
                     <CollapsibleSection title={`How to file in ${state || 'your state'}`}>
                         <ol className="space-y-2 pl-4 list-decimal">
-                            <li>Create your court document using the <Link href="/docuvault" className="no-underline" style={{ color: '#5A8EC9' }}>Template Gallery</Link></li>
-                            <li>Review the document and mark it as <strong style={{ color: '#F7F2EB' }}>Final</strong></li>
+                            <li>Create your court document using the <Link href="/docuvault" className="no-underline" style={{ color: 'var(--info)' }}>Template Gallery</Link></li>
+                            <li>Review the document and mark it as <strong style={{ color: 'var(--zinc-100)' }}>Final</strong></li>
                             <li>Download the PDF from this page</li>
                             <li>Open the eFiling portal and create an account (if you haven&apos;t already)</li>
                             <li>Upload your PDF and follow the portal&apos;s filing instructions</li>
@@ -759,7 +759,7 @@ export default function EFilingPage() {
 
                     <CollapsibleSection title="Common filing fees">
                         <div className="flex items-start gap-2 mb-2">
-                            <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" style={{ color: '#E5A84A' }} />
+                            <Warning size={14} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--warning)' }} />
                             <p>
                                 Filing fees vary by court, case type, and state. Common fees include:
                             </p>
@@ -770,7 +770,7 @@ export default function EFilingPage() {
                             <li>Motions: $15–$50 each</li>
                             <li>Fee waivers may be available for low-income filers</li>
                         </ul>
-                        <p className="mt-2 text-xs" style={{ color: '#7096D1' }}>
+                        <p className="mt-2 text-xs" style={{ color: 'var(--zinc-400)' }}>
                             Contact your local clerk&apos;s office for exact fee amounts. NEXX does not collect or process filing fees.
                         </p>
                     </CollapsibleSection>
@@ -798,15 +798,15 @@ export default function EFilingPage() {
                         <div
                             className="w-8 h-8 rounded-lg flex items-center justify-center"
                             style={{
-                                background: 'rgba(112, 150, 209, 0.06)',
-                                border: '1px solid rgba(112, 150, 209, 0.12)',
+                                background: 'rgba(16, 185, 129, 0.06)',
+                                border: '1px solid rgba(16, 185, 129, 0.12)',
                             }}
                         >
-                            <BookOpen size={15} style={{ color: '#7096D1' }} />
+                            <BookOpen size={15} style={{ color: 'var(--zinc-400)' }} />
                         </div>
                         <h2
                             className="text-sm font-semibold tracking-[0.15em] uppercase"
-                            style={{ color: '#D0E3FF' }}
+                            style={{ color: 'var(--zinc-400)' }}
                         >
                             Quick Links
                         </h2>
@@ -827,24 +827,24 @@ export default function EFilingPage() {
                                         <div
                                             className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                                             style={{
-                                                background: 'rgba(112, 150, 209, 0.1)',
-                                                border: '1px solid rgba(112, 150, 209, 0.25)',
+                                                background: 'rgba(16, 185, 129, 0.1)',
+                                                border: '1px solid rgba(16, 185, 129, 0.25)',
                                             }}
                                         >
-                                            <Landmark size={16} style={{ color: '#7096D1' }} />
+                                            <Bank size={16} style={{ color: 'var(--zinc-400)' }} />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold truncate" style={{ color: '#0A1E54' }}>
+                                            <p className="text-sm font-semibold truncate" style={{ color: 'var(--zinc-900)' }}>
                                                 Court Clerk
                                             </p>
-                                            <p className="text-xs truncate" style={{ color: '#123D7E' }}>
+                                            <p className="text-xs truncate" style={{ color: 'var(--zinc-700)' }}>
                                                 {cachedResources?.courtClerk?.name || 'County Clerk Office'}
                                             </p>
                                         </div>
-                                        <ExternalLink
+                                        <ArrowSquareOut
                                             size={13}
                                             className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                            style={{ color: '#7096D1' }}
+                                            style={{ color: 'var(--zinc-400)' }}
                                         />
                                     </div>
                                 </motion.div>
@@ -865,24 +865,24 @@ export default function EFilingPage() {
                                         <div
                                             className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                                             style={{
-                                                background: 'rgba(112, 150, 209, 0.1)',
-                                                border: '1px solid rgba(112, 150, 209, 0.25)',
+                                                background: 'rgba(16, 185, 129, 0.1)',
+                                                border: '1px solid rgba(16, 185, 129, 0.25)',
                                             }}
                                         >
-                                            <Search size={16} style={{ color: '#7096D1' }} />
+                                            <MagnifyingGlass size={16} style={{ color: 'var(--zinc-400)' }} />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold truncate" style={{ color: '#0A1E54' }}>
+                                            <p className="text-sm font-semibold truncate" style={{ color: 'var(--zinc-900)' }}>
                                                 Case Search
                                             </p>
-                                            <p className="text-xs truncate" style={{ color: '#123D7E' }}>
+                                            <p className="text-xs truncate" style={{ color: 'var(--zinc-700)' }}>
                                                 {cachedResources?.caseSearch?.name || 'Public Records Search'}
                                             </p>
                                         </div>
-                                        <ExternalLink
+                                        <ArrowSquareOut
                                             size={13}
                                             className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                            style={{ color: '#7096D1' }}
+                                            style={{ color: 'var(--zinc-400)' }}
                                         />
                                     </div>
                                 </motion.div>
@@ -903,24 +903,24 @@ export default function EFilingPage() {
                                         <div
                                             className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                                             style={{
-                                                background: 'rgba(112, 150, 209, 0.1)',
-                                                border: '1px solid rgba(112, 150, 209, 0.25)',
+                                                background: 'rgba(16, 185, 129, 0.1)',
+                                                border: '1px solid rgba(16, 185, 129, 0.25)',
                                             }}
                                         >
-                                            <BookOpen size={16} style={{ color: '#7096D1' }} />
+                                            <BookOpen size={16} style={{ color: 'var(--zinc-400)' }} />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold truncate" style={{ color: '#0A1E54' }}>
+                                            <p className="text-sm font-semibold truncate" style={{ color: 'var(--zinc-900)' }}>
                                                 Local Rules
                                             </p>
-                                            <p className="text-xs truncate" style={{ color: '#123D7E' }}>
+                                            <p className="text-xs truncate" style={{ color: 'var(--zinc-700)' }}>
                                                 {cachedResources?.localRules?.name || 'Court Rules & Procedures'}
                                             </p>
                                         </div>
-                                        <ExternalLink
+                                        <ArrowSquareOut
                                             size={13}
                                             className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                            style={{ color: '#7096D1' }}
+                                            style={{ color: 'var(--zinc-400)' }}
                                         />
                                     </div>
                                 </motion.div>

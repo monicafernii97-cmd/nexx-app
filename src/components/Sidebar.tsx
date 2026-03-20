@@ -108,7 +108,7 @@ export default function Sidebar() {
                         }}
                     >
                         <span 
-                            className="text-[26px] font-black font-serif uppercase tracking-tighter" 
+                            className="text-[26px] font-black font-serif italic uppercase tracking-tighter" 
                             style={{
                                 background: 'linear-gradient(135deg, #0A1128 0%, #1E3A8A 30%, #94A3B8 60%, #0A1128 100%)',
                                 backgroundSize: '200% auto',

@@ -303,16 +303,17 @@ function DocuVaultPageInner() {
                         transition={{ duration: 0.5, ease: 'easeOut' }}
                     >
                         <div className="flex items-center gap-4 mb-3">
-                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white shadow-sm border border-[var(--cloud-light)]">
-                                <Bank size={28} className="text-[var(--champagne)]" weight="duotone" />
+                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] relative overflow-hidden">
+                                <div className="absolute inset-0 bg-white/10" />
+                                <Bank size={28} className="text-white relative z-10 drop-shadow-md" weight="fill" />
                             </div>
                             <div>
-                                <h1 className="text-4xl font-light tracking-tight text-[var(--sapphire-dark)]">
+                                <h1 className="text-4xl font-serif font-bold text-white tracking-tight m-0">
                                     DocuVault
                                 </h1>
                             </div>
                         </div>
-                        <p className="text-base text-[var(--sapphire-base)] max-w-2xl leading-relaxed">
+                        <p className="text-base font-medium text-white max-w-2xl leading-relaxed mt-2">
                             Professional Legal Document Generator. Trustworthy. Semantic. Verbatim. Generate court-ready PDFs with AI precision.
                         </p>
                     </motion.div>

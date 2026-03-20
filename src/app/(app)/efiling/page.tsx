@@ -100,16 +100,16 @@ function CollapsibleSection({
 
     return (
         <div
-            className="rounded-2xl overflow-hidden glass-ethereal shadow-sm transition-all duration-300"
+            className="rounded-2xl overflow-hidden bg-[rgba(255,255,255,0.05)] backdrop-blur-md border border-[rgba(255,255,255,0.15)] shadow-sm transition-all duration-300"
         >
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between px-6 py-4 cursor-pointer text-left focus:outline-none"
+                className="w-full flex items-center justify-between px-6 py-4 cursor-pointer text-left focus:outline-none hover:bg-white/5 transition-colors"
                 aria-expanded={isOpen}
             >
-                <span className="text-sm font-medium text-[var(--sapphire-dark)] tracking-wide">{title}</span>
+                <span className="text-sm font-bold text-white tracking-wide">{title}</span>
                 <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                    <CaretDown size={16} className="text-[var(--sapphire-base)]" weight="bold" />
+                    <CaretDown size={16} className="text-white" weight="bold" />
                 </motion.div>
             </button>
             <AnimatePresence>
@@ -119,9 +119,9 @@ function CollapsibleSection({
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.3, ease: 'easeInOut' }}
-                        className="overflow-hidden bg-[rgba(255,255,255,0.4)]"
+                        className="overflow-hidden bg-[rgba(0,0,0,0.2)]"
                     >
-                        <div className="px-6 pb-5 text-sm leading-relaxed text-[var(--sapphire-base)]">
+                        <div className="px-6 pb-5 text-[15px] leading-relaxed text-white font-medium m-0">
                             {children}
                         </div>
                     </motion.div>
@@ -145,23 +145,23 @@ function ReadinessItem({
 }) {
     const content = (
         <div
-            className={`flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-300 ${href && !isReady ? 'cursor-pointer hover:shadow-md' : 'shadow-sm'} bg-white/60 border border-[var(--cloud-light)] backdrop-blur-md`}
+            className={`flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-300 ${href && !isReady ? 'cursor-pointer hover:shadow-md hover:bg-white/10' : 'shadow-sm'} bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] backdrop-blur-md`}
         >
             {isReady ? (
-                <div className="bg-[var(--success)]/10 p-1.5 rounded-full">
-                    <CheckCircle size={20} className="text-[var(--success)]" weight="fill" />
+                <div className="bg-[var(--success)]/20 p-2 rounded-full border border-[var(--success)]/30">
+                    <CheckCircle size={20} className="text-[var(--success)] drop-shadow-sm" weight="fill" />
                 </div>
             ) : (
-                <div className="bg-[var(--champagne)]/10 p-1.5 rounded-full">
-                    <Circle size={20} className="text-[var(--champagne)]" weight="duotone" />
+                <div className="bg-[#B38644]/20 p-2 rounded-full border border-[#B38644]/30">
+                    <Circle size={20} className="text-[#E5A84A] drop-shadow-sm" weight="fill" />
                 </div>
             )}
             <div className="flex-1 min-w-0">
-                <p className={`text-sm tracking-wide font-medium ${isReady ? 'text-[var(--sapphire-dark)]' : 'text-[var(--sapphire-base)]'}`}>
+                <p className={`text-[15px] tracking-wide font-bold text-white m-0`}>
                     {label}
                 </p>
                 {detail && (
-                    <p className="text-xs mt-1 text-[var(--sapphire-light)]">
+                    <p className="text-sm mt-1 text-white font-medium m-0">
                         {detail}
                     </p>
                 )}
@@ -262,17 +262,18 @@ export default function EFilingPage() {
                 transition={{ duration: 0.5, ease: 'easeOut' }}
             >
                 <div className="flex items-center gap-4 mb-3">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white shadow-sm border border-[var(--cloud-light)]">
-                        <FileArrowUp size={28} className="text-[var(--sapphire-base)]" weight="duotone" />
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] relative overflow-hidden">
+                        <div className="absolute inset-0 bg-white/10" />
+                        <FileArrowUp size={28} className="text-white relative z-10 drop-shadow-md" weight="fill" />
                     </div>
                     <div>
-                        <h1 className="text-4xl font-light tracking-tight text-[var(--sapphire-dark)]">
+                        <h1 className="text-4xl font-serif font-bold text-white tracking-tight m-0">
                             eFiling Hub
                         </h1>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    <p className="text-base text-[var(--sapphire-light)] tracking-wide">
+                <div className="flex flex-col md:flex-row md:items-center gap-3 mt-4">
+                    <p className="text-base font-medium text-white tracking-wide leading-relaxed">
                         Prepare and file your court documents electronically
                     </p>
                     {state && (
@@ -290,20 +291,20 @@ export default function EFilingPage() {
                     initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.1 }}
-                    className="card-premium p-8 border-l-4 border-l-[var(--champagne)]"
+                    className="p-8 border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.05)] backdrop-blur-xl rounded-3xl"
                 >
                     <div className="flex items-start gap-5">
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[var(--champagne)]/10 text-[var(--champagne)] shadow-inner">
-                            <MapPin size={28} weight="duotone" />
+                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#B38644,#E5A84A)] text-white shadow-[0_4px_15px_rgba(229,168,74,0.3)] shrink-0">
+                            <MapPin size={28} weight="fill" className="drop-shadow-md" />
                         </div>
                         <div className="flex-1 space-y-3">
-                            <p className="text-lg font-medium tracking-wide text-[var(--sapphire-dark)]">
+                            <p className="text-lg font-bold tracking-wide text-white m-0">
                                 Set your court location first
                             </p>
-                            <p className="text-sm text-[var(--sapphire-base)] leading-relaxed max-w-2xl">
+                            <p className="text-[15px] text-white leading-relaxed max-w-2xl font-medium m-0">
                                 Configure your state and county in Court Settings to discover your local eFiling portal and filing resources.
                             </p>
-                            <Link href="/court-settings" className="btn-primary text-sm inline-flex items-center gap-2 mt-2 px-6 py-2.5">
+                            <Link href="/court-settings" className="btn-primary text-[13px] font-bold tracking-widest uppercase inline-flex items-center gap-2 mt-2 px-6 py-3 shadow-md">
                                 <Scales size={16} weight="bold" />
                                 Court Settings
                             </Link>
@@ -432,11 +433,12 @@ export default function EFilingPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2, duration: 0.5 }}
                     >
-                        <div className="flex items-center gap-3 mb-5">
-                            <div className="w-10 h-10 rounded-xl bg-white shadow-sm border border-[var(--cloud-light)] flex items-center justify-center">
-                                <ShieldCheck size={20} className="text-[var(--sapphire-base)]" weight="duotone" />
+                        <div className="flex items-center gap-4 mb-5">
+                            <div className="w-12 h-12 rounded-2xl bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] flex items-center justify-center relative overflow-hidden shrink-0">
+                                <div className="absolute inset-0 bg-white/10" />
+                                <ShieldCheck size={24} className="text-white relative z-10 drop-shadow-md" weight="fill" />
                             </div>
-                            <h2 className="text-base font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
+                            <h2 className="text-lg font-bold tracking-widest uppercase text-white m-0">
                                 Filing Readiness
                             </h2>
                         </div>
@@ -476,15 +478,16 @@ export default function EFilingPage() {
                             transition={{ delay: 0.25, duration: 0.5 }}
                         >
                             <div className="flex items-center justify-between mb-5">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-white shadow-sm border border-[var(--cloud-light)] flex items-center justify-center">
-                                        <FileText size={20} className="text-[var(--champagne)]" weight="duotone" />
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] flex items-center justify-center relative overflow-hidden shrink-0">
+                                        <div className="absolute inset-0 bg-white/10" />
+                                        <FileText size={24} className="text-white relative z-10 drop-shadow-md" weight="fill" />
                                     </div>
-                                    <h2 className="text-base font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
+                                    <h2 className="text-lg font-bold tracking-widest uppercase text-white m-0">
                                         Ready to File
                                     </h2>
                                 </div>
-                                <span className="text-xs font-bold px-3 py-1 rounded-full bg-[var(--sapphire-light)]/10 text-[var(--sapphire-dark)] shadow-sm">
+                                <span className="text-[13px] font-bold px-4 py-1.5 rounded-full bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.2)] text-white shadow-sm backdrop-blur-md">
                                     {finalDocs.length} Items
                                 </span>
                             </div>
@@ -495,30 +498,31 @@ export default function EFilingPage() {
                                         initial={{ opacity: 0, scale: 0.95 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         transition={{ delay: 0.05 * i }}
-                                        className="card-premium p-5 group hover:shadow-lg transition-all border border-[var(--cloud-light)]"
+                                        className="p-5 group hover:shadow-[0_8px_25px_rgba(0,0,0,0.3)] transition-all border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.05)] backdrop-blur-xl rounded-2xl hover:-translate-y-1"
                                     >
                                         <div className="flex items-start gap-4 mb-4">
-                                            <div className="w-12 h-14 rounded-xl flex items-center justify-center bg-gradient-to-b from-white to-[var(--pearl)] shadow-sm border border-[var(--cloud-light)] shrink-0">
-                                                <FileText size={22} className="text-[var(--sapphire-base)]" weight="duotone" />
+                                            <div className="w-12 h-14 rounded-xl flex items-center justify-center bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] shadow-[0_4px_15px_rgba(46,92,154,0.4)] border border-[rgba(255,255,255,0.3)] shrink-0 relative overflow-hidden">
+                                                <div className="absolute inset-0 bg-white/10" />
+                                                <FileText size={22} className="text-white relative z-10 drop-shadow-md" weight="fill" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-semibold text-[var(--sapphire-dark)] truncate mb-1">
+                                                <p className="text-[15px] font-bold text-white truncate mb-1">
                                                     {doc.templateTitle}
                                                 </p>
                                                 <div className="flex flex-wrap items-center gap-2 mb-2">
                                                     <StatusPill status="final" />
-                                                    <span className="text-[11px] font-medium text-[var(--sapphire-light)]">
+                                                    <span className="text-[12px] font-bold text-white">
                                                         {doc.courtState} · {doc.courtCounty}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--sapphire-base)]">
+                                                <div className="flex items-center gap-1.5 text-[12px] font-bold text-white">
                                                     <Clock size={12} weight="bold" />
                                                     {formatDate(doc.createdAt)}
                                                 </div>
                                             </div>
                                         </div>
                                         
-                                        <div className="grid grid-cols-2 gap-2 pt-4 border-t border-[var(--cloud-light)]">
+                                        <div className="grid grid-cols-2 gap-2 pt-4 border-t border-[rgba(255,255,255,0.15)]">
                                             {doc.storageId && (
                                                 <button
                                                     className="btn-outline text-xs py-2.5 flex justify-center items-center gap-2"
@@ -564,11 +568,12 @@ export default function EFilingPage() {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.3, duration: 0.5 }}
                     >
-                        <div className="flex items-center gap-3 mb-5">
-                            <div className="w-10 h-10 rounded-xl bg-white shadow-sm border border-[var(--cloud-light)] flex items-center justify-center">
-                                <Info size={20} className="text-[var(--sapphire-base)]" weight="duotone" />
+                        <div className="flex items-center gap-4 mb-5">
+                            <div className="w-12 h-12 rounded-2xl bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] flex items-center justify-center relative overflow-hidden shrink-0">
+                                <div className="absolute inset-0 bg-white/10" />
+                                <Info size={24} className="text-white relative z-10 drop-shadow-md" weight="fill" />
                             </div>
-                            <h2 className="text-base font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
+                            <h2 className="text-lg font-bold tracking-widest uppercase text-white m-0">
                                 Filing Guide
                             </h2>
                         </div>

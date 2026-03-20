@@ -98,24 +98,24 @@ export default function Sidebar() {
             {/* Logo */}
             <div className="flex items-center px-6 h-[88px] flex-shrink-0">
                 <Link href="/dashboard" className="flex items-center gap-4 no-underline">
-                    <motion.div
+                        <motion.div
                         layout="position"
-                        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg relative overflow-hidden"
+                        className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-md relative overflow-hidden"
                         style={{
-                            background: 'var(--universe-dark)',
-                            border: '1px solid rgba(255, 255, 255, 0.2)',
-                            borderTop: '1px solid rgba(255, 255, 255, 0.3)',
+                            background: 'linear-gradient(135deg, #FFFFFF 0%, #F1F5F9 100%)',
+                            border: '1px solid rgba(255, 255, 255, 0.4)',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,1)',
                         }}
                     >
-                        {/* Shimmer overlay */}
-                        <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_20%,rgba(255,255,255,0.15)_50%,transparent_80%)] translate-x-[-100%] animate-[shimmer_3s_infinite]" />
                         <span 
-                            className="text-2xl font-black font-serif uppercase tracking-tighter" 
+                            className="text-[26px] font-black font-serif uppercase tracking-tighter" 
                             style={{
-                                background: 'linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 30%, #94A3B8 60%, #1E3A8A 100%)',
+                                background: 'linear-gradient(135deg, #0A1128 0%, #1E3A8A 30%, #94A3B8 60%, #0A1128 100%)',
+                                backgroundSize: '200% auto',
                                 WebkitBackgroundClip: 'text',
                                 WebkitTextFillColor: 'transparent',
                                 color: 'transparent',
+                                animation: 'shimmer 4s linear infinite',
                             }}
                         >
                             N
@@ -128,8 +128,8 @@ export default function Sidebar() {
                                 animate={{ opacity: 1, filter: 'blur(0px)', x: 0 }}
                                 exit={{ opacity: 0, filter: 'blur(4px)', x: -10 }}
                                 transition={{ duration: 0.2 }}
-                                className="text-xl font-serif font-bold tracking-widest text-sapphire"
-                                style={{ color: 'var(--sapphire)' }}
+                                className="text-2xl font-serif font-bold tracking-wide"
+                                style={{ color: 'var(--pure-white)' }}
                             >
                                 NEXX
                             </motion.span>

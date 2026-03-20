@@ -59,16 +59,20 @@
   --color-background: var(--base-bg);
   --color-foreground: var(--text-primary);
   --font-sans: var(--font-outfit), 'Outfit', system-ui, sans-serif;
-  --font-serif: var(--font-outfit), 'Outfit', system-ui, sans-serif; /* Forcing Outfit for serif to remove skinny fonts */
+  --font-serif: var(--font-playfair), 'Playfair Display', Georgia, serif;
   
   /* Legacy Color mappings for Tailwind V4 to prevent breakage */
   --color-sapphire: var(--pure-white);
   --color-sapphire-muted: var(--metallic-dark);
+  --color-sapphire-base: var(--universe-blue); /* Dark text on light backgrounds */
+  --color-sapphire-light: #1E3A8A; /* Vibrant blue */
+  --color-sapphire-dark: var(--pure-white);
   --color-champagne: var(--metallic-silver);
   --color-champagne-light: rgba(255, 255, 255, 0.1);
   --color-emerald: var(--emerald);
   --color-rose: var(--rose);
   --color-cloud: rgba(255, 255, 255, 0.05);
+  --color-cloud-light: rgba(255, 255, 255, 0.1);
 }
 
 /* ═══ Base ═══ */
@@ -86,15 +90,15 @@ body {
 }
 
 /* Typography Overrides */
-/* Removing Playfair Display and replacing with robust bold headers */
+/* Restoring Playfair Display for elegant luxury headers */
 .font-serif, .text-headline, .text-editorial {
-  font-family: var(--font-outfit), system-ui, sans-serif;
+  font-family: var(--font-playfair), Georgia, serif;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--pure-white) !important;
 }
 .font-light {
-    font-weight: 600 !important; /* Force all font-light usage strictly to semi/bold since user hated the skinny tracking */
+    font-weight: 500 !important; /* Bump light to medium to avoid the overly skinny look, but retain elegance */
 }
 
 /* ═══ Galaxy Ambient Background ═══ */
@@ -174,15 +178,16 @@ body {
 }
 
 /* ═══ Buttons ═══ */
+/* Fully rounded buttons by default */
 .btn-primary {
   background: linear-gradient(135deg, #1E3A8A, #0A1128) !important;
   color: var(--pure-white) !important;
-  font-family: var(--font-outfit), sans-serif;
+  font-family: var(--font-sans), sans-serif;
   font-weight: 600;
-  font-size: 14.5px;
+  font-size: 14px;
   letter-spacing: 0.04em;
   padding: 12px 28px;
-  border-radius: 12px;
+  border-radius: 9999px !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
   border-top: 1px solid rgba(255, 255, 255, 0.3) !important;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
@@ -210,9 +215,9 @@ body {
   color: var(--pure-white) !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
   font-weight: 600;
-  font-size: 14.5px;
+  font-size: 14px;
   padding: 12px 28px;
-  border-radius: 12px;
+  border-radius: 9999px !important;
   cursor: pointer;
   transition: all 0.3s var(--ease-smooth);
   text-transform: uppercase;
@@ -224,30 +229,32 @@ body {
 }
 
 /* ═══ Inputs ═══ */
+/* Restoring the light inputs so text contract is strict black/dark blue on light cream/white */
 .input-premium {
-  background: rgba(10, 17, 40, 0.5) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  color: var(--pure-white) !important;
-  font-family: var(--font-outfit), sans-serif;
+  background: #FFF9ED !important; /* Cream light color from screenshot */
+  border: 1px solid rgba(10, 17, 40, 0.15) !important;
+  color: #0A1128 !important; /* Dark text for contrast */
+  font-family: var(--font-sans), sans-serif;
+  font-weight: 500;
   font-size: 14px;
   padding: 14px 18px;
-  border-radius: 12px;
+  border-radius: 12px !important;
   transition: all 0.3s var(--ease-smooth);
   width: 100%;
 }
 
 .input-premium::placeholder {
-  color: rgba(255, 255, 255, 0.4) !important;
+  color: rgba(10, 17, 40, 0.4) !important;
 }
 
 .input-premium:focus {
   outline: none;
-  background: rgba(10, 17, 40, 0.8) !important;
+  background: #FFFFFF !important;
   border-color: var(--galaxy-blue) !important;
-  box-shadow: 0 0 0 4px rgba(30, 58, 138, 0.2) !important;
+  box-shadow: 0 0 0 4px rgba(30, 58, 138, 0.15) !important;
 }
 
-/* Base custom classes to enforce white text on everything */
+/* Base custom classes to enforce white text on backgrounds, but inputs handle their own color */
 h1, h2, h3, h4, h5, h6, p, span, div {
   color: inherit;
 }

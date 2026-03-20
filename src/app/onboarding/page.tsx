@@ -490,26 +490,17 @@ export default function OnboardingPage() {
                                 <p className="text-sm text-[rgba(255,255,255,0.8)] pb-2">
                                     What do you need the most help with right now?
                                 </p>
-                                <div className="flex flex-col gap-3">
+                                <div className="flex flex-wrap gap-2.5">
                                     {goalOptions.map((opt) => (
                                         <button
                                             key={opt}
                                             onClick={() => toggleArrayItem('primaryGoals', opt)}
-                                            className={`w-full text-left px-5 py-3.5 rounded-[14px] transition-all text-[15px] flex items-center gap-4 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                            className={`transition-all text-[14px] font-semibold px-5 py-3 rounded-full border shadow-sm backdrop-blur-md ${
                                                 formData.primaryGoals.includes(opt)
-                                                ? 'bg-white/10 text-white border-white/30 backdrop-blur-md'
-                                                : 'bg-[rgba(255,255,255,0.04)] text-white/90 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
+                                                ? 'bg-white/10 text-white border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]'
+                                                : 'bg-transparent text-[rgba(255,255,255,0.85)] border-[rgba(255,255,255,0.25)] hover:border-[rgba(255,255,255,0.4)] hover:bg-white/5'
                                             }`}
                                         >
-                                            <div
-                                                className={`w-[22px] h-[22px] rounded-md flex items-center justify-center flex-shrink-0 transition-all ${
-                                                    formData.primaryGoals.includes(opt)
-                                                    ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]'
-                                                    : 'bg-white'
-                                                }`}
-                                            >
-                                                {formData.primaryGoals.includes(opt) && <Check size={16} strokeWidth={4} className="text-[#1A4B9B]" />}
-                                            </div>
                                             {opt}
                                         </button>
                                     ))}

@@ -359,25 +359,24 @@ export default function OnboardingPage() {
                                     <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Your Situation</h2>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#D0E3FF' }}>Custody Arrangement</label>
+                                    <label className="text-xs font-bold tracking-[0.1em] uppercase mb-3 block text-white/70">Custody Arrangement</label>
                                     {['Joint / Shared Custody', 'Sole Custody', 'Visitation Only', 'No Order Yet', 'Other'].map((opt) => (
                                         <button
                                             key={opt}
                                             onClick={() => update('custodyType', opt)}
-                                            className="w-full text-left px-4 py-3 rounded-xl mb-2 transition-all text-sm"
-                                            style={{
-                                                background: formData.custodyType === opt ? 'rgba(208, 227, 255, 0.12)' : 'rgba(255, 249, 240, 0.4)',
-                                                border: `1px solid ${formData.custodyType === opt ? 'rgba(208, 227, 255, 0.3)' : 'rgba(208, 227, 255, 0.08)'}`,
-                                                color: formData.custodyType === opt ? '#F7F2EB' : '#D0E3FF',
-                                            }}
+                                            className={`w-full text-left px-5 py-4 rounded-[9999px] mb-3 transition-all text-[15px] font-semibold border shadow-sm ${
+                                                formData.custodyType === opt 
+                                                ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
+                                                : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
+                                            }`}
                                         >
                                             {opt}
                                         </button>
                                     ))}
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#D0E3FF' }}>Do you have a court case currently open?</label>
-                                    <div className="flex gap-3">
+                                    <label className="text-xs font-bold tracking-[0.1em] uppercase mb-3 block text-white/70">Do you have a court case currently open?</label>
+                                    <div className="flex flex-col sm:flex-row gap-3">
                                         {['Yes, I have an active case', 'No, not yet'].map((opt) => (
                                             <button
                                                 key={opt}
@@ -388,12 +387,11 @@ export default function OnboardingPage() {
                                                         update('causeNumber', '');
                                                     }
                                                 }}
-                                                className="flex-1 py-3 rounded-xl text-sm font-medium transition-all"
-                                                style={{
-                                                    background: formData.hasOpenCase === opt ? 'rgba(208, 227, 255, 0.12)' : 'rgba(255, 249, 240, 0.4)',
-                                                    border: `1px solid ${formData.hasOpenCase === opt ? 'rgba(208, 227, 255, 0.3)' : 'rgba(208, 227, 255, 0.08)'}`,
-                                                    color: formData.hasOpenCase === opt ? '#F7F2EB' : '#FFF9F0',
-                                                }}
+                                                className={`flex-1 py-4 px-6 rounded-[9999px] text-[14px] font-semibold transition-all border shadow-sm ${
+                                                    formData.hasOpenCase === opt 
+                                                    ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
+                                                    : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
+                                                }`}
                                             >
                                                 {opt}
                                             </button>
@@ -423,18 +421,17 @@ export default function OnboardingPage() {
                                     </div>
                                 )}
                                 <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-3 block" style={{ color: '#D0E3FF' }}>Do you have an attorney?</label>
-                                    <div className="flex gap-3">
+                                    <label className="text-xs font-bold tracking-[0.1em] uppercase mb-3 block text-white/70">Do you have an attorney?</label>
+                                    <div className="flex flex-col md:flex-row gap-3">
                                         {['Yes', 'No', 'Looking'].map((opt) => (
                                             <button
                                                 key={opt}
                                                 onClick={() => update('hasAttorney', opt)}
-                                                className="flex-1 py-3 rounded-xl text-sm font-medium transition-all"
-                                                style={{
-                                                    background: formData.hasAttorney === opt ? 'rgba(208, 227, 255, 0.12)' : 'rgba(255, 249, 240, 0.4)',
-                                                    border: `1px solid ${formData.hasAttorney === opt ? 'rgba(208, 227, 255, 0.3)' : 'rgba(208, 227, 255, 0.08)'}`,
-                                                    color: formData.hasAttorney === opt ? '#F7F2EB' : '#FFF9F0',
-                                                }}
+                                                className={`flex-1 py-4 px-6 rounded-[9999px] text-[14px] font-semibold transition-all border shadow-sm ${
+                                                    formData.hasAttorney === opt 
+                                                    ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
+                                                    : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
+                                                }`}
                                             >
                                                 {opt}
                                             </button>
@@ -448,33 +445,31 @@ export default function OnboardingPage() {
                         {currentStep === 3 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <Heart size={20} style={{ color: '#F7F2EB' }} />
-                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Your NEX</h2>
+                                    <Heart size={20} weight="fill" className="text-white" />
+                                    <h2 className="font-serif text-xl font-bold text-white">Your NEX</h2>
                                 </div>
-                                <p className="text-sm" style={{ color: '#FFF9F0' }}>
+                                <p className="text-sm text-[rgba(255,255,255,0.8)]">
                                     Select all behaviors you regularly experience:
                                 </p>
-                                <div className="grid grid-cols-1 gap-2">
+                                <div className="grid grid-cols-1 gap-3">
                                     {nexBehaviorOptions.map((opt) => (
                                         <button
                                             key={opt}
                                             onClick={() => toggleArrayItem('nexBehaviors', opt)}
-                                            className="text-left px-4 py-3 rounded-xl transition-all text-sm flex items-center gap-3"
-                                            style={{
-                                                background: formData.nexBehaviors.includes(opt) ? '#FFF9F0' : 'transparent',
-                                                border: formData.nexBehaviors.includes(opt) ? '1px solid rgba(10, 30, 84, 0.12)' : '1px solid rgba(208, 227, 255, 0.25)',
-                                                backgroundImage: !formData.nexBehaviors.includes(opt) ? 'linear-gradient(135deg, rgba(10, 30, 84, 0.05), rgba(18, 61, 126, 0.1))' : 'none',
-                                                color: formData.nexBehaviors.includes(opt) ? '#0A1E54' : '#FFFFFF',
-                                            }}
+                                            className={`text-left px-5 py-4 rounded-[9999px] transition-all text-[15px] font-semibold flex items-center gap-4 border shadow-sm ${
+                                                formData.nexBehaviors.includes(opt)
+                                                ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
+                                                : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
+                                            }`}
                                         >
                                             <div
-                                                className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
-                                                style={{
-                                                    background: formData.nexBehaviors.includes(opt) ? '#7096D1' : '#FFFFFF',
-                                                    border: formData.nexBehaviors.includes(opt) ? '1.5px solid #7096D1' : '1.5px solid rgba(255, 255, 255, 0.6)',
-                                                }}
+                                                className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-colors border-2 ${
+                                                    formData.nexBehaviors.includes(opt)
+                                                    ? 'bg-white border-white'
+                                                    : 'bg-transparent border-[rgba(255,255,255,0.3)]'
+                                                }`}
                                             >
-                                                {formData.nexBehaviors.includes(opt) && <Check size={12} style={{ color: '#FFFFFF' }} />}
+                                                {formData.nexBehaviors.includes(opt) && <Check size={14} weight="bold" className="text-[#1A4B9B]" />}
                                             </div>
                                             {opt}
                                         </button>
@@ -487,23 +482,22 @@ export default function OnboardingPage() {
                         {currentStep === 4 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <Target size={20} style={{ color: '#F7F2EB' }} />
-                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Your Goals</h2>
+                                    <Target size={20} weight="fill" className="text-white" />
+                                    <h2 className="font-serif text-xl font-bold text-white">Your Goals</h2>
                                 </div>
-                                <p className="text-sm" style={{ color: '#FFF9F0' }}>
+                                <p className="text-sm text-[rgba(255,255,255,0.8)] pb-2">
                                     What do you need the most help with right now?
                                 </p>
-                                <div className="flex flex-wrap gap-2">
+                                <div className="flex flex-wrap gap-3">
                                     {goalOptions.map((opt) => (
                                         <button
                                             key={opt}
                                             onClick={() => toggleArrayItem('primaryGoals', opt)}
-                                            className="badge cursor-pointer transition-all text-sm py-2 px-4"
-                                            style={{
-                                                background: formData.primaryGoals.includes(opt) ? 'rgba(208, 227, 255, 0.15)' : 'rgba(255, 249, 240, 0.5)',
-                                                color: formData.primaryGoals.includes(opt) ? '#F7F2EB' : '#FFF9F0',
-                                                border: `1px solid ${formData.primaryGoals.includes(opt) ? 'rgba(208, 227, 255, 0.3)' : 'rgba(208, 227, 255, 0.06)'}`,
-                                            }}
+                                            className={`cursor-pointer transition-all text-[14px] py-3 px-6 rounded-[9999px] font-semibold border shadow-sm ${
+                                                formData.primaryGoals.includes(opt)
+                                                ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
+                                                : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
+                                            }`}
                                         >
                                             {opt}
                                         </button>
@@ -516,37 +510,36 @@ export default function OnboardingPage() {
                         {currentStep === 5 && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <FileText size={20} style={{ color: '#F7F2EB' }} />
-                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Important Notice</h2>
+                                    <FileText size={20} weight="fill" className="text-white" />
+                                    <h2 className="font-serif text-xl font-bold text-white">Important Notice</h2>
                                 </div>
-                                <div className="p-5 space-y-3 rounded-2xl" style={{ background: '#7096D1', border: '1px solid rgba(208, 227, 255, 0.2)' }}>
-                                    <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
-                                        NEXX is an AI-powered tool that provides <strong style={{ color: '#FFFFFF' }}>legal information, strategic guidance, and emotional support</strong>. It is <strong style={{ color: '#FFFFFF' }}>not</strong> a law firm, does not provide legal advice, and is not a substitute for a licensed attorney or therapist.
+                                <div className="p-6 space-y-4 rounded-[2rem] bg-[rgba(10,17,40,0.5)] border border-[rgba(255,255,255,0.1)]">
+                                    <p className="text-sm leading-relaxed text-[rgba(255,255,255,0.85)]">
+                                        NEXX is an AI-powered tool that provides <strong className="text-white">legal information, strategic guidance, and emotional support</strong>. It is <strong className="text-white">not</strong> a law firm, does not provide legal advice, and is not a substitute for a licensed attorney or therapist.
                                     </p>
-                                    <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
+                                    <p className="text-sm leading-relaxed text-[rgba(255,255,255,0.85)]">
                                         Information provided by NEXX should be used as a starting point for your own research and decision-making. For specific legal advice regarding your situation, please consult with a licensed attorney in your state.
                                     </p>
-                                    <p className="text-sm leading-relaxed" style={{ color: '#0A1E54' }}>
-                                        If you or your children are in immediate danger, please call <strong style={{ color: '#FFFFFF' }}>911</strong> or the National Domestic Violence Hotline at <strong style={{ color: '#FFFFFF' }}>1-800-799-7233</strong>.
+                                    <p className="text-sm leading-relaxed text-[rgba(255,255,255,0.85)]">
+                                        If you or your children are in immediate danger, please call <strong className="text-white p-1 bg-[#C75A5A] rounded px-2 ml-1">911</strong> or the National Domestic Violence Hotline at <strong className="text-white font-bold ml-1">1-800-799-7233</strong>.
                                     </p>
                                 </div>
                                 <button
                                     onClick={() => update('acceptedDisclaimer', !formData.acceptedDisclaimer)}
-                                    className="w-full text-left px-4 py-3 rounded-xl transition-all text-sm flex items-center gap-3"
-                                    style={{
-                                        background: formData.acceptedDisclaimer ? 'rgba(208, 227, 255, 0.1)' : 'rgba(255, 249, 240, 0.4)',
-                                        border: `1px solid ${formData.acceptedDisclaimer ? 'rgba(208, 227, 255, 0.25)' : 'rgba(208, 227, 255, 0.06)'}`,
-                                        color: formData.acceptedDisclaimer ? '#F7F2EB' : '#D0E3FF',
-                                    }}
+                                    className={`w-full text-left px-6 py-4 rounded-[9999px] transition-all text-[15px] font-semibold flex items-center gap-4 border mt-6 shadow-sm ${
+                                        formData.acceptedDisclaimer
+                                        ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
+                                        : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
+                                    }`}
                                 >
                                     <div
-                                        className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
-                                        style={{
-                                            background: formData.acceptedDisclaimer ? '#F7F2EB' : 'transparent',
-                                            border: `1.5px solid ${formData.acceptedDisclaimer ? '#F7F2EB' : '#FFF9F0'}`,
-                                        }}
+                                        className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-colors border-2 ${
+                                            formData.acceptedDisclaimer
+                                            ? 'bg-white border-white'
+                                            : 'bg-transparent border-[rgba(255,255,255,0.3)]'
+                                        }`}
                                     >
-                                        {formData.acceptedDisclaimer && <Check size={12} style={{ color: '#0A1E54' }} />}
+                                        {formData.acceptedDisclaimer && <Check size={14} weight="bold" className="text-[#1A4B9B]" />}
                                     </div>
                                     I understand and acknowledge the above
                                 </button>

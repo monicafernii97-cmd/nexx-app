@@ -76,8 +76,8 @@ export default function DashboardPage() {
                 </div>
                 <div className="hidden md:block">
                     {/* Optional float decorative element or status pill */}
-                    <div className="badge badge-primary px-4 py-2 border-transparent shadow-sm bg-white/60 backdrop-blur-md">
-                        <div className="w-2 h-2 rounded-full bg-emerald shadow-[0_0_8px_var(--emerald)] animate-pulse" />
+                    <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-[11px] uppercase tracking-wider text-white bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]">
+                        <div className="w-2 h-2 rounded-full bg-[#10b981] shadow-[0_0_8px_#10b981] animate-pulse" />
                         System Secure
                     </div>
                 </div>
@@ -102,26 +102,20 @@ export default function DashboardPage() {
                                     >
                                         <div className="flex justify-between items-start mb-6">
                                             <div 
-                                                className="w-12 h-12 rounded-[1rem] flex items-center justify-center transition-all duration-400 group-hover:scale-105"
-                                                style={{ 
-                                                    background: `color-mix(in srgb, ${action.accent} 10%, transparent)`,
-                                                    border: `1px solid color-mix(in srgb, ${action.accent} 20%, transparent)`
-                                                }}
+                                                className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-400 group-hover:scale-105 shadow-[0_4px_15px_rgba(18,61,126,0.3)] bg-[linear-gradient(135deg,#1A4B9B,#123D7E)]"
                                             >
-                                                <Icon size={24} weight="duotone" style={{ color: action.accent }} />
+                                                <Icon size={24} weight="bold" className="text-white" />
                                             </div>
-                                            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 duration-300">
-                                                <ArrowRight size={16} className="text-sapphire" />
+                                            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#0A1128] border border-[rgba(255,255,255,0.2)] opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 duration-300 shadow-sm">
+                                                <ArrowRight size={14} weight="bold" className="text-white" />
                                             </div>
                                         </div>
-                                        <div>
-                                            <h3 className="font-semibold text-lg text-sapphire mb-1 tracking-tight">
+                                            <h3 className="font-semibold text-lg text-white mb-1 tracking-tight">
                                                 {action.label}
                                             </h3>
-                                            <p className="text-sm text-sapphire-muted font-medium">
+                                            <p className="text-sm text-[rgba(255,255,255,0.6)] font-medium">
                                                 {action.desc}
                                             </p>
-                                        </div>
                                     </motion.div>
                                 </Link>
                             );
@@ -142,12 +136,14 @@ export default function DashboardPage() {
                             {stats.map((stat) => {
                                 const Icon = stat.icon;
                                 return (
-                                    <div key={stat.label} className="p-4 rounded-2xl bg-white/40 border border-[rgba(10,22,41,0.03)] hover:bg-white/60 transition-colors">
+                                    <div key={stat.label} className="p-5 rounded-[2rem] bg-[#0A1128] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.2)] transition-colors shadow-sm cursor-default">
                                         <div className="flex items-center gap-3 mb-3">
-                                            <Icon size={18} weight="duotone" style={{ color: stat.color }} />
-                                            <span className="text-xs font-semibold text-sapphire-muted uppercase tracking-wider">{stat.label}</span>
+                                            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#123D7E] shadow-[0_2px_8px_rgba(18,61,126,0.5)]">
+                                                <Icon size={14} weight="bold" className="text-white" />
+                                            </div>
+                                            <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{stat.label}</span>
                                         </div>
-                                        <p className="text-3xl font-light tracking-tight text-sapphire">
+                                        <p className="text-3xl font-serif text-white tracking-tight">
                                             {stat.value}
                                         </p>
                                     </div>
@@ -179,17 +175,17 @@ export default function DashboardPage() {
                                 <div className="w-8 h-8 rounded-full border-2 border-champagne border-t-transparent animate-spin" />
                             </div>
                         ) : incidents.length === 0 ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-white/30 rounded-2xl border border-white/40 border-dashed">
-                                <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-white border border-[rgba(10,22,41,0.1)] shadow-sm">
-                                    <Clock size={24} className="text-[#0A1128]" />
+                            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-[rgba(10,17,40,0.5)] rounded-[2rem] border border-[rgba(255,255,255,0.08)]">
+                                <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_15px_rgba(18,61,126,0.3)]">
+                                    <Clock size={28} weight="fill" className="text-white" />
                                 </div>
-                                <p className="text-[15px] font-bold text-sapphire mb-1">
+                                <p className="text-[16px] font-semibold text-white mb-2">
                                     Pristine Record
                                 </p>
-                                <p className="text-xs text-sapphire-muted font-medium mb-6 max-w-[200px] leading-relaxed">
+                                <p className="text-[13px] text-[rgba(255,255,255,0.6)] font-medium mb-6 max-w-[200px] leading-relaxed">
                                     Your activity feed is empty. Start a session to build your court-ready profile.
                                 </p>
-                                <Link href="/chat" className="btn-primary text-xs w-full shadow-md">
+                                <Link href="/chat" className="btn-primary text-xs w-full shadow-md rounded-[9999px] py-4 uppercase tracking-wider font-bold tracking-widest text-[#FFFFFF]">
                                     Begin Session
                                 </Link>
                             </div>

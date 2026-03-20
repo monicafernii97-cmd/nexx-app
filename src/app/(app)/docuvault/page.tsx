@@ -302,20 +302,19 @@ function DocuVaultPageInner() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, ease: 'easeOut' }}
                     >
-                        <div className="flex items-center gap-4 mb-3">
-                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] relative overflow-hidden">
-                                <div className="absolute inset-0 bg-white/10" />
-                                <Bank size={28} className="text-white relative z-10 drop-shadow-md" weight="fill" />
+                        <div className="flex items-center gap-5 mb-5">
+                            <div className="w-16 h-16 rounded-3xl flex items-center justify-center bg-white/5 backdrop-blur-3xl shadow-[inset_0_1px_2px_rgba(255,255,255,0.5),0_12px_40px_rgba(0,0,0,0.6)] border border-white/30 shrink-0">
+                                <Bank size={32} weight="duotone" className="text-[#60A5FA] drop-shadow-[0_4px_12px_rgba(255,255,255,0.8)]" />
                             </div>
                             <div>
-                                <h1 className="text-4xl font-serif font-bold text-white tracking-tight m-0">
+                                <h1 className="text-4xl lg:text-5xl font-serif font-bold text-white mb-2 leading-tight tracking-tight drop-shadow-sm">
                                     DocuVault
                                 </h1>
+                                <p className="text-[15px] font-medium text-white drop-shadow-sm max-w-2xl leading-relaxed">
+                                    Professional Legal Document Generator. Trustworthy. Semantic. Verbatim. Generate court-ready PDFs with AI precision.
+                                </p>
                             </div>
                         </div>
-                        <p className="text-base font-medium text-white max-w-2xl leading-relaxed mt-2">
-                            Professional Legal Document Generator. Trustworthy. Semantic. Verbatim. Generate court-ready PDFs with AI precision.
-                        </p>
                     </motion.div>
 
                     {/* ── Category Tabs ── */}
@@ -333,17 +332,7 @@ function DocuVaultPageInner() {
                                     setActiveTab(tab.id);
                                     setSelectedTemplate(null);
                                 }}
-                                className="px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 snap-center shadow-sm"
-                                style={{
-                                    background: activeTab === tab.id
-                                        ? 'var(--sapphire-dark)'
-                                        : 'rgba(255, 255, 255, 0.6)',
-                                    color: activeTab === tab.id ? 'white' : 'var(--sapphire-base)',
-                                    border: activeTab === tab.id
-                                        ? '1px solid var(--sapphire-dark)'
-                                        : '1px solid var(--cloud-light)',
-                                    backdropFilter: activeTab === tab.id ? 'none' : 'blur(8px)',
-                                }}
+                                className={`px-6 py-2.5 rounded-full text-[14px] font-bold whitespace-nowrap transition-all duration-300 snap-center tracking-wide ${activeTab === tab.id ? 'shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_20px_rgba(0,0,0,0.5)] bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-[rgba(255,255,255,0.25)] text-white drop-shadow-sm scale-105' : 'bg-white/5 backdrop-blur-xl border border-white/10 text-white/70 hover:text-white hover:bg-white/10 hover:border-white/30'}`}
                             >
                                 {tab.label}
                             </button>
@@ -356,25 +345,25 @@ function DocuVaultPageInner() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
                     >
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-sm font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
+                        <div className="flex items-center justify-between mb-4 mt-2">
+                            <h2 className="text-[13px] font-bold tracking-widest uppercase text-[#60A5FA] drop-shadow-sm">
                                 Templates
                             </h2>
                             {templates.length > 3 && (
-                                <div className="flex gap-2">
+                                <div className="flex gap-3">
                                     <button
                                         onClick={() => scrollCarousel('left')}
                                         aria-label="Scroll templates left"
-                                        className="w-8 h-8 rounded-full flex items-center justify-center bg-white shadow-sm border border-[var(--cloud-light)] hover:shadow-md transition-all text-[var(--sapphire-base)] hover:text-[var(--sapphire-dark)]"
+                                        className="w-10 h-10 rounded-full flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_16px_rgba(0,0,0,0.5)] border border-[rgba(255,255,255,0.25)] hover:scale-105 hover:bg-[linear-gradient(135deg,#1e4a9e,#0A1128)] transition-all text-white drop-shadow-sm"
                                     >
-                                        <CaretLeft size={16} weight="bold" />
+                                        <CaretLeft size={18} weight="bold" />
                                     </button>
                                     <button
                                         onClick={() => scrollCarousel('right')}
                                         aria-label="Scroll templates right"
-                                        className="w-8 h-8 rounded-full flex items-center justify-center bg-white shadow-sm border border-[var(--cloud-light)] hover:shadow-md transition-all text-[var(--sapphire-base)] hover:text-[var(--sapphire-dark)]"
+                                        className="w-10 h-10 rounded-full flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_16px_rgba(0,0,0,0.5)] border border-[rgba(255,255,255,0.25)] hover:scale-105 hover:bg-[linear-gradient(135deg,#1e4a9e,#0A1128)] transition-all text-white drop-shadow-sm"
                                     >
-                                        <CaretRight size={16} weight="bold" />
+                                        <CaretRight size={18} weight="bold" />
                                     </button>
                                 </div>
                             )}
@@ -384,18 +373,18 @@ function DocuVaultPageInner() {
                             /* Blank template card */
                             <button
                                 type="button"
-                                className="card-premium p-6 cursor-pointer hover:shadow-lg transition-all w-full text-left border border-[var(--cloud-light)] bg-white/60 hover:bg-white"
+                                className="p-6 cursor-pointer hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_12px_32px_rgba(0,0,0,0.5)] hover:-translate-y-1 transition-all w-full text-left bg-white/5 backdrop-blur-2xl border border-white/20 rounded-3xl group"
                                 onClick={() => setSelectedTemplate(null)}
                             >
                                 <div className="flex items-center gap-5">
-                                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-[var(--cloud)] border-2 border-dashed border-[var(--sapphire-light)]/40">
-                                        <Plus size={28} className="text-[var(--sapphire-base)]" weight="bold" />
+                                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-white/10 border-2 border-dashed border-white/30 group-hover:bg-[#123D7E] group-hover:border-transparent transition-colors">
+                                        <Plus size={28} className="text-white drop-shadow-sm" weight="bold" />
                                     </div>
                                     <div>
-                                        <p className="text-lg font-medium text-[var(--sapphire-dark)] mb-1">
+                                        <p className="text-[17px] font-bold text-white mb-1 drop-shadow-sm tracking-tight text-shadow">
                                             Custom Document
                                         </p>
-                                        <p className="text-sm text-[var(--sapphire-base)]">
+                                        <p className="text-sm font-medium text-white/80">
                                             Start with a blank template utilizing general court and legal structuring.
                                         </p>
                                     </div>
@@ -405,7 +394,7 @@ function DocuVaultPageInner() {
                             /* Template cards carousel */
                             <div
                                 ref={carouselRef}
-                                className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-none"
+                                className="flex gap-4 overflow-x-auto pb-6 pt-2 px-1 snap-x snap-mandatory scrollbar-none"
                                 style={{ scrollbarWidth: 'none' }}
                             >
                                 {templates.map(tmpl => {
@@ -416,31 +405,20 @@ function DocuVaultPageInner() {
                                             onClick={() => setSelectedTemplate(isSelected ? null : tmpl)}
                                             whileHover={{ y: -4 }}
                                             whileTap={{ scale: 0.98 }}
-                                            className="flex-shrink-0 w-56 rounded-3xl p-5 text-left transition-all cursor-pointer snap-start"
-                                            style={{
-                                                background: isSelected
-                                                    ? 'var(--pearl)'
-                                                    : 'rgba(255, 255, 255, 0.7)',
-                                                border: isSelected
-                                                    ? '2px solid var(--champagne)'
-                                                    : '1px solid var(--cloud-light)',
-                                                boxShadow: isSelected 
-                                                    ? '0 12px 24px -10px rgba(138, 122, 96, 0.2)' 
-                                                    : '0 4px 12px -5px rgba(10, 30, 84, 0.05)',
-                                            }}
+                                            className={`flex-shrink-0 w-64 rounded-[2rem] p-5 text-left transition-all cursor-pointer snap-start backdrop-blur-2xl ${isSelected ? 'bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-[rgba(255,255,255,0.35)] shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),0_12px_32px_rgba(0,0,0,0.6)]' : 'bg-white/5 border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.3)] hover:bg-white/10 hover:border-white/30'}`}
                                         >
-                                            <div className={`w-full h-28 rounded-2xl mb-4 flex items-center justify-center relative overflow-hidden transition-all ${isSelected ? 'bg-gradient-to-br from-white to-[var(--pearl)] shadow-inner' : 'bg-white shadow-sm border border-[var(--cloud-light)]'}`}>
+                                            <div className={`w-full h-32 rounded-[1.5rem] mb-5 flex items-center justify-center relative overflow-hidden transition-all ${isSelected ? 'bg-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]' : 'bg-white/5 border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]'}`}>
                                                 {/* Subtle document graphic */}
-                                                <div className="absolute top-3 left-3 w-12 h-2 rounded bg-[var(--sapphire-light)]/10" />
-                                                <div className="absolute top-7 left-3 w-20 h-2 rounded bg-[var(--sapphire-light)]/10" />
-                                                <div className="absolute top-11 left-3 w-16 h-2 rounded bg-[var(--sapphire-light)]/10" />
+                                                <div className={`absolute top-4 left-4 w-12 h-2 rounded ${isSelected ? 'bg-white/30' : 'bg-white/10'}`} />
+                                                <div className={`absolute top-8 left-4 w-20 h-2 rounded ${isSelected ? 'bg-white/30' : 'bg-white/10'}`} />
+                                                <div className={`absolute top-12 left-4 w-16 h-2 rounded ${isSelected ? 'bg-white/30' : 'bg-white/10'}`} />
                                                 <FileText
-                                                    size={40}
+                                                    size={48}
                                                     weight={isSelected ? "duotone" : "regular"}
-                                                    className={`relative z-10 ${isSelected ? 'text-[var(--champagne)] drop-shadow-sm' : 'text-[var(--sapphire-light)]'}`}
+                                                    className={`relative z-10 transition-colors ${isSelected ? 'text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.6)]' : 'text-white/60'}`}
                                                 />
                                             </div>
-                                            <p className={`text-sm font-semibold leading-snug line-clamp-2 ${isSelected ? 'text-[var(--sapphire-dark)]' : 'text-[var(--sapphire-base)]'}`}>
+                                            <p className={`text-[15px] font-bold leading-snug line-clamp-2 ${isSelected ? 'text-white drop-shadow-sm' : 'text-white/80'}`}>
                                                 {tmpl.title}
                                             </p>
                                         </motion.button>
@@ -459,11 +437,11 @@ function DocuVaultPageInner() {
                                 exit={{ opacity: 0, height: 0, scale: 0.95 }}
                                 className="overflow-hidden"
                             >
-                                <div className="card-premium p-5 border-l-4 border-l-[var(--champagne)] bg-gradient-to-r from-[var(--champagne)]/5 to-white/50">
-                                    <p className="text-sm font-semibold tracking-wide text-[var(--sapphire-dark)] mb-1">
+                                <div className="p-5 border-l-4 border-l-[#60A5FA] bg-white/5 backdrop-blur-xl border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.3)] rounded-r-2xl">
+                                    <p className="text-[15px] font-bold tracking-wide text-white drop-shadow-sm mb-1">
                                         {selectedTemplate.title}
                                     </p>
-                                    <p className="text-sm text-[var(--sapphire-base)] leading-relaxed">
+                                    <p className="text-[14px] font-medium text-white/80 leading-relaxed">
                                         {selectedTemplate.description}
                                     </p>
                                 </div>
@@ -477,7 +455,7 @@ function DocuVaultPageInner() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.25 }}
                     >
-                        <h2 className="text-sm font-semibold tracking-widest uppercase text-[var(--sapphire-dark)] mb-3">
+                        <h2 className="text-[13px] font-bold tracking-widest uppercase text-[#60A5FA] drop-shadow-sm mb-3">
                             Document Content
                         </h2>
                         <div className="relative group">
@@ -486,31 +464,31 @@ function DocuVaultPageInner() {
                                 onChange={e => setDocumentContent(e.target.value)}
                                 placeholder="Paste your content here or describe the document title, body, and footer verbatim. The AI will perfectly structure and format it."
                                 rows={8}
-                                className="input-premium resize-none w-full min-h-[220px] pb-14 text-[var(--sapphire-dark)] bg-white/80 focus:bg-white placeholder:text-[var(--sapphire-light)]"
+                                className="w-full min-h-[220px] pb-14 p-6 rounded-[2rem] bg-white/5 backdrop-blur-2xl border border-white/20 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#60A5FA]/50 focus:bg-white/10 transition-all resize-none shadow-[inset_0_1px_2px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)]"
                             />
 
                             {/* Bottom bar overlay */}
-                            <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between pt-3 border-t border-[var(--cloud-light)]">
+                            <div className="absolute bottom-3 left-6 right-6 flex items-center justify-between pt-3 border-t border-white/10">
                                 <div className="flex gap-4">
                                     <button
                                         disabled
                                         title="File attachment coming soon"
-                                        className="flex items-center gap-2 text-sm font-medium transition-colors cursor-not-allowed opacity-50 text-[var(--sapphire-base)]"
+                                        className="flex items-center gap-2 text-sm font-bold transition-colors cursor-not-allowed opacity-40 text-white"
                                     >
-                                        <Paperclip size={16} weight="bold" /> 
+                                        <Paperclip size={18} weight="bold" /> 
                                         <span>Attach File</span>
                                     </button>
                                     {documentContent && (
                                         <button
                                             onClick={() => setDocumentContent('')}
-                                            className="flex items-center gap-2 text-sm font-medium cursor-pointer transition-colors text-[var(--error)] hover:text-[#B91C1C]"
+                                            className="flex items-center gap-2 text-sm font-bold cursor-pointer transition-colors text-white/60 hover:text-white"
                                         >
-                                            <X size={16} weight="bold" /> 
+                                            <X size={18} weight="bold" /> 
                                             <span>Clear</span>
                                         </button>
                                     )}
                                 </div>
-                                <p className="text-xs font-semibold text-[var(--sapphire-light)]">
+                                <p className="text-[13px] font-bold text-white/60">
                                     {documentContent.length > 0 ? `${documentContent.length.toLocaleString()} characters` : ''}
                                 </p>
                             </div>
@@ -526,9 +504,9 @@ function DocuVaultPageInner() {
                         <button
                             onClick={handleGenerate}
                             disabled={(!documentContent.trim() && !selectedTemplate) || isUserProfileLoading}
-                            className="btn-primary w-full flex items-center justify-center gap-3 py-4 text-base shadow-lg shadow-[var(--sapphire-dark)]/10 hover:shadow-xl transition-all disabled:opacity-50 group hover:-translate-y-0.5"
+                            className="w-full flex items-center justify-center gap-3 py-5 rounded-[2rem] text-[16px] font-bold bg-[linear-gradient(135deg,#60A5FA,#2563EB)] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_8px_24px_rgba(37,99,235,0.5)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_12px_32px_rgba(37,99,235,0.6)] transition-all disabled:opacity-50 disabled:grayscale group hover:-translate-y-1 tracking-wide"
                         >
-                            <Sparkle size={20} weight="fill" className="text-[var(--champagne)] drop-shadow-sm group-hover:scale-110 transition-transform" />
+                            <Sparkle size={24} weight="fill" className="text-white drop-shadow-md group-hover:scale-110 transition-transform" />
                             Generate Formal Document
                         </button>
                     </motion.div>
@@ -557,20 +535,20 @@ function DocuVaultPageInner() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.4 }}
-                        className="flex items-center justify-center gap-10 mt-12 py-8 border-t border-[var(--cloud-light)]"
+                        className="flex items-center justify-center gap-14 mt-16 py-10 border-t border-white/10"
                     >
                         {[
-                            { label: 'Describe\nContext', icon: FileText, color: 'text-[var(--sapphire-base)]' },
-                            { label: 'AI Generates\nDraft', icon: Sparkle, color: 'text-[var(--champagne)]' },
-                            { label: 'Download\n& File', icon: ArrowRight, color: 'text-[var(--sapphire-base)]' },
+                            { label: 'Describe\nContext', icon: FileText, color: 'text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]' },
+                            { label: 'AI Generates\nDraft', icon: Sparkle, color: 'text-[#E5A84A] drop-shadow-[0_2px_8px_rgba(229,168,74,0.8)]' },
+                            { label: 'Download\n& File', icon: ArrowRight, color: 'text-[#10B981] drop-shadow-[0_2px_8px_rgba(16,185,129,0.8)]' },
                         ].map((item, i) => {
                             const Icon = item.icon;
                             return (
-                                <div key={i} className="flex flex-col items-center gap-3 relative">
-                                    <div className="w-14 h-14 rounded-full flex items-center justify-center bg-white border border-[var(--cloud-light)] shadow-sm">
-                                        <Icon size={24} weight="duotone" className={item.color} />
+                                <div key={i} className="flex flex-col items-center gap-4 relative">
+                                    <div className="w-20 h-20 rounded-[2.5rem] flex items-center justify-center bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_8px_24px_rgba(255,255,255,0.02),0_12px_40px_rgba(0,0,0,0.6)]">
+                                        <Icon size={36} weight="duotone" className={item.color} />
                                     </div>
-                                    <p className="text-xs text-center font-medium whitespace-pre-line leading-tight text-[var(--sapphire-dark)]">
+                                    <p className="text-[14px] text-center font-bold whitespace-pre-line leading-tight text-white drop-shadow-sm tracking-wide">
                                         {item.label}
                                     </p>
                                 </div>
@@ -595,11 +573,11 @@ function DocuVaultPageInner() {
                         <button
                             onClick={handleNewDocument}
                             aria-label="Cancel generation"
-                            className="w-10 h-10 rounded-full flex items-center justify-center bg-white shadow-sm border border-[var(--cloud-light)] hover:bg-[var(--error)]/5 hover:text-[var(--error)] text-[var(--sapphire-base)] transition-colors"
+                            className="w-12 h-12 rounded-full flex items-center justify-center bg-white/5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border border-white/10 hover:bg-white/10 hover:border-white/30 text-white/80 hover:text-white transition-all backdrop-blur-xl"
                         >
-                            <X size={18} weight="bold" />
+                            <X size={20} weight="bold" />
                         </button>
-                        <span className="text-sm font-medium px-4 py-1.5 rounded-full bg-[var(--sapphire-light)]/10 text-[var(--sapphire-dark)]">
+                        <span className="text-sm font-bold px-4 py-2 rounded-full bg-[#60A5FA]/10 border border-[#60A5FA]/20 text-[#60A5FA] drop-shadow-sm backdrop-blur-xl">
                             Step {Math.min(progressSteps.filter(s => s.status === 'complete').length + 1, progressSteps.length)} of {progressSteps.length}
                         </span>
                     </div>
@@ -611,79 +589,81 @@ function DocuVaultPageInner() {
                             transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
                             className="inline-block mb-6 relative"
                         >
-                            <div className="absolute inset-0 rounded-full blur-2xl bg-[var(--champagne)]/30 scale-150 pointer-events-none" />
-                            <div className="w-24 h-24 rounded-full flex items-center justify-center bg-gradient-to-br from-white to-[var(--pearl)] border flex-shrink-0 border-white shadow-[0_8px_32px_rgba(10,30,84,0.1)] relative z-10">
-                                <Sparkle size={40} weight="duotone" className="text-[var(--champagne)]" />
+                            <div className="absolute inset-0 rounded-full blur-2xl bg-[#60A5FA]/30 scale-150 pointer-events-none" />
+                            <div className="w-24 h-24 rounded-full flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-[#60A5FA]/50 shadow-[0_8px_32px_rgba(96,165,250,0.3)] relative z-10 box-border">
+                                <Sparkle size={44} weight="duotone" className="text-[#60A5FA] drop-shadow-[0_2px_12px_rgba(96,165,250,0.8)]" />
                             </div>
                         </motion.div>
-                        <h3 className="text-2xl font-light text-[var(--sapphire-dark)] tracking-tight">
+                        <h3 className="text-3xl font-serif font-bold text-white tracking-tight drop-shadow-sm">
                             DocuVault AI is drafting...
                         </h3>
-                        <p className="text-sm text-[var(--sapphire-base)] mt-2">
+                        <p className="text-[16px] font-medium text-white/80 mt-3 drop-shadow-sm">
                             Structuring verbatim into local court format
                         </p>
                     </div>
 
                     {/* Progress bar */}
-                    <div className="card-premium p-6 mb-8 border border-[var(--cloud-light)] bg-white/60">
-                        <div className="flex items-center justify-between mb-3">
-                            <p className="text-xs font-semibold tracking-widest uppercase text-[var(--sapphire-base)]">
+                    <div className="p-8 mb-8 rounded-[2rem] border border-white/20 bg-white/5 backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_12px_40px_rgba(0,0,0,0.5)]">
+                        <div className="flex items-center justify-between mb-4">
+                            <p className="text-[13px] font-bold tracking-widest uppercase text-white/60">
                                 Synthesis Progress
                             </p>
-                            <p className="text-sm font-bold text-[var(--sapphire-dark)]">
+                            <p className="text-[15px] font-bold text-white">
                                 {Math.round(progress)}%
                             </p>
                         </div>
-                        <div className="h-2 rounded-full overflow-hidden bg-[var(--cloud)] shadow-inner">
+                        <div className="h-2.5 rounded-full overflow-hidden bg-black/40 shadow-inner border border-white/10">
                             <motion.div
-                                className="h-full rounded-full bg-gradient-to-r from-[var(--sapphire-base)] to-[var(--champagne)] shadow-[0_0_10px_rgba(229,168,74,0.5)]"
+                                className="h-full rounded-full bg-[linear-gradient(90deg,#60A5FA,#E5A84A)] shadow-[0_0_12px_rgba(96,165,250,0.6)] relative"
                                 animate={{ width: `${progress}%` }}
                                 transition={{ duration: 0.5, ease: 'easeOut' }}
-                            />
+                            >
+                                <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]" style={{ transform: 'skewX(-20deg)' }} />
+                            </motion.div>
                         </div>
                         
                         {/* Document context */}
-                        <div className="mt-6 pt-5 border-t border-[var(--cloud-light)]">
-                            <p className="text-[10px] uppercase font-bold text-[var(--sapphire-light)] tracking-widest mb-2">
+                        <div className="mt-8 pt-6 border-t border-white/10">
+                            <p className="text-[11px] uppercase font-bold text-[#60A5FA] tracking-widest mb-3">
                                 Context
                             </p>
-                            <p className="text-sm italic leading-relaxed text-[var(--sapphire-dark)] border-l-2 border-[var(--champagne)] pl-3">
+                            <p className="text-[15px] italic leading-relaxed text-white drop-shadow-sm border-l-2 border-[#60A5FA] pl-4">
                                 &ldquo;{selectedTemplate?.title ?? (() => {
                                     const text = documentContent;
                                     if (text.length <= 100) return text;
                                     const truncated = text.slice(0, 100);
                                     const lastSpace = truncated.lastIndexOf(' ');
                                     return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated) + '...';
-                                })()}&rdquo;
+                                })}&rdquo;
                             </p>
                         </div>
                     </div>
 
                     {/* Step-by-step progress */}
-                    <div className="space-y-4 px-2">
+                    <div className="space-y-5 px-3">
                         {progressSteps.map((step, i) => (
                             <motion.div
                                 key={i}
                                 initial={{ opacity: 0, x: -10 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: i * 0.1 }}
-                                className="flex items-center gap-4"
+                                className="flex items-center gap-5"
                             >
                                 <div className="shrink-0 flex items-center justify-center w-8">
                                     {step.status === 'complete' ? (
-                                        <CheckCircle size={24} weight="fill" className="text-[var(--success)] drop-shadow-sm" />
+                                        <CheckCircle size={28} weight="fill" className="text-[#10B981] drop-shadow-[0_2px_8px_rgba(16,185,129,0.5)]" />
                                     ) : step.status === 'active' ? (
                                         <motion.div
-                                            animate={{ scale: [1, 1.2, 1] }}
+                                            animate={{ scale: [1, 1.3, 1] }}
                                             transition={{ duration: 1.5, repeat: Infinity }}
-                                            className="w-4 h-4 rounded-full bg-[var(--champagne)] shadow-[0_0_8px_rgba(229,168,74,0.6)]"
+                                            className="w-4 h-4 rounded-full bg-[#60A5FA] shadow-[0_0_12px_rgba(96,165,250,0.8)]"
                                         />
                                     ) : (
-                                        <div className="w-2.5 h-2.5 rounded-full bg-[var(--cloud-light)]" />
+                                        <div className="w-2.5 h-2.5 rounded-full bg-white/20 shadow-inner" />
                                     )}
                                 </div>
                                 <div className="flex-1">
-                                    <p className={`text-sm font-medium transition-colors ${step.status === 'complete' ? 'text-[var(--sapphire-dark)]' : step.status === 'active' ? 'text-[var(--sapphire-base)] font-semibold' : 'text-[var(--sapphire-light)]'}`}>
+                                    <p className={`text-[15px] transition-colors ${step.status === 'complete' ? 'text-white font-bold drop-shadow-sm' : step.status === 'active' ? 'text-[#60A5FA] font-bold drop-shadow-sm' : 'text-white/40 font-medium'}`}>
                                         {step.label}
                                     </p>
                                 </div>
@@ -692,7 +672,7 @@ function DocuVaultPageInner() {
                     </div>
 
                     {/* Disclaimer */}
-                    <p className="text-[11px] font-medium text-center mt-10 text-[var(--sapphire-light)] px-8 leading-relaxed">
+                    <p className="text-[13px] font-bold text-center mt-12 text-white/50 px-8 leading-relaxed">
                         Large documents usually take 45-60 seconds to securely generate and process formatting.
                     </p>
                 </motion.div>
@@ -708,73 +688,73 @@ function DocuVaultPageInner() {
                     className="max-w-3xl mx-auto py-6"
                 >
                     {/* Header */}
-                    <div className="flex items-center gap-4 mb-8">
+                    <div className="flex items-center gap-5 mb-10">
                         <button
                             onClick={handleNewDocument}
                             aria-label="Back to document composer"
-                            className="w-12 h-12 rounded-full flex items-center justify-center bg-white shadow-sm border border-[var(--cloud-light)] hover:shadow-md transition-all text-[var(--sapphire-base)] hover:text-[var(--sapphire-dark)] shrink-0"
+                            className="w-12 h-12 rounded-full flex items-center justify-center bg-white/5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border border-white/10 hover:bg-white/10 hover:border-white/30 text-white transition-all backdrop-blur-xl shrink-0 drop-shadow-sm hover:scale-105"
                         >
                             <CaretLeft size={20} weight="bold" />
                         </button>
                         <div>
-                            <h1 className="text-2xl font-semibold tracking-tight text-[var(--sapphire-dark)]">
+                            <h1 className="text-3xl font-serif font-bold tracking-tight text-white drop-shadow-sm">
                                 {selectedTemplate?.title || 'Generated Document'}
                             </h1>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-[var(--sapphire-light)]/10 text-[var(--sapphire-base)] uppercase tracking-wider">
+                            <div className="flex items-center gap-2 mt-2">
+                                <span className="text-[13px] font-bold px-3 py-1 rounded-md bg-white/10 border border-white/20 text-white uppercase tracking-wider">
                                     Case #{caseNumber ?? '------'}
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
                         {/* Document Overview & Badges (Left) */}
-                        <div className="md:col-span-2 space-y-4">
+                        <div className="md:col-span-2 space-y-5">
                             {/* PDF Preview Card */}
-                            <div className="card-premium p-6 text-center border border-[var(--cloud-light)] bg-gradient-to-br from-white to-[var(--pearl)] shadow-md">
-                                <div className="w-32 h-40 mx-auto rounded-xl flex items-center justify-center bg-white shadow-[0_4px_24px_rgba(10,30,84,0.08)] border border-[var(--cloud-light)] mb-5 relative overflow-hidden group">
+                            <div className="p-8 text-center border border-white/20 bg-white/5 backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_12px_40px_rgba(0,0,0,0.5)] rounded-[2rem]">
+                                <div className="w-32 h-44 mx-auto rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),0_8px_32px_rgba(0,0,0,0.8)] border-2 border-white/20 mb-6 relative overflow-hidden group">
                                     {/* Abstract doc lines */}
-                                    <div className="absolute top-6 left-5 right-5 h-2 bg-[var(--cloud)] rounded-full" />
-                                    <div className="absolute top-11 left-5 right-10 h-2 bg-[var(--cloud)] rounded-full" />
-                                    <div className="absolute top-16 left-5 right-5 h-2 bg-[var(--cloud)] rounded-full" />
-                                    <div className="absolute top-21 left-5 right-14 h-2 bg-[var(--cloud)] rounded-full" />
-                                    <div className="absolute bottom-6 right-5 w-8 h-8 rounded-full border-4 border-[var(--champagne)] opacity-30 group-hover:opacity-60 transition-opacity" />
+                                    <div className="absolute top-6 left-5 right-5 h-2 bg-white/20 rounded-full" />
+                                    <div className="absolute top-11 left-5 right-10 h-2 bg-white/20 rounded-full" />
+                                    <div className="absolute top-16 left-5 right-5 h-2 bg-white/20 rounded-full" />
+                                    <div className="absolute top-21 left-5 right-14 h-2 bg-white/20 rounded-full" />
+                                    <div className="absolute bottom-6 right-5 w-8 h-8 rounded-full border-4 border-[#60A5FA] opacity-50 group-hover:opacity-100 transition-opacity" />
                                     
-                                    <FileText size={48} weight="duotone" className="text-[var(--sapphire-base)] z-10 drop-shadow-sm" />
+                                    <FileText size={56} weight="duotone" className="text-white z-10 drop-shadow-[0_4px_12px_rgba(255,255,255,0.6)]" />
                                 </div>
-                                <p className="text-sm font-semibold text-[var(--sapphire-dark)] mb-1">
+                                <p className="text-[16px] font-bold text-white mb-2 drop-shadow-sm">
                                     {selectedTemplate?.title || 'Legal Document'}
                                 </p>
-                                <p className="text-xs font-medium text-[var(--sapphire-light)] uppercase tracking-widest">
+                                <p className="text-[13px] font-bold text-[#10B981] uppercase tracking-widest drop-shadow-sm">
                                     Final Draft • PDF
                                 </p>
                             </div>
 
                             {/* NEXXverification Badges */}
-                            <div className="space-y-3">
-                                <div className="card-premium p-4 flex items-start gap-4 border border-[var(--success)]/30 bg-[var(--success)]/5">
-                                    <div className="w-8 h-8 rounded-full bg-[var(--success)] flex items-center justify-center shrink-0 shadow-sm mt-0.5">
-                                        <CheckCircle size={16} weight="bold" className="text-white" />
+                            <div className="space-y-4">
+                                <div className="p-5 flex items-start gap-4 border border-[#10B981]/40 bg-[#10B981]/10 rounded-[1.5rem] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(16,185,129,0.3),0_8px_24px_rgba(0,0,0,0.3)]">
+                                    <div className="w-10 h-10 rounded-full bg-[#10B981] flex items-center justify-center shrink-0 shadow-sm mt-0.5 border border-[#10B981]/50">
+                                        <CheckCircle size={24} weight="bold" className="text-white" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-bold text-[var(--success)] tracking-wide">
+                                        <p className="text-[15px] font-bold text-white tracking-wide drop-shadow-sm">
                                             Rule 3.1 Certified
                                         </p>
-                                        <p className="text-[11px] font-medium text-[var(--sapphire-base)] mt-0.5">
+                                        <p className="text-[13px] font-medium text-white/80 mt-1 leading-snug">
                                             Adheres to formal court formatting standards.
                                         </p>
                                     </div>
                                 </div>
-                                <div className="card-premium p-4 flex items-start gap-4 border border-[var(--success)]/30 bg-[var(--success)]/5">
-                                    <div className="w-8 h-8 rounded-full bg-[var(--success)] flex items-center justify-center shrink-0 shadow-sm mt-0.5">
-                                        <CheckCircle size={16} weight="bold" className="text-white" />
+                                <div className="p-5 flex items-start gap-4 border border-[#10B981]/40 bg-[#10B981]/10 rounded-[1.5rem] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(16,185,129,0.3),0_8px_24px_rgba(0,0,0,0.3)]">
+                                    <div className="w-10 h-10 rounded-full bg-[#10B981] flex items-center justify-center shrink-0 shadow-sm mt-0.5 border border-[#10B981]/50">
+                                        <CheckCircle size={24} weight="bold" className="text-white" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-bold text-[var(--success)] tracking-wide">
+                                        <p className="text-[15px] font-bold text-white tracking-wide drop-shadow-sm">
                                             Bates Validation
                                         </p>
-                                        <p className="text-[11px] font-medium text-[var(--sapphire-base)] mt-0.5">
+                                        <p className="text-[13px] font-medium text-white/80 mt-1 leading-snug">
                                             Pagination sequence validated & confirmed.
                                         </p>
                                     </div>
@@ -783,17 +763,17 @@ function DocuVaultPageInner() {
                         </div>
 
                         {/* Actions (Right) */}
-                        <div className="md:col-span-3 space-y-6">
+                        <div className="md:col-span-3 space-y-8">
                             {/* AI Summary */}
-                            <div className="card-premium py-6 px-8 border border-[var(--cloud-light)] shadow-sm bg-white/80">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <Sparkle size={20} weight="duotone" className="text-[var(--champagne)]" />
-                                    <h3 className="text-sm font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
+                            <div className="p-8 border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_12px_40px_rgba(0,0,0,0.5)] bg-white/5 backdrop-blur-2xl rounded-[2rem]">
+                                <div className="flex items-center gap-4 mb-5">
+                                    <Sparkle size={28} weight="duotone" className="text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]" />
+                                    <h3 className="text-[15px] font-bold tracking-widest uppercase text-white drop-shadow-sm">
                                         Intelligence Summary
                                     </h3>
                                 </div>
-                                <p className="text-base text-[var(--sapphire-base)] leading-relaxed">
-                                    The provided context has been successfully synthesized into a formal <span className="font-semibold text-[var(--sapphire-dark)]">{selectedTemplate?.title?.toLowerCase() || 'legal document'}</span>. 
+                                <p className="text-[16px] text-white/90 leading-relaxed font-medium">
+                                    The provided context has been successfully synthesized into a formal <span className="font-bold text-white border-b border-white/30 pb-0.5">{selectedTemplate?.title?.toLowerCase() || 'legal document'}</span>. 
                                     All formatting, spacing, and legal headings follow precision local court standards. The document has been cross-referenced for procedural alignment.
                                 </p>
                             </div>

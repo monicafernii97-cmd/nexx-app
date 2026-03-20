@@ -51,7 +51,7 @@ export default function DashboardPage() {
     useEffect(() => {
         const hour = new Date().getHours();
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        setGreetingText(hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening');
+        setGreetingText(hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening');
     }, []);
 
     /** Formatted display name for the greeting header (empty if unavailable). */
@@ -68,7 +68,7 @@ export default function DashboardPage() {
             >
                 <div>
                     <h1 className="text-headline text-4xl mb-3 text-sapphire" suppressHydrationWarning>
-                        {greetingText}<span className="text-editorial shimmer">{userName}</span>
+                        {greetingText}<span className="text-editorial shimmer capitalize">{userName}</span>
                     </h1>
                     <p className="text-sapphire-muted font-medium text-[15px] tracking-wide max-w-lg">
                         Your sanctuary of strategic empowerment. Everything is securely encrypted and court-ready.
@@ -184,7 +184,7 @@ export default function DashboardPage() {
                                 <p className="text-[13px] text-[rgba(255,255,255,0.6)] font-medium mb-6 max-w-[200px] leading-relaxed">
                                     Your activity feed is empty. Start a session to build your court-ready profile.
                                 </p>
-                                <Link href="/chat" className="btn-primary text-xs w-full shadow-md rounded-[9999px] py-4 uppercase tracking-wider font-bold tracking-widest text-[#FFFFFF]">
+                                <Link href="/chat" className="btn-primary text-xs w-full shadow-md rounded-xl py-4 uppercase tracking-wider font-bold tracking-widest text-[#FFFFFF]">
                                     Begin Session
                                 </Link>
                             </div>

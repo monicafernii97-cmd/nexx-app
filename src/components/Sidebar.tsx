@@ -271,7 +271,7 @@ export default function Sidebar() {
                         <AnimatePresence>
                             {!collapsed && (
                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 min-w-0">
-                                    <p className="text-[14px] font-semibold truncate text-sapphire leading-tight">
+                                    <p className="text-[14px] font-semibold truncate text-sapphire leading-tight capitalize">
                                         {user.firstName || user.fullName || 'User'}
                                     </p>
                                     <p className="text-[12px] truncate text-sapphire-muted font-medium mt-0.5">

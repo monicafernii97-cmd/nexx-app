@@ -74,7 +74,7 @@ export default function IncidentReportPage() {
                         Sanctuary of Truth and Admissibility — your court-ready records.
                     </p>
                 </div>
-                <Link href="/incident-report/new" className="btn-primary inline-flex items-center justify-center gap-2 no-underline shadow-[0_8px_20px_rgba(18,61,126,0.4)] flex-shrink-0 px-6 py-3 rounded-[9999px]">
+                <Link href="/incident-report/new" className="btn-primary inline-flex items-center justify-center gap-2 no-underline shadow-[0_8px_20px_rgba(18,61,126,0.4)] flex-shrink-0 px-6 py-3 rounded-xl">
                     <Plus size={16} weight="bold" /> Log Incident
                 </Link>
             </motion.div>
@@ -101,7 +101,7 @@ export default function IncidentReportPage() {
                     <button
                         onClick={() => setActiveFilter(null)}
                         aria-pressed={!activeFilter}
-                        className={`px-4 py-2.5 rounded-[9999px] text-[11px] font-bold tracking-wider uppercase transition-all duration-300 border shadow-sm ${
+                        className={`px-4 py-2.5 rounded-xl text-[11px] font-bold tracking-wider uppercase transition-all duration-300 border shadow-sm ${
                             !activeFilter 
                                 ? 'bg-[#123D7E] border-transparent text-[#FFFFFF] shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
                                 : 'bg-[#0A1128] border border-[rgba(255,255,255,0.2)] text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.4)] hover:text-white'
@@ -114,7 +114,7 @@ export default function IncidentReportPage() {
                             key={cat.value}
                             onClick={() => setActiveFilter(activeFilter === cat.value ? null : cat.value)}
                             aria-pressed={activeFilter === cat.value}
-                            className={`px-4 py-2.5 rounded-[9999px] text-[11px] font-bold tracking-wider uppercase transition-all duration-300 border shadow-sm ${
+                            className={`px-4 py-2.5 rounded-xl text-[11px] font-bold tracking-wider uppercase transition-all duration-300 border shadow-sm ${
                                 activeFilter === cat.value 
                                     ? 'bg-[#123D7E] border-transparent text-[#FFFFFF] shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
                                     : 'bg-[#0A1128] border border-[rgba(255,255,255,0.2)] text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.4)] hover:text-white'

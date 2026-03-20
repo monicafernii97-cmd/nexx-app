@@ -174,7 +174,7 @@ export default function ProfilePage() {
                         <button
                             onClick={handleSave}
                             disabled={saving}
-                            className={`flex items-center gap-2.5 px-6 py-3 rounded-[9999px] text-[14px] font-semibold cursor-pointer transition-all duration-300 shadow-md border ${
+                            className={`flex items-center gap-2.5 px-6 py-3 rounded-xl text-[14px] font-semibold cursor-pointer transition-all duration-300 shadow-md border ${
                                 saved 
                                 ? 'bg-emerald text-white border-transparent' 
                                 : 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:shadow-[0_12px_25px_rgba(26,75,155,0.6)] hover:-translate-y-0.5'

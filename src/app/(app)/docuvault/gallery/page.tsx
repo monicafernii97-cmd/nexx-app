@@ -114,7 +114,7 @@ export default function DocuVaultGalleryPage() {
                             key={tab.id}
                             onClick={() => setActiveFilter(tab.id)}
                             aria-pressed={activeFilter === tab.id}
-                            className={`px-4 py-2.5 rounded-[9999px] text-[11px] font-bold tracking-wider uppercase whitespace-nowrap cursor-pointer transition-all shadow-sm ${
+                            className={`px-4 py-2.5 rounded-xl text-[11px] font-bold tracking-wider uppercase whitespace-nowrap cursor-pointer transition-all shadow-sm ${
                                 activeFilter === tab.id
                                     ? 'bg-[#C58B07] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(197,139,7,0.4)]'
                                     : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border border-[rgba(255,255,255,0.2)] hover:text-white hover:border-[rgba(255,255,255,0.4)]'
@@ -162,7 +162,7 @@ export default function DocuVaultGalleryPage() {
                         <p className="text-[13px] mb-6 text-white/60">
                             Generate your first legal document to see it here.
                         </p>
-                        <Link href="/docuvault" className="btn-primary text-sm font-semibold tracking-wider uppercase px-6 py-3 rounded-[9999px] inline-flex items-center gap-2 shadow-[0_4px_15px_rgba(26,75,155,0.4)] no-underline">
+                        <Link href="/docuvault" className="btn-primary text-sm font-semibold tracking-wider uppercase px-6 py-3 rounded-xl inline-flex items-center gap-2 shadow-[0_4px_15px_rgba(26,75,155,0.4)] no-underline">
                             <Plus size={16} strokeWidth={3} /> Create Document
                         </Link>
                     </div>
@@ -191,7 +191,7 @@ export default function DocuVaultGalleryPage() {
                                             {doc.title}
                                         </p>
                                         <div className="flex items-center gap-2 mb-2">
-                                            <span className="badge text-[10px] font-bold tracking-wider uppercase bg-[#0A1128] text-white border border-[rgba(255,255,255,0.2)] px-2 py-1 rounded-[9999px]">{doc.category}</span>
+                                            <span className="badge text-[10px] font-bold tracking-wider uppercase bg-[#0A1128] text-white border border-[rgba(255,255,255,0.2)] px-2 py-1 rounded-xl">{doc.category}</span>
                                             <span className="text-[11px] font-medium text-white/70">{doc.fileSize}</span>
                                         </div>
                                         <div className="flex items-center gap-1.5 text-[11px] font-medium text-white/50">

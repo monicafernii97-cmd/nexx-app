@@ -369,7 +369,7 @@ export default function OnboardingPage() {
                                         <button
                                             key={opt}
                                             onClick={() => update('custodyType', opt)}
-                                            className={`w-full text-left px-5 py-4 rounded-[9999px] mb-3 transition-all text-[15px] font-semibold border shadow-sm ${
+                                            className={`w-full text-left px-5 py-4 rounded-xl mb-3 transition-all text-[15px] font-semibold border shadow-sm ${
                                                 formData.custodyType === opt 
                                                 ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
                                                 : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
@@ -392,7 +392,7 @@ export default function OnboardingPage() {
                                                         update('causeNumber', '');
                                                     }
                                                 }}
-                                                className={`flex-1 py-4 px-6 rounded-[9999px] text-[14px] font-semibold transition-all border shadow-sm ${
+                                                className={`flex-1 py-4 px-6 rounded-xl text-[14px] font-semibold transition-all border shadow-sm ${
                                                     formData.hasOpenCase === opt 
                                                     ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
                                                     : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
@@ -432,7 +432,7 @@ export default function OnboardingPage() {
                                             <button
                                                 key={opt}
                                                 onClick={() => update('hasAttorney', opt)}
-                                                className={`flex-1 py-2.5 px-5 rounded-[9999px] text-[13px] font-semibold transition-all border shadow-sm ${
+                                                className={`flex-1 py-2.5 px-5 rounded-xl text-[13px] font-semibold transition-all border shadow-sm ${
                                                     formData.hasAttorney === opt 
                                                     ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
                                                     : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
@@ -461,7 +461,7 @@ export default function OnboardingPage() {
                                         <button
                                             key={opt}
                                             onClick={() => toggleArrayItem('nexBehaviors', opt)}
-                                            className={`text-left px-4 py-2.5 rounded-[9999px] transition-all text-[13px] font-semibold flex items-center gap-2.5 border shadow-sm ${
+                                            className={`text-left px-4 py-2.5 rounded-xl transition-all text-[13px] font-semibold flex items-center gap-2.5 border shadow-sm ${
                                                 formData.nexBehaviors.includes(opt)
                                                 ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
                                                 : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
@@ -498,7 +498,7 @@ export default function OnboardingPage() {
                                         <button
                                             key={opt}
                                             onClick={() => toggleArrayItem('primaryGoals', opt)}
-                                            className={`cursor-pointer transition-all text-[13px] py-2 px-4 rounded-[9999px] font-semibold border shadow-sm ${
+                                            className={`cursor-pointer transition-all text-[13px] py-2 px-4 rounded-xl font-semibold border shadow-sm ${
                                                 formData.primaryGoals.includes(opt)
                                                 ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
                                                 : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
@@ -531,7 +531,7 @@ export default function OnboardingPage() {
                                 </div>
                                 <button
                                     onClick={() => update('acceptedDisclaimer', !formData.acceptedDisclaimer)}
-                                    className={`w-full text-left px-6 py-4 rounded-[9999px] transition-all text-[15px] font-semibold flex items-center gap-4 border mt-6 shadow-sm ${
+                                    className={`w-full text-left px-6 py-4 rounded-xl transition-all text-[15px] font-semibold flex items-center gap-4 border mt-6 shadow-sm ${
                                         formData.acceptedDisclaimer
                                         ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
                                         : 'bg-[#0A1128] text-white border-[rgba(255,255,255,0.3)] hover:border-[rgba(255,255,255,0.6)]'

@@ -187,7 +187,7 @@ body {
   font-size: 14px;
   letter-spacing: 0.04em;
   padding: 12px 28px;
-  border-radius: 9999px !important;
+  border-radius: 12px !important;
   border: 1px solid rgba(255, 255, 255, 0.25) !important;
   border-top: 1px solid rgba(255, 255, 255, 0.4) !important;
   box-shadow: 0 8px 20px rgba(18, 61, 126, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important;
@@ -226,7 +226,7 @@ body {
   font-weight: 600;
   font-size: 14px;
   padding: 12px 28px;
-  border-radius: 9999px !important;
+  border-radius: 12px !important;
   cursor: pointer;
   transition: all 0.3s var(--ease-smooth);
   text-transform: uppercase;

@@ -51,30 +51,30 @@ export default function IncidentReportPage() {
     };
 
     return (
-        <div className="max-w-5xl mx-auto pb-12 w-full">
+        <div className="max-w-4xl mx-auto pb-20 w-full px-2 mt-4">
             {/* Header */}
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
+                transition={{ duration: 0.5 }}
                 className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 pt-4 px-2"
             >
                 <div>
                     <div className="flex items-center gap-4 mb-3">
                         <div
-                            className="w-12 h-12 rounded-2xl flex items-center justify-center bg-white border border-[rgba(10,22,41,0.06)] shadow-sm"
+                            className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-transparent shadow-[0_4px_15px_rgba(18,61,126,0.3)]"
                         >
-                            <ClipboardText size={24} weight="duotone" className="text-sapphire" />
+                            <ClipboardText size={24} weight="duotone" className="text-white" />
                         </div>
-                        <h1 className="text-headline text-4xl text-sapphire m-0">
+                        <h1 className="text-4xl font-serif text-headline text-white m-0 tracking-tight">
                             Incident <span className="text-editorial shimmer">Report</span>
                         </h1>
                     </div>
-                    <p className="text-[15px] font-medium text-sapphire-muted max-w-lg">
+                    <p className="text-[15px] font-medium text-white/70 max-w-lg">
                         Sanctuary of Truth and Admissibility — your court-ready records.
                     </p>
                 </div>
-                <Link href="/incident-report/new" className="btn-primary inline-flex items-center justify-center gap-2 no-underline shadow-md flex-shrink-0">
+                <Link href="/incident-report/new" className="btn-primary inline-flex items-center justify-center gap-2 no-underline shadow-[0_8px_20px_rgba(18,61,126,0.4)] flex-shrink-0 px-6 py-3 rounded-[9999px]">
                     <Plus size={16} weight="bold" /> Log Incident
                 </Link>
             </motion.div>
@@ -87,7 +87,7 @@ export default function IncidentReportPage() {
                 className="mb-8 space-y-4"
             >
                 <div className="relative max-w-md w-full">
-                    <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-sapphire-muted" />
+                    <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#0A1128]" />
                     <input
                         type="text"
                         value={searchQuery}
@@ -101,10 +101,10 @@ export default function IncidentReportPage() {
                     <button
                         onClick={() => setActiveFilter(null)}
                         aria-pressed={!activeFilter}
-                        className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                        className={`px-4 py-2.5 rounded-[9999px] text-[11px] font-bold tracking-wider uppercase transition-all duration-300 border shadow-sm ${
                             !activeFilter 
-                            ? 'bg-sapphire text-white shadow-md' 
-                            : 'bg-white border border-transparent shadow-sm text-sapphire hover:border-[rgba(10,22,41,0.1)]'
+                                ? 'bg-[#123D7E] border-transparent text-[#FFFFFF] shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
+                                : 'bg-[#0A1128] border border-[rgba(255,255,255,0.2)] text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.4)] hover:text-white'
                         }`}
                     >
                         All Records
@@ -114,12 +114,11 @@ export default function IncidentReportPage() {
                             key={cat.value}
                             onClick={() => setActiveFilter(activeFilter === cat.value ? null : cat.value)}
                             aria-pressed={activeFilter === cat.value}
-                            className="px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer shadow-sm"
-                            style={{
-                                background: activeFilter === cat.value ? `color-mix(in srgb, ${cat.color} 15%, transparent)` : 'var(--white)',
-                                color: activeFilter === cat.value ? cat.color : 'var(--sapphire)',
-                                border: activeFilter === cat.value ? `1px solid color-mix(in srgb, ${cat.color} 30%, transparent)` : '1px solid transparent',
-                            }}
+                            className={`px-4 py-2.5 rounded-[9999px] text-[11px] font-bold tracking-wider uppercase transition-all duration-300 border shadow-sm ${
+                                activeFilter === cat.value 
+                                    ? 'bg-[#123D7E] border-transparent text-[#FFFFFF] shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
+                                    : 'bg-[#0A1128] border border-[rgba(255,255,255,0.2)] text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.4)] hover:text-white'
+                            }`}
                         >
                             {cat.label}
                         </button>

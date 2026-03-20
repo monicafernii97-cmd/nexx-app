@@ -168,17 +168,17 @@ export default function NewIncidentPage() {
                             <div
                                 className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold transition-all duration-500 shrink-0 shadow-sm ${
                                     isActive 
-                                    ? 'bg-sapphire text-white scale-110 shadow-md' 
-                                    : 'bg-white text-sapphire-muted border border-[rgba(10,22,41,0.08)]'
+                                    ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white scale-110 shadow-[0_4px_12px_rgba(18,61,126,0.3)] border border-transparent' 
+                                    : 'bg-[#0A1128] text-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.2)]'
                                 }`}
                             >
                                 {isPast ? <Check size={14} weight="bold" /> : i + 1}
                             </div>
-                            <span className={`text-[13px] tracking-wide font-bold uppercase whitespace-nowrap ${isActive ? 'text-sapphire' : 'text-sapphire-muted'}`}>
+                            <span className={`text-[13px] tracking-wide font-bold uppercase whitespace-nowrap ${isActive ? 'text-[#FFFFFF]' : 'text-[#FFFFFF]/50'}`}>
                                 {label}
                             </span>
                             {i < 2 && (
-                                <div className="flex-1 h-px min-w-[20px] bg-gradient-to-r from-[rgba(10,22,41,0.08)] to-transparent" />
+                                <div className="flex-1 h-px min-w-[20px] bg-[rgba(255,255,255,0.1)]" />
                             )}
                         </div>
                     );

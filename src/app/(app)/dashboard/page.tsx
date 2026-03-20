@@ -101,11 +101,12 @@ export default function DashboardPage() {
                                         className="card-premium h-full p-6 flex flex-col justify-between group cursor-pointer"
                                     >
                                         <div className="flex justify-between items-start mb-6">
-                                            <div 
-                                                className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-400 group-hover:scale-105 shadow-[0_4px_15px_rgba(18,61,126,0.3)] bg-[linear-gradient(135deg,#1A4B9B,#123D7E)]"
-                                            >
-                                                <Icon size={24} weight="bold" className="text-white" />
-                                            </div>
+                                            <Icon 
+                                                size={32} 
+                                                weight="regular" 
+                                                style={{ color: action.accent }} 
+                                                className="transition-transform duration-400 group-hover:scale-110" 
+                                            />
                                             <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#0A1128] border border-[rgba(255,255,255,0.2)] opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 duration-300 shadow-sm">
                                                 <ArrowRight size={14} weight="bold" className="text-white" />
                                             </div>
@@ -138,9 +139,7 @@ export default function DashboardPage() {
                                 return (
                                     <div key={stat.label} className="p-5 rounded-[2rem] bg-[#0A1128] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.2)] transition-colors shadow-sm cursor-default">
                                         <div className="flex items-center gap-3 mb-3">
-                                            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#123D7E] shadow-[0_2px_8px_rgba(18,61,126,0.5)]">
-                                                <Icon size={14} weight="bold" className="text-white" />
-                                            </div>
+                                            <Icon size={14} weight="regular" style={{ color: stat.color }} />
                                             <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{stat.label}</span>
                                         </div>
                                         <p className="text-3xl font-serif text-white tracking-tight">

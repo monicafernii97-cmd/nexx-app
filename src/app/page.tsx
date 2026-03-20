@@ -129,16 +129,23 @@ export default function WelcomePage() {
   return (
     <div className="bg-[#0A1128] min-h-screen flex flex-col justify-center relative overflow-hidden font-sans">
       {/* Jumbo Background NEXX Shimmer */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden opacity-5">
-        <motion.div
-           initial={{ x: '-100%' }}
-           animate={{ x: '100%' }}
-           transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
-           className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 skew-x-12"
-        />
-        <h1 className="text-[25vw] font-black font-serif tracking-tighter text-white whitespace-nowrap select-none">
+      <div className="absolute inset-0 flex items-center pointer-events-none z-0 overflow-hidden opacity-[0.03]">
+        <motion.h1
+           initial={{ x: '100vw' }}
+           animate={{ x: '-100vw' }}
+           transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
+           className="text-[35vw] font-black font-serif italic tracking-tighter whitespace-nowrap select-none"
+           style={{
+               background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.2) 100%)',
+               backgroundSize: '200% auto',
+               WebkitBackgroundClip: 'text',
+               WebkitTextFillColor: 'transparent',
+               color: 'transparent',
+               animation: 'shimmer 4s linear infinite',
+           }}
+        >
           NEXX
-        </h1>
+        </motion.h1>
       </div>
 
       {/* Ambient Radial Gradients */}
@@ -156,7 +163,7 @@ export default function WelcomePage() {
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           className="w-14 h-14 rounded-2xl flex items-center justify-center mb-10 shadow-[0_4px_20px_rgba(229,168,74,0.15)] border border-[rgba(229,168,74,0.3)] bg-gradient-to-br from-[#123D7E] to-[#0A1128]"
         >
-          <span className="text-2xl font-black text-[var(--champagne)]">N</span>
+          <span className="text-[26px] font-black font-serif italic uppercase tracking-tighter text-[var(--champagne)]">N</span>
         </motion.div>
 
         {/* WELCOME TO NEXX */}

@@ -62,9 +62,10 @@ export default function IncidentReportPage() {
                 <div>
                     <div className="flex items-center gap-4 mb-3">
                         <div
-                            className="w-12 h-12 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-transparent shadow-[0_4px_15px_rgba(18,61,126,0.3)]"
+                            className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] relative overflow-hidden"
                         >
-                            <ClipboardText size={24} weight="duotone" className="text-white" />
+                            <div className="absolute inset-0 bg-white/10" />
+                            <ClipboardText size={28} weight="fill" className="text-white relative z-10 drop-shadow-md" />
                         </div>
                         <h1 className="text-4xl font-serif text-headline text-white m-0 tracking-tight">
                             Incident <span className="text-editorial shimmer">Report</span>
@@ -87,27 +88,28 @@ export default function IncidentReportPage() {
                 className="mb-8 space-y-4"
             >
                 <div className="relative max-w-md w-full">
-                    <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#0A1128]" />
+                    <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70" />
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search incidents..."
-                        className="input-premium pl-12 h-12 w-full"
+                        className="w-full h-12 bg-[#0A1128] border border-[rgba(255,255,255,0.15)] rounded-xl text-white placeholder:text-white/40 pl-11 pr-4 focus:outline-none focus:border-[rgba(255,255,255,0.4)] focus:shadow-[0_4px_20px_rgba(18,61,126,0.3)] transition-all"
                         aria-label="Search incidents"
                     />
                 </div>
-                <div className="flex flex-wrap gap-2.5">
+                <div className="flex flex-wrap gap-2.5 mt-4">
                     <button
                         onClick={() => setActiveFilter(null)}
                         aria-pressed={!activeFilter}
                         className={`px-4 py-2.5 rounded-xl text-[11px] font-bold tracking-wider uppercase transition-all duration-300 border shadow-sm ${
                             !activeFilter 
-                                ? 'bg-[#123D7E] border-transparent text-[#FFFFFF] shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
-                                : 'bg-[#0A1128] border border-[rgba(255,255,255,0.2)] text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.4)] hover:text-white'
+                                ? 'bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border-[rgba(255,255,255,0.3)] text-white shadow-[0_4px_20px_rgba(46,92,154,0.4)] scale-105 relative overflow-hidden z-10' 
+                                : 'bg-[rgba(255,255,255,0.05)] backdrop-blur-md border-[rgba(255,255,255,0.15)] text-white hover:border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.1)] hover:-translate-y-0.5'
                         }`}
                     >
-                        All Records
+                        {!activeFilter && <span className="absolute inset-0 bg-white/10" />}
+                        <span className="relative z-10">All Records</span>
                     </button>
                     {INCIDENT_CATEGORIES.map((cat) => (
                         <button
@@ -116,11 +118,12 @@ export default function IncidentReportPage() {
                             aria-pressed={activeFilter === cat.value}
                             className={`px-4 py-2.5 rounded-xl text-[11px] font-bold tracking-wider uppercase transition-all duration-300 border shadow-sm ${
                                 activeFilter === cat.value 
-                                    ? 'bg-[#123D7E] border-transparent text-[#FFFFFF] shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
-                                    : 'bg-[#0A1128] border border-[rgba(255,255,255,0.2)] text-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.4)] hover:text-white'
+                                    ? 'bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border-[rgba(255,255,255,0.3)] text-white shadow-[0_4px_20px_rgba(46,92,154,0.4)] scale-105 relative overflow-hidden z-10' 
+                                    : 'bg-[rgba(255,255,255,0.05)] backdrop-blur-md border-[rgba(255,255,255,0.15)] text-white hover:border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.1)] hover:-translate-y-0.5'
                             }`}
                         >
-                            {cat.label}
+                            {activeFilter === cat.value && <span className="absolute inset-0 bg-white/10" />}
+                            <span className="relative z-10">{cat.label}</span>
                         </button>
                     ))}
                 </div>

@@ -634,7 +634,7 @@ function DocuVaultPageInner() {
                                     const truncated = text.slice(0, 100);
                                     const lastSpace = truncated.lastIndexOf(' ');
                                     return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated) + '...';
-                                })}&rdquo;
+                                })()}&rdquo;
                             </p>
                         </div>
                     </div>

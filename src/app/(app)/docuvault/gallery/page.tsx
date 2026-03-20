@@ -69,7 +69,7 @@ export default function DocuVaultGalleryPage() {
                     className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all bg-white/10 border border-white/30 hover:bg-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_4px_12px_rgba(0,0,0,0.4)] backdrop-blur-xl shrink-0"
                     aria-label="Back to DocuVault"
                 >
-                    <ArrowLeft size={20} weight="bold" className="text-white drop-shadow-sm" />
+                    <ArrowLeft size={20} strokeWidth={3} className="text-white drop-shadow-sm" />
                 </Link>
                 <div>
                     <h1 className="text-4xl font-serif font-bold tracking-tight text-white drop-shadow-sm">

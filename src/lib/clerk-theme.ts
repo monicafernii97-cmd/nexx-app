@@ -1,85 +1,94 @@
-/** NEXX-branded Clerk theme configuration with Ethereal luxury light mode styling. */
+import { dark } from '@clerk/themes';
+
+/** NEXX-branded Clerk theme configuration with Galaxy luxury dark mode styling. */
 export const nexxClerkAppearance = {
+    baseTheme: dark,
     variables: {
-        colorPrimary: '#8a7a60',          // champagne
-        colorBackground: 'transparent',
-        colorInputBackground: '#ffffff',
-        colorInputText: '#0a1e54',        // sapphire-dark
-        colorText: '#0a1e54',             // sapphire-dark
-        colorTextSecondary: '#4a6094',    // sapphire-base
+        colorPrimary: '#1E3A8A',          /* galaxy-blue */
+        colorBackground: '#020617',       /* universe-dark */
+        colorInputBackground: 'rgba(10, 17, 40, 0.4)', /* translucent universe blue */
+        colorInputText: '#FFFFFF',        /* pure-white */
+        colorText: '#FFFFFF',             /* pure-white for high legibility */
+        colorTextSecondary: '#E2E8F0',    /* metallic-silver */
         borderRadius: '12px',
-        fontFamily: 'Inter, sans-serif',
-        colorSuccess: '#10b981',
-        colorDanger: '#ef4444',
-        colorWarning: '#f59e0b',
+        fontFamily: 'Inter, system-ui, sans-serif', /* robust sans-serif instead of skinny */
+        colorSuccess: '#10B981',
+        colorDanger: '#F43F5E',
+        colorWarning: '#F59E0B',
     },
     elements: {
         card: {
-            background: 'transparent',
-            border: 'none',
-            borderRadius: '16px',
-            boxShadow: 'none',
+            background: 'linear-gradient(135deg, rgba(10, 17, 40, 0.9), rgba(2, 6, 23, 0.95))',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.2)',
+            borderRadius: '20px',
+            boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.8), inset 0 1px 0 0 rgba(255, 255, 255, 0.05)',
         },
         headerTitle: {
-            color: '#0a1e54',             // sapphire-dark
-            fontFamily: "'Playfair Display', serif",
-            fontWeight: '600',
+            color: '#FFFFFF',
+            fontFamily: 'Outfit, system-ui, sans-serif',
+            fontWeight: '700',
+            letterSpacing: '-0.02em',
         },
         headerSubtitle: {
-            color: '#4a6094',             // sapphire-base
+            color: '#E2E8F0',
+            fontWeight: '500',
         },
         socialButtonsBlockButton: {
-            border: '1px solid #d0e3ff',  // cloud-light
-            background: '#ffffff',
-            color: '#0a1e54',             // sapphire-dark
-            boxShadow: '0 1px 2px rgba(10, 30, 84, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            background: 'rgba(255, 255, 255, 0.05)',
+            color: '#FFFFFF',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
         },
         socialButtonsBlockButtonText: {
-            color: '#0a1e54',             // sapphire-dark
+            color: '#FFFFFF',
             fontWeight: '600',
         },
         formFieldLabel: {
-            color: '#4a6094',             // sapphire-base
+            color: '#E2E8F0',
             textTransform: 'uppercase' as const,
             fontSize: '11px',
-            letterSpacing: '0.1em',
-            fontWeight: '600',
+            letterSpacing: '0.05em',
+            fontWeight: '700',
         },
         formFieldInput: {
-            background: '#ffffff',
-            border: '1px solid #d0e3ff',  // cloud-light
-            color: '#0a1e54',             // sapphire-dark
-            boxShadow: 'inset 0 1px 3px rgba(10, 30, 84, 0.02)',
+            background: 'rgba(10, 17, 40, 0.5)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            color: '#FFFFFF',
+            boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.2)',
         },
         formButtonPrimary: {
-            background: 'linear-gradient(135deg, #0a1e54, #123d7e)',
-            color: '#ffffff',
-            fontWeight: '600',
-            letterSpacing: '0.05em',
-            boxShadow: '0 4px 12px rgba(10, 30, 84, 0.15)',
-            border: 'none',
+            background: 'linear-gradient(135deg, #1E3A8A, #0A1128)',
+            color: '#FFFFFF',
+            fontWeight: '700',
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase' as const,
+            boxShadow: '0 8px 20px rgba(0, 0, 0, 0.4)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.3)',
         },
         footerActionLink: {
-            color: '#123d7e',             // sapphire-light mapping approx
+            color: '#E2E8F0',
             fontWeight: '600',
         },
         dividerLine: {
-            background: '#d0e3ff',        // cloud-light
+            background: 'rgba(255, 255, 255, 0.1)',
         },
         dividerText: {
-            color: '#4a6094',             // sapphire-base
+            color: '#94A3B8',
+            fontWeight: '600',
         },
         profileSectionTitleText: {
-            color: '#0a1e54',             // sapphire-dark
-            fontWeight: '600',
-            borderBottom: '1px solid #d0e3ff',
+            color: '#FFFFFF',
+            fontWeight: '700',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
             paddingBottom: '8px',
         },
         profileSectionPrimaryButton: {
-            color: '#123d7e',
+            color: '#E2E8F0',
         },
         accordionTriggerButton: {
-            color: '#0a1e54',
+            color: '#FFFFFF',
         },
     },
 } as const;

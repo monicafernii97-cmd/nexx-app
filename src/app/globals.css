@@ -1,44 +1,49 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════
-   NEXX — Ethereal Luxury Design System V5
-   Named Palette: Pearl · Champagne · Sapphire · Cloud
+   NEXX — Galaxy Luxury Design System
    ═══════════════════════════════════════════ */
 
 :root {
-  /* ── Named Palette ── */
-  --pearl: #FCFCFE;            /* Base background — crisp, pristine */
-  --cloud: #F7F8FA;            /* Soft off-white for contrast panes */
-  --sapphire: #0A1629;         /* Deepest midnight blue for highly readable text */
-  --sapphire-muted: #334155;   /* Secondary text */
-  --champagne: #D4AF37;        /* Luxury accent — subtle gold/champagne */
-  --champagne-light: #F9F6ED;  /* Soft champagne tint for active states */
-  --emerald: #10B981;          /* Success states */
-  --rose: #F43F5E;             /* Danger states */
-  --white: #FFFFFF;
+  /* ── Galaxy Palette ── */
+  --universe-dark: #020617;        
+  --universe-blue: #0A1128;        
+  --galaxy-blue: #1E3A8A;          
+  --nebula-purple: #4C1D95;
+  
+  --metallic-silver: #E2E8F0;      
+  --metallic-dark: #94A3B8;
+
+  --pure-white: #FFFFFF;
+  --cream: #F8FAFC;                
+
+  /* ── Legacy Mappings (to prevent instant breakage before refactor) ── */
+  --pearl: var(--universe-dark);
+  --cloud: rgba(255, 255, 255, 0.05);
+  --cloud-light: rgba(255, 255, 255, 0.1);
+  --sapphire: var(--pure-white);
+  --sapphire-muted: var(--metallic-dark);
+  --sapphire-dark: var(--pure-white);
+  --sapphire-base: var(--metallic-silver);
+  --sapphire-light: var(--galaxy-blue);
+  --champagne: var(--metallic-silver);
+  --champagne-light: rgba(255, 255, 255, 0.1);
+  
+  --emerald: #10B981;
+  --rose: #F43F5E;
+  --warning: #F59E0B;
+  --error: #F43F5E;
 
   /* ── Semantic Aliases ── */
-  --base-bg: var(--pearl);
-  --surface-bg: rgba(255, 255, 255, 0.7);
-  --card-bg: rgba(255, 255, 255, 0.65);
-  --chat-bg: var(--white);
-  
-  /* ── Borders ── */
-  --border-light: rgba(10, 22, 41, 0.06);     /* Subtle separating lines */
-  --border-glass: rgba(255, 255, 255, 0.6);   /* Inner refraction borders */
-  --primary-glow: rgba(212, 175, 55, 0.15);   /* Champagne glow */
+  --base-bg: var(--universe-dark);
+  --surface-bg: var(--universe-blue);
+  --card-bg: rgba(10, 17, 40, 0.6);
+  --border-glass: rgba(255, 255, 255, 0.15);
+  --border-light: rgba(255, 255, 255, 0.1);  
 
   /* ── Text ── */
-  --text-primary: var(--sapphire);
-  --text-secondary: var(--sapphire-muted);
-  --text-muted: #64748B;
-  --text-on-dark: var(--pearl);
-
-  /* ── Status Colors ── */
-  --success: var(--emerald);
-  --warning: #F59E0B;
-  --danger: var(--rose);
-  --info: #3B82F6;
+  --text-primary: var(--pure-white);
+  --text-secondary: var(--metallic-dark);
 
   /* ── Layout ── */
   --sidebar-width: 280px;
@@ -54,7 +59,16 @@
   --color-background: var(--base-bg);
   --color-foreground: var(--text-primary);
   --font-sans: var(--font-outfit), 'Outfit', system-ui, sans-serif;
-  --font-serif: var(--font-playfair), 'Playfair Display', Georgia, serif;
+  --font-serif: var(--font-outfit), 'Outfit', system-ui, sans-serif; /* Forcing Outfit for serif to remove skinny fonts */
+  
+  /* Legacy Color mappings for Tailwind V4 to prevent breakage */
+  --color-sapphire: var(--pure-white);
+  --color-sapphire-muted: var(--metallic-dark);
+  --color-champagne: var(--metallic-silver);
+  --color-champagne-light: rgba(255, 255, 255, 0.1);
+  --color-emerald: var(--emerald);
+  --color-rose: var(--rose);
+  --color-cloud: rgba(255, 255, 255, 0.05);
 }
 
 /* ═══ Base ═══ */
@@ -71,32 +85,21 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ═══ Typography ═══ */
-.font-serif {
-  font-family: var(--font-playfair), 'Playfair Display', Georgia, serif;
+/* Typography Overrides */
+/* Removing Playfair Display and replacing with robust bold headers */
+.font-serif, .text-headline, .text-editorial {
+  font-family: var(--font-outfit), system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--pure-white) !important;
+}
+.font-light {
+    font-weight: 600 !important; /* Force all font-light usage strictly to semi/bold since user hated the skinny tracking */
 }
 
-.font-sans {
-  font-family: var(--font-outfit), 'Outfit', system-ui, sans-serif;
-}
-
-.text-headline {
-  font-family: 'Playfair Display', Georgia, serif;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
-}
-
-.text-editorial {
-  font-family: 'Playfair Display', Georgia, serif;
-  font-weight: 400;
-  font-style: italic;
-  color: var(--champagne);
-}
-
-/* ═══ Ethereal Ambient Background ═══ */
+/* ═══ Galaxy Ambient Background ═══ */
 .silk-bg {
-  background: var(--pearl);
+  background: var(--universe-dark);
   position: relative;
   min-height: 100dvh;
   overflow: hidden;
@@ -109,223 +112,142 @@ body {
   width: 200%;
   height: 200%;
   background: 
-    radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.03) 0%, transparent 40%),
-    radial-gradient(circle at 80% 80%, rgba(59, 130, 246, 0.02) 0%, transparent 40%),
-    radial-gradient(circle at 20% 50%, rgba(252, 252, 254, 0.8) 0%, transparent 50%);
+    radial-gradient(circle at 50% 0%, rgba(30, 58, 138, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(76, 29, 149, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 20% 50%, rgba(10, 17, 40, 0.9) 0%, transparent 60%);
   filter: blur(80px);
-  animation: ethereal-drift 20s ease-in-out infinite alternate;
+  animation: galaxy-drift 25s ease-in-out infinite alternate;
   pointer-events: none;
   z-index: 0;
 }
 
-@keyframes ethereal-drift {
+@keyframes galaxy-drift {
   0% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-2%, 3%) scale(1.02); }
-  100% { transform: translate(2%, -2%) scale(0.98); }
+  50% { transform: translate(-2%, 3%) scale(1.05); }
+  100% { transform: translate(2%, -2%) scale(0.95); }
 }
 
-/* ═══ Glassmorphism (Ethereal Pearl) ═══ */
-/* Outer containers, sidebars, heavy floating elements */
-.glass-ethereal {
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--border-glass);
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ═══ Glassmorphism (Galaxy) ═══ */
+.glass-ethereal, .glass-panel, .card-premium {
+  background: rgba(10, 17, 40, 0.4) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.15) !important;
   box-shadow: 
-    0 20px 40px -15px rgba(10, 22, 41, 0.05),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
-}
-
-/* Inner cards, bento grid items */
-.card-premium {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-light);
+    0 20px 40px -15px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05) !important;
+  color: var(--pure-white) !important;
   border-radius: 20px;
-  box-shadow: 0 4px 20px -5px rgba(10, 22, 41, 0.02);
-  transition: all 0.4s var(--ease-spring);
-  color: var(--sapphire);
   position: relative;
   overflow: hidden;
+  transition: all 0.4s var(--ease-spring);
 }
 
-.card-premium:hover {
+.glass-ethereal:hover, .card-premium:hover {
   transform: translateY(-2px);
   box-shadow: 
-    0 12px 30px -10px rgba(10, 22, 41, 0.06),
-    0 0 0 1px rgba(212, 175, 55, 0.1); /* Subtle champagne glow ring */
+    0 25px 40px -10px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.15) !important;
+  background: rgba(10, 17, 40, 0.6) !important;
+}
+
+/* Shimmer overlay */
+.glass-ethereal::after, .card-premium::after, .btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 20%, rgba(255, 255, 255, 0.08) 50%, transparent 80%);
+  transform: translateX(-100%);
+  transition: transform 0.8s ease-in-out;
+  pointer-events: none;
+}
+
+.glass-ethereal:hover::after, .card-premium:hover::after, .btn-primary:hover::after {
+  transform: translateX(100%);
 }
 
 /* ═══ Buttons ═══ */
 .btn-primary {
-  background: var(--sapphire);
-  color: var(--white);
+  background: linear-gradient(135deg, #1E3A8A, #0A1128) !important;
+  color: var(--pure-white) !important;
   font-family: var(--font-outfit), sans-serif;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 14.5px;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.04em;
   padding: 12px 28px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 14px rgba(10, 22, 41, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
   cursor: pointer;
   transition: all 0.3s var(--ease-smooth);
   position: relative;
   overflow: hidden;
+  text-transform: uppercase;
 }
 
 .btn-primary:hover {
-  transform: translateY(-1px) scale(0.99);
-  box-shadow: 0 6px 20px rgba(10, 22, 41, 0.2);
-  background: #0F223D;
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 25px rgba(30, 58, 138, 0.4) !important;
+  background: linear-gradient(135deg, #2563EB, #1E3A8A) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
 }
 
 .btn-primary:active {
-  transform: translateY(1px) scale(0.97);
+  transform: translateY(1px) scale(0.98);
 }
 
 .btn-outline {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.05) !important;
   backdrop-filter: blur(8px);
-  color: var(--sapphire);
-  border: 1px solid var(--border-light);
-  font-weight: 500;
+  color: var(--pure-white) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  font-weight: 600;
   font-size: 14.5px;
   padding: 12px 28px;
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s var(--ease-smooth);
+  text-transform: uppercase;
 }
 
 .btn-outline:hover {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(10, 22, 41, 0.1);
-  transform: translateY(-1px);
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--text-secondary);
-  font-weight: 500;
-  font-size: 14px;
-  padding: 10px 20px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-ghost:hover {
-  color: var(--sapphire);
-  background: rgba(10, 22, 41, 0.03);
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
 }
 
 /* ═══ Inputs ═══ */
 .input-premium {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border-light);
-  border-radius: 12px;
+  background: rgba(10, 17, 40, 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: var(--pure-white) !important;
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 14px;
   padding: 14px 18px;
-  color: var(--sapphire);
-  font-family: inherit;
-  font-size: 15px;
+  border-radius: 12px;
   transition: all 0.3s var(--ease-smooth);
-  outline: none;
   width: 100%;
-  box-shadow: inset 0 2px 4px rgba(10, 22, 41, 0.01);
 }
 
 .input-premium::placeholder {
-  color: var(--text-muted);
-  font-weight: 400;
+  color: rgba(255, 255, 255, 0.4) !important;
 }
 
 .input-premium:focus {
-  background: var(--white);
-  border-color: rgba(212, 175, 55, 0.4); /* Champagne focus */
-  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.1);
+  outline: none;
+  background: rgba(10, 17, 40, 0.8) !important;
+  border-color: var(--galaxy-blue) !important;
+  box-shadow: 0 0 0 4px rgba(30, 58, 138, 0.2) !important;
 }
 
-/* ═══ Tags / Badges ═══ */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  background: var(--white);
-  border: 1px solid var(--border-light);
-  box-shadow: 0 2px 8px rgba(10, 22, 41, 0.03);
-}
-
-.badge-primary { color: var(--sapphire); border-color: rgba(10, 22, 41, 0.1); }
-.badge-success { color: var(--success); background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.2); }
-.badge-warning { color: var(--warning); background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.2); }
-.badge-danger { color: var(--danger); background: rgba(244, 63, 94, 0.05); border-color: rgba(244, 63, 94, 0.2); }
-.badge-info { color: var(--info); background: #EFF6FF; border-color: rgba(59, 130, 246, 0.2); }
-
-/* ═══ Scrollbar ═══ */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(10, 22, 41, 0.08);
-  border-radius: 6px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(10, 22, 41, 0.15);
-}
-
-/* ═══ Animations & Shimmer ═══ */
-@keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
-}
-
-.shimmer {
-  background: linear-gradient(90deg,
-      var(--sapphire) 0%,
-      var(--champagne) 25%,
-      var(--sapphire) 50%,
-      var(--champagne) 75%,
-      var(--sapphire) 100%);
-  background-size: 200% auto;
-  animation: shimmer 4s linear infinite;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-
-.animate-float {
-  animation: float 4s ease-in-out infinite;
-}
-
-/* ═══ Utility ═══ */
-.text-primary-accent { color: var(--champagne); }
-.text-primary-muted { color: var(--text-muted); }
-.text-brown { color: var(--sapphire); }
-.text-ivory { color: var(--cloud); }
-.muted-text { color: var(--text-muted); }
-
-.primary-divider {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--border-light), transparent);
-}
-
-/* Screen-reader only */
-.sr-only {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0;
+/* Base custom classes to enforce white text on everything */
+h1, h2, h3, h4, h5, h6, p, span, div {
+  color: inherit;
 }

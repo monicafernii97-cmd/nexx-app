@@ -100,13 +100,26 @@ export default function Sidebar() {
                 <Link href="/dashboard" className="flex items-center gap-4 no-underline">
                     <motion.div
                         layout="position"
-                        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
+                        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg relative overflow-hidden"
                         style={{
-                            background: 'linear-gradient(135deg, var(--white), var(--cloud))',
-                            border: '1px solid var(--border-light)',
+                            background: 'var(--universe-dark)',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            borderTop: '1px solid rgba(255, 255, 255, 0.3)',
                         }}
                     >
-                        <span className="text-lg font-black font-sans" style={{ color: 'var(--sapphire)' }}>N</span>
+                        {/* Shimmer overlay */}
+                        <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_20%,rgba(255,255,255,0.15)_50%,transparent_80%)] translate-x-[-100%] animate-[shimmer_3s_infinite]" />
+                        <span 
+                            className="text-2xl font-black font-serif uppercase tracking-tighter" 
+                            style={{
+                                background: 'linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 30%, #94A3B8 60%, #1E3A8A 100%)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                color: 'transparent',
+                            }}
+                        >
+                            N
+                        </span>
                     </motion.div>
                     <AnimatePresence mode="popLayout">
                         {!collapsed && (

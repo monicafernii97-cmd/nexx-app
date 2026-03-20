@@ -258,28 +258,40 @@ export default function Sidebar() {
                 <div className="primary-divider mb-4 opacity-50" />
 
                 {isLoaded && user ? (
-                    <div className={`flex items-center gap-3.5 px-3 py-3 rounded-2xl transition-colors hover:bg-white/40 ${collapsed ? 'justify-center' : ''}`}>
-                        <UserButton
-                            appearance={{
-                                ...nexxClerkAppearance,
-                                elements: {
-                                    ...nexxClerkAppearance.elements,
-                                    userButtonAvatarBox: { width: 36, height: 36, boxShadow: '0 2px 8px rgba(10,22,41,0.08)' },
-                                },
-                            }}
-                        />
-                        <AnimatePresence>
-                            {!collapsed && (
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 min-w-0">
-                                    <p className="text-[14px] font-semibold truncate text-sapphire leading-tight capitalize">
-                                        {user.firstName || user.fullName || 'User'}
-                                    </p>
-                                    <p className="text-[12px] truncate text-sapphire-muted font-medium mt-0.5">
-                                        Owner Account
-                                    </p>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                    <div className="relative group w-full">
+                        {/* Visual layer */}
+                        <div className={`flex items-center gap-3.5 px-3 py-3 rounded-2xl transition-all cursor-pointer bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 hover:border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_24px_rgba(0,0,0,0.4)] hover:-translate-y-0.5 group-hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_12px_32px_rgba(0,0,0,0.5)] ${collapsed ? 'justify-center' : ''}`}>
+                            <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 border border-white/30 shadow-sm relative z-0">
+                                <img src={user.imageUrl} alt={user.fullName || 'User'} className="w-full h-full object-cover" />
+                            </div>
+                            <AnimatePresence>
+                                {!collapsed && (
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 min-w-0 relative z-0">
+                                        <p className="text-[14px] font-bold truncate text-white leading-tight capitalize tracking-wide drop-shadow-sm">
+                                            {user.firstName || user.fullName || 'User'}
+                                        </p>
+                                        <p className="text-[12px] truncate text-white/80 font-semibold mt-0.5 tracking-wider drop-shadow-sm">
+                                            Owner Account
+                                        </p>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                        
+                        {/* Functional Click Layer */}
+                        <div className="absolute inset-0 z-10 opacity-0 overflow-hidden cursor-pointer" title="Account Settings">
+                            <UserButton 
+                                appearance={{
+                                    ...nexxClerkAppearance,
+                                    elements: {
+                                        ...nexxClerkAppearance.elements,
+                                        rootBox: { width: '100%', height: '100%' },
+                                        userButtonTrigger: { width: '100%', height: '100%', borderRadius: '16px' },
+                                        userButtonAvatarBox: { display: 'none' }
+                                    }
+                                }}
+                            />
+                        </div>
                     </div>
                 ) : isLoaded && !user ? (
                     <Link href="/sign-in" className="no-underline block">

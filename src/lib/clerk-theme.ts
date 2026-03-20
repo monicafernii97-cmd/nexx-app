@@ -120,5 +120,23 @@ export const nexxClerkAppearance = {
         navbarButtonIcon: {
             color: '#FFFFFF',
         },
+        userButtonPopoverCard: {
+            background: 'linear-gradient(135deg, #0A1128, #1E3A8A)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 24px 48px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)',
+        },
+        userButtonPopoverActionButton: {
+            color: '#FFFFFF',
+        },
+        userButtonPopoverActionButtonText: {
+            color: '#FFFFFF',
+            fontWeight: '600',
+        },
+        userButtonPopoverActionButtonIcon: {
+            color: '#FFFFFF',
+        },
+        userButtonPopoverFooter: {
+            background: 'rgba(255,255,255,0.05)',
+        },
     },
 } as const;

@@ -62,20 +62,20 @@ export default function DocuVaultGalleryPage() {
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-4 mb-8"
+                className="flex items-center gap-5 mb-10"
             >
                 <Link
                     href="/docuvault"
-                    className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.1)]"
+                    className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all bg-white/10 border border-white/30 hover:bg-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_4px_12px_rgba(0,0,0,0.4)] backdrop-blur-xl shrink-0"
                     aria-label="Back to DocuVault"
                 >
-                    <ArrowLeft size={16} className="text-white" />
+                    <ArrowLeft size={20} weight="bold" className="text-white drop-shadow-sm" />
                 </Link>
                 <div>
-                    <h1 className="text-headline text-2xl text-white">
+                    <h1 className="text-4xl font-serif font-bold tracking-tight text-white drop-shadow-sm">
                         Document Gallery
                     </h1>
-                    <p className="text-[14px] text-white/70">
+                    <p className="text-[15px] font-medium text-white mt-1 drop-shadow-sm">
                         Your generated and saved legal documents
                     </p>
                 </div>
@@ -88,14 +88,14 @@ export default function DocuVaultGalleryPage() {
                 transition={{ delay: 0.1 }}
                 className="mb-6"
             >
-                <div className="relative">
-                    <Search size={16} className="absolute left-5 top-1/2 -translate-y-1/2 text-[#0A1128]" />
+                <div className="relative group">
+                    <Search size={22} className="absolute left-6 top-1/2 -translate-y-1/2 text-white/70 group-focus-within:text-[#60A5FA] transition-colors" />
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         placeholder="Search documents..."
-                        className="input-premium pl-12 h-12"
+                        className="w-full h-16 pl-16 pr-6 rounded-[2rem] bg-white/5 backdrop-blur-2xl border border-white/20 text-[16px] text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-[#60A5FA]/50 focus:bg-white/10 transition-all shadow-[inset_0_1px_2px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)] font-medium"
                         aria-label="Search documents"
                     />
                 </div>
@@ -108,32 +108,40 @@ export default function DocuVaultGalleryPage() {
                 transition={{ delay: 0.15 }}
                 className="flex items-center justify-between mb-6"
             >
-                <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+                <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
                     {filterTabs.map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveFilter(tab.id)}
                             aria-pressed={activeFilter === tab.id}
-                            className={`px-4 py-2.5 rounded-xl text-[11px] font-bold tracking-wider uppercase whitespace-nowrap cursor-pointer transition-all shadow-sm ${
+                            className={`px-6 py-3 rounded-full text-[13px] font-bold tracking-widest uppercase whitespace-nowrap cursor-pointer transition-all shadow-sm ${
                                 activeFilter === tab.id
-                                    ? 'bg-[#C58B07] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(197,139,7,0.4)]'
-                                    : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border border-[rgba(255,255,255,0.2)] hover:text-white hover:border-[rgba(255,255,255,0.4)]'
+                                    ? 'bg-[linear-gradient(135deg,#E5A84A,#B47B04)] text-white border border-white/30 shadow-[inset_0_1px_2px_rgba(255,255,255,0.5),0_8px_24px_rgba(229,168,74,0.6)] drop-shadow-sm'
+                                    : 'bg-white/5 backdrop-blur-xl text-white border border-white/10 hover:bg-white/10 hover:border-white/30 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)]'
                             }`}
                         >
                             {tab.label}
                         </button>
                     ))}
                 </div>
-                <select
-                    value={sortBy}
-                    onChange={e => setSortBy(e.target.value as 'newest' | 'oldest' | 'name')}
-                    aria-label="Sort documents"
-                    className="text-[12px] font-semibold tracking-wider uppercase px-4 py-2 rounded-xl cursor-pointer appearance-none bg-[#0A1128] text-white border border-[rgba(255,255,255,0.2)] outline-none"
-                >
-                    <option value="newest">Newest</option>
-                    <option value="oldest">Oldest</option>
-                    <option value="name">Name</option>
-                </select>
+                <div className="relative shrink-0">
+                    <select
+                        value={sortBy}
+                        onChange={e => setSortBy(e.target.value as 'newest' | 'oldest' | 'name')}
+                        aria-label="Sort documents"
+                        className="text-[13px] font-bold tracking-widest uppercase pl-5 pr-10 py-3 rounded-full cursor-pointer appearance-none bg-white/5 backdrop-blur-xl text-white border border-white/20 hover:bg-white/10 outline-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_12px_rgba(0,0,0,0.3)]"
+                    >
+                        <option value="newest" className="bg-[#0A1128] text-white">Newest</option>
+                        <option value="oldest" className="bg-[#0A1128] text-white">Oldest</option>
+                        <option value="name" className="bg-[#0A1128] text-white">Name</option>
+                    </select>
+                    {/* Add visual dropdown arrow since appearance-none hides it */}
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1 1L5 5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                    </div>
+                </div>
             </motion.div>
 
             {/* Document Gallery Header */}
@@ -143,27 +151,27 @@ export default function DocuVaultGalleryPage() {
                 transition={{ delay: 0.2 }}
             >
                 <h2
-                    className="text-xs font-bold tracking-[0.15em] uppercase mb-4 text-[#C58B07]"
+                    className="text-[14px] font-bold tracking-[0.2em] uppercase mb-6 text-white drop-shadow-sm"
                 >
                     Document Gallery
                 </h2>
 
                 {/* Empty State */}
                 {documents.length === 0 && (
-                    <div className="card-premium p-12 text-center border border-[rgba(255,255,255,0.05)] bg-[rgba(10,17,40,0.4)] backdrop-blur-md">
+                    <div className="p-16 rounded-[2rem] text-center border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_12px_40px_rgba(0,0,0,0.4)]">
                         <div
-                            className="w-20 h-20 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-[#1A4B9B]/20 border border-[#1A4B9B]/40 shadow-[0_4px_15px_rgba(26,75,155,0.2)]"
+                            className="w-24 h-24 rounded-[2rem] mx-auto mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-white/20 shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
                         >
-                            <FileText size={32} className="text-white" />
+                            <FileText size={40} className="text-white drop-shadow-sm" />
                         </div>
-                        <p className="text-[15px] font-medium mb-2 text-white">
+                        <p className="text-[20px] font-bold mb-3 text-white drop-shadow-sm">
                             No documents yet
                         </p>
-                        <p className="text-[13px] mb-6 text-white/60">
+                        <p className="text-[16px] mb-8 text-white font-medium">
                             Generate your first legal document to see it here.
                         </p>
-                        <Link href="/docuvault" className="btn-primary text-sm font-semibold tracking-wider uppercase px-6 py-3 rounded-xl inline-flex items-center gap-2 shadow-[0_4px_15px_rgba(26,75,155,0.4)] no-underline">
-                            <Plus size={16} strokeWidth={3} /> Create Document
+                        <Link href="/docuvault" className="text-[15px] font-bold tracking-widest uppercase px-8 py-4 rounded-full inline-flex items-center gap-3 no-underline transition-all bg-[linear-gradient(135deg,#60A5FA,#2563EB)] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_8px_24px_rgba(37,99,235,0.5)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_12px_32px_rgba(37,99,235,0.6)] hover:-translate-y-1">
+                            <Plus size={20} strokeWidth={3} /> Create Document
                         </Link>
                     </div>
                 )}
@@ -177,45 +185,45 @@ export default function DocuVaultGalleryPage() {
                                 initial={{ opacity: 0, y: 12 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.05 * i }}
-                                className="card-premium p-5 group transition-all border border-[rgba(255,255,255,0.08)] bg-[rgba(10,17,40,0.5)] hover:bg-[rgba(10,17,40,0.7)] hover:border-[rgba(255,255,255,0.2)] shadow-sm"
+                                className="p-6 rounded-[2rem] group transition-all border border-white/10 bg-white/5 backdrop-blur-2xl hover:bg-white/10 hover:border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-1"
                             >
-                                <div className="flex items-start gap-4">
+                                <div className="flex items-start gap-5">
                                     {/* Preview thumbnail */}
                                     <div
-                                        className="w-16 h-20 rounded-lg flex items-center justify-center flex-shrink-0 bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-[rgba(255,255,255,0.15)] shadow-sm"
+                                        className="w-20 h-24 rounded-xl flex items-center justify-center flex-shrink-0 bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-white/20 shadow-[0_4px_16px_rgba(0,0,0,0.5)]"
                                     >
-                                        <FileText size={22} className="text-white" />
+                                        <FileText size={28} className="text-white drop-shadow-sm" />
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-[15px] font-semibold truncate mb-1 text-white">
+                                    <div className="flex-1 min-w-0 py-1">
+                                        <p className="text-[17px] font-bold truncate mb-2 text-white drop-shadow-sm">
                                             {doc.title}
                                         </p>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="badge text-[10px] font-bold tracking-wider uppercase bg-[#0A1128] text-white border border-[rgba(255,255,255,0.2)] px-2 py-1 rounded-xl">{doc.category}</span>
-                                            <span className="text-[11px] font-medium text-white/70">{doc.fileSize}</span>
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <span className="text-[11px] font-bold tracking-widest uppercase bg-white/10 text-white border border-white/20 px-3 py-1.5 rounded-full">{doc.category}</span>
+                                            <span className="text-[13px] font-bold text-white">{doc.fileSize}</span>
                                         </div>
-                                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-white/50">
-                                            <Clock size={12} />
+                                        <div className="flex items-center gap-2 text-[13px] font-bold text-white">
+                                            <Clock size={14} className="text-[#60A5FA]" />
                                             Updated {doc.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                         </div>
                                     </div>
                                     {/* Actions — disabled until backend wiring */}
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-3">
                                         <button
                                             disabled
                                             aria-disabled="true"
                                             title="Download not available yet"
-                                            className="w-8 h-8 rounded-xl flex items-center justify-center cursor-not-allowed bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.05)] text-white/30"
+                                            className="w-10 h-10 rounded-full flex items-center justify-center cursor-not-allowed bg-white/5 border border-white/10 text-white shadow-sm"
                                         >
-                                            <Download size={14} />
+                                            <Download size={16} strokeWidth={2.5} />
                                         </button>
                                         <button
                                             disabled
                                             aria-disabled="true"
                                             title="Delete not available yet"
-                                            className="w-8 h-8 rounded-xl flex items-center justify-center cursor-not-allowed bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.05)] text-[var(--error)] opacity-50"
+                                            className="w-10 h-10 rounded-full flex items-center justify-center cursor-not-allowed bg-white/5 border border-white/10 text-[#F87171] shadow-sm"
                                         >
-                                            <Trash2 size={14} />
+                                            <Trash2 size={16} strokeWidth={2.5} />
                                         </button>
                                     </div>
                                 </div>
@@ -228,30 +236,31 @@ export default function DocuVaultGalleryPage() {
                 {draftDocs.length > 0 && (
                     <>
                         <h2
-                            className="text-xs font-bold tracking-[0.15em] uppercase mb-4 text-[#C58B07]"
+                            className="text-[14px] font-bold tracking-[0.2em] uppercase mt-8 mb-6 text-white drop-shadow-sm"
                         >
                             In Progress
                         </h2>
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             {draftDocs.map((doc, i) => (
                                 <motion.div
                                     key={doc.id}
                                     initial={{ opacity: 0, y: 8 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.05 * i }}
-                                    className="card-premium p-4 flex items-center gap-4 bg-[rgba(10,17,40,0.5)] border border-[rgba(255,255,255,0.08)]"
+                                    className="p-5 rounded-[1.5rem] flex items-center gap-5 bg-white/5 border border-white/10 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_16px_rgba(0,0,0,0.3)]"
                                 >
                                     <div
-                                        className="w-10 h-12 rounded-lg flex items-center justify-center flex-shrink-0 bg-[#0A1128]/50 border border-dashed border-[#C58B07]/40"
+                                        className="w-12 h-14 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#0A1128] border-2 border-dashed border-[#E5A84A] shadow-inner"
                                     >
-                                        <FileText size={16} className="text-[#C58B07]" />
+                                        <FileText size={20} className="text-[#E5A84A] drop-shadow-sm" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[15px] font-semibold truncate text-white">
+                                        <p className="text-[16px] font-bold truncate text-white drop-shadow-sm">
                                             {doc.title}
                                         </p>
-                                        <p className="text-[12px] font-medium text-white/50">Draft</p>
+                                        <p className="text-[13px] font-bold text-[#E5A84A] uppercase tracking-widest mt-1">Draft</p>
                                     </div>
+
                                 </motion.div>
                             ))}
                         </div>

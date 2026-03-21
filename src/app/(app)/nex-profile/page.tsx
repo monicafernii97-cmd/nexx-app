@@ -15,6 +15,7 @@ import {
     Plus,
     X,
 } from '@phosphor-icons/react';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 
 const BEHAVIOR_OPTIONS = [
     'Gaslighting', 'Love-bombing', 'DARVO', 'Triangulation',
@@ -131,19 +132,12 @@ export default function NexProfilePage() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto pb-20">
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
-                    <div>
-                        <h1 className="text-4xl font-serif font-bold text-white mb-1">
-                            NEX Profile
-                        </h1>
-                        <p className="text-[15px] text-[rgba(255,255,255,0.9)] max-w-2xl leading-relaxed">
-                            Document your NEX&apos;s behavioral patterns. This helps NEXX proactively identify tactics.
-                        </p>
-                    </div>
-
+        <PageContainer>
+            <PageHeader
+                icon={Siren}
+                title="NEX Profile"
+                description="Document your NEX's behavioral patterns. This helps NEXX proactively identify tactics."
+                rightElement={
                     <div className="flex flex-col items-end shrink-0 pt-2">
                         <button
                             onClick={handleSave}
@@ -164,7 +158,8 @@ export default function NexProfilePage() {
                             )}
                         </AnimatePresence>
                     </div>
-                </div>
+                }
+            />
 
                 <div className="space-y-6">
                     {/* ── NEX Overview ── */}
@@ -403,8 +398,7 @@ export default function NexProfilePage() {
                         </Section>
                     )}
                 </div>
-            </motion.div>
-        </div>
+        </PageContainer>
     );
 }
 

@@ -16,6 +16,7 @@ import {
 } from '@phosphor-icons/react';
 import { formatDistanceToNow } from 'date-fns';
 import { MODE_LABELS } from '@/lib/constants';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 
 /** Conversation list page with mode picker and new-chat creation. Ethereal theme. */
 export default function ChatListPage() {
@@ -45,30 +46,14 @@ export default function ChatListPage() {
     const archivedConversations = isLoadingConversations ? [] : conversations.filter((c) => c.status === 'archived');
 
     return (
-        <div className="max-w-4xl mx-auto pb-16 px-2">
-            {/* Header */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="flex items-start justify-between mb-10 pt-4"
-            >
-                <div>
-                    <div className="flex items-center gap-4 mb-2">
-                        <div
-                            className="w-12 h-12 rounded-[1rem] flex items-center justify-center bg-white shadow-[0_8px_30px_rgba(208,227,255,0.4)] border border-[rgba(10,22,41,0.04)]"
-                        >
-                            <ChatTeardropDots size={24} weight="duotone" className="text-champagne" />
-                        </div>
-                        <h1 className="text-3xl font-serif font-bold text-sapphire m-0 leading-tight">
-                            NEXX <span className="shimmer text-champagne font-light">Intelligence</span>
-                        </h1>
-                    </div>
-                    <p className="text-[15px] font-medium text-sapphire-muted ml-[64px]">
-                        Strategic AI counsel — your conversations are encrypted and private.
-                    </p>
-                </div>
-            </motion.div>
+        <PageContainer>
+            <PageHeader
+                icon={ChatTeardropDots}
+                title={
+                    <>NEXX <span className="shimmer text-champagne font-light pl-2">Intelligence</span></>
+                }
+                description="Strategic AI counsel — your conversations are encrypted and private."
+            />
 
             {/* New Chat Section (Glass Container) */}
             <motion.div
@@ -266,6 +251,6 @@ export default function ChatListPage() {
                     </div>
                 </motion.div>
             )}
-        </div>
+        </PageContainer>
     );
 }

@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { UI_TABS, getTemplatesForTab } from '@/lib/legal/templateCategories';
 import type { UITabCategory } from '@/lib/legal/templateCategories';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import type { DocumentTemplate } from '@/lib/legal/types';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
@@ -111,34 +112,22 @@ export default function TemplateGalleryPage() {
     };
 
     return (
-        <div className="max-w-5xl mx-auto">
+        <PageContainer>
             {/* Header */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-5 mb-12"
-            >
-                <Link
-                    href="/docuvault"
-                    className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all bg-white/10 border border-white/30 hover:bg-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_4px_12px_rgba(0,0,0,0.4)] backdrop-blur-xl shrink-0"
-                    aria-label="Back to DocuVault"
-                >
-                    <ArrowLeft size={20} strokeWidth={3} className="text-white drop-shadow-sm" />
-                </Link>
-                <div>
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-[#60A5FA]/50 shadow-[0_8px_24px_rgba(96,165,250,0.3)] flex items-center justify-center translate-y-[-2px]">
-                            <FileText size={24} className="text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]" />
-                        </div>
-                        <h1 className="text-4xl font-serif font-bold tracking-tight text-white drop-shadow-sm">
-                            Template Gallery
-                        </h1>
-                    </div>
-                    <p className="text-[16px] font-medium text-white mt-2 drop-shadow-sm">
-                        Browse and preview legal document templates
-                    </p>
-                </div>
-            </motion.div>
+            <PageHeader
+                icon={FileText}
+                title="Template Gallery"
+                description="Browse and preview legal document templates"
+                rightElement={
+                    <Link
+                        href="/docuvault"
+                        className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all bg-white/10 border border-white/30 hover:bg-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_4px_12px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+                        aria-label="Back to DocuVault"
+                    >
+                        <ArrowLeft size={20} strokeWidth={3} className="text-white drop-shadow-sm" />
+                    </Link>
+                }
+            />
 
             {/* Search */}
             <motion.div
@@ -520,6 +509,6 @@ export default function TemplateGalleryPage() {
                     </>
                 )}
             </AnimatePresence>
-        </div>
+        </PageContainer>
     );
 }

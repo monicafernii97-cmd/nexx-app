@@ -15,6 +15,7 @@ import {
     Strategy,
 } from '@phosphor-icons/react';
 import { US_STATES } from '@/lib/constants';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 
 const TONE_OPTIONS = [
     { value: 'direct', label: 'Direct', description: 'Concise, factual, action-oriented' },
@@ -153,30 +154,17 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="max-w-4xl mx-auto pb-16 w-full px-2 mt-4">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
-            >
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
-                    <div className="w-full">
-                        <div className="flex items-center gap-4 mb-3">
-                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] relative overflow-hidden">
-                                <div className="absolute inset-0 bg-white/10" />
-                                <User size={28} className="text-white relative z-10 drop-shadow-md" weight="fill" />
-                            </div>
-                            <h1 className="text-4xl font-serif font-bold text-white tracking-tight m-0">
-                                Personal <span className="text-editorial shimmer">Profile</span>
-                            </h1>
-                        </div>
-                        <p className="text-[15px] font-medium text-white max-w-lg mt-2">
-                            This baseline context empowers NEXX to tailor communication and legal strategy to your exact situation.
-                        </p>
-                    </div>
-                    
-                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
+        <PageContainer>
+            <PageHeader
+                icon={User}
+                title={
+                    <>
+                        Personal <span className="text-editorial shimmer">Profile</span>
+                    </>
+                }
+                description="This baseline context empowers NEXX to tailor communication and legal strategy to your exact situation."
+                rightElement={
+                    <div className="flex flex-col items-end gap-2 flex-shrink-0 pt-2">
                         <button
                             onClick={handleSave}
                             disabled={saving}
@@ -193,7 +181,8 @@ export default function ProfilePage() {
                             <p className="text-xs font-semibold text-rose">{error}</p>
                         )}
                     </div>
-                </div>
+                }
+            />
 
                 <div className="grid grid-cols-1 gap-6">
                     {/* ── Personal Info ── */}
@@ -438,8 +427,7 @@ export default function ProfilePage() {
                         </div>
                     </Section>
                 </div>
-            </motion.div>
-        </div>
+        </PageContainer>
     );
 }
 

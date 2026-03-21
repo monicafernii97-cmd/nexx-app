@@ -15,7 +15,9 @@ import {
     ArrowRight,
     Microphone,
     CaretRight,
+    House,
 } from '@phosphor-icons/react';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { parseLocalDate } from '@/lib/dateUtils';
@@ -58,30 +60,24 @@ export default function DashboardPage() {
     const userName = user?.name ? `, ${user.name}` : '';
 
     return (
-        <div className="max-w-[1400px] w-full mx-auto h-full flex flex-col gap-8 pb-12 overflow-x-hidden">
-            {/* Header Area */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
-                className="flex flex-col md:flex-row md:items-end justify-between gap-4 pt-4 px-2"
-            >
-                <div>
-                    <h1 className="text-headline text-4xl mb-3 text-sapphire" suppressHydrationWarning>
+        <PageContainer>
+            <PageHeader
+                icon={House}
+                title={
+                    <span suppressHydrationWarning>
                         {greetingText}<span className="text-editorial shimmer capitalize">{userName}</span>
-                    </h1>
-                    <p className="text-sapphire-muted font-medium text-[15px] tracking-wide max-w-lg">
-                        Your sanctuary of strategic empowerment. Everything is securely encrypted and court-ready.
-                    </p>
-                </div>
-                <div className="hidden md:block">
-                    {/* Optional float decorative element or status pill */}
-                    <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-[11px] uppercase tracking-wider text-white bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]">
-                        <div className="w-2 h-2 rounded-full bg-[#10b981] shadow-[0_0_8px_#10b981] animate-pulse" />
-                        System Secure
+                    </span>
+                }
+                description="Your sanctuary of strategic empowerment. Everything is securely encrypted and court-ready."
+                rightElement={
+                    <div className="hidden md:block">
+                        <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-[11px] uppercase tracking-wider text-white bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]">
+                            <div className="w-2 h-2 rounded-full bg-[#10b981] shadow-[0_0_8px_#10b981] animate-pulse" />
+                            System Secure
+                        </div>
                     </div>
-                </div>
-            </motion.div>
+                }
+            />
 
             {/* Bento Grid layout */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full relative z-10">
@@ -241,6 +237,6 @@ export default function DashboardPage() {
                     </div>
                 </motion.div>
             </div>
-        </div>
+        </PageContainer>
     );
 }

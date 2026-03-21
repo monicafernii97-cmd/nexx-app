@@ -29,6 +29,7 @@ import {
     Info,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 
 // ═══════════════════════════════════════════
 //  Types
@@ -254,35 +255,20 @@ export default function EFilingPage() {
     const localRulesUrl = toSafeExternalUrl(cachedResources?.localRules?.url);
 
     return (
-        <div className="max-w-5xl mx-auto pb-16 space-y-12">
-            {/* ─── Header ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: 'easeOut' }}
-            >
-                <div className="flex items-center gap-4 mb-3">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white/5 backdrop-blur-2xl border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_32px_rgba(0,0,0,0.4)] relative overflow-hidden shrink-0">
-                        <FileArrowUp size={28} className="text-[#60A5FA] relative z-10 drop-shadow-[0_2px_10px_rgba(96,165,250,0.6)]" weight="duotone" />
-                    </div>
-                    <div>
-                        <h1 className="text-4xl font-serif font-bold text-white tracking-tight m-0">
-                            eFiling Hub
-                        </h1>
-                    </div>
-                </div>
-                <div className="flex flex-col md:flex-row md:items-center gap-3 mt-4">
-                    <p className="text-base font-medium text-white tracking-wide leading-relaxed">
-                        Prepare and file your court documents electronically
-                    </p>
-                    {state && (
+        <PageContainer>
+            <PageHeader
+                icon={FileArrowUp}
+                title="eFiling Hub"
+                description="Prepare and file your court documents electronically"
+                rightElement={
+                    state ? (
                         <span className="text-xs font-medium px-3 py-1 rounded-full bg-white/60 border border-[var(--cloud-light)] text-[var(--sapphire-base)] backdrop-blur-sm shadow-sm flex items-center gap-1.5">
                             <MapPin size={12} weight="fill" />
                             {locationLabel}
                         </span>
-                    )}
-                </div>
-            </motion.div>
+                    ) : undefined
+                }
+            />
 
             {/* ─── No Location Set ─── */}
             {!hasCourtSettings && (
@@ -715,6 +701,6 @@ export default function EFilingPage() {
                     )}
                 </div>
             </div>
-        </div>
+        </PageContainer>
     );
 }

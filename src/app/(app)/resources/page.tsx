@@ -25,6 +25,7 @@ import {
     type IconWeight,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import {
     getStateResources,
     getCountyResources,
@@ -541,33 +542,16 @@ export default function ResourcesPage() {
     const showMyCaseCard = courtSettings?.causeNumber && safeCaseSearchUrl;
 
     return (
-        <div className="max-w-6xl mx-auto pb-16 px-2 md:px-4 mt-4">
-            {/* ─── Header ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6"
-            >
-                <div className="flex items-center gap-5">
-                    <div
-                        className="w-16 h-16 rounded-3xl flex items-center justify-center bg-white/5 backdrop-blur-3xl shadow-[inset_0_1px_2px_rgba(255,255,255,0.5),0_12px_40px_rgba(0,0,0,0.6)] border border-white/30 shrink-0"
-                    >
-                        <BookOpenText size={32} weight="duotone" className="text-white drop-shadow-[0_4px_12px_rgba(255,255,255,0.8)]" />
-                    </div>
-                    <div>
-                        <h1 className="text-4xl lg:text-5xl font-serif font-bold text-white mb-2 leading-tight tracking-tight drop-shadow-sm">
-                            Resources Hub
-                        </h1>
-                        <p className="text-[15px] font-medium text-white drop-shadow-sm">
-                            {state
-                                ? <>Your personalized directory of legal &amp; support resources in <strong className="text-white font-bold">{locationLabel}</strong></>
-                                : 'Discover attorneys, therapists, legal aid, and community resources near you.'
-                            }
-                        </p>
-                    </div>
-                </div>
-            </motion.div>
+        <PageContainer>
+            <PageHeader
+                icon={BookOpenText}
+                title="Resources Hub"
+                description={
+                    state
+                        ? <span className="text-white/90">Your personalized directory of legal &amp; support resources in <strong className="text-white font-bold">{locationLabel}</strong></span>
+                        : 'Discover attorneys, therapists, legal aid, and community resources near you.'
+                }
+            />
 
             {/* ─── Location Not Set Banner ─── */}
             {!state && (
@@ -940,6 +924,6 @@ export default function ResourcesPage() {
                     Full attorney and therapist integration arriving in future capabilities.
                 </p>
             </motion.div>
-        </div>
+        </PageContainer>
     );
 }

@@ -12,6 +12,7 @@ import {
     Trash,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 import { parseLocalDate } from '@/lib/dateUtils';
@@ -51,34 +52,20 @@ export default function IncidentReportPage() {
     };
 
     return (
-        <div className="max-w-[85rem] mx-auto pb-20 w-full px-6 lg:px-12 mt-4">
+        <PageContainer>
             {/* Header */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 pt-4 px-2"
-            >
-                <div>
-                    <div className="flex items-center gap-4 mb-3">
-                        <div
-                            className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] relative overflow-hidden"
-                        >
-                            <div className="absolute inset-0 bg-white/10" />
-                            <ClipboardText size={28} weight="fill" className="text-white relative z-10 drop-shadow-md" />
-                        </div>
-                        <h1 className="text-4xl font-serif text-headline text-white m-0 tracking-tight">
-                            Incident <span className="text-editorial shimmer">Report</span>
-                        </h1>
-                    </div>
-                    <p className="text-[15px] font-medium text-white/70 max-w-lg">
-                        Sanctuary of Truth and Admissibility — your court-ready records.
-                    </p>
-                </div>
-                <Link href="/incident-report/new" className="btn-primary inline-flex items-center justify-center gap-2 no-underline shadow-[0_8px_20px_rgba(18,61,126,0.4)] flex-shrink-0 px-6 py-3 rounded-xl">
-                    <Plus size={16} weight="bold" /> Log Incident
-                </Link>
-            </motion.div>
+            <PageHeader
+                icon={ClipboardText}
+                title={
+                    <>Incident <span className="text-editorial shimmer">Report</span></>
+                }
+                description="Sanctuary of Truth and Admissibility — your court-ready records."
+                rightElement={
+                    <Link href="/incident-report/new" className="btn-primary inline-flex items-center justify-center gap-2 no-underline shadow-[0_8px_20px_rgba(18,61,126,0.4)] flex-shrink-0 px-6 py-3 rounded-xl">
+                        <Plus size={16} weight="bold" /> Log Incident
+                    </Link>
+                }
+            />
 
             {/* Search & Filters */}
             <motion.div
@@ -279,6 +266,6 @@ export default function IncidentReportPage() {
                 showCloseButton
                 dialogTitleId="list-delete-dialog-title"
             />
-        </div>
+        </PageContainer>
     );
 }

@@ -1,20 +1,21 @@
 /**
  * Court Rules Lookup — AI Discovery of Local Court Rules
  *
- * Uses Tavily to search for local/state court formatting rules,
- * then GPT-4o to extract structured CourtFormattingRules from the results.
+ * Uses GPT-4o to discover and extract local court formatting rules
+ * for a given state + county. When available, enriches the prompt
+ * with cached Resources Hub data (e.g. localRules URLs) so the model
+ * can reference real jurisdiction-specific sources.
  *
  * Flow:
  * 1. Check in-memory cache — return cached if fresh (30-day TTL)
- * 2. Search Tavily for "[state] [county] court local rules formatting filing requirements"
- * 3. Feed search results to GPT-4o with a structured extraction prompt
- * 4. Cache results in memory and return Partial<CourtFormattingRules>
+ * 2. Query GPT-4o with a structured extraction prompt
+ * 3. Parse the response into Partial<CourtFormattingRules>
+ * 4. Cache results in memory and return
  *
  * NOTE: In-memory cache is per-process. For multi-instance deployments,
  * integrate the Convex courtRulesCache table for persistent cross-instance caching.
  */
 
-import { tavily } from '@tavily/core';
 import OpenAI from 'openai';
 import type { CourtFormattingRules } from './types';
 
@@ -64,103 +65,18 @@ function setCache(state: string, county: string, result: CourtRulesLookupResult,
     });
 }
 
-// ── Tavily Search for Court Rules ──
+// ── GPT-4o Rules Extraction (Direct Knowledge) ──
 
-let cachedTavilyClient: ReturnType<typeof tavily> | null = null;
+const EXTRACTION_PROMPT = `You are a legal formatting expert specializing in US court filing requirements.
 
-/** Lazily initialize and return the Tavily API client, or null if the API key is not configured. */
-function getTavilyClient() {
-    if (cachedTavilyClient) return cachedTavilyClient;
-    const apiKey = process.env.TAVILY_API_KEY;
-    if (!apiKey) {
-        console.warn('[courtRulesLookup] TAVILY_API_KEY not set — court rules lookup disabled.');
-        return null;
-    }
-    cachedTavilyClient = tavily({ apiKey });
-    return cachedTavilyClient;
-}
+Given a US state and county (and optionally a specific court name), provide the specific document formatting rules that apply to civil/family court filings in that jurisdiction.
 
-/** Build a list of likely official court domains for a given state. */
-function getCourtDomains(state: string): string[] {
-    const s = state.toLowerCase().replace(/\s+/g, '');
-    // Common US court domain patterns by state
-    return [
-        'uscourts.gov',
-        `courts.${s}.gov`,
-        `${s}courts.gov`,
-        `courts.state.${s.slice(0, 2)}.us`,
-        `${s.slice(0, 2)}courts.gov`,
-        `judicial.${s}.gov`,
-        `judiciary.${s}.gov`,
-    ];
-}
+Use your knowledge of:
+- State-level rules of civil procedure (e.g. Texas Rules of Civil Procedure)
+- Local court rules for the specific county
+- General standards for the jurisdiction
 
-/** Search Tavily for official court rules and filing requirements for a given jurisdiction. */
-async function searchCourtRules(
-    state: string,
-    county: string,
-    courtName?: string
-): Promise<{ title: string; url: string; content: string }[]> {
-    const client = getTavilyClient();
-    if (!client) return [];
-
-    try {
-        // First attempt: domain-restricted to official court websites
-        const query = courtName
-            ? `${courtName} ${county} County ${state} local court rules filing format requirements`
-            : `${county} County ${state} family court local rules filing format page margins font requirements`;
-
-        const domains = getCourtDomains(state);
-        const response = await client.search(query, {
-            maxResults: 8,
-            includeDomains: domains,
-            searchDepth: 'advanced',
-        });
-
-        if (response.results && response.results.length > 0) {
-            return response.results.map((r) => ({
-                title: r.title || 'Untitled',
-                url: r.url,
-                content: r.content || '',
-            }));
-        }
-
-        // Second attempt: broader search without domain restrictions
-        const broadResponse = await client.search(
-            `${county} County ${state} court local rules filing requirements margins font size line spacing`,
-            { maxResults: 8, searchDepth: 'advanced' }
-        );
-
-        if (broadResponse.results && broadResponse.results.length > 0) {
-            return broadResponse.results.map((r) => ({
-                title: r.title || 'Untitled',
-                url: r.url,
-                content: r.content || '',
-            }));
-        }
-
-        // Third attempt: general state-level rules
-        const stateResponse = await client.search(
-            `${state} state court formatting rules document filing requirements font margins`,
-            { maxResults: 5, searchDepth: 'basic' }
-        );
-
-        return (stateResponse.results ?? []).map((r) => ({
-            title: r.title || 'Untitled',
-            url: r.url,
-            content: r.content || '',
-        }));
-    } catch (error) {
-        console.error('[courtRulesLookup] Tavily search failed:', error);
-        return [];
-    }
-}
-
-// ── GPT-4o Rules Extraction ──
-
-const EXTRACTION_PROMPT = `You are a legal formatting expert. Given search results about court local rules and filing requirements, extract specific document formatting rules.
-
-Return a JSON object with ONLY the fields you can confidently determine from the sources. Do NOT guess or assume — if a rule is not mentioned, omit that field entirely.
+Return a JSON object with ONLY the fields you can confidently state. Do NOT guess — if a rule is not established for this jurisdiction, omit that field entirely.
 
 The JSON fields you may extract (must match CourtFormattingRules type exactly):
 {
@@ -180,7 +96,7 @@ The JSON fields you may extract (must match CourtFormattingRules type exactly):
   "requiresSignatureBlock": <boolean>,
   "requiresCertificateOfService": <boolean>,
   "requiresVerification": <boolean>,
-  "notes": [<array of string notes about specific requirements>]
+  "notes": [<array of string notes about specific local requirements>]
 }
 
 Respond with ONLY valid JSON, no markdown fences or explanation.`;
@@ -192,12 +108,14 @@ interface ExtractionResult {
 }
 
 /**
- * Use GPT-4o to extract structured formatting rules from search results.
+ * Use GPT-4o to determine formatting rules for a jurisdiction
+ * using model knowledge, optionally enhanced with cached resource URLs.
  */
 async function extractRulesWithAI(
-    searchResults: { title: string; url: string; content: string }[],
     state: string,
-    county: string
+    county: string,
+    courtName?: string,
+    localRulesUrl?: string,
 ): Promise<ExtractionResult> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -207,10 +125,16 @@ async function extractRulesWithAI(
 
     const openai = new OpenAI({ apiKey });
 
-    // Build context from search results
-    const contextChunks = searchResults.map(
-        (r, i) => `[Source ${i + 1}] ${r.title}\nURL: ${r.url}\n${r.content.slice(0, 1500)}`
-    );
+    // Build user prompt with optional enrichment from cached resources
+    let userPrompt = `Provide the court filing formatting rules for ${county} County, ${state}.`;
+    if (courtName) {
+        userPrompt += ` Specifically for ${courtName}.`;
+    }
+    userPrompt += `\n\nFocus on family law / civil court filings. Include any county-specific local rules that differ from or supplement the state-level rules.`;
+
+    if (localRulesUrl) {
+        userPrompt += `\n\nNote: The official local rules for this jurisdiction are published at: ${localRulesUrl}`;
+    }
 
     try {
         const response = await openai.chat.completions.create({
@@ -219,10 +143,7 @@ async function extractRulesWithAI(
             response_format: { type: 'json_object' },
             messages: [
                 { role: 'system', content: EXTRACTION_PROMPT },
-                {
-                    role: 'user',
-                    content: `Extract court formatting rules for ${county} County, ${state} from these search results:\n\n${contextChunks.join('\n\n---\n\n')}`,
-                },
+                { role: 'user', content: userPrompt },
             ],
         });
 
@@ -242,9 +163,13 @@ async function extractRulesWithAI(
         const maxFields = 17; // Must match extractable fields in EXTRACTION_PROMPT
         const confidence = Math.min(fieldCount / maxFields, 1.0);
 
+        // Build sources list from known resources
+        const sources: string[] = [];
+        if (localRulesUrl) sources.push(localRulesUrl);
+
         return {
             rules: parsed,
-            sources: searchResults.map((r) => r.url),
+            sources,
             confidence,
         };
     } catch (error) {
@@ -272,13 +197,15 @@ export interface CourtRulesLookupResult {
  * @param county - County name (e.g. "Fort Bend")
  * @param courtName - Optional specific court name
  * @param forceRefresh - Skip the cache and re-query
+ * @param localRulesUrl - Optional URL from cached resources to enrich the LLM prompt
  * @returns Partial formatting rules discovered from official sources
  */
 export async function lookupCourtRules(
     state: string,
     county: string,
     courtName?: string,
-    forceRefresh = false
+    forceRefresh = false,
+    localRulesUrl?: string,
 ): Promise<CourtRulesLookupResult> {
     // Step 1: Check cache (unless force-refreshing)
     if (!forceRefresh) {
@@ -286,27 +213,15 @@ export async function lookupCourtRules(
         if (cached) return cached;
     }
 
-    // Step 2: Search Tavily
-    const searchResults = await searchCourtRules(state, county, courtName);
-
-    if (searchResults.length === 0) {
-        return {
-            rules: {},
-            sources: [],
-            confidence: 0,
-            cached: false,
-        };
-    }
-
-    // Step 3: Extract rules with GPT-4o
-    const extraction = await extractRulesWithAI(searchResults, state, county);
+    // Step 2: Extract rules with GPT-4o (using model knowledge + optional localRulesUrl)
+    const extraction = await extractRulesWithAI(state, county, courtName, localRulesUrl);
 
     const result: CourtRulesLookupResult = {
         ...extraction,
         cached: false,
     };
 
-    // Step 4: Cache for future requests
+    // Step 3: Cache for future requests
     if (extraction.confidence > 0) {
         setCache(state, county, result, courtName);
     }

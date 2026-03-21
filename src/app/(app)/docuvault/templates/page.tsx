@@ -117,7 +117,7 @@ export default function TemplateGalleryPage() {
             <PageHeader
                 icon={FileText}
                 title="Template Gallery"
-                description="Browse and preview legal document templates"
+                description="Your blueprint for legal success. Browse ironclad templates designed to protect your peace and assert your rights."
                 rightElement={
                     <Link
                         href="/docuvault"

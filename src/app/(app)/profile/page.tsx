@@ -162,7 +162,7 @@ export default function ProfilePage() {
                         Personal <span className="text-editorial shimmer">Profile</span>
                     </>
                 }
-                description="This baseline context empowers NEXX to tailor communication and legal strategy to your exact situation."
+                description="Your baseline of power. Establish your core context so NEXX can construct a tailored, impenetrable legal strategy for you."
                 rightElement={
                     <div className="flex flex-col items-end gap-2 flex-shrink-0 pt-2">
                         <button

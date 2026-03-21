@@ -55,7 +55,7 @@ export default function NexProfilePage() {
         relationship: '',
         description: '',
         behaviors: [] as string[],
-        communicationStyle: '',
+        communicationStyle: [] as string[],
         manipulationTactics: [] as string[],
         triggerPatterns: [] as string[],
     });
@@ -69,14 +69,18 @@ export default function NexProfilePage() {
                 relationship: nexProfile.relationship || '',
                 description: nexProfile.description || '',
                 behaviors: nexProfile.behaviors || [],
-                communicationStyle: nexProfile.communicationStyle || '',
+                communicationStyle: Array.isArray(nexProfile.communicationStyle)
+                    ? nexProfile.communicationStyle
+                    : nexProfile.communicationStyle
+                        ? [nexProfile.communicationStyle]
+                        : [],
                 manipulationTactics: nexProfile.manipulationTactics || [],
                 triggerPatterns: nexProfile.triggerPatterns || [],
             });
         }
     }, [nexProfile]);
 
-    const toggleItem = (field: 'behaviors' | 'manipulationTactics', item: string) => {
+    const toggleItem = (field: 'behaviors' | 'manipulationTactics' | 'communicationStyle', item: string) => {
         const current = form[field];
         const updated = current.includes(item)
             ? current.filter((b) => b !== item)
@@ -106,7 +110,7 @@ export default function NexProfilePage() {
                     nickname: form.nickname || undefined,
                     relationship: form.relationship || undefined,
                     description: form.description || undefined,
-                    communicationStyle: form.communicationStyle || undefined,
+                    communicationStyle: form.communicationStyle.length > 0 ? form.communicationStyle : undefined,
                     manipulationTactics: form.manipulationTactics.length > 0 ? form.manipulationTactics : undefined,
                     triggerPatterns: form.triggerPatterns.length > 0 ? form.triggerPatterns : undefined,
                 });
@@ -116,7 +120,7 @@ export default function NexProfilePage() {
                     nickname: form.nickname || undefined,
                     relationship: form.relationship || undefined,
                     description: form.description || undefined,
-                    communicationStyle: form.communicationStyle || undefined,
+                    communicationStyle: form.communicationStyle.length > 0 ? form.communicationStyle : undefined,
                     manipulationTactics: form.manipulationTactics.length > 0 ? form.manipulationTactics : undefined,
                     triggerPatterns: form.triggerPatterns.length > 0 ? form.triggerPatterns : undefined,
                 });
@@ -136,7 +140,7 @@ export default function NexProfilePage() {
             <PageHeader
                 icon={Siren}
                 title="NEX Profile"
-                description="Document your NEX's behavioral patterns. This helps NEXX proactively identify tactics."
+                description="Decode the playbook. Map their behavioral patterns so NEXX can predict, expose, and neutralize manipulation tactics."
                 rightElement={
                     <div className="flex flex-col items-end shrink-0 pt-2">
                         <button
@@ -246,11 +250,11 @@ export default function NexProfilePage() {
                             {COMMUNICATION_STYLES.map((style) => (
                                 <button
                                     key={style.value}
-                                    onClick={() => setForm({ ...form, communicationStyle: style.value })}
+                                    onClick={() => toggleItem('communicationStyle', style.value)}
                                     type="button"
-                                    aria-pressed={form.communicationStyle === style.value}
+                                    aria-pressed={form.communicationStyle.includes(style.value)}
                                     className={`text-left p-3 rounded-xl transition-all border ${
-                                        form.communicationStyle === style.value 
+                                        form.communicationStyle.includes(style.value) 
                                             ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border-transparent' 
                                             : 'bg-[#0A1128] border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.25)]'
                                     }`}

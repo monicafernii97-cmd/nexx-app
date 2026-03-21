@@ -59,7 +59,7 @@ export default function IncidentReportPage() {
                 title={
                     <>Incident <span className="text-editorial shimmer">Report</span></>
                 }
-                description="Sanctuary of Truth and Admissibility — your court-ready records."
+                description="Transform chaos into undeniable proof. Log, analyze, and bulletproof your timeline for court."
                 rightElement={
                     <Link href="/incident-report/new" className="btn-primary inline-flex items-center justify-center gap-2 no-underline shadow-[0_8px_20px_rgba(18,61,126,0.4)] flex-shrink-0 px-6 py-3 rounded-xl">
                         <Plus size={16} weight="bold" /> Log Incident

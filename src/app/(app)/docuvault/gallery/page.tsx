@@ -62,7 +62,7 @@ export default function DocuVaultGalleryPage() {
             <PageHeader
                 icon={FileText}
                 title="Document Gallery"
-                description="Your generated and saved legal documents"
+                description="Your arsenal of evidence. Access, manage, and deploy your finalized, court-ready documents."
                 rightElement={
                     <Link
                         href="/docuvault"
@@ -94,14 +94,14 @@ export default function DocuVaultGalleryPage() {
                 </div>
             </motion.div>
 
-            {/* Filter Tabs + Sort */}
+            {/* Filter Tabs */}
             <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 }}
-                className="flex items-center justify-between mb-6"
+                className="mb-6 w-full"
             >
-                <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+                <div className="flex gap-3 overflow-x-auto pb-2 min-w-0" style={{ scrollbarWidth: 'none' }}>
                     {filterTabs.map(tab => (
                         <button
                             key={tab.id}
@@ -117,37 +117,38 @@ export default function DocuVaultGalleryPage() {
                         </button>
                     ))}
                 </div>
-                <div className="relative shrink-0">
-                    <select
-                        value={sortBy}
-                        onChange={e => setSortBy(e.target.value as 'newest' | 'oldest' | 'name')}
-                        aria-label="Sort documents"
-                        className="text-[13px] font-bold tracking-widest uppercase pl-5 pr-10 py-3 rounded-full cursor-pointer appearance-none bg-white/5 backdrop-blur-xl text-white border border-white/20 hover:bg-white/10 outline-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_12px_rgba(0,0,0,0.3)]"
-                    >
-                        <option value="newest" className="bg-[#0A1128] text-white">Newest</option>
-                        <option value="oldest" className="bg-[#0A1128] text-white">Oldest</option>
-                        <option value="name" className="bg-[#0A1128] text-white">Name</option>
-                    </select>
-                    {/* Add visual dropdown arrow since appearance-none hides it */}
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                        <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M1 1L5 5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                    </div>
-                </div>
             </motion.div>
 
-            {/* Document Gallery Header */}
+            {/* Document Gallery Wrapper & Header */}
             <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
             >
-                <h2
-                    className="text-[14px] font-bold tracking-[0.2em] uppercase mb-6 text-white drop-shadow-sm"
-                >
-                    Document Gallery
-                </h2>
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-[14px] font-bold tracking-[0.2em] uppercase text-white drop-shadow-sm m-0">
+                        Document Gallery
+                    </h2>
+
+                    <div className="relative shrink-0">
+                        <select
+                            value={sortBy}
+                            onChange={e => setSortBy(e.target.value as 'newest' | 'oldest' | 'name')}
+                            aria-label="Sort documents"
+                            className="text-[12px] font-bold tracking-widest uppercase pl-4 pr-9 py-2 rounded-full cursor-pointer appearance-none bg-white/5 backdrop-blur-xl text-white border border-white/20 hover:bg-white/10 outline-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_12px_rgba(0,0,0,0.3)]"
+                        >
+                            <option value="newest" className="bg-[#0A1128] text-white">Newest</option>
+                            <option value="oldest" className="bg-[#0A1128] text-white">Oldest</option>
+                            <option value="name" className="bg-[#0A1128] text-white">Name</option>
+                        </select>
+                        {/* Add visual dropdown arrow since appearance-none hides it */}
+                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1 1L5 5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Empty State */}
                 {documents.length === 0 && (

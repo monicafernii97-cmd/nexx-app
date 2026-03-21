@@ -170,7 +170,7 @@ export default function CourtSettingsPage() {
             <PageHeader
                 icon={Gavel}
                 title="Court Settings"
-                description="Configure your court location and formatting preferences. These settings are used when generating legal documents."
+                description="Calibrate your jurisdiction. Configure your legal parameters so every document hits with pinpoint local accuracy."
             />
 
             {/* Court Location Section */}

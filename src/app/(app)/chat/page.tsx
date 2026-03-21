@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { useState } from 'react';
@@ -13,6 +13,8 @@ import {
     Clock,
     Archive,
     CaretRight,
+    CaretDown,
+    Trash,
 } from '@phosphor-icons/react';
 import { formatDistanceToNow } from 'date-fns';
 import { MODE_LABELS } from '@/lib/constants';
@@ -23,8 +25,22 @@ export default function ChatListPage() {
     const router = useRouter();
     const conversations = useQuery(api.conversations.list, {});
     const createConversation = useMutation(api.conversations.create);
+    const removeConversation = useMutation(api.conversations.remove);
     const [selectedMode, setSelectedMode] = useState<'therapeutic' | 'legal' | 'strategic' | 'general'>('general');
     const [isCreating, setIsCreating] = useState(false);
+    const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+
+    const handleDelete = async (e: React.MouseEvent, id: any) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.confirm("Are you sure you want to permanently delete this session? This action cannot be undone.")) {
+            try {
+                await removeConversation({ id });
+            } catch (error) {
+                console.error("Failed to delete conversation:", error);
+            }
+        }
+    };
 
     const handleNewChat = async () => {
         setIsCreating(true);
@@ -52,7 +68,7 @@ export default function ChatListPage() {
                 title={
                     <>NEXX <span className="shimmer text-champagne font-light pl-2">Chat</span></>
                 }
-                description="A private space for guidance, clarity, and strategic direction in your situation."
+                description="Your elite strategic counsel. Unpack the manipulation, clarify boundaries, and build an ironclad strategy."
             />
 
             {/* New Chat Section (Glass Container) */}
@@ -192,9 +208,16 @@ export default function ChatListPage() {
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0 mt-2">
-                                                <CaretRight size={14} weight="bold" className="text-sapphire" />
+                                            <div className="w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] -translate-x-6 group-hover:translate-x-0 group-hover:scale-110 mt-1 shadow-[0_12px_32px_rgba(255,255,255,0.15),0_0_20px_rgba(255,255,255,0.1),inset_0_2px_4px_rgba(255,255,255,0.9)] border border-white bg-[linear-gradient(135deg,#FFFFFF,rgba(255,255,255,0.8))] backdrop-blur-xl hover:shadow-[0_20px_40px_rgba(255,255,255,0.25),0_0_30px_rgba(255,255,255,0.2),inset_0_2px_4px_rgba(255,255,255,1)] relative z-10 self-center">
+                                                <CaretRight size={18} weight="bold" className="text-[#0A1128] ml-0.5 drop-shadow-sm" />
                                             </div>
+                                            <button
+                                                onClick={(e) => handleDelete(e, conv._id)}
+                                                title="Delete Chat"
+                                                className="w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud ml-2 self-center shrink-0"
+                                            >
+                                                <Trash size={16} weight="duotone" />
+                                            </button>
                                         </div>
                                     </Link>
                                 </motion.div>
@@ -211,44 +234,64 @@ export default function ChatListPage() {
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.4 }}
                 >
-                    <h2 className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 flex items-center gap-2 text-sapphire-muted px-2">
+                    <button
+                        onClick={() => setIsArchiveOpen(!isArchiveOpen)}
+                        className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 flex items-center gap-2 text-sapphire-muted px-2 hover:text-sapphire transition-colors outline-none"
+                    >
+                        {isArchiveOpen ? <CaretDown size={16} /> : <CaretRight size={16} />}
                         <Archive size={16} /> Archived ({archivedConversations.length})
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 opacity-60 hover:opacity-100 transition-opacity">
-                        {archivedConversations.map((conv) => {
-                            const modeInfo = MODE_LABELS[conv.mode] || MODE_LABELS.general;
-                            return (
-                                <Link
-                                    key={conv._id}
-                                    href={`/chat/${conv._id}`}
-                                    className="card-premium p-4 cursor-pointer block hover:bg-white transition-colors"
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div
-                                            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                                            style={{
-                                                background: `color-mix(in srgb, ${modeInfo.color} 10%, white)`,
-                                            }}
+                    </button>
+                    <AnimatePresence>
+                        {isArchiveOpen && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-10"
+                            >
+                                {archivedConversations.map((conv) => {
+                                    const modeInfo = MODE_LABELS[conv.mode] || MODE_LABELS.general;
+                                    return (
+                                        <Link
+                                            key={conv._id}
+                                            href={`/chat/${conv._id}`}
+                                            className="card-premium p-4 cursor-pointer block hover:bg-white transition-colors group/archived"
                                         >
-                                            <Archive size={14} weight="duotone" style={{ color: modeInfo.color }} />
-                                        </div>
-                                        <p className="text-[14px] font-medium truncate flex-1 text-sapphire">
-                                            {conv.title}
-                                        </p>
-                                        <span
-                                            className="badge text-[10px] font-bold tracking-wider"
-                                            style={{
-                                                background: `color-mix(in srgb, ${modeInfo.color} 10%, white)`,
-                                                color: modeInfo.color,
-                                            }}
-                                        >
-                                            {modeInfo.label}
-                                        </span>
-                                    </div>
-                                </Link>
-                            );
-                        })}
-                    </div>
+                                            <div className="flex items-center gap-4">
+                                                <div
+                                                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                                                    style={{
+                                                        background: `color-mix(in srgb, ${modeInfo.color} 10%, white)`,
+                                                    }}
+                                                >
+                                                    <Archive size={14} weight="duotone" style={{ color: modeInfo.color }} />
+                                                </div>
+                                                <p className="text-[14px] font-medium truncate flex-1 text-sapphire group-hover/archived:text-champagne transition-colors">
+                                                    {conv.title}
+                                                </p>
+                                                <span
+                                                    className="badge text-[10px] font-bold tracking-wider mr-2"
+                                                    style={{
+                                                        background: `color-mix(in srgb, ${modeInfo.color} 10%, white)`,
+                                                        color: modeInfo.color,
+                                                    }}
+                                                >
+                                                    {modeInfo.label}
+                                                </span>
+                                                <button
+                                                    onClick={(e) => handleDelete(e, conv._id)}
+                                                    title="Delete Chat"
+                                                    className="w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover/archived:opacity-100 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud shrink-0"
+                                                >
+                                                    <Trash size={14} weight="duotone" />
+                                                </button>
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </motion.div>
             )}
         </PageContainer>

@@ -6,7 +6,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
 import { Id } from '../../../../../convex/_generated/dataModel';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Archive, FlowArrow } from '@phosphor-icons/react';
+import { ArrowLeft, Archive, Lock } from '@phosphor-icons/react';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
 import { MODE_LABELS } from '@/lib/constants';
@@ -182,13 +182,7 @@ export default function ConversationPage() {
                     <ArrowLeft size={18} weight="bold" />
                 </button>
                 
-                <div
-                    className="w-12 h-12 rounded-[14px] flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_16px_rgba(18,61,126,0.3)] border border-white/10"
-                >
-                    <span className="text-white font-serif font-bold text-[22px] drop-shadow-sm pb-1"><i>N</i></span>
-                </div>
-                
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 pl-1">
                     <h1 className="text-[17px] font-bold text-sapphire truncate">
                         {conversation?.title || 'NEXX Executive Intelligence'}
                     </h1>
@@ -203,10 +197,10 @@ export default function ConversationPage() {
                         >
                             {modeInfo.label} MODE
                         </span>
-                        <div className="flex items-center gap-1.5 text-sapphire-muted">
-                            <FlowArrow size={12} weight="bold" />
-                            <p className="text-[12px] font-medium truncate">
-                                End-to-End Encrypted
+                        <div className="flex items-center gap-1 text-[rgba(10,22,41,0.4)]">
+                            <Lock size={12} weight="fill" />
+                            <p className="text-[11px] font-bold tracking-widest uppercase truncate">
+                                Encrypted
                             </p>
                         </div>
                     </div>

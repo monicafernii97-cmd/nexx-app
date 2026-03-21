@@ -69,7 +69,7 @@ export default defineSchema({
         relationship: v.optional(v.string()),
         behaviors: v.array(v.string()),
         description: v.optional(v.string()),
-        communicationStyle: v.optional(v.string()),
+        communicationStyle: v.optional(v.union(v.array(v.string()), v.string())),
         manipulationTactics: v.optional(v.array(v.string())),
         triggerPatterns: v.optional(v.array(v.string())),
         // AI-enriched fields

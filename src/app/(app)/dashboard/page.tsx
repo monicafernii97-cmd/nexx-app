@@ -6,7 +6,7 @@ import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import {
-    ShieldCheck,
+    ClipboardText,
     ChatCircleText,
     FileText,
     Plus,
@@ -42,10 +42,10 @@ export default function DashboardPage() {
 
     /** Summary statistics displayed in the dashboard header bento grid. */
     const stats = [
-        { label: 'Documented Incidents', value: String(incidentCount), icon: ShieldCheck, color: 'var(--sapphire)' },
-        { label: 'Active Sessions', value: String(conversationCount), icon: ChatCircleText, color: 'var(--champagne)' },
-        { label: 'Court-Ready Records', value: String(confirmedCount), icon: FileText, color: 'var(--info)' },
-        { label: 'Pattern Alerts', value: '0', icon: WarningCircle, color: 'var(--warning)' },
+        { label: 'Documented Incidents', value: String(incidentCount), icon: ClipboardText, color: 'var(--sapphire)', href: '/incident-report' },
+        { label: 'Active Sessions', value: String(conversationCount), icon: ChatCircleText, color: 'var(--champagne)', href: '/chat' },
+        { label: 'Court-Ready Records', value: String(confirmedCount), icon: FileText, color: 'var(--info)', href: '/docuvault' },
+        { label: 'Pattern Alerts', value: '0', icon: WarningCircle, color: 'var(--warning)', href: '/nex-profile' },
     ];
 
     /** Time-of-day greeting, set client-side only to avoid hydration mismatch. */
@@ -68,7 +68,7 @@ export default function DashboardPage() {
                         {greetingText}<span className="text-editorial shimmer capitalize">{userName}</span>
                     </span>
                 }
-                description="Your sanctuary of strategic empowerment. Everything is securely encrypted and court-ready."
+                description="Total control. Absolute privacy. Court-ready precision."
                 rightElement={
                     <div className="hidden md:block">
                         <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-[11px] uppercase tracking-wider text-white bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]">
@@ -133,15 +133,17 @@ export default function DashboardPage() {
                             {stats.map((stat) => {
                                 const Icon = stat.icon;
                                 return (
-                                    <div key={stat.label} className="p-5 rounded-[2rem] bg-[#0A1128] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.2)] transition-colors shadow-sm cursor-default">
-                                        <div className="flex items-center gap-3 mb-3">
-                                            <Icon size={20} weight="regular" style={{ color: stat.color }} />
-                                            <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{stat.label}</span>
+                                    <Link key={stat.label} href={stat.href} className="no-underline block h-full">
+                                        <div className="p-5 flex flex-col justify-between h-full rounded-[2rem] bg-[#0A1128] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.2)] hover:bg-[#121A3A] transition-colors shadow-sm cursor-pointer group">
+                                            <div className="flex items-center gap-3 mb-4 shrink-0">
+                                                <Icon size={28} weight="duotone" style={{ color: stat.color }} className="transition-transform group-hover:scale-110" />
+                                                <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest leading-tight">{stat.label}</span>
+                                            </div>
+                                            <p className="text-3xl font-serif text-white tracking-tight">
+                                                {stat.value}
+                                            </p>
                                         </div>
-                                        <p className="text-3xl font-serif text-white tracking-tight">
-                                            {stat.value}
-                                        </p>
-                                    </div>
+                                    </Link>
                                 );
                             })}
                         </div>

@@ -21,6 +21,7 @@ import {
     WarningCircle,
     Gear,
     Strategy,
+    SealCheck,
     type Icon,
     type IconWeight,
 } from '@phosphor-icons/react';
@@ -116,15 +117,15 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
     return (
         <motion.div
             whileHover={{ scale: 1.02, y: -4 }}
-            className="p-5 group flex flex-col justify-between h-full bg-white/5 backdrop-blur-3xl border border-white/20 hover:border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_16px_48px_rgba(0,0,0,0.5)] transition-all duration-300 rounded-2xl relative overflow-hidden"
+            className={`p-5 group flex flex-col justify-between h-full bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_16px_48px_rgba(0,0,0,0.5)] transition-all duration-300 rounded-2xl relative overflow-hidden ${safeUrl ? 'hover:border-white/40 cursor-pointer' : ''}`}
         >
             <div className="flex items-start justify-between gap-3 mb-4">
                 <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-[15px] text-white mb-1 truncate group-hover:text-[#60A5FA] transition-colors drop-shadow-sm">
+                    <h4 className="font-bold text-[15px] text-white mb-1 truncate group-hover:text-[#60A5FA] transition-colors drop-shadow-sm relative z-10 pointer-events-none">
                         {resource.name}
                     </h4>
                     {resource.description && (
-                        <p className="text-[13px] text-white/80 line-clamp-2 leading-relaxed font-medium">
+                        <p className="text-[13px] text-white/80 line-clamp-2 leading-relaxed font-medium relative z-10 pointer-events-none">
                             {resource.description}
                         </p>
                     )}
@@ -134,10 +135,10 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                         href={safeUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white/80 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all hover:bg-[#123D7E] hover:text-white"
+                        className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white/80 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all hover:bg-[#123D7E] hover:text-white after:absolute after:inset-0 z-0"
                         aria-label={`Open ${resource.name} website`}
                     >
-                        <ArrowUpRight size={14} weight="bold" />
+                        <ArrowUpRight size={14} weight="bold" className="relative z-10 pointer-events-none" />
                     </a>
                 )}
             </div>
@@ -147,14 +148,14 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                     isDialable(resource.phone) ? (
                         <a
                             href={`tel:${resource.phone.replace(/[^\d+]/g, '')}`}
-                            className="flex items-center gap-1.5 text-[12px] font-bold no-underline transition-colors hover:text-white text-[#60A5FA]"
+                            className="relative z-10 flex items-center gap-1.5 text-[12px] font-bold no-underline transition-colors hover:text-white text-[#60A5FA]"
                         >
                             <Phone size={14} weight="fill" />
                             {resource.phone}
                         </a>
                     ) : (
                         <span
-                            className="flex items-center gap-1.5 text-[12px] font-bold text-[#60A5FA]"
+                            className="relative z-10 flex items-center gap-1.5 text-[12px] font-bold text-[#60A5FA]"
                         >
                             <Phone size={14} weight="fill" />
                             {resource.phone}
@@ -163,7 +164,7 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                 )}
                 
                 {resource.address && (
-                    <p className="flex items-center gap-1.5 text-[12px] font-medium text-white/70 ml-auto">
+                    <p className="flex items-center gap-1.5 text-[12px] font-medium text-white/70 ml-auto pointer-events-none relative z-10">
                         <MapPin size={14} weight="fill" />
                         <span className="truncate max-w-[120px]">{resource.address}</span>
                     </p>
@@ -718,7 +719,7 @@ export default function ResourcesPage() {
                 <FinderHeroCard
                     icon={Heart}
                     title="Find a Therapist"
-                    description="Elite NPD-trained therapists & counselors in your area"
+                    description="Your network of power. Connect with elite NPD-trained therapists and legal professionals in your area."
                     localResources={countyData?.therapists ?? []}
                     fallbackResources={NATIONAL_THERAPIST_DIRECTORIES}
                     hasLocalData={hasCuratedData}
@@ -918,7 +919,7 @@ export default function ResourcesPage() {
             >
                 <div className="w-16 h-px bg-cloud mx-auto mb-6" />
                 <p className="text-[12px] font-bold uppercase tracking-widest text-[rgba(10,22,41,0.3)] mb-2 flex items-center justify-center gap-2">
-                    <Strategy size={12} weight="fill" /> Verified Directory
+                    <SealCheck size={14} className="text-[#10B981]" weight="fill" /> Verified Directory
                 </p>
                 <p className="text-[13px] font-medium text-sapphire-muted leading-relaxed">
                     Resources are secured and verified continuously. External resources should be verified independently.

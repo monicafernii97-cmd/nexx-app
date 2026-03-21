@@ -302,7 +302,7 @@ function DocuVaultPageInner() {
                     <PageHeader
                         icon={Bank as React.ElementType}
                         title="DocuVault"
-                        description="Professional Legal Document Generator. Trustworthy. Semantic. Verbatim. Generate court-ready PDFs with precision."
+                        description="Turn your reality into bulletproof legal strategy. Generate pristine, court-ready documents in seconds with AI-powered precision."
                     />
 
                     {/* ── Category Tabs ── */}

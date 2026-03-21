@@ -259,7 +259,7 @@ export default function EFilingPage() {
             <PageHeader
                 icon={FileArrowUp}
                 title="eFiling Hub"
-                description="Prepare and file your court documents electronically"
+                description="Bypass the red tape. Prepare, track, and officially file your court documents with effortless precision."
                 rightElement={
                     state ? (
                         <span className="text-xs font-medium px-3 py-1 rounded-full bg-white/60 border border-[var(--cloud-light)] text-[var(--sapphire-base)] backdrop-blur-sm shadow-sm flex items-center gap-1.5">
@@ -304,7 +304,7 @@ export default function EFilingPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15, duration: 0.5 }}
             >
-                {(isCacheLoading || isCacheMiss) ? (
+                {isCacheLoading ? (
                     <div className="card-premium p-8 animate-pulse border border-[var(--cloud-light)]">
                         <div className="flex items-center gap-5">
                             <div className="w-20 h-20 rounded-2xl bg-[var(--sapphire-light)]/10" />
@@ -352,7 +352,7 @@ export default function EFilingPage() {
                             </div>
                         </div>
                     </div>
-                ) : hasCourtSettings && cachedEntry && !eFilingPortal ? (
+                ) : hasCourtSettings && !eFilingPortal ? (
                     <div className="card-premium p-8 border border-[var(--cloud-light)] relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--champagne)]/5 rounded-full blur-2xl pointer-events-none" />
                         <div className="flex flex-col md:flex-row items-start gap-8 relative z-10">
@@ -364,7 +364,11 @@ export default function EFilingPage() {
                                     File in Person
                                 </h2>
                                 <p className="text-sm text-[var(--sapphire-base)] max-w-2xl leading-relaxed">
-                                    No eFiling portal was found for <span className="font-semibold">{locationLabel}</span>. You can file your documents in person at the county clerk&apos;s office.
+                                    {isCacheMiss ? (
+                                        <>eFiling details for <span className="font-semibold">{locationLabel}</span> are currently being verified. In the meantime, you can file your documents in person at the local county clerk&apos;s office.</>
+                                    ) : (
+                                        <>No eFiling portal was found for <span className="font-semibold">{locationLabel}</span>. You can file your documents in person at the county clerk&apos;s office.</>
+                                    )}
                                 </p>
                             </div>
                             
@@ -581,18 +585,23 @@ export default function EFilingPage() {
                             </CollapsibleSection>
 
                             <CollapsibleSection title="Common filing fees">
-                                <div className="flex items-start gap-3 mb-3 bg-[var(--champagne)]/10 p-4 rounded-xl text-[var(--sapphire-dark)]">
-                                    <Warning size={18} className="shrink-0 text-[var(--champagne)]" weight="duotone" />
-                                    <p className="font-medium text-sm">
-                                        Filing fees vary by court and case type. Check locally.
+                                <div className="flex items-start gap-3 mb-4 bg-white/5 p-4 rounded-xl border border-[rgba(255,255,255,0.1)] shadow-sm">
+                                    <Warning size={20} className="shrink-0 text-[#E5A84A]" weight="duotone" />
+                                    <p className="font-medium text-sm text-[rgba(255,255,255,0.9)] leading-relaxed">
+                                        These are general estimates. Filing fees vary significantly by court and case type. <strong className="text-white">Always verify exact costs with your local court clerk.</strong>
                                     </p>
                                 </div>
-                                <ul className="space-y-2 list-disc pl-5">
-                                    <li>Initial petition: $250–$350</li>
-                                    <li>Response/answer: $200–$300</li>
-                                    <li>Motions: $15–$50 each</li>
-                                    <li className="text-[var(--sapphire-light)] italic">Fee waivers may be available</li>
+                                <ul className="space-y-3 list-disc pl-5 text-white/90">
+                                    <li><span className="font-semibold text-white">Initial petition:</span> Est. $100–$150</li>
+                                    <li><span className="font-semibold text-white">Response/answer:</span> Est. $50–$100</li>
+                                    <li><span className="font-semibold text-white">Motions:</span> Est. $15–$50 each</li>
                                 </ul>
+                                <div className="mt-5 p-3 rounded-lg bg-[rgba(16,185,129,0.1)] border border-[rgba(16,185,129,0.2)] flex items-center gap-2">
+                                    <Info size={18} className="text-[#10B981] shrink-0" weight="bold" />
+                                    <p className="font-bold text-[#10B981] text-[14px]">
+                                        Fee waivers may be available based on income.
+                                    </p>
+                                </div>
                             </CollapsibleSection>
                         </div>
                     </motion.div>

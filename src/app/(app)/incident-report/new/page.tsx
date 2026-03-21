@@ -25,6 +25,8 @@ import {
     Strategy,
     FloppyDisk,
     ArrowRight,
+    ListChecks,
+    Brain,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -250,10 +252,10 @@ export default function NewIncidentPage() {
                 </Link>
                 <div>
                     <h1 className="text-3xl font-serif font-bold text-white m-0">
-                        Secure <span className="text-white shimmer">Testimony</span>
+                        Evidence & <span className="text-white shimmer">Pattern Log</span>
                     </h1>
                     <p className="text-[14px] font-medium text-white opacity-90 mt-1">
-                        Sanctuary for Truth and Admissibility
+                        Documenting undeniable proof of behavior and custody violations.
                     </p>
                 </div>
             </motion.div>
@@ -515,7 +517,7 @@ export default function NewIncidentPage() {
                         <div className="card-premium p-6 md:p-8">
                             <div className="flex items-center justify-between mb-5 border-b border-[rgba(10,22,41,0.04)] pb-4">
                                 <h3 className="text-[13px] font-bold tracking-[0.2em] uppercase text-sapphire flex items-center gap-2">
-                                    <Strategy size={16} weight="duotone" className="text-champagne" /> Court-Ready Summary
+                                    <ListChecks size={16} weight="bold" className="text-champagne drop-shadow-sm" /> Court-Ready Summary
                                 </h3>
                                 <button
                                     onClick={() => setIsEditing(!isEditing)}
@@ -543,7 +545,7 @@ export default function NewIncidentPage() {
                             {behavioralAnalysis && (
                                 <div className="card-premium p-6">
                                     <h3 className="text-[12px] font-bold tracking-[0.15em] uppercase mb-4 flex items-center gap-2 text-warning">
-                                        <Strategy size={16} weight="duotone" /> Behavioral Analysis
+                                        <Brain size={16} weight="fill" className="drop-shadow-sm" /> Behavioral Analysis
                                     </h3>
                                     <p className="text-[14px] leading-relaxed whitespace-pre-wrap text-sapphire">
                                         {behavioralAnalysis}
@@ -575,8 +577,12 @@ export default function NewIncidentPage() {
                                             return (
                                                 <span 
                                                     key={tag} 
-                                                    className="px-3 py-1.5 rounded-md text-[11px] font-bold tracking-wider uppercase border border-[rgba(10,22,41,0.1)] bg-white/50"
-                                                    style={{ color }}
+                                                    className="px-3 py-1.5 rounded-md text-[11px] font-bold tracking-wider uppercase border shadow-sm"
+                                                    style={{ 
+                                                        background: color ? `color-mix(in srgb, ${color} 15%, transparent)` : 'rgba(255,255,255,0.05)',
+                                                        color: color || 'rgba(255,255,255,0.7)',
+                                                        borderColor: color ? `color-mix(in srgb, ${color} 30%, transparent)` : 'rgba(255,255,255,0.1)'
+                                                    }}
                                                 >
                                                     {label}
                                                 </span>
@@ -591,13 +597,13 @@ export default function NewIncidentPage() {
                         </div>
 
                         <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                            <button onClick={() => setStep('describe')} className="btn-secondary flex-1 py-4 uppercase text-[12px] tracking-widest bg-white hover:bg-cloud border-transparent shadow-sm">
+                            <button onClick={() => setStep('describe')} className="flex-1 py-4 uppercase text-[12px] font-bold tracking-widest rounded-xl transition-all shadow-sm text-white bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.2)] hover:bg-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.3)]">
                                 Back to Edit
                             </button>
                             <button
                                 onClick={handleSaveDraft}
                                 disabled={isSaving}
-                                className="btn-secondary flex-1 flex items-center justify-center gap-2 disabled:scale-100 disabled:opacity-50 py-4 uppercase text-[12px] tracking-widest bg-white hover:bg-cloud border-transparent shadow-sm"
+                                className="flex-1 flex items-center justify-center gap-2 disabled:scale-100 disabled:opacity-50 py-4 uppercase text-[12px] font-bold tracking-widest rounded-xl transition-all shadow-sm text-white bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.2)] hover:bg-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.3)] cursor-pointer"
                             >
                                 <FloppyDisk size={16} weight="duotone" /> {isSaving ? 'Saving...' : 'Save as Draft'}
                             </button>

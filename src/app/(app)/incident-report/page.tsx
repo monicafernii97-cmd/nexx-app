@@ -10,6 +10,9 @@ import {
     Plus,
     MagnifyingGlass,
     Trash,
+    Tag,
+    ArrowRight,
+    DownloadSimple,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
@@ -36,6 +39,20 @@ export default function IncidentReportPage() {
         return true;
     });
 
+    // Group incidents by tag for Pattern Detected section
+    const patternsMap = new Map<string, Array<{ id: Id<'incidents'>, date: Date, narrative: string }>>();
+    if (incidents) {
+        incidents.forEach(incident => {
+            if (incident.tags && incident.tags.length > 0) {
+                const date = parseLocalDate(incident.date);
+                incident.tags.forEach(tag => {
+                    if (!patternsMap.has(tag)) patternsMap.set(tag, []);
+                    patternsMap.get(tag)!.push({ id: incident._id, date, narrative: incident.courtSummary || incident.narrative });
+                });
+            }
+        });
+    }
+
     const handleDelete = async () => {
         if (!deleteId) return;
         setIsDeleting(true);
@@ -61,9 +78,21 @@ export default function IncidentReportPage() {
                 }
                 description="Transform chaos into undeniable proof. Log, analyze, and bulletproof your timeline for court."
                 rightElement={
-                    <Link href="/incident-report/new" className="btn-primary inline-flex items-center justify-center gap-2 no-underline shadow-[0_8px_20px_rgba(18,61,126,0.4)] flex-shrink-0 px-6 py-3 rounded-xl">
-                        <Plus size={16} weight="bold" /> Log Incident
-                    </Link>
+                    <div className="flex items-center gap-3">
+                        {incidents && incidents.length > 0 && (
+                            <a 
+                                href="/api/incidents/export"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-[12px] font-bold uppercase tracking-wider bg-[rgba(255,255,255,0.05)] text-white hover:bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.3)] transition-all no-underline shrink-0"
+                            >
+                                <DownloadSimple size={16} weight="bold" /> Export Report
+                            </a>
+                        )}
+                        <Link href="/incident-report/new" className="btn-primary inline-flex items-center justify-center gap-2 no-underline shadow-[0_8px_20px_rgba(18,61,126,0.4)] flex-shrink-0 px-6 py-3 rounded-xl">
+                            <Plus size={16} weight="bold" /> Log Incident
+                        </Link>
+                    </div>
                 }
             />
 
@@ -192,15 +221,32 @@ export default function IncidentReportPage() {
                                             {/* Content */}
                                             <div className="flex-1 min-w-0 py-1">
                                                 <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                                    <span
-                                                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase"
-                                                        style={{ 
-                                                            background: cat?.color ? `color-mix(in srgb, ${cat.color} 12%, transparent)` : 'var(--cloud)', 
-                                                            color: cat?.color || 'var(--sapphire-muted)' 
-                                                        }}
-                                                    >
-                                                        {cat?.label || incident.category}
-                                                    </span>
+                                                    {incident.tags && incident.tags.map(tag => {
+                                                        const ct = INCIDENT_CATEGORIES.find((c) => c.value === tag);
+                                                        return (
+                                                            <span
+                                                                key={tag}
+                                                                className="px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase"
+                                                                style={{ 
+                                                                    background: ct?.color ? `color-mix(in srgb, ${ct.color} 12%, transparent)` : 'var(--cloud)', 
+                                                                    color: ct?.color || 'var(--sapphire-muted)' 
+                                                                }}
+                                                            >
+                                                                {ct?.label || tag.replace(/_/g, ' ')}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                    {(!incident.tags || incident.tags.length === 0) && incident.category && (
+                                                        <span
+                                                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase"
+                                                            style={{ 
+                                                                background: cat?.color ? `color-mix(in srgb, ${cat.color} 12%, transparent)` : 'var(--cloud)', 
+                                                                color: cat?.color || 'var(--sapphire-muted)' 
+                                                            }}
+                                                        >
+                                                            {cat?.label || incident.category}
+                                                        </span>
+                                                    )}
                                                     {incident.status === 'draft' && (
                                                         <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase bg-warning/10 text-warning">Draft</span>
                                                     )}
@@ -250,6 +296,59 @@ export default function IncidentReportPage() {
                                 </motion.div>
                             );
                         })}
+                    </div>
+                )}
+
+                {/* Pattern Detected Section */}
+                {incidents && incidents.length > 0 && Array.from(patternsMap.keys()).length > 0 && (
+                    <div className="mt-16 mb-8">
+                        <h2 className="text-[13px] font-bold tracking-[0.2em] uppercase text-rose flex items-center gap-2 mb-6">
+                            <Tag size={18} weight="duotone" /> Pattern Detected
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            {Array.from(patternsMap.entries())
+                                .sort((a, b) => b[1].length - a[1].length) // Sort by number of occurrences
+                                .map(([tag, occurrences]) => {
+                                const catTheme = INCIDENT_CATEGORIES.find(c => c.value === tag);
+                                const color = catTheme ? catTheme.color : 'var(--sapphire)';
+                                const label = catTheme ? catTheme.label : tag.replace(/_/g, ' ');
+                                
+                                return (
+                                    <div key={tag} className="card-premium p-6 border-[rgba(10,22,41,0.05)]">
+                                        <div className="flex items-center justify-between mb-5">
+                                            <span 
+                                                className="px-3 py-1.5 rounded-md text-[11px] font-bold tracking-wider uppercase bg-white border border-[rgba(10,22,41,0.05)] shadow-sm"
+                                                style={{ color }}
+                                            >
+                                                {label}
+                                            </span>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-sapphire-muted bg-cloud px-2.5 py-1 rounded-md">
+                                                {occurrences.length} {occurrences.length === 1 ? 'Event' : 'Events'}
+                                            </span>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {occurrences.sort((a,b) => b.date.getTime() - a.date.getTime()).slice(0, 3).map(occ => (
+                                                <Link 
+                                                    key={occ.id} 
+                                                    href={`/incident-report/${occ.id}`}
+                                                    className="block p-4 rounded-[1.2rem] bg-cloud hover:bg-white hover:shadow-[0_4px_12px_rgba(10,22,41,0.05)] border border-[rgba(10,22,41,0.03)] hover:border-[rgba(10,22,41,0.08)] transition-all no-underline group"
+                                                >
+                                                    <div className="flex items-center justify-between mb-1.5">
+                                                        <span className="text-[11px] font-bold text-sapphire">
+                                                            {occ.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                                        </span>
+                                                        <ArrowRight size={14} weight="bold" className="text-sapphire-muted opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-4px] group-hover:translate-x-0" />
+                                                    </div>
+                                                    <p className="text-[13px] font-medium text-sapphire-muted line-clamp-2 leading-relaxed">
+                                                        {occ.narrative}
+                                                    </p>
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
             </div>

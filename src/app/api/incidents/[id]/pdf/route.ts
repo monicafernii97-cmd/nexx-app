@@ -63,7 +63,7 @@ export async function GET(
             return new NextResponse('Incident not found or access denied', { status: 404 });
         }
 
-        const catLabel = INCIDENT_CATEGORIES.find(c => c.value === incident.category)?.label || incident.category;
+        const catLabel = INCIDENT_CATEGORIES.find(c => c.value === incident.category)?.label || incident.category || 'Event';
 
         // Build Key Point Boxes (if analysis exists, we can dynamically add them, but for now we just show courtSummary properties)
         let keyPointBoxes = '';

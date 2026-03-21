@@ -1,18 +1,14 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getOpenAI } from '@/lib/openai';
+import { INCIDENT_CATEGORIES } from '@/lib/constants';
+import { getAuthenticatedConvexClient } from '@/lib/convexServer';
+import { api } from '../../../../../convex/_generated/api';
 
 const MAX_NARRATIVE_LENGTH = 5000;
 
-// Strict allowlist for pattern tags — model output is validated against this
-const ALLOWED_TAGS = new Set([
-    'court_order_violation', 'inflexibility', 'gaslighting', 'love_bombing',
-    'devaluation', 'triangulation', 'financial_control', 'parental_alienation',
-    'harassment', 'intimidation', 'isolation', 'blame_shifting',
-    'false_accusations', 'micromanagement', 'boundary_violation',
-    'coercive_control', 'neglect', 'custody_interference',
-    'documentation_tampering', 'witness_manipulation',
-]);
+// Strict allowlist for pattern tags based on official categories
+const ALLOWED_TAGS = new Set<string>(INCIDENT_CATEGORIES.map(c => c.value));
 
 /**
  * Format a YYYY-MM-DD date string without timezone shift.
@@ -65,6 +61,23 @@ export async function POST(req: NextRequest) {
             contextLines.push(`**Witnesses:** ${witnesses.slice(0, 500)}`);
         }
 
+        // Fetch NEX Profile for personalized behavioral tracking
+        const convex = await getAuthenticatedConvexClient();
+        const nexProfile = await convex.query(api.nexProfiles.getByUser);
+
+        if (nexProfile) {
+            contextLines.push(`\n**[User's Recognized NEX Patterns]**`);
+            if (nexProfile.behaviors?.length) {
+                contextLines.push(`- **Known Behaviors:** ${nexProfile.behaviors.join(', ')}`);
+            }
+            if (nexProfile.manipulationTactics?.length) {
+                contextLines.push(`- **Known Manipulation Tactics:** ${nexProfile.manipulationTactics.join(', ')}`);
+            }
+            if (nexProfile.triggerPatterns?.length) {
+                contextLines.push(`- **Known Trigger Patterns:** ${nexProfile.triggerPatterns.join(', ')}`);
+            }
+        }
+
         const completion = await getOpenAI().chat.completions.create({
             model: 'gpt-4o',
             messages: [
@@ -78,7 +91,7 @@ export async function POST(req: NextRequest) {
 
 3. **Strategic Response Suggestion** — Provide 2-3 actionable recommendations for how the user should respond or document this going forward. Include specific language they could use if a response is needed.
 
-4. **Pattern Tags** — Return a comma-separated list of behavioral/legal pattern tags that apply to this incident. Use ONLY from this list: court_order_violation, inflexibility, gaslighting, love_bombing, devaluation, triangulation, financial_control, parental_alienation, harassment, intimidation, isolation, blame_shifting, false_accusations, micromanagement, boundary_violation, coercive_control, neglect, custody_interference, documentation_tampering, witness_manipulation. Only include tags that clearly apply.
+4. **Pattern Tags** — Return a comma-separated list of behavioral/legal pattern tags that apply to this incident. Use ONLY from this exact set: ${Array.from(ALLOWED_TAGS).join(', ')}. Compare the incident against the [User's Recognized NEX Patterns] detailed above to detect known themes. Return only tags that clearly apply to the reported behavior.
 
 Format your response EXACTLY as follows:
 ---COURT_SUMMARY---

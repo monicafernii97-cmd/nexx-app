@@ -31,7 +31,7 @@ export default function NewIncidentPage() {
     const { userId } = useUser();
     const [step, setStep] = useState<Step>('describe');
     const [narrative, setNarrative] = useState('');
-    const [category, setCategory] = useState('');
+    const [tags, setTags] = useState<string[]>([]);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
     const [severity, setSeverity] = useState(2);
@@ -65,7 +65,6 @@ export default function NewIncidentPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     narrative: narrative.trim(),
-                    category: category || 'other',
                     date,
                     time,
                     severity,
@@ -84,6 +83,7 @@ export default function NewIncidentPage() {
             setCourtSummary(data.courtSummary || '');
             setBehavioralAnalysis(data.behavioralAnalysis || '');
             setStrategicResponse(data.strategicResponse || '');
+            setTags(data.tags || []);
             setStep('review');
         } catch (error) {
             console.error('Analysis error:', error);
@@ -107,7 +107,7 @@ export default function NewIncidentPage() {
                 incidentId = await createIncident({
                     narrative,
                     courtSummary,
-                    category: (category || 'other') as 'emotional_abuse' | 'financial_abuse' | 'parental_alienation' | 'custody_violation' | 'harassment' | 'threats' | 'manipulation' | 'neglect' | 'other',
+                    tags,
                     severity,
                     date,
                     time,
@@ -285,28 +285,6 @@ export default function NewIncidentPage() {
                             </div>
                         </div>
 
-                        {/* Category Tags */}
-                        <div>
-                            <label className="text-[12px] font-bold tracking-widest uppercase mb-4 flex items-center gap-2 text-white">
-                                <Tag size={14} /> Incident Context
-                            </label>
-                            <div className="flex flex-wrap gap-2.5">
-                                {INCIDENT_CATEGORIES.map((cat) => (
-                                    <button
-                                        key={cat.value}
-                                        onClick={() => setCategory(category === cat.value ? '' : cat.value)}
-                                        className={`cursor-pointer transition-all px-5 py-2.5 rounded-full border text-[13px] font-bold backdrop-blur-sm ${
-                                            category === cat.value
-                                            ? 'bg-[linear-gradient(135deg,rgba(255,255,255,0.15),rgba(255,255,255,0.05))] border-white shadow-[0_4px_16px_rgba(255,255,255,0.15)] text-white'
-                                            : 'bg-[rgba(10,22,41,0.4)] border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.3)] text-white/60 hover:text-white'
-                                        }`}
-                                    >
-                                        {cat.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
                         {/* Additional Details */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
@@ -451,6 +429,33 @@ export default function NewIncidentPage() {
                                     </p>
                                 </div>
                             )}
+
+                            {tags.length > 0 && (
+                                <div className="card-premium p-6 md:col-span-2">
+                                    <h3 className="text-[12px] font-bold tracking-[0.15em] uppercase mb-4 flex items-center gap-2 text-rose">
+                                        <Tag size={16} weight="duotone" /> Detected Patterns
+                                    </h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {tags.map((tag) => {
+                                            const catTheme = INCIDENT_CATEGORIES.find(c => c.value === tag);
+                                            const color = catTheme ? catTheme.color : 'var(--sapphire)';
+                                            const label = catTheme ? catTheme.label : tag.replace(/_/g, ' ');
+                                            return (
+                                                <span 
+                                                    key={tag} 
+                                                    className="px-3 py-1.5 rounded-md text-[11px] font-bold tracking-wider uppercase border border-[rgba(10,22,41,0.1)] bg-white/50"
+                                                    style={{ color }}
+                                                >
+                                                    {label}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                    <p className="text-[12px] font-medium text-sapphire/60 mt-3 pt-3 border-t border-[rgba(10,22,41,0.05)]">
+                                        These patterns will be flagged in your court-ready summary.
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex gap-4 pt-4">
@@ -494,7 +499,7 @@ export default function NewIncidentPage() {
                                     setCourtSummary('');
                                     setBehavioralAnalysis('');
                                     setStrategicResponse('');
-                                    setCategory('');
+                                    setTags([]);
                                     setSeverity(2);
                                     setLocation('');
                                     setWitnesses('');

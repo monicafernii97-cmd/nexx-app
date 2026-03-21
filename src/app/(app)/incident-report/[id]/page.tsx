@@ -103,7 +103,7 @@ export default function IncidentDetailPage() {
             courtSummary: incident.courtSummary || '',
             date: incident.date,
             time: incident.time,
-            category: incident.category,
+            category: incident.category || 'other',
         });
         setIsEditing(true);
     };

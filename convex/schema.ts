@@ -113,17 +113,20 @@ export default defineSchema({
         userId: v.id('users'),
         narrative: v.string(),
         courtSummary: v.optional(v.string()),
-        category: v.union(
-            v.literal('emotional_abuse'),
-            v.literal('financial_abuse'),
-            v.literal('parental_alienation'),
-            v.literal('custody_violation'),
-            v.literal('harassment'),
-            v.literal('threats'),
-            v.literal('manipulation'),
-            v.literal('neglect'),
-            v.literal('other')
+        category: v.optional(
+            v.union(
+                v.literal('emotional_abuse'),
+                v.literal('financial_abuse'),
+                v.literal('parental_alienation'),
+                v.literal('custody_violation'),
+                v.literal('harassment'),
+                v.literal('threats'),
+                v.literal('manipulation'),
+                v.literal('neglect'),
+                v.literal('other')
+            )
         ),
+        tags: v.optional(v.array(v.string())),
         severity: v.number(),
         date: v.string(),
         time: v.string(),

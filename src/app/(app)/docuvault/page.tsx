@@ -482,16 +482,19 @@ function DocuVaultPageInner() {
                                                 let extractedText = '';
 
                                                 if (isBinary) {
-                                                    // Send to server for parsing
-                                                    const formData = new FormData();
-                                                    formData.append('file', file);
+                                                    // Convert to base64 and send as JSON
+                                                    const arrayBuffer = await file.arrayBuffer();
+                                                    const base64 = btoa(
+                                                        new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+                                                    );
                                                     const res = await fetch('/api/documents/parse', {
                                                         method: 'POST',
-                                                        body: formData,
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ filename: file.name, data: base64 }),
                                                     });
-                                                    const data = await res.json();
-                                                    if (!res.ok) throw new Error(data.error || 'Parse failed');
-                                                    extractedText = data.text;
+                                                    const result = await res.json();
+                                                    if (!res.ok) throw new Error(result.error || 'Parse failed');
+                                                    extractedText = result.text;
                                                 } else {
                                                     // Read plain text client-side
                                                     extractedText = await file.text();

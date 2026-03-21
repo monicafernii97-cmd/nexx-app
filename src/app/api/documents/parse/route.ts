@@ -1,42 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 
 export const maxDuration = 30;
 
 /**
  * POST /api/documents/parse
- * Accepts a multipart form-data file upload (.pdf, .docx, .txt, .md, .csv)
- * and returns the extracted plain text content.
+ * Accepts a JSON body with { filename, data } where data is a base64-encoded file.
+ * Returns the extracted plain text content.
  */
 export async function POST(request: NextRequest) {
     try {
-        const formData = await request.formData();
-        const file = formData.get('file') as File | null;
-
-        if (!file) {
-            return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+        const { userId } = await auth();
+        if (!userId) {
+            return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
+        const body = await request.json();
+        const { filename, data } = body as { filename?: string; data?: string };
+
+        if (!filename || !data) {
+            return NextResponse.json({ error: 'Missing filename or data' }, { status: 400 });
+        }
+
+        const buffer = Buffer.from(data, 'base64');
+
         const maxSize = 10 * 1024 * 1024; // 10 MB
-        if (file.size > maxSize) {
+        if (buffer.length > maxSize) {
             return NextResponse.json({ error: 'File too large. Maximum size is 10 MB.' }, { status: 400 });
         }
 
-        const name = file.name.toLowerCase();
+        const name = filename.toLowerCase();
         let text = '';
 
         if (name.endsWith('.pdf')) {
             const { PDFParse } = await import('pdf-parse');
-            const buffer = Buffer.from(await file.arrayBuffer());
             const pdf = new PDFParse({ data: new Uint8Array(buffer) });
             const result = await pdf.getText();
             text = result.text;
         } else if (name.endsWith('.docx')) {
             const mammoth = await import('mammoth');
-            const buffer = Buffer.from(await file.arrayBuffer());
             const result = await mammoth.extractRawText({ buffer });
             text = result.value;
         } else if (name.endsWith('.txt') || name.endsWith('.md') || name.endsWith('.csv')) {
-            text = await file.text();
+            text = buffer.toString('utf-8');
         } else {
             return NextResponse.json(
                 { error: 'Unsupported file type. Please upload a PDF, DOCX, TXT, MD, or CSV file.' },
@@ -54,7 +60,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        return NextResponse.json({ text, filename: file.name, characters: text.length });
+        return NextResponse.json({ text, filename, characters: text.length });
     } catch (error) {
         console.error('[Document Parse Error]', error);
         return NextResponse.json({ error: 'Failed to parse file' }, { status: 500 });

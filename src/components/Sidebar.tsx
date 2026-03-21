@@ -19,6 +19,7 @@ import {
     GridFour,
     FolderOpen,
     FileArrowUp,
+    Crown,
     IconWeight,
 } from '@phosphor-icons/react';
 import { useState, useMemo, useCallback, type ComponentType, type CSSProperties } from 'react';
@@ -59,6 +60,7 @@ const navItems: NavItem[] = [
     { label: 'eFiling', href: '/efiling', icon: FileArrowUp },
     { label: 'Resources', href: '/resources', icon: BookOpen },
     { label: 'My Profile', href: '/profile', icon: UserCircle },
+    { label: 'Subscription', href: '/subscription', icon: Crown },
     { label: 'Settings', href: '/settings', icon: Gear },
 ];
 

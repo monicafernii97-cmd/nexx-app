@@ -124,7 +124,7 @@ export default function WelcomePage() {
 
   // Only render welcome page for unauthenticated users
   return (
-    <div className="bg-[#0A1128] min-h-screen flex flex-col justify-center relative overflow-hidden font-sans">
+    <div className="bg-[#0A1128] min-h-screen flex flex-col relative overflow-x-hidden font-sans">
       {/* Jumbo Background NEXX Shimmer */}
       <div className="absolute inset-0 flex items-center pointer-events-none z-0 overflow-hidden opacity-[0.03]">
         <motion.h1
@@ -151,7 +151,8 @@ export default function WelcomePage() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[50%] bg-[#1A4B9B]/20 rounded-full blur-[100px]" />
       </div>
 
-      <div className="w-full max-w-7xl mx-auto px-6 md:px-12 xl:px-24 z-10 relative mt-[-10vh]">
+      {/* ═══ Hero Section ═══ */}
+      <div className="w-full max-w-7xl mx-auto px-6 md:px-12 xl:px-24 z-10 relative flex flex-col justify-center min-h-screen">
         
         {/* Logo Mark */}
         <motion.div
@@ -214,17 +215,193 @@ export default function WelcomePage() {
           </Link>
         </motion.div>
 
+        {/* Scroll hint */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2, duration: 1 }}
+          className="absolute bottom-8 left-0 right-0 text-center text-[10px] md:text-xs tracking-[0.25em] font-semibold text-[rgba(255,255,255,0.3)] uppercase"
+        >
+          Prepare. Preempt. Prevail.
+        </motion.p>
+
+      </div>
+
+      {/* ═══ Pricing Section ═══ */}
+      <div className="w-full z-10 relative py-24 md:py-32">
+        {/* Section ambient glow */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-[20%] left-[50%] -translate-x-1/2 w-[60%] h-[40%] bg-[#1A4B9B]/10 rounded-full blur-[150px]" />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-6 md:px-12 xl:px-24">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-100px' }}
+            transition={{ duration: 0.8 }}
+            className="text-center mb-16"
+          >
+            <p className="text-[11px] md:text-xs font-bold tracking-[0.25em] uppercase text-[var(--champagne)] mb-4">
+              Choose Your Arsenal
+            </p>
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold italic text-white tracking-tight mb-4">
+              Plans Built for Battle
+            </h2>
+            <p className="text-base text-[rgba(255,255,255,0.5)] max-w-lg mx-auto leading-relaxed">
+              Every tier is designed to arm you with the tools you need. Start free, upgrade when you&apos;re ready to dominate.
+            </p>
+          </motion.div>
+
+          {/* Pricing Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[
+              {
+                name: 'Free',
+                price: '$0',
+                period: 'forever',
+                description: 'Get your bearings. Start documenting.',
+                badge: null,
+                features: [
+                  '5 legal AI messages/day',
+                  '50 support messages/day',
+                  '3 document generations/mo',
+                  '3 court rules lookups/mo',
+                  'Incident reporting',
+                ],
+                cta: 'Start Free',
+                accent: 'rgba(255,255,255,0.1)',
+                borderAccent: 'rgba(255,255,255,0.08)',
+                popular: false,
+              },
+              {
+                name: 'Pro',
+                price: '$29.99',
+                period: '/month',
+                description: 'For parents actively building their case.',
+                badge: null,
+                features: [
+                  '50 legal AI messages/day',
+                  'Unlimited support chat',
+                  'Unlimited documents',
+                  'Full resource finder',
+                  'Priority pattern detection',
+                ],
+                cta: 'Go Pro',
+                accent: 'rgba(26,75,155,0.3)',
+                borderAccent: 'rgba(26,75,155,0.4)',
+                popular: false,
+              },
+              {
+                name: 'Premium',
+                price: '$49.99',
+                period: '/month',
+                description: 'Maximum firepower for high-conflict cases.',
+                badge: 'Most Popular',
+                features: [
+                  '100 legal AI messages/day',
+                  'Unlimited support chat',
+                  'Unlimited everything',
+                  'Advanced compliance checks',
+                  'Priority support',
+                ],
+                cta: 'Go Premium',
+                accent: 'rgba(229,168,74,0.15)',
+                borderAccent: 'rgba(229,168,74,0.35)',
+                popular: true,
+              },
+              {
+                name: 'Executive',
+                price: '$149.99',
+                period: '/month',
+                description: 'Unlimited. Unrestricted. Unstoppable.',
+                badge: 'Elite',
+                features: [
+                  'Unlimited legal AI (GPT-4o)',
+                  'Unlimited everything',
+                  'All models & features',
+                  'White-glove onboarding',
+                  'Dedicated support channel',
+                ],
+                cta: 'Go Executive',
+                accent: 'rgba(229,168,74,0.25)',
+                borderAccent: 'rgba(229,168,74,0.5)',
+                popular: false,
+              },
+            ].map((plan, i) => (
+              <motion.div
+                key={plan.name}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-50px' }}
+                transition={{ delay: i * 0.1, duration: 0.6 }}
+                className={`relative rounded-[2rem] p-6 flex flex-col border transition-all hover:scale-[1.02] hover:shadow-[0_8px_40px_rgba(26,75,155,0.2)] ${
+                  plan.popular
+                    ? 'bg-gradient-to-b from-[#0F1D3D] to-[#0A1128] border-[rgba(229,168,74,0.35)] shadow-[0_4px_30px_rgba(229,168,74,0.1)]'
+                    : 'bg-[#0A1128] border-[rgba(255,255,255,0.08)]'
+                }`}
+              >
+                {/* Badge */}
+                {plan.badge && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] shadow-[0_2px_12px_rgba(229,168,74,0.3)]">
+                      {plan.badge}
+                    </span>
+                  </div>
+                )}
+
+                {/* Plan Name */}
+                <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--champagne)] mb-3 mt-1">
+                  {plan.name}
+                </h3>
+
+                {/* Price */}
+                <div className="flex items-baseline gap-1 mb-1">
+                  <span className="text-4xl font-serif font-bold text-white tracking-tight">{plan.price}</span>
+                  <span className="text-sm text-[rgba(255,255,255,0.4)]">{plan.period}</span>
+                </div>
+
+                {/* Description */}
+                <p className="text-[13px] text-[rgba(255,255,255,0.5)] leading-relaxed mb-6">
+                  {plan.description}
+                </p>
+
+                {/* Features */}
+                <ul className="flex-1 space-y-3 mb-8">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2.5">
+                      <span className="mt-0.5 w-4 h-4 rounded-full bg-[rgba(229,168,74,0.15)] flex items-center justify-center shrink-0">
+                        <span className="text-[10px] text-[var(--champagne)]">✓</span>
+                      </span>
+                      <span className="text-[13px] text-[rgba(255,255,255,0.7)] leading-snug">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* CTA */}
+                <Link href="/sign-up">
+                  <button
+                    className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all ${
+                      plan.popular
+                        ? 'bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] hover:shadow-[0_4px_20px_rgba(229,168,74,0.4)]'
+                        : 'bg-[rgba(255,255,255,0.05)] text-[rgba(255,255,255,0.8)] border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.2)]'
+                    }`}
+                  >
+                    {plan.cta}
+                  </button>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Bottom Footer Text */}
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.2, duration: 1 }}
-        className="absolute bottom-8 left-0 right-0 text-center text-[10px] md:text-xs tracking-[0.25em] font-semibold text-[rgba(255,255,255,0.3)] uppercase"
-      >
-        Prepare. Preempt. Prevail.
-      </motion.p>
+      <div className="w-full py-8 z-10 relative">
+        <p className="text-center text-[10px] md:text-xs tracking-[0.25em] font-semibold text-[rgba(255,255,255,0.3)] uppercase">
+          Prepare. Preempt. Prevail.
+        </p>
+      </div>
     </div>
   );
 }

@@ -68,7 +68,7 @@ export default function DashboardPage() {
                         {greetingText}<span className="text-editorial shimmer capitalize">{userName}</span>
                     </span>
                 }
-                description="Total control. Absolute privacy. Court-ready precision."
+                description="Your secure command center. Turn high-conflict chaos into calculated, court-ready strategy."
                 rightElement={
                     <div className="hidden md:block">
                         <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-[11px] uppercase tracking-wider text-white bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]">

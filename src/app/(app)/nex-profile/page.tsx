@@ -12,7 +12,6 @@ import {
     FloppyDisk,
     Check,
     Warning,
-    Lightning,
     Plus,
     X,
 } from '@phosphor-icons/react';

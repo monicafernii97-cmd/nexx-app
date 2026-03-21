@@ -249,7 +249,7 @@ function FinderHeroCard({
             {/* Header */}
             <div className="flex items-center gap-4 mb-6 relative z-10">
                 <div
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white/10 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)] border border-white/30"
+                    className="shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center bg-white/10 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)] border border-white/30"
                 >
                     <Icon size={28} weight="duotone" className={title.includes('Attorney') ? 'text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]' : 'text-[#10B981] drop-shadow-[0_2px_8px_rgba(16,185,129,0.8)]'} />
                 </div>

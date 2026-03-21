@@ -168,7 +168,7 @@ export default function NexProfilePage() {
 
                 <div className="space-y-6">
                     {/* ── NEX Overview ── */}
-                    <Section icon={<Siren size={20} className="text-white" weight="bold" />} title="NEX Overview">
+                    <Section icon={<Siren size={20} className="text-rose" weight="duotone" />} title="NEX Overview">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
                                 <label className="text-sm text-white mb-2 block">
@@ -216,7 +216,7 @@ export default function NexProfilePage() {
                     </Section>
 
                     {/* ── Behavioral Patterns ── */}
-                    <Section icon={<Brain size={20} className="text-white" weight="bold" />} title="Behavioral Patterns">
+                    <Section icon={<Brain size={20} className="text-purple-400" weight="duotone" />} title="Behavioral Patterns">
                         <p className="text-[13px] text-white/90 mb-4">
                             Select all behaviors you&apos;ve observed. NEXX will flag these proactively in conversations.
                         </p>
@@ -243,7 +243,7 @@ export default function NexProfilePage() {
                     </Section>
 
                     {/* ── Communication Style ── */}
-                    <Section icon={<ChatTeardropText size={20} className="text-white" weight="bold" />} title="Communication Style">
+                    <Section icon={<ChatTeardropText size={20} className="text-emerald" weight="duotone" />} title="Communication Style">
                         <p className="text-[13px] text-white/90 mb-4">
                             How does your NEX typically communicate?
                         </p>
@@ -272,7 +272,7 @@ export default function NexProfilePage() {
                     </Section>
 
                     {/* ── Manipulation Tactics ── */}
-                    <Section icon={<Warning size={20} className="text-white" weight="bold" />} title="Known Manipulation Tactics">
+                    <Section icon={<Warning size={20} className="text-warning" weight="duotone" />} title="Known Manipulation Tactics">
                         <p className="text-[13px] text-white/90 mb-4">
                             Select tactics your NEX uses. NEXX will watch for these in your descriptions.
                         </p>
@@ -299,7 +299,7 @@ export default function NexProfilePage() {
                     </Section>
 
                     {/* ── Trigger Patterns ── */}
-                    <Section icon={<Strategy size={20} className="text-white" weight="bold" />} title="Trigger Patterns">
+                    <Section icon={<Strategy size={20} className="text-[#60A5FA]" weight="duotone" />} title="Trigger Patterns">
                         <p className="text-[13px] text-white/90 mb-4">
                             What sets your NEX off? Add specific patterns you&apos;ve noticed.
                         </p>
@@ -351,7 +351,7 @@ export default function NexProfilePage() {
 
                     {/* ── AI Insights (read-only) ── */}
                     {nexProfile?.aiInsights && (
-                        <Section icon={<Strategy size={20} className="text-[#3b82f6]" weight="fill" />} title="AI Threat Analysis Summary">
+                        <Section icon={<Strategy size={20} className="text-[#3b82f6]" weight="duotone" />} title="NEXX Threat Analysis Summary">
                             <div className="card-premium p-6 border border-[#3b82f6]/20 bg-gradient-to-br from-white to-[#eff6ff] shadow-sm ml-1">
                                 <p className="text-sm leading-relaxed whitespace-pre-wrap text-[var(--sapphire-dark)] font-medium">
                                     {nexProfile.aiInsights}

@@ -267,3 +267,33 @@ body {
 h1, h2, h3, h4, h5, h6, p, span, div {
   color: inherit;
 }
+/* Clerk UserProfile Overrides for Dark Visibility */
+.cl-headerTitle,
+.cl-headerSubtitle,
+.cl-profilePageTitle,
+.cl-profilePageSubtitle,
+.cl-userPreviewMainIdentifier,
+.cl-userPreviewSecondaryIdentifier,
+.cl-profileSectionContent p,
+.cl-accordionTriggerButton,
+.cl-navbarButton {
+  color: #FFFFFF !important;
+}
+
+.cl-dividerLine,
+.cl-dividerRow {
+  background: rgba(255, 255, 255, 0.4) !important;
+}
+
+.cl-navbar {
+  border-right: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.cl-profileSectionTitle {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: #FFFFFF !important;
+}
+
+.cl-profileSectionContent {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+}

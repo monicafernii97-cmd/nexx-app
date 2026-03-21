@@ -58,6 +58,7 @@ function DocuVaultPageInner() {
 
     // Content input state
     const [documentContent, setDocumentContent] = useState('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Flow state
     const [view, setView] = useState<GeneratorView>('compose');
@@ -458,10 +459,36 @@ function DocuVaultPageInner() {
                             {/* Bottom bar overlay */}
                             <div className="absolute bottom-3 left-6 right-6 flex items-center justify-between pt-3 border-t border-white/10">
                                 <div className="flex gap-4">
+                                    <button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="flex items-center gap-2 text-[14px] font-bold cursor-pointer transition-colors text-white/60 hover:text-[#60A5FA] z-10 relative"
+                                    >
+                                        <Paperclip size={18} weight="bold" />
+                                        <span>Upload File</span>
+                                    </button>
+                                    <input 
+                                        type="file" 
+                                        ref={fileInputRef} 
+                                        className="hidden" 
+                                        accept=".txt,.md,.csv" 
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                try {
+                                                    const text = await file.text();
+                                                    setDocumentContent(prev => prev ? prev + '\n\n' + text : text);
+                                                } catch (err) {
+                                                    setGenerationError('Failed to read file. Please paste content manually.');
+                                                }
+                                            }
+                                            // Reset input so the same file can be selected again
+                                            e.target.value = '';
+                                        }} 
+                                    />
                                     {documentContent && (
                                         <button
                                             onClick={() => setDocumentContent('')}
-                                            className="flex items-center gap-2 text-sm font-bold cursor-pointer transition-colors text-white/60 hover:text-white"
+                                            className="flex items-center gap-2 text-[14px] font-bold cursor-pointer transition-colors text-white/60 hover:text-rose z-10 relative"
                                         >
                                             <X size={18} weight="bold" /> 
                                             <span>Clear</span>

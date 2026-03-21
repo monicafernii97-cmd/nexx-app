@@ -75,7 +75,7 @@ export default function IncidentDetailPage() {
 
     if (!incident) {
         return (
-            <div className="max-w-3xl mx-auto flex items-center justify-center h-64">
+            <div className="max-w-[85rem] mx-auto flex items-center justify-center h-64">
                 <div className="w-10 h-10 rounded-full border-2 border-sapphire border-t-transparent animate-spin" />
             </div>
         );
@@ -196,7 +196,7 @@ export default function IncidentDetailPage() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto pb-16 w-full px-2">
+        <div className="max-w-[85rem] mx-auto pb-16 w-full px-6 lg:px-12">
             {/* Header */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}

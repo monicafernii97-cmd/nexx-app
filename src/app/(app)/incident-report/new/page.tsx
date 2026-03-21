@@ -132,7 +132,7 @@ export default function NewIncidentPage() {
     const severityColors = ['var(--emerald)', 'var(--warning)', 'var(--rose)'];
 
     return (
-        <div className="max-w-3xl mx-auto pb-16 w-full px-2 mt-4">
+        <div className="max-w-5xl mx-auto pb-16 w-full px-6 lg:px-12 mt-4">
             {/* Header */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}

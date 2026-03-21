@@ -51,7 +51,7 @@ export default function IncidentReportPage() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto pb-20 w-full px-2 mt-4">
+        <div className="max-w-[85rem] mx-auto pb-20 w-full px-6 lg:px-12 mt-4">
             {/* Header */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}

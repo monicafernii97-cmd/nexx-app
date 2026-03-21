@@ -11,7 +11,6 @@ import {
     Briefcase,
     FloppyDisk,
     Check,
-    Strategy,
     Shapes,
 } from '@phosphor-icons/react';
 import { US_STATES } from '@/lib/constants';

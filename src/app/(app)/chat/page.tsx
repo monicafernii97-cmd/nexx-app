@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
+import { Id } from '../../../../convex/_generated/dataModel';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -30,7 +31,7 @@ export default function ChatListPage() {
     const [isCreating, setIsCreating] = useState(false);
     const [isArchiveOpen, setIsArchiveOpen] = useState(false);
 
-    const handleDelete = async (e: React.MouseEvent, id: any) => {
+    const handleDelete = async (e: React.MouseEvent, id: Id<'conversations'>) => {
         e.preventDefault();
         e.stopPropagation();
         if (window.confirm("Are you sure you want to permanently delete this session? This action cannot be undone.")) {

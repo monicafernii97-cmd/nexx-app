@@ -237,11 +237,9 @@ export default function CourtSettingsPage() {
                                                 setShowStateDropdown(false);
                                                 setStateQuery('');
                                             }}
-                                            className="w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-[var(--cloud)] cursor-pointer"
-                                            style={{
-                                                color: s === state ? 'var(--sapphire-dark)' : 'var(--sapphire-base)',
-                                                fontWeight: s === state ? 600 : 400,
-                                            }}
+                                            className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-slate-100 cursor-pointer ${
+                                                s === state ? 'text-[#0A1128] font-bold' : 'text-[#334155] font-medium'
+                                            }`}
                                         >
                                             {s}
                                         </button>
@@ -297,11 +295,9 @@ export default function CourtSettingsPage() {
                                                 setCountyQuery('');
                                                 setShowCountyDropdown(false);
                                             }}
-                                            className="w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-[var(--cloud)] cursor-pointer"
-                                            style={{
-                                                color: c === county ? 'var(--sapphire-dark)' : 'var(--sapphire-base)',
-                                                fontWeight: c === county ? 600 : 400,
-                                            }}
+                                            className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-slate-100 cursor-pointer ${
+                                                c === county ? 'text-[#0A1128] font-bold' : 'text-[#334155] font-medium'
+                                            }`}
                                         >
                                             {c} County
                                         </button>

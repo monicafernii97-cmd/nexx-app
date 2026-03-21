@@ -135,7 +135,7 @@ export default function DashboardPage() {
                                 return (
                                     <div key={stat.label} className="p-5 rounded-[2rem] bg-[#0A1128] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.2)] transition-colors shadow-sm cursor-default">
                                         <div className="flex items-center gap-3 mb-3">
-                                            <Icon size={14} weight="regular" style={{ color: stat.color }} />
+                                            <Icon size={20} weight="regular" style={{ color: stat.color }} />
                                             <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{stat.label}</span>
                                         </div>
                                         <p className="text-3xl font-serif text-white tracking-tight">

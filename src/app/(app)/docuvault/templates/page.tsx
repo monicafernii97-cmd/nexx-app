@@ -227,7 +227,7 @@ export default function TemplateGalleryPage() {
                             </p>
 
                             {/* Requirement indicators */}
-                            <div className="flex items-center gap-4 mt-auto pt-4 border-t border-white/10">
+                            <div className="flex items-center flex-wrap gap-x-3 gap-y-2 mt-auto pt-4 border-t border-white/10">
                                 {template.requiresDeclaration && (
                                     <div
                                         className="flex items-center gap-1.5"

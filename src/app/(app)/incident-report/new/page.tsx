@@ -626,8 +626,11 @@ export default function NewIncidentPage() {
                         <p className="text-[15px] font-medium mb-8 text-sapphire-muted max-w-sm mx-auto leading-relaxed">
                             This record has been securely encrypted and is ready for court presentation when needed.
                         </p>
-                        <div className="flex gap-4 justify-center">
-                            <Link href="/incident-report" className="btn-secondary bg-white hover:bg-cloud shadow-sm no-underline text-[13px] uppercase tracking-widest rounded-xl">
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center items-stretch">
+                            <Link 
+                                href="/incident-report" 
+                                className="flex items-center justify-center px-6 py-3.5 rounded-xl text-[13px] font-bold tracking-widest uppercase transition-all bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.1)] text-white shadow-sm no-underline"
+                            >
                                 View Records
                             </Link>
                             <button
@@ -646,7 +649,7 @@ export default function NewIncidentPage() {
                                     setAnalyzeError(null);
                                     setCreatedId(null);
                                 }}
-                                className="btn-primary flex items-center gap-2 shadow-md text-[13px] uppercase tracking-widest rounded-xl"
+                                className="btn-primary flex items-center justify-center px-6 py-3.5 gap-2 shadow-[0_4px_20px_rgba(26,75,155,0.4)] text-[13px] font-bold tracking-widest uppercase rounded-xl"
                             >
                                 <Plus size={16} weight="bold" /> Log Another
                             </button>

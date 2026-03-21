@@ -66,9 +66,9 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
         >
             {role === 'assistant' && (
                 <div
-                    className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center mt-1 bg-white shadow-sm border border-[rgba(10,22,41,0.04)]"
+                    className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center mt-1 bg-[linear-gradient(135deg,#1E3A8A,#123D7E)] shadow-sm border border-white/20"
                 >
-                    <ChatTeardropDots size={18} weight="duotone" className="text-champagne" />
+                    <ChatTeardropDots size={18} weight="duotone" className="text-white" />
                 </div>
             )}
 
@@ -79,31 +79,31 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
                 style={
                     role === 'user'
                         ? {
-                            background: 'var(--sapphire)',
+                            background: '#FFFFFF',
                             borderColor: 'transparent',
-                            color: 'white',
+                            color: '#0A1128',
                         }
                         : {
-                            background: 'rgba(255, 255, 255, 0.7)',
+                            background: 'linear-gradient(135deg, #1E3A8A, #123D7E)',
                             backdropFilter: 'blur(12px)',
                             WebkitBackdropFilter: 'blur(12px)',
-                            borderColor: 'rgba(255, 255, 255, 0.8)',
-                            color: 'var(--sapphire)',
+                            borderColor: 'rgba(255, 255, 255, 0.15)',
+                            color: '#FFFFFF',
                         }
                 }
             >
                 <div
-                    className={`text-[15px] leading-relaxed whitespace-pre-wrap font-medium ${role === 'user' ? 'text-white' : 'text-sapphire'}`}
+                    className={`text-[15px] leading-relaxed whitespace-pre-wrap font-medium ${role === 'user' ? 'text-[#0A1128]' : 'text-white'}`}
                     dangerouslySetInnerHTML={{ __html: renderContent(content) }}
                 />
 
                 {role === 'assistant' && !isStreaming && (
                     <div
                         className="flex justify-end gap-2 mt-3 pt-2"
-                        style={{ borderTop: '1px solid rgba(10, 22, 41, 0.04)' }}
+                        style={{ borderTop: '1px solid rgba(255, 255, 255, 0.15)' }}
                     >
                         <button
-                            className="bg-cloud hover:bg-[rgba(10,22,41,0.06)] text-sapphire-muted hover:text-sapphire transition-colors text-[11px] font-bold uppercase tracking-widest flex items-center gap-1.5 py-1.5 px-3 rounded-lg"
+                            className="bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors text-[11px] font-bold uppercase tracking-widest flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-white/5"
                             onClick={handleCopy}
                             aria-label={copied ? 'Copied to clipboard' : 'Copy message to clipboard'}
                         >
@@ -123,9 +123,9 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
 
             {role === 'user' && (
                 <div
-                    className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center mt-1 bg-white shadow-sm border border-[rgba(10,22,41,0.04)]"
+                    className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center mt-1 bg-white shadow-sm border border-[rgba(10,22,41,0.1)]"
                 >
-                    <User size={16} weight="duotone" className="text-sapphire" />
+                    <User size={16} weight="duotone" className="text-[#0A1128]" />
                 </div>
             )}
         </motion.div>

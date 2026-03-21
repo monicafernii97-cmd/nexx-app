@@ -142,10 +142,10 @@ export default function IncidentReportPage() {
                     <div className="space-y-4">
                         {[0, 1, 2].map((j) => (
                             <div key={j} className="card-premium p-6 animate-pulse border-white flex gap-4">
-                                <div className="w-12 h-16 rounded-xl bg-[rgba(10,22,41,0.04)]" />
+                                <div className="w-12 h-16 rounded-xl bg-white/10" />
                                 <div className="flex-1 space-y-3 pt-2">
-                                    <div className="h-4 w-1/4 rounded bg-[rgba(10,22,41,0.04)]" />
-                                    <div className="h-4 w-3/4 rounded bg-[rgba(10,22,41,0.02)]" />
+                                    <div className="h-4 w-1/4 rounded bg-white/10" />
+                                    <div className="h-4 w-3/4 rounded bg-white/5" />
                                 </div>
                             </div>
                         ))}

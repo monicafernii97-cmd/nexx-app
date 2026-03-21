@@ -371,33 +371,30 @@ export default function OnboardingPage() {
                                     <MapPin size={24} style={{ color: '#F7F2EB' }} />
                                     <h2 className="font-serif text-2xl font-bold" style={{ color: '#F7F2EB' }}>Your Situation</h2>
                                 </div>
-                                <div className="flex flex-col text-left mb-6 max-w-lg mx-auto w-full">
+                                <div className="flex flex-col text-center mb-6 max-w-lg mx-auto w-full">
                                     <label className="text-[13px] font-bold tracking-[0.1em] uppercase mb-4 block text-white/70">Custody Arrangement</label>
-                                    <div className="flex flex-col gap-3">
+                                    <div className="flex flex-wrap justify-center gap-2.5">
                                         {['Joint / Shared Custody', 'Sole Custody', 'Visitation Only', 'No Order Yet', 'Other'].map((opt) => {
                                             const active = formData.custodyType === opt;
                                             return (
                                                 <button
                                                     key={opt}
                                                     onClick={() => update('custodyType', opt)}
-                                                    className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[15px] font-medium flex items-center gap-4 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                                    className={`transition-all text-[13px] font-semibold px-5 py-2.5 rounded-full border shadow-sm backdrop-blur-md ${
                                                         active
-                                                        ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
-                                                        : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
+                                                        ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
+                                                        : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
                                                     }`}
                                                 >
-                                                    <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-white'}`}>
-                                                        {active && <Check size={14} strokeWidth={4} className="text-[#1A4B9B]" />}
-                                                    </div>
                                                     {opt}
                                                 </button>
                                             );
                                         })}
                                     </div>
                                 </div>
-                                <div className="flex flex-col text-left mb-6 max-w-lg mx-auto w-full">
+                                <div className="flex flex-col text-center mb-6 max-w-lg mx-auto w-full">
                                     <label className="text-[13px] font-bold tracking-[0.1em] uppercase mb-4 block text-white/70">Do you have a court case currently open?</label>
-                                    <div className="flex flex-col gap-3">
+                                    <div className="flex flex-wrap justify-center gap-2.5">
                                         {['Yes, I have an active case', 'No, not yet'].map((opt) => {
                                             const active = formData.hasOpenCase === opt;
                                             return (
@@ -410,15 +407,12 @@ export default function OnboardingPage() {
                                                             update('causeNumber', '');
                                                         }
                                                     }}
-                                                    className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[15px] font-medium flex items-center gap-4 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                                    className={`transition-all text-[13px] font-semibold px-5 py-2.5 rounded-full border shadow-sm backdrop-blur-md ${
                                                         active
-                                                        ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
-                                                        : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
+                                                        ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
+                                                        : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
                                                     }`}
                                                 >
-                                                    <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-white'}`}>
-                                                        {active && <Check size={14} strokeWidth={4} className="text-[#1A4B9B]" />}
-                                                    </div>
                                                     {opt}
                                                 </button>
                                             );
@@ -447,24 +441,21 @@ export default function OnboardingPage() {
                                         </div>
                                     </div>
                                 )}
-                                <div className="flex flex-col text-left max-w-lg mx-auto w-full">
+                                <div className="flex flex-col text-center max-w-lg mx-auto w-full">
                                     <label className="text-[13px] font-bold tracking-[0.1em] uppercase mb-4 block text-white/70">Do you have an attorney?</label>
-                                    <div className="flex flex-col gap-3">
+                                    <div className="flex flex-wrap justify-center gap-2.5">
                                         {['Yes', 'No', 'Looking'].map((opt) => {
                                             const active = formData.hasAttorney === opt;
                                             return (
                                                 <button
                                                     key={opt}
                                                     onClick={() => update('hasAttorney', opt)}
-                                                    className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[15px] font-medium flex items-center gap-4 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                                    className={`transition-all text-[13px] font-semibold px-5 py-2.5 rounded-full border shadow-sm backdrop-blur-md ${
                                                         active
-                                                        ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
-                                                        : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
+                                                        ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
+                                                        : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
                                                     }`}
                                                 >
-                                                    <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-white'}`}>
-                                                        {active && <Check size={14} strokeWidth={4} className="text-[#1A4B9B]" />}
-                                                    </div>
                                                     {opt}
                                                 </button>
                                             );

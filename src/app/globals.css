@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 html {
-  font-size: 14px;
+  font-size: 16px;
 }
 
 /* ═══════════════════════════════════════════
@@ -300,12 +300,7 @@ h1, h2, h3, h4, h5, h6, p, span, div {
   border-right: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
 
-/* Enforce static sizing instantly to prevent Clerk hydration jump scare */
-.cl-rootBox {
-  transform: scale(1.142857);
-  transform-origin: top center;
-}
-
+/* Removed Cl-RootBox scaling hack since root font is standardized to 16px again */
 .cl-profileSectionTitle {
   border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
   color: #FFFFFF !important;

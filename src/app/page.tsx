@@ -192,7 +192,7 @@ export default function WelcomePage() {
           transition={{ delay: 0.5, duration: 0.8 }}
           className="text-base md:text-[17px] text-[rgba(255,255,255,0.7)] max-w-xl leading-[1.6] mb-12 font-medium"
         >
-          Strategic empowerment and refined counsel, designed for parents who need clarity, documentation, and peace of mind.
+          Take command of your narrative. Transform high-conflict manipulation into a bulletproof, court-ready strategy.
         </motion.p>
 
         {/* CTA Buttons */}
@@ -223,7 +223,7 @@ export default function WelcomePage() {
         transition={{ delay: 1.2, duration: 1 }}
         className="absolute bottom-8 left-0 right-0 text-center text-[10px] md:text-xs tracking-[0.25em] font-semibold text-[rgba(255,255,255,0.3)] uppercase"
       >
-        Secure. Private. Empowering.
+        Calculated. Bulletproof. Victorious.
       </motion.p>
     </div>
   );

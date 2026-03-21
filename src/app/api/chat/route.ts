@@ -5,6 +5,9 @@ import { buildSystemPrompt } from '@/lib/systemPrompt';
 import type { UserContext, LegalSearchResult } from '@/lib/types';
 import { detectLegalTopic, extractLegalQuery, searchStatutes } from '@/lib/legal/search';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import { getModelForMode, isPremiumModel, getDailyLimit, type SubscriptionTier } from '@/lib/tiers';
+import { getAuthenticatedConvexClient } from '@/lib/convexServer';
+import { api } from '../../../../convex/_generated/api';
 
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_MESSAGES = 50;
@@ -17,7 +20,7 @@ export async function POST(req: NextRequest) {
         return Response.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // ── Rate limit (50/day free tier) ──
+    // ── Rate limit (general — legacy fallback) ──
     const rl = checkRateLimit(userId, 'chat_message');
     if (!rl.allowed) {
         const { body, status } = rateLimitResponse(rl);
@@ -35,6 +38,34 @@ export async function POST(req: NextRequest) {
             conversationMode?: string;
             userContext?: UserContext;
         } = body;
+
+        // ── Determine model from conversation mode ──
+        const model = getModelForMode(conversationMode);
+        const premium = isPremiumModel(model);
+
+        // ── Fetch user tier from Convex ──
+        let userTier: SubscriptionTier = 'free';
+        try {
+            const convex = await getAuthenticatedConvexClient();
+            const userRecord = await convex.query(api.users.getByClerkId, { clerkId: userId });
+            if (userRecord?.subscriptionTier) {
+                userTier = userRecord.subscriptionTier as SubscriptionTier;
+            }
+        } catch {
+            // If Convex lookup fails, default to free tier
+        }
+
+        // ── Tier-specific rate limit for the chosen model ──
+        const feature = premium ? 'chat_message_4o' as const : 'chat_message_mini' as const;
+        const dailyCap = getDailyLimit(userTier, model);
+
+        if (dailyCap !== -1) { // -1 = unlimited
+            const tierRl = checkRateLimit(userId, feature, dailyCap);
+            if (!tierRl.allowed) {
+                const { body: rlBody, status } = rateLimitResponse(tierRl);
+                return Response.json(rlBody, { status });
+            }
+        }
 
         if (!messages || messages.length === 0) {
             return Response.json({ error: 'Messages are required' }, { status: 400 });
@@ -100,9 +131,9 @@ export async function POST(req: NextRequest) {
             legalContext,
         });
 
-        // Stream response from OpenAI
+        // Stream response from OpenAI (model determined by conversation mode + tier)
         const stream = await getOpenAI().chat.completions.create({
-            model: 'gpt-4o',
+            model,
             messages: [
                 { role: 'system', content: systemPrompt },
                 ...messages,

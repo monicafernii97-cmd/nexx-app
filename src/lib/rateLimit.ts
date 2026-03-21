@@ -16,6 +16,8 @@ export type RateLimitFeature =
     | 'document_generation'
     | 'compliance_check'
     | 'chat_message'
+    | 'chat_message_4o'
+    | 'chat_message_mini'
     | 'legal_search'
     | 'resource_lookup';
 
@@ -53,6 +55,16 @@ export const FEATURE_LIMITS: Record<RateLimitFeature, FeatureLimit> = {
     },
     chat_message: {
         maxRequests: 50,
+        windowMs: ONE_DAY_MS,
+        label: 'chat messages',
+    },
+    chat_message_4o: {
+        maxRequests: 5, // free-tier default; overridden by tier config at runtime
+        windowMs: ONE_DAY_MS,
+        label: 'GPT-4o chat messages',
+    },
+    chat_message_mini: {
+        maxRequests: 50, // free-tier default; overridden by tier config at runtime
         windowMs: ONE_DAY_MS,
         label: 'chat messages',
     },
@@ -138,12 +150,14 @@ export interface RateLimitResult {
  */
 export function checkRateLimit(
     userId: string,
-    feature: RateLimitFeature
+    feature: RateLimitFeature,
+    overrideMax?: number
 ): RateLimitResult {
     // Periodic cleanup to prevent memory leaks
     cleanup();
 
     const featureLimit = FEATURE_LIMITS[feature];
+    const effectiveMax = overrideMax ?? featureLimit.maxRequests;
     const key = `${userId}:${feature}`;
     const now = Date.now();
 
@@ -172,11 +186,11 @@ export function checkRateLimit(
             ? featureLimit.windowMs
             : Math.max(0, featureLimit.windowMs - (now - window.timestamps[0]));
 
-    if (window.timestamps.length >= featureLimit.maxRequests) {
+    if (window.timestamps.length >= effectiveMax) {
         return {
             allowed: false,
             current: window.timestamps.length,
-            limit: featureLimit.maxRequests,
+            limit: effectiveMax,
             resetInMs,
             featureLabel: featureLimit.label,
         };
@@ -187,7 +201,7 @@ export function checkRateLimit(
     return {
         allowed: true,
         current: window.timestamps.length,
-        limit: featureLimit.maxRequests,
+        limit: effectiveMax,
         resetInMs,
         featureLabel: featureLimit.label,
     };

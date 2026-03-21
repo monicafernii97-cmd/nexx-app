@@ -165,3 +165,38 @@ export const completeOnboarding = mutation({
         await ctx.db.patch(args.id, { onboardingComplete: true });
     },
 });
+
+/** Look up user by Clerk ID — auth-guarded. Used by API routes to fetch tier info. */
+export const getByClerkId = query({
+    args: { clerkId: v.string() },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error('Not authenticated');
+        if (identity.subject !== args.clerkId) {
+            throw new Error('Not authorized: clerkId mismatch');
+        }
+        return await ctx.db
+            .query('users')
+            .withIndex('by_clerk', (q) => q.eq('clerkId', args.clerkId))
+            .first();
+    },
+});
+
+/** Admin mutation to set a user's subscription tier. */
+export const setSubscriptionTier = mutation({
+    args: {
+        id: v.id('users'),
+        tier: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error('Not authenticated');
+
+        const validTiers = ['free', 'pro', 'premium', 'executive'];
+        if (!validTiers.includes(args.tier)) {
+            throw new Error(`Invalid tier: ${args.tier}. Must be one of: ${validTiers.join(', ')}`);
+        }
+
+        await ctx.db.patch(args.id, { subscriptionTier: args.tier });
+    },
+});

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { UI_TABS } from '@/lib/legal/templateCategories';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 
 /** Mock document data (will connect to Convex backend) */
 interface SavedDocument {
@@ -57,29 +58,21 @@ export default function DocuVaultGalleryPage() {
     const draftDocs = filteredDocs.filter(d => d.status === 'draft');
 
     return (
-        <div className="max-w-5xl mx-auto">
-            {/* Header */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-5 mb-10"
-            >
-                <Link
-                    href="/docuvault"
-                    className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all bg-white/10 border border-white/30 hover:bg-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_4px_12px_rgba(0,0,0,0.4)] backdrop-blur-xl shrink-0"
-                    aria-label="Back to DocuVault"
-                >
-                    <ArrowLeft size={20} strokeWidth={3} className="text-white drop-shadow-sm" />
-                </Link>
-                <div>
-                    <h1 className="text-4xl font-serif font-bold tracking-tight text-white drop-shadow-sm">
-                        Document Gallery
-                    </h1>
-                    <p className="text-[15px] font-medium text-white mt-1 drop-shadow-sm">
-                        Your generated and saved legal documents
-                    </p>
-                </div>
-            </motion.div>
+        <PageContainer>
+            <PageHeader
+                icon={FileText}
+                title="Document Gallery"
+                description="Your generated and saved legal documents"
+                rightElement={
+                    <Link
+                        href="/docuvault"
+                        className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all bg-white/10 border border-white/30 hover:bg-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_4px_12px_rgba(0,0,0,0.4)] backdrop-blur-xl shrink-0"
+                        aria-label="Back to DocuVault"
+                    >
+                        <ArrowLeft size={20} strokeWidth={3} className="text-white drop-shadow-sm" />
+                    </Link>
+                }
+            />
 
             {/* Search */}
             <motion.div
@@ -178,7 +171,7 @@ export default function DocuVaultGalleryPage() {
 
                 {/* Completed Documents Grid */}
                 {completeDocs.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                         {completeDocs.map((doc, i) => (
                             <motion.div
                                 key={doc.id}
@@ -267,6 +260,6 @@ export default function DocuVaultGalleryPage() {
                     </>
                 )}
             </motion.div>
-        </div>
+        </PageContainer>
     );
 }

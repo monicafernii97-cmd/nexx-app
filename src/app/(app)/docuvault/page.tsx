@@ -21,6 +21,7 @@ import { api } from '../../../../convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import { UI_TABS, getTemplatesForTab } from '@/lib/legal/templateCategories';
 import type { UITabCategory } from '@/lib/legal/templateCategories';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import type { DocumentTemplate } from '@/lib/legal/types';
 
 /** State for the 3-step generation flow */
@@ -285,7 +286,7 @@ function DocuVaultPageInner() {
     }, []);
 
     return (
-        <div className="max-w-5xl mx-auto relative pb-20">
+        <PageContainer>
             {/* ═══════════════════════════════════════════════════
                 VIEW: COMPOSE (Main Generator)
                ═══════════════════════════════════════════════════ */}
@@ -297,25 +298,11 @@ function DocuVaultPageInner() {
                     className="space-y-8"
                 >
                     {/* Header */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, ease: 'easeOut' }}
-                    >
-                        <div className="flex items-center gap-5 mb-5">
-                            <div className="w-16 h-16 rounded-3xl flex items-center justify-center bg-white/5 backdrop-blur-3xl shadow-[inset_0_1px_2px_rgba(255,255,255,0.5),0_12px_40px_rgba(0,0,0,0.6)] border border-white/30 shrink-0">
-                                <Bank size={32} weight="duotone" className="text-[#60A5FA] drop-shadow-[0_4px_12px_rgba(255,255,255,0.8)]" />
-                            </div>
-                            <div>
-                                <h1 className="text-4xl lg:text-5xl font-serif font-bold text-white mb-2 leading-tight tracking-tight drop-shadow-sm">
-                                    DocuVault
-                                </h1>
-                                <p className="text-[15px] font-medium text-white drop-shadow-sm max-w-2xl leading-relaxed">
-                                    Professional Legal Document Generator. Trustworthy. Semantic. Verbatim. Generate court-ready PDFs with AI precision.
-                                </p>
-                            </div>
-                        </div>
-                    </motion.div>
+                    <PageHeader
+                        icon={Bank as any}
+                        title="DocuVault"
+                        description="Professional Legal Document Generator. Trustworthy. Semantic. Verbatim. Generate court-ready PDFs with AI precision."
+                    />
 
                     {/* ── Category Tabs ── */}
                     <motion.div
@@ -407,13 +394,13 @@ function DocuVaultPageInner() {
                                             whileTap={{ scale: 0.98 }}
                                             className={`flex-shrink-0 w-64 rounded-[2rem] p-5 text-left transition-all cursor-pointer snap-start backdrop-blur-2xl ${isSelected ? 'bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-[rgba(255,255,255,0.35)] shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),0_12px_32px_rgba(0,0,0,0.6)]' : 'bg-white/5 border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.3)] hover:bg-white/10 hover:border-white/30'}`}
                                         >
-                                            <div className={`w-full h-32 rounded-[1.5rem] mb-5 flex items-center justify-center relative overflow-hidden transition-all ${isSelected ? 'bg-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]' : 'bg-white/5 border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]'}`}>
+                                            <div className={`w-full h-20 rounded-[1.5rem] mb-4 flex items-center justify-center relative overflow-hidden transition-all ${isSelected ? 'bg-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]' : 'bg-white/5 border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]'}`}>
                                                 {/* Subtle document graphic */}
-                                                <div className={`absolute top-4 left-4 w-12 h-2 rounded ${isSelected ? 'bg-white/30' : 'bg-white/10'}`} />
-                                                <div className={`absolute top-8 left-4 w-20 h-2 rounded ${isSelected ? 'bg-white/30' : 'bg-white/10'}`} />
-                                                <div className={`absolute top-12 left-4 w-16 h-2 rounded ${isSelected ? 'bg-white/30' : 'bg-white/10'}`} />
+                                                <div className={`absolute top-2 left-4 w-12 h-2 rounded ${isSelected ? 'bg-white/30' : 'bg-white/10'}`} />
+                                                <div className={`absolute top-6 left-4 w-20 h-2 rounded ${isSelected ? 'bg-white/30' : 'bg-white/10'}`} />
+                                                <div className={`absolute top-10 left-4 w-16 h-2 rounded ${isSelected ? 'bg-white/30' : 'bg-white/10'}`} />
                                                 <FileText
-                                                    size={48}
+                                                    size={32}
                                                     weight={isSelected ? "duotone" : "regular"}
                                                     className={`relative z-10 transition-colors ${isSelected ? 'text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.6)]' : 'text-white/60'}`}
                                                 />
@@ -850,6 +837,6 @@ function DocuVaultPageInner() {
                     </div>
                 </motion.div>
             )}
-        </div>
+        </PageContainer>
     );
 }

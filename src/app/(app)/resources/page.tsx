@@ -775,6 +775,7 @@ export default function ResourcesPage() {
                     icon={HandHeart}
                     label="Legal Aid & Assistance"
                     subtitle="Free and low-cost legal support, bar associations, and pro bono programs"
+                    colorMode="warning"
                 />
                 {isCacheQueryLoading || isLookingUp ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

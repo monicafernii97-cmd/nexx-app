@@ -185,7 +185,7 @@ export default function TemplateGalleryPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
             >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
                     {filteredTemplates.map(({ template, tabLabel }, i) => (
                         <motion.button
                             type="button"
@@ -194,13 +194,13 @@ export default function TemplateGalleryPage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.03 * Math.min(i, 15) }}
                             onClick={() => setPreviewTemplate(template)}
-                            className="p-8 rounded-[2rem] group transition-all border border-white/10 bg-white/5 backdrop-blur-2xl hover:bg-white/10 hover:border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-1 text-left flex flex-col h-full"
+                            className="p-5 rounded-[1.5rem] group transition-all border border-white/10 bg-white/5 backdrop-blur-2xl hover:bg-white/10 hover:border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-1 text-left flex flex-col h-full"
                         >
                             {/* Document preview icon */}
                             <div
-                                className="w-full h-32 rounded-2xl mb-5 flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-white/20 shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),0_8px_24px_rgba(0,0,0,0.4)] transition-all group-hover:border-white/40"
+                                className="w-full h-20 rounded-2xl mb-4 flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-white/20 shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),0_8px_24px_rgba(0,0,0,0.4)] transition-all group-hover:border-white/40"
                             >
-                                <FileText size={40} className="text-white drop-shadow-sm opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-transform duration-300" />
+                                <FileText size={32} className="text-white drop-shadow-sm opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-transform duration-300" />
                             </div>
 
                             {/* Category badge */}

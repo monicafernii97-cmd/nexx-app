@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+html {
+  font-size: 14px;
+}
+
 /* ═══════════════════════════════════════════
    NEXX — Galaxy Luxury Design System
    ═══════════════════════════════════════════ */

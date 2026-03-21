@@ -504,7 +504,7 @@ export default function OnboardingPage() {
                                         <button
                                             key={opt}
                                             onClick={() => toggleArrayItem('primaryGoals', opt)}
-                                            className={`transition-all text-[14px] font-semibold px-5 py-3 rounded-full border shadow-sm backdrop-blur-md ${
+                                            className={`transition-all text-[13px] font-semibold px-4 py-2 rounded-full border shadow-sm backdrop-blur-md ${
                                                 formData.primaryGoals.includes(opt)
                                                 ? 'bg-white/10 text-white border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]'
                                                 : 'bg-transparent text-[rgba(255,255,255,0.85)] border-[rgba(255,255,255,0.25)] hover:border-[rgba(255,255,255,0.4)] hover:bg-white/5'

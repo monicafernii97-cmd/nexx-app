@@ -177,6 +177,8 @@ export default function OnboardingPage() {
                     'Other': 'none',
                 };
 
+                const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+
                 await updateProfile({
                     id: userId,
                     name: formData.name || undefined,
@@ -189,7 +191,12 @@ export default function OnboardingPage() {
                     custodyType: formData.custodyType ? custodyMap[formData.custodyType] ?? undefined : undefined,
                     hasAttorney: formData.hasAttorney ? formData.hasAttorney === 'Yes' : undefined,
                     primaryGoals: formData.primaryGoals.length > 0 ? formData.primaryGoals : undefined,
+                    subscriptionTier: selectedPlan || undefined,
                 });
+
+                if (selectedPlan && typeof window !== 'undefined') {
+                    localStorage.removeItem('selectedPlan');
+                }
 
                 // Create NEX profile with behaviors (backend mutation is idempotent)
                 if (formData.nexBehaviors.length > 0) {

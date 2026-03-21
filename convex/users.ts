@@ -128,6 +128,7 @@ export const updateProfile = mutation({
                 v.null()
             )
         ),
+        subscriptionTier: v.optional(v.union(v.string(), v.null())),
         primaryGoals: v.optional(v.union(v.array(v.string()), v.null())),
     },
     handler: async (ctx, args) => {

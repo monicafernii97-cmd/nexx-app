@@ -8,6 +8,8 @@ import { api } from '../../convex/_generated/api';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
+import { CaretDown } from '@phosphor-icons/react';
+
 /**
  * Welcome / landing page and auth-aware router.
  *
@@ -126,7 +128,7 @@ export default function WelcomePage() {
   return (
     <div className="bg-[#0A1128] min-h-screen flex flex-col relative overflow-x-hidden font-sans">
       {/* Jumbo Background NEXX Shimmer */}
-      <div className="absolute inset-0 flex items-center pointer-events-none z-0 overflow-hidden opacity-[0.03]">
+      <div className="absolute top-0 w-full h-screen flex items-center pointer-events-none z-0 overflow-hidden opacity-[0.03]">
         <motion.h1
            initial={{ x: '100vw' }}
            animate={{ x: '-100vw' }}
@@ -203,32 +205,42 @@ export default function WelcomePage() {
           transition={{ delay: 0.7, duration: 0.8 }}
           className="flex flex-col sm:flex-row items-start gap-4"
         >
-          <Link href="/sign-up">
-            <button className="btn-primary w-full sm:w-auto px-8 py-3.5 text-[13px]">
-              Get Started
-            </button>
-          </Link>
           <Link href="/sign-in">
-            <button className="btn-outline w-full sm:w-auto px-8 py-3.5 text-[13px] hover:bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.9)] hover:border-[rgba(255,255,255,0.3)]">
+            <button className="btn-primary w-full sm:w-auto px-8 py-3.5 text-[13px] shadow-[0_4px_20px_rgba(26,75,155,0.4)]">
               Sign In
             </button>
           </Link>
+          <button 
+            onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+            className="btn-outline w-full sm:w-auto px-8 py-3.5 text-[13px] hover:bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.9)] hover:border-[rgba(255,255,255,0.3)]"
+          >
+            Sign Up
+          </button>
         </motion.div>
 
-        {/* Scroll hint */}
-        <motion.p
+        {/* Bouncing Arrow Scroll hint */}
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2, duration: 1 }}
-          className="absolute bottom-8 left-0 right-0 text-center text-[10px] md:text-xs tracking-[0.25em] font-semibold text-[rgba(255,255,255,0.3)] uppercase"
+          className="absolute bottom-8 left-0 right-0 flex flex-col items-center cursor-pointer group"
+          onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
         >
-          Prepare. Preempt. Prevail.
-        </motion.p>
+          <p className="text-[10px] md:text-xs tracking-[0.25em] font-semibold text-[rgba(255,255,255,0.3)] uppercase mb-2 group-hover:text-[rgba(255,255,255,0.5)] transition-colors">
+            Prepare. Preempt. Prevail.
+          </p>
+          <motion.div
+            animate={{ y: [0, 8, 0] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <CaretDown size={20} className="text-[rgba(255,255,255,0.3)] group-hover:text-[var(--champagne)] transition-colors" />
+          </motion.div>
+        </motion.div>
 
       </div>
 
       {/* ═══ Pricing Section ═══ */}
-      <div className="w-full z-10 relative py-24 md:py-32">
+      <div id="pricing" className="w-full z-10 relative py-24 md:py-32">
         {/* Section ambient glow */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-[20%] left-[50%] -translate-x-1/2 w-[60%] h-[40%] bg-[#1A4B9B]/10 rounded-full blur-[150px]" />
@@ -379,17 +391,19 @@ export default function WelcomePage() {
                 </ul>
 
                 {/* CTA */}
-                <Link href="/sign-up">
-                  <button
-                    className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all ${
-                      plan.popular
-                        ? 'bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] hover:shadow-[0_4px_20px_rgba(229,168,74,0.4)]'
-                        : 'bg-[rgba(255,255,255,0.05)] text-[rgba(255,255,255,0.8)] border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.2)]'
-                    }`}
-                  >
-                    {plan.cta}
-                  </button>
-                </Link>
+                <button
+                  onClick={() => {
+                    localStorage.setItem('selectedPlan', plan.name);
+                    router.push('/sign-up');
+                  }}
+                  className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all ${
+                    plan.popular
+                      ? 'bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] hover:shadow-[0_4px_20px_rgba(229,168,74,0.4)]'
+                      : 'bg-[rgba(255,255,255,0.05)] text-[rgba(255,255,255,0.8)] border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.2)]'
+                  }`}
+                >
+                  {plan.cta}
+                </button>
               </motion.div>
             ))}
           </div>

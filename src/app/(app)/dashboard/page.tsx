@@ -136,7 +136,7 @@ export default function DashboardPage() {
                                     <Link key={stat.label} href={stat.href} className="no-underline block h-full">
                                         <div className="p-4 flex flex-col justify-between h-full rounded-[2rem] bg-[#0A1128] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.2)] hover:bg-[#121A3A] transition-colors shadow-sm cursor-pointer group">
                                             <div className="flex items-center gap-2 mb-3 shrink-0">
-                                                <Icon size={18} weight="fill" color={stat.color} className="shrink-0 transition-transform group-hover:scale-110" />
+                                                <Icon size={14} weight="fill" color={stat.color} className="shrink-0 transition-transform group-hover:scale-110" />
                                                 <span className="text-[9px] font-bold text-white/50 uppercase tracking-widest leading-tight">{stat.label}</span>
                                             </div>
                                             <p className="text-2xl font-serif text-white tracking-tight">

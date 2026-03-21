@@ -42,9 +42,9 @@ export default function DashboardPage() {
 
     /** Summary statistics displayed in the dashboard header bento grid. */
     const stats = [
-        { label: 'Documented Incidents', value: String(incidentCount), icon: ClipboardText, color: 'var(--info)', href: '/incident-report' },
+        { label: 'Documented Incidents', value: String(incidentCount), icon: ClipboardText, color: '#60A5FA', href: '/incident-report' },
         { label: 'Active Sessions', value: String(conversationCount), icon: ChatCircleText, color: 'var(--champagne)', href: '/chat' },
-        { label: 'Court-Ready Records', value: String(confirmedCount), icon: FileText, color: 'var(--info)', href: '/docuvault/gallery' },
+        { label: 'Court-Ready Records', value: String(confirmedCount), icon: FileText, color: '#60A5FA', href: '/docuvault/gallery' },
         { label: 'Pattern Alerts', value: '0', icon: WarningCircle, color: 'var(--warning)', href: '/nex-profile' },
     ];
 

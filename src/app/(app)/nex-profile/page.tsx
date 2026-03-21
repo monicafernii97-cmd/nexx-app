@@ -8,7 +8,7 @@ import {
     Siren,
     Brain,
     ChatTeardropText,
-    Lightning,
+    Strategy,
     FloppyDisk,
     Check,
     Warning,
@@ -299,13 +299,13 @@ export default function NexProfilePage() {
                     </Section>
 
                     {/* ── Trigger Patterns ── */}
-                    <Section icon={<Lightning size={20} className="text-white" weight="bold" />} title="Trigger Patterns">
+                    <Section icon={<Strategy size={20} className="text-white" weight="bold" />} title="Trigger Patterns">
                         <p className="text-[13px] text-white/90 mb-4">
                             What sets your NEX off? Add specific patterns you&apos;ve noticed.
                         </p>
                         <div className="flex gap-3 mb-4">
                             <div className="flex-1 relative">
-                                <Lightning size={16} weight="bold" className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1A4B9B]" />
+                                <Strategy size={16} weight="bold" className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1A4B9B]" />
                                 <input
                                     className="w-full text-base p-3 !pl-11 rounded-xl bg-white text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
                                     value={newTrigger}
@@ -351,7 +351,7 @@ export default function NexProfilePage() {
 
                     {/* ── AI Insights (read-only) ── */}
                     {nexProfile?.aiInsights && (
-                        <Section icon={<Lightning size={20} className="text-[#3b82f6]" weight="fill" />} title="AI Threat Analysis Summary">
+                        <Section icon={<Strategy size={20} className="text-[#3b82f6]" weight="fill" />} title="AI Threat Analysis Summary">
                             <div className="card-premium p-6 border border-[#3b82f6]/20 bg-gradient-to-br from-white to-[#eff6ff] shadow-sm ml-1">
                                 <p className="text-sm leading-relaxed whitespace-pre-wrap text-[var(--sapphire-dark)] font-medium">
                                     {nexProfile.aiInsights}

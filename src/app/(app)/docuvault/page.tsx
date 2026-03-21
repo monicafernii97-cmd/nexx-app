@@ -7,7 +7,7 @@ import {
     CaretLeft,
     CaretRight,
     FileText,
-    Lightning,
+    Strategy,
     Plus,
     Paperclip,
     X,
@@ -506,7 +506,7 @@ function DocuVaultPageInner() {
                             disabled={(!documentContent.trim() && !selectedTemplate) || isUserProfileLoading}
                             className="w-full flex items-center justify-center gap-4 py-6 rounded-[2rem] text-[15px] font-bold tracking-[0.2em] uppercase text-white transition-all border border-white/20 bg-white/5 backdrop-blur-3xl shadow-[inset_0_1px_2px_rgba(255,255,255,0.2),0_12px_40px_rgba(0,0,0,0.4)] hover:bg-white/10 hover:border-white/30 hover:shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_16px_48px_rgba(0,0,0,0.5)] disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed group hover:-translate-y-1"
                         >
-                            <Lightning size={26} weight="duotone" className="text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.8)] group-hover:scale-110 transition-transform duration-300" />
+                            <Strategy size={26} weight="duotone" className="text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.8)] group-hover:scale-110 transition-transform duration-300" />
                             <span className="drop-shadow-sm">Generate Formal Document</span>
                         </button>
                     </motion.div>
@@ -539,7 +539,7 @@ function DocuVaultPageInner() {
                     >
                         {[
                             { label: 'Describe\nContext', icon: FileText, color: 'text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]' },
-                            { label: 'AI Generates\nDraft', icon: Lightning, color: 'text-[#E5A84A] drop-shadow-[0_2px_8px_rgba(229,168,74,0.8)]' },
+                            { label: 'AI Generates\nDraft', icon: Strategy, color: 'text-[#E5A84A] drop-shadow-[0_2px_8px_rgba(229,168,74,0.8)]' },
                             { label: 'Download\n& File', icon: ArrowRight, color: 'text-[#10B981] drop-shadow-[0_2px_8px_rgba(16,185,129,0.8)]' },
                         ].map((item, i) => {
                             const Icon = item.icon;
@@ -591,7 +591,7 @@ function DocuVaultPageInner() {
                         >
                             <div className="absolute inset-0 rounded-full blur-2xl bg-[#60A5FA]/30 scale-150 pointer-events-none" />
                             <div className="w-24 h-24 rounded-full flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-[#60A5FA]/50 shadow-[0_8px_32px_rgba(96,165,250,0.3)] relative z-10 box-border">
-                                <Lightning size={44} weight="duotone" className="text-[#60A5FA] drop-shadow-[0_2px_12px_rgba(96,165,250,0.8)]" />
+                                <Strategy size={44} weight="duotone" className="text-[#60A5FA] drop-shadow-[0_2px_12px_rgba(96,165,250,0.8)]" />
                             </div>
                         </motion.div>
                         <h3 className="text-3xl font-serif font-bold text-white tracking-tight drop-shadow-sm">
@@ -767,7 +767,7 @@ function DocuVaultPageInner() {
                             {/* AI Summary */}
                             <div className="p-8 border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_12px_40px_rgba(0,0,0,0.5)] bg-white/5 backdrop-blur-2xl rounded-[2rem]">
                                 <div className="flex items-center gap-4 mb-5">
-                                    <Lightning size={28} weight="duotone" className="text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]" />
+                                    <Strategy size={28} weight="duotone" className="text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]" />
                                     <h3 className="text-[15px] font-bold tracking-widest uppercase text-white drop-shadow-sm">
                                         Intelligence Summary
                                     </h3>
@@ -836,7 +836,7 @@ function DocuVaultPageInner() {
                                     disabled
                                 />
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40">
-                                    <Lightning size={20} weight="duotone" className="text-[var(--sapphire-base)]" />
+                                    <Strategy size={20} weight="duotone" className="text-[var(--sapphire-base)]" />
                                 </div>
                                 <button disabled className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-[var(--sapphire-light)]/20 flex items-center justify-center cursor-not-allowed opacity-50">
                                     <ArrowRight size={16} weight="bold" className="text-[var(--sapphire-dark)]" />

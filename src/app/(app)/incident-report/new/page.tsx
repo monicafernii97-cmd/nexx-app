@@ -9,7 +9,7 @@ import { useUser } from '@/lib/user-context';
 import {
     Microphone,
     ArrowLeft,
-    Lightning,
+    Strategy,
     Check,
     PencilSimple,
     CalendarBlank,
@@ -371,7 +371,7 @@ export default function NewIncidentPage() {
                         {/* Error */}
                         {analyzeError && (
                             <div className="p-4 rounded-xl bg-rose/10 border border-rose/20 text-rose text-[13px] font-semibold flex items-center gap-2">
-                                <Lightning size={16} /> {analyzeError}
+                                <Strategy size={16} /> {analyzeError}
                             </div>
                         )}
 
@@ -385,12 +385,12 @@ export default function NewIncidentPage() {
                                 {isAnalyzing ? (
                                     <>
                                         <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}>
-                                            <Lightning size={20} weight="fill" className="text-white" />
+                                            <Strategy size={20} weight="fill" className="text-white" />
                                         </motion.div>
                                         Analyzing Dynamics securely...
                                     </>
                                 ) : (
-                                    <><Lightning size={20} weight="duotone" className="text-white group-hover:animate-pulse" /> Generate Court-Ready Summary</>
+                                    <><Strategy size={20} weight="duotone" className="text-white group-hover:animate-pulse" /> Generate Court-Ready Summary</>
                                 )}
                             </button>
                         </div>
@@ -404,7 +404,7 @@ export default function NewIncidentPage() {
                         <div className="card-premium p-6 md:p-8">
                             <div className="flex items-center justify-between mb-5 border-b border-[rgba(10,22,41,0.04)] pb-4">
                                 <h3 className="text-[13px] font-bold tracking-[0.2em] uppercase text-sapphire flex items-center gap-2">
-                                    <Lightning size={16} weight="duotone" className="text-champagne" /> Court-Ready Summary
+                                    <Strategy size={16} weight="duotone" className="text-champagne" /> Court-Ready Summary
                                 </h3>
                                 <button
                                     onClick={() => setIsEditing(!isEditing)}
@@ -432,7 +432,7 @@ export default function NewIncidentPage() {
                             {behavioralAnalysis && (
                                 <div className="card-premium p-6">
                                     <h3 className="text-[12px] font-bold tracking-[0.15em] uppercase mb-4 flex items-center gap-2 text-warning">
-                                        <Lightning size={16} weight="duotone" /> Behavioral Analysis
+                                        <Strategy size={16} weight="duotone" /> Behavioral Analysis
                                     </h3>
                                     <p className="text-[14px] leading-relaxed whitespace-pre-wrap text-sapphire">
                                         {behavioralAnalysis}

@@ -20,7 +20,7 @@ import {
     MagnifyingGlass,
     WarningCircle,
     Gear,
-    Lightning,
+    Strategy,
     type Icon,
     type IconWeight,
 } from '@phosphor-icons/react';
@@ -619,7 +619,7 @@ export default function ResourcesPage() {
                                 animate={{ rotate: 360 }}
                                 transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                             >
-                                <Lightning size={24} weight="duotone" className="text-champagne" />
+                                <Strategy size={24} weight="duotone" className="text-champagne" />
                             </motion.div>
                             <div>
                                 <h4 className="text-[15px] font-bold text-sapphire mb-0.5">
@@ -933,7 +933,7 @@ export default function ResourcesPage() {
             >
                 <div className="w-16 h-px bg-cloud mx-auto mb-6" />
                 <p className="text-[12px] font-bold uppercase tracking-widest text-[rgba(10,22,41,0.3)] mb-2 flex items-center justify-center gap-2">
-                    <Lightning size={12} weight="fill" /> Verified Directory
+                    <Strategy size={12} weight="fill" /> Verified Directory
                 </p>
                 <p className="text-[13px] font-medium text-sapphire-muted leading-relaxed">
                     Resources are secured and verified continuously. AI-discovered external resources should be verified independently.

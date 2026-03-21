@@ -295,13 +295,24 @@ export default function OnboardingPage() {
                             <div className="text-center py-8">
                                 <motion.div
                                     initial={{ scale: 0.8, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    transition={{ delay: 0.2, type: 'spring' }}
-                                    className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#60A5FA,#2563EB)] shadow-[0_8px_32px_rgba(96,165,250,0.4)] border border-white/20 relative overflow-hidden"
+                                    animate={{ scale: 1, opacity: 1, y: [0, -8, 0] }}
+                                    transition={{ delay: 0.2, type: 'spring', y: { duration: 4, repeat: Infinity, ease: "easeInOut" } }}
+                                    className="w-20 h-20 rounded-[1.5rem] mx-auto mb-10 flex items-center justify-center bg-[linear-gradient(135deg,#1E3A8A,#0A1128)] shadow-[0_24px_50px_rgba(18,61,126,0.6),inset_0_2px_4px_rgba(255,255,255,0.4)] border border-[rgba(255,255,255,0.3)] relative overflow-visible backdrop-blur-3xl"
                                 >
-                                    <div className="absolute inset-0 bg-white/10" />
-                                    <span className="text-white font-serif font-bold text-3xl drop-shadow-sm relative z-10 mt-1">
-                                        <i>N</i>
+                                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.2)_0%,transparent_70%)] rounded-[1.5rem]" />
+                                    <span 
+                                        className="font-serif font-black italic text-[44px] pb-1 tracking-tighter"
+                                        style={{
+                                            background: 'linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 40%, #94A3B8 100%)',
+                                            backgroundSize: '200% auto',
+                                            WebkitBackgroundClip: 'text',
+                                            WebkitTextFillColor: 'transparent',
+                                            color: 'transparent',
+                                            animation: 'shimmer 4s linear infinite',
+                                            filter: 'drop-shadow(0 8px 12px rgba(255,255,255,0.3))'
+                                        }}
+                                    >
+                                        N
                                     </span>
                                 </motion.div>
                                 <h1 className="font-serif text-3xl font-bold mb-4" style={{ color: '#F7F2EB' }}>

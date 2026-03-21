@@ -260,6 +260,7 @@ export default function Sidebar() {
                         {/* Visual layer */}
                         <div className={`flex items-center gap-3.5 px-3 py-3 rounded-2xl transition-all cursor-pointer bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 hover:border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_24px_rgba(0,0,0,0.4)] hover:-translate-y-0.5 group-hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_12px_32px_rgba(0,0,0,0.5)] ${collapsed ? 'justify-center' : ''}`}>
                             <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 border border-white/30 shadow-sm relative z-0">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={user.imageUrl} alt={user.fullName || 'User'} className="w-full h-full object-cover" />
                             </div>
                             <AnimatePresence>

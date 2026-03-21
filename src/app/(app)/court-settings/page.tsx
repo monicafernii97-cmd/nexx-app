@@ -9,7 +9,6 @@ import {
     Gavel,
     MapPin,
     FloppyDisk,
-    Strategy,
     Check,
     Warning,
     CaretDown,

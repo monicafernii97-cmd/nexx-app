@@ -176,7 +176,7 @@ export default function ConversationPage() {
             >
                 <button
                     onClick={() => router.push('/chat')}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all hover:scale-105 bg-white shadow-sm border border-[rgba(10,22,41,0.05)] text-sapphire hover:shadow"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all hover:scale-105 bg-white shadow-sm border border-[rgba(10,22,41,0.05)] text-[#1E3A8A] hover:shadow"
                     aria-label="Back to conversations"
                 >
                     <ArrowLeft size={18} weight="bold" />

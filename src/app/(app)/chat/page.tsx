@@ -9,7 +9,7 @@ import Link from 'next/link';
 import {
     ChatCircleDots,
     Plus,
-    Strategy,
+    ChatTeardropDots,
     Clock,
     Archive,
     CaretRight,
@@ -58,7 +58,7 @@ export default function ChatListPage() {
                         <div
                             className="w-12 h-12 rounded-[1rem] flex items-center justify-center bg-white shadow-[0_8px_30px_rgba(208,227,255,0.4)] border border-[rgba(10,22,41,0.04)]"
                         >
-                            <Strategy size={24} weight="duotone" className="text-champagne" />
+                            <ChatTeardropDots size={24} weight="duotone" className="text-champagne" />
                         </div>
                         <h1 className="text-3xl font-serif font-bold text-sapphire m-0 leading-tight">
                             NEXX <span className="shimmer text-champagne font-light">Intelligence</span>
@@ -80,7 +80,7 @@ export default function ChatListPage() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
                         <h2 className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 text-sapphire flex items-center gap-2">
-                            <Strategy size={16} className="text-champagne" /> Start New Session
+                            <ChatTeardropDots size={16} className="text-champagne" /> Start New Session
                         </h2>
                         <div className="flex flex-wrap gap-2.5">
                             {Object.entries(MODE_LABELS).map(([key, { label, color }]) => (
@@ -170,7 +170,7 @@ export default function ChatListPage() {
                                                     border: `1px solid color-mix(in srgb, ${modeInfo.color} 30%, transparent)`,
                                                 }}
                                             >
-                                                <Strategy size={20} weight="duotone" style={{ color: modeInfo.color }} />
+                                                <ChatTeardropDots size={20} weight="duotone" style={{ color: modeInfo.color }} />
                                             </div>
                                             <div className="flex-1 min-w-0 pr-4">
                                                 <div className="flex items-center gap-2 mb-2">

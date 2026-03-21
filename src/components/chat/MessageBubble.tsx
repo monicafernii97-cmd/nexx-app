@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Strategy, User, Copy, Check } from '@phosphor-icons/react';
+import { ChatTeardropDots, User, Copy, Check } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
 
@@ -68,7 +68,7 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
                 <div
                     className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center mt-1 bg-white shadow-sm border border-[rgba(10,22,41,0.04)]"
                 >
-                    <Strategy size={18} weight="duotone" className="text-champagne" />
+                    <ChatTeardropDots size={18} weight="duotone" className="text-champagne" />
                 </div>
             )}
 

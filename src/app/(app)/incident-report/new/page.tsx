@@ -9,7 +9,7 @@ import { useUser } from '@/lib/user-context';
 import {
     Microphone,
     ArrowLeft,
-    Strategy,
+    CircleNotch,
     FileText,
     Check,
     PencilSimple,
@@ -20,6 +20,8 @@ import {
     Users,
     Baby,
     Plus,
+    WarningCircle,
+    Strategy,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
@@ -350,7 +352,7 @@ export default function NewIncidentPage() {
                         {/* Error */}
                         {analyzeError && (
                             <div className="p-4 rounded-xl bg-rose/10 border border-rose/20 text-rose text-[13px] font-semibold flex items-center gap-2">
-                                <Strategy size={16} /> {analyzeError}
+                                <WarningCircle size={16} weight="fill" /> {analyzeError}
                             </div>
                         )}
 
@@ -363,8 +365,8 @@ export default function NewIncidentPage() {
                             >
                                 {isAnalyzing ? (
                                     <>
-                                        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}>
-                                            <Strategy size={20} weight="fill" className="text-white" />
+                                        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+                                            <CircleNotch size={20} weight="bold" className="text-white" />
                                         </motion.div>
                                         Analyzing Dynamics securely...
                                     </>

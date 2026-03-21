@@ -61,21 +61,26 @@ export async function POST(req: NextRequest) {
             contextLines.push(`**Witnesses:** ${witnesses.slice(0, 500)}`);
         }
 
-        // Fetch NEX Profile for personalized behavioral tracking
-        const convex = await getAuthenticatedConvexClient();
-        const nexProfile = await convex.query(api.nexProfiles.getByUser);
+        // Fetch NEX Profile for personalized behavioral tracking (non-blocking)
+        try {
+            const convex = await getAuthenticatedConvexClient();
+            const nexProfile = await convex.query(api.nexProfiles.getByUser);
 
-        if (nexProfile) {
-            contextLines.push(`\n**[User's Recognized NEX Patterns]**`);
-            if (nexProfile.behaviors?.length) {
-                contextLines.push(`- **Known Behaviors:** ${nexProfile.behaviors.join(', ')}`);
+            if (nexProfile) {
+                contextLines.push(`\n**[User's Recognized NEX Patterns]**`);
+                if (nexProfile.behaviors?.length) {
+                    contextLines.push(`- **Known Behaviors:** ${nexProfile.behaviors.join(', ')}`);
+                }
+                if (nexProfile.manipulationTactics?.length) {
+                    contextLines.push(`- **Known Manipulation Tactics:** ${nexProfile.manipulationTactics.join(', ')}`);
+                }
+                if (nexProfile.triggerPatterns?.length) {
+                    contextLines.push(`- **Known Trigger Patterns:** ${nexProfile.triggerPatterns.join(', ')}`);
+                }
             }
-            if (nexProfile.manipulationTactics?.length) {
-                contextLines.push(`- **Known Manipulation Tactics:** ${nexProfile.manipulationTactics.join(', ')}`);
-            }
-            if (nexProfile.triggerPatterns?.length) {
-                contextLines.push(`- **Known Trigger Patterns:** ${nexProfile.triggerPatterns.join(', ')}`);
-            }
+        } catch (profileErr) {
+            // NEX profile enrichment is optional — continue without it
+            console.warn('Could not fetch NEX profile for enrichment:', profileErr);
         }
 
         const completion = await getOpenAI().chat.completions.create({
@@ -146,8 +151,14 @@ Format your response EXACTLY as follows:
         });
     } catch (error) {
         console.error('Incident analysis error:', error);
+        const message =
+            error instanceof Error && error.message.includes('OPENAI_API_KEY')
+                ? 'AI service is not configured. Please contact support.'
+                : error instanceof Error && (error.message.includes('429') || error.message.includes('Rate limit'))
+                    ? 'Too many requests. Please wait a moment and try again.'
+                    : 'Failed to analyze incident. Please try again.';
         return Response.json(
-            { error: 'Failed to analyze incident' },
+            { error: message },
             { status: 500 }
         );
     }

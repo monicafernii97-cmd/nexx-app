@@ -23,6 +23,7 @@ import {
     Baby,
     ArrowsClockwise,
     DownloadSimple,
+    CircleNotch,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
@@ -156,6 +157,10 @@ export default function IncidentDetailPage() {
                     category: incident.category,
                     date: incident.date,
                     time: incident.time,
+                    severity: incident.severity,
+                    location: incident.location || undefined,
+                    witnesses: incident.witnesses || undefined,
+                    childrenInvolved: incident.childrenInvolved || undefined,
                 }),
             });
 
@@ -404,8 +409,8 @@ export default function IncidentDetailPage() {
                     </div>
                     {isAnalyzing ? (
                         <div className="flex flex-col items-center justify-center gap-4 py-8 opacity-60">
-                            <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}>
-                                <Strategy size={32} weight="duotone" className="text-champagne" />
+                            <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+                                <CircleNotch size={32} weight="bold" className="text-white" />
                             </motion.div>
                             <p className="text-[13px] font-bold uppercase tracking-widest text-sapphire">
                                 Generating encrypted court summary...

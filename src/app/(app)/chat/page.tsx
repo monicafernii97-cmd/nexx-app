@@ -121,7 +121,10 @@ export default function ChatListPage() {
             >
                 <h2 className="text-[12px] font-bold tracking-[0.2em] uppercase mb-5 text-sapphire px-2 flex items-center justify-between">
                     <span>Active Sessions</span>
-                    <span className="bg-white px-2 py-0.5 rounded-md shadow-[0_2px_4px_rgba(10,22,41,0.02)] border border-[rgba(10,22,41,0.06)] text-[12px] text-[#1E3A8A]">
+                    <span 
+                        className="bg-white px-2 py-1 rounded-md shadow-[0_2px_4px_rgba(10,22,41,0.02)] border border-[rgba(10,22,41,0.06)] text-[12px] font-black"
+                        style={{ color: '#0A1128' }}
+                    >
                         {isLoadingConversations ? '…' : activeConversations.length}
                     </span>
                 </h2>

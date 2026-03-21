@@ -37,7 +37,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
 
     return (
         <div
-            className="flex items-end gap-3 rounded-[1.5rem] p-3 bg-white/80 backdrop-blur-md shadow-[0_4px_24px_rgba(208,227,255,0.4)] border border-white transition-all focus-within:ring-2 focus-within:ring-champagne/30"
+            className="flex items-end gap-3 rounded-[1.5rem] p-3 bg-white shadow-[0_4px_24px_rgba(208,227,255,0.4)] border border-white transition-all focus-within:ring-2 focus-within:ring-champagne/30"
         >
             <textarea
                 ref={textareaRef}

@@ -192,7 +192,7 @@ export default function WelcomePage() {
           transition={{ delay: 0.5, duration: 0.8 }}
           className="text-base md:text-[17px] text-[rgba(255,255,255,0.7)] max-w-xl leading-[1.6] mb-12 font-medium"
         >
-          Take command of your narrative. Transform high-conflict manipulation into a bulletproof, court-ready strategy.
+          Take command of your narrative. Transform high-conflict turmoil into a bulletproof, court-ready strategy.
         </motion.p>
 
         {/* CTA Buttons */}

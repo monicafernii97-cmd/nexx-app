@@ -204,16 +204,16 @@ export default function IncidentReportPage() {
                                     className="group relative flex items-stretch"
                                 >
                                     <Link href={`/incident-report/${incident._id}`} className="flex-1 min-w-0 no-underline outline-none">
-                                        <div className="card-premium p-5 hover:bg-white border-white/80 transition-all duration-300 flex items-start gap-5">
+                                        <div className="card-premium p-5 hover:border-[rgba(255,255,255,0.4)] hover:shadow-[0_8px_32px_rgba(26,75,155,0.3)] transition-all duration-300 flex items-start gap-5">
                                             {/* Date Column */}
-                                            <div className="flex flex-col items-center justify-center min-w-[56px] py-2 bg-cloud rounded-xl px-2 shrink-0 border border-[rgba(10,22,41,0.03)]">
-                                                <p className="text-[11px] font-bold uppercase tracking-wider text-sapphire-muted">
+                                            <div className="flex flex-col items-center justify-center min-w-[56px] py-2 bg-[rgba(255,255,255,0.05)] rounded-xl px-2 shrink-0 border border-[rgba(255,255,255,0.1)]">
+                                                <p className="text-[11px] font-bold uppercase tracking-wider text-white/60">
                                                     {date.toLocaleDateString('en-US', { month: 'short' })}
                                                 </p>
-                                                <p className="text-2xl font-bold text-sapphire leading-none mt-1 mb-0.5">
+                                                <p className="text-2xl font-bold text-white leading-none mt-1 mb-0.5">
                                                     {date.getDate()}
                                                 </p>
-                                                <p className="text-[10px] font-semibold text-sapphire-muted/60">
+                                                <p className="text-[10px] font-semibold text-white/50">
                                                     {incident.time}
                                                 </p>
                                             </div>
@@ -226,10 +226,11 @@ export default function IncidentReportPage() {
                                                         return (
                                                             <span
                                                                 key={tag}
-                                                                className="px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase"
+                                                                className="px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase border shadow-sm"
                                                                 style={{ 
-                                                                    background: ct?.color ? `color-mix(in srgb, ${ct.color} 12%, transparent)` : 'var(--cloud)', 
-                                                                    color: ct?.color || 'var(--sapphire-muted)' 
+                                                                    background: ct?.color ? `color-mix(in srgb, ${ct.color} 15%, transparent)` : 'rgba(255,255,255,0.05)', 
+                                                                    color: ct?.color || 'rgba(255,255,255,0.7)',
+                                                                    borderColor: ct?.color ? `color-mix(in srgb, ${ct.color} 30%, transparent)` : 'rgba(255,255,255,0.1)'
                                                                 }}
                                                             >
                                                                 {ct?.label || tag.replace(/_/g, ' ')}
@@ -277,7 +278,7 @@ export default function IncidentReportPage() {
                                                         );
                                                     })()}
                                                 </div>
-                                                <p className="text-[14px] leading-relaxed text-sapphire font-medium line-clamp-2">
+                                                <p className="text-[14px] leading-relaxed text-white/80 font-medium line-clamp-2 mt-2">
                                                     {incident.courtSummary || incident.narrative}
                                                 </p>
                                             </div>
@@ -317,12 +318,16 @@ export default function IncidentReportPage() {
                                     <div key={tag} className="card-premium p-6 border-[rgba(10,22,41,0.05)]">
                                         <div className="flex items-center justify-between mb-5">
                                             <span 
-                                                className="px-3 py-1.5 rounded-md text-[11px] font-bold tracking-wider uppercase bg-white border border-[rgba(10,22,41,0.05)] shadow-sm"
-                                                style={{ color }}
+                                                className="px-3 py-1.5 rounded-md text-[11px] font-bold tracking-wider uppercase shadow-sm border"
+                                                style={{ 
+                                                    background: `color-mix(in srgb, ${color} 15%, transparent)`,
+                                                    color: color,
+                                                    borderColor: `color-mix(in srgb, ${color} 30%, transparent)`
+                                                }}
                                             >
                                                 {label}
                                             </span>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-sapphire-muted bg-cloud px-2.5 py-1 rounded-md">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-white/70 bg-[rgba(255,255,255,0.1)] px-2.5 py-1 rounded-md">
                                                 {occurrences.length} {occurrences.length === 1 ? 'Event' : 'Events'}
                                             </span>
                                         </div>
@@ -331,15 +336,15 @@ export default function IncidentReportPage() {
                                                 <Link 
                                                     key={occ.id} 
                                                     href={`/incident-report/${occ.id}`}
-                                                    className="block p-4 rounded-[1.2rem] bg-cloud hover:bg-white hover:shadow-[0_4px_12px_rgba(10,22,41,0.05)] border border-[rgba(10,22,41,0.03)] hover:border-[rgba(10,22,41,0.08)] transition-all no-underline group"
+                                                    className="block p-4 rounded-[1.2rem] bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)] hover:shadow-[0_4px_20px_rgba(26,75,155,0.2)] transition-all no-underline group"
                                                 >
                                                     <div className="flex items-center justify-between mb-1.5">
-                                                        <span className="text-[11px] font-bold text-sapphire">
+                                                        <span className="text-[11px] font-bold text-white/90">
                                                             {occ.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                                                         </span>
-                                                        <ArrowRight size={14} weight="bold" className="text-sapphire-muted opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-4px] group-hover:translate-x-0" />
+                                                        <ArrowRight size={14} weight="bold" className="text-white/60 opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-4px] group-hover:translate-x-0" />
                                                     </div>
-                                                    <p className="text-[13px] font-medium text-sapphire-muted line-clamp-2 leading-relaxed">
+                                                    <p className="text-[13px] font-medium text-white/60 line-clamp-2 leading-relaxed">
                                                         {occ.narrative}
                                                     </p>
                                                 </Link>

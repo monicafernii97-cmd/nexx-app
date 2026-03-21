@@ -315,26 +315,26 @@ export default function EFilingPage() {
                         </div>
                     </div>
                 ) : eFilingPortal && portalUrl ? (
-                    <div className="relative overflow-hidden rounded-3xl p-8 bg-gradient-to-br from-white/90 to-[var(--pearl)] border border-[var(--cloud-light)] shadow-[0_8px_32px_-8px_rgba(10,30,84,0.08)] backdrop-blur-xl group hover:shadow-[0_12px_48px_-12px_rgba(10,30,84,0.12)] transition-all duration-500">
+                    <div className="relative overflow-hidden rounded-3xl p-8 glass-ethereal shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:shadow-[0_15px_45px_rgba(18,61,126,0.6)] transition-all duration-500 border border-white/20 group">
                         {/* Decorative background elements */}
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--champagne)]/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-                        <div className="absolute bottom-0 left-0 w-48 h-48 bg-[var(--sapphire-light)]/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
                         
                         <div className="relative z-10 flex items-start sm:items-center gap-6 flex-col sm:flex-row">
-                            <div className="w-20 h-20 rounded-2xl flex items-center justify-center bg-white shadow-md border border-[var(--cloud-light)] shrink-0">
-                                <FileArrowUp size={36} className="text-[var(--sapphire-base)]" weight="duotone" />
+                            <div className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] shadow-[0_8px_30px_rgba(0,0,0,0.5)] border border-white/30 group-hover:scale-110 transition-transform duration-500 text-white relative overflow-hidden">
+                                <div className="absolute inset-0 bg-white/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <FileArrowUp size={36} className="text-white relative z-10 drop-shadow-md" weight="duotone" />
                             </div>
                             <div className="flex-1 space-y-2">
-                                <h2 className="text-xl font-semibold tracking-tight text-[var(--sapphire-dark)]">
+                                <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
                                     {eFilingPortal.name}
                                 </h2>
                                 {eFilingPortal.provider && (
-                                    <p className="text-xs uppercase tracking-widest font-medium text-[var(--sapphire-light)]">
+                                    <p className="text-xs uppercase tracking-widest font-bold text-[#60A5FA]">
                                         Powered by {eFilingPortal.provider}
                                     </p>
                                 )}
                                 {eFilingPortal.description && (
-                                    <p className="text-sm text-[var(--sapphire-base)] leading-relaxed max-w-2xl pt-1">
+                                    <p className="text-sm font-medium text-white/80 leading-relaxed max-w-2xl pt-1">
                                         {eFilingPortal.description}
                                     </p>
                                 )}
@@ -668,9 +668,9 @@ export default function EFilingPage() {
                                         <div className="glass-ethereal p-4 flex items-center gap-4 hover:shadow-[0_10px_35px_rgba(18,61,126,0.8)] border border-white/20 transition-all duration-500 hover:-translate-y-1 relative overflow-hidden">
                                             {/* Hover Glow Background Map */}
                                             <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                            <div className="w-12 h-12 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] flex items-center justify-center shrink-0 border border-white/20 shadow-inner relative group-hover:scale-110 transition-transform duration-500 z-10">
+                                            <div className="w-12 h-12 rounded-xl bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] flex items-center justify-center shrink-0 border border-[rgba(255,255,255,0.3)] shadow-[0_4px_15px_rgba(0,0,0,0.5)] relative group-hover:scale-110 transition-transform duration-500 z-10 overflow-hidden">
                                                 <div className="absolute inset-0 bg-white/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                <Bank size={22} weight="duotone" className="text-white relative z-10" />
+                                                <Bank size={22} weight="duotone" className="text-white relative z-10 drop-shadow-sm" />
                                             </div>
                                             <div className="flex-1 min-w-0 z-10">
                                                 <p className="text-sm font-semibold truncate text-white transition-colors duration-300">Court Clerk</p>
@@ -685,9 +685,9 @@ export default function EFilingPage() {
                                         <div className="glass-ethereal p-4 flex items-center gap-4 hover:shadow-[0_10px_35px_rgba(18,61,126,0.8)] border border-white/20 transition-all duration-500 hover:-translate-y-1 relative overflow-hidden">
                                             {/* Hover Glow Background Map */}
                                             <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                            <div className="w-12 h-12 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] flex items-center justify-center shrink-0 border border-white/20 shadow-inner relative group-hover:scale-110 transition-transform duration-500 z-10">
+                                            <div className="w-12 h-12 rounded-xl bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] flex items-center justify-center shrink-0 border border-[rgba(255,255,255,0.3)] shadow-[0_4px_15px_rgba(0,0,0,0.5)] relative group-hover:scale-110 transition-transform duration-500 z-10 overflow-hidden">
                                                 <div className="absolute inset-0 bg-white/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                <MagnifyingGlass size={22} weight="bold" className="text-white relative z-10" />
+                                                <MagnifyingGlass size={22} weight="bold" className="text-white relative z-10 drop-shadow-sm" />
                                             </div>
                                             <div className="flex-1 min-w-0 z-10">
                                                 <p className="text-sm font-semibold truncate text-white transition-colors duration-300">Case Search</p>
@@ -702,9 +702,9 @@ export default function EFilingPage() {
                                         <div className="glass-ethereal p-4 flex items-center gap-4 hover:shadow-[0_10px_35px_rgba(18,61,126,0.8)] border border-white/20 transition-all duration-500 hover:-translate-y-1 relative overflow-hidden">
                                             {/* Hover Glow Background Map */}
                                             <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                            <div className="w-12 h-12 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] flex items-center justify-center shrink-0 border border-white/20 shadow-inner relative group-hover:scale-110 transition-transform duration-500 z-10">
+                                            <div className="w-12 h-12 rounded-xl bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] flex items-center justify-center shrink-0 border border-[rgba(255,255,255,0.3)] shadow-[0_4px_15px_rgba(0,0,0,0.5)] relative group-hover:scale-110 transition-transform duration-500 z-10 overflow-hidden">
                                                 <div className="absolute inset-0 bg-white/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                <BookOpen size={22} weight="duotone" className="text-white relative z-10" />
+                                                <BookOpen size={22} weight="duotone" className="text-white relative z-10 drop-shadow-sm" />
                                             </div>
                                             <div className="flex-1 min-w-0 z-10">
                                                 <p className="text-sm font-semibold truncate text-white transition-colors duration-300">Local Rules</p>

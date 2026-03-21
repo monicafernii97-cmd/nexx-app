@@ -292,16 +292,16 @@ export default function OnboardingPage() {
                     >
                         {/* Step 0: Welcome */}
                         {currentStep === 0 && (
-                            <div className="text-center py-8">
+                            <div className="text-center py-8 md:py-16 max-w-xl mx-auto">
                                 <motion.div
                                     initial={{ scale: 0.8, opacity: 0 }}
                                     animate={{ scale: 1, opacity: 1, y: [0, -8, 0] }}
                                     transition={{ delay: 0.2, type: 'spring', y: { duration: 4, repeat: Infinity, ease: "easeInOut" } }}
-                                    className="w-20 h-20 rounded-[1.5rem] mx-auto mb-10 flex items-center justify-center bg-[linear-gradient(135deg,#1E3A8A,#0A1128)] shadow-[0_24px_50px_rgba(18,61,126,0.6),inset_0_2px_4px_rgba(255,255,255,0.4)] border border-[rgba(255,255,255,0.3)] relative overflow-visible backdrop-blur-3xl"
+                                    className="w-20 h-20 md:w-28 md:h-28 rounded-[1.5rem] md:rounded-[2rem] mx-auto mb-10 md:mb-12 flex items-center justify-center bg-[linear-gradient(135deg,#1E3A8A,#0A1128)] shadow-[0_24px_50px_rgba(18,61,126,0.6),inset_0_2px_4px_rgba(255,255,255,0.4)] border border-[rgba(255,255,255,0.3)] relative overflow-visible backdrop-blur-3xl"
                                 >
-                                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.2)_0%,transparent_70%)] rounded-[1.5rem]" />
+                                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.2)_0%,transparent_70%)] rounded-[1.5rem] md:rounded-[2rem]" />
                                     <span 
-                                        className="font-serif font-black italic text-[44px] pb-1 tracking-tighter"
+                                        className="font-serif font-black italic text-[44px] md:text-[64px] pb-1 tracking-tighter"
                                         style={{
                                             background: 'linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 40%, #94A3B8 100%)',
                                             backgroundSize: '200% auto',
@@ -315,13 +315,13 @@ export default function OnboardingPage() {
                                         N
                                     </span>
                                 </motion.div>
-                                <h1 className="font-serif text-3xl font-bold mb-4" style={{ color: '#F7F2EB' }}>
+                                <h1 className="font-serif text-3xl md:text-5xl font-bold mb-4 md:mb-8" style={{ color: '#F7F2EB' }}>
                                     Welcome to <span className="shimmer">NEXX</span>
                                 </h1>
-                                <p className="text-sm leading-relaxed mb-2" style={{ color: '#D0E3FF' }}>
+                                <p className="text-base md:text-xl leading-relaxed mb-3 md:mb-4 font-medium" style={{ color: '#D0E3FF' }}>
                                     If you&apos;re here, you already know something isn&apos;t right.
                                 </p>
-                                <p className="text-sm leading-relaxed" style={{ color: '#FFF9F0' }}>
+                                <p className="text-base md:text-xl leading-relaxed font-medium" style={{ color: '#FFF9F0' }}>
                                     You&apos;re not crazy, you&apos;re not overreacting, and you&apos;re not alone. Let&apos;s get you set up with the tools, strategy, and support you deserve.
                                 </p>
                             </div>
@@ -366,55 +366,67 @@ export default function OnboardingPage() {
 
                         {/* Step 2: Situation */}
                         {currentStep === 2 && (
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <MapPin size={20} style={{ color: '#F7F2EB' }} />
-                                    <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>Your Situation</h2>
+                            <div className="space-y-8 max-w-xl mx-auto">
+                                <div className="flex items-center justify-center gap-3 mb-6">
+                                    <MapPin size={24} style={{ color: '#F7F2EB' }} />
+                                    <h2 className="font-serif text-2xl font-bold" style={{ color: '#F7F2EB' }}>Your Situation</h2>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold tracking-[0.1em] uppercase mb-3 block text-white/70">Custody Arrangement</label>
-                                    <div className="flex flex-wrap gap-2.5">
-                                        {['Joint / Shared Custody', 'Sole Custody', 'Visitation Only', 'No Order Yet', 'Other'].map((opt) => (
-                                            <button
-                                                key={opt}
-                                                onClick={() => update('custodyType', opt)}
-                                                className={`transition-all text-[13px] font-semibold px-5 py-2.5 rounded-full border shadow-sm backdrop-blur-md ${
-                                                    formData.custodyType === opt 
-                                                    ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
-                                                    : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
-                                                }`}
-                                            >
-                                                {opt}
-                                            </button>
-                                        ))}
+                                <div className="flex flex-col text-left mb-6">
+                                    <label className="text-xs font-bold tracking-[0.1em] uppercase mb-4 block text-white/70">Custody Arrangement</label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {['Joint / Shared Custody', 'Sole Custody', 'Visitation Only', 'No Order Yet', 'Other'].map((opt) => {
+                                            const active = formData.custodyType === opt;
+                                            return (
+                                                <button
+                                                    key={opt}
+                                                    onClick={() => update('custodyType', opt)}
+                                                    className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[14px] font-medium flex items-center gap-3.5 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                                        active
+                                                        ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
+                                                        : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
+                                                    }`}
+                                                >
+                                                    <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-[rgba(255,255,255,0.8)]'}`}>
+                                                        {active && <Check size={14} strokeWidth={4} className="text-[#1A4B9B]" />}
+                                                    </div>
+                                                    {opt}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold tracking-[0.1em] uppercase mb-3 block text-white/70">Do you have a court case currently open?</label>
-                                    <div className="flex flex-wrap gap-2.5">
-                                        {['Yes, I have an active case', 'No, not yet'].map((opt) => (
-                                            <button
-                                                key={opt}
-                                                onClick={() => {
-                                                    update('hasOpenCase', opt);
-                                                    if (opt === 'No, not yet') {
-                                                        update('courtName', '');
-                                                        update('causeNumber', '');
-                                                    }
-                                                }}
-                                                className={`transition-all text-[13px] font-semibold px-5 py-2.5 rounded-full border shadow-sm backdrop-blur-md ${
-                                                    formData.hasOpenCase === opt 
-                                                    ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
-                                                    : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
-                                                }`}
-                                            >
-                                                {opt}
-                                            </button>
-                                        ))}
+                                <div className="flex flex-col text-left mb-6">
+                                    <label className="text-xs font-bold tracking-[0.1em] uppercase mb-4 block text-white/70">Do you have a court case currently open?</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
+                                        {['Yes, I have an active case', 'No, not yet'].map((opt) => {
+                                            const active = formData.hasOpenCase === opt;
+                                            return (
+                                                <button
+                                                    key={opt}
+                                                    onClick={() => {
+                                                        update('hasOpenCase', opt);
+                                                        if (opt === 'No, not yet') {
+                                                            update('courtName', '');
+                                                            update('causeNumber', '');
+                                                        }
+                                                    }}
+                                                    className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[14px] font-medium flex items-center gap-3.5 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                                        active
+                                                        ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
+                                                        : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
+                                                    }`}
+                                                >
+                                                    <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-[rgba(255,255,255,0.8)]'}`}>
+                                                        {active && <Check size={14} strokeWidth={4} className="text-[#1A4B9B]" />}
+                                                    </div>
+                                                    {opt}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                                 {formData.hasOpenCase === 'Yes, I have an active case' && (
-                                    <div className="space-y-4 pt-1">
+                                    <div className="space-y-4 pt-1 mb-6">
                                         <div>
                                             <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Court Name <span className="text-xs normal-case tracking-normal" style={{ color: '#7096D1' }}>(optional)</span></label>
                                             <input
@@ -435,22 +447,28 @@ export default function OnboardingPage() {
                                         </div>
                                     </div>
                                 )}
-                                <div>
-                                    <label className="text-xs font-bold tracking-[0.1em] uppercase mb-3 block text-white/70">Do you have an attorney?</label>
-                                    <div className="flex flex-wrap gap-2.5">
-                                        {['Yes', 'No', 'Looking'].map((opt) => (
-                                            <button
-                                                key={opt}
-                                                onClick={() => update('hasAttorney', opt)}
-                                                className={`transition-all text-[13px] font-semibold px-5 py-2.5 rounded-full border shadow-sm backdrop-blur-md ${
-                                                    formData.hasAttorney === opt 
-                                                    ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
-                                                    : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
-                                                }`}
-                                            >
-                                                {opt}
-                                            </button>
-                                        ))}
+                                <div className="flex flex-col text-left">
+                                    <label className="text-xs font-bold tracking-[0.1em] uppercase mb-4 block text-white/70">Do you have an attorney?</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        {['Yes', 'No', 'Looking'].map((opt) => {
+                                            const active = formData.hasAttorney === opt;
+                                            return (
+                                                <button
+                                                    key={opt}
+                                                    onClick={() => update('hasAttorney', opt)}
+                                                    className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[14px] font-medium flex items-center gap-3.5 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                                        active
+                                                        ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
+                                                        : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
+                                                    }`}
+                                                >
+                                                    <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-[rgba(255,255,255,0.8)]'}`}>
+                                                        {active && <Check size={14} strokeWidth={4} className="text-[#1A4B9B]" />}
+                                                    </div>
+                                                    {opt}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             </div>
@@ -458,75 +476,78 @@ export default function OnboardingPage() {
 
                         {/* Step 3: Your NEX */}
                         {currentStep === 3 && (
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <Heart size={20} className="text-white" />
-                                    <h2 className="font-serif text-xl font-bold text-white">Your NEX</h2>
+                            <div className="space-y-6 max-w-xl mx-auto">
+                                <div className="flex items-center justify-center gap-3 mb-4">
+                                    <Heart size={24} className="text-white" />
+                                    <h2 className="font-serif text-2xl font-bold text-white">Your NEX</h2>
                                 </div>
-                                <p className="text-sm text-[rgba(255,255,255,0.8)]">
+                                <p className="text-[15px] font-medium text-[rgba(255,255,255,0.8)] text-center mb-6">
                                     Select all behaviors you regularly experience:
                                 </p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                                    {nexBehaviorOptions.map((opt) => (
-                                        <button
-                                            key={opt}
-                                            onClick={() => toggleArrayItem('nexBehaviors', opt)}
-                                            className={`w-full text-left px-3 py-2 rounded-xl transition-all text-[12px] font-medium flex items-center gap-2.5 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
-                                                formData.nexBehaviors.includes(opt)
-                                                ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
-                                                : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
-                                            }`}
-                                        >
-                                            <div
-                                                className={`w-[16px] h-[16px] rounded-[4px] flex items-center justify-center flex-shrink-0 transition-all ${
-                                                    formData.nexBehaviors.includes(opt)
-                                                    ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]'
-                                                    : 'bg-[rgba(255,255,255,0.8)]'
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {nexBehaviorOptions.map((opt) => {
+                                        const active = formData.nexBehaviors.includes(opt);
+                                        return (
+                                            <button
+                                                key={opt}
+                                                onClick={() => toggleArrayItem('nexBehaviors', opt)}
+                                                className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[14px] font-medium flex items-center gap-3.5 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                                    active
+                                                    ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
+                                                    : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
                                                 }`}
                                             >
-                                                {formData.nexBehaviors.includes(opt) && <Check size={12} strokeWidth={4} className="text-[#1A4B9B]" />}
-                                            </div>
-                                            {opt}
-                                        </button>
-                                    ))}
+                                                <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-[rgba(255,255,255,0.8)]'}`}>
+                                                    {active && <Check size={14} strokeWidth={4} className="text-[#1A4B9B]" />}
+                                                </div>
+                                                {opt}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
 
                         {/* Step 4: Goals */}
                         {currentStep === 4 && (
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <Target size={20} className="text-white" />
-                                    <h2 className="font-serif text-xl font-bold text-white">Your Goals</h2>
+                            <div className="space-y-6 max-w-xl mx-auto">
+                                <div className="flex items-center justify-center gap-3 mb-4">
+                                    <Target size={24} className="text-white" />
+                                    <h2 className="font-serif text-2xl font-bold text-white">Your Goals</h2>
                                 </div>
-                                <p className="text-sm text-[rgba(255,255,255,0.8)] pb-2">
+                                <p className="text-[15px] font-medium text-[rgba(255,255,255,0.8)] pb-2 text-center mb-6">
                                     What do you need the most help with right now?
                                 </p>
-                                <div className="flex flex-wrap gap-2.5">
-                                    {goalOptions.map((opt) => (
-                                        <button
-                                            key={opt}
-                                            onClick={() => toggleArrayItem('primaryGoals', opt)}
-                                            className={`transition-all text-[13px] font-semibold px-4 py-2 rounded-full border shadow-sm backdrop-blur-md ${
-                                                formData.primaryGoals.includes(opt)
-                                                ? 'bg-white/10 text-white border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]'
-                                                : 'bg-transparent text-[rgba(255,255,255,0.85)] border-[rgba(255,255,255,0.25)] hover:border-[rgba(255,255,255,0.4)] hover:bg-white/5'
-                                            }`}
-                                        >
-                                            {opt}
-                                        </button>
-                                    ))}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {goalOptions.map((opt) => {
+                                        const active = formData.primaryGoals.includes(opt);
+                                        return (
+                                            <button
+                                                key={opt}
+                                                onClick={() => toggleArrayItem('primaryGoals', opt)}
+                                                className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[14px] font-medium flex items-center gap-3.5 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                                    active
+                                                    ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
+                                                    : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
+                                                }`}
+                                            >
+                                                <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-[rgba(255,255,255,0.8)]'}`}>
+                                                    {active && <Check size={14} strokeWidth={4} className="text-[#1A4B9B]" />}
+                                                </div>
+                                                {opt}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
 
                         {/* Step 5: Disclaimer */}
                         {currentStep === 5 && (
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <FileText size={20} className="text-white" />
-                                    <h2 className="font-serif text-xl font-bold text-white">Important Notice</h2>
+                            <div className="space-y-6 max-w-2xl mx-auto">
+                                <div className="flex items-center justify-center gap-3 mb-6">
+                                    <FileText size={24} className="text-white" />
+                                    <h2 className="font-serif text-2xl font-bold text-white">Important Notice</h2>
                                 </div>
                                 <div className="p-6 md:p-8 space-y-4 rounded-[1.5rem] bg-[linear-gradient(135deg,rgba(110,150,230,0.5),rgba(40,80,165,0.7))] border border-[rgba(255,255,255,0.2)] shadow-[0_16px_40px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.3)] backdrop-blur-xl">
                                     <p className="text-[15px] leading-relaxed text-[#0A1128] font-medium drop-shadow-sm">
@@ -541,7 +562,7 @@ export default function OnboardingPage() {
                                 </div>
                                 <button
                                     onClick={() => update('acceptedDisclaimer', !formData.acceptedDisclaimer)}
-                                    className={`w-full text-left px-5 py-3.5 rounded-[14px] transition-all text-[15px] flex items-center gap-4 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] mt-4 ${
+                                    className={`w-full text-left px-5 py-3.5 rounded-xl transition-all text-[15px] flex items-center gap-4 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] mt-4 ${
                                         formData.acceptedDisclaimer
                                         ? 'bg-white/10 text-white border-white/30 backdrop-blur-md'
                                         : 'bg-[rgba(255,255,255,0.04)] text-white/90 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
@@ -564,7 +585,7 @@ export default function OnboardingPage() {
                 </AnimatePresence>
 
                 {/* Navigation Buttons */}
-                <div className="flex items-center gap-3 mt-10">
+                <div className="flex items-center justify-center gap-3 mt-10 max-w-xl mx-auto">
                     {currentStep > 0 && (
                         <button 
                             onClick={() => setCurrentStep((prev) => prev - 1)} 

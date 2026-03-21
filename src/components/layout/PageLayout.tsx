@@ -22,10 +22,10 @@ export function PageHeader({ icon: Icon, title, description, rightElement }: Pag
             <div>
                 <div className="flex items-center gap-4 mb-3">
                     <div
-                        className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border border-[rgba(255,255,255,0.3)] shadow-[0_8px_30px_rgba(46,92,154,0.5)] relative overflow-hidden flex-shrink-0"
+                        className="w-14 h-14 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 shadow-[0_8px_30px_rgba(18,61,126,0.6)] relative overflow-hidden flex-shrink-0"
                     >
-                        <div className="absolute inset-0 bg-white/10" />
-                        <Icon size={28} weight="fill" className="text-white relative z-10 drop-shadow-md" />
+                        <div className="absolute inset-0 bg-white/5 backdrop-blur-sm" />
+                        <Icon size={28} weight="duotone" className="text-white relative z-10 drop-shadow-[0_2px_10px_rgba(255,255,255,0.3)]" />
                     </div>
                     <h1 className="text-4xl font-serif text-headline text-white m-0 tracking-tight flex items-center gap-2">
                         {title}

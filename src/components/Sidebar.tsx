@@ -115,7 +115,7 @@ export default function Sidebar() {
                                 WebkitBackgroundClip: 'text',
                                 WebkitTextFillColor: 'transparent',
                                 color: 'transparent',
-                                animation: 'shimmer 4s linear infinite',
+                                animation: 'shimmer-bg 4s linear infinite',
                             }}
                         >
                             N

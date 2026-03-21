@@ -215,7 +215,7 @@ export default function NexProfilePage() {
                         <p className="text-[13px] text-white/90 mb-4">
                             Select all behaviors you&apos;ve observed. NEXX will flag these proactively in conversations.
                         </p>
-                        <div className="flex flex-wrap gap-3">
+                        <div className="flex flex-wrap gap-2.5">
                             {BEHAVIOR_OPTIONS.map((behavior) => {
                                 const selected = form.behaviors.includes(behavior);
                                 return (
@@ -224,7 +224,7 @@ export default function NexProfilePage() {
                                         onClick={() => toggleItem('behaviors', behavior)}
                                         type="button"
                                         aria-pressed={selected}
-                                        className={`px-4 py-2 rounded-[6px] text-[13px] font-medium transition-all border ${
+                                        className={`px-3 py-1.5 rounded-[4px] text-[11px] font-medium transition-all border ${
                                             selected 
                                                 ? 'bg-[#123D7E] text-white border-transparent' 
                                                 : 'bg-transparent border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.8)] hover:bg-[#123D7E]/20 hover:text-white'
@@ -242,23 +242,23 @@ export default function NexProfilePage() {
                         <p className="text-[13px] text-white/90 mb-4">
                             How does your NEX typically communicate?
                         </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {COMMUNICATION_STYLES.map((style) => (
                                 <button
                                     key={style.value}
                                     onClick={() => setForm({ ...form, communicationStyle: style.value })}
                                     type="button"
                                     aria-pressed={form.communicationStyle === style.value}
-                                    className={`text-left p-4 rounded-xl transition-all border ${
+                                    className={`text-left p-3 rounded-xl transition-all border ${
                                         form.communicationStyle === style.value 
                                             ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border-transparent' 
                                             : 'bg-[#0A1128] border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.25)]'
                                     }`}
                                 >
-                                    <p className="text-sm font-semibold text-white mb-1">
+                                    <p className="text-xs font-semibold text-white mb-0.5">
                                         {style.label}
                                     </p>
-                                    <p className="text-[13px] text-white/80">
+                                    <p className="text-[11px] text-white/80">
                                         {style.description}
                                     </p>
                                 </button>
@@ -271,7 +271,7 @@ export default function NexProfilePage() {
                         <p className="text-[13px] text-white/90 mb-4">
                             Select tactics your NEX uses. NEXX will watch for these in your descriptions.
                         </p>
-                        <div className="flex flex-wrap gap-3">
+                        <div className="flex flex-wrap gap-2.5">
                             {MANIPULATION_OPTIONS.map((tactic) => {
                                 const selected = form.manipulationTactics.includes(tactic);
                                 return (
@@ -280,7 +280,7 @@ export default function NexProfilePage() {
                                         onClick={() => toggleItem('manipulationTactics', tactic)}
                                         type="button"
                                         aria-pressed={selected}
-                                        className={`px-4 py-2 rounded-[6px] text-[13px] font-medium transition-all border ${
+                                        className={`px-3 py-1.5 rounded-[4px] text-[11px] font-medium transition-all border ${
                                             selected 
                                                 ? 'bg-[#123D7E] text-white border-transparent' 
                                                 : 'bg-transparent border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.8)] hover:bg-[#123D7E]/20 hover:text-white'

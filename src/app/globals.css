@@ -140,6 +140,11 @@ body {
   100% { transform: translateX(100%); }
 }
 
+@keyframes shimmer-bg {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
 /* ═══ Glassmorphism (Navy Metallic) ═══ */
 .glass-ethereal, .glass-panel, .card-premium {
   background: linear-gradient(135deg, rgba(18, 61, 126, 0.45), rgba(10, 17, 40, 0.8)) !important; /* Rich Navy Blue */

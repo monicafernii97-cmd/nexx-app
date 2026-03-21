@@ -411,14 +411,14 @@ export default function CourtSettingsPage() {
             >
                 <div className="flex items-center gap-3 mb-4">
                     <div className="w-8 h-8 rounded-full bg-[var(--champagne)]/10 flex items-center justify-center">
-                        <Strategy size={16} className="text-[var(--champagne)]" weight="duotone" />
+                        <Gavel size={18} className="text-[var(--champagne)]" weight="duotone" />
                     </div>
                     <h2 className="text-sm font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
-                        AI Court Rules Verification
+                        Court Rules Verification
                     </h2>
                 </div>
                 <p className="text-sm mb-6 text-[var(--sapphire-base)] leading-relaxed pl-2">
-                    NEXX AI will search official court websites and local rules to verify formatting
+                    NEXX will search official court websites and local rules to verify formatting
                     requirements for your selected court. This ensures your documents comply with
                     local filing standards.
                 </p>
@@ -435,14 +435,14 @@ export default function CourtSettingsPage() {
                                     animate={{ rotate: 360 }}
                                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                                 >
-                                    <Strategy size={16} className="text-[var(--champagne)]" weight="fill" />
+                                    <Gavel size={16} className="text-[var(--champagne)]" weight="fill" />
                                 </motion.div>
                                 Verifying Framework...
                             </>
                         ) : (
                             <>
-                                <Strategy size={16} className="text-[var(--champagne)] group-hover:scale-110 transition-transform" weight="fill" />
-                                Verify with AI
+                                <Gavel size={16} className="text-[var(--champagne)] group-hover:rotate-[-12deg] transition-transform" weight="fill" />
+                                Verify with NEXX
                             </>
                         )}
                     </button>
@@ -567,7 +567,7 @@ export default function CourtSettingsPage() {
                 transition={{ delay: 0.5 }}
                 className="text-center text-xs mt-10 text-[var(--sapphire-light)] font-medium"
             >
-                Court settings directly inform NEXX AI for precision formatting of generated legal filings.
+                Court settings directly inform NEXX for precision formatting of generated legal filings.
             </motion.p>
         </PageContainer>
     );

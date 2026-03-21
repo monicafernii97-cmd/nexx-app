@@ -50,9 +50,9 @@ export default function ChatListPage() {
             <PageHeader
                 icon={ChatTeardropDots}
                 title={
-                    <>NEXX <span className="shimmer text-champagne font-light pl-2">Intelligence</span></>
+                    <>NEXX <span className="shimmer text-champagne font-light pl-2">Chat</span></>
                 }
-                description="Strategic AI counsel — your conversations are encrypted and private."
+                description="A private space for guidance, clarity, and strategic direction in your situation."
             />
 
             {/* New Chat Section (Glass Container) */}

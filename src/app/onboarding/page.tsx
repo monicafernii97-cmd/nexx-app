@@ -266,7 +266,7 @@ export default function OnboardingPage() {
                 background: `repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 8px), linear-gradient(135deg, #2E5C9A 0%, #123D7E 40%, #0A1128 100%)` 
             }}
         >
-            <div className="w-full max-w-lg mx-auto px-6 py-10 relative z-10">
+            <div className="w-full max-w-2xl mx-auto px-6 py-10 relative z-10">
                 {/* Progress Bar */}
                 <div className="flex items-center gap-1 mb-8">
                     {ONBOARDING_STEPS.map((_, i) => (
@@ -308,7 +308,7 @@ export default function OnboardingPage() {
                                             WebkitBackgroundClip: 'text',
                                             WebkitTextFillColor: 'transparent',
                                             color: 'transparent',
-                                            animation: 'shimmer 4s linear infinite',
+                                            animation: 'shimmer-bg 4s linear infinite',
                                             filter: 'drop-shadow(0 8px 12px rgba(255,255,255,0.3))'
                                         }}
                                     >
@@ -330,33 +330,35 @@ export default function OnboardingPage() {
                         {/* Step 1: About You */}
                         {currentStep === 1 && (
                             <div className="space-y-6">
-                                <div className="flex items-center gap-3 mb-2">
+                                <div className="flex items-center gap-3 mb-4">
                                     <Users size={20} style={{ color: '#F7F2EB' }} />
                                     <h2 className="font-serif text-xl font-semibold" style={{ color: '#F7F2EB' }}>About You</h2>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Your Name</label>
-                                    <input value={formData.name} onChange={(e) => update('name', e.target.value)} placeholder="First name" className="input-premium" />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>State</label>
-                                    <select value={formData.state} onChange={(e) => update('state', e.target.value)} className="input-premium">
-                                        <option value="">Select your state</option>
-                                        {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>County</label>
-                                    <input value={formData.county} onChange={(e) => update('county', e.target.value)} placeholder="e.g. Harris County" className="input-premium" />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div>
-                                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Children</label>
-                                        <input type="number" value={formData.childrenCount} onChange={(e) => update('childrenCount', e.target.value)} placeholder="How many?" className="input-premium" min="1" />
+                                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Your Name</label>
+                                        <input value={formData.name} onChange={(e) => update('name', e.target.value)} placeholder="First name" className="input-premium" />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Ages</label>
-                                        <input value={formData.childrenAges} onChange={(e) => update('childrenAges', e.target.value)} placeholder="e.g. 4, 7" className="input-premium" />
+                                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>State</label>
+                                        <select value={formData.state} onChange={(e) => update('state', e.target.value)} className="input-premium bg-[#0A1128]">
+                                            <option value="">Select your state</option>
+                                            {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>County</label>
+                                        <input value={formData.county} onChange={(e) => update('county', e.target.value)} placeholder="e.g. Harris County" className="input-premium" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Children</label>
+                                            <input type="number" value={formData.childrenCount} onChange={(e) => update('childrenCount', e.target.value)} placeholder="How many?" className="input-premium" min="1" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold tracking-[0.1em] uppercase mb-2 block" style={{ color: '#D0E3FF' }}>Ages</label>
+                                            <input value={formData.childrenAges} onChange={(e) => update('childrenAges', e.target.value)} placeholder="e.g. 4, 7" className="input-premium" />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -371,23 +373,25 @@ export default function OnboardingPage() {
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold tracking-[0.1em] uppercase mb-3 block text-white/70">Custody Arrangement</label>
-                                    {['Joint / Shared Custody', 'Sole Custody', 'Visitation Only', 'No Order Yet', 'Other'].map((opt) => (
-                                        <button
-                                            key={opt}
-                                            onClick={() => update('custodyType', opt)}
-                                            className={`w-full text-left px-5 py-4 rounded-xl mb-3 transition-all text-[15px] font-semibold border shadow-sm ${
-                                                formData.custodyType === opt 
-                                                ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
-                                                : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
-                                            }`}
-                                        >
-                                            {opt}
-                                        </button>
-                                    ))}
+                                    <div className="flex flex-wrap gap-2.5">
+                                        {['Joint / Shared Custody', 'Sole Custody', 'Visitation Only', 'No Order Yet', 'Other'].map((opt) => (
+                                            <button
+                                                key={opt}
+                                                onClick={() => update('custodyType', opt)}
+                                                className={`transition-all text-[13px] font-semibold px-5 py-2.5 rounded-full border shadow-sm backdrop-blur-md ${
+                                                    formData.custodyType === opt 
+                                                    ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
+                                                    : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
+                                                }`}
+                                            >
+                                                {opt}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold tracking-[0.1em] uppercase mb-3 block text-white/70">Do you have a court case currently open?</label>
-                                    <div className="flex flex-col sm:flex-row gap-3">
+                                    <div className="flex flex-wrap gap-2.5">
                                         {['Yes, I have an active case', 'No, not yet'].map((opt) => (
                                             <button
                                                 key={opt}
@@ -398,7 +402,7 @@ export default function OnboardingPage() {
                                                         update('causeNumber', '');
                                                     }
                                                 }}
-                                                className={`flex-1 py-4 px-6 rounded-xl text-[14px] font-semibold transition-all border shadow-sm ${
+                                                className={`transition-all text-[13px] font-semibold px-5 py-2.5 rounded-full border shadow-sm backdrop-blur-md ${
                                                     formData.hasOpenCase === opt 
                                                     ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
                                                     : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
@@ -433,12 +437,12 @@ export default function OnboardingPage() {
                                 )}
                                 <div>
                                     <label className="text-xs font-bold tracking-[0.1em] uppercase mb-3 block text-white/70">Do you have an attorney?</label>
-                                    <div className="flex flex-col md:flex-row gap-3">
+                                    <div className="flex flex-wrap gap-2.5">
                                         {['Yes', 'No', 'Looking'].map((opt) => (
                                             <button
                                                 key={opt}
                                                 onClick={() => update('hasAttorney', opt)}
-                                                className={`flex-1 py-2.5 px-5 rounded-xl text-[13px] font-semibold transition-all border shadow-sm ${
+                                                className={`transition-all text-[13px] font-semibold px-5 py-2.5 rounded-full border shadow-sm backdrop-blur-md ${
                                                     formData.hasAttorney === opt 
                                                     ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]' 
                                                     : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
@@ -462,25 +466,25 @@ export default function OnboardingPage() {
                                 <p className="text-sm text-[rgba(255,255,255,0.8)]">
                                     Select all behaviors you regularly experience:
                                 </p>
-                                <div className="flex flex-col gap-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                                     {nexBehaviorOptions.map((opt) => (
                                         <button
                                             key={opt}
                                             onClick={() => toggleArrayItem('nexBehaviors', opt)}
-                                            className={`w-full text-left px-5 py-3.5 rounded-[14px] transition-all text-[15px] flex items-center gap-4 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                            className={`w-full text-left px-3 py-2 rounded-xl transition-all text-[12px] font-medium flex items-center gap-2.5 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
                                                 formData.nexBehaviors.includes(opt)
-                                                ? 'bg-white/10 text-white border-white/30 backdrop-blur-md'
-                                                : 'bg-[rgba(255,255,255,0.04)] text-white/90 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
+                                                ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
+                                                : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
                                             }`}
                                         >
                                             <div
-                                                className={`w-[22px] h-[22px] rounded-md flex items-center justify-center flex-shrink-0 transition-all ${
+                                                className={`w-[16px] h-[16px] rounded-[4px] flex items-center justify-center flex-shrink-0 transition-all ${
                                                     formData.nexBehaviors.includes(opt)
                                                     ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]'
-                                                    : 'bg-white'
+                                                    : 'bg-[rgba(255,255,255,0.8)]'
                                                 }`}
                                             >
-                                                {formData.nexBehaviors.includes(opt) && <Check size={16} strokeWidth={4} className="text-[#1A4B9B]" />}
+                                                {formData.nexBehaviors.includes(opt) && <Check size={12} strokeWidth={4} className="text-[#1A4B9B]" />}
                                             </div>
                                             {opt}
                                         </button>

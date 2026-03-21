@@ -138,7 +138,7 @@ export default function WelcomePage() {
                WebkitBackgroundClip: 'text',
                WebkitTextFillColor: 'transparent',
                color: 'transparent',
-               animation: 'shimmer 4s linear infinite',
+               animation: 'shimmer-bg 4s linear infinite',
            }}
         >
           NEXX

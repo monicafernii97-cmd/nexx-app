@@ -383,7 +383,7 @@ export default function OnboardingPage() {
                                                     className={`transition-all text-[14px] font-semibold px-5 py-3 rounded-xl border shadow-sm backdrop-blur-md ${
                                                         active
                                                         ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
-                                                        : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
+                                                        : 'bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.8)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:bg-white/5 hover:text-[#FFFFFF]'
                                                     }`}
                                                 >
                                                     {opt}
@@ -410,7 +410,7 @@ export default function OnboardingPage() {
                                                     className={`transition-all text-[14px] font-semibold px-5 py-3 rounded-xl border shadow-sm backdrop-blur-md ${
                                                         active
                                                         ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
-                                                        : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
+                                                        : 'bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.8)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:bg-white/5 hover:text-[#FFFFFF]'
                                                     }`}
                                                 >
                                                     {opt}
@@ -453,7 +453,7 @@ export default function OnboardingPage() {
                                                     className={`transition-all text-[14px] font-semibold px-5 py-3 rounded-xl border shadow-sm backdrop-blur-md ${
                                                         active
                                                         ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
-                                                        : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
+                                                        : 'bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.8)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:bg-white/5 hover:text-[#FFFFFF]'
                                                     }`}
                                                 >
                                                     {opt}

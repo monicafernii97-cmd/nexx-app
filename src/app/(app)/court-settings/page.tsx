@@ -426,22 +426,27 @@ export default function CourtSettingsPage() {
                     <button
                         onClick={handleVerify}
                         disabled={!state || !county || verifying}
-                        className="btn-outline text-sm flex items-center gap-2 group hover:shadow-md disabled:opacity-50"
+                        className="relative overflow-hidden px-8 py-4 rounded-[1.25rem] text-[13px] font-bold tracking-[0.1em] uppercase flex items-center gap-3 transition-all duration-300 shadow-[0_16px_40px_rgba(0,0,0,0.5),inset_0_1px_2px_rgba(255,255,255,0.4)] hover:shadow-[0_24px_54px_rgba(0,0,0,0.7),inset_0_2px_4px_rgba(255,255,255,0.6)] hover:-translate-y-1.5 disabled:translate-y-0 disabled:opacity-50 border border-[rgba(255,255,255,0.3)] hover:border-[rgba(255,255,255,0.6)] backdrop-blur-3xl bg-[linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,255,255,0.02))] text-white group"
                     >
+                        {/* Glossy top highlight overlay */}
+                        <div className="absolute inset-0 rounded-[1.25rem] bg-[linear-gradient(to_bottom,rgba(255,255,255,0.15)_0%,transparent_40%)] pointer-events-none" />
+                        {/* Hover shimmer effect */}
+                        <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-[-20deg] group-hover:animate-shimmer pointer-events-none" />
+                        
                         {verifying ? (
                             <>
                                 <motion.div
                                     animate={{ rotate: 360 }}
                                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                                 >
-                                    <Gavel size={16} className="text-[var(--champagne)]" weight="fill" />
+                                    <Gavel size={20} className="text-[#F7F2EB] drop-shadow-md" weight="fill" />
                                 </motion.div>
-                                Verifying Framework...
+                                <span className="relative z-10 drop-shadow-md">Verifying Framework...</span>
                             </>
                         ) : (
                             <>
-                                <Gavel size={16} className="text-[var(--champagne)] group-hover:rotate-[-12deg] transition-transform" weight="fill" />
-                                Verify with NEXX
+                                <Gavel size={20} className="text-[#F7F2EB] group-hover:rotate-[-12deg] transition-transform drop-shadow-md" weight="fill" />
+                                <span className="relative z-10 drop-shadow-md">Verify with NEXX</span>
                             </>
                         )}
                     </button>

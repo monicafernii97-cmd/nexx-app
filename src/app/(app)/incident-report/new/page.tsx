@@ -1,13 +1,14 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
 import { Id } from '../../../../../convex/_generated/dataModel';
 import { useUser } from '@/lib/user-context';
 import {
     Microphone,
+    MicrophoneSlash,
     ArrowLeft,
     CircleNotch,
     FileText,
@@ -22,8 +23,11 @@ import {
     Plus,
     WarningCircle,
     Strategy,
+    FloppyDisk,
+    ArrowRight,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 
 type Step = 'describe' | 'review' | 'confirmed';
@@ -31,6 +35,7 @@ type Step = 'describe' | 'review' | 'confirmed';
 /** Premium multi-step incident creation form with AI-powered narrative analysis. */
 export default function NewIncidentPage() {
     const { userId } = useUser();
+    const router = useRouter();
     const [step, setStep] = useState<Step>('describe');
     const [narrative, setNarrative] = useState('');
     const [tags, setTags] = useState<string[]>([]);
@@ -48,6 +53,60 @@ export default function NewIncidentPage() {
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [createdId, setCreatedId] = useState<Id<'incidents'> | null>(null);
+
+    // ── Speech Recognition ──
+    const [isListening, setIsListening] = useState(false);
+    const [speechSupported, setSpeechSupported] = useState(true);
+    const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+    useEffect(() => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            setSpeechSupported(false);
+            return;
+        }
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+            let transcript = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                transcript += event.results[i][0].transcript;
+            }
+            // Append final results to the narrative
+            if (event.results[event.resultIndex].isFinal) {
+                setNarrative((prev) => prev + (prev ? ' ' : '') + transcript.trim());
+            }
+        };
+
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+            console.error('Speech recognition error:', event.error);
+            setIsListening(false);
+        };
+
+        recognition.onend = () => {
+            setIsListening(false);
+        };
+
+        recognitionRef.current = recognition;
+
+        return () => {
+            recognition.abort();
+        };
+    }, []);
+
+    const toggleListening = useCallback(() => {
+        if (!recognitionRef.current) return;
+        if (isListening) {
+            recognitionRef.current.stop();
+            setIsListening(false);
+        } else {
+            recognitionRef.current.start();
+            setIsListening(true);
+        }
+    }, [isListening]);
 
     const createIncident = useMutation(api.incidents.create);
     const confirmIncident = useMutation(api.incidents.confirm);
@@ -95,9 +154,48 @@ export default function NewIncidentPage() {
         }
     };
 
-    const handleConfirm = async () => {
+    /** Save the incident as a draft (no confirmation). */
+    const handleSaveDraft = async () => {
         if (!userId || isSaving) return;
         setIsSaving(true);
+        setAnalyzeError(null);
+
+        try {
+            const witnessArr = witnesses.trim()
+                ? witnesses.split(',').map((w) => w.trim()).filter(Boolean)
+                : undefined;
+
+            if (createdId) {
+                // Already created — just redirect, it's already a draft
+            } else {
+                const incidentId = await createIncident({
+                    narrative,
+                    courtSummary: courtSummary || undefined,
+                    tags: tags.length > 0 ? tags : undefined,
+                    severity,
+                    date,
+                    time,
+                    location: location.trim() || undefined,
+                    witnesses: witnessArr,
+                    childrenInvolved: childrenInvolved || undefined,
+                    aiAnalysis: behavioralAnalysis || undefined,
+                });
+                setCreatedId(incidentId);
+            }
+            router.push('/incident-report');
+        } catch (error) {
+            console.error('Draft save error:', error);
+            setAnalyzeError('Failed to save draft. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    /** Publish the incident to the timeline (create + confirm). */
+    const handlePublish = async () => {
+        if (!userId || isSaving) return;
+        setIsSaving(true);
+        setAnalyzeError(null);
 
         try {
             const witnessArr = witnesses.trim()
@@ -124,8 +222,8 @@ export default function NewIncidentPage() {
             await confirmIncident({ id: incidentId });
             setStep('confirmed');
         } catch (error) {
-            console.error('Save error:', error);
-            setAnalyzeError('Failed to save incident. Please try again.');
+            console.error('Publish error:', error);
+            setAnalyzeError('Failed to publish incident. Please try again.');
         } finally {
             setIsSaving(false);
         }
@@ -200,18 +298,43 @@ export default function NewIncidentPage() {
                         transition={{ duration: 0.4 }}
                         className="glass-ethereal rounded-[2rem] p-6 md:p-8 space-y-8"
                     >
-                        {/* Voice Record Button (Placeholder) */}
+                        {/* Voice Record Button */}
                         <div className="text-center">
-                            <button
-                                className="w-24 h-24 rounded-full mx-auto flex items-center justify-center cursor-pointer transition-all hover:scale-105 bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_8px_32px_rgba(26,75,155,0.5)] border-[4px] border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.3)] group relative overflow-hidden"
-                                title="Voice recording (coming soon)"
-                            >
-                                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <Microphone size={36} weight="duotone" className="text-white group-hover:scale-110 transition-all drop-shadow-md" />
-                            </button>
-                            <p className="text-[13px] font-bold tracking-widest uppercase mt-4 text-white">
-                                Tap to Record Testimony
-                            </p>
+                            {speechSupported ? (
+                                <>
+                                    <button
+                                        onClick={toggleListening}
+                                        className={`w-24 h-24 rounded-full mx-auto flex items-center justify-center cursor-pointer transition-all hover:scale-105 shadow-[0_8px_32px_rgba(26,75,155,0.5)] border-[4px] group relative overflow-hidden ${
+                                            isListening
+                                                ? 'bg-[linear-gradient(135deg,#C75A5A,#8B3A3A)] border-[rgba(199,90,90,0.5)] animate-pulse shadow-[0_0_30px_rgba(199,90,90,0.5)]'
+                                                : 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.3)]'
+                                        }`}
+                                        title={isListening ? 'Stop recording' : 'Start voice recording'}
+                                    >
+                                        <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        {isListening ? (
+                                            <MicrophoneSlash size={36} weight="fill" className="text-white drop-shadow-md" />
+                                        ) : (
+                                            <Microphone size={36} weight="duotone" className="text-white group-hover:scale-110 transition-all drop-shadow-md" />
+                                        )}
+                                    </button>
+                                    <p className={`text-[13px] font-bold tracking-widest uppercase mt-4 ${
+                                        isListening ? 'text-rose' : 'text-white'
+                                    }`}>
+                                        {isListening ? '● Listening... Tap to Stop' : 'Tap to Record Testimony'}
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="w-24 h-24 rounded-full mx-auto flex items-center justify-center bg-[rgba(255,255,255,0.05)] border-[4px] border-[rgba(255,255,255,0.08)] opacity-50">
+                                        <MicrophoneSlash size={36} className="text-white/40" />
+                                    </div>
+                                    <p className="text-[12px] font-medium text-white/40 mt-4">
+                                        Voice recording not supported in this browser.
+                                        <br />Use Chrome, Edge, or Safari.
+                                    </p>
+                                </>
+                            )}
                         </div>
 
                         <div className="primary-divider opacity-50" />
@@ -357,7 +480,7 @@ export default function NewIncidentPage() {
                         )}
 
                         {/* Submit */}
-                        <div className="pt-4">
+                        <div className="pt-4 space-y-3">
                             <button
                                 onClick={handleAnalyze}
                                 disabled={!narrative.trim() || isAnalyzing}
@@ -373,6 +496,13 @@ export default function NewIncidentPage() {
                                 ) : (
                                     <><FileText size={20} weight="duotone" className="text-white group-hover:animate-pulse" /> Generate Court-Ready Summary</>
                                 )}
+                            </button>
+                            <button
+                                onClick={handleSaveDraft}
+                                disabled={!narrative.trim() || isAnalyzing || isSaving}
+                                className="w-full flex items-center justify-center gap-2.5 rounded-[2rem] bg-transparent border border-[rgba(255,255,255,0.12)] hover:border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.04)] transition-all disabled:opacity-40 py-4 text-[13px] text-white/70 hover:text-white font-bold tracking-widest uppercase backdrop-blur-md cursor-pointer"
+                            >
+                                <FloppyDisk size={16} weight="duotone" /> {isSaving ? 'Saving...' : 'Save as Draft'}
                             </button>
                         </div>
                     </motion.div>
@@ -460,16 +590,23 @@ export default function NewIncidentPage() {
                             )}
                         </div>
 
-                        <div className="flex gap-4 pt-4">
+                        <div className="flex flex-col sm:flex-row gap-3 pt-4">
                             <button onClick={() => setStep('describe')} className="btn-secondary flex-1 py-4 uppercase text-[12px] tracking-widest bg-white hover:bg-cloud border-transparent shadow-sm">
                                 Back to Edit
                             </button>
                             <button
-                                onClick={handleConfirm}
+                                onClick={handleSaveDraft}
                                 disabled={isSaving}
-                                className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:scale-100 disabled:opacity-50 py-4 uppercase text-[12px] tracking-widest shadow-md"
+                                className="btn-secondary flex-1 flex items-center justify-center gap-2 disabled:scale-100 disabled:opacity-50 py-4 uppercase text-[12px] tracking-widest bg-white hover:bg-cloud border-transparent shadow-sm"
                             >
-                                <Check size={16} weight="bold" /> {isSaving ? 'Saving...' : 'Confirm & Save'}
+                                <FloppyDisk size={16} weight="duotone" /> {isSaving ? 'Saving...' : 'Save as Draft'}
+                            </button>
+                            <button
+                                onClick={handlePublish}
+                                disabled={isSaving}
+                                className="btn-primary flex-[1.5] flex items-center justify-center gap-2 disabled:scale-100 disabled:opacity-50 py-4 uppercase text-[12px] tracking-widest shadow-md"
+                            >
+                                <ArrowRight size={16} weight="bold" /> {isSaving ? 'Publishing...' : 'Publish to Timeline'}
                             </button>
                         </div>
                     </motion.div>

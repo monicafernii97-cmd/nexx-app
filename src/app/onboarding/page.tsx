@@ -371,22 +371,22 @@ export default function OnboardingPage() {
                                     <MapPin size={24} style={{ color: '#F7F2EB' }} />
                                     <h2 className="font-serif text-2xl font-bold" style={{ color: '#F7F2EB' }}>Your Situation</h2>
                                 </div>
-                                <div className="flex flex-col text-left mb-6">
-                                    <label className="text-xs font-bold tracking-[0.1em] uppercase mb-4 block text-white/70">Custody Arrangement</label>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="flex flex-col text-left mb-6 max-w-lg mx-auto w-full">
+                                    <label className="text-[13px] font-bold tracking-[0.1em] uppercase mb-4 block text-white/70">Custody Arrangement</label>
+                                    <div className="flex flex-col gap-3">
                                         {['Joint / Shared Custody', 'Sole Custody', 'Visitation Only', 'No Order Yet', 'Other'].map((opt) => {
                                             const active = formData.custodyType === opt;
                                             return (
                                                 <button
                                                     key={opt}
                                                     onClick={() => update('custodyType', opt)}
-                                                    className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[14px] font-medium flex items-center gap-3.5 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                                    className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[15px] font-medium flex items-center gap-4 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
                                                         active
                                                         ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
                                                         : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
                                                     }`}
                                                 >
-                                                    <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-[rgba(255,255,255,0.8)]'}`}>
+                                                    <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-white'}`}>
                                                         {active && <Check size={14} strokeWidth={4} className="text-[#1A4B9B]" />}
                                                     </div>
                                                     {opt}
@@ -395,9 +395,9 @@ export default function OnboardingPage() {
                                         })}
                                     </div>
                                 </div>
-                                <div className="flex flex-col text-left mb-6">
-                                    <label className="text-xs font-bold tracking-[0.1em] uppercase mb-4 block text-white/70">Do you have a court case currently open?</label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
+                                <div className="flex flex-col text-left mb-6 max-w-lg mx-auto w-full">
+                                    <label className="text-[13px] font-bold tracking-[0.1em] uppercase mb-4 block text-white/70">Do you have a court case currently open?</label>
+                                    <div className="flex flex-col gap-3">
                                         {['Yes, I have an active case', 'No, not yet'].map((opt) => {
                                             const active = formData.hasOpenCase === opt;
                                             return (
@@ -410,13 +410,13 @@ export default function OnboardingPage() {
                                                             update('causeNumber', '');
                                                         }
                                                     }}
-                                                    className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[14px] font-medium flex items-center gap-3.5 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                                    className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[15px] font-medium flex items-center gap-4 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
                                                         active
                                                         ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
                                                         : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
                                                     }`}
                                                 >
-                                                    <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-[rgba(255,255,255,0.8)]'}`}>
+                                                    <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-white'}`}>
                                                         {active && <Check size={14} strokeWidth={4} className="text-[#1A4B9B]" />}
                                                     </div>
                                                     {opt}
@@ -447,22 +447,22 @@ export default function OnboardingPage() {
                                         </div>
                                     </div>
                                 )}
-                                <div className="flex flex-col text-left">
-                                    <label className="text-xs font-bold tracking-[0.1em] uppercase mb-4 block text-white/70">Do you have an attorney?</label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div className="flex flex-col text-left max-w-lg mx-auto w-full">
+                                    <label className="text-[13px] font-bold tracking-[0.1em] uppercase mb-4 block text-white/70">Do you have an attorney?</label>
+                                    <div className="flex flex-col gap-3">
                                         {['Yes', 'No', 'Looking'].map((opt) => {
                                             const active = formData.hasAttorney === opt;
                                             return (
                                                 <button
                                                     key={opt}
                                                     onClick={() => update('hasAttorney', opt)}
-                                                    className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[14px] font-medium flex items-center gap-3.5 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                                    className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[15px] font-medium flex items-center gap-4 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
                                                         active
                                                         ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
                                                         : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
                                                     }`}
                                                 >
-                                                    <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-[rgba(255,255,255,0.8)]'}`}>
+                                                    <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-white'}`}>
                                                         {active && <Check size={14} strokeWidth={4} className="text-[#1A4B9B]" />}
                                                     </div>
                                                     {opt}
@@ -481,17 +481,17 @@ export default function OnboardingPage() {
                                     <Heart size={24} className="text-white" />
                                     <h2 className="font-serif text-2xl font-bold text-white">Your NEX</h2>
                                 </div>
-                                <p className="text-[15px] font-medium text-[rgba(255,255,255,0.8)] text-center mb-6">
+                                <p className="text-[17px] font-medium text-[rgba(255,255,255,0.8)] text-center mb-8">
                                     Select all behaviors you regularly experience:
                                 </p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="flex flex-col gap-3 max-w-lg mx-auto w-full">
                                     {nexBehaviorOptions.map((opt) => {
                                         const active = formData.nexBehaviors.includes(opt);
                                         return (
                                             <button
                                                 key={opt}
                                                 onClick={() => toggleArrayItem('nexBehaviors', opt)}
-                                                className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[14px] font-medium flex items-center gap-3.5 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                                className={`w-full text-left px-5 py-4 rounded-xl transition-all text-[15px] font-medium flex items-center gap-4 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
                                                     active
                                                     ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
                                                     : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
@@ -515,25 +515,23 @@ export default function OnboardingPage() {
                                     <Target size={24} className="text-white" />
                                     <h2 className="font-serif text-2xl font-bold text-white">Your Goals</h2>
                                 </div>
-                                <p className="text-[15px] font-medium text-[rgba(255,255,255,0.8)] pb-2 text-center mb-6">
+                                <p className="text-[17px] font-medium text-[rgba(255,255,255,0.8)] pb-2 text-center mb-6">
                                     What do you need the most help with right now?
                                 </p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="flex flex-wrap justify-center gap-2.5 max-w-xl mx-auto">
                                     {goalOptions.map((opt) => {
                                         const active = formData.primaryGoals.includes(opt);
                                         return (
                                             <button
                                                 key={opt}
                                                 onClick={() => toggleArrayItem('primaryGoals', opt)}
-                                                className={`w-full text-left px-4 py-3.5 rounded-xl transition-all text-[14px] font-medium flex items-center gap-3.5 border shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] ${
+                                                className={`transition-all text-[14px] font-semibold px-4 py-2.5 rounded-xl border shadow-sm backdrop-blur-md flex items-center gap-2 ${
                                                     active
-                                                    ? 'bg-white/10 text-white border-white/30 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
-                                                    : 'bg-[rgba(255,255,255,0.04)] text-white/80 border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)] backdrop-blur-md'
+                                                    ? 'bg-white/10 text-white border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]'
+                                                    : 'bg-transparent text-[rgba(255,255,255,0.85)] border-[rgba(255,255,255,0.25)] hover:border-[rgba(255,255,255,0.4)] hover:bg-white/5'
                                                 }`}
                                             >
-                                                <div className={`w-[20px] h-[20px] rounded-[6px] flex items-center justify-center flex-shrink-0 transition-all ${active ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-[rgba(255,255,255,0.8)]'}`}>
-                                                    {active && <Check size={14} strokeWidth={4} className="text-[#1A4B9B]" />}
-                                                </div>
+                                                {active && <Check size={14} strokeWidth={3} className="text-[#F7F2EB]" />}
                                                 {opt}
                                             </button>
                                         );

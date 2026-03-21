@@ -17,10 +17,6 @@ export const nexxClerkAppearance = {
         colorWarning: '#F59E0B',
     },
     elements: {
-        rootBox: {
-            transform: 'scale(1.142857)', /* Reverts global 14px font-size reduction back to 16px */
-            transformOrigin: 'top center',
-        },
         card: {
             background: 'linear-gradient(135deg, rgba(18, 61, 126, 0.45), rgba(10, 17, 40, 0.85))',
             backdropFilter: 'blur(24px)',

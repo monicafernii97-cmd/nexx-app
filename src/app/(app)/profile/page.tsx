@@ -379,7 +379,10 @@ export default function ProfilePage() {
                     </Section>
 
                     {/* ── NEXX Personalization ── */}
-                    <Section icon={<Strategy size={20} weight="duotone" className="text-champagne" />} title="NEXX A.I. Dynamics">
+                    <Section icon={<Strategy size={20} weight="duotone" className="text-champagne" />} title="NEXX Dynamics">
+                        <div className="mb-6 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-[13px] font-medium text-white/80 leading-relaxed shadow-sm">
+                            <span className="font-bold text-white">Note:</span> These preferences only dictate how information is relayed to you. All facts, case details, and strategic advice from NEXX remain strictly direct and objective regardless of the chosen communication tone.
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
                             <div>
                                 <Field label="Communication Preference">

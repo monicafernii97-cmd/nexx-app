@@ -80,6 +80,21 @@ function getTavilyClient() {
     return cachedTavilyClient;
 }
 
+/** Build a list of likely official court domains for a given state. */
+function getCourtDomains(state: string): string[] {
+    const s = state.toLowerCase().replace(/\s+/g, '');
+    // Common US court domain patterns by state
+    return [
+        'uscourts.gov',
+        `courts.${s}.gov`,
+        `${s}courts.gov`,
+        `courts.state.${s.slice(0, 2)}.us`,
+        `${s.slice(0, 2)}courts.gov`,
+        `judicial.${s}.gov`,
+        `judiciary.${s}.gov`,
+    ];
+}
+
 /** Search Tavily for official court rules and filing requirements for a given jurisdiction. */
 async function searchCourtRules(
     state: string,
@@ -90,30 +105,47 @@ async function searchCourtRules(
     if (!client) return [];
 
     try {
+        // First attempt: domain-restricted to official court websites
         const query = courtName
             ? `${courtName} ${county} County ${state} local court rules filing format requirements`
-            : `${county} County ${state} district court local rules filing format page margins font requirements`;
+            : `${county} County ${state} family court local rules filing format page margins font requirements`;
 
+        const domains = getCourtDomains(state);
         const response = await client.search(query, {
             maxResults: 8,
-            includeDomains: ['uscourts.gov', 'txcourts.gov', 'courts.state.tx.us'],
+            includeDomains: domains,
             searchDepth: 'advanced',
         });
 
-        if (!response.results || response.results.length === 0) {
-            // Broaden search without domain restriction
-            const broadResponse = await client.search(
-                `${county} County ${state} court filing format requirements margins font size`,
-                { maxResults: 5, searchDepth: 'advanced' }
-            );
-            return (broadResponse.results ?? []).map((r) => ({
+        if (response.results && response.results.length > 0) {
+            return response.results.map((r) => ({
                 title: r.title || 'Untitled',
                 url: r.url,
                 content: r.content || '',
             }));
         }
 
-        return response.results.map((r) => ({
+        // Second attempt: broader search without domain restrictions
+        const broadResponse = await client.search(
+            `${county} County ${state} court local rules filing requirements margins font size line spacing`,
+            { maxResults: 8, searchDepth: 'advanced' }
+        );
+
+        if (broadResponse.results && broadResponse.results.length > 0) {
+            return broadResponse.results.map((r) => ({
+                title: r.title || 'Untitled',
+                url: r.url,
+                content: r.content || '',
+            }));
+        }
+
+        // Third attempt: general state-level rules
+        const stateResponse = await client.search(
+            `${state} state court formatting rules document filing requirements font margins`,
+            { maxResults: 5, searchDepth: 'basic' }
+        );
+
+        return (stateResponse.results ?? []).map((r) => ({
             title: r.title || 'Untitled',
             url: r.url,
             content: r.content || '',

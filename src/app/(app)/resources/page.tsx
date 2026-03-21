@@ -204,7 +204,7 @@ function SectionHeader({
                     className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-xl border border-white/20 shrink-0"
                     style={{ background: iconBg }}
                 >
-                    <Icon size={24} weight={weight} style={{ color: iconColor }} className="drop-shadow-md" />
+                    <Icon size={24} weight={weight} color={iconColor} className="drop-shadow-md" />
                 </div>
                 <h2 className="text-[15px] font-bold tracking-[0.2em] uppercase text-white drop-shadow-sm">
                     {label}
@@ -359,7 +359,7 @@ function CourtResourcesGrid({
                             <div
                                 className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-white/10 border border-white/20 text-[#60A5FA] group-hover:bg-[#123D7E] group-hover:text-white transition-colors"
                             >
-                                <item.icon size={22} weight="duotone" className="drop-shadow-sm" />
+                                <item.icon size={22} weight="duotone" color="#60A5FA" className="drop-shadow-sm" />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-[15px] font-bold truncate text-white mb-0.5">

@@ -75,6 +75,8 @@ html {
   --color-champagne-light: rgba(255, 255, 255, 0.1);
   --color-emerald: var(--emerald);
   --color-rose: var(--rose);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
   --color-cloud: rgba(255, 255, 255, 0.05);
   --color-cloud-light: rgba(255, 255, 255, 0.1);
 }

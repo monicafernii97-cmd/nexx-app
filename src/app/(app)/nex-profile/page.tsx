@@ -267,7 +267,7 @@ export default function NexProfilePage() {
                     </Section>
 
                     {/* ── Manipulation Tactics ── */}
-                    <Section icon={<Warning size={20} className="text-warning" weight="duotone" />} title="Known Manipulation Tactics">
+                    <Section icon={<Warning size={20} color="#F59E0B" weight="duotone" />} title="Known Manipulation Tactics">
                         <p className="text-[13px] text-white/90 mb-4">
                             Select tactics your NEX uses. NEXX will watch for these in your descriptions.
                         </p>

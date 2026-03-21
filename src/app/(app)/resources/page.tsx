@@ -658,31 +658,36 @@ export default function ResourcesPage() {
                         className="no-underline block"
                     >
                         <motion.div
-                            whileHover={{ scale: 1.01, y: -2 }}
-                            className="glass-ethereal rounded-[2rem] p-6 md:p-8 cursor-pointer group shadow-sm hover:shadow-lg transition-all border-champagne/20 bg-champagne/5"
+                            whileHover={{ y: -4 }}
+                            transition={{ duration: 0.5, ease: "easeOut" }}
+                            className="glass-ethereal rounded-[2rem] p-6 md:p-8 cursor-pointer group shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:shadow-[0_15px_45px_rgba(18,61,126,0.8)] transition-all border border-white/20 overflow-hidden relative"
                         >
-                            <div className="flex flex-col md:flex-row md:items-center gap-6">
+                            {/* Hover Glow Background Map */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                            
+                            <div className="flex flex-col md:flex-row md:items-center gap-6 relative z-10">
                                 <div
-                                    className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 bg-[#0A1128] shadow-sm border border-[rgba(255,255,255,0.1)] group-hover:bg-[#123D7E] transition-colors text-champagne"
+                                    className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 bg-[linear-gradient(135deg,#123D7E,#0A1128)] shadow-[0_8px_30px_rgba(0,0,0,0.5)] border border-white/20 group-hover:scale-110 transition-transform duration-500 text-white relative overflow-hidden"
                                 >
-                                    <MagnifyingGlass size={32} weight="duotone" />
+                                    <div className="absolute inset-0 bg-white/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <MagnifyingGlass size={32} weight="bold" className="relative z-10 drop-shadow-[0_2px_10px_rgba(255,255,255,0.4)]" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-3 mb-2">
-                                        <h3 className="font-serif font-bold text-2xl text-sapphire">
+                                        <h3 className="font-serif font-bold text-2xl text-white">
                                             My Case
                                         </h3>
                                         <span
-                                            className="text-[12px] font-bold font-mono px-3 py-1 rounded-lg bg-white border border-[rgba(10,22,41,0.06)] text-sapphire shadow-sm"
+                                            className="text-[12px] font-bold font-mono px-3 py-1 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-white shadow-sm"
                                         >
                                             {courtSettings.causeNumber}
                                         </span>
                                     </div>
-                                    <p className="text-[14px] font-medium text-sapphire-muted leading-relaxed">
+                                    <p className="text-[14px] font-medium text-white/70 leading-relaxed">
                                         {cachedResources?.caseSearch?.description || `Search your case on ${cachedResources?.caseSearch?.name}`}
                                     </p>
                                     {courtSettings.courtName && (
-                                        <p className="text-[13px] font-bold text-sapphire mt-2">
+                                        <p className="text-[13px] font-bold text-white mt-2">
                                             {courtSettings.courtName}
                                             {courtSettings.assignedJudge ? ` · Hon. ${courtSettings.assignedJudge}` : ''}
                                         </p>
@@ -690,9 +695,9 @@ export default function ResourcesPage() {
                                 </div>
                                 <div className="flex-shrink-0 flex items-center justify-end w-full md:w-auto">
                                     <span
-                                        className="text-[12px] font-bold uppercase tracking-widest px-6 py-3.5 rounded-xl transition-all group-hover:scale-105 bg-white shadow-sm text-sapphire border border-transparent group-hover:border-[rgba(10,22,41,0.05)] flex items-center gap-2"
+                                        className="text-[12px] font-bold uppercase tracking-widest px-6 py-3.5 rounded-xl transition-all duration-300 group-hover:scale-105 bg-white shadow-sm text-[#0A1128] border border-transparent flex items-center gap-2"
                                     >
-                                        Access Portal <ArrowUpRight size={16} weight="bold" className="text-champagne" />
+                                        Access Portal <ArrowUpRight size={16} weight="bold" className="text-[#123D7E]" />
                                     </span>
                                 </div>
                             </div>

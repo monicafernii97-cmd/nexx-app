@@ -188,11 +188,12 @@ export default function ConversationPage() {
                     </h1>
                     <div className="flex items-center gap-3 mt-1">
                         <span
-                            className="badge text-[10px] font-bold tracking-wider py-1 px-2 shadow-sm"
+                            className="text-[10px] tracking-widest font-bold py-1 px-3 rounded-full border border-white/10 shadow-sm"
                             style={{
-                                background: `color-mix(in srgb, ${modeInfo.color} 15%, white)`,
+                                background: `color-mix(in srgb, ${modeInfo.color} 15%, transparent)`,
+                                backdropFilter: 'blur(8px)',
                                 color: modeInfo.color,
-                                border: `1px solid color-mix(in srgb, ${modeInfo.color} 30%, transparent)`,
+                                borderColor: `color-mix(in srgb, ${modeInfo.color} 40%, transparent)`,
                             }}
                         >
                             {modeInfo.label} MODE

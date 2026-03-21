@@ -180,10 +180,12 @@ export default function ChatListPage() {
                                             <div className="flex-1 min-w-0 pr-4">
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <span
-                                                        className="badge text-[10px] tracking-wider font-bold py-1 px-2"
+                                                        className="text-[10px] tracking-widest font-bold py-1 px-3 rounded-full border border-white/10 shadow-sm"
                                                         style={{
-                                                            background: `color-mix(in srgb, ${modeInfo.color} 10%, white)`,
+                                                            background: `color-mix(in srgb, ${modeInfo.color} 15%, transparent)`,
+                                                            backdropFilter: 'blur(8px)',
                                                             color: modeInfo.color,
+                                                            borderColor: `color-mix(in srgb, ${modeInfo.color} 40%, transparent)`,
                                                         }}
                                                     >
                                                         {modeInfo.label}
@@ -271,10 +273,12 @@ export default function ChatListPage() {
                                                     {conv.title}
                                                 </p>
                                                 <span
-                                                    className="badge text-[10px] font-bold tracking-wider mr-2"
+                                                    className="text-[10px] tracking-widest font-bold py-1 px-3 rounded-full border border-white/10 shadow-sm mr-2"
                                                     style={{
-                                                        background: `color-mix(in srgb, ${modeInfo.color} 10%, white)`,
+                                                        background: `color-mix(in srgb, ${modeInfo.color} 15%, transparent)`,
+                                                        backdropFilter: 'blur(8px)',
                                                         color: modeInfo.color,
+                                                        borderColor: `color-mix(in srgb, ${modeInfo.color} 40%, transparent)`,
                                                     }}
                                                 >
                                                     {modeInfo.label}

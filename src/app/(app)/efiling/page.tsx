@@ -665,43 +665,52 @@ export default function EFilingPage() {
                             <div className="space-y-3">
                                 {clerkUrl && (
                                     <a href={clerkUrl} target="_blank" rel="noopener noreferrer" className="block group">
-                                        <div className="card-premium p-4 flex items-center gap-4 hover:shadow-md transition-all border border-[var(--cloud-light)]">
-                                            <div className="w-10 h-10 rounded-xl bg-[var(--sapphire-light)]/10 flex items-center justify-center text-[var(--sapphire-base)] shrink-0 group-hover:bg-[var(--sapphire-base)] group-hover:text-white transition-colors">
-                                                <Bank size={18} weight="duotone" />
+                                        <div className="glass-ethereal p-4 flex items-center gap-4 hover:shadow-[0_10px_35px_rgba(18,61,126,0.8)] border border-white/20 transition-all duration-500 hover:-translate-y-1 relative overflow-hidden">
+                                            {/* Hover Glow Background Map */}
+                                            <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                            <div className="w-12 h-12 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] flex items-center justify-center shrink-0 border border-white/20 shadow-inner relative group-hover:scale-110 transition-transform duration-500 z-10">
+                                                <div className="absolute inset-0 bg-white/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                <Bank size={22} weight="duotone" className="text-white relative z-10" />
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-semibold truncate text-[var(--sapphire-dark)]">Court Clerk</p>
-                                                <p className="text-xs truncate text-[var(--sapphire-light)]">{cachedResources?.courtClerk?.name || 'County Clerk Office'}</p>
+                                            <div className="flex-1 min-w-0 z-10">
+                                                <p className="text-sm font-semibold truncate text-white transition-colors duration-300">Court Clerk</p>
+                                                <p className="text-xs truncate text-white/60">{cachedResources?.courtClerk?.name || 'County Clerk Office'}</p>
                                             </div>
-                                            <ArrowSquareOut size={16} className="text-[var(--sapphire-light)] group-hover:text-[var(--sapphire-base)] transition-colors shrink-0" weight="bold" />
+                                            <ArrowSquareOut size={18} className="text-white/40 group-hover:text-white transition-colors shrink-0 z-10" weight="bold" />
                                         </div>
                                     </a>
                                 )}
                                 {caseSearchUrl && (
                                     <a href={caseSearchUrl} target="_blank" rel="noopener noreferrer" className="block group">
-                                        <div className="card-premium p-4 flex items-center gap-4 hover:shadow-md transition-all border border-[var(--cloud-light)]">
-                                            <div className="w-10 h-10 rounded-xl bg-[var(--sapphire-light)]/10 flex items-center justify-center text-[var(--sapphire-base)] shrink-0 group-hover:bg-[var(--sapphire-base)] group-hover:text-white transition-colors">
-                                                <MagnifyingGlass size={18} weight="bold" />
+                                        <div className="glass-ethereal p-4 flex items-center gap-4 hover:shadow-[0_10px_35px_rgba(18,61,126,0.8)] border border-white/20 transition-all duration-500 hover:-translate-y-1 relative overflow-hidden">
+                                            {/* Hover Glow Background Map */}
+                                            <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                            <div className="w-12 h-12 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] flex items-center justify-center shrink-0 border border-white/20 shadow-inner relative group-hover:scale-110 transition-transform duration-500 z-10">
+                                                <div className="absolute inset-0 bg-white/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                <MagnifyingGlass size={22} weight="bold" className="text-white relative z-10" />
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-semibold truncate text-[var(--sapphire-dark)]">Case Search</p>
-                                                <p className="text-xs truncate text-[var(--sapphire-light)]">{cachedResources?.caseSearch?.name || 'Public Records Search'}</p>
+                                            <div className="flex-1 min-w-0 z-10">
+                                                <p className="text-sm font-semibold truncate text-white transition-colors duration-300">Case Search</p>
+                                                <p className="text-xs truncate text-white/60">{cachedResources?.caseSearch?.name || 'Public Records Search'}</p>
                                             </div>
-                                            <ArrowSquareOut size={16} className="text-[var(--sapphire-light)] group-hover:text-[var(--sapphire-base)] transition-colors shrink-0" weight="bold" />
+                                            <ArrowSquareOut size={18} className="text-white/40 group-hover:text-white transition-colors shrink-0 z-10" weight="bold" />
                                         </div>
                                     </a>
                                 )}
                                 {localRulesUrl && (
                                     <a href={localRulesUrl} target="_blank" rel="noopener noreferrer" className="block group">
-                                        <div className="card-premium p-4 flex items-center gap-4 hover:shadow-md transition-all border border-[var(--cloud-light)]">
-                                            <div className="w-10 h-10 rounded-xl bg-[var(--sapphire-light)]/10 flex items-center justify-center text-[var(--sapphire-base)] shrink-0 group-hover:bg-[var(--sapphire-base)] group-hover:text-white transition-colors">
-                                                <BookOpen size={18} weight="duotone" />
+                                        <div className="glass-ethereal p-4 flex items-center gap-4 hover:shadow-[0_10px_35px_rgba(18,61,126,0.8)] border border-white/20 transition-all duration-500 hover:-translate-y-1 relative overflow-hidden">
+                                            {/* Hover Glow Background Map */}
+                                            <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                            <div className="w-12 h-12 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] flex items-center justify-center shrink-0 border border-white/20 shadow-inner relative group-hover:scale-110 transition-transform duration-500 z-10">
+                                                <div className="absolute inset-0 bg-white/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                <BookOpen size={22} weight="duotone" className="text-white relative z-10" />
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-semibold truncate text-[var(--sapphire-dark)]">Local Rules</p>
-                                                <p className="text-xs truncate text-[var(--sapphire-light)]">{cachedResources?.localRules?.name || 'Rules & Procedures'}</p>
+                                            <div className="flex-1 min-w-0 z-10">
+                                                <p className="text-sm font-semibold truncate text-white transition-colors duration-300">Local Rules</p>
+                                                <p className="text-xs truncate text-white/60">{cachedResources?.localRules?.name || 'Local Rules & Procedures'}</p>
                                             </div>
-                                            <ArrowSquareOut size={16} className="text-[var(--sapphire-light)] group-hover:text-[var(--sapphire-base)] transition-colors shrink-0" weight="bold" />
+                                            <ArrowSquareOut size={18} className="text-white/40 group-hover:text-white transition-colors shrink-0 z-10" weight="bold" />
                                         </div>
                                     </a>
                                 )}

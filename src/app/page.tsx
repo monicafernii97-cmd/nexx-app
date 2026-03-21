@@ -223,7 +223,7 @@ export default function WelcomePage() {
         transition={{ delay: 1.2, duration: 1 }}
         className="absolute bottom-8 left-0 right-0 text-center text-[10px] md:text-xs tracking-[0.25em] font-semibold text-[rgba(255,255,255,0.3)] uppercase"
       >
-        Calculated. Bulletproof. Victorious.
+        Prepare. Preempt. Prevail.
       </motion.p>
     </div>
   );

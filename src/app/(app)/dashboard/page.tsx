@@ -6,7 +6,7 @@ import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import {
-    NotePencil,
+    Note,
     ChatCircleText,
     FileText,
     Plus,
@@ -42,7 +42,7 @@ export default function DashboardPage() {
 
     /** Summary statistics displayed in the dashboard header bento grid. */
     const stats = [
-        { label: 'Documented Incidents', value: String(incidentCount), icon: NotePencil, color: '#F59E0B', href: '/incident-report' },
+        { label: 'Documented Incidents', value: String(incidentCount), icon: Note, color: '#F59E0B', href: '/incident-report' },
         { label: 'Active Sessions', value: String(conversationCount), icon: ChatCircleText, color: 'var(--champagne)', href: '/chat' },
         { label: 'Court-Ready Records', value: String(confirmedCount), icon: FileText, color: '#60A5FA', href: '/docuvault/gallery' },
         { label: 'Pattern Alerts', value: '0', icon: WarningCircle, color: 'var(--warning)', href: '/nex-profile' },
@@ -136,7 +136,7 @@ export default function DashboardPage() {
                                     <Link key={stat.label} href={stat.href} className="no-underline block h-full">
                                         <div className="p-5 flex flex-col justify-between h-full rounded-[2rem] bg-[#0A1128] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.2)] hover:bg-[#121A3A] transition-colors shadow-sm cursor-pointer group">
                                             <div className="flex items-center gap-3 mb-4 shrink-0">
-                                                <Icon size={28} weight="duotone" style={{ color: stat.color }} className="transition-transform group-hover:scale-110" />
+                                                <Icon size={24} weight="fill" color={stat.color} className="shrink-0 transition-transform group-hover:scale-110" />
                                                 <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest leading-tight">{stat.label}</span>
                                             </div>
                                             <p className="text-3xl font-serif text-white tracking-tight">

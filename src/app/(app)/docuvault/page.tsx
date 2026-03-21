@@ -470,16 +470,41 @@ function DocuVaultPageInner() {
                                         type="file" 
                                         ref={fileInputRef} 
                                         className="hidden" 
-                                        accept=".txt,.md,.csv" 
+                                        accept=".pdf,.docx,.txt,.md,.csv" 
                                         onChange={async (e) => {
                                             const file = e.target.files?.[0];
-                                            if (file) {
-                                                try {
-                                                    const text = await file.text();
-                                                    setDocumentContent(prev => prev ? prev + '\n\n' + text : text);
-                                                } catch (err) {
-                                                    setGenerationError('Failed to read file. Please paste content manually.');
+                                            if (!file) return;
+
+                                            const name = file.name.toLowerCase();
+                                            const isBinary = name.endsWith('.pdf') || name.endsWith('.docx');
+
+                                            try {
+                                                let extractedText = '';
+
+                                                if (isBinary) {
+                                                    // Send to server for parsing
+                                                    const formData = new FormData();
+                                                    formData.append('file', file);
+                                                    const res = await fetch('/api/documents/parse', {
+                                                        method: 'POST',
+                                                        body: formData,
+                                                    });
+                                                    const data = await res.json();
+                                                    if (!res.ok) throw new Error(data.error || 'Parse failed');
+                                                    extractedText = data.text;
+                                                } else {
+                                                    // Read plain text client-side
+                                                    extractedText = await file.text();
                                                 }
+
+                                                if (extractedText.trim()) {
+                                                    setDocumentContent(prev => prev ? prev + '\n\n' + extractedText : extractedText);
+                                                } else {
+                                                    setGenerationError('No text could be extracted from this file.');
+                                                }
+                                            } catch (err) {
+                                                console.error('[File Upload Error]', err);
+                                                setGenerationError(err instanceof Error ? err.message : 'Failed to read file. Please paste content manually.');
                                             }
                                             // Reset input so the same file can be selected again
                                             e.target.value = '';

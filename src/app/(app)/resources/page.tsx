@@ -610,7 +610,7 @@ export default function ResourcesPage() {
                                     Discovering resources for {locationLabel}…
                                 </h4>
                                 <p className="text-[13px] font-medium text-sapphire-muted">
-                                    NEXX AI is gathering robust local court, legal aid, and support data.
+                                    NEXX is gathering robust local court, legal aid, and support data.
                                 </p>
                             </div>
                         </div>
@@ -921,7 +921,7 @@ export default function ResourcesPage() {
                     <Strategy size={12} weight="fill" /> Verified Directory
                 </p>
                 <p className="text-[13px] font-medium text-sapphire-muted leading-relaxed">
-                    Resources are secured and verified continuously. AI-discovered external resources should be verified independently.
+                    Resources are secured and verified continuously. External resources should be verified independently.
                     Full attorney and therapist integration arriving in future capabilities.
                 </p>
             </motion.div>

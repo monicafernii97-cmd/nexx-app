@@ -12,6 +12,7 @@ import {
     FloppyDisk,
     Check,
     Strategy,
+    Shapes,
 } from '@phosphor-icons/react';
 import { US_STATES } from '@/lib/constants';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
@@ -367,7 +368,7 @@ export default function ProfilePage() {
                     </Section>
 
                     {/* ── NEXX Personalization ── */}
-                    <Section icon={<Strategy size={20} weight="duotone" className="text-champagne" />} title="NEXX Dynamics">
+                    <Section icon={<Shapes size={20} weight="duotone" className="text-champagne" />} title="NEXX Dynamics">
                         <div className="mb-6 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-[13px] font-medium text-white/80 leading-relaxed shadow-sm">
                             <span className="font-bold text-white">Note:</span> These preferences only dictate how information is relayed to you. All facts, case details, and strategic advice from NEXX remain strictly direct and objective regardless of the chosen communication tone.
                         </div>

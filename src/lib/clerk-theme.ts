@@ -58,6 +58,24 @@ export const nexxClerkAppearance = {
             color: '#FFFFFF',
             boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.05)',
         },
+        pageScrollBox: {
+            background: 'transparent',
+        },
+        pageHeaderTitle: {
+            color: '#FFFFFF',
+            fontFamily: 'Playfair Display, Georgia, serif',
+            fontWeight: '700',
+        },
+        pageHeaderSubtitle: {
+            color: '#FFFFFF',
+            fontWeight: '600',
+        },
+        profileSectionTitle: {
+            color: '#FFFFFF',
+        },
+        profileSectionContent: {
+            color: '#FFFFFF',
+        },
         formButtonPrimary: {
             background: 'linear-gradient(135deg, #60A5FA, #2563EB)',
             color: '#FFFFFF',

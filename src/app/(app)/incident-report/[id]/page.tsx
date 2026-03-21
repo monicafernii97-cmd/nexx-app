@@ -22,6 +22,7 @@ import {
     Users,
     Baby,
     ArrowsClockwise,
+    DownloadSimple,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
@@ -248,9 +249,19 @@ export default function IncidentDetailPage() {
                     )}
                     <button
                         onClick={() => setShowDeleteConfirm(true)}
-                        className="px-5 py-2.5 rounded-xl bg-rose/10 hover:bg-rose text-rose hover:text-white border border-rose/20 text-[13px] font-bold uppercase tracking-widest shadow-sm transition-all flex items-center gap-2"
+                        disabled={isDeleting}
+                        className="w-11 h-11 rounded-xl flex items-center justify-center bg-rose/10 text-rose hover:bg-rose hover:text-white transition-all shadow-sm cursor-pointer ml-1"
+                        title="Delete incident"
+                        aria-label="Delete incident"
                     >
-                        <Trash size={16} /> Delete
+                        <Trash size={20} weight="duotone" />
+                    </button>
+                    <button
+                        onClick={() => window.open(`/api/incidents/${incidentId}/pdf`, '_blank')}
+                        className="px-5 py-2.5 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] text-white text-[13px] font-bold uppercase tracking-widest shadow-md hover:shadow-[0_8px_16px_rgba(10,22,41,0.2)] hover:-translate-y-0.5 transition-all flex items-center gap-2 border border-white/10 group"
+                        title="Export Incident Record to PDF"
+                    >
+                        <DownloadSimple size={18} weight="bold" className="group-hover:-translate-y-0.5 transition-transform" /> Export PDF
                     </button>
                 </div>
                 {saveError && (

@@ -83,13 +83,13 @@ export default function OnboardingPage() {
         return (
             <div className="silk-bg min-h-screen flex items-center justify-center">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
-                    <div className="w-14 h-14 rounded-2xl mx-auto mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#60A5FA,#2563EB)] shadow-[0_8px_32px_rgba(96,165,250,0.4)] border border-white/20 relative overflow-hidden">
+                    <div className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#60A5FA,#2563EB)] shadow-[0_8px_32px_rgba(96,165,250,0.4)] border border-white/20 relative overflow-hidden">
                         <div className="absolute inset-0 bg-white/10" />
-                        <span className="text-white font-serif font-bold text-2xl drop-shadow-sm relative z-10 mt-1">
+                        <span className="text-white font-serif font-bold text-3xl drop-shadow-sm relative z-10 mt-1">
                             <i>N</i>
                         </span>
                     </div>
-                    <p className="text-[13px] font-bold text-white tracking-[0.2em] uppercase drop-shadow-sm">Loading...</p>
+                    <p className="text-sm font-bold text-white tracking-[0.2em] uppercase drop-shadow-sm">Loading...</p>
                 </motion.div>
             </div>
         );
@@ -380,7 +380,7 @@ export default function OnboardingPage() {
                                                 <button
                                                     key={opt}
                                                     onClick={() => update('custodyType', opt)}
-                                                    className={`transition-all text-[13px] font-semibold px-5 py-2.5 rounded-full border shadow-sm backdrop-blur-md ${
+                                                    className={`transition-all text-[14px] font-semibold px-5 py-3 rounded-xl border shadow-sm backdrop-blur-md ${
                                                         active
                                                         ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
                                                         : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
@@ -407,7 +407,7 @@ export default function OnboardingPage() {
                                                             update('causeNumber', '');
                                                         }
                                                     }}
-                                                    className={`transition-all text-[13px] font-semibold px-5 py-2.5 rounded-full border shadow-sm backdrop-blur-md ${
+                                                    className={`transition-all text-[14px] font-semibold px-5 py-3 rounded-xl border shadow-sm backdrop-blur-md ${
                                                         active
                                                         ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
                                                         : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'
@@ -450,7 +450,7 @@ export default function OnboardingPage() {
                                                 <button
                                                     key={opt}
                                                     onClick={() => update('hasAttorney', opt)}
-                                                    className={`transition-all text-[13px] font-semibold px-5 py-2.5 rounded-full border shadow-sm backdrop-blur-md ${
+                                                    className={`transition-all text-[14px] font-semibold px-5 py-3 rounded-xl border shadow-sm backdrop-blur-md ${
                                                         active
                                                         ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-[#FFFFFF] border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]'
                                                         : 'bg-[#0A1128] text-[rgba(255,255,255,0.7)] border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:text-[#FFFFFF]'

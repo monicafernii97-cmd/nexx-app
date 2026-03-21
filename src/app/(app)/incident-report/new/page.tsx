@@ -10,6 +10,7 @@ import {
     Microphone,
     ArrowLeft,
     Strategy,
+    FileText,
     Check,
     PencilSimple,
     CalendarBlank,
@@ -390,7 +391,7 @@ export default function NewIncidentPage() {
                                         Analyzing Dynamics securely...
                                     </>
                                 ) : (
-                                    <><Strategy size={20} weight="duotone" className="text-white group-hover:animate-pulse" /> Generate Court-Ready Summary</>
+                                    <><FileText size={20} weight="duotone" className="text-white group-hover:animate-pulse" /> Generate Court-Ready Summary</>
                                 )}
                             </button>
                         </div>

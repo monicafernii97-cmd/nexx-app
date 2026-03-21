@@ -109,13 +109,13 @@ export default function WelcomePage() {
           animate={{ opacity: 1 }}
           className="text-center"
         >
-          <div className="w-14 h-14 rounded-2xl mx-auto mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#60A5FA,#2563EB)] shadow-[0_8px_32px_rgba(96,165,250,0.4)] border border-white/20 relative overflow-hidden">
+          <div className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#60A5FA,#2563EB)] shadow-[0_8px_32px_rgba(96,165,250,0.4)] border border-white/20 relative overflow-hidden">
             <div className="absolute inset-0 bg-white/10" />
-            <span className="text-white font-serif font-bold text-2xl drop-shadow-sm relative z-10 mt-1">
+            <span className="text-white font-serif font-bold text-3xl drop-shadow-sm relative z-10 mt-1">
               <i>N</i>
             </span>
           </div>
-          <p className="text-[13px] font-bold text-white tracking-[0.2em] uppercase drop-shadow-sm">Loading...</p>
+          <p className="text-sm font-bold text-white tracking-[0.2em] uppercase drop-shadow-sm">Loading...</p>
         </motion.div>
       </div>
     );

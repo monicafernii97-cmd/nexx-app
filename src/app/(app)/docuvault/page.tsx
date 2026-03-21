@@ -14,6 +14,7 @@ import {
     ArrowRight,
     CheckCircle,
     DownloadSimple,
+    ArrowsClockwise,
 } from '@phosphor-icons/react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from 'convex/react';
@@ -301,7 +302,7 @@ function DocuVaultPageInner() {
                     <PageHeader
                         icon={Bank as React.ElementType}
                         title="DocuVault"
-                        description="Professional Legal Document Generator. Trustworthy. Semantic. Verbatim. Generate court-ready PDFs with AI precision."
+                        description="Professional Legal Document Generator. Trustworthy. Semantic. Verbatim. Generate court-ready PDFs with precision."
                     />
 
                     {/* ── Category Tabs ── */}
@@ -449,7 +450,7 @@ function DocuVaultPageInner() {
                             <textarea
                                 value={documentContent}
                                 onChange={e => setDocumentContent(e.target.value)}
-                                placeholder="Paste your content here or describe the document title, body, and footer verbatim. The AI will perfectly structure and format it."
+                                placeholder="Paste your content here or describe the document title, body, and footer verbatim. Nexx will perfectly structure and format it."
                                 rows={8}
                                 className="w-full min-h-[220px] pb-14 p-6 rounded-[2rem] bg-white/5 backdrop-blur-2xl border border-white/20 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#60A5FA]/50 focus:bg-white/10 transition-all resize-none shadow-[inset_0_1px_2px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)]"
                             />
@@ -457,14 +458,6 @@ function DocuVaultPageInner() {
                             {/* Bottom bar overlay */}
                             <div className="absolute bottom-3 left-6 right-6 flex items-center justify-between pt-3 border-t border-white/10">
                                 <div className="flex gap-4">
-                                    <button
-                                        disabled
-                                        title="File attachment coming soon"
-                                        className="flex items-center gap-2 text-sm font-bold transition-colors cursor-not-allowed opacity-40 text-white"
-                                    >
-                                        <Paperclip size={18} weight="bold" /> 
-                                        <span>Attach File</span>
-                                    </button>
                                     {documentContent && (
                                         <button
                                             onClick={() => setDocumentContent('')}
@@ -493,7 +486,7 @@ function DocuVaultPageInner() {
                             disabled={(!documentContent.trim() && !selectedTemplate) || isUserProfileLoading}
                             className="w-full flex items-center justify-center gap-4 py-6 rounded-[2rem] text-[15px] font-bold tracking-[0.2em] uppercase text-white transition-all border border-white/20 bg-white/5 backdrop-blur-3xl shadow-[inset_0_1px_2px_rgba(255,255,255,0.2),0_12px_40px_rgba(0,0,0,0.4)] hover:bg-white/10 hover:border-white/30 hover:shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_16px_48px_rgba(0,0,0,0.5)] disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed group hover:-translate-y-1"
                         >
-                            <Strategy size={26} weight="duotone" className="text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.8)] group-hover:scale-110 transition-transform duration-300" />
+                            <ArrowsClockwise size={26} weight="bold" className="text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.8)] group-hover:scale-110 group-hover:rotate-180 transition-transform duration-500" />
                             <span className="drop-shadow-sm">Generate Formal Document</span>
                         </button>
                     </motion.div>
@@ -526,7 +519,7 @@ function DocuVaultPageInner() {
                     >
                         {[
                             { label: 'Describe\nContext', icon: FileText, color: 'text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]' },
-                            { label: 'AI Generates\nDraft', icon: Strategy, color: 'text-[#E5A84A] drop-shadow-[0_2px_8px_rgba(229,168,74,0.8)]' },
+                            { label: 'NEXX Generates\nDraft', icon: ArrowsClockwise, color: 'text-[#E5A84A] drop-shadow-[0_2px_8px_rgba(229,168,74,0.8)]' },
                             { label: 'Download\n& File', icon: ArrowRight, color: 'text-[#10B981] drop-shadow-[0_2px_8px_rgba(16,185,129,0.8)]' },
                         ].map((item, i) => {
                             const Icon = item.icon;

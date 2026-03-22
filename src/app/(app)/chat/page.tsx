@@ -30,15 +30,20 @@ export default function ChatListPage() {
     const [selectedMode, setSelectedMode] = useState<'therapeutic' | 'legal' | 'strategic' | 'general'>('general');
     const [isCreating, setIsCreating] = useState(false);
     const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+    const [deletingId, setDeletingId] = useState<Id<'conversations'> | null>(null);
 
     const handleDelete = async (e: React.MouseEvent, id: Id<'conversations'>) => {
         e.preventDefault();
         e.stopPropagation();
+        if (deletingId) return; // prevent concurrent deletes
         if (window.confirm("Are you sure you want to permanently delete this session? This action cannot be undone.")) {
+            setDeletingId(id);
             try {
                 await removeConversation({ id });
             } catch (error) {
                 console.error("Failed to delete conversation:", error);
+            } finally {
+                setDeletingId(null);
             }
         }
     };
@@ -216,8 +221,9 @@ export default function ChatListPage() {
                                             </div>
                                             <button
                                                 onClick={(e) => handleDelete(e, conv._id)}
+                                                disabled={deletingId === conv._id}
                                                 title="Delete Chat"
-                                                className="w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud ml-2 self-center shrink-0"
+                                                className="w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud ml-2 self-center shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 <Trash size={16} weight="duotone" />
                                             </button>
@@ -285,8 +291,9 @@ export default function ChatListPage() {
                                                 </span>
                                                 <button
                                                     onClick={(e) => handleDelete(e, conv._id)}
+                                                    disabled={deletingId === conv._id}
                                                     title="Delete Chat"
-                                                    className="w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover/archived:opacity-100 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud shrink-0"
+                                                    className="w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover/archived:opacity-100 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     <Trash size={14} weight="duotone" />
                                                 </button>

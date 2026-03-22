@@ -146,6 +146,8 @@ export interface RateLimitResult {
  *
  * @param userId - Clerk user ID
  * @param feature - Which feature is being rate-limited
+ * @param overrideMax - Optional per-call override for maxRequests (e.g. tier-specific limits).
+ *   When provided, replaces the default `FEATURE_LIMITS[feature].maxRequests` for this check only.
  * @returns RateLimitResult indicating whether the request is allowed
  */
 export function checkRateLimit(

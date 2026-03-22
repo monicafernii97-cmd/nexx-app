@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '../../../../../convex/_generated/api';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
@@ -29,7 +29,7 @@ function escapeHtml(text: string): string {
 
 export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
     try {
         const convex = await getAuthenticatedConvexClient();
         const incidentsList = await convex.query(api.incidents.list, {});

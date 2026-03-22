@@ -28,7 +28,7 @@ export function AuthPageLayout({
                 <div
                     className="absolute w-96 h-96 rounded-full blur-3xl opacity-20"
                     style={{
-                        background: 'radial-gradient(circle, #4C1D95 0%, transparent 70%)',
+                        background: 'radial-gradient(circle, var(--galaxy-purple, #4C1D95) 0%, transparent 70%)',
                         bottom: '10%',
                         right: '20%',
                     }}

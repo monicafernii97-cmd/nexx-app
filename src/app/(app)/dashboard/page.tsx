@@ -45,14 +45,13 @@ export default function DashboardPage() {
         { label: 'Documented Incidents', value: String(incidentCount), icon: Note, color: '#F59E0B', href: '/incident-report' },
         { label: 'Active Sessions', value: String(conversationCount), icon: ChatCircleText, color: 'var(--champagne)', href: '/chat' },
         { label: 'Court-Ready Records', value: String(confirmedCount), icon: FileText, color: '#60A5FA', href: '/docuvault/gallery' },
-        { label: 'Pattern Alerts', value: '0', icon: WarningCircle, color: 'var(--warning)', href: '/nex-profile' },
+        { label: 'Pattern Alerts', value: '—' /* TODO: wire to real pattern count */, icon: WarningCircle, color: 'var(--warning)', href: '/nex-profile' },
     ];
 
     /** Time-of-day greeting, set client-side only to avoid hydration mismatch. */
     const [greetingText, setGreetingText] = useState('');
     useEffect(() => {
         const hour = new Date().getHours();
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setGreetingText(hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening');
     }, []);
 

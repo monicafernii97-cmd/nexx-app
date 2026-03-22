@@ -21,8 +21,12 @@ export async function GET() {
         try {
             convex = await getAuthenticatedConvexClient();
         } catch (authErr) {
-            console.error('[Timeline PDF Export] Auth failed:', authErr);
-            return new NextResponse('Unauthorized', { status: 401 });
+            // Only treat auth-token failures as 401; re-throw config/runtime errors → outer 500
+            if (authErr instanceof Error && authErr.message.includes('auth token')) {
+                console.error('[Timeline PDF Export] Auth failed:', authErr);
+                return new NextResponse('Unauthorized', { status: 401 });
+            }
+            throw authErr;
         }
         const incidentsList = await convex.query(api.incidents.list, {});
 
@@ -30,13 +34,27 @@ export async function GET() {
             return new NextResponse('No incidents found', { status: 404 });
         }
 
+        /** Parse a time string (12h or 24h) to minutes since midnight for sorting. */
+        const parseTimeToMinutes = (value?: string): number => {
+            if (!value) return Number.POSITIVE_INFINITY;
+            const normalized = value.trim().toUpperCase();
+            const match12 = normalized.match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/);
+            if (match12) {
+                let hours = Number(match12[1]) % 12;
+                if (match12[3] === 'PM') hours += 12;
+                return hours * 60 + Number(match12[2]);
+            }
+            const match24 = normalized.match(/^(\d{1,2}):(\d{2})$/);
+            if (match24) return Number(match24[1]) * 60 + Number(match24[2]);
+            return Number.POSITIVE_INFINITY;
+        };
+
         // Sort chronologically ascending (date + time)
         const sortedIncidents = [...incidentsList].sort((a, b) => {
             const dateA = new Date(a.date).getTime() || 0;
             const dateB = new Date(b.date).getTime() || 0;
             if (dateA !== dateB) return dateA - dateB;
-            // Secondary sort by time string (e.g. "14:30", "9:00 AM")
-            return (a.time || '').localeCompare(b.time || '');
+            return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
         });
 
         // Group by pattern tags for a high-level summary at the top

@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useRef, useCallback, useEffect, Suspense, type RefObject } from 'react';
+import { useState, useRef, useCallback, useEffect, Suspense } from 'react';
 import {
     Bank,
     CaretLeft,
@@ -78,9 +78,11 @@ function DocuVaultPageInner() {
     /** Tracks the active timeout for the popup-blocked print warning so rapid clicks don't race. */
     const printWarningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Revoke blob URL and abort stream on unmount to prevent leaks
+    // Revoke blob URL and abort streams on unmount to prevent leaks
     useEffect(() => {
         return () => {
+            parseAbortRef.current?.abort();
+            parseAbortRef.current = null;
             generationAbortRef.current?.abort();
             if (pdfUrlRef.current) {
                 URL.revokeObjectURL(pdfUrlRef.current);
@@ -134,6 +136,12 @@ function DocuVaultPageInner() {
             return;
         }
 
+        // Fail fast if required profile data is missing
+        if (!user?.state || !user?.county) {
+            setGenerationError('Please set your state and county in Court Settings before generating documents.');
+            return;
+        }
+
         // Increment token so stale runs can detect cancellation
         const currentToken = ++generationTokenRef.current;
         generationAbortRef.current?.abort();
@@ -165,13 +173,13 @@ function DocuVaultPageInner() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    templateId: selectedTemplate?.id ?? 'petition_divorce',
+                    templateId: selectedTemplate?.id ?? 'general',
                     courtSettings: {
-                        state: user?.state || 'Texas',
-                        county: user?.county || 'Fort Bend',
+                        state: user.state,
+                        county: user.county,
                     },
-                    petitioner: { name: user?.name || 'Petitioner' },
-                    caseType: selectedTemplate?.caseTypes?.[0] ?? 'divorce_without_children',
+                    petitioner: { name: user.name || 'Petitioner' },
+                    caseType: selectedTemplate?.caseTypes?.[0] ?? undefined,
                     bodyContent: documentContent ? [{ heading: 'Content', paragraphs: [documentContent] }] : [],
                 }),
             });
@@ -272,6 +280,17 @@ function DocuVaultPageInner() {
 
     /** Reset all state to begin composing a new document, aborting any in-flight generation. */
     const handleNewDocument = useCallback(() => {
+        // Clear any pending print-warning timer
+        if (printWarningTimeoutRef.current) {
+            clearTimeout(printWarningTimeoutRef.current);
+            printWarningTimeoutRef.current = null;
+        }
+
+        // Abort any in-flight parse
+        parseAbortRef.current?.abort();
+        parseAbortRef.current = null;
+        setIsParsing(false);
+
         // Increment token to abort any running generation
         generationTokenRef.current++;
         generationAbortRef.current?.abort();

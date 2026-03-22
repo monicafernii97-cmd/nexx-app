@@ -550,11 +550,6 @@ export default function NewIncidentPage() {
                                     <p className="text-[14px] leading-relaxed whitespace-pre-wrap text-sapphire">
                                         {behavioralAnalysis}
                                     </p>
-                                    <div className="mt-4 pt-3 border-t border-[rgba(10,22,41,0.06)]">
-                                        <p className="text-[11px] leading-relaxed text-[var(--sapphire-light)] italic">
-                                            ⚠️ This analysis is for your personal awareness only. Do not include behavioral interpretations in court filings, as they may undermine your credibility. Use only the Court-Ready Summary for legal proceedings.
-                                        </p>
-                                    </div>
                                 </div>
                             )}
 

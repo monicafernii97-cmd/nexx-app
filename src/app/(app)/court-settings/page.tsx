@@ -469,20 +469,20 @@ export default function CourtSettingsPage() {
                             exit={{ opacity: 0, height: 0 }}
                             className="overflow-hidden"
                         >
-                            <div className="mt-6 rounded-xl p-5 border border-[var(--cloud-light)] bg-white/80 shadow-inner">
+                            <div className="mt-6 rounded-[1.5rem] p-5 border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
                                 <div className="flex items-center gap-2 mb-3">
                                     {verifyResult.confidence > 0.5 ? (
                                         <Check size={18} className="text-[var(--success)]" weight="bold" />
                                     ) : (
                                         <Warning size={18} className="text-[#FF9800]" weight="bold" />
                                     )}
-                                    <span className="text-sm font-semibold text-[var(--sapphire-dark)]">
+                                    <span className="text-sm font-semibold text-white/90 tracking-wide">
                                         Confidence: {Math.round(verifyResult.confidence * 100)}%
                                     </span>
                                 </div>
                                 {verifyResult.sources.length > 0 && (
                                     <div className="mt-3">
-                                        <span className="text-xs font-bold uppercase tracking-widest text-[var(--sapphire-light)]">Sources:</span>
+                                        <span className="text-xs font-bold uppercase tracking-widest text-white/50">Sources:</span>
                                         <ul className="mt-2 space-y-1.5 pl-1">
                                             {verifyResult.sources.slice(0, 3).map((url) => {
                                                 try {
@@ -496,7 +496,7 @@ export default function CourtSettingsPage() {
                                                                 href={parsed.href}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
-                                                                className="text-sm truncate block hover:underline text-[var(--sapphire-base)] hover:text-[var(--sapphire-dark)]"
+                                                                className="text-sm truncate block hover:underline text-[#60A5FA] hover:text-white transition-colors"
                                                             >
                                                                 {parsed.hostname}
                                                             </a>
@@ -510,7 +510,7 @@ export default function CourtSettingsPage() {
                                     </div>
                                 )}
                                 {verifyResult.confidence === 0 && (
-                                    <p className="text-sm mt-3 text-[var(--sapphire-base)] italic">
+                                    <p className="text-sm mt-3 text-white/60 italic">
                                         No specific formatting rules found for this court. Default state rules will be applied.
                                     </p>
                                 )}

@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useRef, useCallback, useEffect, Suspense } from 'react';
+import { useState, useRef, useCallback, useEffect, Suspense, type RefObject } from 'react';
 import {
     Bank,
     CaretLeft,
@@ -67,6 +67,8 @@ function DocuVaultPageInner() {
     const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
     const [generationError, setGenerationError] = useState<string | null>(null);
     const [caseNumber, setCaseNumber] = useState<string | null>(null);
+    const [isParsing, setIsParsing] = useState(false);
+    const parseAbortRef = useRef<AbortController | null>(null);
 
     // Abort mechanism for generation
     const generationTokenRef = useRef(0);
@@ -244,7 +246,7 @@ function DocuVaultPageInner() {
 
                             pdfUrlRef.current = url;
                             setGeneratedPdfUrl(url);
-                            setCaseNumber(`DRAFT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`);
+                            setCaseNumber(`LOCAL-DRAFT-${Math.random().toString(36).substring(2, 8).toUpperCase()} [UNSAVED]`);
                             setView('result');
                         } catch (decodeErr) {
                             console.error('[DocuVault] Failed to decode PDF:', decodeErr);
@@ -482,6 +484,13 @@ function DocuVaultPageInner() {
                                                 return;
                                             }
 
+                                            // Abort any in-flight parse before starting a new one
+                                            parseAbortRef.current?.abort();
+                                            const controller = new AbortController();
+                                            parseAbortRef.current = controller;
+                                            setIsParsing(true);
+                                            setGenerationError(null);
+
                                             const name = file.name.toLowerCase();
                                             const isBinary = name.endsWith('.pdf') || name.endsWith('.docx');
 
@@ -501,10 +510,12 @@ function DocuVaultPageInner() {
                                                         reader.onerror = () => reject(new Error('Failed to read file'));
                                                         reader.readAsDataURL(file);
                                                     });
+                                                    if (controller.signal.aborted) return;
                                                     const res = await fetch('/api/documents/parse', {
                                                         method: 'POST',
                                                         headers: { 'Content-Type': 'application/json' },
                                                         body: JSON.stringify({ filename: file.name, data: base64 }),
+                                                        signal: controller.signal,
                                                     });
                                                     const result = await res.json();
                                                     if (!res.ok) throw new Error(result.error || 'Parse failed');
@@ -514,14 +525,19 @@ function DocuVaultPageInner() {
                                                     extractedText = await file.text();
                                                 }
 
+                                                if (controller.signal.aborted) return;
                                                 if (extractedText.trim()) {
                                                     setDocumentContent(prev => prev ? prev + '\n\n' + extractedText : extractedText);
                                                 } else {
                                                     setGenerationError('No text could be extracted from this file.');
                                                 }
                                             } catch (err) {
+                                                if (err instanceof DOMException && err.name === 'AbortError') return;
+                                                if (controller.signal.aborted) return;
                                                 console.error('[File Upload Error]', err);
                                                 setGenerationError(err instanceof Error ? err.message : 'Failed to read file. Please paste content manually.');
+                                            } finally {
+                                                if (!controller.signal.aborted) setIsParsing(false);
                                             }
                                             // Reset input so the same file can be selected again
                                             e.target.value = '';
@@ -529,7 +545,12 @@ function DocuVaultPageInner() {
                                     />
                                     {documentContent && (
                                         <button
-                                            onClick={() => setDocumentContent('')}
+                                            onClick={() => {
+                                                parseAbortRef.current?.abort();
+                                                parseAbortRef.current = null;
+                                                setIsParsing(false);
+                                                setDocumentContent('');
+                                            }}
                                             className="flex items-center gap-2 text-[14px] font-bold cursor-pointer transition-colors text-white/60 hover:text-rose z-10 relative"
                                         >
                                             <X size={18} weight="bold" /> 
@@ -552,11 +573,11 @@ function DocuVaultPageInner() {
                     >
                         <button
                             onClick={handleGenerate}
-                            disabled={(!documentContent.trim() && !selectedTemplate) || isUserProfileLoading}
+                            disabled={(!documentContent.trim() && !selectedTemplate) || isUserProfileLoading || isParsing}
                             className="w-full flex items-center justify-center gap-4 py-6 rounded-[2rem] text-[15px] font-bold tracking-[0.2em] uppercase text-white transition-all border border-white/20 bg-white/5 backdrop-blur-3xl shadow-[inset_0_1px_2px_rgba(255,255,255,0.2),0_12px_40px_rgba(0,0,0,0.4)] hover:bg-white/10 hover:border-white/30 hover:shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_16px_48px_rgba(0,0,0,0.5)] disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed group hover:-translate-y-1"
                         >
-                            <ArrowsClockwise size={26} weight="bold" className="text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.8)] group-hover:scale-110 group-hover:rotate-180 transition-transform duration-500" />
-                            <span className="drop-shadow-sm">Generate Formal Document</span>
+                            <ArrowsClockwise size={26} weight="bold" className={`text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.8)] group-hover:scale-110 group-hover:rotate-180 transition-transform duration-500 ${isParsing ? 'animate-spin' : ''}`} />
+                            <span className="drop-shadow-sm">{isParsing ? 'Extracting File…' : 'Generate Formal Document'}</span>
                         </button>
                     </motion.div>
 
@@ -569,7 +590,7 @@ function DocuVaultPageInner() {
                                 exit={{ opacity: 0, height: 0 }}
                                 className="overflow-hidden"
                             >
-                                <div className="mt-4 px-5 py-4 rounded-xl bg-[var(--error)]/5 border border-[var(--error)]/20 shadow-sm flex items-start gap-3">
+                                <div role="alert" aria-live="assertive" className="mt-4 px-5 py-4 rounded-xl bg-[var(--error)]/5 border border-[var(--error)]/20 shadow-sm flex items-start gap-3">
                                     <X size={20} weight="bold" className="text-[var(--error)] shrink-0 mt-0.5" />
                                     <p className="text-sm font-medium text-[var(--error)]">
                                         {generationError}
@@ -745,7 +766,7 @@ function DocuVaultPageInner() {
                                 exit={{ opacity: 0, height: 0 }}
                                 className="overflow-hidden mb-6"
                             >
-                                <div className="px-5 py-4 rounded-xl bg-[var(--error)]/5 border border-[var(--error)]/20 shadow-sm flex items-start gap-3">
+                                <div role="alert" aria-live="assertive" className="px-5 py-4 rounded-xl bg-[var(--error)]/5 border border-[var(--error)]/20 shadow-sm flex items-start gap-3">
                                     <X size={20} weight="bold" className="text-[var(--error)] shrink-0 mt-0.5" />
                                     <p className="text-sm font-medium text-[var(--error)]">
                                         {generationError}
@@ -802,33 +823,51 @@ function DocuVaultPageInner() {
 
                             {/* Format indicators — describe how the document was generated, not verified outcomes */}
                             <div className="space-y-4">
-                                <p className="text-[11px] font-medium text-white/40 uppercase tracking-widest">Document Format</p>
-                                <div className="p-5 flex items-start gap-4 border border-[#10B981]/40 bg-[#10B981]/10 rounded-[1.5rem] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(16,185,129,0.3),0_8px_24px_rgba(0,0,0,0.3)]">
-                                    <div className="w-10 h-10 rounded-full bg-[#10B981] flex items-center justify-center shrink-0 shadow-sm mt-0.5 border border-[#10B981]/50">
-                                        <CheckCircle size={24} weight="bold" className="text-white" />
+                                <p className="text-[11px] font-medium text-white/40 uppercase tracking-widest">Generation Details</p>
+                                {selectedTemplate ? (
+                                    <>
+                                        <div className="p-5 flex items-start gap-4 border border-[#10B981]/40 bg-[#10B981]/10 rounded-[1.5rem] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(16,185,129,0.3),0_8px_24px_rgba(0,0,0,0.3)]">
+                                            <div className="w-10 h-10 rounded-full bg-[#10B981] flex items-center justify-center shrink-0 shadow-sm mt-0.5 border border-[#10B981]/50">
+                                                <CheckCircle size={24} weight="bold" className="text-white" />
+                                            </div>
+                                            <div>
+                                                <p className="text-[15px] font-bold text-white tracking-wide drop-shadow-sm">
+                                                    Court Format Applied
+                                                </p>
+                                                <p className="text-[13px] font-medium text-white/80 mt-1 leading-snug">
+                                                    Generated using local court formatting rules. Independent verification recommended.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="p-5 flex items-start gap-4 border border-[#10B981]/40 bg-[#10B981]/10 rounded-[1.5rem] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(16,185,129,0.3),0_8px_24px_rgba(0,0,0,0.3)]">
+                                            <div className="w-10 h-10 rounded-full bg-[#10B981] flex items-center justify-center shrink-0 shadow-sm mt-0.5 border border-[#10B981]/50">
+                                                <CheckCircle size={24} weight="bold" className="text-white" />
+                                            </div>
+                                            <div>
+                                                <p className="text-[15px] font-bold text-white tracking-wide drop-shadow-sm">
+                                                    Page Numbering Included
+                                                </p>
+                                                <p className="text-[13px] font-medium text-white/80 mt-1 leading-snug">
+                                                    Sequential page numbering added per court standards.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="p-5 flex items-start gap-4 border border-white/20 bg-white/5 rounded-[1.5rem] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.3)]">
+                                        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0 shadow-sm mt-0.5 border border-white/10">
+                                            <FileText size={24} weight="bold" className="text-white/80" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[15px] font-bold text-white tracking-wide drop-shadow-sm">
+                                                General Formatting
+                                            </p>
+                                            <p className="text-[13px] font-medium text-white/80 mt-1 leading-snug">
+                                                Generated with standard document formatting. No template-specific court rules applied.
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-[15px] font-bold text-white tracking-wide drop-shadow-sm">
-                                            Format Compliant
-                                        </p>
-                                        <p className="text-[13px] font-medium text-white/80 mt-1 leading-snug">
-                                            Generated using local court formatting rules.
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="p-5 flex items-start gap-4 border border-[#10B981]/40 bg-[#10B981]/10 rounded-[1.5rem] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(16,185,129,0.3),0_8px_24px_rgba(0,0,0,0.3)]">
-                                    <div className="w-10 h-10 rounded-full bg-[#10B981] flex items-center justify-center shrink-0 shadow-sm mt-0.5 border border-[#10B981]/50">
-                                        <CheckCircle size={24} weight="bold" className="text-white" />
-                                    </div>
-                                    <div>
-                                        <p className="text-[15px] font-bold text-white tracking-wide drop-shadow-sm">
-                                            Page Numbering Applied
-                                        </p>
-                                        <p className="text-[13px] font-medium text-white/80 mt-1 leading-snug">
-                                            Sequential page numbering included per court standards.
-                                        </p>
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         </div>
 
@@ -843,8 +882,10 @@ function DocuVaultPageInner() {
                                     </h3>
                                 </div>
                                 <p className="text-[16px] text-white/90 leading-relaxed font-medium">
-                                    The provided context has been successfully synthesized into a formal <span className="font-bold text-white border-b border-white/30 pb-0.5">{selectedTemplate?.title?.toLowerCase() || 'legal document'}</span>. 
-                                    All formatting, spacing, and legal headings follow precision local court standards. The document has been cross-referenced for procedural alignment.
+                                    The provided context has been synthesized into a formal <span className="font-bold text-white border-b border-white/30 pb-0.5">{selectedTemplate?.title?.toLowerCase() || 'legal document'}</span>. 
+                                    {selectedTemplate
+                                        ? 'Formatting and legal headings follow local court standards. Please verify all content independently before filing.'
+                                        : 'Standard document formatting has been applied. Please verify all content and formatting independently before use.'}
                                 </p>
                             </div>
 

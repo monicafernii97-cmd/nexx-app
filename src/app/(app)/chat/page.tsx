@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
-import { Id } from '../../../../convex/_generated/dataModel';
+import type { Id } from '../../../../convex/_generated/dataModel';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -223,7 +223,7 @@ export default function ChatListPage() {
                                         onClick={(e) => handleDelete(e, conv._id)}
                                         disabled={!!deletingId}
                                         title="Delete Chat"
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud z-20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud z-20 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <Trash size={16} weight="duotone" />
                                     </button>
@@ -296,7 +296,7 @@ export default function ChatListPage() {
                                                 onClick={(e) => handleDelete(e, conv._id)}
                                                 disabled={!!deletingId}
                                                 title="Delete Chat"
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover/archived:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud shrink-0 disabled:opacity-50 disabled:cursor-not-allowed z-20"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover/archived:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud shrink-0 disabled:opacity-50 disabled:cursor-not-allowed z-20"
                                             >
                                                 <Trash size={14} weight="duotone" />
                                             </button>

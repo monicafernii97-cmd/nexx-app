@@ -36,15 +36,15 @@ export default function DashboardPage() {
     const conversations = useQuery(api.conversations.list, {});
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
 
-    const incidentCount = incidents?.length ?? 0;
-    const conversationCount = conversations?.filter((c) => c.status === 'active').length ?? 0;
-    const confirmedCount = incidents?.filter((i) => i.status === 'confirmed').length ?? 0;
+    const incidentCount = incidents === undefined ? null : incidents.length;
+    const conversationCount = conversations === undefined ? null : conversations.filter((c) => c.status === 'active').length;
+    const confirmedCount = incidents === undefined ? null : incidents.filter((i) => i.status === 'confirmed').length;
 
     /** Summary statistics displayed in the dashboard header bento grid. */
     const stats = [
-        { label: 'Documented Incidents', value: String(incidentCount), icon: Note, color: '#F59E0B', href: '/incident-report' },
-        { label: 'Active Sessions', value: String(conversationCount), icon: ChatCircleText, color: 'var(--champagne)', href: '/chat' },
-        { label: 'Court-Ready Records', value: String(confirmedCount), icon: FileText, color: '#60A5FA', href: '/docuvault/gallery' },
+        { label: 'Documented Incidents', value: incidentCount === null ? '—' : String(incidentCount), icon: Note, color: '#F59E0B', href: '/incident-report' },
+        { label: 'Active Sessions', value: conversationCount === null ? '—' : String(conversationCount), icon: ChatCircleText, color: 'var(--champagne)', href: '/chat' },
+        { label: 'Court-Ready Records', value: confirmedCount === null ? '—' : String(confirmedCount), icon: FileText, color: '#60A5FA', href: '/docuvault/gallery' },
         { label: 'Pattern Alerts', value: '—' /* TODO: wire to real pattern count */, icon: WarningCircle, color: 'var(--warning)', href: '/nex-profile' },
     ];
 
@@ -102,7 +102,7 @@ export default function DashboardPage() {
                                                 style={{ color: action.accent }} 
                                                 className="transition-transform duration-400 group-hover:scale-110" 
                                             />
-                                            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#0A1128] border border-[rgba(255,255,255,0.2)] opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 duration-300 shadow-sm">
+                                            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#0A1128] border border-[rgba(255,255,255,0.2)] opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0 duration-300 shadow-sm">
                                                 <ArrowRight size={14} weight="bold" className="text-white" />
                                             </div>
                                         </div>

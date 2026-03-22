@@ -22,7 +22,12 @@ export async function POST(req: NextRequest) {
 
 
     try {
-        const body = await req.json();
+        let body: unknown;
+        try {
+            body = await req.json();
+        } catch {
+            return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+        }
         if (!body || typeof body !== 'object' || Array.isArray(body)) {
             return Response.json({ error: 'Invalid request body' }, { status: 400 });
         }
@@ -30,11 +35,11 @@ export async function POST(req: NextRequest) {
             messages,
             conversationMode,
             userContext,
-        }: {
+        } = body as {
             messages: { role: 'user' | 'assistant'; content: string }[];
             conversationMode?: string;
             userContext?: UserContext;
-        } = body;
+        };
 
         // ── Determine model from conversation mode ──
         const model = getModelForMode(conversationMode);

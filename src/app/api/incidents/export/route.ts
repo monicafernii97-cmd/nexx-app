@@ -17,18 +17,26 @@ export async function GET() {
             return new NextResponse('Unauthorized', { status: 401 });
         }
 
-        const convex = await getAuthenticatedConvexClient();
+        let convex;
+        try {
+            convex = await getAuthenticatedConvexClient();
+        } catch (authErr) {
+            console.error('[Timeline PDF Export] Auth failed:', authErr);
+            return new NextResponse('Unauthorized', { status: 401 });
+        }
         const incidentsList = await convex.query(api.incidents.list, {});
 
         if (!incidentsList || incidentsList.length === 0) {
             return new NextResponse('No incidents found', { status: 404 });
         }
 
-        // Sort chronologically ascending
+        // Sort chronologically ascending (date + time)
         const sortedIncidents = [...incidentsList].sort((a, b) => {
             const dateA = new Date(a.date).getTime() || 0;
             const dateB = new Date(b.date).getTime() || 0;
-            return dateA - dateB;
+            if (dateA !== dateB) return dateA - dateB;
+            // Secondary sort by time string (e.g. "14:30", "9:00 AM")
+            return (a.time || '').localeCompare(b.time || '');
         });
 
         // Group by pattern tags for a high-level summary at the top

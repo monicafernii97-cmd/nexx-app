@@ -40,9 +40,13 @@ export async function GET() {
             const normalized = value.trim().toUpperCase();
             const match12 = normalized.match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/);
             if (match12) {
-                let hours = Number(match12[1]) % 12;
-                if (match12[3] === 'PM') hours += 12;
-                return hours * 60 + Number(match12[2]);
+                const h = Number(match12[1]);
+                const m = Number(match12[2]);
+                if (h >= 1 && h <= 12 && m >= 0 && m <= 59) {
+                    let hours = h % 12;
+                    if (match12[3] === 'PM') hours += 12;
+                    return hours * 60 + m;
+                }
             }
             const match24 = normalized.match(/^(\d{1,2}):(\d{2})$/);
             if (match24) {

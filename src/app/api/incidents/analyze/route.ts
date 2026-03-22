@@ -61,14 +61,27 @@ export async function POST(req: NextRequest) {
             contextLines.push(`**Witnesses:** ${witnesses.slice(0, 500)}`);
         }
 
-        // Fetch NEX Profile for personalized behavioral tracking (non-blocking)
+        // Fetch NEX Profile for personalized behavioral tracking (best-effort, 2s timeout)
         try {
             const convex = await getAuthenticatedConvexClient();
-            const nexProfile = await convex.query(api.nexProfiles.getByUser);
+            const nexProfile = await Promise.race([
+                convex.query(api.nexProfiles.getByUser),
+                new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+            ]);
 
-            // Sanitize profile values: truncate and strip control characters
+            // Sanitize profile values: truncate, strip control chars / code fences / section markers, filter non-strings
             const sanitize = (arr: string[] | undefined, maxItems = 10, maxLen = 100) =>
-                arr?.slice(0, maxItems).map(s => String(s).slice(0, maxLen).replace(/[\r\n]+/g, ' ').trim()).filter(Boolean) ?? [];
+                arr
+                    ?.filter((s): s is string => typeof s === 'string')
+                    .slice(0, maxItems)
+                    .map(s =>
+                        s.slice(0, maxLen)
+                            .replace(/[\x00-\x1f\x7f]/g, ' ')       // strip all control chars
+                            .replace(/```+/g, '')                     // strip code fences
+                            .replace(/---[A-Z_-]+---/g, '')          // strip section markers
+                            .trim()
+                    )
+                    .filter(Boolean) ?? [];
 
             if (nexProfile) {
                 contextLines.push(`\n**[User's Recognized NEX Patterns]**`);
@@ -111,7 +124,8 @@ export async function POST(req: NextRequest) {
 You must generate FOUR outputs:
 
 1. **Court-Ready Summary** — A neutral, fact-based, chronological account suitable for submission as a court exhibit. Requirements:
-   - Write in third person using "the reporting party" and "the other party" (or "the father"/"the mother" when contextually appropriate)
+   - Write in third person using "the reporting party" and "the other party"
+   - Only use role-specific labels such as "the father" or "the mother" when the user's narrative explicitly states that role
    - State ONLY what happened: dates, times, locations, direct quotes, observable actions
    - Do NOT interpret behavior, assign motives, or draw conclusions
    - Do NOT use terms like "manipulation," "gaslighting," "coercive control," or "narcissistic" in this section

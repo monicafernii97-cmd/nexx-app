@@ -197,9 +197,9 @@ export default function DashboardPage() {
                                     const date = (() => {
                                         try {
                                             const parsed = parseLocalDate(incident.date);
-                                            return isNaN(parsed.getTime()) ? new Date() : parsed;
+                                            return Number.isNaN(parsed.getTime()) ? null : parsed;
                                         } catch {
-                                            return new Date();
+                                            return null;
                                         }
                                     })();
                                     return (
@@ -217,10 +217,10 @@ export default function DashboardPage() {
                                                     <div className="flex items-start gap-4 relative z-10">
                                                         <div className="text-center flex-shrink-0 flex flex-col justify-center min-w-[42px] py-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-[0.85rem] px-2 h-fit shadow-sm backdrop-blur-sm">
                                                             <p className="text-[10px] font-bold uppercase tracking-wider text-white/50">
-                                                                {date.toLocaleDateString('en-US', { month: 'short' })}
+                                                                {date ? date.toLocaleDateString('en-US', { month: 'short' }) : '—'}
                                                             </p>
                                                             <p className="text-lg font-bold text-white/90 leading-none mt-0.5">
-                                                                {date.getDate()}
+                                                                {date ? date.getDate() : '—'}
                                                             </p>
                                                         </div>
                                                         <div className="flex-1 min-w-0 pt-0.5">

@@ -529,10 +529,7 @@ export default function EFilingPage() {
                                                     onClick={() => {
                                                         const baseUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
                                                         if (!baseUrl) return;
-                                                        const storageBase = baseUrl.includes('.cloud')
-                                                            ? baseUrl.replace('.cloud', '.site')
-                                                            : baseUrl;
-                                                        window.open(`${storageBase}/api/storage/${doc.storageId}`, '_blank');
+                                                        window.open(`${baseUrl}/api/storage/${doc.storageId}`, '_blank');
                                                     }}
                                                 >
                                                     <DownloadSimple size={14} weight="bold" />

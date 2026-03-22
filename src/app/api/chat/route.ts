@@ -23,6 +23,9 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json();
+        if (!body || typeof body !== 'object' || Array.isArray(body)) {
+            return Response.json({ error: 'Invalid request body' }, { status: 400 });
+        }
         const {
             messages,
             conversationMode,

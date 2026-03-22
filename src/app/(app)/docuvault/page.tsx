@@ -37,7 +37,7 @@ interface ProgressStep {
 /** Wrapper with Suspense boundary for useSearchParams */
 export default function DocuVaultPage() {
     return (
-        <Suspense fallback={<div className="max-w-5xl mx-auto flex items-center justify-center min-h-[50vh]"><div className="w-8 h-8 rounded-full border-2 border-[var(--champagne)] border-t-transparent animate-spin" /></div>}>
+        <Suspense fallback={<div className="max-w-5xl mx-auto flex items-center justify-center min-h-[50vh]" role="status" aria-live="polite"><div className="w-8 h-8 rounded-full border-2 border-[var(--champagne)] border-t-transparent animate-spin" /><span className="sr-only">Loading DocuVault…</span></div>}>
             <DocuVaultPageInner />
         </Suspense>
     );
@@ -474,6 +474,13 @@ function DocuVaultPageInner() {
                                         onChange={async (e) => {
                                             const file = e.target.files?.[0];
                                             if (!file) return;
+
+                                            const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+                                            if (file.size > MAX_FILE_SIZE) {
+                                                setGenerationError('File exceeds 25 MB limit. Please use a smaller file.');
+                                                e.target.value = '';
+                                                return;
+                                            }
 
                                             const name = file.name.toLowerCase();
                                             const isBinary = name.endsWith('.pdf') || name.endsWith('.docx');

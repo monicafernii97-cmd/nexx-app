@@ -123,6 +123,7 @@ export async function GET(
                 'Content-Type': 'application/pdf',
                 'Content-Disposition': `inline; filename="${filename}"`,
                 'Content-Length': pdfBytes.length.toString(),
+                'Cache-Control': 'private, no-store, max-age=0',
             },
         });
     } catch (error) {

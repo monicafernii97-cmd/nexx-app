@@ -19,6 +19,17 @@
 import OpenAI from 'openai';
 import type { CourtFormattingRules } from './types';
 
+/** Returns sanitized URL if valid http(s), otherwise undefined. */
+function sanitizeUrl(url: string | undefined): string | undefined {
+    if (!url) return undefined;
+    try {
+        const parsed = new URL(url);
+        return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? parsed.href : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 /** How long cached rules remain valid (30 days in ms). */
 export const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -175,15 +186,9 @@ async function extractRulesWithAI(
     }
     userPrompt += `\n\nFocus on family law / civil court filings. Include any county-specific local rules that differ from or supplement the state-level rules.`;
 
-    if (localRulesUrl) {
-        try {
-            const parsed = new URL(localRulesUrl);
-            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-                userPrompt += `\n\nNote: The official local rules for this jurisdiction are published at: ${parsed.href}`;
-            }
-        } catch {
-            // Invalid URL — skip interpolation
-        }
+    const safeLocalRulesUrl = sanitizeUrl(localRulesUrl);
+    if (safeLocalRulesUrl) {
+        userPrompt += `\n\nNote: The official local rules for this jurisdiction are published at: ${safeLocalRulesUrl}`;
     }
 
     try {
@@ -213,21 +218,11 @@ async function extractRulesWithAI(
 
         // Calculate confidence based on how many valid fields were extracted
         const fieldCount = Object.keys(validatedRules).length;
-        const maxFields = 17; // Must match extractable fields in EXTRACTION_PROMPT
+        const maxFields = Object.keys(KNOWN_RULES_FIELDS).length;
         const confidence = Math.min(fieldCount / maxFields, 1.0);
 
         // Build sources list from known resources
-        const sources: string[] = [];
-        if (localRulesUrl) {
-            try {
-                const parsed = new URL(localRulesUrl);
-                if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-                    sources.push(parsed.href);
-                }
-            } catch {
-                // Invalid URL — don't include in sources
-            }
-        }
+        const sources: string[] = safeLocalRulesUrl ? [safeLocalRulesUrl] : [];
 
         return {
             rules: validatedRules,

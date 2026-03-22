@@ -509,6 +509,7 @@ export default function CourtSettingsPage() {
                                 type="button"
                                 role="radio"
                                 aria-checked={caseTitleFormat === option.value}
+                                tabIndex={caseTitleFormat === option.value ? 0 : -1}
                                 onClick={() => setCaseTitleFormat(option.value)}
                                 className={`w-full text-left p-3.5 rounded-xl transition-all border ${
                                     caseTitleFormat === option.value
@@ -577,10 +578,10 @@ export default function CourtSettingsPage() {
                                 <>IN THE INTEREST OF{'\n'}[CHILD NAME(S)],{'\n'}A CHILD / CHILDREN</>
                             )}
                             {caseTitleFormat === 'in_matter_of_marriage' && (
-                                <>IN THE MATTER OF THE MARRIAGE OF{'\n'}{(respondentLegalName || 'PARTY 1').toUpperCase().split(' ').pop()} AND {(nexProfile?.legalName || respondentLegalName || 'PARTY 2').toUpperCase().split(' ').pop()}</>
+                                <>IN THE MATTER OF THE MARRIAGE OF{'\n'}{(respondentLegalName || 'PARTY 1').toUpperCase().split(' ').pop()} AND {(nexProfile?.legalName || 'PARTY 2').toUpperCase().split(' ').pop()}</>
                             )}
                             {caseTitleFormat === 'in_re_marriage' && (
-                                <>IN RE MARRIAGE OF{'\n'}{(respondentLegalName || 'PARTY 1').toUpperCase().split(' ').pop()} AND {(nexProfile?.legalName || respondentLegalName || 'PARTY 2').toUpperCase().split(' ').pop()}</>
+                                <>IN RE MARRIAGE OF{'\n'}{(respondentLegalName || 'PARTY 1').toUpperCase().split(' ').pop()} AND {(nexProfile?.legalName || 'PARTY 2').toUpperCase().split(' ').pop()}</>
                             )}
                             {caseTitleFormat === 'custom' && (
                                 <>{caseTitleCustom || 'Your custom caption will appear here...'}</>

@@ -7,7 +7,7 @@ import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import {
     Crown,
     Lightning,
-    Sparkle,
+    Star,
     Shield,
     ChatCircleText,
     FileText,
@@ -280,7 +280,7 @@ export default function SubscriptionPage() {
                 </div>
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-4">
-                        <Sparkle size={20} weight="fill" className="text-[var(--champagne)]" />
+                        <Star size={20} weight="fill" className="text-[var(--champagne)]" />
                         <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--champagne)]">
                             Coming Soon
                         </h3>
@@ -299,15 +299,14 @@ export default function SubscriptionPage() {
                             'eSignature & notarization',
                             'Court date countdown & prep coach',
                             'Custody exchange logger',
-                            'Children\'s wellbeing tracker',
-                            'Financial abuse tracker',
                             'Co-parent communication filter',
+                            'Mock trial prep integration',
                         ].map((feature) => (
                             <div
                                 key={feature}
                                 className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06]"
                             >
-                                <Sparkle size={12} weight="fill" className="text-[var(--champagne)]/50 shrink-0" />
+                                <Star size={12} weight="fill" className="text-[var(--champagne)]/50 shrink-0" />
                                 <span className="text-[12px] text-white/40">{feature}</span>
                             </div>
                         ))}

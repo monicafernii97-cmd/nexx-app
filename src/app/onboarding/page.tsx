@@ -18,6 +18,7 @@ import {
     Check,
 } from 'lucide-react';
 import { US_STATES, ONBOARDING_STEPS } from '@/lib/constants';
+import { PLANS } from '@/lib/plans';
 
 /**
  * Onboarding flow for new NEXX users.
@@ -55,7 +56,7 @@ export default function OnboardingPage() {
         if (currentUser.onboardingComplete) return; // returning user
         if (currentUser.subscriptionTier) return; // already has a plan in DB
         const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-        const validPlans = new Set(['free', 'pro', 'premium', 'executive']);
+        const validPlans = new Set(PLANS.map((p) => p.tier));
         if (!selectedPlan || !validPlans.has(selectedPlan)) {
             router.replace('/#pricing');
         }
@@ -200,14 +201,13 @@ export default function OnboardingPage() {
                     setIsSaving(false);
                     return;
                 }
-                const validTiers = ['free', 'pro', 'premium', 'executive'] as const;
-                type Tier = typeof validTiers[number];
-                if (!validTiers.includes(selectedPlan as Tier)) {
+                const validTierSet = new Set(PLANS.map((p) => p.tier));
+                if (!validTierSet.has(selectedPlan)) {
                     setSaveError(`Invalid plan "${selectedPlan}". Please select a valid plan.`);
                     setIsSaving(false);
                     return;
                 }
-                const tier = selectedPlan as Tier;
+                const tier = selectedPlan as 'free' | 'pro' | 'premium' | 'executive';
 
                 await updateProfile({
                     id: userId,

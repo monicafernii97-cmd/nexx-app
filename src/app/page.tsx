@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 
 import { CaretDown } from '@phosphor-icons/react';
 import { PLANS } from '@/lib/plans';
+import { COMING_SOON_FEATURES } from '@/lib/coming-soon';
 
 /**
  * Welcome / landing page and auth-aware router.
@@ -41,7 +42,7 @@ export default function WelcomePage() {
     convexReady ? {} : 'skip'
   );
 
-  // Derived: show "no account found" banner when signed in but no plan selected.
+  // Derived: show "no plan selected" banner when signed in but no plan selected.
   // UserProvider.ensureFromClerk auto-creates a Convex record on any sign-in,
   // so currentUser is never null — we must check for a missing subscriptionTier instead.
   const showNoPlanBanner = (() => {
@@ -291,10 +292,10 @@ export default function WelcomePage() {
                 className="mb-10 mx-auto max-w-lg rounded-2xl p-5 border border-[rgba(229,168,74,0.4)] bg-gradient-to-b from-[rgba(229,168,74,0.12)] to-[rgba(229,168,74,0.04)] shadow-[0_8px_30px_rgba(229,168,74,0.1)] backdrop-blur-md"
               >
                 <p className="text-sm font-bold text-[var(--champagne)] mb-1.5 tracking-wide">
-                  No account found
+                  No plan selected
                 </p>
                 <p className="text-[13px] text-[rgba(255,255,255,0.7)] leading-relaxed">
-                  It looks like you don&apos;t have an account yet. Select a plan below to get started.
+                  You need to select a plan to get started. Choose one below.
                 </p>
               </motion.div>
             )}
@@ -407,19 +408,7 @@ export default function WelcomePage() {
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-4xl mx-auto">
-                {[
-                  'Voice-first AI conversations',
-                  'Court order upload & analysis',
-                  'Affidavit builder',
-                  'eFiling integration',
-                  'Attorney collaboration portal',
-                  'Therapist collaboration portal',
-                  'eSignature & notarization',
-                  'Court date countdown & prep coach',
-                  'Custody exchange logger',
-                  'Co-parent communication filter',
-                  'Mock trial prep integration',
-                ].map((feature) => (
+                {COMING_SOON_FEATURES.map((feature) => (
                   <div
                     key={feature}
                     className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)]"

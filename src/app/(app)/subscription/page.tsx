@@ -15,6 +15,7 @@ import {
     Check,
 } from '@phosphor-icons/react';
 import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
+import { COMING_SOON_FEATURES } from '@/lib/coming-soon';
 
 /** Subscription management page — shows current plan and upgrade options. */
 export default function SubscriptionPage() {
@@ -289,19 +290,7 @@ export default function SubscriptionPage() {
                         NEXX is evolving. These features are in development and will be available in upcoming releases.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {[
-                            'Voice-first AI conversations',
-                            'Court order upload & analysis',
-                            'Affidavit builder',
-                            'eFiling integration',
-                            'Attorney collaboration portal',
-                            'Therapist collaboration portal',
-                            'eSignature & notarization',
-                            'Court date countdown & prep coach',
-                            'Custody exchange logger',
-                            'Co-parent communication filter',
-                            'Mock trial prep integration',
-                        ].map((feature) => (
+                        {COMING_SOON_FEATURES.map((feature) => (
                             <div
                                 key={feature}
                                 className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06]"

@@ -45,16 +45,14 @@ export default function OnboardingPage() {
             router.replace('/dashboard');
         }
     }, [currentUser, router]);
-
     // Guard: if the user hasn't selected a plan yet, redirect to the
     // landing page pricing section. ensureFromClerk auto-creates a Convex
     // record on sign-in, so we check subscriptionTier + localStorage.
     useEffect(() => {
         if (!convexReady || convexLoading) return;
         if (currentUser === undefined) return; // still loading
-        if (currentUser === null) return; // edge: record not yet created
-        if (currentUser.onboardingComplete) return; // returning user
-        if (currentUser.subscriptionTier) return; // already has a plan in DB
+        if (currentUser?.onboardingComplete) return; // returning user
+        if (currentUser?.subscriptionTier) return; // already has a plan in DB
         const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
         const validPlans = new Set(PLANS.map((p) => p.tier));
         if (!selectedPlan || !validPlans.has(selectedPlan)) {
@@ -194,7 +192,9 @@ export default function OnboardingPage() {
                     'Other': 'none',
                 };
 
-                const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+                const selectedPlan =
+                    currentUser?.subscriptionTier ??
+                    (typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null);
 
                 if (!selectedPlan) {
                     setSaveError('Please select a plan before completing onboarding.');

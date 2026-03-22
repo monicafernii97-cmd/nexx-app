@@ -199,29 +199,36 @@ export default function DashboardPage() {
                                             transition={{ delay: 0.6 + i * 0.1 }}
                                         >
                                             <Link href={`/incident-report/${incident._id}`} className="no-underline block outline-none">
-                                                <div className="group relative bg-white/50 hover:bg-white border border-[rgba(10,22,41,0.04)] hover:border-[rgba(212,175,55,0.2)] p-4 rounded-2xl cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md">
-                                                    <div className="flex items-start gap-4">
-                                                        <div className="text-center flex-shrink-0 flex flex-col justify-center min-w-[42px] py-1 bg-cloud/50 rounded-xl px-2 h-fit">
-                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-sapphire-muted">
+                                                <div className="group relative bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(212,175,55,0.3)] p-4 rounded-[1.5rem] cursor-pointer transition-all duration-300 shadow-sm hover:shadow-[0_8px_32px_rgba(0,0,0,0.15)] backdrop-blur-md overflow-hidden">
+                                                    {/* Hyperglass glint hover effect */}
+                                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[rgba(255,255,255,0.05)] to-transparent -translate-x-full group-hover:animate-glint pointer-events-none" />
+                                                    
+                                                    <div className="flex items-start gap-4 relative z-10">
+                                                        <div className="text-center flex-shrink-0 flex flex-col justify-center min-w-[42px] py-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-[0.85rem] px-2 h-fit shadow-sm backdrop-blur-sm">
+                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-white/50">
                                                                 {date.toLocaleDateString('en-US', { month: 'short' })}
                                                             </p>
-                                                            <p className="text-lg font-bold text-sapphire leading-none mt-0.5">
+                                                            <p className="text-lg font-bold text-white/90 leading-none mt-0.5">
                                                                 {date.getDate()}
                                                             </p>
                                                         </div>
                                                         <div className="flex-1 min-w-0 pt-0.5">
                                                             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                                                 <span
-                                                                    className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase"
-                                                                    style={{ background: cat?.color ? `color-mix(in srgb, ${cat.color} 12%, transparent)` : 'var(--cloud)', color: cat?.color || 'var(--sapphire-muted)' }}
+                                                                    className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase border shadow-sm backdrop-blur-md"
+                                                                    style={{ 
+                                                                        background: cat?.color ? `color-mix(in srgb, ${cat.color} 15%, transparent)` : 'rgba(255,255,255,0.05)', 
+                                                                        color: cat?.color || 'rgba(255,255,255,0.8)',
+                                                                        borderColor: cat?.color ? `color-mix(in srgb, ${cat.color} 30%, transparent)` : 'rgba(255,255,255,0.1)'
+                                                                    }}
                                                                 >
                                                                     {cat?.label || incident.category}
                                                                 </span>
                                                                 {incident.status === 'draft' && (
-                                                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase bg-warning/10 text-warning">Draft</span>
+                                                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase bg-[rgba(255,183,77,0.1)] text-warning border border-[rgba(255,183,77,0.2)] shadow-sm">Draft</span>
                                                                 )}
                                                             </div>
-                                                            <p className="text-[13px] font-medium text-sapphire line-clamp-2 leading-relaxed">
+                                                            <p className="text-[13px] font-medium text-white/80 line-clamp-2 leading-relaxed">
                                                                 {incident.courtSummary || incident.narrative || 'Draft incident report...'}
                                                             </p>
                                                         </div>

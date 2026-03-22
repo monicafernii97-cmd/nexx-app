@@ -204,7 +204,7 @@ export default function IncidentReportPage() {
                                     className="group relative flex items-stretch"
                                 >
                                     <Link href={`/incident-report/${incident._id}`} className="flex-1 min-w-0 no-underline outline-none">
-                                        <div className="card-premium p-5 hover:border-[rgba(255,255,255,0.4)] hover:shadow-[0_8px_32px_rgba(26,75,155,0.3)] transition-all duration-300 flex items-start gap-5">
+                                        <div className="card-premium p-5 pr-[4.5rem] hover:border-[rgba(255,255,255,0.4)] hover:shadow-[0_8px_32px_rgba(26,75,155,0.3)] transition-all duration-300 flex items-start gap-5">
                                             {/* Date Column */}
                                             <div className="flex flex-col items-center justify-center min-w-[56px] py-2 bg-[rgba(255,255,255,0.05)] rounded-xl px-2 shrink-0 border border-[rgba(255,255,255,0.1)]">
                                                 <p className="text-[11px] font-bold uppercase tracking-wider text-white/60">

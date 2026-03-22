@@ -262,8 +262,8 @@ export default function EFilingPage() {
                 description="Bypass the red tape. Prepare, track, and officially file your court documents with effortless precision."
                 rightElement={
                     state ? (
-                        <span className="text-xs font-medium px-3 py-1 rounded-full bg-white/60 border border-[var(--cloud-light)] text-[var(--sapphire-base)] backdrop-blur-sm shadow-sm flex items-center gap-1.5">
-                            <MapPin size={12} weight="fill" />
+                        <span className="text-[11px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-xl bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white/80 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.1)] flex items-center gap-1.5">
+                            <MapPin size={14} weight="fill" className="text-[#60A5FA]" />
                             {locationLabel}
                         </span>
                     ) : undefined

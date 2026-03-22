@@ -448,8 +448,8 @@ export default function CourtSettingsPage() {
                     </button>
 
                     {existingSettings?.aiVerified && (
-                        <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--success)] bg-[var(--success)]/10 px-3 py-1.5 rounded-full border border-[var(--success)]/20">
-                            <Check size={14} weight="bold" /> AI Verified
+                        <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--success)] bg-[var(--success)]/10 px-3 py-1.5 rounded-full border border-[var(--success)]/20 shadow-sm backdrop-blur-md">
+                            <Check size={14} weight="bold" /> NEXX Verified
                         </span>
                     )}
 

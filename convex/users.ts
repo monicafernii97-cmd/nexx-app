@@ -128,6 +128,13 @@ export const updateProfile = mutation({
                 v.null()
             )
         ),
+        subscriptionTier: v.optional(v.union(
+            v.literal('free'),
+            v.literal('pro'),
+            v.literal('premium'),
+            v.literal('executive'),
+            v.null()
+        )),
         primaryGoals: v.optional(v.union(v.array(v.string()), v.null())),
     },
     handler: async (ctx, args) => {
@@ -163,5 +170,46 @@ export const completeOnboarding = mutation({
         }
 
         await ctx.db.patch(args.id, { onboardingComplete: true });
+    },
+});
+
+/** Look up user by Clerk ID — auth-guarded. Used by API routes to fetch tier info. */
+export const getByClerkId = query({
+    args: { clerkId: v.string() },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error('Not authenticated');
+        if (identity.subject !== args.clerkId) {
+            throw new Error('Not authorized: clerkId mismatch');
+        }
+        return await ctx.db
+            .query('users')
+            .withIndex('by_clerk', (q) => q.eq('clerkId', args.clerkId))
+            .first();
+    },
+});
+
+/** Admin mutation to set a user's subscription tier — restricted to the user's own record. */
+export const setSubscriptionTier = mutation({
+    args: {
+        id: v.id('users'),
+        tier: v.union(
+            v.literal('free'),
+            v.literal('pro'),
+            v.literal('premium'),
+            v.literal('executive')
+        ),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error('Not authenticated');
+
+        // Authorization: verify the caller owns this user record
+        const user = await ctx.db.get(args.id);
+        if (!user || user.clerkId !== identity.subject) {
+            throw new Error('Not authorized to modify this user');
+        }
+
+        await ctx.db.patch(args.id, { subscriptionTier: args.tier });
     },
 });

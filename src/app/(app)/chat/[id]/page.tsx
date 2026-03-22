@@ -6,12 +6,12 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
 import { Id } from '../../../../../convex/_generated/dataModel';
 import { useParams, useRouter } from 'next/navigation';
-import { Sparkles, ArrowLeft, Archive as ArchiveIcon } from 'lucide-react';
+import { ArrowLeft, Archive, Lock } from '@phosphor-icons/react';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
 import { MODE_LABELS } from '@/lib/constants';
 
-/** Full-screen chat interface for a single NEXX AI conversation. */
+/** Premium full-screen chat interface for a single NEXX AI conversation. */
 export default function ConversationPage() {
     const params = useParams();
     const router = useRouter();
@@ -66,8 +66,6 @@ export default function ConversationPage() {
                 setStreamingContent('');
 
                 // Build message history for the API
-                // Note: `messages` from useQuery won't include the just-saved user message yet,
-                // so we append the current input manually below to ensure the API gets the full history.
                 const history = (messages ?? []).map((m) => ({
                     role: m.role as 'user' | 'assistant',
                     content: m.content,
@@ -141,7 +139,7 @@ export default function ConversationPage() {
                     conversationId,
                     role: 'assistant',
                     content:
-                        "I apologize, but I'm unable to respond right now. Please try again in a moment. If this issue persists, check that the OpenAI API key is configured correctly.",
+                        "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.",
                 }).catch(() => { }); // Don't throw if fallback also fails
             } finally {
                 setIsStreaming(false);
@@ -156,7 +154,7 @@ export default function ConversationPage() {
     if (!isValidId) return null;
 
     const handleArchive = async () => {
-        const confirmed = window.confirm('Archive this conversation? You can still view it in the Archived section.');
+        const confirmed = window.confirm('Archive this encrypted conversation? It will remain securely stored but removed from your active log.');
         if (!confirmed) return;
         try {
             await archiveConversation({ id: conversationId });
@@ -169,87 +167,80 @@ export default function ConversationPage() {
     const modeInfo = MODE_LABELS[conversation?.mode ?? 'general'] ?? MODE_LABELS.general;
 
     return (
-        <div className="flex flex-col h-[calc(100vh-48px)] max-w-4xl mx-auto">
-            {/* Header */}
+        <div className="flex flex-col h-[calc(100vh-80px)] max-w-5xl mx-auto px-2 md:px-4 pt-4">
+            {/* Header (Glass Morphism Pill) */}
             <motion.div
-                initial={{ opacity: 0, y: -8 }}
+                initial={{ opacity: 0, y: -12 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-3 pb-4 mb-4"
-                style={{ borderBottom: '1px solid rgba(208, 227, 255, 0.1)' }}
+                className="glass-ethereal rounded-2xl p-4 flex items-center gap-4 mb-6 shadow-sm border-white shrink-0"
             >
                 <button
                     onClick={() => router.push('/chat')}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(208, 227, 255,0.08)]"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all hover:scale-105 bg-white shadow-sm border border-[rgba(10,22,41,0.05)] text-[#1E3A8A] hover:shadow"
                     aria-label="Back to conversations"
                 >
-                    <ArrowLeft size={16} style={{ color: '#F7F2EB' }} />
+                    <ArrowLeft size={18} weight="bold" />
                 </button>
-                <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{
-                        background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
-                        boxShadow: '0 2px 12px rgba(208, 227, 255, 0.25)',
-                    }}
-                >
-                    <Sparkles size={18} style={{ color: '#F7F2EB' }} />
-                </div>
-                <div className="flex-1">
-                    <h1 className="text-lg font-semibold" style={{ color: '#F7F2EB' }}>
-                        {conversation?.title || 'NEXX Strategic AI'}
+                
+                <div className="flex-1 min-w-0 pl-1">
+                    <h1 className="text-[17px] font-bold text-sapphire truncate">
+                        {conversation?.title || 'NEXX Executive Intelligence'}
                     </h1>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3 mt-1">
                         <span
-                            className="badge text-xs"
+                            className="text-[10px] tracking-widest font-bold py-1 px-3 rounded-full border border-white/10 shadow-sm"
                             style={{
-                                background: `${modeInfo.color}20`,
+                                background: `color-mix(in srgb, ${modeInfo.color} 15%, transparent)`,
+                                backdropFilter: 'blur(8px)',
                                 color: modeInfo.color,
+                                borderColor: `color-mix(in srgb, ${modeInfo.color} 40%, transparent)`,
                             }}
                         >
-                            {modeInfo.label}
+                            {modeInfo.label} MODE
                         </span>
-                        <p className="text-xs" style={{ color: '#D0E3FF' }}>
-                            Executive Intelligence
-                        </p>
+                        <div className="flex items-center gap-1 text-[rgba(10,22,41,0.4)]">
+                            <Lock size={12} weight="fill" />
+                            <p className="text-[11px] font-bold tracking-widest uppercase truncate">
+                                Encrypted
+                            </p>
+                        </div>
                     </div>
                 </div>
+
                 <button
                     onClick={handleArchive}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(208, 227, 255,0.08)]"
-                    title="Archive conversation"
-                    aria-label="Archive conversation"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all bg-white hover:bg-cloud border border-transparent hover:border-[rgba(10,22,41,0.05)] text-sapphire-muted hover:text-sapphire"
+                    title="Archive Conversation"
+                    aria-label="Archive Conversation"
                 >
-                    <ArchiveIcon size={14} style={{ color: '#FFF9F0' }} />
+                    <Archive size={18} weight="duotone" />
                 </button>
             </motion.div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto space-y-6 pb-4 pr-2">
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto w-full no-scrollbar pb-6 px-1 lg:px-6 relative scroll-smooth flex flex-col space-y-6">
                 {(!messages || messages.length === 0) && !isStreaming && (
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.3 }}
-                        className="flex flex-col items-center justify-center h-full text-center px-4"
+                        className="flex flex-col items-center justify-center m-auto text-center px-6 py-12 card-premium max-w-md w-full"
                     >
                         <div
-                            className="w-20 h-20 rounded-2xl mb-6 flex items-center justify-center"
-                            style={{
-                                background: 'rgba(208, 227, 255, 0.08)',
-                                border: '1px solid rgba(208, 227, 255, 0.15)',
-                            }}
+                            className="w-20 h-20 rounded-[24px] mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_8px_32px_rgba(18,61,126,0.3)] border border-white/10"
                         >
-                            <Sparkles size={32} style={{ color: '#F7F2EB' }} />
+                            <span className="text-white font-serif font-bold text-[40px] drop-shadow-sm pb-2"><i>N</i></span>
                         </div>
-                        <h2
-                            className="font-serif text-2xl font-semibold mb-2"
-                            style={{ color: '#F7F2EB' }}
-                        >
-                            How can I help you today?
+                        <h2 className="font-serif text-2xl font-bold mb-3 text-sapphire">
+                            Secure Counsel Authorized
                         </h2>
-                        <p className="text-sm max-w-md" style={{ color: '#FFF9F0' }}>
+                        <p className="text-[15px] max-w-sm text-sapphire-muted font-medium mb-6 leading-relaxed">
                             Share what&apos;s on your mind — an incident, a message from your NEX,
-                            a legal question, or just how you&apos;re feeling. I&apos;m here.
+                            a legal concern, or your emotional state.
                         </p>
+                        <div className="flex items-center justify-center text-[12px] font-bold tracking-[0.2em] uppercase text-white bg-[linear-gradient(135deg,#60A5FA,#2563EB)] px-5 py-2.5 rounded-full shadow-md">
+                            Ready to Analyze
+                        </div>
                     </motion.div>
                 )}
 
@@ -270,39 +261,28 @@ export default function ConversationPage() {
                     />
                 )}
 
-                {/* Loading indicator */}
+                {/* Loading indicator (Pre-stream) */}
                 {isStreaming && !streamingContent && (
                     <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="flex gap-3"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex w-full justify-start pl-2"
                     >
-                        <div
-                            className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center animate-pulse-primary"
-                            style={{
-                                background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
-                            }}
-                        >
-                            <Sparkles size={14} style={{ color: '#0A1E54' }} />
-                        </div>
-                        <div
-                            className="rounded-2xl rounded-bl-md px-5 py-4"
-                            style={{
-                                background: '#F7F2EB',
-                                border: '1px solid rgba(208, 227, 255, 0.1)',
-                            }}
-                        >
-                            <div className="flex gap-1.5">
+                        <div className="flex max-w-[85%] lg:max-w-[75%] gap-4">
+                            <div className="w-10 h-10 rounded-[12px] flex-shrink-0 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-md sticky top-2 z-10 border border-white/10">
+                                <span className="text-white font-serif font-bold text-[18px] drop-shadow-sm mb-0.5 animate-pulse"><i>N</i></span>
+                            </div>
+                            <div className="card-premium p-5 rounded-tl-sm flex items-center gap-3 w-32 border-white bg-white/60">
                                 {[0, 1, 2].map((j) => (
                                     <motion.div
                                         key={j}
-                                        className="w-2 h-2 rounded-full"
-                                        style={{ background: '#7096D1' }}
-                                        animate={{ opacity: [0.3, 1, 0.3] }}
+                                        className="w-2 h-2 rounded-full bg-sapphire"
+                                        animate={{ y: [0, -6, 0], opacity: [0.4, 1, 0.4] }}
                                         transition={{
-                                            duration: 1,
+                                            duration: 0.8,
                                             repeat: Infinity,
-                                            delay: j * 0.2,
+                                            delay: j * 0.15,
+                                            ease: "easeInOut"
                                         }}
                                     />
                                 ))}
@@ -311,20 +291,22 @@ export default function ConversationPage() {
                     </motion.div>
                 )}
 
-                <div ref={messagesEndRef} />
+                {/* Invisible element to scroll to bottom */}
+                <div ref={messagesEndRef} className="h-4" />
             </div>
 
-            {/* Input Area */}
+            {/* Input Area (Floating Pill) */}
             <motion.div
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="pt-4"
-                style={{ borderTop: '1px solid rgba(208, 227, 255, 0.1)' }}
+                className="pt-2 pb-6 px-1 lg:px-6 shrink-0 relative z-20"
             >
-                <ChatInput onSend={handleSend} disabled={isStreaming || isPending || !isThreadReady} />
-                <p className="text-center text-xs mt-2" style={{ color: '#D0E3FF' }}>
-                    NEXX provides legal information and strategic guidance, not legal advice.
+                <div className="glass-ethereal rounded-[2rem] p-2 shadow-lg border-white">
+                    <ChatInput onSend={handleSend} disabled={isStreaming || isPending || !isThreadReady} />
+                </div>
+                <p className="text-center text-[10px] font-bold tracking-[0.15em] uppercase mt-4 text-[#0A1128]/50 flex items-center justify-center">
+                    NEXX provides strategic guidance, not formal legal advice.
                 </p>
             </motion.div>
         </div>

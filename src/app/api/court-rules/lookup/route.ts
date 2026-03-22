@@ -3,7 +3,7 @@
  *
  * POST /api/court-rules/lookup
  *
- * Discovers local court formatting rules via Tavily + GPT-4o.
+ * Discovers local court formatting rules via GPT-4o (using model knowledge + optional cached localRulesUrl).
  * Requires authentication (Clerk) to protect against uncontrolled API costs.
  * Results are cached in-memory for 30 days per state/county pair.
  */
@@ -87,19 +87,42 @@ export async function POST(request: NextRequest) {
         const normalizedCounty = titleCase(county);
         const normalizedCourtName = courtName ? titleCase(courtName) : undefined;
 
-        // Look up rules via Tavily + GPT-4o (with in-memory cache)
+        // Create a single authenticated Convex client for reuse
+        const convex = await getAuthenticatedConvexClient();
+
+        // Fetch cached resources to get the localRules URL (if available)
+        // This bridges the Resources page data with the court rules verification.
+        let localRulesUrl: string | undefined;
+        try {
+            const cached = await convex.query(api.resourcesCache.get, {
+                state: normalizedState,
+                county: normalizedCounty,
+            });
+            const resources = cached?.resources as Record<string, unknown> | undefined;
+            if (resources?.localRules && typeof resources.localRules === 'object') {
+                const lr = resources.localRules as Record<string, unknown>;
+                if (typeof lr.url === 'string') {
+                    localRulesUrl = lr.url;
+                }
+            }
+        } catch (cacheErr) {
+            console.warn('[Court Rules Lookup] Failed to fetch cached resources (non-blocking):', cacheErr);
+        }
+
+        // Look up rules via GPT-4o (with in-memory cache)
         const result = await lookupCourtRules(
             normalizedState,
             normalizedCounty,
             normalizedCourtName,
             forceRefresh,
+            localRulesUrl,
         );
 
         // If settingsId provided and verification yielded results,
         // mark settings as NEXXverified via server-secret-gated action.
         if (settingsId && result.rules && Object.keys(result.rules).length > 0) {
             try {
-                const convex = await getAuthenticatedConvexClient();
+                // Reuse the existing Convex client (already authenticated above)
                 await convex.action(
                     api.courtSettings.applyNEXXverification,
                     {

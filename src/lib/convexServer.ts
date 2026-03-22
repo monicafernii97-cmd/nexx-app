@@ -38,6 +38,9 @@ export async function getAuthenticatedConvexClient(): Promise<ConvexHttpClient> 
     const reqClient = new ConvexHttpClient(CONVEX_URL);
     const { getToken } = await auth();
     const token = await getToken({ template: 'convex' });
-    if (token) reqClient.setAuth(token);
+    if (!token) {
+        throw new Error('Failed to obtain Convex auth token — user may not be authenticated');
+    }
+    reqClient.setAuth(token);
     return reqClient;
 }

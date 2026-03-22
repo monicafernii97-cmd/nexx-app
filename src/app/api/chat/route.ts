@@ -5,6 +5,9 @@ import { buildSystemPrompt } from '@/lib/systemPrompt';
 import type { UserContext, LegalSearchResult } from '@/lib/types';
 import { detectLegalTopic, extractLegalQuery, searchStatutes } from '@/lib/legal/search';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import { getModelForMode, isPremiumModel, getDailyLimit, type SubscriptionTier } from '@/lib/tiers';
+import { getAuthenticatedConvexClient } from '@/lib/convexServer';
+import { api } from '../../../../convex/_generated/api';
 
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_MESSAGES = 50;
@@ -17,26 +20,48 @@ export async function POST(req: NextRequest) {
         return Response.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // ── Rate limit (50/day free tier) ──
-    const rl = checkRateLimit(userId, 'chat_message');
-    if (!rl.allowed) {
-        const { body, status } = rateLimitResponse(rl);
-        return Response.json(body, { status });
-    }
 
     try {
-        const body = await req.json();
+        let body: unknown;
+        try {
+            body = await req.json();
+        } catch {
+            return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+        }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) {
+            return Response.json({ error: 'Invalid request body' }, { status: 400 });
+        }
         const {
             messages,
             conversationMode,
             userContext,
-        }: {
+        } = body as {
             messages: { role: 'user' | 'assistant'; content: string }[];
             conversationMode?: string;
             userContext?: UserContext;
-        } = body;
+        };
 
-        if (!messages || messages.length === 0) {
+        // ── Determine model from conversation mode ──
+        const model = getModelForMode(conversationMode);
+        const premium = isPremiumModel(model);
+
+        // ── Fetch user tier from Convex ──
+        const validTiers: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
+        let userTier: SubscriptionTier = 'free';
+        let tierResolved = false; // true = tier came from DB; false = lookup failed
+        try {
+            const convex = await getAuthenticatedConvexClient();
+            const userRecord = await convex.query(api.users.getByClerkId, { clerkId: userId });
+            if (userRecord?.subscriptionTier && validTiers.includes(userRecord.subscriptionTier as SubscriptionTier)) {
+                userTier = userRecord.subscriptionTier as SubscriptionTier;
+            }
+            tierResolved = true;
+        } catch (err) {
+            console.warn('[Chat] Failed to fetch user tier from Convex — skipping rate limit for this request:', err);
+        }
+
+        // ── Validate input before consuming rate limit ──
+        if (!Array.isArray(messages) || messages.length === 0) {
             return Response.json({ error: 'Messages are required' }, { status: 400 });
         }
 
@@ -44,12 +69,34 @@ export async function POST(req: NextRequest) {
             return Response.json({ error: 'Too many messages' }, { status: 400 });
         }
 
-        for (const msg of messages) {
-            if (!msg.role || !['user', 'assistant'].includes(msg.role)) {
+        for (const msg of messages as unknown[]) {
+            if (!msg || typeof msg !== 'object') {
+                return Response.json({ error: 'Invalid message payload' }, { status: 400 });
+            }
+
+            const { role, content } = msg as { role?: unknown; content?: unknown };
+            if (role !== 'user' && role !== 'assistant') {
                 return Response.json({ error: 'Invalid message role' }, { status: 400 });
             }
-            if (typeof msg.content !== 'string' || msg.content.length > MAX_MESSAGE_LENGTH) {
+            if (typeof content !== 'string' || content.length > MAX_MESSAGE_LENGTH) {
                 return Response.json({ error: 'Invalid message content' }, { status: 400 });
+            }
+        }
+
+        // ── Tier-specific rate limit for the chosen model ──
+        // Only enforce when the tier was successfully resolved from the DB.
+        // If the lookup failed, we skip rate limiting to avoid penalizing paid
+        // users with free-tier limits during transient outages.
+        if (tierResolved) {
+            const feature = premium ? 'chat_message_4o' as const : 'chat_message_mini' as const;
+            const dailyCap = getDailyLimit(userTier, model);
+
+            if (dailyCap !== -1) { // -1 = unlimited
+                const tierRl = checkRateLimit(userId, feature, dailyCap);
+                if (!tierRl.allowed) {
+                    const { body: rlBody, status } = rateLimitResponse(tierRl, userTier);
+                    return Response.json(rlBody, { status });
+                }
             }
         }
 
@@ -100,9 +147,9 @@ export async function POST(req: NextRequest) {
             legalContext,
         });
 
-        // Stream response from OpenAI
+        // Stream response from OpenAI (model determined by conversation mode + tier)
         const stream = await getOpenAI().chat.completions.create({
-            model: 'gpt-4o',
+            model,
             messages: [
                 { role: 'system', content: systemPrompt },
                 ...messages,

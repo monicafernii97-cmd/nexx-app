@@ -1,66 +1,160 @@
 import { dark } from '@clerk/themes';
 
-/** NEXX-branded Clerk theme configuration with luxury dark mode styling. */
+/** NEXX-branded Clerk theme configuration with Galaxy luxury dark mode styling. */
 export const nexxClerkAppearance = {
     baseTheme: dark,
     variables: {
-        colorPrimary: '#123D7E',
-        colorBackground: '#0A1E54',
-        colorInputBackground: '#FFF9F0',
-        colorInputText: '#0A1E54',
-        colorText: '#F7F2EB',
-        colorTextSecondary: '#D0E3FF',
-        borderRadius: '12px',
-        fontFamily: 'Inter, sans-serif',
+        colorPrimary: '#60A5FA',          /* neon-blue for primary actions */
+        colorBackground: 'transparent',   /* enforce true transparency for parent glass wrappers */
+        colorInputBackground: 'rgba(255, 255, 255, 0.05)', /* true glass inputs */
+        colorInputText: '#FFFFFF',        /* pure-white */
+        colorText: '#FFFFFF',             /* pure-white for high legibility */
+        colorTextSecondary: '#FFFFFF',    /* GUARANTEE pure white */
+        borderRadius: '16px',
+        fontFamily: 'Inter, system-ui, sans-serif', /* robust sans-serif instead of skinny */
+        colorSuccess: '#10B981',
+        colorDanger: '#F43F5E',
+        colorWarning: '#F59E0B',
     },
     elements: {
         card: {
-            background: '#0A1E54',
-            border: '1px solid rgba(208, 227, 255, 0.15)',
-            borderRadius: '16px',
-            boxShadow: '0 16px 64px rgba(0, 0, 0, 0.4)',
+            background: 'linear-gradient(135deg, rgba(18, 61, 126, 0.45), rgba(10, 17, 40, 0.85))',
+            backdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.25)',
+            borderRadius: '20px',
+            boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.8), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)',
         },
         headerTitle: {
-            color: '#F7F2EB',
-            fontFamily: "'Playfair Display', serif",
+            color: '#FFFFFF',
+            fontFamily: 'Playfair Display, Georgia, serif',
+            fontWeight: '700',
+            letterSpacing: '-0.02em',
         },
         headerSubtitle: {
-            color: '#D0E3FF',
+            color: '#FFFFFF',
+            fontWeight: '600',
         },
         socialButtonsBlockButton: {
-            border: '1px solid rgba(208, 227, 255, 0.15)',
-            background: '#FFF9F0',
-            color: '#0A1E54',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            background: 'rgba(255, 255, 255, 0.05)',
+            color: '#FFFFFF',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
         },
         socialButtonsBlockButtonText: {
-            color: '#0A1E54',
+            color: '#FFFFFF',
+            fontWeight: '600',
         },
         formFieldLabel: {
-            color: '#D0E3FF',
+            color: '#FFFFFF',
             textTransform: 'uppercase' as const,
             fontSize: '11px',
-            letterSpacing: '0.1em',
-            fontWeight: '600',
+            letterSpacing: '0.05em',
+            fontWeight: '700',
         },
         formFieldInput: {
-            background: '#FFF9F0',
-            border: '1px solid rgba(10, 30, 84, 0.12)',
-            color: '#0A1E54',
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            color: '#FFFFFF',
+            boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.05)',
+        },
+        pageScrollBox: {
+            background: 'transparent',
+        },
+        pageHeaderTitle: {
+            color: '#FFFFFF',
+            fontFamily: 'Playfair Display, Georgia, serif',
+            fontWeight: '700',
+        },
+        pageHeaderSubtitle: {
+            color: '#FFFFFF',
+            fontWeight: '600',
+        },
+        profileSectionTitle: {
+            color: '#FFFFFF',
+        },
+        profileSectionContent: {
+            color: '#FFFFFF',
         },
         formButtonPrimary: {
-            background: 'linear-gradient(135deg, #FFF9F0, #D0E3FF)',
-            color: '#0A1E54',
-            fontWeight: '600',
-            letterSpacing: '0.05em',
+            background: 'linear-gradient(135deg, #60A5FA, #2563EB)',
+            color: '#FFFFFF',
+            fontWeight: '700',
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase' as const,
+            boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 8px 16px rgba(37, 99, 235, 0.4)',
+            border: 'none',
         },
         footerActionLink: {
-            color: '#D0E3FF',
+            color: '#60A5FA',
+            fontWeight: '600',
         },
         dividerLine: {
-            background: 'rgba(208, 227, 255, 0.15)',
+            background: 'rgba(255, 255, 255, 0.1)',
         },
         dividerText: {
-            color: '#D0E3FF',
+            color: '#FFFFFF',
+            fontWeight: '600',
+        },
+        profileSectionTitleText: {
+            color: '#FFFFFF',
+            fontWeight: '800',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            paddingBottom: '8px',
+        },
+        profileSectionPrimaryButton: {
+            color: '#60A5FA',
+            fontWeight: '700',
+        },
+        accordionTriggerButton: {
+            color: '#FFFFFF',
+        },
+        userPreviewMainIdentifier: {
+            color: '#FFFFFF',
+            fontWeight: '700',
+        },
+        userPreviewSecondaryIdentifier: {
+            color: '#FFFFFF',
+        },
+        breadcrumbsItem: {
+            color: '#FFFFFF',
+            fontWeight: '600',
+        },
+        breadcrumbsItemDivider: {
+            color: '#FFFFFF',
+        },
+        badge: {
+            background: 'rgba(255,255,255,0.1)',
+            color: '#FFFFFF',
+            border: '1px solid rgba(255,255,255,0.2)',
+        },
+        menuButton: {
+            color: '#FFFFFF',
+        },
+        navbarButton: {
+            color: '#FFFFFF',
+            fontWeight: '600',
+        },
+        navbarButtonIcon: {
+            color: '#FFFFFF',
+        },
+        userButtonPopoverCard: {
+            background: 'linear-gradient(135deg, #0A1128, #1E3A8A)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 24px 48px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)',
+        },
+        userButtonPopoverActionButton: {
+            color: '#FFFFFF',
+        },
+        userButtonPopoverActionButtonText: {
+            color: '#FFFFFF',
+            fontWeight: '600',
+        },
+        userButtonPopoverActionButtonIcon: {
+            color: '#FFFFFF',
+        },
+        userButtonPopoverFooter: {
+            background: 'rgba(255,255,255,0.05)',
         },
     },
 } as const;

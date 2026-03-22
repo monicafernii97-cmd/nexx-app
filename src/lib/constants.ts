@@ -14,7 +14,6 @@ export const INCIDENT_CATEGORIES = [
     { value: 'emotional_abuse', label: 'Emotional Abuse', color: '#C75A5A' },
     { value: 'financial_abuse', label: 'Financial Abuse', color: '#5A8EC9' },
     { value: 'parental_alienation', label: 'Parental Alienation', color: '#7C6FA0' },
-    { value: 'custody_violation', label: 'Custody Violation', color: '#E5A84A' },
     { value: 'harassment', label: 'Harassment', color: '#A85050' },
     { value: 'threats', label: 'Threats', color: '#B04848' },
     { value: 'manipulation', label: 'Manipulation', color: '#7096D1' },

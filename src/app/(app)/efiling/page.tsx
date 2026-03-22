@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
@@ -8,27 +8,28 @@ import type { Id } from '../../../../convex/_generated/dataModel';
 import { useUser } from '@/lib/user-context';
 import { titleCase } from '@/lib/utils/stringHelpers';
 import {
-    FileUp,
-    ExternalLink,
+    FileArrowUp,
+    ArrowSquareOut,
     MapPin,
-    CheckCircle2,
+    CheckCircle,
     Circle,
-    Download,
+    DownloadSimple,
     ArrowRight,
-    ChevronDown,
-    AlertTriangle,
-    Landmark,
-    Search,
+    CaretDown,
+    Warning,
+    Bank,
+    MagnifyingGlass,
     BookOpen,
     FileText,
-    Scale,
-    Shield,
+    Scales,
+    ShieldCheck,
     Clock,
-    Building,
+    Buildings,
     Phone,
     Info,
-} from 'lucide-react';
+} from '@phosphor-icons/react';
 import Link from 'next/link';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 
 // ═══════════════════════════════════════════
 //  Types
@@ -70,17 +71,17 @@ function formatDate(ts: number): string {
 /** Status pill for document lifecycle — Draft → Final → Filed. */
 function StatusPill({ status }: { status: 'draft' | 'final' | 'filed' }) {
     const config = {
-        draft: { label: 'Draft', bg: 'rgba(229, 168, 74, 0.1)', border: 'rgba(229, 168, 74, 0.25)', color: '#E5A84A' },
-        final: { label: 'Final', bg: 'rgba(90, 142, 201, 0.1)', border: 'rgba(90, 142, 201, 0.25)', color: '#5A8EC9' },
-        filed: { label: 'Filed', bg: 'rgba(74, 163, 100, 0.1)', border: 'rgba(74, 163, 100, 0.25)', color: '#4AA364' },
+        draft: { label: 'Draft', bg: 'var(--champagne)', border: 'var(--champagne)', color: 'white' },
+        final: { label: 'Final', bg: 'var(--sapphire-base)', border: 'var(--sapphire-base)', color: 'white' },
+        filed: { label: 'Filed', bg: 'var(--success)', border: 'var(--success)', color: 'white' },
     }[status];
 
     return (
         <span
-            className="text-xs font-medium px-2.5 py-0.5 rounded-full inline-flex items-center gap-1"
+            className="text-xs font-medium px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-sm"
             style={{ background: config.bg, border: `1px solid ${config.border}`, color: config.color }}
         >
-            {status === 'filed' && <CheckCircle2 size={10} />}
+            {status === 'filed' && <CheckCircle size={12} weight="fill" />}
             {config.label}
         </span>
     );
@@ -100,21 +101,16 @@ function CollapsibleSection({
 
     return (
         <div
-            className="rounded-xl overflow-hidden"
-            style={{
-                background: 'rgba(10, 30, 84, 0.25)',
-                border: '1px solid rgba(208, 227, 255, 0.08)',
-            }}
+            className="rounded-2xl overflow-hidden bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-300"
         >
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between px-5 py-3.5 cursor-pointer text-left"
-                style={{ background: 'transparent', border: 'none', color: '#F7F2EB' }}
+                className="w-full flex items-center justify-between px-6 py-4 cursor-pointer text-left focus:outline-none hover:bg-white/5 transition-colors"
                 aria-expanded={isOpen}
             >
-                <span className="text-sm font-medium">{title}</span>
+                <span className="text-sm font-bold text-white tracking-wide">{title}</span>
                 <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                    <ChevronDown size={16} style={{ color: '#7096D1' }} />
+                    <CaretDown size={16} className="text-white" weight="bold" />
                 </motion.div>
             </button>
             <AnimatePresence>
@@ -123,10 +119,10 @@ function CollapsibleSection({
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.25 }}
-                        className="overflow-hidden"
+                        transition={{ duration: 0.3, ease: 'easeInOut' }}
+                        className="overflow-hidden bg-[rgba(0,0,0,0.2)]"
                     >
-                        <div className="px-5 pb-4 text-xs leading-relaxed" style={{ color: '#D0E3FF' }}>
+                        <div className="px-6 pb-5 text-[15px] leading-relaxed text-white font-medium m-0">
                             {children}
                         </div>
                     </motion.div>
@@ -150,39 +146,39 @@ function ReadinessItem({
 }) {
     const content = (
         <div
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${href && !isReady ? 'cursor-pointer group' : ''}`}
-            style={{
-                background: isReady ? 'rgba(74, 163, 100, 0.06)' : 'rgba(229, 168, 74, 0.04)',
-                border: `1px solid ${isReady ? 'rgba(74, 163, 100, 0.15)' : 'rgba(229, 168, 74, 0.12)'}`,
-            }}
+            className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 ${href && !isReady ? 'cursor-pointer hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-0.5 hover:bg-white/10' : 'shadow-[0_8px_32px_rgba(0,0,0,0.2)]'} bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]`}
         >
             {isReady ? (
-                <CheckCircle2 size={16} style={{ color: '#4AA364' }} />
+                <div className="bg-white/10 p-2 rounded-xl border border-[#10B981]/40 shadow-[inset_0_1px_2px_rgba(16,185,129,0.3)] backdrop-blur-md">
+                    <CheckCircle size={22} className="text-[#10B981] drop-shadow-[0_2px_8px_rgba(16,185,129,0.8)]" weight="fill" />
+                </div>
             ) : (
-                <Circle size={16} style={{ color: '#E5A84A' }} />
+                <div className="bg-white/10 p-2 rounded-xl border border-[#E5A84A]/40 shadow-[inset_0_1px_2px_rgba(229,168,74,0.3)] backdrop-blur-md">
+                    <Circle size={22} className="text-[#E5A84A] drop-shadow-[0_2px_8px_rgba(229,168,74,0.8)]" weight="bold" />
+                </div>
             )}
             <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium" style={{ color: isReady ? '#4AA364' : '#F7F2EB' }}>
+                <p className={`text-[15px] tracking-wide font-bold m-0 ${isReady ? 'text-[#10B981] drop-shadow-sm' : 'text-[#E5A84A] drop-shadow-sm'}`}>
                     {label}
                 </p>
                 {detail && (
-                    <p className="text-xs mt-0.5" style={{ color: '#7096D1' }}>
+                    <p className={`text-[13px] mt-1 font-medium m-0 ${isReady ? 'text-[#10B981]/80' : 'text-[#E5A84A]/80'}`}>
                         {detail}
                     </p>
                 )}
             </div>
             {href && !isReady && (
                 <ArrowRight
-                    size={14}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ color: '#7096D1' }}
+                    size={16}
+                    className="text-[#E5A84A]/60 transition-all group-hover:text-[#E5A84A] group-hover:translate-x-1"
+                    weight="bold"
                 />
             )}
         </div>
     );
 
     return href && !isReady ? (
-        <Link href={href} className="no-underline block">
+        <Link href={href} className="no-underline block group">
             {content}
         </Link>
     ) : (
@@ -227,17 +223,30 @@ export default function EFilingPage() {
 
     // Mark as filed handler with inline error feedback
     const [filingId, setFilingId] = useState<string | null>(null);
-    const [filingError, setFilingError] = useState<string | null>(null);
+    const [filingErrors, setFilingErrors] = useState<Record<string, string>>({});
+    const filingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+    useEffect(() => {
+        const timeouts = filingTimeoutsRef.current;
+        return () => {
+            timeouts.forEach(clearTimeout);
+        };
+    }, []);
     const handleMarkAsFiled = useCallback(async (docId: Id<'generatedDocuments'>) => {
         setFilingId(docId);
-        setFilingError(null);
+        const existing = filingTimeoutsRef.current.get(docId);
+        if (existing) clearTimeout(existing);
+        setFilingErrors(prev => { const next = { ...prev }; delete next[docId]; return next; });
         try {
             await updateStatus({ id: docId, status: 'filed' });
         } catch (err) {
             console.error('[eFiling] Failed to mark as filed:', err);
-            setFilingError(err instanceof Error ? err.message : 'Failed to mark as filed. Please try again.');
-            // Auto-dismiss error after 5 seconds
-            setTimeout(() => setFilingError(null), 5000);
+            const msg = err instanceof Error ? err.message : 'Failed to mark as filed. Please try again.';
+            setFilingErrors(prev => ({ ...prev, [docId]: msg }));
+            const tid = setTimeout(() => {
+                setFilingErrors(prev => { const next = { ...prev }; delete next[docId]; return next; });
+                filingTimeoutsRef.current.delete(docId);
+            }, 5000);
+            filingTimeoutsRef.current.set(docId, tid);
         } finally {
             setFilingId(null);
         }
@@ -259,77 +268,42 @@ export default function EFilingPage() {
     const localRulesUrl = toSafeExternalUrl(cachedResources?.localRules?.url);
 
     return (
-        <div className="max-w-5xl mx-auto pb-12">
-            {/* ─── Header ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="mb-8"
-            >
-                <div className="flex items-center gap-3 mb-2">
-                    <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center"
-                        style={{
-                            background: 'linear-gradient(135deg, #FFF9F0, #D0E3FF)',
-                            boxShadow: '0 2px 12px rgba(208, 227, 255, 0.3)',
-                        }}
-                    >
-                        <FileUp size={18} style={{ color: '#0A1E54' }} />
-                    </div>
-                    <div>
-                        <h1 className="text-headline text-3xl" style={{ color: '#F7F2EB' }}>
-                            eFiling Hub
-                        </h1>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                    <p className="text-sm" style={{ color: '#D0E3FF' }}>
-                        Prepare and file your court documents electronically
-                    </p>
-                    {state && (
-                        <span
-                            className="text-xs font-medium px-2.5 py-0.5 rounded-full inline-flex items-center gap-1"
-                            style={{
-                                background: 'rgba(112, 150, 209, 0.1)',
-                                border: '1px solid rgba(112, 150, 209, 0.2)',
-                                color: '#D0E3FF',
-                            }}
-                        >
-                            <MapPin size={10} />
+        <PageContainer>
+            <PageHeader
+                icon={FileArrowUp}
+                title="eFiling Hub"
+                description="Bypass the red tape. Prepare, track, and officially file your court documents with effortless precision."
+                rightElement={
+                    state ? (
+                        <span className="text-[11px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-xl bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white/80 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.1)] flex items-center gap-1.5">
+                            <MapPin size={14} weight="fill" className="text-[#60A5FA]" />
                             {locationLabel}
                         </span>
-                    )}
-                </div>
-            </motion.div>
+                    ) : undefined
+                }
+            />
 
             {/* ─── No Location Set ─── */}
             {!hasCourtSettings && (
                 <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15 }}
-                    className="card-premium p-6 mb-8"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.1 }}
+                    className="p-8 border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.05)] backdrop-blur-xl rounded-3xl"
                 >
-                    <div className="flex items-start gap-4">
-                        <div
-                            className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                            style={{
-                                background: 'rgba(229, 168, 74, 0.12)',
-                                border: '1px solid rgba(229, 168, 74, 0.3)',
-                            }}
-                        >
-                            <MapPin size={20} style={{ color: '#E5A84A' }} />
+                    <div className="flex items-start gap-5">
+                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#B38644,#E5A84A)] text-white shadow-[0_4px_15px_rgba(229,168,74,0.3)] shrink-0">
+                            <MapPin size={28} weight="fill" className="drop-shadow-md" />
                         </div>
-                        <div className="flex-1">
-                            <p className="font-semibold text-sm mb-1" style={{ color: '#0A1E54' }}>
+                        <div className="flex-1 space-y-3">
+                            <p className="text-lg font-bold tracking-wide text-white m-0">
                                 Set your court location first
                             </p>
-                            <p className="text-xs mb-3" style={{ color: '#123D7E' }}>
+                            <p className="text-[15px] text-white leading-relaxed max-w-2xl font-medium m-0">
                                 Configure your state and county in Court Settings to discover your local eFiling portal and filing resources.
                             </p>
-                            <Link href="/court-settings" className="btn-primary text-xs inline-flex items-center gap-2 no-underline">
-                                <Scale size={13} />
+                            <Link href="/court-settings" className="btn-primary text-[13px] font-bold tracking-widest uppercase inline-flex items-center gap-2 mt-2 px-6 py-3 shadow-md">
+                                <Scales size={16} weight="bold" />
                                 Court Settings
                             </Link>
                         </div>
@@ -341,594 +315,425 @@ export default function EFilingPage() {
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1, duration: 0.5 }}
-                className="mb-6"
+                transition={{ delay: 0.15, duration: 0.5 }}
             >
-                {(isCacheLoading || isCacheMiss) ? (
-                    /* Shimmer loading state — shown while cache query is in-flight OR while AI lookup is running */
-                    <div className="card-premium p-8 animate-pulse">
-                        <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-2xl" style={{ background: 'rgba(208, 227, 255, 0.08)' }} />
-                            <div className="flex-1 space-y-3">
-                                <div className="h-4 rounded-full w-1/3" style={{ background: 'rgba(208, 227, 255, 0.12)' }} />
-                                <div className="h-3 rounded-full w-2/3" style={{ background: 'rgba(208, 227, 255, 0.08)' }} />
+                {isCacheLoading ? (
+                    <div className="card-premium p-8 animate-pulse border border-[var(--cloud-light)]">
+                        <div className="flex items-center gap-5">
+                            <div className="w-20 h-20 rounded-2xl bg-[var(--sapphire-light)]/10" />
+                            <div className="flex-1 space-y-4">
+                                <div className="h-5 rounded-full w-1/3 bg-[var(--sapphire-light)]/20" />
+                                <div className="h-4 rounded-full w-2/3 bg-[var(--sapphire-light)]/10" />
                             </div>
                         </div>
                     </div>
                 ) : eFilingPortal && portalUrl ? (
-                    /* eFiling portal found */
-                    <div
-                        className="rounded-2xl p-6 relative overflow-hidden"
-                        style={{
-                            background: 'linear-gradient(135deg, rgba(90, 142, 201, 0.12), rgba(208, 227, 255, 0.05))',
-                            border: '1px solid rgba(208, 227, 255, 0.2)',
-                        }}
-                    >
-                        {/* Decorative gradient orb */}
-                        <div
-                            className="absolute -top-12 -right-12 w-40 h-40 rounded-full opacity-20 pointer-events-none"
-                            style={{ background: 'radial-gradient(circle, #D0E3FF, transparent)' }}
-                        />
-                        <div className="relative flex items-start gap-5">
-                            <div
-                                className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
-                                style={{
-                                    background: 'linear-gradient(135deg, rgba(208, 227, 255, 0.15), rgba(112, 150, 209, 0.08))',
-                                    border: '1px solid rgba(208, 227, 255, 0.25)',
-                                }}
-                            >
-                                <FileUp size={28} style={{ color: '#D0E3FF' }} />
+                    <div className="relative overflow-hidden rounded-3xl p-8 glass-ethereal shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:shadow-[0_15px_45px_rgba(18,61,126,0.6)] transition-all duration-500 border border-white/20 group">
+                        {/* Decorative background elements */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                        
+                        <div className="relative z-10 flex items-start sm:items-center gap-6 flex-col sm:flex-row">
+                            <div className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] shadow-[0_8px_30px_rgba(0,0,0,0.5)] border border-white/30 group-hover:scale-110 transition-transform duration-500 text-white relative overflow-hidden">
+                                <div className="absolute inset-0 bg-white/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <FileArrowUp size={36} className="text-white relative z-10 drop-shadow-md" weight="duotone" />
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <h2 className="font-semibold text-lg mb-1" style={{ color: '#F7F2EB' }}>
+                            <div className="flex-1 space-y-2">
+                                <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
                                     {eFilingPortal.name}
                                 </h2>
                                 {eFilingPortal.provider && (
-                                    <p className="text-xs mb-1.5" style={{ color: '#7096D1' }}>
+                                    <p className="text-xs uppercase tracking-widest font-bold text-[#60A5FA]">
                                         Powered by {eFilingPortal.provider}
                                     </p>
                                 )}
                                 {eFilingPortal.description && (
-                                    <p className="text-sm mb-4" style={{ color: '#D0E3FF' }}>
+                                    <p className="text-sm font-medium text-white/80 leading-relaxed max-w-2xl pt-1">
                                         {eFilingPortal.description}
                                     </p>
                                 )}
+                            </div>
+                            <div className="shrink-0 pt-4 sm:pt-0">
                                 <a
                                     href={portalUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold no-underline transition-all hover:scale-[1.02] active:scale-[0.98]"
-                                    style={{
-                                        background: 'linear-gradient(135deg, #D0E3FF, #7096D1)',
-                                        color: '#0A1E54',
-                                        boxShadow: '0 4px 16px rgba(208, 227, 255, 0.25)',
-                                    }}
+                                    className="btn-primary px-8 py-3.5 flex items-center gap-2 group/btn shadow-md hover:shadow-lg"
                                 >
-                                    <ExternalLink size={15} />
-                                    Launch eFiling Portal
+                                    Launch Portal
+                                    <ArrowSquareOut size={18} weight="bold" className="transition-transform group-hover/btn:-translate-y-0.5 group-hover/btn:translate-x-0.5" />
                                 </a>
                             </div>
                         </div>
                     </div>
-                ) : hasCourtSettings && cachedEntry && !eFilingPortal ? (
-                    /* Lookup completed but no eFiling portal found — File in Person fallback */
-                    <div
-                        className="rounded-2xl p-6"
-                        style={{
-                            background: 'rgba(10, 30, 84, 0.3)',
-                            border: '1px solid rgba(208, 227, 255, 0.1)',
-                        }}
-                    >
-                        <div className="flex items-start gap-4">
-                            <div
-                                className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
-                                style={{
-                                    background: 'rgba(229, 168, 74, 0.08)',
-                                    border: '1px solid rgba(229, 168, 74, 0.2)',
-                                }}
-                            >
-                                <Building size={24} style={{ color: '#E5A84A' }} />
+                ) : hasCourtSettings ? (
+                    <div className="card-premium p-8 border border-[var(--cloud-light)] relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--champagne)]/5 rounded-full blur-2xl pointer-events-none" />
+                        <div className="flex flex-col md:flex-row items-start gap-8 relative z-10">
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br from-white to-[var(--pearl)] shadow-sm border border-[var(--cloud-light)] shrink-0">
+                                <Buildings size={32} className="text-[var(--champagne)]" weight="duotone" />
                             </div>
-                            <div className="flex-1">
-                                <h2 className="font-semibold text-base mb-1" style={{ color: '#F7F2EB' }}>
+                            <div className="flex-1 space-y-3">
+                                <h2 className="text-lg font-medium tracking-wide text-[var(--sapphire-dark)]">
                                     File in Person
                                 </h2>
-                                <p className="text-sm mb-3" style={{ color: '#D0E3FF' }}>
-                                    No eFiling portal was found for {locationLabel}. You can file your documents in person at the county clerk&apos;s office.
+                                <p className="text-sm text-[var(--sapphire-base)] max-w-2xl leading-relaxed">
+                                    {isCacheMiss ? (
+                                        <>eFiling details for <span className="font-semibold">{locationLabel}</span> are currently being verified. In the meantime, you can file your documents in person at the local county clerk&apos;s office.</>
+                                    ) : (
+                                        <>No eFiling portal was found for <span className="font-semibold">{locationLabel}</span>. You can file your documents in person at the county clerk&apos;s office.</>
+                                    )}
                                 </p>
-                                {cachedResources?.courtClerk && (
-                                    <div
-                                        className="rounded-xl px-4 py-3"
-                                        style={{
-                                            background: 'rgba(208, 227, 255, 0.04)',
-                                            border: '1px solid rgba(208, 227, 255, 0.1)',
-                                        }}
-                                    >
-                                        <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>
-                                            {cachedResources.courtClerk.name}
-                                        </p>
+                            </div>
+                            
+                            {cachedResources?.courtClerk && (
+                                <div className="w-full md:w-80 bg-white/60 p-5 rounded-2xl border border-[var(--cloud-light)] backdrop-blur-sm shadow-sm space-y-3">
+                                    <p className="text-sm font-semibold tracking-wide text-[var(--sapphire-dark)]">
+                                        {cachedResources.courtClerk.name}
+                                    </p>
+                                    <div className="space-y-2">
                                         {cachedResources.courtClerk.phone && (
-                                            <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#5A8EC9' }}>
-                                                <Phone size={10} />
+                                            <span className="text-xs flex items-center gap-2 text-[var(--sapphire-base)] font-medium">
+                                                <span className="bg-[var(--sapphire-light)]/10 p-1 rounded-md inline-flex">
+                                                    <Phone size={12} weight="fill" className="text-[var(--sapphire-base)]" />
+                                                </span>
                                                 {cachedResources.courtClerk.phone}
-                                            </p>
+                                            </span>
                                         )}
                                         {cachedResources.courtClerk.address && (
-                                            <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#7096D1' }}>
-                                                <MapPin size={10} />
-                                                {cachedResources.courtClerk.address}
-                                            </p>
-                                        )}
-                                        {clerkUrl && (
-                                            <a
-                                                href={clerkUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-xs mt-2 inline-flex items-center gap-1 no-underline"
-                                                style={{ color: '#5A8EC9' }}
-                                            >
-                                                <ExternalLink size={10} />
-                                                Visit Website
-                                            </a>
+                                            <span className="text-xs flex items-start gap-2 text-[var(--sapphire-base)] font-medium">
+                                                <span className="bg-[var(--sapphire-light)]/10 p-1 rounded-md mt-0.5 shrink-0 inline-flex">
+                                                    <MapPin size={12} weight="fill" className="text-[var(--sapphire-base)]" />
+                                                </span>
+                                                <span className="leading-snug">{cachedResources.courtClerk.address}</span>
+                                            </span>
                                         )}
                                     </div>
-                                )}
-                            </div>
+                                    {clerkUrl && (
+                                        <a
+                                            href={clerkUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="mt-4 text-xs font-semibold text-[var(--sapphire-base)] hover:text-[var(--sapphire-dark)] transition-colors inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--cloud-light)] bg-white/50 hover:bg-white w-full justify-center"
+                                        >
+                                            <ArrowSquareOut size={14} weight="bold" />
+                                            Visit Website
+                                        </a>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 ) : null}
             </motion.div>
 
-            {/* ─── Filing Readiness Checklist ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
-                className="mb-8"
-            >
-                <div className="flex items-center gap-2 mb-4">
-                    <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center"
-                        style={{
-                            background: 'rgba(208, 227, 255, 0.06)',
-                            border: '1px solid rgba(208, 227, 255, 0.12)',
-                        }}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">
+                {/* ─── Left Column (Main Content) ─── */}
+                <div className="lg:col-span-8 space-y-8">
+                    {/* ─── Filing Readiness Checklist ─── */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2, duration: 0.5 }}
                     >
-                        <Shield size={15} style={{ color: '#D0E3FF' }} />
-                    </div>
-                    <h2
-                        className="text-sm font-semibold tracking-[0.15em] uppercase"
-                        style={{ color: '#D0E3FF' }}
-                    >
-                        Filing Readiness
-                    </h2>
-                </div>
-                <div className="space-y-2">
-                    <ReadinessItem
-                        label="Court settings configured"
-                        isReady={hasCourtSettings}
-                        href="/court-settings"
-                        detail={hasCourtSettings ? `${locationLabel}` : 'Set your state and county'}
-                    />
-                    <ReadinessItem
-                        label="Court name on file"
-                        isReady={hasCourtName}
-                        href="/court-settings"
-                        detail={hasCourtName ? courtSettings?.courtName : 'Add your court name'}
-                    />
-                    <ReadinessItem
-                        label="Cause number on file"
-                        isReady={hasCauseNumber}
-                        href="/court-settings"
-                        detail={hasCauseNumber ? courtSettings?.causeNumber : 'Add your case/cause number'}
-                    />
-                    <ReadinessItem
-                        label="At least one document marked as Final"
-                        isReady={hasFinalDocs}
-                        href="/docuvault"
-                        detail={hasFinalDocs ? `${finalDocs.length} document${finalDocs.length !== 1 ? 's' : ''} ready` : 'Create and finalize a document'}
-                    />
-                </div>
-            </motion.div>
-
-            {/* ─── Documents Ready to File ─── */}
-            {finalDocs.length > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.25, duration: 0.5 }}
-                    className="mb-8"
-                >
-                    <div className="flex items-center gap-2 mb-4">
-                        <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center"
-                            style={{
-                                background: 'rgba(90, 142, 201, 0.08)',
-                                border: '1px solid rgba(90, 142, 201, 0.15)',
-                            }}
-                        >
-                            <FileText size={15} style={{ color: '#5A8EC9' }} />
-                        </div>
-                        <h2
-                            className="text-sm font-semibold tracking-[0.15em] uppercase"
-                            style={{ color: '#D0E3FF' }}
-                        >
-                            Documents Ready to File
-                        </h2>
-                        <span
-                            className="text-xs font-medium px-2 py-0.5 rounded-full"
-                            style={{
-                                background: 'rgba(90, 142, 201, 0.1)',
-                                color: '#5A8EC9',
-                            }}
-                        >
-                            {finalDocs.length}
-                        </span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {finalDocs.map((doc, i) => (
-                            <motion.div
-                                key={doc._id}
-                                initial={{ opacity: 0, y: 8 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.05 * i }}
-                                className="card-premium p-4 group"
-                            >
-                                <div className="flex items-start gap-3">
-                                    <div
-                                        className="w-11 h-14 rounded-lg flex items-center justify-center flex-shrink-0"
-                                        style={{
-                                            background: 'rgba(90, 142, 201, 0.06)',
-                                            border: '1px solid rgba(90, 142, 201, 0.12)',
-                                        }}
-                                    >
-                                        <FileText size={18} style={{ color: '#5A8EC9' }} />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate mb-1" style={{ color: '#F7F2EB' }}>
-                                            {doc.templateTitle}
-                                        </p>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <StatusPill status="final" />
-                                            <span className="text-xs" style={{ color: '#7096D1' }}>
-                                                {doc.courtState} · {doc.courtCounty}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-1 text-xs" style={{ color: '#5A8EC9' }}>
-                                            <Clock size={10} />
-                                            {formatDate(doc.createdAt)}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2 mt-3 pt-3" style={{ borderTop: '1px solid rgba(208, 227, 255, 0.06)' }}>
-                                    {doc.storageId && (
-                                        <button
-                                            className="flex-1 text-xs font-medium py-2 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all hover:opacity-80"
-                                            style={{
-                                                background: 'rgba(208, 227, 255, 0.06)',
-                                                border: '1px solid rgba(208, 227, 255, 0.12)',
-                                                color: '#D0E3FF',
-                                            }}
-                                            onClick={() => {
-                                                // Download PDF via Convex storage URL
-                                                window.open(`${process.env.NEXT_PUBLIC_CONVEX_URL?.replace('.cloud', '.site')}/api/storage/${doc.storageId}`, '_blank');
-                                            }}
-                                        >
-                                            <Download size={12} />
-                                            Download PDF
-                                        </button>
-                                    )}
-                                    <button
-                                        className="flex-1 text-xs font-medium py-2 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-                                        style={{
-                                            background: 'linear-gradient(135deg, rgba(74, 163, 100, 0.15), rgba(74, 163, 100, 0.08))',
-                                            border: '1px solid rgba(74, 163, 100, 0.25)',
-                                            color: '#4AA364',
-                                        }}
-                                        onClick={() => handleMarkAsFiled(doc._id)}
-                                        disabled={filingId === doc._id}
-                                    >
-                                        <CheckCircle2 size={12} />
-                                        {filingId === doc._id ? 'Marking…' : 'Mark as Filed'}
-                                    </button>
-                                    {/* Inline error for this card */}
-                                    {filingError && (
-                                        <motion.p
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            className="text-xs mt-1.5 flex items-center gap-1 col-span-full"
-                                            style={{ color: '#DC2626' }}
-                                        >
-                                            <AlertTriangle size={10} />
-                                            {filingError}
-                                        </motion.p>
-                                    )}
-                                </div>
-                            </motion.div>
-                        ))}
-                    </div>
-                </motion.div>
-            )}
-
-            {/* ─── Recently Filed ─── */}
-            {filedDocs.length > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3, duration: 0.5 }}
-                    className="mb-8"
-                >
-                    <div className="flex items-center gap-2 mb-4">
-                        <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center"
-                            style={{
-                                background: 'rgba(74, 163, 100, 0.06)',
-                                border: '1px solid rgba(74, 163, 100, 0.12)',
-                            }}
-                        >
-                            <CheckCircle2 size={15} style={{ color: '#4AA364' }} />
-                        </div>
-                        <h2
-                            className="text-sm font-semibold tracking-[0.15em] uppercase"
-                            style={{ color: '#4AA364' }}
-                        >
-                            Recently Filed
-                        </h2>
-                    </div>
-                    <div className="space-y-2">
-                        {filedDocs.map((doc) => (
-                            <div
-                                key={doc._id}
-                                className="card-premium p-4 flex items-center gap-3"
-                            >
-                                <div
-                                    className="w-10 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-                                    style={{
-                                        background: 'rgba(74, 163, 100, 0.06)',
-                                        border: '1px solid rgba(74, 163, 100, 0.12)',
-                                    }}
-                                >
-                                    <FileText size={16} style={{ color: '#4AA364' }} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate" style={{ color: '#F7F2EB' }}>
-                                        {doc.templateTitle}
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                        <StatusPill status="filed" />
-                                        <span className="text-xs" style={{ color: '#7096D1' }}>
-                                            {formatDate(doc.updatedAt)}
-                                        </span>
-                                    </div>
-                                </div>
+                        <div className="flex items-center gap-4 mb-5">
+                            <div className="w-12 h-12 rounded-2xl bg-white/5 backdrop-blur-2xl border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-center relative overflow-hidden shrink-0">
+                                <ShieldCheck size={24} className="text-[#60A5FA] relative z-10 drop-shadow-[0_2px_10px_rgba(96,165,250,0.6)]" weight="duotone" />
                             </div>
-                        ))}
-                    </div>
-                </motion.div>
-            )}
-
-            {/* ─── Filing Guide ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35, duration: 0.5 }}
-                className="mb-8"
-            >
-                <div className="flex items-center gap-2 mb-4">
-                    <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center"
-                        style={{
-                            background: 'rgba(208, 227, 255, 0.06)',
-                            border: '1px solid rgba(208, 227, 255, 0.12)',
-                        }}
-                    >
-                        <Info size={15} style={{ color: '#D0E3FF' }} />
-                    </div>
-                    <h2
-                        className="text-sm font-semibold tracking-[0.15em] uppercase"
-                        style={{ color: '#D0E3FF' }}
-                    >
-                        Filing Guide
-                    </h2>
-                </div>
-                <div className="space-y-2">
-                    <CollapsibleSection title="What is eFiling?" defaultOpen>
-                        <p className="mb-2">
-                            eFiling (electronic filing) allows you to submit court documents online instead of
-                            filing them in person at the courthouse. Most Texas counties use <strong style={{ color: '#F7F2EB' }}>eFileTexas.gov</strong>,
-                            while other states may use systems like TurboCourt, File &amp; ServeXpress, or Odyssey.
-                        </p>
-                        <p>
-                            Benefits include 24/7 availability, instant confirmation receipts, reduced trips to the
-                            courthouse, and faster document processing.
-                        </p>
-                    </CollapsibleSection>
-
-                    <CollapsibleSection title={`How to file in ${state || 'your state'}`}>
-                        <ol className="space-y-2 pl-4 list-decimal">
-                            <li>Create your court document using the <Link href="/docuvault" className="no-underline" style={{ color: '#5A8EC9' }}>Template Gallery</Link></li>
-                            <li>Review the document and mark it as <strong style={{ color: '#F7F2EB' }}>Final</strong></li>
-                            <li>Download the PDF from this page</li>
-                            <li>Open the eFiling portal and create an account (if you haven&apos;t already)</li>
-                            <li>Upload your PDF and follow the portal&apos;s filing instructions</li>
-                            <li>Pay any required filing fees</li>
-                            <li>Save your confirmation receipt</li>
-                            <li>Return here and click <strong style={{ color: '#4AA364' }}>Mark as Filed</strong></li>
-                        </ol>
-                    </CollapsibleSection>
-
-                    <CollapsibleSection title="Common filing fees">
-                        <div className="flex items-start gap-2 mb-2">
-                            <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" style={{ color: '#E5A84A' }} />
-                            <p>
-                                Filing fees vary by court, case type, and state. Common fees include:
-                            </p>
+                            <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
+                                Filing Readiness
+                            </h2>
                         </div>
-                        <ul className="space-y-1 pl-4 list-disc">
-                            <li>Initial petition filing: $250–$350</li>
-                            <li>Response/answer: $200–$300</li>
-                            <li>Motions: $15–$50 each</li>
-                            <li>Fee waivers may be available for low-income filers</li>
-                        </ul>
-                        <p className="mt-2 text-xs" style={{ color: '#7096D1' }}>
-                            Contact your local clerk&apos;s office for exact fee amounts. NEXX does not collect or process filing fees.
-                        </p>
-                    </CollapsibleSection>
-
-                    <CollapsibleSection title="What to expect after filing">
-                        <ul className="space-y-1 pl-4 list-disc">
-                            <li>You&apos;ll receive an electronic confirmation with a timestamp</li>
-                            <li>The clerk&apos;s office reviews your filing (usually within 1–3 business days)</li>
-                            <li>If accepted, you&apos;ll get a file-stamped copy of your document</li>
-                            <li>If rejected, you&apos;ll receive a notice explaining why — you can correct and refile</li>
-                            <li>Keep all confirmation receipts in your records</li>
-                        </ul>
-                    </CollapsibleSection>
-                </div>
-            </motion.div>
-
-            {/* ─── Quick Links ─── */}
-            {(clerkUrl || caseSearchUrl || localRulesUrl) && (
-                <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4, duration: 0.5 }}
-                >
-                    <div className="flex items-center gap-2 mb-4">
-                        <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center"
-                            style={{
-                                background: 'rgba(112, 150, 209, 0.06)',
-                                border: '1px solid rgba(112, 150, 209, 0.12)',
-                            }}
-                        >
-                            <BookOpen size={15} style={{ color: '#7096D1' }} />
+                        <div className="space-y-3">
+                            <ReadinessItem
+                                label="Court settings configured"
+                                isReady={hasCourtSettings}
+                                href="/court-settings"
+                                detail={hasCourtSettings ? `${locationLabel}` : 'Set your state and county'}
+                            />
+                            <ReadinessItem
+                                label="Court name on file"
+                                isReady={hasCourtName}
+                                href="/court-settings"
+                                detail={hasCourtName ? courtSettings?.courtName : 'Add your court name'}
+                            />
+                            <ReadinessItem
+                                label="Cause number on file"
+                                isReady={hasCauseNumber}
+                                href="/court-settings"
+                                detail={hasCauseNumber ? courtSettings?.causeNumber : 'Add your case/cause number'}
+                            />
+                            <ReadinessItem
+                                label="At least one document marked as Final"
+                                isReady={hasFinalDocs}
+                                href="/docuvault"
+                                detail={hasFinalDocs ? `${finalDocs.length} document${finalDocs.length !== 1 ? 's' : ''} ready` : 'Create and finalize a document'}
+                            />
                         </div>
-                        <h2
-                            className="text-sm font-semibold tracking-[0.15em] uppercase"
-                            style={{ color: '#D0E3FF' }}
+                    </motion.div>
+
+                    {/* ─── Documents Ready to File ─── */}
+                    {finalDocs.length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.25, duration: 0.5 }}
                         >
-                            Quick Links
-                        </h2>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {clerkUrl && (
-                            <a
-                                href={clerkUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="no-underline"
-                            >
-                                <motion.div
-                                    whileHover={{ scale: 1.02, y: -2 }}
-                                    className="card-premium p-4 cursor-pointer group h-full"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div
-                                            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                                            style={{
-                                                background: 'rgba(112, 150, 209, 0.1)',
-                                                border: '1px solid rgba(112, 150, 209, 0.25)',
-                                            }}
-                                        >
-                                            <Landmark size={16} style={{ color: '#7096D1' }} />
+                            <div className="flex items-center justify-between mb-5">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-white/5 backdrop-blur-2xl border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-center relative overflow-hidden shrink-0">
+                                        <FileText size={24} className="text-[#E5A84A] relative z-10 drop-shadow-[0_2px_10px_rgba(229,168,74,0.6)]" weight="duotone" />
+                                    </div>
+                                    <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
+                                        Ready to File
+                                    </h2>
+                                </div>
+                                <span className="text-[13px] font-bold px-4 py-1.5 rounded-full bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.2)] text-white shadow-sm backdrop-blur-md">
+                                    {finalDocs.length} Items
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {finalDocs.map((doc, i) => (
+                                    <motion.div
+                                        key={doc._id}
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: 0.05 * i }}
+                                        className="p-5 group hover:shadow-[0_8px_25px_rgba(0,0,0,0.3)] transition-all border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.05)] backdrop-blur-xl rounded-2xl hover:-translate-y-1"
+                                    >
+                                        <div className="flex items-start gap-4 mb-4">
+                                            <div className="w-12 h-14 rounded-xl flex items-center justify-center bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] shadow-[0_4px_15px_rgba(46,92,154,0.4)] border border-[rgba(255,255,255,0.3)] shrink-0 relative overflow-hidden">
+                                                <div className="absolute inset-0 bg-white/10" />
+                                                <FileText size={22} className="text-white relative z-10 drop-shadow-md" weight="fill" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[15px] font-bold text-white truncate mb-1">
+                                                    {doc.templateTitle}
+                                                </p>
+                                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                                    <StatusPill status="final" />
+                                                    <span className="text-[12px] font-bold text-white">
+                                                        {doc.courtState} · {doc.courtCounty}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 text-[12px] font-bold text-white">
+                                                    <Clock size={12} weight="bold" />
+                                                    {formatDate(doc.createdAt)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-2 pt-4 border-t border-[rgba(255,255,255,0.15)]">
+                                            {doc.storageId && (
+                                                <button
+                                                    className="btn-outline text-xs py-2.5 flex justify-center items-center gap-2"
+                                                    onClick={() => {
+                                                        const baseUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+                                                        if (!baseUrl) return;
+                                                        window.open(`${baseUrl}/api/storage/${doc.storageId}`, '_blank');
+                                                    }}
+                                                >
+                                                    <DownloadSimple size={14} weight="bold" />
+                                                    PDF
+                                                </button>
+                                            )}
+                                            <button
+                                                className="btn-primary text-xs py-2.5 flex justify-center items-center gap-2 shadow-sm disabled:opacity-50"
+                                                onClick={() => handleMarkAsFiled(doc._id)}
+                                                disabled={filingId === doc._id}
+                                            >
+                                                <CheckCircle size={14} weight="bold" />
+                                                {filingId === doc._id ? 'Saving…' : 'Mark Filed'}
+                                            </button>
+                                            {filingErrors[doc._id] && (
+                                                <motion.p
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    className="col-span-2 text-xs flex items-center gap-1 text-[var(--error)] bg-[var(--error)]/10 px-3 py-2 rounded-lg mt-1"
+                                                >
+                                                    <Warning size={14} weight="bold" />
+                                                    {filingErrors[doc._id]}
+                                                </motion.p>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+                </div>
+
+                {/* ─── Right Column (Sidebar) ─── */}
+                <div className="lg:col-span-4 space-y-8">
+                    {/* ─── Filing Guide ─── */}
+                    <motion.div
+                        initial={{ opacity: 0, x: 12 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.3, duration: 0.5 }}
+                    >
+                        <div className="flex items-center gap-4 mb-5">
+                            <div className="w-12 h-12 rounded-2xl bg-white/5 backdrop-blur-2xl border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-center relative overflow-hidden shrink-0">
+                                <Info size={24} className="text-[#10B981] relative z-10 drop-shadow-[0_2px_10px_rgba(16,185,129,0.6)]" weight="duotone" />
+                            </div>
+                            <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
+                                Filing Guide
+                            </h2>
+                        </div>
+                        <div className="space-y-3">
+                            <CollapsibleSection title="What is eFiling?" defaultOpen>
+                                <p className="mb-3">
+                                    eFiling allows you to submit court documents securely online instead of
+                                    filing in person.{state === 'Texas' ? <> Most Texas counties use <strong className="text-[var(--sapphire-dark)]">eFileTexas.gov</strong>.</> : <> Check your state&apos;s eFiling portal for availability.</>}
+                                </p>
+                                <p>
+                                    Enjoy 24/7 availability, instant confirmation receipts, and faster document processing directly from your home.
+                                </p>
+                            </CollapsibleSection>
+
+                            <CollapsibleSection title={`How to file in ${state || 'your state'}`}>
+                                <ul className="space-y-3">
+                                    <li className="flex gap-3"><span className="font-bold text-[var(--champagne)]">1.</span> <span>Create formatting-compliant docs using <Link href="/docuvault" className="font-semibold text-[var(--sapphire-base)] hover:underline">DocuVault</Link>.</span></li>
+                                    <li className="flex gap-3"><span className="font-bold text-[var(--champagne)]">2.</span> <span>Mark the document as <strong className="text-[var(--sapphire-dark)]">Final</strong>.</span></li>
+                                    <li className="flex gap-3"><span className="font-bold text-[var(--champagne)]">3.</span> <span>Download your generated PDF.</span></li>
+                                    <li className="flex gap-3"><span className="font-bold text-[var(--champagne)]">4.</span> <span>Upload it to your local eFiling portal and pay any court fees.</span></li>
+                                    <li className="flex gap-3"><span className="font-bold text-[var(--champagne)]">5.</span> <span>Return here and mark it <strong className="text-[var(--success)]">Filed</strong> to track completion.</span></li>
+                                </ul>
+                            </CollapsibleSection>
+
+                            <CollapsibleSection title="Common filing fees">
+                                <div className="flex items-start gap-3 mb-4 bg-white/5 p-4 rounded-xl border border-[rgba(255,255,255,0.1)] shadow-sm">
+                                    <Warning size={20} className="shrink-0 text-[#E5A84A]" weight="duotone" />
+                                    <p className="font-medium text-sm text-[rgba(255,255,255,0.9)] leading-relaxed">
+                                        These are general estimates. Filing fees vary significantly by court and case type. <strong className="text-white">Always verify exact costs with your local court clerk.</strong>
+                                    </p>
+                                </div>
+                                <ul className="space-y-3 list-disc pl-5 text-white/90">
+                                    <li><span className="font-semibold text-white">Initial petition:</span> Est. $100–$150</li>
+                                    <li><span className="font-semibold text-white">Response/answer:</span> Est. $50–$100</li>
+                                    <li><span className="font-semibold text-white">Motions:</span> Est. $15–$50 each</li>
+                                </ul>
+                                <div className="mt-5 p-3 rounded-lg bg-[rgba(16,185,129,0.1)] border border-[rgba(16,185,129,0.2)] flex items-center gap-2">
+                                    <Info size={18} className="text-[#10B981] shrink-0" weight="bold" />
+                                    <p className="font-bold text-[#10B981] text-[14px]">
+                                        Fee waivers may be available based on income.
+                                    </p>
+                                </div>
+                            </CollapsibleSection>
+                        </div>
+                    </motion.div>
+
+                    {/* ─── Recently Filed ─── */}
+                    {filedDocs.length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0, x: 12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.35, duration: 0.5 }}
+                        >
+                            <div className="flex items-center gap-3 mb-5">
+                                <div className="w-10 h-10 rounded-xl bg-[var(--success)]/10 text-[var(--success)] shadow-sm border border-[var(--success)]/20 flex items-center justify-center">
+                                    <CheckCircle size={20} weight="fill" />
+                                </div>
+                                <h2 className="text-base font-semibold tracking-widest uppercase text-[var(--success)]">
+                                    Recently Filed
+                                </h2>
+                            </div>
+                            <div className="space-y-3">
+                                {filedDocs.map((doc) => (
+                                    <div
+                                        key={doc._id}
+                                        className="card-premium p-4 flex items-center gap-4 bg-white/60 border border-[var(--cloud-light)] shadow-sm"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl bg-[var(--success)]/10 text-[var(--success)] flex items-center justify-center shrink-0 border border-[var(--success)]/20">
+                                            <FileText size={18} weight="duotone" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold truncate" style={{ color: '#0A1E54' }}>
-                                                Court Clerk
+                                            <p className="text-sm font-semibold truncate text-[var(--sapphire-dark)] mb-1">
+                                                {doc.templateTitle}
                                             </p>
-                                            <p className="text-xs truncate" style={{ color: '#123D7E' }}>
-                                                {cachedResources?.courtClerk?.name || 'County Clerk Office'}
-                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <StatusPill status="filed" />
+                                                <span className="text-[11px] font-medium text-[var(--sapphire-light)]">
+                                                    {formatDate(doc.updatedAt)}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <ExternalLink
-                                            size={13}
-                                            className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                            style={{ color: '#7096D1' }}
-                                        />
                                     </div>
-                                </motion.div>
-                            </a>
-                        )}
-                        {caseSearchUrl && (
-                            <a
-                                href={caseSearchUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="no-underline"
-                            >
-                                <motion.div
-                                    whileHover={{ scale: 1.02, y: -2 }}
-                                    className="card-premium p-4 cursor-pointer group h-full"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div
-                                            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                                            style={{
-                                                background: 'rgba(112, 150, 209, 0.1)',
-                                                border: '1px solid rgba(112, 150, 209, 0.25)',
-                                            }}
-                                        >
-                                            <Search size={16} style={{ color: '#7096D1' }} />
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* ─── Quick Links ─── */}
+                    {(clerkUrl || caseSearchUrl || localRulesUrl) && (
+                        <motion.div
+                            initial={{ opacity: 0, x: 12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.4, duration: 0.5 }}
+                        >
+                            <div className="flex items-center gap-3 mb-5">
+                                <div className="w-10 h-10 rounded-xl bg-white shadow-sm border border-[var(--cloud-light)] flex items-center justify-center">
+                                    <BookOpen size={20} className="text-[var(--sapphire-base)]" weight="duotone" />
+                                </div>
+                                <h2 className="text-base font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
+                                    Court Resources
+                                </h2>
+                            </div>
+                            <div className="space-y-3">
+                                {clerkUrl && (
+                                    <a href={clerkUrl} target="_blank" rel="noopener noreferrer" className="block group">
+                                        <div className="glass-ethereal p-4 flex items-center gap-4 hover:shadow-[0_10px_35px_rgba(18,61,126,0.8)] border border-white/20 transition-all duration-500 hover:-translate-y-1 relative overflow-hidden">
+                                            {/* Hover Glow Background Map */}
+                                            <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                            <div className="w-12 h-12 rounded-xl bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] flex items-center justify-center shrink-0 border border-[rgba(255,255,255,0.3)] shadow-[0_4px_15px_rgba(0,0,0,0.5)] relative group-hover:scale-110 transition-transform duration-500 z-10 overflow-hidden">
+                                                <div className="absolute inset-0 bg-white/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                <Bank size={22} weight="duotone" className="text-white relative z-10 drop-shadow-sm" />
+                                            </div>
+                                            <div className="flex-1 min-w-0 z-10">
+                                                <p className="text-sm font-semibold truncate text-white transition-colors duration-300">Court Clerk</p>
+                                                <p className="text-xs truncate text-white/60">{cachedResources?.courtClerk?.name || 'County Clerk Office'}</p>
+                                            </div>
+                                            <ArrowSquareOut size={18} className="text-white/40 group-hover:text-white transition-colors shrink-0 z-10" weight="bold" />
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold truncate" style={{ color: '#0A1E54' }}>
-                                                Case Search
-                                            </p>
-                                            <p className="text-xs truncate" style={{ color: '#123D7E' }}>
-                                                {cachedResources?.caseSearch?.name || 'Public Records Search'}
-                                            </p>
+                                    </a>
+                                )}
+                                {caseSearchUrl && (
+                                    <a href={caseSearchUrl} target="_blank" rel="noopener noreferrer" className="block group">
+                                        <div className="glass-ethereal p-4 flex items-center gap-4 hover:shadow-[0_10px_35px_rgba(18,61,126,0.8)] border border-white/20 transition-all duration-500 hover:-translate-y-1 relative overflow-hidden">
+                                            {/* Hover Glow Background Map */}
+                                            <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                            <div className="w-12 h-12 rounded-xl bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] flex items-center justify-center shrink-0 border border-[rgba(255,255,255,0.3)] shadow-[0_4px_15px_rgba(0,0,0,0.5)] relative group-hover:scale-110 transition-transform duration-500 z-10 overflow-hidden">
+                                                <div className="absolute inset-0 bg-white/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                <MagnifyingGlass size={22} weight="bold" className="text-white relative z-10 drop-shadow-sm" />
+                                            </div>
+                                            <div className="flex-1 min-w-0 z-10">
+                                                <p className="text-sm font-semibold truncate text-white transition-colors duration-300">Case Search</p>
+                                                <p className="text-xs truncate text-white/60">{cachedResources?.caseSearch?.name || 'Public Records Search'}</p>
+                                            </div>
+                                            <ArrowSquareOut size={18} className="text-white/40 group-hover:text-white transition-colors shrink-0 z-10" weight="bold" />
                                         </div>
-                                        <ExternalLink
-                                            size={13}
-                                            className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                            style={{ color: '#7096D1' }}
-                                        />
-                                    </div>
-                                </motion.div>
-                            </a>
-                        )}
-                        {localRulesUrl && (
-                            <a
-                                href={localRulesUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="no-underline"
-                            >
-                                <motion.div
-                                    whileHover={{ scale: 1.02, y: -2 }}
-                                    className="card-premium p-4 cursor-pointer group h-full"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div
-                                            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                                            style={{
-                                                background: 'rgba(112, 150, 209, 0.1)',
-                                                border: '1px solid rgba(112, 150, 209, 0.25)',
-                                            }}
-                                        >
-                                            <BookOpen size={16} style={{ color: '#7096D1' }} />
+                                    </a>
+                                )}
+                                {localRulesUrl && (
+                                    <a href={localRulesUrl} target="_blank" rel="noopener noreferrer" className="block group">
+                                        <div className="glass-ethereal p-4 flex items-center gap-4 hover:shadow-[0_10px_35px_rgba(18,61,126,0.8)] border border-white/20 transition-all duration-500 hover:-translate-y-1 relative overflow-hidden">
+                                            {/* Hover Glow Background Map */}
+                                            <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                            <div className="w-12 h-12 rounded-xl bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] flex items-center justify-center shrink-0 border border-[rgba(255,255,255,0.3)] shadow-[0_4px_15px_rgba(0,0,0,0.5)] relative group-hover:scale-110 transition-transform duration-500 z-10 overflow-hidden">
+                                                <div className="absolute inset-0 bg-white/20 blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                <BookOpen size={22} weight="duotone" className="text-white relative z-10 drop-shadow-sm" />
+                                            </div>
+                                            <div className="flex-1 min-w-0 z-10">
+                                                <p className="text-sm font-semibold truncate text-white transition-colors duration-300">Local Rules</p>
+                                                <p className="text-xs truncate text-white/60">{cachedResources?.localRules?.name || 'Local Rules & Procedures'}</p>
+                                            </div>
+                                            <ArrowSquareOut size={18} className="text-white/40 group-hover:text-white transition-colors shrink-0 z-10" weight="bold" />
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold truncate" style={{ color: '#0A1E54' }}>
-                                                Local Rules
-                                            </p>
-                                            <p className="text-xs truncate" style={{ color: '#123D7E' }}>
-                                                {cachedResources?.localRules?.name || 'Court Rules & Procedures'}
-                                            </p>
-                                        </div>
-                                        <ExternalLink
-                                            size={13}
-                                            className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                            style={{ color: '#7096D1' }}
-                                        />
-                                    </div>
-                                </motion.div>
-                            </a>
-                        )}
-                    </div>
-                </motion.div>
-            )}
-        </div>
+                                    </a>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                </div>
+            </div>
+        </PageContainer>
     );
 }

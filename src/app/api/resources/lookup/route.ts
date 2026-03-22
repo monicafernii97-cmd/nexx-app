@@ -39,6 +39,116 @@ const RESOURCE_JSON_SCHEMA = `{
   "sources": [string]
 }`;
 
+/**
+ * Lightweight URL health check — returns true if the URL responds with a 2xx or 3xx.
+ * Falls back to false on any network error or 4xx/5xx status.
+ */
+async function validateUrl(url: string): Promise<boolean> {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5_000);
+        const res = await fetch(url, {
+            method: 'HEAD',
+            redirect: 'follow',
+            signal: controller.signal,
+            headers: { 'User-Agent': 'NEXX-UrlValidator/1.0' },
+        });
+        clearTimeout(timeout);
+        return res.ok || (res.status >= 300 && res.status < 400);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Build a Google search fallback URL for a resource.
+ * Used when the AI-generated URL fails validation.
+ */
+function googleFallback(county: string, state: string, resourceType: string): string {
+    const q = encodeURIComponent(`${county} County ${state} ${resourceType} official site`);
+    return `https://www.google.com/search?q=${q}`;
+}
+
+/**
+ * Validate all URLs in the resources object.
+ * Invalid URLs (404, network error, timeout) are replaced with a Google search fallback.
+ * Runs validations in parallel for speed.
+ */
+async function validateResourceUrls(
+    resources: Record<string, unknown>,
+    county: string,
+    state: string,
+): Promise<Record<string, unknown>> {
+    const result = { ...resources };
+
+    const singleKeys: { key: string; fallbackLabel: string }[] = [
+        { key: 'courtClerk', fallbackLabel: 'county clerk' },
+        { key: 'courtsWebsite', fallbackLabel: 'district courts' },
+        { key: 'familyDivision', fallbackLabel: 'family court' },
+        { key: 'localRules', fallbackLabel: 'local court rules' },
+        { key: 'stateFamilyCode', fallbackLabel: 'family law code' },
+        { key: 'caseSearch', fallbackLabel: 'case search records' },
+        { key: 'eFilingPortal', fallbackLabel: 'eFiling portal' },
+    ];
+
+    // Build list of validation tasks
+    const tasks: { apply: (valid: boolean) => void; url: string }[] = [];
+
+    for (const { key, fallbackLabel } of singleKeys) {
+        const entry = result[key];
+        if (entry && typeof entry === 'object' && 'url' in (entry as Record<string, unknown>)) {
+            const obj = entry as Record<string, unknown>;
+            const url = obj.url;
+            if (typeof url === 'string' && url.startsWith('http')) {
+                tasks.push({
+                    url,
+                    apply: (valid) => {
+                        if (!valid) {
+                            console.warn(`[Resource Lookup] URL failed validation for ${key}: ${url}`);
+                            (obj as Record<string, unknown>).url = googleFallback(county, state, fallbackLabel);
+                        }
+                    },
+                });
+            }
+        }
+    }
+
+    // Also validate arrays (legalAid, nonprofits)
+    for (const arrayKey of ['legalAid', 'nonprofits']) {
+        const arr = result[arrayKey];
+        if (Array.isArray(arr)) {
+            for (const item of arr) {
+                if (typeof item === 'object' && item && 'url' in item) {
+                    const url = (item as Record<string, unknown>).url;
+                    if (typeof url === 'string' && url.startsWith('http')) {
+                        tasks.push({
+                            url,
+                            apply: (valid) => {
+                                if (!valid) {
+                                    console.warn(`[Resource Lookup] URL failed validation in ${arrayKey}: ${url}`);
+                                    (item as Record<string, unknown>).url = undefined;
+                                }
+                            },
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Run all validations in parallel
+    if (tasks.length > 0) {
+        const results = await Promise.all(tasks.map(t => validateUrl(t.url)));
+        results.forEach((valid, i) => tasks[i].apply(valid));
+        const failedCount = results.filter(v => !v).length;
+        if (failedCount > 0) {
+            console.warn(`[Resource Lookup] ${failedCount}/${tasks.length} URLs failed validation — replaced with fallbacks`);
+        }
+    }
+
+    return result;
+}
+
 export async function POST(req: NextRequest) {
     // ── Auth ──
     const { userId } = await auth();
@@ -109,13 +219,13 @@ export async function POST(req: NextRequest) {
         let completion;
         try {
             completion = await openai.chat.completions.create({
-                model: 'gpt-4o-mini',
+                model: 'gpt-4o',
                 response_format: { type: 'json_object' },
                 temperature: 0.2,
                 messages: [
                     {
                         role: 'system',
-                        content: `You are a US legal resources researcher. Return ONLY valid JSON matching this schema:\n${RESOURCE_JSON_SCHEMA}\n\nRules:\n- Use official government websites (.gov, .us) when possible.\n- Include real phone numbers and addresses when available.\n- For "sources", list 2-4 URLs you referenced.\n- If a resource doesn't exist for this location, set it to null.\n- For arrays (legalAid, nonprofits), include 1-3 entries each.\n- All URLs must be complete (https://...).\n- Descriptions should be 1-2 sentences max.`,
+                        content: `You are a US legal resources researcher. Return ONLY valid JSON matching this schema:\n${RESOURCE_JSON_SCHEMA}\n\nCRITICAL RULES:\n- ONLY return URLs you are CERTAIN exist and are currently active. Do NOT guess, construct, or fabricate URLs.\n- If you are not confident a specific URL exists, set the "url" field to null — do NOT invent a plausible-looking URL.\n- Prefer official government websites (.gov, .us) over third-party sites.\n- Include real phone numbers and addresses when available.\n- For "sources", list 2-4 URLs you actually referenced.\n- If a resource doesn't exist for this location, set that entire field to null.\n- For arrays (legalAid, nonprofits), include 1-3 entries each, only with verified information.\n- All URLs must be complete (https://...).\n- Descriptions should be 1-2 sentences max.\n- When unsure about a URL, it is ALWAYS better to return null than to return a wrong URL that could lead to a 404 page.`,
                     },
                     {
                         role: 'user',
@@ -169,15 +279,18 @@ export async function POST(req: NextRequest) {
                 ? sanitizeEFilingPortal(parsed.eFilingPortal as Record<string, unknown>) : undefined,
         };
 
+        // ── Validate URLs before caching ──
+        const validatedResources = await validateResourceUrls(resources, normCounty, normState);
+
         // ── Store in Convex (via public action wrapper) ──
         await convex.action(api.resourcesCache.upsertFromServer, {
             state: normState,
             county: normCounty,
-            resources,
+            resources: validatedResources,
             sources,
         });
 
-        return { resources, sources };
+        return { resources: validatedResources, sources };
     })();
 
     pendingLookups.set(lookupKey, lookupPromise);

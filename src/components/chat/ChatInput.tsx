@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Mic } from 'lucide-react';
+import { PaperPlaneRight, Microphone } from '@phosphor-icons/react';
 
 interface ChatInputProps {
     onSend: (message: string) => void;
@@ -9,7 +9,7 @@ interface ChatInputProps {
     placeholder?: string;
 }
 
-/** Auto-resizing chat input bar with send button and voice input placeholder. */
+/** Premium Auto-resizing chat input bar with send button and voice input placeholder. */
 export default function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
     const [input, setInput] = useState('');
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -37,11 +37,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
 
     return (
         <div
-            className="flex items-end gap-3 rounded-2xl p-3"
-            style={{
-                background: '#F7F2EB',
-                border: '1px solid rgba(208, 227, 255, 0.15)',
-            }}
+            className="flex items-end gap-3 rounded-[1.5rem] p-3 bg-white shadow-[0_4px_24px_rgba(208,227,255,0.4)] border border-white transition-all focus-within:ring-2 focus-within:ring-champagne/30"
         >
             <textarea
                 ref={textareaRef}
@@ -50,39 +46,30 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder ?? 'Consult NEXX Intelligence...'}
                 rows={1}
-                className="flex-1 bg-transparent border-none outline-none resize-none text-sm placeholder:text-[#7096D1]"
+                className="flex-1 bg-transparent border-none outline-none resize-none text-[15px] font-bold placeholder:text-[#0A1128]/40 text-[#0A1128] pl-2 pt-2 pb-1"
                 style={{
-                    color: '#0A1E54',
-                    caretColor: '#0A1E54',
+                    caretColor: '#2563EB',
                     minHeight: 24,
                     maxHeight: 120,
-                    fontFamily: 'Inter, sans-serif',
                 }}
             />
             <div className="flex items-center gap-2 flex-shrink-0">
                 <button
-                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer"
-                    style={{
-                        background: 'rgba(208, 227, 255, 0.08)',
-                        border: '1px solid rgba(208, 227, 255, 0.2)',
-                        color: '#D0E3FF',
-                    }}
+                    className="w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#0A1128]/50 hover:text-[#0A1128]"
                     title="Voice input (coming soon)"
                 >
-                    <Mic size={16} />
+                    <Microphone size={18} weight="duotone" />
                 </button>
                 <button
                     onClick={handleSend}
                     disabled={!input.trim() || disabled}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                    style={{
-                        background: input.trim()
-                            ? 'linear-gradient(135deg, #F7F2EB, #123D7E)'
-                            : 'rgba(208, 227, 255, 0.08)',
-                        color: input.trim() ? '#F7F2EB' : '#FFF9F0',
-                    }}
+                    className={`w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-300 shadow-sm ${
+                        input.trim() && !disabled
+                            ? 'bg-[linear-gradient(135deg,#60A5FA,#2563EB)] text-white hover:scale-105 hover:shadow-lg cursor-pointer'
+                            : 'bg-[#F1F5F9] text-[#0A1128]/30 cursor-not-allowed'
+                    }`}
                 >
-                    <Send size={16} />
+                    <PaperPlaneRight size={18} weight={input.trim() && !disabled ? "fill" : "regular"} />
                 </button>
             </div>
         </div>

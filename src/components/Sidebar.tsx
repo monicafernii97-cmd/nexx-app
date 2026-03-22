@@ -4,23 +4,24 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    LayoutDashboard,
-    MessageCircle,
-    Landmark,
-    ClipboardList,
-    Siren,
-    Scale,
+    SquaresFour,
+    ChatCircleText,
+    Bank,
+    ClipboardText,
+    WarningCircle,
+    Scales,
     BookOpen,
     UserCircle,
-    Settings,
-    ChevronLeft,
-    ChevronRight,
-    ChevronDown,
-    LogIn,
-    LayoutGrid,
+    Gear,
+    CaretLeft,
+    CaretDown,
+    SignIn,
+    GridFour,
     FolderOpen,
-    FileUp,
-} from 'lucide-react';
+    FileArrowUp,
+    Crown,
+    IconWeight,
+} from '@phosphor-icons/react';
 import { useState, useMemo, useCallback, type ComponentType, type CSSProperties } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
@@ -29,47 +30,48 @@ import { nexxClerkAppearance } from '@/lib/clerk-theme';
 interface NavChild {
     label: string;
     href: string;
-    icon: ComponentType<{ size?: number; strokeWidth?: number; style?: CSSProperties }>;
+    icon: ComponentType<{ size?: number; weight?: IconWeight; style?: CSSProperties }>;
 }
 
 /** Top-level navigation item with optional expandable children. */
 interface NavItem {
     label: string;
     href: string;
-    icon: ComponentType<{ size?: number; strokeWidth?: number; style?: CSSProperties }>;
+    icon: ComponentType<{ size?: number; weight?: IconWeight; style?: CSSProperties }>;
     children?: NavChild[];
 }
 
 /** Ordered list of sidebar navigation items with DocuVault sub-routes. */
 const navItems: NavItem[] = [
-    { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { label: 'Chat', href: '/chat', icon: MessageCircle },
+    { label: 'Dashboard', href: '/dashboard', icon: SquaresFour },
+    { label: 'Chat', href: '/chat', icon: ChatCircleText },
     {
         label: 'DocuVault',
         href: '/docuvault',
-        icon: Landmark,
+        icon: Bank,
         children: [
-            { label: 'Template Gallery', href: '/docuvault/templates', icon: LayoutGrid },
+            { label: 'Template Gallery', href: '/docuvault/templates', icon: GridFour },
             { label: 'Saved Documents', href: '/docuvault/gallery', icon: FolderOpen },
         ],
     },
-    { label: 'Incident Report', href: '/incident-report', icon: ClipboardList },
-    { label: 'NEX Profile', href: '/nex-profile', icon: Siren },
-    { label: 'Legal Suite', href: '/court-settings', icon: Scale },
-    { label: 'eFiling', href: '/efiling', icon: FileUp },
+    { label: 'Incident Report', href: '/incident-report', icon: ClipboardText },
+    { label: 'NEX Profile', href: '/nex-profile', icon: WarningCircle },
+    { label: 'Legal Suite', href: '/court-settings', icon: Scales },
+    { label: 'eFiling', href: '/efiling', icon: FileArrowUp },
     { label: 'Resources', href: '/resources', icon: BookOpen },
     { label: 'My Profile', href: '/profile', icon: UserCircle },
-    { label: 'Settings', href: '/settings', icon: Settings },
+    { label: 'Subscription', href: '/subscription', icon: Crown },
+    { label: 'Settings', href: '/settings', icon: Gear },
 ];
 
-/** Collapsible navigation sidebar with branded logo, nav items, user info, and auth state. */
+/** Floating ethereal glass sidebar component. */
 export default function Sidebar() {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
     const { user, isLoaded } = useUser();
     const [manualExpanded, setManualExpanded] = useState<Record<string, boolean>>({});
 
-    /** Compute which nav groups are expanded — auto-expand active parent routes, merge manual overrides. */
+    /** Compute which nav groups are expanded. */
     const expandedItems = useMemo(() => {
         const autoExpanded: Record<string, boolean> = {};
         if (pathname) {
@@ -82,41 +84,54 @@ export default function Sidebar() {
         return { ...autoExpanded, ...manualExpanded };
     }, [pathname, manualExpanded]);
 
-    /** Toggle the expanded/collapsed state of a parent nav item's children. */
+    /** Toggle sub-menu. */
     const toggleExpand = useCallback((href: string) => {
         setManualExpanded((prev) => ({ ...prev, [href]: !expandedItems[href] }));
     }, [expandedItems]);
 
     return (
         <motion.aside
-            animate={{ width: collapsed ? 72 : 260 }}
-            transition={{ duration: 0.3, ease: [0.25, 1, 0.5, 1] }}
-            className="fixed left-0 top-0 h-screen z-50 flex flex-col"
-            style={{
-                background: 'linear-gradient(180deg, #123D7E 0%, #0A1E54 100%)',
-                borderRight: '1px solid rgba(208, 227, 255, 0.12)',
-            }}
+            layout
+            initial={false}
+            animate={{ width: collapsed ? 80 : 280 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="sticky top-6 h-[calc(100dvh-3rem)] z-40 flex flex-col flex-shrink-0 glass-ethereal rounded-[2rem] overflow-visible"
         >
             {/* Logo */}
-            <div className="flex items-center px-5 h-[72px] flex-shrink-0">
-                <Link href="/dashboard" className="flex items-center gap-3 no-underline">
-                    <div
-                        className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+            <div className="flex items-center px-6 h-[88px] flex-shrink-0">
+                <Link href="/dashboard" className="flex items-center gap-4 no-underline">
+                        <motion.div
+                        layout="position"
+                        className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-md relative overflow-hidden"
                         style={{
-                            background: 'linear-gradient(135deg, #FFF9F0, #D0E3FF)',
-                            boxShadow: '0 2px 12px rgba(208, 227, 255, 0.3)',
+                            background: 'linear-gradient(135deg, #FFFFFF 0%, #F1F5F9 100%)',
+                            border: '1px solid rgba(255, 255, 255, 0.4)',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,1)',
                         }}
                     >
-                        <span className="text-sm font-black" style={{ color: '#0A1E54' }}>N</span>
-                    </div>
-                    <AnimatePresence>
+                        <span 
+                            className="text-[26px] font-black font-serif italic uppercase tracking-tighter" 
+                            style={{
+                                background: 'linear-gradient(135deg, #0A1128 0%, #1E3A8A 30%, #94A3B8 60%, #0A1128 100%)',
+                                backgroundSize: '200% auto',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                color: 'transparent',
+                                animation: 'shimmer-bg 4s linear infinite',
+                            }}
+                        >
+                            N
+                        </span>
+                    </motion.div>
+                    <AnimatePresence mode="popLayout">
                         {!collapsed && (
                             <motion.span
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -10 }}
-                                className="text-lg font-serif font-bold tracking-widest"
-                                style={{ color: '#F7F2EB' }}
+                                initial={{ opacity: 0, filter: 'blur(4px)', x: -10 }}
+                                animate={{ opacity: 1, filter: 'blur(0px)', x: 0 }}
+                                exit={{ opacity: 0, filter: 'blur(4px)', x: -10 }}
+                                transition={{ duration: 0.2 }}
+                                className="text-2xl font-serif font-bold tracking-wide"
+                                style={{ color: 'var(--pure-white)' }}
                             >
                                 NEXX
                             </motion.span>
@@ -126,10 +141,10 @@ export default function Sidebar() {
             </div>
 
             {/* Divider */}
-            <div className="mx-4 primary-divider" />
+            <div className="mx-6 primary-divider opacity-50" />
 
             {/* Navigation */}
-            <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+            <nav className="flex-1 py-6 px-4 space-y-1.5 overflow-y-auto overflow-x-hidden no-scrollbar">
                 {navItems.map((item) => {
                     const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
                     const hasChildren = item.children && item.children.length > 0;
@@ -138,106 +153,91 @@ export default function Sidebar() {
 
                     return (
                         <div key={item.href}>
-                            {/* Parent nav item */}
                             <div className="flex items-center">
                                 <Link
                                     href={item.href}
-                                    aria-current={pathname === item.href ? 'page' : undefined}
                                     className="no-underline flex-1 min-w-0"
                                 >
                                     <motion.div
-                                        whileHover={{ x: 2 }}
-                                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${collapsed ? 'justify-center' : ''
-                                            }`}
+                                        whileTap={{ scale: 0.96 }}
+                                        className={`group relative flex items-center gap-3.5 px-3.5 py-3 rounded-2xl transition-all duration-300 hover:bg-white/10 ${collapsed ? 'justify-center' : ''}`}
                                         style={{
                                             background: isActive && !hasChildren
-                                                ? 'rgba(255, 249, 240, 0.15)'
+                                                ? 'linear-gradient(135deg,rgba(255,255,255,0.15),rgba(255,255,255,0.05))'
                                                 : isActive && hasChildren
-                                                    ? 'rgba(255, 249, 240, 0.08)'
+                                                    ? 'rgba(255, 255, 255, 0.1)'
                                                     : 'transparent',
-                                            color: isActive ? '#F7F2EB' : '#D0E3FF',
-                                            borderLeft: isActive ? '3px solid #FFF9F0' : '3px solid transparent',
+                                            boxShadow: isActive && !hasChildren ? '0 4px 12px rgba(0,0,0,0.2)' : 'none',
+                                            border: isActive && !hasChildren ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
                                         }}
                                     >
-                                        <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
-                                        <AnimatePresence>
+                                        <div className={`transition-colors duration-300 flex items-center justify-center ${isActive ? 'text-white' : 'text-[#94A3B8] group-hover:text-white'}`}>
+                                            <Icon size={20} weight={isActive ? "fill" : "regular"} style={{ color: 'currentColor' }} />
+                                        </div>
+                                        <AnimatePresence mode="popLayout">
                                             {!collapsed && (
                                                 <motion.span
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
-                                                    exit={{ opacity: 0 }}
-                                                    className="text-sm font-medium whitespace-nowrap flex-1"
+                                                    initial={{ opacity: 0, width: 0 }}
+                                                    animate={{ opacity: 1, width: 'auto' }}
+                                                    exit={{ opacity: 0, width: 0 }}
+                                                    className={`text-[14px] font-medium whitespace-nowrap flex-1 transition-colors duration-300 ${isActive ? 'text-white' : 'text-white/70 group-hover:text-white'}`}
                                                 >
                                                     {item.label}
                                                 </motion.span>
                                             )}
                                         </AnimatePresence>
+                                        
+                                        {/* Active Indicator Dot */}
+                                        {isActive && !hasChildren && collapsed && (
+                                            <motion.div 
+                                                layoutId="sidebar-active-indicator"
+                                                className="absolute right-1 w-1.5 h-1.5 rounded-full bg-[var(--champagne)] shadow-[0_0_8px_var(--champagne)]"
+                                            />
+                                        )}
                                     </motion.div>
                                 </Link>
 
-                                {/* Expand/collapse chevron for items with children */}
                                 {hasChildren && !collapsed && (
                                     <button
-                                        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${item.label} submenu`}
-                                        aria-expanded={isExpanded}
-                                        aria-controls={`submenu-${item.href.replace(/\W/g, '-')}`}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             toggleExpand(item.href);
                                         }}
-                                        className="w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 flex-shrink-0 mr-1"
-                                        style={{
-                                            background: 'transparent',
-                                            color: '#D0E3FF',
-                                            border: 'none',
-                                        }}
+                                        className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-all hover:bg-white/40 flex-shrink-0 ml-1 text-sapphire-muted hover:text-sapphire"
                                     >
-                                        <motion.div
-                                            animate={{ rotate: isExpanded ? 180 : 0 }}
-                                            transition={{ duration: 0.2 }}
-                                        >
-                                            <ChevronDown size={14} />
+                                        <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ type: 'spring' }}>
+                                            <CaretDown size={14} weight="bold" />
                                         </motion.div>
                                     </button>
                                 )}
                             </div>
 
-                            {/* Child nav items */}
                             <AnimatePresence>
                                 {hasChildren && isExpanded && !collapsed && (
                                     <motion.div
-                                        id={`submenu-${item.href.replace(/\W/g, '-')}`}
                                         initial={{ opacity: 0, height: 0 }}
                                         animate={{ opacity: 1, height: 'auto' }}
                                         exit={{ opacity: 0, height: 0 }}
-                                        transition={{ duration: 0.2 }}
                                         className="overflow-hidden"
                                     >
-                                        <div className="ml-5 pl-4 mt-1 mb-1 space-y-0.5" style={{ borderLeft: '1px solid rgba(208, 227, 255, 0.1)' }}>
+                                        <div className="ml-7 pl-3 mt-1.5 mb-2 space-y-1 border-l border-[rgba(10,22,41,0.08)]">
                                             {item.children!.map((child) => {
-                                                const isChildActive =
-                                                    pathname === child.href ||
-                                                    pathname?.startsWith(child.href + '/');
+                                                const isChildActive = pathname === child.href || pathname?.startsWith(child.href + '/');
                                                 const ChildIcon = child.icon;
                                                 return (
-                                                    <Link
-                                                        key={child.href}
-                                                        href={child.href}
-                                                        aria-current={isChildActive ? 'page' : undefined}
-                                                        className="no-underline"
-                                                    >
+                                                    <Link key={child.href} href={child.href} className="no-underline block">
                                                         <motion.div
-                                                            whileHover={{ x: 2 }}
-                                                            className="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-200"
+                                                            whileHover={{ x: 4 }}
+                                                            className="group flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all duration-300 hover:bg-white/10"
                                                             style={{
-                                                                background: isChildActive
-                                                                    ? 'rgba(208, 227, 255, 0.12)'
-                                                                    : 'transparent',
-                                                                color: isChildActive ? '#F7F2EB' : '#D0E3FF',
+                                                                background: isChildActive ? 'rgba(255,255,255,0.15)' : 'transparent',
+                                                                border: isChildActive ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
                                                             }}
                                                         >
-                                                            <ChildIcon size={15} strokeWidth={isChildActive ? 2.2 : 1.6} />
-                                                            <span className="text-xs font-medium whitespace-nowrap">
+                                                            <div className={`transition-colors duration-300 flex items-center justify-center ${isChildActive ? 'text-[var(--champagne)]' : 'text-[#94A3B8] group-hover:text-white'}`}>
+                                                                <ChildIcon size={16} weight={isChildActive ? "fill" : "regular"} style={{ color: 'currentColor' }} />
+                                                            </div>
+                                                            <span className={`text-[13px] font-medium transition-colors duration-300 ${isChildActive ? 'text-white' : 'text-white/70 group-hover:text-white'}`}>
                                                                 {child.label}
                                                             </span>
                                                         </motion.div>
@@ -253,91 +253,74 @@ export default function Sidebar() {
                 })}
             </nav>
 
-            {/* User Section */}
-            <div className="px-3 pb-4 space-y-2">
-                <div className="primary-divider mb-3" />
+            {/* Bottom User Section */}
+            <div className="px-5 pb-6 pt-4 mt-auto">
+                <div className="primary-divider mb-4 opacity-50" />
 
                 {isLoaded && user ? (
-                    /* ─── Authenticated: Clerk UserButton + user info ─── */
-                    <div
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-[rgba(208,227,255,0.06)] ${collapsed ? 'justify-center' : ''
-                            }`}
-                    >
-                        <UserButton
-                            appearance={{
-                                ...nexxClerkAppearance,
-                                elements: {
-                                    ...nexxClerkAppearance.elements,
-                                    userButtonAvatarBox: {
-                                        width: 32,
-                                        height: 32,
-                                    },
-                                },
-                            }}
-                        />
-
-                        <AnimatePresence>
-                            {!collapsed && (
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="flex-1 min-w-0"
-                                >
-                                    <p className="text-sm font-medium truncate" style={{ color: '#F7F2EB' }}>
-                                        {user.firstName || user.fullName || 'User'}
-                                    </p>
-                                    <p className="text-xs truncate" style={{ color: '#FFF9F0' }}>
-                                        {user.primaryEmailAddress?.emailAddress || 'Manage Account'}
-                                    </p>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-                ) : isLoaded && !user ? (
-                    /* ─── Not authenticated: Sign In link ─── */
-                    <Link href="/sign-in" className="no-underline">
-                        <div
-                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors hover:bg-[rgba(208,227,255,0.06)] ${collapsed ? 'justify-center' : ''
-                                }`}
-                        >
-                            <div
-                                className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                                style={{ background: 'rgba(208, 227, 255, 0.1)', border: '1px solid rgba(208, 227, 255, 0.25)' }}
-                            >
-                                <LogIn size={16} style={{ color: '#F7F2EB' }} />
+                    <div className="relative group w-full">
+                        {/* Visual layer */}
+                        <div className={`flex items-center gap-3.5 px-3 py-3 rounded-2xl transition-all cursor-pointer bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 hover:border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_24px_rgba(0,0,0,0.4)] hover:-translate-y-0.5 group-hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_12px_32px_rgba(0,0,0,0.5)] ${collapsed ? 'justify-center' : ''}`}>
+                            <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 border border-white/30 shadow-sm relative z-0">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={user.imageUrl} alt={user.fullName || 'User'} className="w-full h-full object-cover" />
                             </div>
                             <AnimatePresence>
                                 {!collapsed && (
-                                    <motion.span
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        className="text-sm font-medium"
-                                        style={{ color: '#F7F2EB' }}
-                                    >
-                                        Sign In
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 min-w-0 relative z-0">
+                                        <p className="text-[14px] font-bold truncate text-white leading-tight capitalize tracking-wide drop-shadow-sm">
+                                            {user.firstName || user.fullName || 'User'}
+                                        </p>
+                                        <p className="text-[12px] truncate text-white/80 font-semibold mt-0.5 tracking-wider drop-shadow-sm">
+                                            Owner Account
+                                        </p>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                        
+                        {/* Functional Click Layer */}
+                        <div className="absolute inset-0 z-10 opacity-0 overflow-hidden cursor-pointer" title="Account Settings">
+                            <UserButton 
+                                appearance={{
+                                    ...nexxClerkAppearance,
+                                    elements: {
+                                        ...nexxClerkAppearance.elements,
+                                        rootBox: { width: '100%', height: '100%' },
+                                        userButtonTrigger: { width: '100%', height: '100%', borderRadius: '16px' },
+                                        userButtonAvatarBox: { display: 'none' }
+                                    }
+                                }}
+                            />
+                        </div>
+                    </div>
+                ) : isLoaded && !user ? (
+                    <Link href="/sign-in" className="no-underline block">
+                        <div className={`flex items-center gap-3.5 px-3 py-3 rounded-2xl transition-colors hover:bg-white/40 ${collapsed ? 'justify-center' : ''}`}>
+                            <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-sm border border-[rgba(10,22,41,0.05)]">
+                                <SignIn size={18} style={{ color: 'var(--sapphire)' }} />
+                            </div>
+                            <AnimatePresence>
+                                {!collapsed && (
+                                    <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-sm font-semibold text-sapphire">
+                                        Sign In safely
                                     </motion.span>
                                 )}
                             </AnimatePresence>
                         </div>
                     </Link>
-                ) : null}
+                ) : <div className="h-[60px]" />}
             </div>
 
-            {/* Collapse Toggle */}
+            {/* Floating Collapse Toggle */}
             <button
                 onClick={() => setCollapsed(!collapsed)}
                 aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer
-          transition-all duration-200 hover:scale-110"
-                style={{
-                    background: 'linear-gradient(135deg, #7096D1, #123D7E)',
-                    border: '1px solid rgba(208, 227, 255, 0.2)',
-                    color: '#D0E3FF',
-                }}
+                className="absolute -right-4 top-12 w-8 h-8 rounded-full flex items-center justify-center glass-ethereal shadow-[0_4px_12px_rgba(10,22,41,0.06)] transition-all hover:scale-110 z-50 text-sapphire hover:text-champagne cursor-pointer border border-white"
             >
-                {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
+                <motion.div animate={{ rotate: collapsed ? 180 : 0 }} transition={{ type: "spring", stiffness: 300, damping: 20 }}>
+                    <CaretLeft size={14} weight="bold" />
+                </motion.div>
             </button>
         </motion.aside>
     );

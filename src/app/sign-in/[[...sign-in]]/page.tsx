@@ -7,8 +7,7 @@ import { nexxClerkAppearance } from '@/lib/clerk-theme';
 export default function SignInPage() {
     return (
         <div
-            className="min-h-screen flex items-center justify-center relative overflow-hidden"
-            style={{ background: '#0E0804' }}
+            className="bg-[#0A1128] min-h-screen flex items-center justify-center relative overflow-hidden"
         >
             {/* Background ambient glow */}
             <div className="absolute inset-0 pointer-events-none">

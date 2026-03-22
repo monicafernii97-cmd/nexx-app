@@ -1,29 +1,32 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import { titleCase } from '@/lib/utils/stringHelpers';
 import {
-    BookOpen,
-    Scale,
+    BookOpenText,
+    Scales,
     Heart,
-    Landmark,
-    HandHelping,
+    Bank,
+    HandHeart,
     Users,
     Phone,
-    ExternalLink,
+    ArrowUpRight,
     MapPin,
-    ArrowRight,
     Shield,
-    Search,
-    AlertTriangle,
-    Settings,
-    Sparkles,
-} from 'lucide-react';
+    MagnifyingGlass,
+    WarningCircle,
+    Gear,
+    Strategy,
+    SealCheck,
+    type Icon,
+    type IconWeight,
+} from '@phosphor-icons/react';
 import Link from 'next/link';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import {
     getStateResources,
     getCountyResources,
@@ -113,59 +116,17 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
     const safeUrl = toSafeExternalUrl(resource.url);
     return (
         <motion.div
-            whileHover={{ scale: 1.01, y: -1 }}
-            className="card-premium p-4 group"
+            whileHover={{ scale: 1.02, y: -4 }}
+            className={`p-5 group flex flex-col justify-between h-full bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_16px_48px_rgba(0,0,0,0.5)] transition-all duration-300 rounded-2xl relative overflow-hidden ${safeUrl ? 'hover:border-white/40 cursor-pointer' : ''}`}
         >
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-between gap-3 mb-4">
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold text-sm truncate" style={{ color: '#0A1E54' }}>
-                            {resource.name}
-                        </p>
-                    </div>
+                    <h4 className="font-bold text-[15px] text-white mb-1 truncate group-hover:text-[#60A5FA] transition-colors drop-shadow-sm relative z-10 pointer-events-none">
+                        {resource.name}
+                    </h4>
                     {resource.description && (
-                        <p className="text-xs mb-2 line-clamp-2" style={{ color: '#123D7E' }}>
+                        <p className="text-[13px] text-white/80 line-clamp-2 leading-relaxed font-medium relative z-10 pointer-events-none">
                             {resource.description}
-                        </p>
-                    )}
-                    <div className="flex flex-wrap items-center gap-3">
-                        {resource.phone && (
-                            isDialable(resource.phone) ? (
-                                <a
-                                    href={`tel:${resource.phone.replace(/[^\d+]/g, '')}`}
-                                    className="flex items-center gap-1 text-xs font-medium no-underline transition-colors hover:opacity-80"
-                                    style={{ color: '#5A8EC9' }}
-                                >
-                                    <Phone size={11} />
-                                    {resource.phone}
-                                </a>
-                            ) : (
-                                <span
-                                    className="flex items-center gap-1 text-xs font-medium"
-                                    style={{ color: '#5A8EC9' }}
-                                >
-                                    <Phone size={11} />
-                                    {resource.phone}
-                                </span>
-                            )
-                        )}
-                        {safeUrl && (
-                            <a
-                                href={safeUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-xs font-medium no-underline transition-colors hover:opacity-80"
-                                style={{ color: '#5A9E6F' }}
-                            >
-                                <ExternalLink size={11} />
-                                Visit Website
-                            </a>
-                        )}
-                    </div>
-                    {resource.address && (
-                        <p className="flex items-center gap-1 text-xs mt-1.5" style={{ color: '#7096D1' }}>
-                            <MapPin size={10} />
-                            {resource.address}
                         </p>
                     )}
                 </div>
@@ -174,11 +135,39 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
                         href={safeUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 rounded transition-opacity"
+                        className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white/80 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all hover:bg-[#123D7E] hover:text-white after:absolute after:inset-0 z-0"
                         aria-label={`Open ${resource.name} website`}
                     >
-                        <ArrowRight size={14} style={{ color: '#0A1E54' }} />
+                        <ArrowUpRight size={14} weight="bold" className="relative z-10 pointer-events-none" />
                     </a>
+                )}
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 border-t border-white/10">
+                {resource.phone && (
+                    isDialable(resource.phone) ? (
+                        <a
+                            href={`tel:${resource.phone.replace(/[^\d+]/g, '')}`}
+                            className="relative z-10 flex items-center gap-1.5 text-[12px] font-bold no-underline transition-colors hover:text-white text-[#60A5FA]"
+                        >
+                            <Phone size={14} weight="fill" />
+                            {resource.phone}
+                        </a>
+                    ) : (
+                        <span
+                            className="relative z-10 flex items-center gap-1.5 text-[12px] font-bold text-[#60A5FA]"
+                        >
+                            <Phone size={14} weight="fill" />
+                            {resource.phone}
+                        </span>
+                    )
+                )}
+                
+                {resource.address && (
+                    <p className="flex items-center gap-1.5 text-[12px] font-medium text-white/70 ml-auto pointer-events-none relative z-10">
+                        <MapPin size={14} weight="fill" />
+                        <span className="truncate max-w-[120px]">{resource.address}</span>
+                    </p>
                 )}
             </div>
         </motion.div>
@@ -190,34 +179,40 @@ function SectionHeader({
     icon: Icon,
     label,
     subtitle,
-    color = '#D0E3FF',
+    colorMode = 'default',
 }: {
-    icon: typeof BookOpen;
+    icon: Icon;
     label: string;
     subtitle?: string;
-    color?: string;
+    colorMode?: 'default' | 'rose' | 'warning';
 }) {
+    let iconColor = '#60A5FA';
+    let iconBg = 'rgba(255,255,255,0.05)';
+    const weight: IconWeight = "duotone";
+
+    if (colorMode === 'rose') {
+        iconColor = '#F43F5E';
+        iconBg = 'rgba(244,63,94,0.1)';
+    } else if (colorMode === 'warning') {
+        iconColor = '#FBBF24';
+        iconBg = 'rgba(251,191,36,0.1)';
+    }
+
     return (
-        <div className="mb-4">
-            <div className="flex items-center gap-2 mb-1">
+        <div className="mb-6">
+            <div className="flex items-center gap-4 mb-2">
                 <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center"
-                    style={{
-                        background: `${color}15`,
-                        border: `1px solid ${color}30`,
-                    }}
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-xl border border-white/20 shrink-0"
+                    style={{ background: iconBg }}
                 >
-                    <Icon size={15} style={{ color }} />
+                    <Icon size={24} weight={weight} color={iconColor} className="drop-shadow-md" />
                 </div>
-                <h2
-                    className="text-sm font-semibold tracking-[0.15em] uppercase"
-                    style={{ color: '#D0E3FF' }}
-                >
+                <h2 className="text-[15px] font-bold tracking-[0.2em] uppercase text-white drop-shadow-sm">
                     {label}
                 </h2>
             </div>
             {subtitle && (
-                <p className="text-xs ml-10" style={{ color: '#7096D1' }}>
+                <p className="text-[14px] font-medium text-white drop-shadow-sm ml-[64px]">
                     {subtitle}
                 </p>
             )}
@@ -233,40 +228,36 @@ function FinderHeroCard({
     localResources,
     fallbackResources,
     hasLocalData,
-    accentColor,
 }: {
-    icon: typeof Scale;
+    icon: Icon;
     title: string;
     description: string;
     localResources: ResourceEntry[];
     fallbackResources: ResourceEntry[];
     hasLocalData: boolean;
-    accentColor: string;
 }) {
     const resources = hasLocalData && localResources.length > 0 ? localResources : fallbackResources;
     const showFallbackNotice = !hasLocalData || localResources.length === 0;
 
     return (
         <motion.div
-            whileHover={{ y: -3 }}
-            className="card-premium p-6 h-full"
+            whileHover={{ y: -4 }}
+            className="p-6 md:p-8 h-full rounded-[2rem] bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_12px_40px_rgba(0,0,0,0.4)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_20px_60px_rgba(0,0,0,0.6)] transition-all duration-300 relative overflow-hidden group"
         >
+            <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-[100px] pointer-events-none opacity-20 transition-opacity duration-500 group-hover:opacity-40 ${title.includes('Attorney') ? 'bg-[#60A5FA]' : 'bg-[#10B981]'}`} />
+            
             {/* Header */}
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-4 mb-6 relative z-10">
                 <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{
-                        background: `linear-gradient(135deg, ${accentColor}25, ${accentColor}08)`,
-                        border: `1px solid ${accentColor}40`,
-                    }}
+                    className="shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center bg-white/10 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)] border border-white/30"
                 >
-                    <Icon size={22} style={{ color: accentColor }} />
+                    <Icon size={28} weight="duotone" className={title.includes('Attorney') ? 'text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]' : 'text-[#10B981] drop-shadow-[0_2px_8px_rgba(16,185,129,0.8)]'} />
                 </div>
                 <div>
-                    <h3 className="font-semibold text-base" style={{ color: '#0A1E54' }}>
+                    <h3 className="font-serif font-bold text-2xl text-white mb-1 tracking-tight">
                         {title}
                     </h3>
-                    <p className="text-xs" style={{ color: '#123D7E' }}>
+                    <p className="text-[14px] font-medium text-white/80">
                         {description}
                     </p>
                 </div>
@@ -275,21 +266,17 @@ function FinderHeroCard({
             {/* Fallback badge */}
             {showFallbackNotice && (
                 <div
-                    className="flex items-center gap-2 rounded-lg px-3 py-2 mb-4"
-                    style={{
-                        background: 'rgba(229, 168, 74, 0.08)',
-                        border: '1px solid rgba(229, 168, 74, 0.2)',
-                    }}
+                    className="flex items-center gap-2.5 rounded-xl px-4 py-3 mb-6 bg-white/10 border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] relative z-10"
                 >
-                    <Search size={12} style={{ color: '#E5A84A' }} />
-                    <span className="text-xs" style={{ color: '#E5A84A' }}>
-                        Use these directories to search in your area
+                    <MagnifyingGlass size={16} weight="bold" className="text-white" />
+                    <span className="text-[12px] font-bold uppercase tracking-widest text-[#E5A84A]">
+                        Use directories to search locally
                     </span>
                 </div>
             )}
 
             {/* Resources list */}
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-4">
                 {resources.map((r) => (
                     <ResourceCard key={resourceKey(r)} resource={r} />
                 ))}
@@ -308,19 +295,19 @@ function CourtResourcesGrid({
     countyData: CountyResources | null;
     cachedResources: CachedResources | null;
 }) {
-    const items: { label: string; resource: ResourceEntry; icon: typeof Landmark }[] = [];
+    const items: { label: string; resource: ResourceEntry; icon: Icon }[] = [];
 
     // AI-cached data takes priority; fall back to curated data
     if (cachedResources?.courtClerk) {
-        items.push({ label: 'County Clerk', resource: toResourceEntry(cachedResources.courtClerk, ['clerk', 'court']), icon: Landmark });
+        items.push({ label: 'County Clerk', resource: toResourceEntry(cachedResources.courtClerk, ['clerk', 'court']), icon: Bank });
     } else if (countyData?.courtClerk) {
-        items.push({ label: 'County Clerk', resource: countyData.courtClerk, icon: Landmark });
+        items.push({ label: 'County Clerk', resource: countyData.courtClerk, icon: Bank });
     }
 
     if (cachedResources?.courtsWebsite) {
-        items.push({ label: 'Courts Website', resource: toResourceEntry(cachedResources.courtsWebsite, ['court', 'website']), icon: Scale });
+        items.push({ label: 'Courts Website', resource: toResourceEntry(cachedResources.courtsWebsite, ['court', 'website']), icon: Scales });
     } else if (countyData?.courtsWebsite) {
-        items.push({ label: 'Courts Website', resource: countyData.courtsWebsite, icon: Scale });
+        items.push({ label: 'Courts Website', resource: countyData.courtsWebsite, icon: Scales });
     }
 
     if (cachedResources?.familyDivision) {
@@ -330,12 +317,11 @@ function CourtResourcesGrid({
     }
 
     if (cachedResources?.localRules) {
-        items.push({ label: 'Rules & Procedures', resource: toResourceEntry(cachedResources.localRules, ['rules', 'procedures']), icon: BookOpen });
+        items.push({ label: 'Rules & Procedures', resource: toResourceEntry(cachedResources.localRules, ['rules', 'procedures']), icon: BookOpenText });
     } else if (countyData?.rulesAndProcedures) {
-        items.push({ label: 'Rules & Procedures', resource: countyData.rulesAndProcedures, icon: BookOpen });
+        items.push({ label: 'Rules & Procedures', resource: countyData.rulesAndProcedures, icon: BookOpenText });
     }
 
-    // State family code: AI-cached first, then curated
     if (cachedResources?.stateFamilyCode) {
         items.push({
             label: 'State Family Law Code',
@@ -352,53 +338,49 @@ function CourtResourcesGrid({
 
     if (items.length === 0) {
         return (
-            <div className="card-premium p-6 text-center sm:col-span-2 lg:col-span-3">
-                <p className="text-sm" style={{ color: '#123D7E' }}>
-                    Court resources for this location are still being curated. Check back soon.
+            <div className="card-premium p-8 text-center sm:col-span-2 lg:col-span-3 border-dashed">
+                <p className="text-[14px] font-medium text-sapphire-muted">
+                    Court resources for this location are still being securely curated. Check back soon.
                 </p>
             </div>
         );
     }
 
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {items.map((item) => {
                 const safeItemUrl = toSafeExternalUrl(item.resource.url);
                 const CardContent = (
                     <motion.div
-                        whileHover={safeItemUrl ? { scale: 1.02, y: -2 } : undefined}
+                        whileHover={safeItemUrl ? { scale: 1.02, y: -4 } : undefined}
                         whileTap={safeItemUrl ? { scale: 0.98 } : undefined}
-                        className={`card-premium p-4 ${safeItemUrl ? 'cursor-pointer' : ''} group h-full`}
+                        className={`p-5 bg-white/5 backdrop-blur-2xl border border-white/20 rounded-2xl ${safeItemUrl ? 'cursor-pointer hover:border-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_16px_48px_rgba(0,0,0,0.5)]' : 'shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_16px_rgba(0,0,0,0.2)]'} group h-full flex flex-col justify-between transition-all duration-300`}
                     >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-start gap-4 mb-3">
                             <div
-                                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                                style={{
-                                    background: 'rgba(112, 150, 209, 0.1)',
-                                    border: '1px solid rgba(112, 150, 209, 0.25)',
-                                }}
+                                className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-white/10 border border-white/20 text-[#60A5FA] group-hover:bg-[#123D7E] group-hover:text-white transition-colors"
                             >
-                                <item.icon size={16} style={{ color: '#7096D1' }} />
+                                <item.icon size={22} weight="duotone" color="#60A5FA" className="drop-shadow-sm" />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold truncate" style={{ color: '#0A1E54' }}>
+                                <p className="text-[15px] font-bold truncate text-white mb-0.5">
                                     {item.label}
                                 </p>
-                                <p className="text-xs truncate" style={{ color: '#123D7E' }}>
+                                <p className="text-[13px] font-medium text-white/80 line-clamp-2 leading-snug">
                                     {item.resource.name}
                                 </p>
                             </div>
                             {safeItemUrl && (
-                                <ExternalLink
-                                    size={13}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                    style={{ color: '#7096D1' }}
+                                <ArrowUpRight
+                                    size={16}
+                                    weight="bold"
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 text-white relative top-1"
                                 />
                             )}
                         </div>
                         {item.resource.phone && (
-                            <p className="text-xs mt-2 ml-[52px]" style={{ color: '#5A8EC9' }}>
-                                {item.resource.phone}
+                            <p className="text-[12px] font-bold text-[#5A8EC9] mt-1 ml-[64px] flex items-center gap-1.5 border-t border-[rgba(10,22,41,0.04)] pt-3">
+                                <Phone size={14} weight="fill" /> {item.resource.phone}
                             </p>
                         )}
                     </motion.div>
@@ -409,12 +391,12 @@ function CourtResourcesGrid({
                         href={safeItemUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="no-underline"
+                        className="no-underline block h-full"
                     >
                         {CardContent}
                     </a>
                 ) : (
-                    <div key={item.label}>
+                    <div key={item.label} className="h-full">
                         {CardContent}
                     </div>
                 );
@@ -426,12 +408,12 @@ function CourtResourcesGrid({
 /** Shimmer card placeholder for loading states. */
 function ShimmerCard() {
     return (
-        <div className="card-premium p-4 animate-pulse">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: 'rgba(208, 227, 255, 0.08)' }} />
-                <div className="flex-1 space-y-2">
-                    <div className="h-3 rounded-full w-2/3" style={{ background: 'rgba(208, 227, 255, 0.12)' }} />
-                    <div className="h-2.5 rounded-full w-1/2" style={{ background: 'rgba(208, 227, 255, 0.08)' }} />
+        <div className="card-premium p-5 animate-pulse bg-white/50 border-white h-full">
+            <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl flex-shrink-0 bg-cloud/50" />
+                <div className="flex-1 space-y-3 py-1">
+                    <div className="h-3.5 rounded-full w-2/3 bg-cloud" />
+                    <div className="h-2.5 rounded-full w-1/2 bg-cloud/50" />
                 </div>
             </div>
         </div>
@@ -525,10 +507,6 @@ export default function ResourcesPage() {
 
     // Auto-trigger lookup on cache miss for any location
     useEffect(() => {
-        // Only trigger if:
-        // 1. We have a state and county
-        // 2. The cache query has loaded (not undefined) and returned null
-        // 3. We haven't already triggered
         if (
             normState &&
             normCountyTitle &&
@@ -543,8 +521,6 @@ export default function ResourcesPage() {
         ? `${county}${county.toLowerCase().endsWith('county') ? '' : ' County'}, ${state}`
         : state || 'your area';
 
-    // isLookingUp: true only after cache query has completed (cachedEntry === null
-    // indicates a miss; undefined means the query is still loading)
     const hasCanonicalLocation = Boolean(normState && normCountyTitle);
     const isCacheQueryLoading = hasCanonicalLocation && cachedEntry === undefined;
     const isLookingUp = hasCanonicalLocation && cachedEntry === null && !lookupError;
@@ -562,214 +538,179 @@ export default function ResourcesPage() {
         countyData?.nonprofits ?? [],
     );
 
-    // My Case card rendering
+    // My Case card rendering — cascading URL fallback:
+    // 1. AI-cached case search URL (may 404)
+    // 2. Court clerk URL (more stable, usually the county clerk homepage)
+    // 3. Constructed Google search as last resort
     const safeCaseSearchUrl = toSafeExternalUrl(cachedResources?.caseSearch?.url);
-    const showMyCaseCard = courtSettings?.causeNumber && safeCaseSearchUrl;
+    const safeClerkFallbackUrl = toSafeExternalUrl(cachedResources?.courtClerk?.url);
+    const googleFallbackUrl = county && state
+        ? `https://www.google.com/search?q=${encodeURIComponent(`${county} County ${state} case records search`)}`
+        : null;
+    const myCasePortalUrl = safeCaseSearchUrl || safeClerkFallbackUrl || googleFallbackUrl;
+    const showMyCaseCard = courtSettings?.causeNumber && myCasePortalUrl;
 
     return (
-        <div className="max-w-6xl mx-auto pb-12">
-            {/* ─── Header ─── */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="mb-8"
-            >
-                <div className="flex items-center gap-3 mb-2">
-                    <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center"
-                        style={{
-                            background: 'linear-gradient(135deg, #FFF9F0, #D0E3FF)',
-                            boxShadow: '0 2px 12px rgba(208, 227, 255, 0.3)',
-                        }}
-                    >
-                        <BookOpen size={18} style={{ color: '#0A1E54' }} />
-                    </div>
-                    <h1 className="text-headline text-3xl" style={{ color: '#F7F2EB' }}>
-                        Resources Hub
-                    </h1>
-                </div>
-                <p className="text-sm" style={{ color: '#D0E3FF' }}>
-                    {state
-                        ? <>Your personalized directory of legal &amp; support resources in <strong style={{ color: '#F7F2EB' }}>{locationLabel}</strong></>
+        <PageContainer>
+            <PageHeader
+                icon={BookOpenText}
+                title="Resources Hub"
+                description={
+                    state
+                        ? <span className="text-white/90">Your personalized directory of legal &amp; support resources in <strong className="text-white font-bold">{locationLabel}</strong></span>
                         : 'Discover attorneys, therapists, legal aid, and community resources near you.'
-                    }
-                </p>
-            </motion.div>
+                }
+            />
 
             {/* ─── Location Not Set Banner ─── */}
             {!state && (
                 <motion.div
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="card-premium p-6 mb-8"
+                    transition={{ delay: 0.1 }}
+                    className="p-6 md:p-8 mb-8 rounded-[2rem] border border-[#E5A84A]/30 bg-white/5 backdrop-blur-3xl shadow-[0_8px_32px_rgba(0,0,0,0.3)]"
                 >
-                    <div className="flex items-start gap-4">
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                         <div
-                            className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                            style={{
-                                background: 'rgba(229, 168, 74, 0.12)',
-                                border: '1px solid rgba(229, 168, 74, 0.3)',
-                            }}
+                            className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 bg-white/10 border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]"
                         >
-                            <MapPin size={20} style={{ color: '#E5A84A' }} />
+                            <MapPin size={24} weight="duotone" className="text-[#E5A84A] drop-shadow-md" />
                         </div>
                         <div className="flex-1">
-                            <p className="font-semibold text-sm mb-1" style={{ color: '#0A1E54' }}>
+                            <h3 className="font-bold text-[16px] text-white mb-1">
                                 Set your location to see local resources
-                            </p>
-                            <p className="text-xs mb-3" style={{ color: '#123D7E' }}>
+                            </h3>
+                            <p className="text-[14px] font-medium text-white/80 leading-relaxed max-w-2xl">
                                 Configure your state and county in Court Settings or your Profile to unlock
                                 personalized attorney, therapist, and court resources for your area.
                             </p>
-                            <div className="flex gap-3">
-                                <Link
-                                    href="/court-settings"
-                                    className="btn-primary text-xs flex items-center gap-2 no-underline"
-                                >
-                                    <Settings size={13} />
-                                    Court Settings
-                                </Link>
-                                <Link
-                                    href="/profile"
-                                    className="btn-outline text-xs flex items-center gap-2 no-underline"
-                                    style={{ color: '#0A1E54', borderColor: 'rgba(10, 30, 84, 0.2)' }}
-                                >
-                                    My Profile
-                                </Link>
-                            </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mt-2 md:mt-0">
+                            <Link
+                                href="/court-settings"
+                                className="btn-primary text-[12px] flex items-center justify-center gap-2 uppercase tracking-widest px-6 py-3.5 shadow-[0_4px_15px_rgba(255,255,255,0.1)] flex-1 whitespace-nowrap"
+                            >
+                                <Gear size={16} weight="bold" />
+                                Court Settings
+                            </Link>
                         </div>
                     </div>
                 </motion.div>
             )}
 
             {/* ─── AI Lookup Loading Banner ─── */}
-            {(isCacheQueryLoading || isLookingUp) && (
-                <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15 }}
-                    className="card-premium p-5 mb-6"
-                >
-                    <div className="flex items-center gap-3">
-                        <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                        >
-                            <Sparkles size={18} style={{ color: '#F7F2EB' }} />
-                        </motion.div>
-                        <div>
-                            <p className="text-sm font-medium" style={{ color: '#F7F2EB' }}>
-                                Discovering resources for {locationLabel}…
-                            </p>
-                            <p className="text-xs" style={{ color: '#D0E3FF' }}>
-                                NEXX AI is finding your local court, legal aid, and support resources.
-                            </p>
+            <AnimatePresence>
+                {(isCacheQueryLoading || isLookingUp) && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="glass-ethereal p-6 mb-8 rounded-[1.5rem] border-white flex flex-col sm:flex-row items-center justify-center gap-4 text-center sm:text-left">
+                            <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                            >
+                                <Strategy size={24} weight="duotone" className="text-champagne" />
+                            </motion.div>
+                            <div>
+                                <h4 className="text-[15px] font-bold text-sapphire mb-0.5">
+                                    Discovering resources for {locationLabel}…
+                                </h4>
+                                <p className="text-[13px] font-medium text-sapphire-muted">
+                                    NEXX is gathering robust local court, legal aid, and support data.
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                </motion.div>
-            )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* ─── Lookup Error ─── */}
             {lookupError && (
                 <motion.div
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="card-premium p-5 mb-6"
-                    style={{ borderColor: 'rgba(220, 38, 38, 0.2)' }}
+                    className="card-premium p-6 mb-8 border-rose/20 bg-rose/5"
                 >
-                    <div className="flex items-center gap-3">
-                        <AlertTriangle size={16} style={{ color: '#DC2626' }} />
+                    <div className="flex items-center gap-4">
+                        <WarningCircle size={24} weight="fill" className="text-rose flex-shrink-0" />
                         <div className="flex-1">
-                            <p className="text-sm" style={{ color: '#DC2626' }}>
+                            <p className="text-[14px] font-bold text-rose">
                                 {lookupError}
                             </p>
                         </div>
                         <button
                             onClick={() => { setLookupTriggered(false); setLookupError(null); }}
-                            className="text-xs font-medium px-3 py-1 rounded-lg transition-colors cursor-pointer"
-                            style={{ color: '#5A8EC9', background: 'rgba(90, 142, 201, 0.1)' }}
+                            className="text-[12px] font-bold tracking-widest uppercase px-4 py-2 rounded-xl bg-rose/10 hover:bg-rose/20 text-rose transition-colors cursor-pointer shrink-0"
                         >
                             Retry
                         </button>
                     </div>
                 </motion.div>
             )}
+
             {/* ─── My Case Card ─── */}
-            {showMyCaseCard && safeCaseSearchUrl && (
+            {showMyCaseCard && myCasePortalUrl && (
                 <motion.div
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.18, duration: 0.5 }}
-                    className="mb-6"
+                    transition={{ delay: 0.15, duration: 0.5 }}
+                    className="mb-10"
                 >
                     <a
-                        href={safeCaseSearchUrl}
+                        href={myCasePortalUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="no-underline block"
                     >
                         <motion.div
-                            whileHover={{ scale: 1.01, y: -2 }}
-                            className="rounded-2xl p-5 cursor-pointer group"
-                            style={{
-                                background: 'linear-gradient(135deg, rgba(90, 142, 201, 0.08), rgba(208, 227, 255, 0.04))',
-                                border: '1px solid rgba(208, 227, 255, 0.2)',
-                            }}
+                            whileHover={{ y: -4 }}
+                            transition={{ duration: 0.5, ease: "easeOut" }}
+                            className="glass-ethereal rounded-[2rem] p-6 md:p-8 cursor-pointer group shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:shadow-[0_15px_45px_rgba(18,61,126,0.8)] transition-all border border-white/20 overflow-hidden relative"
                         >
-                            <div className="flex items-center gap-4">
+                            {/* Hover Glow Background Map */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                            
+                            <div className="flex flex-col md:flex-row md:items-center gap-6 relative z-10 w-full mb-4 md:mb-0">
                                 <div
-                                    className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
-                                    style={{
-                                        background: 'linear-gradient(135deg, rgba(208, 227, 255, 0.15), rgba(112, 150, 209, 0.08))',
-                                        border: '1px solid rgba(208, 227, 255, 0.25)',
-                                    }}
+                                    className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] shadow-[0_4px_15px_rgba(0,0,0,0.5)] border border-[rgba(255,255,255,0.3)] group-hover:scale-110 transition-transform duration-500 text-white relative overflow-hidden"
                                 >
-                                    <Search size={22} style={{ color: '#D0E3FF' }} />
+                                    <div className="absolute inset-0 bg-white/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <MagnifyingGlass size={32} weight="bold" className="relative z-10 drop-shadow-sm" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="font-semibold text-base" style={{ color: '#F7F2EB' }}>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <h3 className="font-serif font-bold text-2xl text-white">
                                             My Case
                                         </h3>
                                         <span
-                                            className="text-xs font-mono px-2 py-0.5 rounded-md"
-                                            style={{
-                                                background: 'rgba(208, 227, 255, 0.1)',
-                                                border: '1px solid rgba(208, 227, 255, 0.15)',
-                                                color: '#D0E3FF',
-                                            }}
+                                            className="text-[12px] font-bold font-mono px-3 py-1 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-white shadow-sm"
                                         >
                                             {courtSettings.causeNumber}
                                         </span>
                                     </div>
-                                    <p className="text-xs" style={{ color: '#7096D1' }}>
-                                        {cachedResources?.caseSearch?.description || `Search your case on ${cachedResources?.caseSearch?.name}`}
+                                    <p className="text-[14px] font-medium text-white/70 leading-relaxed">
+                                        {safeCaseSearchUrl
+                                            ? (cachedResources?.caseSearch?.description || `Search your case on ${cachedResources?.caseSearch?.name || 'your county portal'}`)
+                                            : safeClerkFallbackUrl
+                                                ? `Look up your case through ${cachedResources?.courtClerk?.name || 'the county clerk\'s office'}`
+                                                : `Search for your case records in ${locationLabel}`}
                                     </p>
                                     {courtSettings.courtName && (
-                                        <p className="text-xs mt-0.5" style={{ color: '#5A8EC9' }}>
+                                        <p className="text-[13px] font-bold text-white mt-2">
                                             {courtSettings.courtName}
-                                            {courtSettings.assignedJudge ? ` · ${courtSettings.assignedJudge}` : ''}
+                                            {courtSettings.assignedJudge ? ` · Hon. ${courtSettings.assignedJudge}` : ''}
                                         </p>
                                     )}
                                 </div>
-                                <div className="flex-shrink-0 flex items-center gap-2">
+                                <div className="flex-shrink-0 flex items-center justify-end w-full md:w-auto">
                                     <span
-                                        className="text-xs font-medium px-3 py-1.5 rounded-lg transition-all group-hover:scale-105"
-                                        style={{
-                                            background: 'rgba(208, 227, 255, 0.1)',
-                                            border: '1px solid rgba(208, 227, 255, 0.2)',
-                                            color: '#D0E3FF',
-                                        }}
+                                        className="text-[12px] font-bold uppercase tracking-widest px-6 py-3.5 rounded-xl transition-all duration-300 group-hover:scale-105 shadow-sm text-white bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.2)] hover:bg-[rgba(255,255,255,0.15)] flex items-center gap-2"
                                     >
-                                        View Case
+                                        Access Portal <ArrowUpRight size={16} weight="bold" className="text-white drop-shadow-sm" />
                                     </span>
-                                    <ExternalLink
-                                        size={14}
-                                        className="opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity"
-                                        style={{ color: '#7096D1' }}
-                                    />
                                 </div>
                             </div>
                         </motion.div>
@@ -782,25 +723,23 @@ export default function ResourcesPage() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.5 }}
-                className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8"
+                className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12"
             >
                 <FinderHeroCard
-                    icon={Scale}
-                    title="Find an Attorney Near Me"
-                    description={`Browse family law attorneys in ${locationLabel}`}
+                    icon={Scales}
+                    title="Find an Attorney"
+                    description={`Browse distinguished family law attorneys in ${locationLabel}`}
                     localResources={countyData?.attorneys ?? []}
                     fallbackResources={NATIONAL_ATTORNEY_DIRECTORIES}
                     hasLocalData={hasCuratedData}
-                    accentColor="#5A8EC9"
                 />
                 <FinderHeroCard
                     icon={Heart}
-                    title="Find a Therapist / Counselor"
-                    description="NPD-trained therapists & counselors in your area"
+                    title="Find a Therapist"
+                    description="Your network of power. Connect with elite NPD-trained therapists and legal professionals in your area."
                     localResources={countyData?.therapists ?? []}
                     fallbackResources={NATIONAL_THERAPIST_DIRECTORIES}
                     hasLocalData={hasCuratedData}
-                    accentColor="#5A9E6F"
                 />
             </motion.div>
 
@@ -809,20 +748,19 @@ export default function ResourcesPage() {
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4, duration: 0.5 }}
-                    className="mb-8"
+                    transition={{ delay: 0.3, duration: 0.5 }}
+                    className="mb-12"
                 >
                     <SectionHeader
-                        icon={Landmark}
+                        icon={Bank}
                         label="Court & County Resources"
                         subtitle={county
-                            ? `${county}${county.toLowerCase().endsWith('county') ? '' : ' County'} courthouse, clerk, and court information`
+                            ? `${county}${county.toLowerCase().endsWith('county') ? '' : ' County'} courthouse, clerk, and procedural information`
                             : 'Your local court resources'
                         }
-                        color="#7096D1"
                     />
                     {isCacheQueryLoading || isLookingUp ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             <ShimmerCard />
                             <ShimmerCard />
                             <ShimmerCard />
@@ -834,15 +772,13 @@ export default function ResourcesPage() {
                             cachedResources={cachedResources}
                         />
                     ) : (
-                        <div className="card-premium p-6 text-center">
-                            <p className="text-sm" style={{ color: '#123D7E' }}>
-                                Court resources for <strong>{state}</strong> are coming soon.
-                                Check back as we expand our coverage.
+                        <div className="card-premium p-8 text-center border-dashed">
+                            <p className="text-[14px] font-medium text-sapphire-muted">
+                                Court resources for <strong className="text-sapphire">{state}</strong> are coming soon.
+                                Check back as we continuously expand our coverage.
                             </p>
                         </div>
                     )}
-
-
                 </motion.div>
             )}
 
@@ -850,40 +786,43 @@ export default function ResourcesPage() {
             <motion.div
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, duration: 0.5 }}
-                className="mb-8"
+                transition={{ delay: 0.4, duration: 0.5 }}
+                className="mb-12"
             >
                 <SectionHeader
-                    icon={HandHelping}
+                    icon={HandHeart}
                     label="Legal Aid & Assistance"
-                    subtitle="Free and low-cost legal help, bar associations, and pro bono programs"
-                    color="#E5A84A"
+                    subtitle="Free and low-cost legal support, bar associations, and pro bono programs"
+                    colorMode="warning"
                 />
                 {isCacheQueryLoading || isLookingUp ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <ShimmerCard />
                         <ShimmerCard />
                         <ShimmerCard />
                     </div>
                 ) : legalAidResources.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {legalAidResources.map((r) => (
                             <ResourceCard key={resourceKey(r)} resource={r} />
                         ))}
                     </div>
                 ) : (
-                    <div className="card-premium p-5 md:col-span-2 text-center">
-                        <p className="text-xs" style={{ color: '#123D7E' }}>
-                            Set your location above to see local legal aid resources, or search&nbsp;
+                    <div className="card-premium p-8 md:col-span-2 text-center border-dashed flex flex-col items-center justify-center">
+                        <div className="w-12 h-12 rounded-full bg-cloud flex items-center justify-center mb-4">
+                            <HandHeart size={20} weight="duotone" className="text-sapphire-muted" />
+                        </div>
+                        <p className="text-[14px] font-medium text-sapphire-muted max-w-lg">
+                            Set your location above to see local legal aid resources, or search{' '}
                             <a
                                 href="https://www.lsc.gov/about-lsc/what-legal-aid/get-legal-help"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="font-medium no-underline"
-                                style={{ color: '#5A8EC9' }}
+                                className="font-bold border-b border-sapphire-muted/30 hover:border-sapphire hover:text-sapphire transition-colors text-sapphire"
                             >
                                 LSC.gov
                             </a>
-                            &nbsp;for free legal aid programs nationwide.
+                            {' '}for free legal aid programs nationwide.
                         </p>
                     </div>
                 )}
@@ -893,32 +832,31 @@ export default function ResourcesPage() {
             <motion.div
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6, duration: 0.5 }}
-                className="mb-8"
+                transition={{ delay: 0.5, duration: 0.5 }}
+                className="mb-12"
             >
                 <SectionHeader
                     icon={Users}
-                    label="Nonprofits & Support Organizations"
-                    subtitle="Shelters, crisis centers, family support, and advocacy groups"
-                    color="#C75A5A"
+                    label="Community Support Organizations"
+                    subtitle="Shelters, crisis centers, family support, and specialized advocacy groups"
                 />
                 {isCacheQueryLoading || isLookingUp ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <ShimmerCard />
                         <ShimmerCard />
                     </div>
                 ) : nonprofitResources.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {nonprofitResources.map((r) => (
                             <ResourceCard key={resourceKey(r)} resource={r} />
                         ))}
                     </div>
                 ) : (
-                    <div className="card-premium p-5 text-center">
-                        <p className="text-xs" style={{ color: '#123D7E' }}>
+                    <div className="card-premium p-8 text-center border-dashed">
+                        <p className="text-[14px] font-medium text-sapphire-muted">
                             {state
-                                ? `Local nonprofit data for ${locationLabel} is being curated. Check back soon.`
-                                : 'Set your location to discover local support organizations.'}
+                                ? `Local community support data for ${locationLabel} is actively being curated. Check back soon.`
+                                : 'Set your location to discover robust local support organizations.'}
                         </p>
                     </div>
                 )}
@@ -928,52 +866,46 @@ export default function ResourcesPage() {
             <motion.div
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7, duration: 0.5 }}
+                transition={{ delay: 0.6, duration: 0.5 }}
             >
                 <SectionHeader
-                    icon={AlertTriangle}
+                    icon={WarningCircle}
                     label="Crisis & Safety"
-                    subtitle="Immediate help — available 24/7, nationwide"
-                    color="#C75A5A"
+                    subtitle="Immediate emergency help — available 24/7, nationwide"
+                    colorMode="rose"
                 />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {CRISIS_RESOURCES.map((r) => {
                         const safeCrisisUrl = toSafeExternalUrl(r.url);
                         return (
                         <motion.div
                             key={r.name}
-                            whileHover={{ scale: 1.01, y: -1 }}
-                            className="rounded-2xl p-4 group"
-                            style={{
-                                background: 'linear-gradient(135deg, rgba(199, 90, 90, 0.06), rgba(199, 90, 90, 0.02))',
-                                border: '1px solid rgba(199, 90, 90, 0.15)',
-                            }}
+                            whileHover={{ scale: 1.01, y: -2 }}
+                            className="card-premium p-6 group border-rose/10 hover:border-rose/30 bg-rose/[0.02]"
                         >
-                            <p className="font-semibold text-sm mb-1" style={{ color: '#F7F2EB' }}>
-                                {r.name}
-                            </p>
+                            <h4 className="font-bold text-[16px] text-rose mb-1.5 flex items-center gap-2">
+                               {r.name}
+                            </h4>
                             {r.description && (
-                                <p className="text-xs mb-2" style={{ color: '#D0E3FF' }}>
+                                <p className="text-[13px] font-medium text-sapphire mb-4 leading-relaxed">
                                     {r.description}
                                 </p>
                             )}
-                            <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-rose/10">
                                 {r.phone && (
                                     isDialable(r.phone) ? (
                                         <a
                                             href={`tel:${r.phone.replace(/[^\d+]/g, '')}`}
-                                            className="flex items-center gap-1 text-xs font-bold no-underline"
-                                            style={{ color: '#F7F2EB' }}
+                                            className="flex items-center gap-1.5 text-[14px] font-bold text-rose hover:opacity-80 transition-all bg-rose/10 px-3 py-1.5 rounded-lg"
                                         >
-                                            <Phone size={11} />
+                                            <Phone size={14} weight="fill" />
                                             {r.phone}
                                         </a>
                                     ) : (
                                         <span
-                                            className="flex items-center gap-1 text-xs font-bold"
-                                            style={{ color: '#F7F2EB' }}
+                                            className="flex items-center gap-1.5 text-[14px] font-bold text-rose bg-rose/10 px-3 py-1.5 rounded-lg"
                                         >
-                                            <Phone size={11} />
+                                            <Phone size={14} weight="fill" />
                                             {r.phone}
                                         </span>
                                     )
@@ -983,11 +915,9 @@ export default function ResourcesPage() {
                                         href={safeCrisisUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center gap-1 text-xs font-medium no-underline"
-                                        style={{ color: '#D0E3FF' }}
+                                        className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-widest text-sapphire hover:text-rose transition-colors ml-auto"
                                     >
-                                        <ExternalLink size={11} />
-                                        Website
+                                        Visit Site <ArrowUpRight size={14} weight="bold" />
                                     </a>
                                 )}
                             </div>
@@ -1001,17 +931,18 @@ export default function ResourcesPage() {
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.9 }}
-                className="mt-10 text-center"
+                transition={{ delay: 0.8 }}
+                className="mt-16 text-center max-w-2xl mx-auto pb-8"
             >
-                <p className="text-xs" style={{ color: '#7096D1' }}>
-                    Resources are curated and verified periodically. AI-discovered resources should be verified independently.
+                <div className="w-16 h-px bg-cloud mx-auto mb-6" />
+                <p className="text-[12px] font-bold uppercase tracking-widest text-[rgba(10,22,41,0.3)] mb-2 flex items-center justify-center gap-2">
+                    <SealCheck size={14} className="text-[#10B981]" weight="fill" /> Verified Directory
                 </p>
-                <p className="text-xs mt-1" style={{ color: '#7096D1' }}>
-                    In future updates, you&apos;ll be able to connect directly with attorneys and therapists
-                    through NEXX — share documents, get feedback, and manage your care team.
+                <p className="text-[13px] font-medium text-sapphire-muted leading-relaxed">
+                    Resources are secured and verified continuously. External resources should be verified independently.
+                    Full attorney and therapist integration arriving in future capabilities.
                 </p>
             </motion.div>
-        </div>
+        </PageContainer>
     );
 }

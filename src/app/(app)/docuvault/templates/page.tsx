@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { UI_TABS, getTemplatesForTab } from '@/lib/legal/templateCategories';
 import type { UITabCategory } from '@/lib/legal/templateCategories';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import type { DocumentTemplate } from '@/lib/legal/types';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
@@ -111,46 +112,34 @@ export default function TemplateGalleryPage() {
     };
 
     return (
-        <div className="max-w-5xl mx-auto">
+        <PageContainer>
             {/* Header */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-4 mb-8"
-            >
-                <Link
-                    href="/docuvault"
-                    className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors no-underline"
-                    style={{
-                        background: 'rgba(208, 227, 255, 0.08)',
-                        border: '1px solid rgba(208, 227, 255, 0.15)',
-                    }}
-                    aria-label="Back to DocuVault"
-                >
-                    <ArrowLeft size={16} style={{ color: '#F7F2EB' }} />
-                </Link>
-                <div>
-                    <h1 className="text-headline text-2xl" style={{ color: '#F7F2EB' }}>
-                        Template Gallery
-                    </h1>
-                    <p className="text-sm" style={{ color: '#FFF9F0' }}>
-                        Browse and preview legal document templates
-                    </p>
-                </div>
-            </motion.div>
+            <PageHeader
+                icon={FileText}
+                title="Template Gallery"
+                description="Your blueprint for legal success. Browse ironclad templates designed to protect your peace and assert your rights."
+                rightElement={
+                    <Link
+                        href="/docuvault"
+                        className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all bg-white/10 border border-white/30 hover:bg-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_4px_12px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+                        aria-label="Back to DocuVault"
+                    >
+                        <ArrowLeft size={20} strokeWidth={3} className="text-white drop-shadow-sm" />
+                    </Link>
+                }
+            />
 
             {/* Search */}
             <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="mb-6"
+                className="mb-8"
             >
-                <div className="relative">
+                <div className="relative group">
                     <Search
-                        size={16}
-                        className="absolute left-4 top-1/2 -translate-y-1/2"
-                        style={{ color: '#FFF9F0' }}
+                        size={22}
+                        className="absolute left-6 top-1/2 -translate-y-1/2 text-white/70 group-focus-within:text-[#60A5FA] transition-colors"
                     />
                     <input
                         type="text"
@@ -158,7 +147,7 @@ export default function TemplateGalleryPage() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search templates..."
                         aria-label="Search templates"
-                        className="input-premium pl-11"
+                        className="w-full h-16 pl-16 pr-6 rounded-[2rem] bg-white/5 backdrop-blur-2xl border border-white/20 text-[16px] text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-[#60A5FA]/50 focus:bg-white/10 transition-all shadow-[inset_0_1px_2px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)] font-medium"
                     />
                 </div>
             </motion.div>
@@ -168,31 +157,24 @@ export default function TemplateGalleryPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 }}
-                className="flex items-center justify-between mb-6"
+                className="flex items-center justify-between mb-10"
             >
-                <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+                <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
                     {filterTabs.map((tab) => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveFilter(tab.id)}
-                            className="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap cursor-pointer transition-all"
-                            style={{
-                                background:
-                                    activeFilter === tab.id
-                                        ? 'rgba(208, 227, 255, 0.12)'
-                                        : 'transparent',
-                                color: activeFilter === tab.id ? '#F7F2EB' : '#FFF9F0',
-                                border:
-                                    activeFilter === tab.id
-                                        ? '1px solid rgba(208, 227, 255, 0.25)'
-                                        : '1px solid rgba(138, 122, 96, 0.08)',
-                            }}
+                            className={`px-6 py-3 rounded-full text-[13px] font-bold tracking-widest uppercase whitespace-nowrap cursor-pointer transition-all shadow-sm ${
+                                activeFilter === tab.id
+                                    ? 'bg-[linear-gradient(135deg,#E5A84A,#B47B04)] text-white border border-white/30 shadow-[inset_0_1px_2px_rgba(255,255,255,0.5),0_8px_24px_rgba(229,168,74,0.6)] drop-shadow-sm'
+                                    : 'bg-white/5 backdrop-blur-xl text-white border border-white/10 hover:bg-white/10 hover:border-white/30 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)]'
+                            }`}
                         >
                             {tab.label}
                         </button>
                     ))}
                 </div>
-                <p className="text-xs flex-shrink-0 ml-4" style={{ color: '#D0E3FF' }}>
+                <p className="text-[14px] font-bold tracking-wide text-white drop-shadow-sm flex-shrink-0 ml-4">
                     {filteredTemplates.length} template{filteredTemplates.length !== 1 ? 's' : ''}
                 </p>
             </motion.div>
@@ -203,7 +185,7 @@ export default function TemplateGalleryPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
             >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
                     {filteredTemplates.map(({ template, tabLabel }, i) => (
                         <motion.button
                             type="button"
@@ -212,40 +194,19 @@ export default function TemplateGalleryPage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.03 * Math.min(i, 15) }}
                             onClick={() => setPreviewTemplate(template)}
-                            className="group rounded-2xl p-5 cursor-pointer transition-all duration-200 hover:scale-[1.02] text-left"
-                            style={{
-                                background: 'rgba(208, 227, 255, 0.04)',
-                                border: '1px solid rgba(208, 227, 255, 0.1)',
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.borderColor = 'rgba(208, 227, 255, 0.25)';
-                                e.currentTarget.style.background = 'rgba(208, 227, 255, 0.08)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.borderColor = 'rgba(208, 227, 255, 0.1)';
-                                e.currentTarget.style.background = 'rgba(208, 227, 255, 0.04)';
-                            }}
+                            className="p-5 rounded-[1.5rem] group transition-all border border-white/10 bg-white/5 backdrop-blur-2xl hover:bg-white/10 hover:border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-1 text-left flex flex-col h-full"
                         >
                             {/* Document preview icon */}
                             <div
-                                className="w-full h-28 rounded-xl mb-4 flex items-center justify-center"
-                                style={{
-                                    background: 'rgba(10, 30, 84, 0.4)',
-                                    border: '1px solid rgba(208, 227, 255, 0.08)',
-                                }}
+                                className="w-full h-20 rounded-2xl mb-4 flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-white/20 shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),0_8px_24px_rgba(0,0,0,0.4)] transition-all group-hover:border-white/40"
                             >
-                                <FileText size={32} style={{ color: '#D0E3FF', opacity: 0.6 }} />
+                                <FileText size={32} className="text-white drop-shadow-sm opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-transform duration-300" />
                             </div>
 
                             {/* Category badge */}
-                            <div className="flex items-center gap-2 mb-2">
+                            <div className="flex items-center gap-2 mb-3">
                                 <span
-                                    className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full"
-                                    style={{
-                                        background: 'rgba(208, 227, 255, 0.08)',
-                                        color: '#D0E3FF',
-                                        border: '1px solid rgba(208, 227, 255, 0.12)',
-                                    }}
+                                    className="text-[11px] font-bold tracking-widest uppercase bg-white/10 text-white border border-white/20 shadow-sm px-3 py-1.5 rounded-full"
                                 >
                                     {tabLabel}
                                 </span>
@@ -253,48 +214,46 @@ export default function TemplateGalleryPage() {
 
                             {/* Title */}
                             <p
-                                className="text-sm font-medium leading-snug mb-2 line-clamp-2"
-                                style={{ color: '#F7F2EB' }}
+                                className="text-[18px] font-bold leading-snug mb-2 line-clamp-2 text-white drop-shadow-sm flex-1"
                             >
                                 {template.title}
                             </p>
 
                             {/* Description */}
                             <p
-                                className="text-xs leading-relaxed line-clamp-2"
-                                style={{ color: '#FFF9F0', opacity: 0.7 }}
+                                className="text-[14px] leading-relaxed line-clamp-2 text-white font-medium mb-4"
                             >
                                 {template.description}
                             </p>
 
                             {/* Requirement indicators */}
-                            <div className="flex items-center gap-3 mt-3">
+                            <div className="flex items-center flex-wrap gap-x-3 gap-y-2 mt-auto pt-4 border-t border-white/10">
                                 {template.requiresDeclaration && (
                                     <div
-                                        className="flex items-center gap-1"
+                                        className="flex items-center gap-1.5"
                                         title="Requires Declaration"
                                     >
-                                        <Shield size={10} style={{ color: '#D0E3FF', opacity: 0.5 }} />
-                                        <span className="text-[10px]" style={{ color: '#D0E3FF', opacity: 0.5 }}>
+                                        <Shield size={14} className="text-white drop-shadow-sm" />
+                                        <span className="text-[11px] font-bold tracking-wide uppercase text-white">
                                             Decl.
                                         </span>
                                     </div>
                                 )}
                                 {template.requiresProposedOrder && (
                                     <div
-                                        className="flex items-center gap-1"
+                                        className="flex items-center gap-1.5"
                                         title="Requires Proposed Order"
                                     >
-                                        <Scale size={10} style={{ color: '#D0E3FF', opacity: 0.5 }} />
-                                        <span className="text-[10px]" style={{ color: '#D0E3FF', opacity: 0.5 }}>
+                                        <Scale size={14} className="text-white drop-shadow-sm" />
+                                        <span className="text-[11px] font-bold tracking-wide uppercase text-white">
                                             Order
                                         </span>
                                     </div>
                                 )}
                                 {template.supportsExhibits && (
-                                    <div className="flex items-center gap-1" title="Supports Exhibits">
-                                        <Paperclip size={10} style={{ color: '#D0E3FF', opacity: 0.5 }} />
-                                        <span className="text-[10px]" style={{ color: '#D0E3FF', opacity: 0.5 }}>
+                                    <div className="flex items-center gap-1.5" title="Supports Exhibits">
+                                        <Paperclip size={14} className="text-white drop-shadow-sm" />
+                                        <span className="text-[11px] font-bold tracking-wide uppercase text-white">
                                             Exhibits
                                         </span>
                                     </div>
@@ -311,28 +270,19 @@ export default function TemplateGalleryPage() {
                     >
                         <Link href="/docuvault" className="no-underline">
                             <div
-                                className="rounded-2xl p-5 cursor-pointer transition-all duration-200 hover:scale-[1.02] h-full flex flex-col items-center justify-center min-h-[220px]"
-                                style={{
-                                    background: 'rgba(208, 227, 255, 0.02)',
-                                    border: '1px dashed rgba(208, 227, 255, 0.2)',
-                                }}
+                                className="p-8 rounded-[2rem] group transition-all border border-dashed border-white/30 bg-white/5 backdrop-blur-2xl hover:bg-white/10 hover:border-white/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-1 h-full flex flex-col items-center justify-center min-h-[300px]"
                             >
                                 <div
-                                    className="w-14 h-14 rounded-xl flex items-center justify-center mb-4"
-                                    style={{
-                                        background: 'rgba(208, 227, 255, 0.06)',
-                                        border: '1px dashed rgba(208, 227, 255, 0.2)',
-                                    }}
+                                    className="w-20 h-20 rounded-[1.5rem] flex items-center justify-center mb-6 border-2 border-dashed border-white/40 bg-white/5 group-hover:bg-white/10 group-hover:border-white/60 transition-all group-hover:scale-110 duration-300"
                                 >
-                                    <Plus size={24} style={{ color: '#D0E3FF' }} />
+                                    <Plus size={36} className="text-white drop-shadow-sm" strokeWidth={3} />
                                 </div>
                                 <p
-                                    className="text-sm font-semibold mb-1"
-                                    style={{ color: '#F7F2EB' }}
+                                    className="text-[18px] font-bold mb-2 text-white drop-shadow-sm"
                                 >
                                     Create Your Own
                                 </p>
-                                <p className="text-xs text-center" style={{ color: '#FFF9F0', opacity: 0.6 }}>
+                                <p className="text-[14px] font-medium text-white text-center px-4">
                                     Start with a blank template
                                 </p>
                             </div>
@@ -342,13 +292,12 @@ export default function TemplateGalleryPage() {
 
                 {/* Empty state */}
                 {filteredTemplates.length === 0 && (
-                    <div className="text-center py-12">
+                    <div className="text-center py-20 px-8 rounded-[2rem] border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_12px_40px_rgba(0,0,0,0.4)] mt-8">
                         <FileText
-                            size={32}
-                            className="mx-auto mb-3"
-                            style={{ color: '#D0E3FF', opacity: 0.3 }}
+                            size={56}
+                            className="mx-auto mb-6 text-white drop-shadow-sm"
                         />
-                        <p className="text-sm" style={{ color: '#D0E3FF' }}>
+                        <p className="text-[18px] font-bold text-white mb-4 drop-shadow-sm">
                             No templates match your search.
                         </p>
                         <button
@@ -356,8 +305,7 @@ export default function TemplateGalleryPage() {
                                 setSearchQuery('');
                                 setActiveFilter('all');
                             }}
-                            className="text-xs mt-2 cursor-pointer underline"
-                            style={{ color: '#FFF9F0', background: 'none', border: 'none' }}
+                            className="text-[14px] font-bold tracking-wide cursor-pointer transition-all border-b-2 border-white pb-0.5 text-white hover:text-[#60A5FA] hover:border-[#60A5FA]"
                         >
                             Clear filters
                         </button>
@@ -404,22 +352,16 @@ export default function TemplateGalleryPage() {
                                 }}
                             >
                                 {/* Modal header */}
-                                <div className="flex items-start justify-between p-6 pb-4">
+                                <div className="flex items-start justify-between p-8 pb-6 border-b border-white/10">
                                     <div className="flex-1 min-w-0">
                                         <span
-                                            className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full inline-block mb-3"
-                                            style={{
-                                                background: 'rgba(208, 227, 255, 0.08)',
-                                                color: '#D0E3FF',
-                                                border: '1px solid rgba(208, 227, 255, 0.15)',
-                                            }}
+                                            className="text-[11px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full inline-block mb-4 text-white bg-white/10 border border-white/20 shadow-sm"
                                         >
                                             {CATEGORY_LABELS[previewTemplate.category] || previewTemplate.category}
                                         </span>
                                         <h2
                                             id="template-preview-title"
-                                            className="text-lg font-serif font-semibold leading-snug"
-                                            style={{ color: '#F7F2EB' }}
+                                            className="text-2xl font-serif font-bold leading-snug text-white drop-shadow-sm"
                                         >
                                             {previewTemplate.title}
                                         </h2>
@@ -427,88 +369,61 @@ export default function TemplateGalleryPage() {
                                     <button
                                         onClick={() => setPreviewTemplate(null)}
                                         aria-label="Close preview"
-                                        className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer flex-shrink-0 ml-4 transition-colors"
-                                        style={{
-                                            background: 'rgba(208, 227, 255, 0.08)',
-                                            border: 'none',
-                                            color: '#D0E3FF',
-                                        }}
+                                        className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer flex-shrink-0 ml-4 transition-all bg-white/10 border border-white/20 text-white hover:bg-white/20 hover:scale-105"
                                     >
-                                        <X size={16} />
+                                        <X size={20} strokeWidth={2.5} />
                                     </button>
                                 </div>
 
                                 {/* Modal body (scrollable) */}
-                                <div className="flex-1 overflow-y-auto px-6 pb-2" style={{ scrollbarWidth: 'thin' }}>
+                                <div className="flex-1 overflow-y-auto px-8 py-6" style={{ scrollbarWidth: 'thin' }}>
                                     {/* Description */}
                                     <p
-                                        className="text-sm leading-relaxed mb-5"
-                                        style={{ color: '#FFF9F0' }}
+                                        className="text-[15px] leading-relaxed mb-8 text-white font-medium"
                                     >
                                         {previewTemplate.description}
                                     </p>
 
                                     {/* Requirements badges */}
-                                    <div className="flex flex-wrap gap-2 mb-5">
+                                    <div className="flex flex-wrap gap-3 mb-8">
                                         {previewTemplate.requiresDeclaration && (
                                             <div
-                                                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg"
-                                                style={{
-                                                    background: 'rgba(229, 168, 74, 0.08)',
-                                                    border: '1px solid rgba(229, 168, 74, 0.2)',
-                                                    color: '#E5A84A',
-                                                }}
+                                                className="flex items-center gap-2 text-[12px] font-bold tracking-wide uppercase px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white"
                                             >
-                                                <Shield size={12} />
+                                                <Shield size={14} className="text-[#E5A84A]" />
                                                 Requires Declaration
                                             </div>
                                         )}
                                         {previewTemplate.requiresProposedOrder && (
                                             <div
-                                                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg"
-                                                style={{
-                                                    background: 'rgba(112, 150, 209, 0.08)',
-                                                    border: '1px solid rgba(112, 150, 209, 0.2)',
-                                                    color: '#7096D1',
-                                                }}
+                                                className="flex items-center gap-2 text-[12px] font-bold tracking-wide uppercase px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white"
                                             >
-                                                <Scale size={12} />
+                                                <Scale size={14} className="text-[#60A5FA]" />
                                                 Requires Proposed Order
                                             </div>
                                         )}
                                         {previewTemplate.supportsExhibits && (
                                             <div
-                                                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg"
-                                                style={{
-                                                    background: 'rgba(90, 158, 111, 0.08)',
-                                                    border: '1px solid rgba(90, 158, 111, 0.2)',
-                                                    color: '#5A9E6F',
-                                                }}
+                                                className="flex items-center gap-2 text-[12px] font-bold tracking-wide uppercase px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white"
                                             >
-                                                <Paperclip size={12} />
+                                                <Paperclip size={14} className="text-[#10B981]" />
                                                 Supports Exhibits
                                             </div>
                                         )}
                                     </div>
 
                                     {/* Case Types */}
-                                    <div className="mb-5">
+                                    <div className="mb-8 p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
                                         <h3
-                                            className="text-xs font-semibold tracking-[0.15em] uppercase mb-2"
-                                            style={{ color: '#D0E3FF' }}
+                                            className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 text-white drop-shadow-sm"
                                         >
                                             Applicable Case Types
                                         </h3>
-                                        <div className="flex flex-wrap gap-1.5">
+                                        <div className="flex flex-wrap gap-2">
                                             {previewTemplate.caseTypes.map((ct) => (
                                                 <span
                                                     key={ct}
-                                                    className="text-[11px] px-2 py-1 rounded-md"
-                                                    style={{
-                                                        background: 'rgba(208, 227, 255, 0.06)',
-                                                        color: '#D0E3FF',
-                                                        border: '1px solid rgba(208, 227, 255, 0.1)',
-                                                    }}
+                                                    className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 text-white border border-white/20 shadow-sm"
                                                 >
                                                     {CASE_TYPE_LABELS[ct] || ct}
                                                 </span>
@@ -517,35 +432,27 @@ export default function TemplateGalleryPage() {
                                     </div>
 
                                     {/* Document Sections */}
-                                    <div className="mb-5">
+                                    <div className="mb-8 p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
                                         <h3
-                                            className="text-xs font-semibold tracking-[0.15em] uppercase mb-2"
-                                            style={{ color: '#D0E3FF' }}
+                                            className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 text-white drop-shadow-sm"
                                         >
                                             Document Structure
                                         </h3>
-                                        <div className="space-y-1.5">
+                                        <div className="space-y-2.5">
                                             {previewTemplate.sections.map((section, idx) => (
                                                 <div
                                                     key={`${section.id}-${idx}`}
-                                                    className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
-                                                    style={{
-                                                        background: 'rgba(208, 227, 255, 0.03)',
-                                                        border: '1px solid rgba(208, 227, 255, 0.06)',
-                                                    }}
+                                                    className="flex items-center gap-3 text-[14px] font-medium px-4 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
                                                 >
                                                     <CheckCircle2
-                                                        size={12}
-                                                        style={{
-                                                            color: section.required ? '#5A9E6F' : '#D0E3FF',
-                                                            opacity: section.required ? 1 : 0.4,
-                                                        }}
+                                                        size={16}
+                                                        className={section.required ? "text-[#10B981]" : "text-white/40"}
                                                     />
-                                                    <span style={{ color: '#F7F2EB' }}>
+                                                    <span className="text-white drop-shadow-sm">
                                                         {section.title || section.type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                                     </span>
                                                     {!section.required && (
-                                                        <span className="ml-auto text-[10px]" style={{ color: '#D0E3FF', opacity: 0.4 }}>
+                                                        <span className="ml-auto text-[11px] font-bold tracking-wider uppercase text-white/50 bg-white/5 px-2 py-1 rounded-md">
                                                             Optional
                                                         </span>
                                                     )}
@@ -556,24 +463,22 @@ export default function TemplateGalleryPage() {
 
                                     {/* State Variants */}
                                     {previewTemplate.stateVariants && Object.keys(previewTemplate.stateVariants).length > 0 && (
-                                        <div className="mb-5">
+                                        <div className="mb-4 p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
                                             <h3
-                                                className="text-xs font-semibold tracking-[0.15em] uppercase mb-2"
-                                                style={{ color: '#D0E3FF' }}
+                                                className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 text-white drop-shadow-sm"
                                             >
                                                 State Variants
                                             </h3>
-                                            <div className="space-y-1">
+                                            <div className="space-y-2">
                                                 {Object.entries(previewTemplate.stateVariants).map(([state, name]) => (
                                                     <div
                                                         key={state}
-                                                        className="flex items-center gap-2 text-xs"
-                                                        style={{ color: '#FFF9F0', opacity: 0.7 }}
+                                                        className="flex flex-col sm:flex-row sm:items-start sm:gap-3 text-[14px]"
                                                     >
-                                                        <span className="font-medium" style={{ color: '#D0E3FF' }}>
+                                                        <span className="font-bold text-white shrink-0 min-w-[120px]">
                                                             {state}:
                                                         </span>
-                                                        <span>{name}</span>
+                                                        <span className="font-medium text-white/90">{name}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -583,31 +488,20 @@ export default function TemplateGalleryPage() {
 
                                 {/* Modal footer */}
                                 <div
-                                    className="p-6 pt-4 flex items-center gap-3"
-                                    style={{ borderTop: '1px solid rgba(208, 227, 255, 0.08)' }}
+                                    className="p-6 flex items-center gap-4 border-t border-white/10 bg-white/5"
                                 >
                                     <button
                                         onClick={() => setPreviewTemplate(null)}
-                                        className="flex-1 py-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all"
-                                        style={{
-                                            background: 'rgba(208, 227, 255, 0.06)',
-                                            border: '1px solid rgba(208, 227, 255, 0.15)',
-                                            color: '#D0E3FF',
-                                        }}
+                                        className="flex-1 py-4 rounded-[1rem] text-[14px] font-bold tracking-wider uppercase cursor-pointer transition-all bg-white/10 border border-white/20 text-white hover:bg-white/20"
                                     >
-                                        Back
+                                        Cancel
                                     </button>
                                     <button
                                         onClick={() => handleUseTemplate(previewTemplate.id)}
-                                        className="flex-[2] py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all flex items-center justify-center gap-2"
-                                        style={{
-                                            background: 'linear-gradient(135deg, #F7F2EB, #D0E3FF)',
-                                            border: 'none',
-                                            color: '#0A1E54',
-                                        }}
+                                        className="flex-[2] py-4 rounded-[1rem] text-[15px] font-bold tracking-wider uppercase cursor-pointer transition-all flex items-center justify-center gap-3 bg-[linear-gradient(135deg,#60A5FA,#2563EB)] border-none text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_8px_24px_rgba(37,99,235,0.5)] hover:shadow-[0_12px_32px_rgba(37,99,235,0.6)] hover:-translate-y-1"
                                     >
                                         Use This Template
-                                        <ArrowRight size={14} />
+                                        <ArrowRight size={18} strokeWidth={2.5} />
                                     </button>
                                 </div>
                             </div>
@@ -615,6 +509,6 @@ export default function TemplateGalleryPage() {
                     </>
                 )}
             </AnimatePresence>
-        </div>
+        </PageContainer>
     );
 }

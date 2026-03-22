@@ -57,6 +57,12 @@ export default defineSchema({
                 v.literal('numb')
             )
         ),
+        subscriptionTier: v.optional(v.union(
+            v.literal('free'),
+            v.literal('pro'),
+            v.literal('premium'),
+            v.literal('executive')
+        )),
         onboardingComplete: v.boolean(),
         primaryGoals: v.optional(v.array(v.string())),
         createdAt: v.number(),
@@ -67,9 +73,15 @@ export default defineSchema({
         userId: v.id('users'),
         nickname: v.optional(v.string()),
         relationship: v.optional(v.string()),
+        /** Full legal name of the opposing party as it appears on court documents */
+        legalName: v.optional(v.string()),
+        /** Court-appropriate designations (multi-select): e.g. ["Child's Father", "Ex-Husband"] */
+        legalRelation: v.optional(v.array(v.string())),
+        /** Whether the opposing party is the Petitioner or Respondent in the case */
+        partyRole: v.optional(v.union(v.literal('petitioner'), v.literal('respondent'))),
         behaviors: v.array(v.string()),
         description: v.optional(v.string()),
-        communicationStyle: v.optional(v.string()),
+        communicationStyle: v.optional(v.union(v.array(v.string()), v.string())),
         manipulationTactics: v.optional(v.array(v.string())),
         triggerPatterns: v.optional(v.array(v.string())),
         // AI-enriched fields
@@ -113,17 +125,20 @@ export default defineSchema({
         userId: v.id('users'),
         narrative: v.string(),
         courtSummary: v.optional(v.string()),
-        category: v.union(
-            v.literal('emotional_abuse'),
-            v.literal('financial_abuse'),
-            v.literal('parental_alienation'),
-            v.literal('custody_violation'),
-            v.literal('harassment'),
-            v.literal('threats'),
-            v.literal('manipulation'),
-            v.literal('neglect'),
-            v.literal('other')
+        category: v.optional(
+            v.union(
+                v.literal('emotional_abuse'),
+                v.literal('financial_abuse'),
+                v.literal('parental_alienation'),
+                v.literal('custody_violation'),
+                v.literal('harassment'),
+                v.literal('threats'),
+                v.literal('manipulation'),
+                v.literal('neglect'),
+                v.literal('other')
+            )
         ),
+        tags: v.optional(v.array(v.string())),
         severity: v.number(),
         date: v.string(),
         time: v.string(),
@@ -174,6 +189,18 @@ export default defineSchema({
         judicialDistrict: v.optional(v.string()),
         assignedJudge: v.optional(v.string()),
         causeNumber: v.optional(v.string()),
+        /** Case title format for document captions */
+        caseTitleFormat: v.optional(v.union(
+            v.literal('name_v_name'),
+            v.literal('in_interest_of'),
+            v.literal('in_matter_of_marriage'),
+            v.literal('in_re_marriage'),
+            v.literal('custom')
+        )),
+        /** Custom case title (used when caseTitleFormat is 'custom') */
+        caseTitleCustom: v.optional(v.string()),
+        /** Respondent/opposing party legal name for document generation */
+        respondentLegalName: v.optional(v.string()),
         /** User-verified formatting overrides (merged on top of state/county defaults) */
         formattingOverrides: v.optional(v.any()),
         /** Whether the user has verified these settings via AI lookup */

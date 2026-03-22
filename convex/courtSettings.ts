@@ -14,11 +14,25 @@ export const upsert = mutation({
         judicialDistrict: v.optional(v.string()),
         assignedJudge: v.optional(v.string()),
         causeNumber: v.optional(v.string()),
+        caseTitleFormat: v.optional(v.union(
+            v.literal('name_v_name'),
+            v.literal('in_interest_of'),
+            v.literal('in_matter_of_marriage'),
+            v.literal('in_re_marriage'),
+            v.literal('custom')
+        )),
+        caseTitleCustom: v.optional(v.string()),
+        respondentLegalName: v.optional(v.string()),
         formattingOverrides: v.optional(v.any()),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
         const now = Date.now();
+
+        // Validate: custom title format requires non-empty custom text
+        if (args.caseTitleFormat === 'custom' && (!args.caseTitleCustom || !args.caseTitleCustom.trim())) {
+            throw new Error('Custom case title text is required when format is set to "custom".');
+        }
 
         // Check if user already has settings
         const existing = await ctx.db

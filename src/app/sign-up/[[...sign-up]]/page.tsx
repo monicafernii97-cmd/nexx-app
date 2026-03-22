@@ -7,8 +7,7 @@ import { nexxClerkAppearance } from '@/lib/clerk-theme';
 export default function SignUpPage() {
     return (
         <div
-            className="min-h-screen flex items-center justify-center relative overflow-hidden"
-            style={{ background: '#0E0804' }}
+            className="bg-[#0A1128] min-h-screen flex items-center justify-center relative overflow-hidden"
         >
             {/* Background ambient glow */}
             <div className="absolute inset-0 pointer-events-none">
@@ -31,14 +30,14 @@ export default function SignUpPage() {
             </div>
 
             <div className="relative z-10">
-                <div className="text-center mb-8">
+                <div className="text-center mb-10">
                     <h1
-                        className="font-serif text-4xl font-bold italic tracking-wide mb-2"
+                        className="font-serif text-5xl font-bold italic tracking-wide mb-3"
                         style={{ color: '#F7F2EB' }}
                     >
                         <span className="shimmer">NEXX</span>
                     </h1>
-                    <p className="text-sm tracking-[0.2em] uppercase" style={{ color: '#D0E3FF' }}>
+                    <p className="text-base tracking-[0.2em] md:text-lg uppercase" style={{ color: '#D0E3FF' }}>
                         Begin Your Journey
                     </p>
                 </div>

@@ -1,29 +1,52 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
+import type { Id } from '../../../../convex/_generated/dataModel';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-    MessageCircle,
+    ChatCircleDots,
     Plus,
-    Sparkles,
+    ChatTeardropDots,
     Clock,
     Archive,
-    ChevronRight,
-} from 'lucide-react';
+    CaretRight,
+    CaretDown,
+    Trash,
+} from '@phosphor-icons/react';
 import { formatDistanceToNow } from 'date-fns';
 import { MODE_LABELS } from '@/lib/constants';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 
-/** Conversation list page with mode picker and new-chat creation. */
+/** Conversation list page with mode picker and new-chat creation. Ethereal theme. */
 export default function ChatListPage() {
     const router = useRouter();
     const conversations = useQuery(api.conversations.list, {});
     const createConversation = useMutation(api.conversations.create);
+    const removeConversation = useMutation(api.conversations.remove);
     const [selectedMode, setSelectedMode] = useState<'therapeutic' | 'legal' | 'strategic' | 'general'>('general');
     const [isCreating, setIsCreating] = useState(false);
+    const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+    const [deletingId, setDeletingId] = useState<Id<'conversations'> | null>(null);
+
+    const handleDelete = async (e: React.MouseEvent, id: Id<'conversations'>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (deletingId) return; // prevent concurrent deletes
+        if (window.confirm("Are you sure you want to permanently delete this session? This action cannot be undone.")) {
+            setDeletingId(id);
+            try {
+                await removeConversation({ id });
+            } catch (error) {
+                console.error("Failed to delete conversation:", error);
+            } finally {
+                setDeletingId(null);
+            }
+        }
+    };
 
     const handleNewChat = async () => {
         setIsCreating(true);
@@ -45,75 +68,56 @@ export default function ChatListPage() {
     const archivedConversations = isLoadingConversations ? [] : conversations.filter((c) => c.status === 'archived');
 
     return (
-        <div className="max-w-4xl mx-auto">
-            {/* Header */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-start justify-between mb-8"
-            >
-                <div>
-                    <div className="flex items-center gap-3 mb-2">
-                        <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center"
-                            style={{
-                                background: 'linear-gradient(135deg, #F7F2EB, #123D7E)',
-                                boxShadow: '0 2px 12px rgba(208, 227, 255, 0.25)',
-                            }}
-                        >
-                            <Sparkles size={18} style={{ color: '#F7F2EB' }} />
-                        </div>
-                        <h1 className="text-headline text-2xl" style={{ color: '#F7F2EB' }}>
-                            NEXX Intelligence
-                        </h1>
-                    </div>
-                    <p className="text-sm" style={{ color: '#FFF9F0' }}>
-                        Strategic AI counsel — your conversations are encrypted and private.
-                    </p>
-                </div>
-            </motion.div>
+        <PageContainer>
+            <PageHeader
+                icon={ChatTeardropDots}
+                title={
+                    <>NEXX <span className="shimmer text-champagne font-light pl-2">Chat</span></>
+                }
+                description="Your elite strategic counsel. Unpack the manipulation, clarify boundaries, and build an ironclad strategy."
+            />
 
-            {/* New Chat Section */}
+            {/* New Chat Section (Glass Container) */}
             <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="card-premium p-6 mb-8"
+                className="glass-ethereal p-8 mb-10 rounded-[2rem] border-white"
             >
-                <h2
-                    className="text-sm font-semibold tracking-[0.15em] uppercase mb-4"
-                    style={{ color: '#D0E3FF' }}
-                >
-                    Start New Session
-                </h2>
-                <div className="flex flex-wrap gap-2 mb-4">
-                    {Object.entries(MODE_LABELS).map(([key, { label, color }]) => (
-                        <button
-                            key={key}
-                            onClick={() => setSelectedMode(key as typeof selectedMode)}
-                            aria-pressed={selectedMode === key}
-                            className="badge cursor-pointer transition-all"
-                            style={{
-                                background:
-                                    selectedMode === key
-                                        ? `${color}25`
-                                        : 'rgba(138, 122, 96, 0.08)',
-                                color: selectedMode === key ? color : '#FFF9F0',
-                                border: `1px solid ${selectedMode === key ? `${color}40` : 'transparent'}`,
-                            }}
-                        >
-                            {label}
-                        </button>
-                    ))}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div>
+                        <h2 className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 text-sapphire flex items-center gap-2">
+                            <ChatTeardropDots size={16} className="text-champagne" /> Start New Session
+                        </h2>
+                        <div className="flex flex-wrap gap-2.5">
+                            {Object.entries(MODE_LABELS).map(([key, { label, color }]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => setSelectedMode(key as typeof selectedMode)}
+                                    aria-pressed={selectedMode === key}
+                                    className={`relative px-5 py-2.5 rounded-xl cursor-pointer font-bold tracking-wide transition-all duration-300 overflow-hidden active:scale-95 border backdrop-blur-xl hover:-translate-y-0.5 z-10`}
+                                    style={{
+                                        background: selectedMode === key ? `color-mix(in srgb, ${color} 40%, rgba(255,255,255,0.15))` : 'rgba(255,255,255,0.03)',
+                                        color: selectedMode === key ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
+                                        borderColor: selectedMode === key ? `rgba(255,255,255,0.4)` : 'rgba(255,255,255,0.1)',
+                                        boxShadow: selectedMode === key ? `inset 0 4px 15px rgba(255,255,255,0.1), inset 0 -4px 15px rgba(0,0,0,0.1), 0 8px 20px rgba(0,0,0,0.3)` : 'inset 0 2px 4px rgba(255,255,255,0.05), 0 4px 10px rgba(0,0,0,0.1)',
+                                    }}
+                                >
+                                    <span className="relative z-20 drop-shadow-md">{label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <button
+                        onClick={handleNewChat}
+                        disabled={isCreating}
+                        className="btn-primary shrink-0 py-4 px-8 text-[13px] uppercase tracking-widest flex items-center gap-2 disabled:scale-100 disabled:opacity-50 shadow-md transition-all self-start md:self-end"
+                    >
+                        <Plus size={16} weight="bold" />
+                        {isCreating ? 'Initializing...' : 'New Session'}
+                    </button>
                 </div>
-                <button
-                    onClick={handleNewChat}
-                    disabled={isCreating}
-                    className="btn-primary text-xs flex items-center gap-2 disabled:opacity-40"
-                >
-                    <Plus size={14} />
-                    {isCreating ? 'Creating...' : 'New Conversation'}
-                </button>
             </motion.div>
 
             {/* Active Conversations */}
@@ -122,50 +126,42 @@ export default function ChatListPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
             >
-                <h2
-                    className="text-sm font-semibold tracking-[0.15em] uppercase mb-4"
-                    style={{ color: '#D0E3FF' }}
-                >
-                    Active Sessions ({isLoadingConversations ? '…' : activeConversations.length})
+                <h2 className="text-[12px] font-bold tracking-[0.2em] uppercase mb-5 text-sapphire px-2 flex items-center justify-between">
+                    <span>Active Sessions</span>
+                    <span 
+                        className="bg-white px-2 py-1 rounded-md shadow-[0_2px_4px_rgba(10,22,41,0.02)] border border-[rgba(10,22,41,0.06)] text-[12px] font-black"
+                        style={{ color: '#0A1128' }}
+                    >
+                        {isLoadingConversations ? '…' : activeConversations.length}
+                    </span>
                 </h2>
 
                 {isLoadingConversations ? (
-                    <div className="card-premium p-8 text-center mb-8">
-                        <div className="flex gap-1.5 justify-center">
-                            {[0, 1, 2].map((j) => (
-                                <motion.div
-                                    key={j}
-                                    className="w-2 h-2 rounded-full"
-                                    style={{ background: '#F7F2EB' }}
-                                    animate={{ opacity: [0.3, 1, 0.3] }}
-                                    transition={{ duration: 1, repeat: Infinity, delay: j * 0.2 }}
-                                />
-                            ))}
+                    <div className="card-premium p-12 text-center mb-8 border-dashed">
+                        <div className="flex flex-col items-center justify-center gap-4">
+                            <div className="w-10 h-10 rounded-full border-2 border-sapphire border-t-transparent animate-spin" />
+                            <p className="text-[13px] font-bold uppercase tracking-widest text-sapphire mt-2">
+                                Loading securely...
+                            </p>
                         </div>
-                        <p className="text-sm font-medium mt-3" style={{ color: '#D0E3FF' }}>
-                            Loading conversations…
-                        </p>
                     </div>
                 ) : activeConversations.length === 0 ? (
-                    <div className="card-premium p-8 text-center mb-8">
+                    <div className="card-premium p-12 text-center mb-8 flex flex-col items-center justify-center border-dashed">
                         <div
-                            className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-                            style={{
-                                background: 'rgba(208, 227, 255, 0.08)',
-                                border: '1px solid rgba(208, 227, 255, 0.15)',
-                            }}
+                            className="w-20 h-20 rounded-[2rem] mx-auto mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_25px_rgba(18,61,126,0.4)] border border-[rgba(255,255,255,0.1)] relative overflow-hidden"
                         >
-                            <MessageCircle size={28} style={{ color: '#FFF9F0' }} />
+                            <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity" />
+                            <ChatCircleDots size={36} weight="duotone" className="text-white relative z-10" />
                         </div>
-                        <p className="text-sm font-medium mb-2" style={{ color: '#D0E3FF' }}>
+                        <p className="text-[16px] font-bold mb-2 text-sapphire">
                             No conversations yet
                         </p>
-                        <p className="text-xs" style={{ color: '#FFF9F0' }}>
-                            Start your first session with NEXX to get strategic counsel.
+                        <p className="text-[14px] font-medium text-sapphire-muted max-w-xs mx-auto">
+                            Start your first session with NEXX to access elite strategic counsel.
                         </p>
                     </div>
                 ) : (
-                    <div className="space-y-3 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
                         {activeConversations.map((conv, i) => {
                             const modeInfo = MODE_LABELS[conv.mode] || MODE_LABELS.general;
                             return (
@@ -174,57 +170,63 @@ export default function ChatListPage() {
                                     initial={{ opacity: 0, y: 8 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.05 * i }}
+                                    className="relative group"
                                 >
-                                    <Link href={`/chat/${conv._id}`} className="card-premium p-4 cursor-pointer group block">
-                                        <div className="flex items-center gap-4">
+                                    <Link href={`/chat/${conv._id}`} className="card-premium p-5 cursor-pointer block border hover:border-sapphire/20 transition-all shadow-sm hover:shadow-md">
+                                        <div className="flex items-start gap-4">
                                             <div
-                                                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                                                className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
                                                 style={{
-                                                    background: `${modeInfo.color}15`,
-                                                    border: `1px solid ${modeInfo.color}30`,
+                                                    background: `color-mix(in srgb, ${modeInfo.color} 15%, white)`,
+                                                    border: `1px solid color-mix(in srgb, ${modeInfo.color} 30%, transparent)`,
                                                 }}
                                             >
-                                                <Sparkles size={16} style={{ color: modeInfo.color }} />
+                                                <ChatTeardropDots size={20} weight="duotone" style={{ color: modeInfo.color }} />
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <p
-                                                        className="text-sm font-semibold truncate"
-                                                        style={{ color: '#F7F2EB' }}
-                                                    >
-                                                        {conv.title}
-                                                    </p>
+                                            <div className="flex-1 min-w-0 pr-4">
+                                                <div className="flex items-center gap-2 mb-2">
                                                     <span
-                                                        className="badge text-xs"
+                                                        className="text-[10px] tracking-widest font-bold py-1 px-3 rounded-full border border-white/10 shadow-sm"
                                                         style={{
-                                                            background: `${modeInfo.color}20`,
+                                                            background: `color-mix(in srgb, ${modeInfo.color} 15%, transparent)`,
+                                                            backdropFilter: 'blur(8px)',
                                                             color: modeInfo.color,
+                                                            borderColor: `color-mix(in srgb, ${modeInfo.color} 40%, transparent)`,
                                                         }}
                                                     >
                                                         {modeInfo.label}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Clock size={10} style={{ color: '#FFF9F0' }} />
-                                                    <p className="text-xs" style={{ color: '#FFF9F0' }}>
-                                                        {formatDistanceToNow(conv.lastMessageAt, {
-                                                            addSuffix: true,
-                                                        })}
-                                                    </p>
-                                                    {conv.messageCount !== undefined && (
-                                                        <p className="text-xs" style={{ color: '#FFF9F0' }}>
-                                                            · {conv.messageCount} messages
+                                                <p className="text-[15px] font-bold truncate text-sapphire mb-1 group-hover:text-champagne transition-colors">
+                                                    {conv.title}
+                                                </p>
+                                                <div className="flex items-center gap-3 text-sapphire-muted">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Clock size={12} weight="bold" />
+                                                        <p className="text-[12px] font-medium">
+                                                            {formatDistanceToNow(conv.lastMessageAt, { addSuffix: true })}
                                                         </p>
+                                                    </div>
+                                                    {conv.messageCount !== undefined && (
+                                                        <>
+                                                            <div className="w-1 h-1 rounded-full bg-cloud" />
+                                                            <p className="text-[12px] font-medium">
+                                                                {conv.messageCount} msg
+                                                            </p>
+                                                        </>
                                                     )}
                                                 </div>
                                             </div>
-                                            <ChevronRight
-                                                size={14}
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                                style={{ color: '#F7F2EB' }}
-                                            />
                                         </div>
                                     </Link>
+                                    <button
+                                        onClick={(e) => handleDelete(e, conv._id)}
+                                        disabled={!!deletingId}
+                                        title="Delete Chat"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud z-20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <Trash size={16} weight="duotone" />
+                                    </button>
                                 </motion.div>
                             );
                         })}
@@ -239,41 +241,73 @@ export default function ChatListPage() {
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.4 }}
                 >
-                    <h2
-                        className="text-sm font-semibold tracking-[0.15em] uppercase mb-4 flex items-center gap-2"
-                        style={{ color: '#D0E3FF' }}
+                    <button
+                        onClick={() => setIsArchiveOpen(!isArchiveOpen)}
+                        aria-expanded={isArchiveOpen}
+                        aria-controls="archived-conversations"
+                        className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 flex items-center gap-2 text-sapphire-muted px-2 hover:text-sapphire transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60A5FA] focus-visible:rounded-md"
                     >
-                        <Archive size={14} /> Archived ({archivedConversations.length})
-                    </h2>
-                    <div className="space-y-3 opacity-60">
-                        {archivedConversations.map((conv) => {
-                            const modeInfo = MODE_LABELS[conv.mode] || MODE_LABELS.general;
-                            return (
-                                <Link
-                                    key={conv._id}
-                                    href={`/chat/${conv._id}`}
-                                    className="card-premium p-3 cursor-pointer block"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <p className="text-sm truncate flex-1" style={{ color: '#D0E3FF' }}>
-                                            {conv.title}
-                                        </p>
-                                        <span
-                                            className="badge text-xs"
-                                            style={{
-                                                background: `${modeInfo.color}15`,
-                                                color: modeInfo.color,
-                                            }}
-                                        >
-                                            {modeInfo.label}
-                                        </span>
-                                    </div>
-                                </Link>
-                            );
-                        })}
-                    </div>
+                        {isArchiveOpen ? <CaretDown size={16} /> : <CaretRight size={16} />}
+                        <Archive size={16} /> Archived ({archivedConversations.length})
+                    </button>
+                    <AnimatePresence>
+                        {isArchiveOpen && (
+                            <motion.div
+                                id="archived-conversations"
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-10"
+                            >
+                                {archivedConversations.map((conv) => {
+                                    const modeInfo = MODE_LABELS[conv.mode] || MODE_LABELS.general;
+                                    return (
+                                        <div key={conv._id} className="relative group/archived">
+                                            <Link
+                                                href={`/chat/${conv._id}`}
+                                                className="card-premium p-4 cursor-pointer block hover:bg-white transition-colors"
+                                            >
+                                                <div className="flex items-center gap-4 pr-10">
+                                                    <div
+                                                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                                                        style={{
+                                                            background: `color-mix(in srgb, ${modeInfo.color} 10%, white)`,
+                                                        }}
+                                                    >
+                                                        <Archive size={14} weight="duotone" style={{ color: modeInfo.color }} />
+                                                    </div>
+                                                    <p className="text-[14px] font-medium truncate flex-1 text-sapphire group-hover/archived:text-champagne transition-colors">
+                                                        {conv.title}
+                                                    </p>
+                                                    <span
+                                                        className="text-[10px] tracking-widest font-bold py-1 px-3 rounded-full border border-white/10 shadow-sm"
+                                                        style={{
+                                                            background: `color-mix(in srgb, ${modeInfo.color} 15%, transparent)`,
+                                                            backdropFilter: 'blur(8px)',
+                                                            color: modeInfo.color,
+                                                            borderColor: `color-mix(in srgb, ${modeInfo.color} 40%, transparent)`,
+                                                        }}
+                                                    >
+                                                        {modeInfo.label}
+                                                    </span>
+                                                </div>
+                                            </Link>
+                                            <button
+                                                onClick={(e) => handleDelete(e, conv._id)}
+                                                disabled={!!deletingId}
+                                                title="Delete Chat"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover/archived:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud shrink-0 disabled:opacity-50 disabled:cursor-not-allowed z-20"
+                                            >
+                                                <Trash size={14} weight="duotone" />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </motion.div>
             )}
-        </div>
+        </PageContainer>
     );
 }

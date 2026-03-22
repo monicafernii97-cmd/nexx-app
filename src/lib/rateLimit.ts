@@ -16,6 +16,8 @@ export type RateLimitFeature =
     | 'document_generation'
     | 'compliance_check'
     | 'chat_message'
+    | 'chat_message_4o'
+    | 'chat_message_mini'
     | 'legal_search'
     | 'resource_lookup';
 
@@ -53,6 +55,16 @@ export const FEATURE_LIMITS: Record<RateLimitFeature, FeatureLimit> = {
     },
     chat_message: {
         maxRequests: 50,
+        windowMs: ONE_DAY_MS,
+        label: 'chat messages',
+    },
+    chat_message_4o: {
+        maxRequests: 5, // free-tier default; overridden by tier config at runtime
+        windowMs: ONE_DAY_MS,
+        label: 'GPT-4o chat messages',
+    },
+    chat_message_mini: {
+        maxRequests: 50, // free-tier default; overridden by tier config at runtime
         windowMs: ONE_DAY_MS,
         label: 'chat messages',
     },
@@ -134,16 +146,20 @@ export interface RateLimitResult {
  *
  * @param userId - Clerk user ID
  * @param feature - Which feature is being rate-limited
+ * @param overrideMax - Optional per-call override for maxRequests (e.g. tier-specific limits).
+ *   When provided, replaces the default `FEATURE_LIMITS[feature].maxRequests` for this check only.
  * @returns RateLimitResult indicating whether the request is allowed
  */
 export function checkRateLimit(
     userId: string,
-    feature: RateLimitFeature
+    feature: RateLimitFeature,
+    overrideMax?: number
 ): RateLimitResult {
     // Periodic cleanup to prevent memory leaks
     cleanup();
 
     const featureLimit = FEATURE_LIMITS[feature];
+    const effectiveMax = overrideMax ?? featureLimit.maxRequests;
     const key = `${userId}:${feature}`;
     const now = Date.now();
 
@@ -172,11 +188,11 @@ export function checkRateLimit(
             ? featureLimit.windowMs
             : Math.max(0, featureLimit.windowMs - (now - window.timestamps[0]));
 
-    if (window.timestamps.length >= featureLimit.maxRequests) {
+    if (window.timestamps.length >= effectiveMax) {
         return {
             allowed: false,
             current: window.timestamps.length,
-            limit: featureLimit.maxRequests,
+            limit: effectiveMax,
             resetInMs,
             featureLabel: featureLimit.label,
         };
@@ -187,7 +203,7 @@ export function checkRateLimit(
     return {
         allowed: true,
         current: window.timestamps.length,
-        limit: featureLimit.maxRequests,
+        limit: effectiveMax,
         resetInMs,
         featureLabel: featureLimit.label,
     };
@@ -195,8 +211,9 @@ export function checkRateLimit(
 
 /**
  * Build a standard 429 JSON response for rate limit rejections.
+ * @param tier - The user's subscription tier, used for contextual messaging.
  */
-export function rateLimitResponse(result: RateLimitResult) {
+export function rateLimitResponse(result: RateLimitResult, tier: 'free' | 'pro' | 'premium' | 'executive' = 'free') {
     const resetMinutes = Math.ceil(result.resetInMs / (60 * 1000));
     const resetHours = Math.ceil(result.resetInMs / (60 * 60 * 1000));
     const resetDisplay = resetHours > 24
@@ -205,14 +222,21 @@ export function rateLimitResponse(result: RateLimitResult) {
             ? `${resetHours} hours`
             : `${resetMinutes} minutes`;
 
+    const tierLabel = tier === 'free' ? 'free' : tier;
+    const upgradeHint = tier === 'executive'
+        ? 'You have reached your executive plan limit. Contact support for custom limits.'
+        : tier === 'premium'
+            ? 'Upgrade to Executive for higher limits.'
+            : 'Upgrade to Premium for unlimited access.';
+
     return {
         body: {
             error: 'Rate limit exceeded',
-            message: `You've used ${result.current}/${result.limit} free ${result.featureLabel} this period. Resets in ${resetDisplay}.`,
+            message: `You've used ${result.current}/${result.limit} ${tierLabel} ${result.featureLabel} this period. Resets in ${resetDisplay}.`,
             current: result.current,
             limit: result.limit,
             resetInMs: result.resetInMs,
-            upgradeHint: 'Upgrade to Premium for unlimited access.',
+            upgradeHint,
         },
         status: 429,
     };

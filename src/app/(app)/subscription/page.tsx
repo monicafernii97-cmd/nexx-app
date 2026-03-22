@@ -36,11 +36,11 @@ export default function SubscriptionPage() {
             tier: 'free',
             icon: Shield,
             iconColor: 'rgba(255,255,255,0.5)',
-            description: 'Start documenting incidents and familiarize yourself with the tools at no cost.',
+            description: 'Start documenting incidents and explore what NEXX can do — completely free.',
             features: [
-                '5 legal AI messages per day',
-                '50 support chat messages per day',
-                '3 document generations per month',
+                '5 legal guidance messages per day',
+                '50 NEXX Chat messages per day',
+                '3 legal document generations per month',
                 '3 court rules lookups per month',
                 'Basic incident reporting & analysis',
             ],
@@ -50,13 +50,13 @@ export default function SubscriptionPage() {
             tier: 'pro',
             icon: Lightning,
             iconColor: '#60A5FA',
-            description: 'For parents ready to build a strong, evidence-backed case with more daily resources.',
+            description: 'For parents ready to build a strong, evidence-backed case with expanded access to every tool.',
             features: [
-                '50 legal AI messages per day',
-                'Unlimited support chat',
-                'Unlimited document generation',
-                'Full county resource finder',
-                'Priority behavioral pattern detection',
+                '50 legal guidance messages per day',
+                'Unlimited NEXX Chat',
+                'Unlimited legal document generation',
+                'Unlimited incident analysis & timeline reports',
+                'Full county resource finder & court rules lookup',
             ],
             highlight: false,
         },
@@ -64,14 +64,14 @@ export default function SubscriptionPage() {
             tier: 'premium',
             icon: Sparkle,
             iconColor: '#E5A84A',
-            description: 'Our most popular plan for parents navigating high-conflict custody and family law cases.',
+            description: 'Our most popular plan — built for parents actively navigating custody, family law, or high-conflict cases.',
             badge: 'Most Popular',
             features: [
-                '100 legal AI messages per day',
-                'Unlimited support chat',
-                'Unlimited document generation',
-                'Advanced court compliance checks',
-                'Priority email support',
+                '100 legal guidance messages per day',
+                'Unlimited NEXX Chat',
+                'Unlimited document generation & DocuVault access',
+                'Advanced court compliance verification',
+                'Unlimited access to local legal resources',
             ],
             highlight: true,
         },
@@ -79,14 +79,14 @@ export default function SubscriptionPage() {
             tier: 'executive',
             icon: Crown,
             iconColor: '#E5A84A',
-            description: 'No limits, no restrictions. Full access to every NEXX feature for the most demanding cases.',
+            description: 'No daily caps. No restrictions. Full, unrestricted access to every NEXX feature — built for your most demanding legal needs.',
             badge: 'Elite',
             features: [
-                'Unlimited legal AI messages',
-                'Unlimited document generation',
-                'All AI models & premium features',
-                'Personalized setup & orientation call',
-                'Direct priority support via email',
+                'Unlimited legal guidance messages',
+                'Unlimited document generation & template gallery',
+                'Unlimited incident analysis & timeline reports',
+                'Unlimited compliance verification & court rule lookups',
+                'Dedicated family code search tailored to your location',
             ],
             highlight: false,
         },
@@ -132,7 +132,7 @@ export default function SubscriptionPage() {
                         <div className="rounded-2xl bg-[#0A1128] border border-[rgba(255,255,255,0.08)] px-5 py-3 text-center min-w-[120px]">
                             <div className="flex items-center justify-center gap-2 mb-1">
                                 <ChatCircleText size={16} weight="fill" color="#60A5FA" />
-                                <span className="text-[10px] font-bold tracking-wider uppercase text-white/40">Legal AI / Day</span>
+                                <span className="text-[10px] font-bold tracking-wider uppercase text-white/40">Legal Guidance / Day</span>
                             </div>
                             <p className="text-xl font-serif font-bold text-white">
                                 {currentConfig.gpt4oDailyLimit === -1 ? '∞' : currentConfig.gpt4oDailyLimit}
@@ -141,7 +141,7 @@ export default function SubscriptionPage() {
                         <div className="rounded-2xl bg-[#0A1128] border border-[rgba(255,255,255,0.08)] px-5 py-3 text-center min-w-[120px]">
                             <div className="flex items-center justify-center gap-2 mb-1">
                                 <FileText size={16} weight="fill" color="#60A5FA" />
-                                <span className="text-[10px] font-bold tracking-wider uppercase text-white/40">Support Chat / Day</span>
+                                <span className="text-[10px] font-bold tracking-wider uppercase text-white/40">NEXX Chat / Day</span>
                             </div>
                             <p className="text-xl font-serif font-bold text-white">
                                 {currentConfig.gpt4oMiniDailyLimit === -1 ? '∞' : currentConfig.gpt4oMiniDailyLimit}
@@ -252,6 +252,53 @@ export default function SubscriptionPage() {
                 <a href="mailto:support@nexxapp.com" className="text-[var(--champagne)] hover:underline">support@nexxapp.com</a>
                 {' '}and we&apos;ll get you set up.
             </motion.p>
+
+            {/* Coming Soon */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.9, duration: 0.6 }}
+                className="glass-ethereal rounded-3xl p-6 md:p-8 mt-8 relative overflow-hidden"
+            >
+                <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute bottom-[-20%] left-[-10%] w-[35%] h-[50%] bg-[#E5A84A]/8 rounded-full blur-[80px]" />
+                </div>
+                <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-4">
+                        <Sparkle size={20} weight="fill" className="text-[var(--champagne)]" />
+                        <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--champagne)]">
+                            Coming Soon
+                        </h3>
+                    </div>
+                    <p className="text-[13px] text-white/50 leading-relaxed mb-5">
+                        NEXX is evolving. These features are in development and will be available in upcoming releases.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {[
+                            'Voice-first AI conversations',
+                            'Court order upload & analysis',
+                            'Affidavit builder',
+                            'eFiling integration',
+                            'Attorney collaboration portal',
+                            'Therapist collaboration portal',
+                            'eSignature & notarization',
+                            'Court date countdown & prep coach',
+                            'Custody exchange logger',
+                            'Children\'s wellbeing tracker',
+                            'Financial abuse tracker',
+                            'Co-parent communication filter',
+                        ].map((feature) => (
+                            <div
+                                key={feature}
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06]"
+                            >
+                                <Sparkle size={12} weight="fill" className="text-[var(--champagne)]/50 shrink-0" />
+                                <span className="text-[12px] text-white/40">{feature}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </motion.div>
         </PageContainer>
     );
 }

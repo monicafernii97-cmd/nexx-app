@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 import { CaretDown } from '@phosphor-icons/react';
+import { PLANS } from '@/lib/plans';
 
 /**
  * Welcome / landing page and auth-aware router.
@@ -276,80 +277,7 @@ export default function WelcomePage() {
 
           {/* Pricing Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {[
-              {
-                name: 'Free',
-                price: '$0',
-                period: 'forever',
-                description: 'Start documenting incidents and explore what NEXX can do — completely free.',
-                badge: null,
-                features: [
-                  '5 legal guidance messages per day',
-                  '50 NEXX Chat messages per day',
-                  '3 legal document generations per month',
-                  '3 court rules lookups per month',
-                  'Basic incident reporting & analysis',
-                ],
-                cta: 'Start Free',
-                accent: 'rgba(255,255,255,0.1)',
-                borderAccent: 'rgba(255,255,255,0.08)',
-                popular: false,
-              },
-              {
-                name: 'Pro',
-                price: '$29.99',
-                period: '/month',
-                description: 'For parents ready to build a strong, evidence-backed case with expanded access to every tool.',
-                badge: null,
-                features: [
-                  '50 legal guidance messages per day',
-                  'Unlimited NEXX Chat',
-                  'Unlimited legal document generation',
-                  'Unlimited incident analysis & timeline reports',
-                  'Full county resource finder & court rules lookup',
-                ],
-                cta: 'Go Pro',
-                accent: 'rgba(26,75,155,0.3)',
-                borderAccent: 'rgba(26,75,155,0.4)',
-                popular: false,
-              },
-              {
-                name: 'Premium',
-                price: '$49.99',
-                period: '/month',
-                description: 'Our most popular plan — built for parents actively navigating custody, family law, or high-conflict cases.',
-                badge: 'Most Popular',
-                features: [
-                  '100 legal guidance messages per day',
-                  'Unlimited NEXX Chat',
-                  'Unlimited document generation & DocuVault access',
-                  'Advanced court compliance verification',
-                  'Unlimited access to local legal resources',
-                ],
-                cta: 'Go Premium',
-                accent: 'rgba(229,168,74,0.15)',
-                borderAccent: 'rgba(229,168,74,0.35)',
-                popular: true,
-              },
-              {
-                name: 'Executive',
-                price: '$149.99',
-                period: '/month',
-                description: 'No daily caps. No restrictions. Full, unrestricted access to every NEXX feature.',
-                badge: 'Elite',
-                features: [
-                  'Unlimited legal guidance messages',
-                  'Unlimited document generation & template gallery',
-                  'Unlimited incident analysis & timeline reports',
-                  'Unlimited compliance verification & court rule lookups',
-                  'Dedicated family code search tailored to your location',
-                ],
-                cta: 'Go Executive',
-                accent: 'rgba(229,168,74,0.25)',
-                borderAccent: 'rgba(229,168,74,0.5)',
-                popular: false,
-              },
-            ].map((plan, i) => (
+            {PLANS.map((plan, i) => (
               <motion.div
                 key={plan.name}
                 initial={{ opacity: 0, y: 30 }}
@@ -402,7 +330,7 @@ export default function WelcomePage() {
                 {/* CTA */}
                 <button
                   onClick={() => {
-                    localStorage.setItem('selectedPlan', plan.name.toLowerCase());
+                    localStorage.setItem('selectedPlan', plan.tier);
                     router.push('/sign-up');
                   }}
                   className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all ${

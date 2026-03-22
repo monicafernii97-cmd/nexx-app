@@ -45,9 +45,10 @@ export default function IncidentReportPage() {
         incidents.forEach(incident => {
             if (incident.tags && incident.tags.length > 0) {
                 const date = parseLocalDate(incident.date);
+                const narrative = incident.courtSummary || incident.narrative;
                 incident.tags.forEach(tag => {
                     if (!patternsMap.has(tag)) patternsMap.set(tag, []);
-                    patternsMap.get(tag)!.push({ id: incident._id, date, narrative: incident.courtSummary || incident.narrative });
+                    patternsMap.get(tag)!.push({ id: incident._id, date, narrative });
                 });
             }
         });

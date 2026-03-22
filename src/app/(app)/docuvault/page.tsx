@@ -729,6 +729,24 @@ function DocuVaultPageInner() {
                     animate={{ opacity: 1, scale: 1 }}
                     className="max-w-3xl mx-auto py-6"
                 >
+                    {/* Error banner (e.g. popup blocked for print) */}
+                    <AnimatePresence>
+                        {generationError && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="overflow-hidden mb-6"
+                            >
+                                <div className="px-5 py-4 rounded-xl bg-[var(--error)]/5 border border-[var(--error)]/20 shadow-sm flex items-start gap-3">
+                                    <X size={20} weight="bold" className="text-[var(--error)] shrink-0 mt-0.5" />
+                                    <p className="text-sm font-medium text-[var(--error)]">
+                                        {generationError}
+                                    </p>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                     {/* Header */}
                     <div className="flex items-center gap-5 mb-10">
                         <button

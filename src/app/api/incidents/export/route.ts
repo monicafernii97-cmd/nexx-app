@@ -24,14 +24,7 @@ function getLegalCSS(): string {
     return cachedCSS;
 }
 
-function escapeHtml(text: string): string {
-    return (text || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
+import { escapeHtml } from '@/lib/utils/htmlUtils';
 
 export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
 

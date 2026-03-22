@@ -36,13 +36,13 @@ export default function SubscriptionPage() {
             tier: 'free',
             icon: Shield,
             iconColor: 'rgba(255,255,255,0.5)',
-            description: 'Get your bearings. Start documenting.',
+            description: 'Start documenting incidents and familiarize yourself with the tools at no cost.',
             features: [
-                '5 legal AI messages/day',
-                '50 support messages/day',
-                '3 document generations/mo',
-                '3 court rules lookups/mo',
-                'Basic incident reporting',
+                '5 legal AI messages per day',
+                '50 support chat messages per day',
+                '3 document generations per month',
+                '3 court rules lookups per month',
+                'Basic incident reporting & analysis',
             ],
             highlight: false,
         },
@@ -50,13 +50,13 @@ export default function SubscriptionPage() {
             tier: 'pro',
             icon: Lightning,
             iconColor: '#60A5FA',
-            description: 'For parents actively building their case.',
+            description: 'For parents ready to build a strong, evidence-backed case with more daily resources.',
             features: [
-                '50 legal AI messages/day',
+                '50 legal AI messages per day',
                 'Unlimited support chat',
-                'Unlimited documents',
-                'Full resource finder',
-                'Priority pattern detection',
+                'Unlimited document generation',
+                'Full county resource finder',
+                'Priority behavioral pattern detection',
             ],
             highlight: false,
         },
@@ -64,14 +64,14 @@ export default function SubscriptionPage() {
             tier: 'premium',
             icon: Sparkle,
             iconColor: '#E5A84A',
-            description: 'Maximum firepower for high-conflict cases.',
+            description: 'Our most popular plan for parents navigating high-conflict custody and family law cases.',
             badge: 'Most Popular',
             features: [
-                '100 legal AI messages/day',
+                '100 legal AI messages per day',
                 'Unlimited support chat',
-                'Unlimited everything',
-                'Advanced compliance checks',
-                'Priority support',
+                'Unlimited document generation',
+                'Advanced court compliance checks',
+                'Priority email support',
             ],
             highlight: true,
         },
@@ -79,14 +79,14 @@ export default function SubscriptionPage() {
             tier: 'executive',
             icon: Crown,
             iconColor: '#E5A84A',
-            description: 'Unlimited. Unrestricted. Unstoppable.',
+            description: 'No limits, no restrictions. Full access to every NEXX feature for the most demanding cases.',
             badge: 'Elite',
             features: [
-                'Unlimited legal AI (GPT-4o)',
-                'Unlimited everything',
-                'All models & features',
-                'White-glove onboarding',
-                'Dedicated support channel',
+                'Unlimited legal AI messages',
+                'Unlimited document generation',
+                'All AI models & premium features',
+                'Personalized setup & orientation call',
+                'Direct priority support via email',
             ],
             highlight: false,
         },
@@ -132,7 +132,7 @@ export default function SubscriptionPage() {
                         <div className="rounded-2xl bg-[#0A1128] border border-[rgba(255,255,255,0.08)] px-5 py-3 text-center min-w-[120px]">
                             <div className="flex items-center justify-center gap-2 mb-1">
                                 <ChatCircleText size={16} weight="fill" color="#60A5FA" />
-                                <span className="text-[10px] font-bold tracking-wider uppercase text-white/40">GPT-4o / Day</span>
+                                <span className="text-[10px] font-bold tracking-wider uppercase text-white/40">Legal AI / Day</span>
                             </div>
                             <p className="text-xl font-serif font-bold text-white">
                                 {currentConfig.gpt4oDailyLimit === -1 ? '∞' : currentConfig.gpt4oDailyLimit}
@@ -141,7 +141,7 @@ export default function SubscriptionPage() {
                         <div className="rounded-2xl bg-[#0A1128] border border-[rgba(255,255,255,0.08)] px-5 py-3 text-center min-w-[120px]">
                             <div className="flex items-center justify-center gap-2 mb-1">
                                 <FileText size={16} weight="fill" color="#60A5FA" />
-                                <span className="text-[10px] font-bold tracking-wider uppercase text-white/40">Support / Day</span>
+                                <span className="text-[10px] font-bold tracking-wider uppercase text-white/40">Support Chat / Day</span>
                             </div>
                             <p className="text-xl font-serif font-bold text-white">
                                 {currentConfig.gpt4oMiniDailyLimit === -1 ? '∞' : currentConfig.gpt4oMiniDailyLimit}
@@ -189,7 +189,7 @@ export default function SubscriptionPage() {
                             )}
 
                             {/* Icon + Name */}
-                            <div className="flex items-center gap-3 mb-3 mt-1">
+                            <div className={`flex items-center gap-3 mb-3 ${(plan.badge || isCurrent) ? 'mt-5' : 'mt-1'}`}>
                                 <Icon size={20} weight="fill" color={plan.iconColor} />
                                 <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--champagne)]">
                                     {plan.tier}
@@ -248,7 +248,9 @@ export default function SubscriptionPage() {
                 transition={{ delay: 0.8, duration: 0.6 }}
                 className="text-center text-[11px] text-white/30 mt-8"
             >
-                Subscription management coming soon. Contact support to upgrade your plan.
+                Ready to upgrade? Reach out to{' '}
+                <a href="mailto:support@nexxapp.com" className="text-[var(--champagne)] hover:underline">support@nexxapp.com</a>
+                {' '}and we&apos;ll get you set up.
             </motion.p>
         </PageContainer>
     );

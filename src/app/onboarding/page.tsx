@@ -45,6 +45,19 @@ export default function OnboardingPage() {
         }
     }, [currentUser, router]);
 
+    // Guard: if signed in but no Convex user record and no plan selected,
+    // redirect to the landing page pricing section instead of wasting
+    // time on 6 onboarding steps with no plan.
+    useEffect(() => {
+        if (!convexReady || convexLoading) return;
+        if (currentUser !== null) return; // has a record, or still loading (undefined)
+        const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+        const validPlans = new Set(['free', 'pro', 'premium', 'executive']);
+        if (!selectedPlan || !validPlans.has(selectedPlan)) {
+            router.replace('/#pricing');
+        }
+    }, [convexReady, convexLoading, currentUser, router]);
+
     // ─── Form state (must be declared before any early returns) ───
     const [currentStep, setCurrentStep] = useState(0);
     const [formData, setFormData] = useState({

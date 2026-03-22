@@ -24,7 +24,6 @@ const INCIDENT_CATEGORIES = [
     { value: 'emotional_abuse', label: 'Emotional or Psychological Abuse' },
     { value: 'financial_abuse', label: 'Financial or Economic Abuse' },
     { value: 'parental_alienation', label: 'Parental Alienation' },
-    { value: 'custody_violation', label: 'Custody Order Violation' },
     { value: 'harassment', label: 'Harassment or Stalking' },
     { value: 'threats', label: 'Threats or Intimidation' },
     { value: 'manipulation', label: 'Coercive Control' },

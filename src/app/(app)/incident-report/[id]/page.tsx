@@ -120,7 +120,7 @@ export default function IncidentDetailPage() {
                 courtSummary: editData.courtSummary || undefined,
                 date: editData.date,
                 time: editData.time,
-                category: editData.category as 'emotional_abuse' | 'financial_abuse' | 'parental_alienation' | 'custody_violation' | 'harassment' | 'threats' | 'manipulation' | 'neglect' | 'other',
+                category: editData.category as 'emotional_abuse' | 'financial_abuse' | 'parental_alienation' | 'harassment' | 'threats' | 'manipulation' | 'neglect' | 'other',
             });
             setIsEditing(false);
             setEditData(null);

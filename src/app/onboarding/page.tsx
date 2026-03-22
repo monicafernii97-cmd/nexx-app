@@ -51,8 +51,10 @@ export default function OnboardingPage() {
     useEffect(() => {
         if (!convexReady || convexLoading) return;
         if (currentUser === undefined) return; // still loading
+        // currentUser is null (rare) or exists but hasn't completed onboarding
         if (currentUser?.onboardingComplete) return; // returning user
         if (currentUser?.subscriptionTier) return; // already has a plan in DB
+        // No DB tier — check localStorage for a freshly selected plan
         const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
         const validPlans = new Set(PLANS.map((p) => p.tier));
         if (!selectedPlan || !validPlans.has(selectedPlan)) {
@@ -192,16 +194,21 @@ export default function OnboardingPage() {
                     'Other': 'none',
                 };
 
+                const validTierSet = new Set(PLANS.map((p) => p.tier));
+                const storedPlan =
+                    typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+                const dbPlan = currentUser?.subscriptionTier ?? null;
+                // Prefer localStorage (latest user selection) over DB tier
                 const selectedPlan =
-                    currentUser?.subscriptionTier ??
-                    (typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null);
+                    storedPlan && validTierSet.has(storedPlan)
+                        ? storedPlan
+                        : dbPlan;
 
                 if (!selectedPlan) {
                     setSaveError('Please select a plan before completing onboarding.');
                     setIsSaving(false);
                     return;
                 }
-                const validTierSet = new Set(PLANS.map((p) => p.tier));
                 if (!validTierSet.has(selectedPlan)) {
                     setSaveError(`Invalid plan "${selectedPlan}". Please select a valid plan.`);
                     setIsSaving(false);

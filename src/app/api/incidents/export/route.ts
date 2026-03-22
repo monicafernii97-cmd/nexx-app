@@ -110,10 +110,10 @@ export async function GET() {
             
             timelineRows += `
                 <tr>
-                    <td><strong>${escapeHtml(incident.date)}</strong><br/>${escapeHtml(incident.time)}</td>
+                    <td><strong>${escapeHtml(incident.date)}</strong><br/>${escapeHtml(incident.time ?? '')}</td>
                     <td>
                         <strong>${escapeHtml(catLabel)}</strong><br/>
-                        ${escapeHtml(incident.courtSummary || incident.narrative)}
+                        ${escapeHtml(incident.courtSummary || incident.narrative || '')}
                         ${tagsHtml}
                     </td>
                 </tr>

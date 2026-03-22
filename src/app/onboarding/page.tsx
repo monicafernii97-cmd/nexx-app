@@ -50,7 +50,8 @@ export default function OnboardingPage() {
     // time on 6 onboarding steps with no plan.
     useEffect(() => {
         if (!convexReady || convexLoading) return;
-        if (currentUser !== null) return; // has a record, or still loading (undefined)
+        if (currentUser === undefined) return; // still loading
+        if (currentUser !== null) return; // has a record
         const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
         const validPlans = new Set(['free', 'pro', 'premium', 'executive']);
         if (!selectedPlan || !validPlans.has(selectedPlan)) {

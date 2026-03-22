@@ -32,6 +32,9 @@ export default function WelcomePage() {
   const { isAuthenticated: convexReady, isLoading: convexLoading } = useConvexAuth();
   const router = useRouter();
 
+  /** Valid plan tier IDs, derived once from the PLANS constant. */
+  const VALID_PLAN_TIERS = new Set(PLANS.map((p) => p.tier));
+
   // Only query when Convex auth is fully synced (not just Clerk signed-in)
   const currentUser = useQuery(
     api.users.me,
@@ -44,8 +47,7 @@ export default function WelcomePage() {
     if (currentUser !== null) return false;
     if (currentUser === undefined) return false;
     const plan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-    const valid = new Set(['free', 'pro', 'premium', 'executive']);
-    return !plan || !valid.has(plan);
+    return !plan || !VALID_PLAN_TIERS.has(plan);
   })();
 
   // Terminal state: Clerk is signed in but Convex auth failed to sync
@@ -69,8 +71,7 @@ export default function WelcomePage() {
     if (currentUser === null) {
       // Signed in but no Convex record yet — new user
       const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-      const validPlans = new Set(['free', 'pro', 'premium', 'executive']);
-      if (!selectedPlan || !validPlans.has(selectedPlan)) {
+      if (!selectedPlan || !VALID_PLAN_TIERS.has(selectedPlan)) {
         localStorage.removeItem('selectedPlan');
         // No valid plan selected — scroll to pricing so they pick a plan first
         requestAnimationFrame(() => {

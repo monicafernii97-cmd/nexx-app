@@ -45,13 +45,15 @@ export default function OnboardingPage() {
         }
     }, [currentUser, router]);
 
-    // Guard: if signed in but no Convex user record and no plan selected,
-    // redirect to the landing page pricing section instead of wasting
-    // time on 6 onboarding steps with no plan.
+    // Guard: if the user hasn't selected a plan yet, redirect to the
+    // landing page pricing section. ensureFromClerk auto-creates a Convex
+    // record on sign-in, so we check subscriptionTier + localStorage.
     useEffect(() => {
         if (!convexReady || convexLoading) return;
         if (currentUser === undefined) return; // still loading
-        if (currentUser !== null) return; // has a record
+        if (currentUser === null) return; // edge: record not yet created
+        if (currentUser.onboardingComplete) return; // returning user
+        if (currentUser.subscriptionTier) return; // already has a plan in DB
         const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
         const validPlans = new Set(['free', 'pro', 'premium', 'executive']);
         if (!selectedPlan || !validPlans.has(selectedPlan)) {

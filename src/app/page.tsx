@@ -41,13 +41,17 @@ export default function WelcomePage() {
     convexReady ? {} : 'skip'
   );
 
-  // Derived: show "no account found" banner when signed in with no Convex record and no plan
+  // Derived: show "no account found" banner when signed in but no plan selected.
+  // UserProvider.ensureFromClerk auto-creates a Convex record on any sign-in,
+  // so currentUser is never null — we must check for a missing subscriptionTier instead.
   const showNoPlanBanner = (() => {
     if (!clerkLoaded || !isSignedIn || convexLoading || !convexReady) return false;
-    if (currentUser !== null) return false;
-    if (currentUser === undefined) return false;
+    if (currentUser === undefined) return false; // still loading
+    if (currentUser === null) return false; // shouldn't happen, but safe
+    if (currentUser.onboardingComplete) return false; // returning user
+    if (currentUser.subscriptionTier) return false; // already has a plan in DB
     const plan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-    return !plan || !VALID_PLAN_TIERS.has(plan);
+    return !plan || !VALID_PLAN_TIERS.has(plan); // no valid plan anywhere
   })();
 
   // Terminal state: Clerk is signed in but Convex auth failed to sync
@@ -69,25 +73,25 @@ export default function WelcomePage() {
     if (currentUser === undefined) return; // Still loading
 
     if (currentUser === null) {
-      // Signed in but no Convex record yet — new user
-      const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-      if (!selectedPlan || !VALID_PLAN_TIERS.has(selectedPlan)) {
-        localStorage.removeItem('selectedPlan');
-        // No valid plan selected — scroll to pricing so they pick a plan first
-        requestAnimationFrame(() => {
-          document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
-        });
-        return; // Stay on welcome page — don't redirect
-      } else {
-        // Plan selected — proceed to onboarding
-        router.replace('/onboarding');
-      }
+      // No Convex record yet — shouldn't normally happen (ensureFromClerk runs),
+      // but handle it gracefully by staying on the landing page.
+      return;
     } else if (currentUser.onboardingComplete) {
       // Returning user — straight to dashboard
       router.replace('/dashboard');
     } else {
-      // Has account but hasn't finished onboarding
-      router.replace('/onboarding');
+      // Has account but hasn't finished onboarding.
+      // Only proceed if they have a plan (in localStorage or DB).
+      const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+      const hasPlan = currentUser.subscriptionTier || (selectedPlan && VALID_PLAN_TIERS.has(selectedPlan));
+      if (hasPlan) {
+        router.replace('/onboarding');
+      } else {
+        // No plan selected — stay on welcome page, scroll to pricing
+        requestAnimationFrame(() => {
+          document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+        });
+      }
     }
   }, [clerkLoaded, isSignedIn, convexLoading, convexReady, currentUser, router]);
 

@@ -16,12 +16,24 @@ import {
     FileText,
     User,
     Buildings,
+    Scroll,
 } from '@phosphor-icons/react';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
+
+type CaseTitleFormat = '' | 'name_v_name' | 'in_interest_of' | 'in_matter_of_marriage' | 'in_re_marriage' | 'custom';
+
+const CASE_TITLE_OPTIONS: { value: CaseTitleFormat; label: string; example: string }[] = [
+    { value: 'name_v_name', label: 'Name v. Name', example: 'SMITH, Petitioner v. JONES, Respondent' },
+    { value: 'in_interest_of', label: 'In the Interest of (SAPCR)', example: 'IN THE INTEREST OF [CHILD], A CHILD' },
+    { value: 'in_matter_of_marriage', label: 'In the Matter of the Marriage of', example: 'IN THE MATTER OF THE MARRIAGE OF SMITH AND JONES' },
+    { value: 'in_re_marriage', label: 'In Re Marriage of', example: 'IN RE MARRIAGE OF SMITH AND JONES' },
+    { value: 'custom', label: 'Custom', example: 'Enter your own case caption' },
+];
 
 /** Court settings page for configuring state, county, judge, and cause number. */
 export default function CourtSettingsPage() {
     const existingSettings = useQuery(api.courtSettings.get);
+    const nexProfile = useQuery(api.nexProfiles.getByUser);
     const upsertSettings = useMutation(api.courtSettings.upsert);
 
     // Form state
@@ -31,6 +43,9 @@ export default function CourtSettingsPage() {
     const [causeNumber, setCauseNumber] = useState('');
     const [assignedJudge, setAssignedJudge] = useState('');
     const [judicialDistrict, setJudicialDistrict] = useState('');
+    const [caseTitleFormat, setCaseTitleFormat] = useState<CaseTitleFormat>('');
+    const [caseTitleCustom, setCaseTitleCustom] = useState('');
+    const [respondentLegalName, setRespondentLegalName] = useState('');
 
     // UI state
     const [countyQuery, setCountyQuery] = useState('');
@@ -62,9 +77,19 @@ export default function CourtSettingsPage() {
             setCauseNumber(existingSettings.causeNumber || '');
             setAssignedJudge(existingSettings.assignedJudge || '');
             setJudicialDistrict(existingSettings.judicialDistrict || '');
+            setCaseTitleFormat((existingSettings.caseTitleFormat as CaseTitleFormat) || '');
+            setCaseTitleCustom(existingSettings.caseTitleCustom || '');
+            setRespondentLegalName(existingSettings.respondentLegalName || '');
             initializedRef.current = true;
         }
     }, [existingSettings]);
+
+    // Auto-populate respondent name from NEX profile if not already set
+    useEffect(() => {
+        if (nexProfile?.legalName && !respondentLegalName && initializedRef.current) {
+            setRespondentLegalName(nexProfile.legalName);
+        }
+    }, [nexProfile?.legalName, respondentLegalName]);
 
     // Filtered counties based on current typing
     const filteredCounties = state
@@ -107,6 +132,9 @@ export default function CourtSettingsPage() {
                 causeNumber: causeNumber || undefined,
                 assignedJudge: assignedJudge || undefined,
                 judicialDistrict: judicialDistrict || undefined,
+                caseTitleFormat: caseTitleFormat || undefined,
+                caseTitleCustom: caseTitleCustom || undefined,
+                respondentLegalName: respondentLegalName || undefined,
             });
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
@@ -130,7 +158,7 @@ export default function CourtSettingsPage() {
         } finally {
             setSaving(false);
         }
-    }, [state, county, courtName, causeNumber, assignedJudge, judicialDistrict, upsertSettings]);
+    }, [state, county, courtName, causeNumber, assignedJudge, judicialDistrict, caseTitleFormat, caseTitleCustom, respondentLegalName, upsertSettings]);
 
     // AI Verify handler
     const handleVerify = useCallback(async () => {
@@ -395,6 +423,155 @@ export default function CourtSettingsPage() {
                         </div>
                     </div>
                 </div>
+            </motion.div>
+
+            {/* Case Title & Parties Section */}
+            <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 }}
+                className="card-premium p-6 mb-8 border border-[var(--champagne)]/30 bg-gradient-to-br from-white to-[var(--pearl)] shadow-sm"
+            >
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-full bg-[var(--champagne)]/10 flex items-center justify-center">
+                        <Scroll size={18} className="text-[var(--champagne)]" weight="duotone" />
+                    </div>
+                    <h2 className="text-sm font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
+                        Case Title &amp; Parties
+                    </h2>
+                </div>
+                <p className="text-sm mb-6 text-[var(--sapphire-base)] leading-relaxed pl-2">
+                    Configure how parties are named and how the case caption appears on generated documents.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+                    <div>
+                        <label htmlFor="respondent-name-input" className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
+                            Opposing Party Legal Name
+                        </label>
+                        <div className="relative">
+                            <User
+                                size={16}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sapphire-light)]"
+                                weight="bold"
+                            />
+                            <input
+                                type="text"
+                                value={respondentLegalName}
+                                onChange={(e) => setRespondentLegalName(e.target.value)}
+                                placeholder="Full legal name of the opposing party"
+                                className="input-premium w-full !pl-10 pr-4 text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
+                                id="respondent-name-input"
+                            />
+                        </div>
+                        {nexProfile?.legalName && respondentLegalName !== nexProfile.legalName && (
+                            <button
+                                type="button"
+                                onClick={() => setRespondentLegalName(nexProfile.legalName!)}
+                                className="text-[11px] text-[var(--champagne)] mt-1.5 hover:underline"
+                            >
+                                Sync from NEX Profile: {nexProfile.legalName}
+                            </button>
+                        )}
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
+                            Your Role
+                        </label>
+                        <div className="text-sm text-[var(--sapphire-dark)] p-3 rounded-xl bg-white/60 border border-[var(--cloud)]">
+                            {nexProfile?.partyRole === 'respondent'
+                                ? '✦ You are the Respondent'
+                                : nexProfile?.partyRole === 'petitioner'
+                                    ? '✦ You are the Petitioner (opposing party is Respondent)'
+                                    : '⚠ Set party roles in NEX Profile'
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                {/* Case Title Format */}
+                <div className="mb-6">
+                    <label className="block text-xs font-semibold mb-3 text-[var(--sapphire-base)] uppercase tracking-wide">
+                        Case Title Format
+                    </label>
+                    <div className="space-y-2.5">
+                        {CASE_TITLE_OPTIONS.map((option) => (
+                            <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => setCaseTitleFormat(option.value)}
+                                className={`w-full text-left p-3.5 rounded-xl transition-all border ${
+                                    caseTitleFormat === option.value
+                                        ? 'bg-[var(--champagne)]/10 border-[var(--champagne)]/40 shadow-sm'
+                                        : 'bg-white/50 border-[var(--cloud)] hover:border-[var(--sapphire-light)]'
+                                }`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                        caseTitleFormat === option.value
+                                            ? 'border-[var(--champagne)] bg-[var(--champagne)]'
+                                            : 'border-[var(--cloud-dark)]'
+                                    }`}>
+                                        {caseTitleFormat === option.value && (
+                                            <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-semibold text-[var(--sapphire-dark)]">{option.label}</p>
+                                        <p className="text-[11px] text-[var(--sapphire-light)] mt-0.5 font-mono">{option.example}</p>
+                                    </div>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Custom Caption */}
+                {caseTitleFormat === 'custom' && (
+                    <div className="mb-6">
+                        <label htmlFor="custom-caption-input" className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
+                            Custom Case Caption
+                        </label>
+                        <textarea
+                            value={caseTitleCustom}
+                            onChange={(e) => setCaseTitleCustom(e.target.value)}
+                            placeholder="Enter your custom case caption exactly as it should appear..."
+                            rows={3}
+                            className="input-premium w-full text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)] resize-none"
+                            id="custom-caption-input"
+                        />
+                    </div>
+                )}
+
+                {/* Live Preview */}
+                {caseTitleFormat && (
+                    <div className="bg-[#0A1128] rounded-xl p-5 border border-[rgba(255,255,255,0.1)]">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-3">Caption Preview</p>
+                        <div className="font-mono text-[12px] text-white/80 leading-relaxed whitespace-pre-line">
+                            {caseTitleFormat === 'name_v_name' && (
+                                <>
+                                    {nexProfile?.partyRole === 'respondent' ? (
+                                        <>{(nexProfile?.legalName || respondentLegalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(respondentLegalName || nexProfile?.legalName || 'RESPONDENT').toUpperCase()}, Respondent</>
+                                    ) : (
+                                        <>{(respondentLegalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(nexProfile?.legalName || respondentLegalName || 'RESPONDENT').toUpperCase()}, Respondent</>
+                                    )}
+                                </>
+                            )}
+                            {caseTitleFormat === 'in_interest_of' && (
+                                <>IN THE INTEREST OF{'\n'}[CHILD NAME(S)],{'\n'}A CHILD / CHILDREN</>
+                            )}
+                            {caseTitleFormat === 'in_matter_of_marriage' && (
+                                <>IN THE MATTER OF THE MARRIAGE OF{'\n'}{(respondentLegalName || 'PARTY 1').toUpperCase().split(' ').pop()} AND {(nexProfile?.legalName || respondentLegalName || 'PARTY 2').toUpperCase().split(' ').pop()}</>
+                            )}
+                            {caseTitleFormat === 'in_re_marriage' && (
+                                <>IN RE MARRIAGE OF{'\n'}{(respondentLegalName || 'PARTY 1').toUpperCase().split(' ').pop()} AND {(nexProfile?.legalName || respondentLegalName || 'PARTY 2').toUpperCase().split(' ').pop()}</>
+                            )}
+                            {caseTitleFormat === 'custom' && (
+                                <>{caseTitleCustom || 'Your custom caption will appear here...'}</>
+                            )}
+                        </div>
+                    </div>
+                )}
             </motion.div>
 
             {/* AI Verification Section */}

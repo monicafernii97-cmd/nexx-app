@@ -14,8 +14,17 @@ import {
     Warning,
     Plus,
     X,
+    Scales,
 } from '@phosphor-icons/react';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
+
+const LEGAL_RELATION_OPTIONS = [
+    "Child's Father",
+    "Child's Mother",
+    'Ex-Husband',
+    'Ex-Wife',
+    'Co-Parent',
+];
 
 const BEHAVIOR_OPTIONS = [
     'Gaslighting', 'Love-bombing', 'DARVO', 'Triangulation',
@@ -53,6 +62,9 @@ export default function NexProfilePage() {
     const [form, setForm] = useState({
         nickname: '',
         relationship: '',
+        legalName: '',
+        legalRelation: [] as string[],
+        partyRole: '' as '' | 'petitioner' | 'respondent',
         description: '',
         behaviors: [] as string[],
         communicationStyle: [] as string[],
@@ -67,6 +79,9 @@ export default function NexProfilePage() {
             setForm({
                 nickname: nexProfile.nickname || '',
                 relationship: nexProfile.relationship || '',
+                legalName: nexProfile.legalName || '',
+                legalRelation: nexProfile.legalRelation || [],
+                partyRole: (nexProfile.partyRole as '' | 'petitioner' | 'respondent') || '',
                 description: nexProfile.description || '',
                 behaviors: nexProfile.behaviors || [],
                 communicationStyle: Array.isArray(nexProfile.communicationStyle)
@@ -109,6 +124,9 @@ export default function NexProfilePage() {
                     behaviors: form.behaviors,
                     nickname: form.nickname || undefined,
                     relationship: form.relationship || undefined,
+                    legalName: form.legalName || undefined,
+                    legalRelation: form.legalRelation.length > 0 ? form.legalRelation : undefined,
+                    partyRole: form.partyRole || undefined,
                     description: form.description || undefined,
                     communicationStyle: form.communicationStyle.length > 0 ? form.communicationStyle : undefined,
                     manipulationTactics: form.manipulationTactics.length > 0 ? form.manipulationTactics : undefined,
@@ -119,6 +137,9 @@ export default function NexProfilePage() {
                     behaviors: form.behaviors,
                     nickname: form.nickname || undefined,
                     relationship: form.relationship || undefined,
+                    legalName: form.legalName || undefined,
+                    legalRelation: form.legalRelation.length > 0 ? form.legalRelation : undefined,
+                    partyRole: form.partyRole || undefined,
                     description: form.description || undefined,
                     communicationStyle: form.communicationStyle.length > 0 ? form.communicationStyle : undefined,
                     manipulationTactics: form.manipulationTactics.length > 0 ? form.manipulationTactics : undefined,
@@ -211,6 +232,73 @@ export default function NexProfilePage() {
                                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                                 placeholder="Briefly describe your NEX's personality and the dynamic..."
                             />
+                        </div>
+                    </Section>
+
+                    {/* ── Legal Identity ── */}
+                    <Section icon={<Scales size={20} className="text-[#60A5FA]" weight="duotone" />} title="Legal Identity">
+                        <p className="text-[13px] text-white/90 mb-4">
+                            These details ensure NEXX refers to the opposing party appropriately in court documents, incident reports, and generated filings.
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                            <div>
+                                <label className="text-sm text-white mb-2 block">
+                                    Full Legal Name
+                                </label>
+                                <input
+                                    className="w-full text-base p-3 rounded-xl bg-white text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
+                                    value={form.legalName}
+                                    onChange={(e) => setForm({ ...form, legalName: e.target.value })}
+                                    placeholder="Their full legal name as it appears on court documents"
+                                />
+                                <p className="text-xs text-[rgba(255,255,255,0.7)] mt-1.5">Used in court document captions and filings</p>
+                            </div>
+                            <div>
+                                <label className="text-sm text-white mb-2 block">
+                                    Party Role in Case
+                                </label>
+                                <select
+                                    className="w-full text-base p-3 rounded-xl bg-white text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
+                                    value={form.partyRole}
+                                    onChange={(e) => setForm({ ...form, partyRole: e.target.value as '' | 'petitioner' | 'respondent' })}
+                                >
+                                    <option value="" disabled>Select their role</option>
+                                    <option value="respondent">Respondent (you are the Petitioner)</option>
+                                    <option value="petitioner">Petitioner (you are the Respondent)</option>
+                                </select>
+                                <p className="text-xs text-[rgba(255,255,255,0.7)] mt-1.5">Determines name placement in case captions</p>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-sm text-white mb-2 block">
+                                Court Designations
+                            </label>
+                            <p className="text-xs text-[rgba(255,255,255,0.6)] mb-3">Select all that apply — NEXX will use the most appropriate designation based on context.</p>
+                            <div className="flex flex-wrap gap-2.5">
+                                {LEGAL_RELATION_OPTIONS.map((relation) => {
+                                    const selected = form.legalRelation.includes(relation);
+                                    return (
+                                        <button
+                                            key={relation}
+                                            onClick={() => {
+                                                const updated = selected
+                                                    ? form.legalRelation.filter((r) => r !== relation)
+                                                    : [...form.legalRelation, relation];
+                                                setForm({ ...form, legalRelation: updated });
+                                            }}
+                                            type="button"
+                                            aria-pressed={selected}
+                                            className={`px-4 py-2 rounded-md text-[13px] font-medium transition-all border ${
+                                                selected
+                                                    ? 'bg-[#123D7E] text-white border-transparent'
+                                                    : 'bg-transparent border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.8)] hover:bg-[#123D7E]/20 hover:text-white'
+                                            }`}
+                                        >
+                                            {relation}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </Section>
 

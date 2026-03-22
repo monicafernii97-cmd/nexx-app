@@ -14,6 +14,15 @@ export const upsert = mutation({
         judicialDistrict: v.optional(v.string()),
         assignedJudge: v.optional(v.string()),
         causeNumber: v.optional(v.string()),
+        caseTitleFormat: v.optional(v.union(
+            v.literal('name_v_name'),
+            v.literal('in_interest_of'),
+            v.literal('in_matter_of_marriage'),
+            v.literal('in_re_marriage'),
+            v.literal('custom')
+        )),
+        caseTitleCustom: v.optional(v.string()),
+        respondentLegalName: v.optional(v.string()),
         formattingOverrides: v.optional(v.any()),
     },
     handler: async (ctx, args) => {

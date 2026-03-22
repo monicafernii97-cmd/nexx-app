@@ -49,7 +49,7 @@ export default function DashboardPage() {
     ];
 
     /** Time-of-day greeting, set client-side only to avoid hydration mismatch. */
-    const [greetingText, setGreetingText] = useState(() => {
+    const [greetingText] = useState(() => {
         if (typeof window === 'undefined') return '';
         const hour = new Date().getHours();
         return hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
@@ -189,7 +189,10 @@ export default function DashboardPage() {
                             <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar pr-1 -mr-1">
                                 {incidents.slice(0, 6).map((incident, i) => {
                                     const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
-                                    const date = parseLocalDate(incident.date);
+                                    const date = (() => {
+                                        const parsed = parseLocalDate(incident.date);
+                                        return isNaN(parsed.getTime()) ? new Date() : parsed;
+                                    })();
                                     return (
                                         <motion.div
                                             key={incident._id}

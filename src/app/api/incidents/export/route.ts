@@ -11,10 +11,15 @@ import { join } from 'path';
 let cachedCSS: string | null = null;
 function getLegalCSS(): string {
     if (!cachedCSS) {
-        cachedCSS = readFileSync(
-            join(process.cwd(), 'src/lib/legal/legalDocStyles.css'),
-            'utf-8'
-        );
+        try {
+            cachedCSS = readFileSync(
+                join(process.cwd(), 'src/lib/legal/legalDocStyles.css'),
+                'utf-8'
+            );
+        } catch (err) {
+            console.error('[getLegalCSS] Failed to load legalDocStyles.css:', err);
+            cachedCSS = ''; // Fallback to empty styles
+        }
     }
     return cachedCSS;
 }
@@ -46,8 +51,8 @@ export async function GET() {
 
         // Sort chronologically ascending
         const sortedIncidents = [...incidentsList].sort((a, b) => {
-            const dateA = new Date(a.date).getTime();
-            const dateB = new Date(b.date).getTime();
+            const dateA = new Date(a.date).getTime() || 0;
+            const dateB = new Date(b.date).getTime() || 0;
             return dateA - dateB;
         });
 

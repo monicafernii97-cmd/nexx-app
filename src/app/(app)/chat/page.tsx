@@ -216,19 +216,16 @@ export default function ChatListPage() {
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] -translate-x-6 group-hover:translate-x-0 group-hover:scale-110 mt-1 shadow-[0_12px_32px_rgba(255,255,255,0.15),0_0_20px_rgba(255,255,255,0.1),inset_0_2px_4px_rgba(255,255,255,0.9)] border border-white bg-[linear-gradient(135deg,#FFFFFF,rgba(255,255,255,0.8))] backdrop-blur-xl hover:shadow-[0_20px_40px_rgba(255,255,255,0.25),0_0_30px_rgba(255,255,255,0.2),inset_0_2px_4px_rgba(255,255,255,1)] relative z-10 self-center">
-                                                <CaretRight size={18} weight="bold" className="text-[#0A1128] ml-0.5 drop-shadow-sm" />
-                                            </div>
-                                            <button
-                                                onClick={(e) => handleDelete(e, conv._id)}
-                                                disabled={deletingId === conv._id}
-                                                title="Delete Chat"
-                                                className="w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud ml-2 self-center shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                <Trash size={16} weight="duotone" />
-                                            </button>
                                         </div>
                                     </Link>
+                                    <button
+                                        onClick={(e) => handleDelete(e, conv._id)}
+                                        disabled={deletingId === conv._id}
+                                        title="Delete Chat"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud z-20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <Trash size={16} weight="duotone" />
+                                    </button>
                                 </motion.div>
                             );
                         })}
@@ -245,7 +242,7 @@ export default function ChatListPage() {
                 >
                     <button
                         onClick={() => setIsArchiveOpen(!isArchiveOpen)}
-                        className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 flex items-center gap-2 text-sapphire-muted px-2 hover:text-sapphire transition-colors outline-none"
+                        className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 flex items-center gap-2 text-sapphire-muted px-2 hover:text-sapphire transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#60A5FA] focus-visible:rounded-md"
                     >
                         {isArchiveOpen ? <CaretDown size={16} /> : <CaretRight size={16} />}
                         <Archive size={16} /> Archived ({archivedConversations.length})

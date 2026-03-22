@@ -72,13 +72,15 @@ export default function NewIncidentPage() {
         recognition.lang = 'en-US';
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
-            let transcript = '';
+            const finalChunks: string[] = [];
             for (let i = event.resultIndex; i < event.results.length; i++) {
-                transcript += event.results[i][0].transcript;
+                const result = event.results[i];
+                if (result.isFinal) {
+                    finalChunks.push(result[0].transcript.trim());
+                }
             }
-            // Append final results to the narrative
-            if (event.results[event.resultIndex].isFinal) {
-                setNarrative((prev) => prev + (prev ? ' ' : '') + transcript.trim());
+            if (finalChunks.length) {
+                setNarrative((prev) => `${prev}${prev ? ' ' : ''}${finalChunks.join(' ')}`);
             }
         };
 

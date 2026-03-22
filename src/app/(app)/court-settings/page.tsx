@@ -90,9 +90,11 @@ export default function CourtSettingsPage() {
     }, [existingSettings]);
 
     // Auto-populate respondent name from NEX profile if not already set
+    const autofilledRef = useRef(false);
     useEffect(() => {
-        if (nexProfile?.legalName && !respondentLegalName && initializedRef.current) {
+        if (nexProfile?.legalName && !respondentLegalName && initializedRef.current && !autofilledRef.current) {
             setRespondentLegalName(nexProfile.legalName);
+            autofilledRef.current = true;
         }
     }, [nexProfile?.legalName, respondentLegalName]);
 
@@ -556,11 +558,11 @@ export default function CourtSettingsPage() {
                             {caseTitleFormat === 'name_v_name' && (
                                 <>
                                     {nexProfile?.partyRole === 'respondent' ? (
-                                        // NEX is respondent → user is petitioner
-                                        <>{('PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(nexProfile?.legalName || respondentLegalName || 'RESPONDENT').toUpperCase()}, Respondent</>
+                                        // NEX is respondent → opposing party filed, user is respondent
+                                        <>{(respondentLegalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(nexProfile?.legalName || 'RESPONDENT').toUpperCase()}, Respondent</>
                                     ) : nexProfile?.partyRole === 'petitioner' ? (
-                                        // NEX is petitioner → user is respondent
-                                        <>{(nexProfile?.legalName || respondentLegalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{('RESPONDENT').toUpperCase()}, Respondent</>
+                                        // NEX is petitioner → user filed
+                                        <>{(nexProfile?.legalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(respondentLegalName || 'RESPONDENT').toUpperCase()}, Respondent</>
                                     ) : (
                                         // No role set — generic fallback
                                         <>{(respondentLegalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(nexProfile?.legalName || 'RESPONDENT').toUpperCase()}, Respondent</>

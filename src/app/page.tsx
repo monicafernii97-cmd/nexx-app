@@ -56,8 +56,18 @@ export default function WelcomePage() {
     if (currentUser === undefined) return; // Still loading
 
     if (currentUser === null) {
-      // Signed in but no Convex record yet — send to onboarding
-      router.replace('/onboarding');
+      // Signed in but no Convex record yet — new user
+      const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+      if (!selectedPlan) {
+        // No plan selected — scroll to pricing so they pick a plan first
+        setTimeout(() => {
+          document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+        }, 300);
+        return; // Stay on welcome page — don't redirect
+      } else {
+        // Plan selected — proceed to onboarding
+        router.replace('/onboarding');
+      }
     } else if (currentUser.onboardingComplete) {
       // Returning user — straight to dashboard
       router.replace('/dashboard');
@@ -272,14 +282,14 @@ export default function WelcomePage() {
                 name: 'Free',
                 price: '$0',
                 period: 'forever',
-                description: 'Get your bearings. Start documenting.',
+                description: 'Start documenting incidents and explore what NEXX can do — completely free.',
                 badge: null,
                 features: [
-                  '5 legal AI messages/day',
-                  '50 support messages/day',
-                  '3 document generations/mo',
-                  '3 court rules lookups/mo',
-                  'Incident reporting',
+                  '5 legal guidance messages per day',
+                  '50 NEXX Chat messages per day',
+                  '3 legal document generations per month',
+                  '3 court rules lookups per month',
+                  'Basic incident reporting & analysis',
                 ],
                 cta: 'Start Free',
                 accent: 'rgba(255,255,255,0.1)',
@@ -290,14 +300,14 @@ export default function WelcomePage() {
                 name: 'Pro',
                 price: '$29.99',
                 period: '/month',
-                description: 'For parents actively building their case.',
+                description: 'For parents ready to build a strong, evidence-backed case with expanded access to every tool.',
                 badge: null,
                 features: [
-                  '50 legal AI messages/day',
-                  'Unlimited support chat',
-                  'Unlimited documents',
-                  'Full resource finder',
-                  'Priority pattern detection',
+                  '50 legal guidance messages per day',
+                  'Unlimited NEXX Chat',
+                  'Unlimited legal document generation',
+                  'Unlimited incident analysis & timeline reports',
+                  'Full county resource finder & court rules lookup',
                 ],
                 cta: 'Go Pro',
                 accent: 'rgba(26,75,155,0.3)',
@@ -308,14 +318,14 @@ export default function WelcomePage() {
                 name: 'Premium',
                 price: '$49.99',
                 period: '/month',
-                description: 'Maximum firepower for high-conflict cases.',
+                description: 'Our most popular plan — built for parents actively navigating custody, family law, or high-conflict cases.',
                 badge: 'Most Popular',
                 features: [
-                  '100 legal AI messages/day',
-                  'Unlimited support chat',
-                  'Unlimited everything',
-                  'Advanced compliance checks',
-                  'Priority support',
+                  '100 legal guidance messages per day',
+                  'Unlimited NEXX Chat',
+                  'Unlimited document generation & DocuVault access',
+                  'Advanced court compliance verification',
+                  'Unlimited access to local legal resources',
                 ],
                 cta: 'Go Premium',
                 accent: 'rgba(229,168,74,0.15)',
@@ -326,14 +336,14 @@ export default function WelcomePage() {
                 name: 'Executive',
                 price: '$149.99',
                 period: '/month',
-                description: 'Unlimited. Unrestricted. Unstoppable.',
+                description: 'No daily caps. No restrictions. Full, unrestricted access to every NEXX feature.',
                 badge: 'Elite',
                 features: [
-                  'Unlimited legal AI (GPT-4o)',
-                  'Unlimited everything',
-                  'All models & features',
-                  'White-glove onboarding',
-                  'Dedicated support channel',
+                  'Unlimited legal guidance messages',
+                  'Unlimited document generation & template gallery',
+                  'Unlimited incident analysis & timeline reports',
+                  'Unlimited compliance verification & court rule lookups',
+                  'Dedicated family code search tailored to your location',
                 ],
                 cta: 'Go Executive',
                 accent: 'rgba(229,168,74,0.25)',

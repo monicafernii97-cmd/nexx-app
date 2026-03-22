@@ -12,6 +12,7 @@ import {
     FloppyDisk,
     Check,
     Shapes,
+    Envelope,
 } from '@phosphor-icons/react';
 import { US_STATES } from '@/lib/constants';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
@@ -44,6 +45,8 @@ export default function ProfilePage() {
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [supportMessage, setSupportMessage] = useState('');
+    const [supportSent, setSupportSent] = useState(false);
     const [form, setForm] = useState({
         name: '',
         state: '',
@@ -109,6 +112,20 @@ export default function ProfilePage() {
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleSendSupport = () => {
+        if (!supportMessage.trim()) return;
+        const subject = encodeURIComponent(`NEXX Support — ${form.name || 'User'}`);
+        const body = encodeURIComponent(
+            `From: ${form.name || 'NEXX User'}\nEmail: ${user?.email || 'N/A'}\n\n${supportMessage}`
+        );
+        window.open(`mailto:support@nexxapp.com?subject=${subject}&body=${body}`, '_blank');
+        setSupportSent(true);
+        setTimeout(() => {
+            setSupportSent(false);
+            setSupportMessage('');
+        }, 3000);
     };
 
     const updateChildName = (index: number, name: string) => {
@@ -423,6 +440,36 @@ export default function ProfilePage() {
                                     </div>
                                 </Field>
                             </div>
+                        </div>
+                    </Section>
+
+                    {/* ── Contact Support ── */}
+                    <Section icon={<Envelope size={20} weight="duotone" className="text-champagne" />} title="Contact Support">
+                        <p className="text-[13px] font-medium text-white/70 mb-4 leading-relaxed">
+                            Have a question, issue, or suggestion? Send us a message and our team will get back to you as quickly as possible.
+                        </p>
+                        <textarea
+                            className="input-premium w-full min-h-[120px] resize-none mb-4"
+                            value={supportMessage}
+                            onChange={(e) => setSupportMessage(e.target.value)}
+                            placeholder="Describe your question or issue..."
+                        />
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={handleSendSupport}
+                                disabled={!supportMessage.trim() || supportSent}
+                                className={`flex items-center gap-2.5 px-6 py-3 rounded-xl text-[14px] font-semibold cursor-pointer transition-all duration-300 shadow-md border ${
+                                    supportSent
+                                        ? 'bg-emerald text-white border-transparent'
+                                        : 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:shadow-[0_12px_25px_rgba(26,75,155,0.6)] hover:-translate-y-0.5'
+                                } disabled:opacity-50 disabled:cursor-default disabled:hover:translate-y-0`}
+                            >
+                                {supportSent ? <Check size={18} weight="bold" /> : <Envelope size={18} weight="bold" />}
+                                {supportSent ? 'Opening Email Client...' : 'Send Message'}
+                            </button>
+                            <span className="text-[11px] text-white/40">
+                                Opens your email client to send to support@nexxapp.com
+                            </span>
                         </div>
                     </Section>
                 </div>

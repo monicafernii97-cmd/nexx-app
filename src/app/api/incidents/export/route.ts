@@ -34,6 +34,15 @@ export async function GET() {
             return new NextResponse('No incidents found', { status: 404 });
         }
 
+        // Guard against overly large exports that could cause memory pressure or timeouts
+        const MAX_EXPORT_INCIDENTS = 500;
+        if (incidentsList.length > MAX_EXPORT_INCIDENTS) {
+            return NextResponse.json(
+                { error: `Export limited to ${MAX_EXPORT_INCIDENTS} incidents. You have ${incidentsList.length}. Please contact support.` },
+                { status: 413 }
+            );
+        }
+
         /** Parse a time string (12h or 24h) to minutes since midnight for sorting. */
         const parseTimeToMinutes = (value?: string): number => {
             if (!value) return Number.POSITIVE_INFINITY;
@@ -101,7 +110,7 @@ export async function GET() {
 
         let timelineRows = '';
         sortedIncidents.forEach(incident => {
-            const catLabel = categoryLabelByValue.get(incident.category ?? '') || incident.category || 'Event';
+            const catLabel = categoryLabelByValue.get(incident.category ?? '') || incident.category?.replace(/_/g, ' ') || 'Event';
             let tagsHtml = '';
             if (incident.tags && incident.tags.length > 0) {
                 const tagLabels = incident.tags.map(t => categoryLabelByValue.get(t) || t.replace(/_/g, ' '));

@@ -6,7 +6,7 @@ import { useAuth, useClerk } from '@clerk/nextjs';
 import { useQuery, useConvexAuth } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { CaretDown } from '@phosphor-icons/react';
 import { PLANS } from '@/lib/plans';
@@ -31,6 +31,7 @@ export default function WelcomePage() {
   // hasn't received the token yet, causing users.me to return null.
   const { isAuthenticated: convexReady, isLoading: convexLoading } = useConvexAuth();
   const router = useRouter();
+  const [showNoPlanBanner, setShowNoPlanBanner] = useState(false);
 
   // Only query when Convex auth is fully synced (not just Clerk signed-in)
   const currentUser = useQuery(
@@ -62,7 +63,8 @@ export default function WelcomePage() {
       const validPlans = new Set(['free', 'pro', 'premium', 'executive']);
       if (!selectedPlan || !validPlans.has(selectedPlan)) {
         localStorage.removeItem('selectedPlan');
-        // No valid plan selected — scroll to pricing so they pick a plan first
+        // No valid plan selected — show banner and scroll to pricing
+        setShowNoPlanBanner(true);
         requestAnimationFrame(() => {
           document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
         });
@@ -267,6 +269,22 @@ export default function WelcomePage() {
             transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
+            {/* Account Not Found Banner */}
+            {showNoPlanBanner && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="mb-10 mx-auto max-w-lg rounded-2xl p-5 border border-[rgba(229,168,74,0.4)] bg-gradient-to-b from-[rgba(229,168,74,0.12)] to-[rgba(229,168,74,0.04)] shadow-[0_8px_30px_rgba(229,168,74,0.1)] backdrop-blur-md"
+              >
+                <p className="text-sm font-bold text-[var(--champagne)] mb-1.5 tracking-wide">
+                  No account found
+                </p>
+                <p className="text-[13px] text-[rgba(255,255,255,0.7)] leading-relaxed">
+                  It looks like you don&apos;t have an account yet. Select a plan below to get started.
+                </p>
+              </motion.div>
+            )}
             <p className="text-[11px] md:text-xs font-bold tracking-[0.25em] uppercase text-[var(--champagne)] mb-4">
               Choose Your Arsenal
             </p>

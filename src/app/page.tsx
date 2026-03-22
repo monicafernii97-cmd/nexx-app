@@ -6,7 +6,7 @@ import { useAuth, useClerk } from '@clerk/nextjs';
 import { useQuery, useConvexAuth } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 import { CaretDown } from '@phosphor-icons/react';
 import { PLANS } from '@/lib/plans';
@@ -31,13 +31,22 @@ export default function WelcomePage() {
   // hasn't received the token yet, causing users.me to return null.
   const { isAuthenticated: convexReady, isLoading: convexLoading } = useConvexAuth();
   const router = useRouter();
-  const [showNoPlanBanner, setShowNoPlanBanner] = useState(false);
 
   // Only query when Convex auth is fully synced (not just Clerk signed-in)
   const currentUser = useQuery(
     api.users.me,
     convexReady ? {} : 'skip'
   );
+
+  // Derived: show "no account found" banner when signed in with no Convex record and no plan
+  const showNoPlanBanner = (() => {
+    if (!clerkLoaded || !isSignedIn || convexLoading || !convexReady) return false;
+    if (currentUser !== null) return false;
+    if (currentUser === undefined) return false;
+    const plan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+    const valid = new Set(['free', 'pro', 'premium', 'executive']);
+    return !plan || !valid.has(plan);
+  })();
 
   // Terminal state: Clerk is signed in but Convex auth failed to sync
   const convexAuthFailed = clerkLoaded && isSignedIn && !convexLoading && !convexReady;
@@ -63,8 +72,7 @@ export default function WelcomePage() {
       const validPlans = new Set(['free', 'pro', 'premium', 'executive']);
       if (!selectedPlan || !validPlans.has(selectedPlan)) {
         localStorage.removeItem('selectedPlan');
-        // No valid plan selected — show banner and scroll to pricing
-        setShowNoPlanBanner(true);
+        // No valid plan selected — scroll to pricing so they pick a plan first
         requestAnimationFrame(() => {
           document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
         });

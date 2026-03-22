@@ -83,7 +83,7 @@ export async function GET() {
         });
 
         // Precompute category labels to avoid repeated linear lookups
-        const categoryLabelByValue = new Map(
+        const categoryLabelByValue = new Map<string, string>(
             INCIDENT_CATEGORIES.map(({ value, label }) => [value, label])
         );
 
@@ -101,7 +101,7 @@ export async function GET() {
 
         let timelineRows = '';
         sortedIncidents.forEach(incident => {
-            const catLabel = categoryLabelByValue.get(incident.category) || incident.category || 'Event';
+            const catLabel = categoryLabelByValue.get(incident.category ?? '') || incident.category || 'Event';
             let tagsHtml = '';
             if (incident.tags && incident.tags.length > 0) {
                 const tagLabels = incident.tags.map(t => categoryLabelByValue.get(t) || t.replace(/_/g, ' '));

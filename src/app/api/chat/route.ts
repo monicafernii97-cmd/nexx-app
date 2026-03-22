@@ -43,14 +43,16 @@ export async function POST(req: NextRequest) {
         // ── Fetch user tier from Convex ──
         const validTiers: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
         let userTier: SubscriptionTier = 'free';
+        let tierResolved = false; // true = tier came from DB; false = lookup failed
         try {
             const convex = await getAuthenticatedConvexClient();
             const userRecord = await convex.query(api.users.getByClerkId, { clerkId: userId });
             if (userRecord?.subscriptionTier && validTiers.includes(userRecord.subscriptionTier as SubscriptionTier)) {
                 userTier = userRecord.subscriptionTier as SubscriptionTier;
             }
+            tierResolved = true;
         } catch (err) {
-            console.warn('[Chat] Failed to fetch user tier from Convex — defaulting to free:', err);
+            console.warn('[Chat] Failed to fetch user tier from Convex — skipping rate limit for this request:', err);
         }
 
         // ── Validate input before consuming rate limit ──
@@ -77,14 +79,19 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Tier-specific rate limit for the chosen model ──
-        const feature = premium ? 'chat_message_4o' as const : 'chat_message_mini' as const;
-        const dailyCap = getDailyLimit(userTier, model);
+        // Only enforce when the tier was successfully resolved from the DB.
+        // If the lookup failed, we skip rate limiting to avoid penalizing paid
+        // users with free-tier limits during transient outages.
+        if (tierResolved) {
+            const feature = premium ? 'chat_message_4o' as const : 'chat_message_mini' as const;
+            const dailyCap = getDailyLimit(userTier, model);
 
-        if (dailyCap !== -1) { // -1 = unlimited
-            const tierRl = checkRateLimit(userId, feature, dailyCap);
-            if (!tierRl.allowed) {
-                const { body: rlBody, status } = rateLimitResponse(tierRl, userTier);
-                return Response.json(rlBody, { status });
+            if (dailyCap !== -1) { // -1 = unlimited
+                const tierRl = checkRateLimit(userId, feature, dailyCap);
+                if (!tierRl.allowed) {
+                    const { body: rlBody, status } = rateLimitResponse(tierRl, userTier);
+                    return Response.json(rlBody, { status });
+                }
             }
         }
 

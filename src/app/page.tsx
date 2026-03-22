@@ -32,23 +32,11 @@ export default function WelcomePage() {
   const { isAuthenticated: convexReady, isLoading: convexLoading } = useConvexAuth();
   const router = useRouter();
 
-  /** Valid plan tier IDs, derived once from the PLANS constant. */
-  const VALID_PLAN_TIERS = new Set(PLANS.map((p) => p.tier));
-
   // Only query when Convex auth is fully synced (not just Clerk signed-in)
   const currentUser = useQuery(
     api.users.me,
     convexReady ? {} : 'skip'
   );
-
-  // Derived: show "no account found" banner when signed in with no Convex record and no plan
-  const showNoPlanBanner = (() => {
-    if (!clerkLoaded || !isSignedIn || convexLoading || !convexReady) return false;
-    if (currentUser !== null) return false;
-    if (currentUser === undefined) return false;
-    const plan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-    return !plan || !VALID_PLAN_TIERS.has(plan);
-  })();
 
   // Terminal state: Clerk is signed in but Convex auth failed to sync
   const convexAuthFailed = clerkLoaded && isSignedIn && !convexLoading && !convexReady;
@@ -71,7 +59,8 @@ export default function WelcomePage() {
     if (currentUser === null) {
       // Signed in but no Convex record yet — new user
       const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-      if (!selectedPlan || !VALID_PLAN_TIERS.has(selectedPlan)) {
+      const validPlans = new Set(['free', 'pro', 'premium', 'executive']);
+      if (!selectedPlan || !validPlans.has(selectedPlan)) {
         localStorage.removeItem('selectedPlan');
         // No valid plan selected — scroll to pricing so they pick a plan first
         requestAnimationFrame(() => {
@@ -278,22 +267,6 @@ export default function WelcomePage() {
             transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
-            {/* Account Not Found Banner */}
-            {showNoPlanBanner && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="mb-10 mx-auto max-w-lg rounded-2xl p-5 border border-[rgba(229,168,74,0.4)] bg-gradient-to-b from-[rgba(229,168,74,0.12)] to-[rgba(229,168,74,0.04)] shadow-[0_8px_30px_rgba(229,168,74,0.1)] backdrop-blur-md"
-              >
-                <p className="text-sm font-bold text-[var(--champagne)] mb-1.5 tracking-wide">
-                  No account found
-                </p>
-                <p className="text-[13px] text-[rgba(255,255,255,0.7)] leading-relaxed">
-                  It looks like you don&apos;t have an account yet. Select a plan below to get started.
-                </p>
-              </motion.div>
-            )}
             <p className="text-[11px] md:text-xs font-bold tracking-[0.25em] uppercase text-[var(--champagne)] mb-4">
               Choose Your Arsenal
             </p>

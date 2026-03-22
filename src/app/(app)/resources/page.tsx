@@ -538,9 +538,17 @@ export default function ResourcesPage() {
         countyData?.nonprofits ?? [],
     );
 
-    // My Case card rendering
+    // My Case card rendering — cascading URL fallback:
+    // 1. AI-cached case search URL (may 404)
+    // 2. Court clerk URL (more stable, usually the county clerk homepage)
+    // 3. Constructed Google search as last resort
     const safeCaseSearchUrl = toSafeExternalUrl(cachedResources?.caseSearch?.url);
-    const showMyCaseCard = courtSettings?.causeNumber && safeCaseSearchUrl;
+    const safeClerkFallbackUrl = toSafeExternalUrl(cachedResources?.courtClerk?.url);
+    const googleFallbackUrl = county && state
+        ? `https://www.google.com/search?q=${encodeURIComponent(`${county} County ${state} case records search`)}`
+        : null;
+    const myCasePortalUrl = safeCaseSearchUrl || safeClerkFallbackUrl || googleFallbackUrl;
+    const showMyCaseCard = courtSettings?.causeNumber && myCasePortalUrl;
 
     return (
         <PageContainer>
@@ -644,7 +652,7 @@ export default function ResourcesPage() {
             )}
 
             {/* ─── My Case Card ─── */}
-            {showMyCaseCard && safeCaseSearchUrl && (
+            {showMyCaseCard && myCasePortalUrl && (
                 <motion.div
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -652,7 +660,7 @@ export default function ResourcesPage() {
                     className="mb-10"
                 >
                     <a
-                        href={safeCaseSearchUrl}
+                        href={myCasePortalUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="no-underline block"

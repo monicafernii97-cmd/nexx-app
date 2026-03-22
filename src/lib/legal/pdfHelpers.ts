@@ -7,7 +7,7 @@ import { join } from 'path';
  */
 let cachedCSS: string | null = null;
 export function getLegalCSS(): string {
-    if (!cachedCSS) {
+    if (cachedCSS === null) {
         try {
             cachedCSS = readFileSync(
                 join(process.cwd(), 'src/lib/legal/legalDocStyles.css'),

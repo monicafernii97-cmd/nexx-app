@@ -195,8 +195,12 @@ export default function DashboardPage() {
                                 {incidents.slice(0, 6).map((incident, i) => {
                                     const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
                                     const date = (() => {
-                                        const parsed = parseLocalDate(incident.date);
-                                        return isNaN(parsed.getTime()) ? new Date() : parsed;
+                                        try {
+                                            const parsed = parseLocalDate(incident.date);
+                                            return isNaN(parsed.getTime()) ? new Date() : parsed;
+                                        } catch {
+                                            return new Date();
+                                        }
                                     })();
                                     return (
                                         <motion.div

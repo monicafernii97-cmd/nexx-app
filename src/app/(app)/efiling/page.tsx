@@ -380,20 +380,20 @@ export default function EFilingPage() {
                                     </p>
                                     <div className="space-y-2">
                                         {cachedResources.courtClerk.phone && (
-                                            <p className="text-xs flex items-center gap-2 text-[var(--sapphire-base)] font-medium">
-                                                <div className="bg-[var(--sapphire-light)]/10 p-1 rounded-md">
+                                            <span className="text-xs flex items-center gap-2 text-[var(--sapphire-base)] font-medium">
+                                                <span className="bg-[var(--sapphire-light)]/10 p-1 rounded-md inline-flex">
                                                     <Phone size={12} weight="fill" className="text-[var(--sapphire-base)]" />
-                                                </div>
+                                                </span>
                                                 {cachedResources.courtClerk.phone}
-                                            </p>
+                                            </span>
                                         )}
                                         {cachedResources.courtClerk.address && (
-                                            <p className="text-xs flex items-start gap-2 text-[var(--sapphire-base)] font-medium">
-                                                <div className="bg-[var(--sapphire-light)]/10 p-1 rounded-md mt-0.5 shrink-0">
+                                            <span className="text-xs flex items-start gap-2 text-[var(--sapphire-base)] font-medium">
+                                                <span className="bg-[var(--sapphire-light)]/10 p-1 rounded-md mt-0.5 shrink-0 inline-flex">
                                                     <MapPin size={12} weight="fill" className="text-[var(--sapphire-base)]" />
-                                                </div>
+                                                </span>
                                                 <span className="leading-snug">{cachedResources.courtClerk.address}</span>
-                                            </p>
+                                            </span>
                                         )}
                                     </div>
                                     {clerkUrl && (

@@ -22,7 +22,6 @@ import {
     Baby,
     Plus,
     WarningCircle,
-    Strategy,
     FloppyDisk,
     ArrowRight,
     ListChecks,

@@ -176,7 +176,14 @@ async function extractRulesWithAI(
     userPrompt += `\n\nFocus on family law / civil court filings. Include any county-specific local rules that differ from or supplement the state-level rules.`;
 
     if (localRulesUrl) {
-        userPrompt += `\n\nNote: The official local rules for this jurisdiction are published at: ${localRulesUrl}`;
+        try {
+            const parsed = new URL(localRulesUrl);
+            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                userPrompt += `\n\nNote: The official local rules for this jurisdiction are published at: ${parsed.href}`;
+            }
+        } catch {
+            // Invalid URL — skip interpolation
+        }
     }
 
     try {

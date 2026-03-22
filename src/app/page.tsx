@@ -60,9 +60,9 @@ export default function WelcomePage() {
       const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
       if (!selectedPlan) {
         // No plan selected — scroll to pricing so they pick a plan first
-        setTimeout(() => {
+        requestAnimationFrame(() => {
           document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
-        }, 300);
+        });
         return; // Stay on welcome page — don't redirect
       } else {
         // Plan selected — proceed to onboarding
@@ -229,23 +229,22 @@ export default function WelcomePage() {
         </motion.div>
 
         {/* Bouncing Arrow Scroll hint */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2, duration: 1 }}
-          className="absolute bottom-8 left-0 right-0 flex flex-col items-center cursor-pointer group"
-          onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-        >
-          <p className="text-[10px] md:text-xs tracking-[0.25em] font-semibold text-[rgba(255,255,255,0.3)] uppercase mb-2 group-hover:text-[rgba(255,255,255,0.5)] transition-colors">
-            Prepare. Preempt. Prevail.
-          </p>
-          <motion.div
-            animate={{ y: [0, 8, 0] }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          <motion.button
+            type="button"
+            aria-label="Scroll to pricing"
+            onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 cursor-pointer group bg-transparent border-none p-0"
           >
-            <CaretDown size={20} className="text-[rgba(255,255,255,0.3)] group-hover:text-[var(--champagne)] transition-colors" />
-          </motion.div>
-        </motion.div>
+            <p className="text-[11px] uppercase tracking-widest font-bold text-[rgba(255,255,255,0.25)] group-hover:text-[var(--champagne)] transition-colors">
+              Prepare. Preempt. Prevail.
+            </p>
+            <motion.div
+              animate={{ y: [0, 8, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              <CaretDown size={20} className="text-[rgba(255,255,255,0.3)] group-hover:text-[var(--champagne)] transition-colors" />
+            </motion.div>
+          </motion.button>
 
       </div>
 

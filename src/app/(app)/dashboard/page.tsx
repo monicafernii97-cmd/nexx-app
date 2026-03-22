@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
@@ -49,11 +49,11 @@ export default function DashboardPage() {
     ];
 
     /** Time-of-day greeting, set client-side only to avoid hydration mismatch. */
-    const [greetingText, setGreetingText] = useState('');
-    useEffect(() => {
+    const [greetingText, setGreetingText] = useState(() => {
+        if (typeof window === 'undefined') return '';
         const hour = new Date().getHours();
-        setGreetingText(hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening');
-    }, []);
+        return hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+    });
 
     /** Formatted display name for the greeting header (empty if unavailable). */
     const userName = user?.name ? `, ${user.name}` : '';

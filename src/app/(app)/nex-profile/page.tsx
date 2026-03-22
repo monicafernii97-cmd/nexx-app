@@ -452,7 +452,7 @@ export default function NexProfilePage() {
                                 
                                 {nexProfile.dangerLevel !== undefined && (
                                     <div className="mt-6 flex items-center gap-4 pt-4 border-t border-[var(--cloud)]">
-                                        <span className="text-xs font-bold uppercase tracking-widest text-[var(--sapphire-base)]">Lethality Index:</span>
+                                        <span className="text-xs font-bold uppercase tracking-widest text-[var(--sapphire-base)]">Risk Level:</span>
                                         <div className="flex gap-1.5 flex-1 max-w-[180px]">
                                             {[1, 2, 3, 4, 5].map((level) => {
                                                 const isActive = level <= (nexProfile.dangerLevel ?? 0);

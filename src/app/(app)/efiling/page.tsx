@@ -353,7 +353,7 @@ export default function EFilingPage() {
                             </div>
                         </div>
                     </div>
-                ) : hasCourtSettings && !eFilingPortal ? (
+                ) : hasCourtSettings ? (
                     <div className="card-premium p-8 border border-[var(--cloud-light)] relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--champagne)]/5 rounded-full blur-2xl pointer-events-none" />
                         <div className="flex flex-col md:flex-row items-start gap-8 relative z-10">

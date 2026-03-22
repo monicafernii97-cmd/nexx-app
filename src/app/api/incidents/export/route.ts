@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '../../../../../convex/_generated/api';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
@@ -31,6 +32,11 @@ export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
 
 export async function GET() {
     try {
+        const { userId } = await auth();
+        if (!userId) {
+            return new NextResponse('Unauthorized', { status: 401 });
+        }
+
         const convex = await getAuthenticatedConvexClient();
         const incidentsList = await convex.query(api.incidents.list, {});
 

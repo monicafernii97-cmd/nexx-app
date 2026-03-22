@@ -4,6 +4,7 @@ import { api } from '../../../../../../convex/_generated/api';
 import { Id } from '../../../../../../convex/_generated/dataModel';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
 import { getMergedRules } from '@/lib/legal/courtRules';
+import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -19,17 +20,6 @@ function getLegalCSS(): string {
     }
     return cachedCSS;
 }
-
-const INCIDENT_CATEGORIES = [
-    { value: 'emotional_abuse', label: 'Emotional or Psychological Abuse' },
-    { value: 'financial_abuse', label: 'Financial or Economic Abuse' },
-    { value: 'parental_alienation', label: 'Parental Alienation' },
-    { value: 'harassment', label: 'Harassment or Stalking' },
-    { value: 'threats', label: 'Threats or Intimidation' },
-    { value: 'manipulation', label: 'Coercive Control' },
-    { value: 'neglect', label: 'Child Neglect or Endangerment' },
-    { value: 'other', label: 'Other Incident Type' },
-];
 
 function escapeHtml(text: string): string {
     return (text || '')

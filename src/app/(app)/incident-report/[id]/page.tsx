@@ -75,10 +75,21 @@ export default function IncidentDetailPage() {
     // Early return AFTER all hooks
     if (!isValidId) return null;
 
-    if (!incident) {
+    if (incident === undefined) {
         return (
             <div className="max-w-[85rem] mx-auto flex items-center justify-center h-64">
                 <div className="w-10 h-10 rounded-full border-2 border-sapphire border-t-transparent animate-spin" />
+            </div>
+        );
+    }
+
+    if (incident === null) {
+        return (
+            <div className="max-w-[85rem] mx-auto py-16 text-center">
+                <p className="text-sm font-medium text-white/70">Incident not found.</p>
+                <Link href="/incident-report" className="inline-flex items-center gap-2 mt-4 text-sm font-bold text-[#60A5FA] hover:underline">
+                    ← Back to incident reports
+                </Link>
             </div>
         );
     }
@@ -461,7 +472,7 @@ export default function IncidentDetailPage() {
                             className="card-premium p-6"
                         >
                             <h3 className="text-[12px] font-bold tracking-[0.15em] uppercase mb-4 flex items-center gap-2 text-warning pb-3 border-b border-[rgba(10,22,41,0.04)]">
-                                <WarningCircle size={16} weight="duotone" /> NPD Behavioral Analysis
+                                <WarningCircle size={16} weight="duotone" /> Behavioral Observations
                             </h3>
                             <p className="text-[14px] leading-relaxed whitespace-pre-wrap text-sapphire font-medium">
                                 {analysis.behavioralAnalysis}

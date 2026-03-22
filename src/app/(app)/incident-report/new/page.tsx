@@ -111,6 +111,7 @@ export default function NewIncidentPage() {
     }, [isListening]);
 
     const createIncident = useMutation(api.incidents.create);
+    const updateIncident = useMutation(api.incidents.update);
     const confirmIncident = useMutation(api.incidents.confirm);
 
     const handleAnalyze = async () => {
@@ -168,7 +169,20 @@ export default function NewIncidentPage() {
                 : undefined;
 
             if (createdId) {
-                // Already created — just redirect, it's already a draft
+                // Already created — update the draft with current edits
+                await updateIncident({
+                    id: createdId,
+                    narrative,
+                    courtSummary: courtSummary || undefined,
+                    tags: tags.length > 0 ? tags : undefined,
+                    severity,
+                    date,
+                    time,
+                    location: location.trim() || undefined,
+                    witnesses: witnessArr,
+                    childrenInvolved: childrenInvolved || undefined,
+                    aiAnalysis: behavioralAnalysis || undefined,
+                });
             } else {
                 const incidentId = await createIncident({
                     narrative,
@@ -219,6 +233,21 @@ export default function NewIncidentPage() {
                     aiAnalysis: behavioralAnalysis || undefined,
                 });
                 setCreatedId(incidentId);
+            } else {
+                // Update the draft with latest edits before confirming
+                await updateIncident({
+                    id: incidentId,
+                    narrative,
+                    courtSummary,
+                    tags,
+                    severity,
+                    date,
+                    time,
+                    location: location.trim() || undefined,
+                    witnesses: witnessArr,
+                    childrenInvolved: childrenInvolved || undefined,
+                    aiAnalysis: behavioralAnalysis || undefined,
+                });
             }
 
             await confirmIncident({ id: incidentId });
@@ -595,6 +624,13 @@ export default function NewIncidentPage() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Error display for review step */}
+                        {analyzeError && (
+                            <div className="p-4 rounded-xl bg-rose/10 border border-rose/20 text-rose text-[13px] font-semibold flex items-center gap-2">
+                                <WarningCircle size={16} weight="fill" /> {analyzeError}
+                            </div>
+                        )}
 
                         <div className="flex flex-col sm:flex-row gap-3 pt-4">
                             <button onClick={() => setStep('describe')} className="flex-1 py-4 uppercase text-[12px] font-bold tracking-widest rounded-xl transition-all shadow-sm text-white bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.2)] hover:bg-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.3)]">

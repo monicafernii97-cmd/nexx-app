@@ -98,6 +98,8 @@ export async function POST(req: NextRequest) {
 - Use OBSERVATIONAL language: "The other party stated..." not "The other party manipulated..."
 - Flag behavioral patterns ONLY when they are clearly and obviously present in the narrative — do NOT force tags
 - Write as if a judge will read every word — maintain the standard of credibility expected in court
+- NEVER fabricate, invent, or guess legal citations, statute numbers, court rules, dates, or facts not explicitly present in the user's narrative
+- Only reference information the user has provided — do NOT add details, embellish events, or assume facts not stated
 
 You must generate FOUR outputs:
 

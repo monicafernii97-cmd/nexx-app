@@ -35,14 +35,16 @@ const MAX_CACHE_SIZE = 500;
 /** Process-local cache keyed by "state|county" */
 const rulesCache = new Map<string, CacheEntry>();
 
-/** Build a cache key from state, county, and optional court name. */
-function getCacheKey(state: string, county: string, courtName?: string): string {
-    return courtName ? `${state}|${county}|${courtName}` : `${state}|${county}`;
+/** Build a cache key from state, county, optional court name, and optional localRulesUrl. */
+function getCacheKey(state: string, county: string, courtName?: string, localRulesUrl?: string): string {
+    let key = courtName ? `${state}|${county}|${courtName}` : `${state}|${county}`;
+    if (localRulesUrl) key += `|${localRulesUrl}`;
+    return key;
 }
 
 /** Return a cached lookup result if available and not expired; otherwise null. */
-function getCached(state: string, county: string, courtName?: string): CourtRulesLookupResult | null {
-    const key = getCacheKey(state, county, courtName);
+function getCached(state: string, county: string, courtName?: string, localRulesUrl?: string): CourtRulesLookupResult | null {
+    const key = getCacheKey(state, county, courtName, localRulesUrl);
     const entry = rulesCache.get(key);
     if (!entry) return null;
     if (Date.now() > entry.expiresAt) {
@@ -53,16 +55,57 @@ function getCached(state: string, county: string, courtName?: string): CourtRule
 }
 
 /** Store a lookup result in the process-local cache with TTL and FIFO eviction. */
-function setCache(state: string, county: string, result: CourtRulesLookupResult, courtName?: string): void {
+function setCache(state: string, county: string, result: CourtRulesLookupResult, courtName?: string, localRulesUrl?: string): void {
     // Evict oldest entry if cache is full (FIFO)
     if (rulesCache.size >= MAX_CACHE_SIZE) {
         const oldestKey = rulesCache.keys().next().value;
         if (oldestKey) rulesCache.delete(oldestKey);
     }
-    rulesCache.set(getCacheKey(state, county, courtName), {
+    rulesCache.set(getCacheKey(state, county, courtName, localRulesUrl), {
         result,
         expiresAt: Date.now() + CACHE_TTL_MS,
     });
+}
+
+/** Whitelist of known CourtFormattingRules fields and their expected types. */
+const KNOWN_RULES_FIELDS: Record<string, 'number' | 'string' | 'boolean' | 'string[]'> = {
+    paperWidth: 'number',
+    paperHeight: 'number',
+    marginTop: 'number',
+    marginBottom: 'number',
+    marginLeft: 'number',
+    marginRight: 'number',
+    fontFamily: 'string',
+    fontSize: 'number',
+    lineSpacing: 'number',
+    pageNumbering: 'boolean',
+    pageNumberFormat: 'string',
+    pageNumberPosition: 'string',
+    captionStyle: 'string',
+    requiresSignatureBlock: 'boolean',
+    requiresCertificateOfService: 'boolean',
+    requiresVerification: 'boolean',
+    notes: 'string[]',
+};
+
+/**
+ * Validate and whitelist model JSON output against known CourtFormattingRules fields.
+ * Strips unknown fields and type-mismatched values to prevent bad data from being cached.
+ */
+function validateCourtFormattingRules(raw: Record<string, unknown>): Partial<CourtFormattingRules> {
+    const validated: Record<string, unknown> = {};
+    for (const [key, expectedType] of Object.entries(KNOWN_RULES_FIELDS)) {
+        if (!(key in raw)) continue;
+        const value = raw[key];
+        if (expectedType === 'string[]') {
+            if (Array.isArray(value) && value.every((v) => typeof v === 'string')) {
+                validated[key] = value;
+            }
+        } else if (typeof value === expectedType) {
+            validated[key] = value;
+        }
+    }
+    return validated as Partial<CourtFormattingRules>;
 }
 
 // ── GPT-4o Rules Extraction (Direct Knowledge) ──
@@ -158,8 +201,11 @@ async function extractRulesWithAI(
             return { rules: {}, sources: [], confidence: 0 };
         }
 
-        // Calculate confidence based on how many fields were extracted
-        const fieldCount = Object.keys(parsed).length;
+        // Validate/whitelist known fields before computing confidence
+        const validatedRules = validateCourtFormattingRules(parsed);
+
+        // Calculate confidence based on how many valid fields were extracted
+        const fieldCount = Object.keys(validatedRules).length;
         const maxFields = 17; // Must match extractable fields in EXTRACTION_PROMPT
         const confidence = Math.min(fieldCount / maxFields, 1.0);
 
@@ -168,7 +214,7 @@ async function extractRulesWithAI(
         if (localRulesUrl) sources.push(localRulesUrl);
 
         return {
-            rules: parsed,
+            rules: validatedRules,
             sources,
             confidence,
         };
@@ -209,7 +255,7 @@ export async function lookupCourtRules(
 ): Promise<CourtRulesLookupResult> {
     // Step 1: Check cache (unless force-refreshing)
     if (!forceRefresh) {
-        const cached = getCached(state, county, courtName);
+        const cached = getCached(state, county, courtName, localRulesUrl);
         if (cached) return cached;
     }
 
@@ -223,7 +269,7 @@ export async function lookupCourtRules(
 
     // Step 3: Cache for future requests
     if (extraction.confidence > 0) {
-        setCache(state, county, result, courtName);
+        setCache(state, county, result, courtName, localRulesUrl);
     }
 
     return result;

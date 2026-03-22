@@ -29,6 +29,11 @@ export const upsert = mutation({
         const user = await getAuthenticatedUser(ctx);
         const now = Date.now();
 
+        // Validate: custom title format requires non-empty custom text
+        if (args.caseTitleFormat === 'custom' && (!args.caseTitleCustom || !args.caseTitleCustom.trim())) {
+            throw new Error('Custom case title text is required when format is set to "custom".');
+        }
+
         // Check if user already has settings
         const existing = await ctx.db
             .query('userCourtSettings')

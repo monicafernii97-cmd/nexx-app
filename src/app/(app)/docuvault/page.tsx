@@ -482,11 +482,18 @@ function DocuVaultPageInner() {
                                                 let extractedText = '';
 
                                                 if (isBinary) {
-                                                    // Convert to base64 and send as JSON
-                                                    const arrayBuffer = await file.arrayBuffer();
-                                                    const base64 = btoa(
-                                                        new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-                                                    );
+                                                    // Convert to base64 via FileReader (avoids O(n²) reduce)
+                                                    const base64 = await new Promise<string>((resolve, reject) => {
+                                                        const reader = new FileReader();
+                                                        reader.onload = () => {
+                                                            const dataUrl = reader.result as string;
+                                                            // Strip "data:*;base64," prefix
+                                                            const commaIdx = dataUrl.indexOf(',');
+                                                            resolve(commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl);
+                                                        };
+                                                        reader.onerror = () => reject(new Error('Failed to read file'));
+                                                        reader.readAsDataURL(file);
+                                                    });
                                                     const res = await fetch('/api/documents/parse', {
                                                         method: 'POST',
                                                         headers: { 'Content-Type': 'application/json' },
@@ -736,9 +743,11 @@ function DocuVaultPageInner() {
                                 {selectedTemplate?.title || 'Generated Document'}
                             </h1>
                             <div className="flex items-center gap-2 mt-2">
-                                <span className="text-[13px] font-bold px-3 py-1 rounded-md bg-white/10 border border-white/20 text-white uppercase tracking-wider">
-                                    Case #{caseNumber ?? '------'}
-                                </span>
+                                {caseNumber && (
+                                    <span className="text-[13px] font-bold px-3 py-1 rounded-md bg-white/10 border border-white/20 text-white uppercase tracking-wider">
+                                        Case #{caseNumber}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -766,7 +775,7 @@ function DocuVaultPageInner() {
                                 </p>
                             </div>
 
-                            {/* NEXXverification Badges */}
+                            {/* NEXXverification Badges — shown only as format indicators, not legal certifications */}
                             <div className="space-y-4">
                                 <div className="p-5 flex items-start gap-4 border border-[#10B981]/40 bg-[#10B981]/10 rounded-[1.5rem] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(16,185,129,0.3),0_8px_24px_rgba(0,0,0,0.3)]">
                                     <div className="w-10 h-10 rounded-full bg-[#10B981] flex items-center justify-center shrink-0 shadow-sm mt-0.5 border border-[#10B981]/50">
@@ -774,10 +783,10 @@ function DocuVaultPageInner() {
                                     </div>
                                     <div>
                                         <p className="text-[15px] font-bold text-white tracking-wide drop-shadow-sm">
-                                            Rule 3.1 Certified
+                                            Format Compliant
                                         </p>
                                         <p className="text-[13px] font-medium text-white/80 mt-1 leading-snug">
-                                            Adheres to formal court formatting standards.
+                                            Generated using local court formatting rules.
                                         </p>
                                     </div>
                                 </div>
@@ -787,10 +796,10 @@ function DocuVaultPageInner() {
                                     </div>
                                     <div>
                                         <p className="text-[15px] font-bold text-white tracking-wide drop-shadow-sm">
-                                            Bates Validation
+                                            Page Numbering Applied
                                         </p>
                                         <p className="text-[13px] font-medium text-white/80 mt-1 leading-snug">
-                                            Pagination sequence validated & confirmed.
+                                            Sequential page numbering included per court standards.
                                         </p>
                                     </div>
                                 </div>

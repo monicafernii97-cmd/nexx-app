@@ -115,6 +115,12 @@ export default function NexProfilePage() {
     };
 
     const handleSave = async () => {
+        // Guard: nexProfile === undefined means the query is still loading.
+        // Wait for it to resolve to prevent duplicate creates vs. updates.
+        if (nexProfile === undefined) {
+            setError('Profile is still loading. Please try again in a moment.');
+            return;
+        }
         setSaving(true);
         setError(null);
         try {

@@ -57,7 +57,12 @@ export default defineSchema({
                 v.literal('numb')
             )
         ),
-        subscriptionTier: v.optional(v.string()),
+        subscriptionTier: v.optional(v.union(
+            v.literal('free'),
+            v.literal('pro'),
+            v.literal('premium'),
+            v.literal('executive')
+        )),
         onboardingComplete: v.boolean(),
         primaryGoals: v.optional(v.array(v.string())),
         createdAt: v.number(),

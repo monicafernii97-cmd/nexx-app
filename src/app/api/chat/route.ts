@@ -20,12 +20,6 @@ export async function POST(req: NextRequest) {
         return Response.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    // ── Rate limit (general — legacy fallback) ──
-    const rl = checkRateLimit(userId, 'chat_message');
-    if (!rl.allowed) {
-        const { body, status } = rateLimitResponse(rl);
-        return Response.json(body, { status });
-    }
 
     try {
         const body = await req.json();
@@ -44,15 +38,16 @@ export async function POST(req: NextRequest) {
         const premium = isPremiumModel(model);
 
         // ── Fetch user tier from Convex ──
+        const validTiers: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
         let userTier: SubscriptionTier = 'free';
         try {
             const convex = await getAuthenticatedConvexClient();
             const userRecord = await convex.query(api.users.getByClerkId, { clerkId: userId });
-            if (userRecord?.subscriptionTier) {
+            if (userRecord?.subscriptionTier && validTiers.includes(userRecord.subscriptionTier as SubscriptionTier)) {
                 userTier = userRecord.subscriptionTier as SubscriptionTier;
             }
-        } catch {
-            // If Convex lookup fails, default to free tier
+        } catch (err) {
+            console.warn('[Chat] Failed to fetch user tier from Convex — defaulting to free:', err);
         }
 
         // ── Tier-specific rate limit for the chosen model ──

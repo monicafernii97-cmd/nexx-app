@@ -69,8 +69,13 @@ export default function CourtSettingsPage() {
     const initializedRef = useRef(false);
 
     // Load existing settings (only on first data arrival to avoid resetting mid-edit)
+    // Mark initialized once the query resolves (even if null) so NEX autofill can fire.
     useEffect(() => {
-        if (existingSettings && !initializedRef.current) {
+        if (initializedRef.current) return;
+        // existingSettings is undefined while loading, null if no record exists
+        if (existingSettings === undefined) return;
+
+        if (existingSettings) {
             setState(existingSettings.state || '');
             setCounty(existingSettings.county || '');
             setCourtName(existingSettings.courtName || '');
@@ -80,8 +85,8 @@ export default function CourtSettingsPage() {
             setCaseTitleFormat((existingSettings.caseTitleFormat as CaseTitleFormat) || '');
             setCaseTitleCustom(existingSettings.caseTitleCustom || '');
             setRespondentLegalName(existingSettings.respondentLegalName || '');
-            initializedRef.current = true;
         }
+        initializedRef.current = true;
     }, [existingSettings]);
 
     // Auto-populate respondent name from NEX profile if not already set
@@ -551,9 +556,14 @@ export default function CourtSettingsPage() {
                             {caseTitleFormat === 'name_v_name' && (
                                 <>
                                     {nexProfile?.partyRole === 'respondent' ? (
-                                        <>{(nexProfile?.legalName || respondentLegalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(respondentLegalName || nexProfile?.legalName || 'RESPONDENT').toUpperCase()}, Respondent</>
+                                        // NEX is respondent → user is petitioner
+                                        <>{('PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(nexProfile?.legalName || respondentLegalName || 'RESPONDENT').toUpperCase()}, Respondent</>
+                                    ) : nexProfile?.partyRole === 'petitioner' ? (
+                                        // NEX is petitioner → user is respondent
+                                        <>{(nexProfile?.legalName || respondentLegalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{('RESPONDENT').toUpperCase()}, Respondent</>
                                     ) : (
-                                        <>{(respondentLegalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(nexProfile?.legalName || respondentLegalName || 'RESPONDENT').toUpperCase()}, Respondent</>
+                                        // No role set — generic fallback
+                                        <>{(respondentLegalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(nexProfile?.legalName || 'RESPONDENT').toUpperCase()}, Respondent</>
                                     )}
                                 </>
                             )}

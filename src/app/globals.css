@@ -37,6 +37,7 @@ html {
   --rose: #F43F5E;
   --warning: #F59E0B;
   --error: #F43F5E;
+  --success: var(--emerald);
 
   /* ── Semantic Aliases ── */
   --base-bg: var(--universe-dark);

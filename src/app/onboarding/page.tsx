@@ -179,6 +179,20 @@ export default function OnboardingPage() {
 
                 const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
 
+                if (!selectedPlan) {
+                    setSaveError('Please select a plan before completing onboarding.');
+                    setIsSaving(false);
+                    return;
+                }
+                const validTiers = ['free', 'pro', 'premium', 'executive'] as const;
+                type Tier = typeof validTiers[number];
+                if (!validTiers.includes(selectedPlan as Tier)) {
+                    setSaveError(`Invalid plan "${selectedPlan}". Please select a valid plan.`);
+                    setIsSaving(false);
+                    return;
+                }
+                const tier = selectedPlan as Tier;
+
                 await updateProfile({
                     id: userId,
                     name: formData.name || undefined,
@@ -191,7 +205,7 @@ export default function OnboardingPage() {
                     custodyType: formData.custodyType ? custodyMap[formData.custodyType] ?? undefined : undefined,
                     hasAttorney: formData.hasAttorney ? formData.hasAttorney === 'Yes' : undefined,
                     primaryGoals: formData.primaryGoals.length > 0 ? formData.primaryGoals : undefined,
-                    subscriptionTier: selectedPlan || undefined,
+                    subscriptionTier: tier,
                 });
 
                 if (selectedPlan && typeof window !== 'undefined') {

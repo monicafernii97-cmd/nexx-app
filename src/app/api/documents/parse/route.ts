@@ -22,9 +22,15 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Missing filename or data' }, { status: 400 });
         }
 
-        const buffer = Buffer.from(data, 'base64');
-
         const maxSize = 10 * 1024 * 1024; // 10 MB
+        // Check base64 string length before decoding to avoid memory spikes.
+        // Base64 encodes 3 bytes in 4 chars, so decoded ≈ data.length * 3/4.
+        const estimatedDecodedSize = Math.floor((data.length * 3) / 4);
+        if (estimatedDecodedSize > maxSize) {
+            return NextResponse.json({ error: 'File too large. Maximum size is 10 MB.' }, { status: 400 });
+        }
+
+        const buffer = Buffer.from(data, 'base64');
         if (buffer.length > maxSize) {
             return NextResponse.json({ error: 'File too large. Maximum size is 10 MB.' }, { status: 400 });
         }

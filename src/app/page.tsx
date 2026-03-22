@@ -403,7 +403,7 @@ export default function WelcomePage() {
                 {/* CTA */}
                 <button
                   onClick={() => {
-                    localStorage.setItem('selectedPlan', plan.name);
+                    localStorage.setItem('selectedPlan', plan.name.toLowerCase());
                     router.push('/sign-up');
                   }}
                   className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all ${

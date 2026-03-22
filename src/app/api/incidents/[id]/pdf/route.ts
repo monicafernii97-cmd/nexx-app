@@ -54,6 +54,11 @@ export async function GET(
             return new NextResponse('Incident ID is required', { status: 400 });
         }
 
+        // Validate ID format before Convex cast (Convex IDs are base32-like alphanumeric strings)
+        if (!/^[a-zA-Z0-9_]+$/.test(id)) {
+            return new NextResponse('Invalid incident ID format', { status: 400 });
+        }
+
         // Fetch incident from Convex securely
         const convex = await getAuthenticatedConvexClient();
         const incident = await convex.query(api.incidents.get, { id: id as Id<'incidents'> });

@@ -150,7 +150,7 @@ export default function DocuVaultGalleryPage() {
                     </div>
                 </div>
 
-                {/* Empty State */}
+                {/* Empty State — no documents at all */}
                 {documents.length === 0 && (
                     <div className="p-16 rounded-[2rem] text-center border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_12px_40px_rgba(0,0,0,0.4)]">
                         <div
@@ -167,6 +167,19 @@ export default function DocuVaultGalleryPage() {
                         <Link href="/docuvault" className="text-[15px] font-bold tracking-widest uppercase px-8 py-4 rounded-full inline-flex items-center gap-3 no-underline transition-all bg-[linear-gradient(135deg,#60A5FA,#2563EB)] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_8px_24px_rgba(37,99,235,0.5)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_12px_32px_rgba(37,99,235,0.6)] hover:-translate-y-1">
                             <Plus size={20} strokeWidth={3} /> Create Document
                         </Link>
+                    </div>
+                )}
+
+                {/* No matching results — documents exist but filters yield nothing */}
+                {documents.length > 0 && filteredDocs.length === 0 && (
+                    <div className="p-12 rounded-[2rem] text-center border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_12px_40px_rgba(0,0,0,0.4)]">
+                        <Search size={40} className="mx-auto mb-4 text-white/40" />
+                        <p className="text-[18px] font-bold mb-2 text-white drop-shadow-sm">
+                            No matching documents
+                        </p>
+                        <p className="text-[15px] text-white/60 font-medium">
+                            Try adjusting your search or filter to find what you&apos;re looking for.
+                        </p>
                     </div>
                 )}
 

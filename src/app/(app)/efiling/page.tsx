@@ -223,17 +223,18 @@ export default function EFilingPage() {
 
     // Mark as filed handler with inline error feedback
     const [filingId, setFilingId] = useState<string | null>(null);
-    const [filingError, setFilingError] = useState<string | null>(null);
+    const [filingErrors, setFilingErrors] = useState<Record<string, string>>({});
     const handleMarkAsFiled = useCallback(async (docId: Id<'generatedDocuments'>) => {
         setFilingId(docId);
-        setFilingError(null);
+        setFilingErrors(prev => { const next = { ...prev }; delete next[docId]; return next; });
         try {
             await updateStatus({ id: docId, status: 'filed' });
         } catch (err) {
             console.error('[eFiling] Failed to mark as filed:', err);
-            setFilingError(err instanceof Error ? err.message : 'Failed to mark as filed. Please try again.');
+            const msg = err instanceof Error ? err.message : 'Failed to mark as filed. Please try again.';
+            setFilingErrors(prev => ({ ...prev, [docId]: msg }));
             // Auto-dismiss error after 5 seconds
-            setTimeout(() => setFilingError(null), 5000);
+            setTimeout(() => setFilingErrors(prev => { const next = { ...prev }; delete next[docId]; return next; }), 5000);
         } finally {
             setFilingId(null);
         }
@@ -529,14 +530,14 @@ export default function EFilingPage() {
                                                 <CheckCircle size={14} weight="bold" />
                                                 {filingId === doc._id ? 'Saving…' : 'Mark Filed'}
                                             </button>
-                                            {filingError && (
+                                            {filingErrors[doc._id] && (
                                                 <motion.p
                                                     initial={{ opacity: 0 }}
                                                     animate={{ opacity: 1 }}
                                                     className="col-span-2 text-xs flex items-center gap-1 text-[var(--error)] bg-[var(--error)]/10 px-3 py-2 rounded-lg mt-1"
                                                 >
                                                     <Warning size={14} weight="bold" />
-                                                    {filingError}
+                                                    {filingErrors[doc._id]}
                                                 </motion.p>
                                             )}
                                         </div>

@@ -20,7 +20,22 @@ import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
 export default function SubscriptionPage() {
     const user = useQuery(api.users.me);
 
-    const currentTier: SubscriptionTier = (user?.subscriptionTier as SubscriptionTier) || 'free';
+    // Show loading spinner while user data is being fetched
+    if (user === undefined) {
+        return (
+            <PageContainer>
+                <div className="flex items-center justify-center h-64">
+                    <div className="w-10 h-10 rounded-full border-2 border-[#60A5FA] border-t-transparent animate-spin" />
+                </div>
+            </PageContainer>
+        );
+    }
+
+    const validTiers: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
+    const rawTier = user?.subscriptionTier as string | undefined;
+    const currentTier: SubscriptionTier = rawTier && validTiers.includes(rawTier as SubscriptionTier)
+        ? (rawTier as SubscriptionTier)
+        : 'free';
     const currentConfig = TIER_LIMITS[currentTier];
 
     const plans: {

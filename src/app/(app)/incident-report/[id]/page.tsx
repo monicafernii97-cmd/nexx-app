@@ -160,7 +160,7 @@ export default function IncidentDetailPage() {
                     severity: incident.severity,
                     location: incident.location || undefined,
                     witnesses: incident.witnesses || undefined,
-                    childrenInvolved: incident.childrenInvolved || undefined,
+                    childrenInvolved: incident.childrenInvolved ?? undefined,
                 }),
             });
 

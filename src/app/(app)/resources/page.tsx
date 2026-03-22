@@ -692,7 +692,11 @@ export default function ResourcesPage() {
                                         </span>
                                     </div>
                                     <p className="text-[14px] font-medium text-white/70 leading-relaxed">
-                                        {cachedResources?.caseSearch?.description || `Search your case on ${cachedResources?.caseSearch?.name}`}
+                                        {safeCaseSearchUrl
+                                            ? (cachedResources?.caseSearch?.description || `Search your case on ${cachedResources?.caseSearch?.name || 'your county portal'}`)
+                                            : safeClerkFallbackUrl
+                                                ? `Look up your case through ${cachedResources?.courtClerk?.name || 'the county clerk\'s office'}`
+                                                : `Search for your case records in ${locationLabel}`}
                                     </p>
                                     {courtSettings.courtName && (
                                         <p className="text-[13px] font-bold text-white mt-2">

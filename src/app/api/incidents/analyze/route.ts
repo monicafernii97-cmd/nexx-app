@@ -189,7 +189,7 @@ Format your response EXACTLY as follows:
         const message =
             error instanceof Error && error.message.includes('OPENAI_API_KEY')
                 ? 'AI service is not configured. Please contact support.'
-                : error instanceof Error && (error.message.includes('429') || error.message.includes('Rate limit'))
+                : (error as { status?: number })?.status === 429
                     ? 'Too many requests. Please wait a moment and try again.'
                     : 'Failed to analyze incident. Please try again.';
         return Response.json(

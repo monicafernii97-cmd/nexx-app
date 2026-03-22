@@ -62,7 +62,14 @@ export async function GET() {
             const dateA = new Date(a.date).getTime() || 0;
             const dateB = new Date(b.date).getTime() || 0;
             if (dateA !== dateB) return dateA - dateB;
-            return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
+            const timeA = parseTimeToMinutes(a.time);
+            const timeB = parseTimeToMinutes(b.time);
+            const aValid = Number.isFinite(timeA);
+            const bValid = Number.isFinite(timeB);
+            if (aValid && bValid) return timeA - timeB;
+            if (aValid) return -1;
+            if (bValid) return 1;
+            return 0;
         });
 
         // Group by pattern tags for a high-level summary at the top
@@ -75,13 +82,18 @@ export async function GET() {
             }
         });
 
+        // Precompute category labels to avoid repeated linear lookups
+        const categoryLabelByValue = new Map(
+            INCIDENT_CATEGORIES.map(({ value, label }) => [value, label])
+        );
+
         let summaryHtml = '';
         if (patternsMap.size > 0) {
             summaryHtml += '<div class="body-paragraph" style="margin-top: 1rem;"><strong>Detected Behavioral Patterns Across Timeline:</strong></div><ul>';
             Array.from(patternsMap.entries())
                 .sort((a, b) => b[1] - a[1])
                 .forEach(([tag, count]) => {
-                    const label = INCIDENT_CATEGORIES.find(c => c.value === tag)?.label || tag.replace(/_/g, ' ');
+                    const label = categoryLabelByValue.get(tag) || tag.replace(/_/g, ' ');
                     summaryHtml += `<li>${escapeHtml(label)} (${count} occurrences)</li>`;
                 });
             summaryHtml += '</ul>';
@@ -89,10 +101,10 @@ export async function GET() {
 
         let timelineRows = '';
         sortedIncidents.forEach(incident => {
-            const catLabel = INCIDENT_CATEGORIES.find(c => c.value === incident.category)?.label || incident.category || 'Event';
+            const catLabel = categoryLabelByValue.get(incident.category) || incident.category || 'Event';
             let tagsHtml = '';
             if (incident.tags && incident.tags.length > 0) {
-                const tagLabels = incident.tags.map(t => INCIDENT_CATEGORIES.find(c => c.value === t)?.label || t.replace(/_/g, ' '));
+                const tagLabels = incident.tags.map(t => categoryLabelByValue.get(t) || t.replace(/_/g, ' '));
                 tagsHtml = `<br/><small style="color: #666;"><strong>Tags:</strong> ${escapeHtml(tagLabels.join(', '))}</small>`;
             }
             

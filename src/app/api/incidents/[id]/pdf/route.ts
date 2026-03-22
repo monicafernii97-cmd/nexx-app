@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '../../../../../../convex/_generated/api';
 import { Id } from '../../../../../../convex/_generated/dataModel';
@@ -13,10 +14,15 @@ import { join } from 'path';
 let cachedCSS: string | null = null;
 function getLegalCSS(): string {
     if (!cachedCSS) {
-        cachedCSS = readFileSync(
-            join(process.cwd(), 'src/lib/legal/legalDocStyles.css'),
-            'utf-8'
-        );
+        try {
+            cachedCSS = readFileSync(
+                join(process.cwd(), 'src/lib/legal/legalDocStyles.css'),
+                'utf-8'
+            );
+        } catch (err) {
+            console.error('[getLegalCSS] Failed to load legalDocStyles.css:', err);
+            cachedCSS = ''; // Fallback to empty styles
+        }
     }
     return cachedCSS;
 }
@@ -32,6 +38,11 @@ export async function GET(
     context: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { userId } = await auth();
+        if (!userId) {
+            return new NextResponse('Unauthorized', { status: 401 });
+        }
+
         const { id } = await context.params;
         if (!id) {
             return new NextResponse('Incident ID is required', { status: 400 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
@@ -224,8 +224,16 @@ export default function EFilingPage() {
     // Mark as filed handler with inline error feedback
     const [filingId, setFilingId] = useState<string | null>(null);
     const [filingErrors, setFilingErrors] = useState<Record<string, string>>({});
+    const filingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+    useEffect(() => {
+        return () => {
+            filingTimeoutsRef.current.forEach(clearTimeout);
+        };
+    }, []);
     const handleMarkAsFiled = useCallback(async (docId: Id<'generatedDocuments'>) => {
         setFilingId(docId);
+        const existing = filingTimeoutsRef.current.get(docId);
+        if (existing) clearTimeout(existing);
         setFilingErrors(prev => { const next = { ...prev }; delete next[docId]; return next; });
         try {
             await updateStatus({ id: docId, status: 'filed' });
@@ -233,8 +241,11 @@ export default function EFilingPage() {
             console.error('[eFiling] Failed to mark as filed:', err);
             const msg = err instanceof Error ? err.message : 'Failed to mark as filed. Please try again.';
             setFilingErrors(prev => ({ ...prev, [docId]: msg }));
-            // Auto-dismiss error after 5 seconds
-            setTimeout(() => setFilingErrors(prev => { const next = { ...prev }; delete next[docId]; return next; }), 5000);
+            const tid = setTimeout(() => {
+                setFilingErrors(prev => { const next = { ...prev }; delete next[docId]; return next; });
+                filingTimeoutsRef.current.delete(docId);
+            }, 5000);
+            filingTimeoutsRef.current.set(docId, tid);
         } finally {
             setFilingId(null);
         }
@@ -568,7 +579,7 @@ export default function EFilingPage() {
                             <CollapsibleSection title="What is eFiling?" defaultOpen>
                                 <p className="mb-3">
                                     eFiling allows you to submit court documents securely online instead of
-                                    filing in person. Most Texas counties use <strong className="text-[var(--sapphire-dark)]">eFileTexas.gov</strong>.
+                                    filing in person.{state === 'Texas' ? <> Most Texas counties use <strong className="text-[var(--sapphire-dark)]">eFileTexas.gov</strong>.</> : <> Check your state&apos;s eFiling portal for availability.</>}
                                 </p>
                                 <p>
                                     Enjoy 24/7 availability, instant confirmation receipts, and faster document processing directly from your home.

@@ -40,7 +40,13 @@ export default function NewIncidentPage() {
     const [step, setStep] = useState<Step>('describe');
     const [narrative, setNarrative] = useState('');
     const [tags, setTags] = useState<string[]>([]);
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    });
     const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
     const [severity, setSeverity] = useState(2);
     const [location, setLocation] = useState('');
@@ -106,8 +112,12 @@ export default function NewIncidentPage() {
             recognitionRef.current.stop();
             setIsListening(false);
         } else {
-            recognitionRef.current.start();
-            setIsListening(true);
+            try {
+                recognitionRef.current.start();
+                setIsListening(true);
+            } catch (err) {
+                console.error('Failed to start speech recognition:', err);
+            }
         }
     }, [isListening]);
 
@@ -223,7 +233,7 @@ export default function NewIncidentPage() {
             if (!incidentId) {
                 incidentId = await createIncident({
                     narrative,
-                    courtSummary,
+                    courtSummary: courtSummary || undefined,
                     tags,
                     severity,
                     date,
@@ -239,7 +249,7 @@ export default function NewIncidentPage() {
                 await updateIncident({
                     id: incidentId,
                     narrative,
-                    courtSummary,
+                    courtSummary: courtSummary || undefined,
                     tags,
                     severity,
                     date,

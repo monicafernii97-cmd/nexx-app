@@ -417,28 +417,24 @@ export default function NexProfilePage() {
                                 <Plus size={18} weight="bold" />
                             </button>
                         </div>
-                        <AnimatePresence>
-                            {form.triggerPatterns.length > 0 && (
-                                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-2.5 pl-1 overflow-hidden">
-                                    {form.triggerPatterns.map((trigger, i) => (
-                                        <motion.div
-                                            initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: i * 0.05 }}
-                                            key={trigger}
-                                            className="group flex items-center justify-between px-4 py-3 rounded-2xl bg-[#0A1128] border border-[rgba(255,255,255,0.15)] shadow-sm transition-all"
-                                        >
-                                            <span className="text-sm font-semibold text-white break-words pr-4">{trigger}</span>
-                                            <button
-                                                onClick={() => removeTrigger(trigger)}
-                                                type="button"
-                                                aria-label={`Remove trigger pattern`}
-                                                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[rgba(255,255,255,0.1)] group-hover:bg-[#ef4444] text-[rgba(255,255,255,0.7)] group-hover:text-white transition-colors"
-                                            >
-                                                <X size={14} weight="bold" />
-                                            </button>
-                                        </motion.div>
-                                    ))}
+                        <AnimatePresence mode="popLayout">
+                            {form.triggerPatterns.map((trigger, i) => (
+                                <motion.div
+                                    initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: i * 0.05 }}
+                                    key={trigger}
+                                    className="group flex items-center justify-between px-4 py-3 rounded-2xl bg-[#0A1128] border border-[rgba(255,255,255,0.15)] shadow-sm transition-all"
+                                >
+                                    <span className="text-sm font-semibold text-white break-words pr-4">{trigger}</span>
+                                    <button
+                                        onClick={() => removeTrigger(trigger)}
+                                        type="button"
+                                        aria-label={`Remove trigger pattern: ${trigger}`}
+                                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[rgba(255,255,255,0.1)] group-hover:bg-[#ef4444] text-[rgba(255,255,255,0.7)] group-hover:text-white transition-colors"
+                                    >
+                                        <X size={14} weight="bold" />
+                                    </button>
                                 </motion.div>
-                            )}
+                            ))}
                         </AnimatePresence>
                     </Section>
 

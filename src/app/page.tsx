@@ -59,8 +59,10 @@ export default function WelcomePage() {
     if (currentUser === null) {
       // Signed in but no Convex record yet — new user
       const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-      if (!selectedPlan) {
-        // No plan selected — scroll to pricing so they pick a plan first
+      const validPlans = new Set(['free', 'pro', 'premium', 'executive']);
+      if (!selectedPlan || !validPlans.has(selectedPlan)) {
+        localStorage.removeItem('selectedPlan');
+        // No valid plan selected — scroll to pricing so they pick a plan first
         requestAnimationFrame(() => {
           document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
         });
@@ -216,10 +218,11 @@ export default function WelcomePage() {
           transition={{ delay: 0.7, duration: 0.8 }}
           className="flex flex-col sm:flex-row items-start gap-4"
         >
-          <Link href="/sign-in">
-            <button className="btn-primary w-full sm:w-auto px-8 py-3.5 text-[13px] shadow-[0_4px_20px_rgba(26,75,155,0.4)]">
-              Sign In
-            </button>
+          <Link
+            href="/sign-in"
+            className="btn-primary w-full sm:w-auto px-8 py-3.5 text-[13px] shadow-[0_4px_20px_rgba(26,75,155,0.4)] inline-flex items-center justify-center"
+          >
+            Sign In
           </Link>
           <button 
             onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
@@ -331,7 +334,7 @@ export default function WelcomePage() {
                 <button
                   onClick={() => {
                     localStorage.setItem('selectedPlan', plan.tier);
-                    router.push('/sign-up');
+                    router.push(isSignedIn ? '/onboarding' : '/sign-up');
                   }}
                   className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all ${
                     plan.popular

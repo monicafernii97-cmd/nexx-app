@@ -167,8 +167,13 @@ export default function DashboardPage() {
                         </div>
 
                         {incidents === undefined ? (
-                            <div className="flex-1 flex flex-col items-center justify-center min-h-[200px] opacity-60 animate-pulse">
-                                <div className="w-8 h-8 rounded-full border-2 border-champagne border-t-transparent animate-spin" />
+                            <div
+                                className="flex-1 flex flex-col items-center justify-center min-h-[200px] opacity-60 animate-pulse"
+                                role="status"
+                                aria-live="polite"
+                            >
+                                <div className="w-8 h-8 rounded-full border-2 border-champagne border-t-transparent animate-spin" aria-hidden="true" />
+                                <span className="sr-only">Loading recent activity</span>
                             </div>
                         ) : incidents.length === 0 ? (
                             <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-[rgba(10,17,40,0.5)] rounded-[2rem] border border-[rgba(255,255,255,0.08)]">
@@ -200,7 +205,7 @@ export default function DashboardPage() {
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: 0.6 + i * 0.1 }}
                                         >
-                                            <Link href={`/incident-report/${incident._id}`} className="no-underline block outline-none">
+                                            <Link href={`/incident-report/${incident._id}`} className="no-underline block rounded-[1.5rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1128]">
                                                 <div className="group relative bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(212,175,55,0.3)] p-4 rounded-[1.5rem] cursor-pointer transition-all duration-300 shadow-sm hover:shadow-[0_8px_32px_rgba(0,0,0,0.15)] backdrop-blur-md overflow-hidden">
                                                     {/* Hyperglass glint hover effect */}
                                                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[rgba(255,255,255,0.05)] to-transparent -translate-x-full group-hover:animate-glint pointer-events-none" />

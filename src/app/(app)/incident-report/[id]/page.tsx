@@ -213,16 +213,16 @@ export default function IncidentDetailPage() {
                 <div className="flex items-start gap-4">
                     <Link
                         href="/incident-report"
-                        className="w-11 h-11 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-105 bg-white shadow-sm border border-[rgba(10,22,41,0.05)] hover:shadow shrink-0"
+                        className="w-11 h-11 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-105 bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-md border border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] shrink-0"
                         aria-label="Back to incident reports"
                     >
-                        <ArrowLeft size={20} weight="bold" className="text-sapphire" />
+                        <ArrowLeft size={20} weight="bold" className="text-white" />
                     </Link>
                     <div>
-                        <h1 className="text-3xl font-serif font-bold text-sapphire mb-1 leading-tight">
+                        <h1 className="text-3xl font-serif font-bold text-white mb-1 leading-tight">
                             Incident Record
                         </h1>
-                        <p className="text-[14px] font-medium text-sapphire-muted">
+                        <p className="text-[14px] font-medium text-white/70">
                             {incidentDate
                                 ? incidentDate.toLocaleDateString('en-US', {
                                     weekday: 'long',
@@ -238,14 +238,14 @@ export default function IncidentDetailPage() {
                     {incident.status === 'draft' && (
                         <>
                             {!isEditing ? (
-                                <button onClick={startEditing} className="px-5 py-2.5 rounded-xl bg-white border border-[rgba(10,22,41,0.05)] text-sapphire text-[13px] font-bold uppercase tracking-widest shadow-sm hover:shadow transition-all flex items-center gap-2">
+                                <button onClick={startEditing} className="px-5 py-2.5 rounded-[1.25rem] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white text-[13px] font-bold uppercase tracking-widest shadow-sm hover:bg-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.2)] transition-all flex items-center gap-2 backdrop-blur-md">
                                     <PencilSimple size={16} /> Edit
                                 </button>
                             ) : (
                                 <button
                                     onClick={handleSave}
                                     disabled={isSaving}
-                                    className="px-5 py-2.5 rounded-xl bg-sapphire text-white text-[13px] font-bold uppercase tracking-widest shadow-md hover:bg-[#0F223D] transition-all flex items-center gap-2"
+                                    className="px-5 py-2.5 rounded-[1.25rem] bg-[linear-gradient(135deg,#123D7E,#0A1128)] text-white text-[13px] font-bold uppercase tracking-widest shadow-md hover:shadow-[0_8px_16px_rgba(10,22,41,0.2)] hover:-translate-y-0.5 transition-all flex items-center gap-2 border border-white/10"
                                 >
                                     <FloppyDisk size={16} className={isSaving ? "animate-pulse" : ""} /> {isSaving ? 'Saving...' : 'Save'}
                                 </button>
@@ -255,7 +255,7 @@ export default function IncidentDetailPage() {
                     <button
                         onClick={() => setShowDeleteConfirm(true)}
                         disabled={isDeleting}
-                        className="w-11 h-11 rounded-xl flex items-center justify-center bg-rose/10 text-rose hover:bg-rose hover:text-white transition-all shadow-sm cursor-pointer ml-1"
+                        className="w-11 h-11 rounded-[1.25rem] flex items-center justify-center bg-[rgba(225,29,72,0.1)] text-rose border border-[rgba(225,29,72,0.2)] hover:bg-rose hover:text-white transition-all shadow-sm cursor-pointer ml-1"
                         title="Delete incident"
                         aria-label="Delete incident"
                     >
@@ -263,7 +263,7 @@ export default function IncidentDetailPage() {
                     </button>
                     <button
                         onClick={() => window.open(`/api/incidents/${incidentId}/pdf`, '_blank')}
-                        className="px-5 py-2.5 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] text-white text-[13px] font-bold uppercase tracking-widest shadow-md hover:shadow-[0_8px_16px_rgba(10,22,41,0.2)] hover:-translate-y-0.5 transition-all flex items-center gap-2 border border-white/10 group"
+                        className="px-5 py-2.5 rounded-[1.25rem] bg-[linear-gradient(135deg,#123D7E,#0A1128)] text-white text-[13px] font-bold uppercase tracking-widest shadow-md hover:shadow-[0_8px_16px_rgba(10,22,41,0.2)] hover:-translate-y-0.5 transition-all flex items-center gap-2 border border-white/10 group"
                         title="Export Incident Record to PDF"
                     >
                         <DownloadSimple size={18} weight="bold" className="group-hover:-translate-y-0.5 transition-transform" /> Export PDF
@@ -279,33 +279,35 @@ export default function IncidentDetailPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="flex flex-wrap items-center gap-3 mb-8 p-3 rounded-2xl bg-white/50 border border-[rgba(10,22,41,0.03)] backdrop-blur-md"
+                className="flex flex-wrap items-center gap-3 mb-8 p-3 rounded-[1.5rem] bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)] backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.15)] relative overflow-hidden group"
             >
+                {/* Hyperglass ambient glint */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[rgba(255,255,255,0.05)] to-transparent -translate-x-full group-hover:animate-glint pointer-events-none" />
+                
                 <span
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase border border-transparent shadow-sm"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold tracking-wider uppercase border border-[rgba(255,255,255,0.1)] shadow-sm backdrop-blur-md"
                     style={{
-                        background: cat?.color ? `color-mix(in srgb, ${cat.color} 15%, white)` : 'var(--white)',
-                        color: cat?.color || 'var(--sapphire)',
-                        borderColor: cat?.color ? `color-mix(in srgb, ${cat.color} 30%, transparent)` : 'transparent',
+                        background: cat?.color ? `color-mix(in srgb, ${cat.color} 15%, transparent)` : 'rgba(255,255,255,0.05)',
+                        color: cat?.color || 'rgba(255,255,255,0.8)',
                     }}
                 >
                     <Tag size={14} weight="fill" /> {cat?.label || incident.category}
                 </span>
                 
                 {incident.status === 'draft' && (
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-warning/15 text-warning">Draft</span>
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold tracking-wider uppercase bg-[rgba(255,183,77,0.1)] text-warning border border-[rgba(255,183,77,0.2)] shadow-sm">Draft</span>
                 )}
                 
                 {incident.status === 'confirmed' && (
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-emerald/15 text-emerald shadow-sm">
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold tracking-wider uppercase bg-[rgba(16,185,129,0.1)] text-emerald border border-[rgba(16,185,129,0.2)] shadow-sm">
                         <Check size={14} weight="bold" /> Confirmed
                     </span>
                 )}
                 
-                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-cloud text-sapphire shadow-sm">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold tracking-wider uppercase bg-[rgba(255,255,255,0.05)] text-white/80 border border-[rgba(255,255,255,0.1)] shadow-sm">
                     <CalendarBlank size={14} /> {incident.date}
                 </span>
-                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-cloud text-sapphire shadow-sm">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold tracking-wider uppercase bg-[rgba(255,255,255,0.05)] text-white/80 border border-[rgba(255,255,255,0.1)] shadow-sm">
                     <Clock size={14} /> {incident.time}
                 </span>
                 
@@ -314,15 +316,19 @@ export default function IncidentDetailPage() {
                     const sev = Math.max(1, Math.min(3, incident.severity ?? 2));
                     return (
                         <span
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-white border shadow-sm"
-                            style={{ borderColor: severityColors[sev - 1], color: severityColors[sev - 1] }}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[11px] font-bold tracking-wider uppercase border shadow-sm backdrop-blur-md"
+                            style={{ 
+                                borderColor: `color-mix(in srgb, ${severityColors[sev - 1]} 30%, transparent)`, 
+                                color: severityColors[sev - 1],
+                                background: `color-mix(in srgb, ${severityColors[sev - 1]} 10%, transparent)`
+                            }}
                         >
                             <span className="flex gap-0.5" aria-hidden="true">
                                 {[1, 2, 3].map((level) => (
                                     <span
                                         key={level}
                                         className="w-1.5 h-3 rounded-sm inline-block"
-                                        style={{ background: level <= sev ? severityColors[sev - 1] : 'var(--cloud)' }}
+                                        style={{ background: level <= sev ? severityColors[sev - 1] : 'rgba(255,255,255,0.1)' }}
                                     />
                                 ))}
                             </span>
@@ -332,19 +338,19 @@ export default function IncidentDetailPage() {
                 })()}
 
                 {incident.childrenInvolved && (
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-warning/15 text-warning shadow-sm">
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold tracking-wider uppercase bg-[rgba(255,183,77,0.1)] text-warning border border-[rgba(255,183,77,0.2)] shadow-sm">
                         <Baby size={14} weight="fill" /> Children Involved
                     </span>
                 )}
                 
                 {/* Location & Witnesses inline if any */}
                 {incident.location && (
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-cloud text-sapphire shadow-sm">
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold tracking-wider uppercase bg-[rgba(255,255,255,0.05)] text-white/80 border border-[rgba(255,255,255,0.1)] shadow-sm">
                         <MapPin size={14} /> {incident.location}
                     </span>
                 )}
                 {incident.witnesses && incident.witnesses.length > 0 && (
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-wider uppercase bg-cloud text-sapphire shadow-sm">
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold tracking-wider uppercase bg-[rgba(255,255,255,0.05)] text-white/80 border border-[rgba(255,255,255,0.1)] shadow-sm">
                         <Users size={14} /> {incident.witnesses.length} {incident.witnesses.length === 1 ? 'Witness' : 'Witnesses'}
                     </span>
                 )}

@@ -447,6 +447,7 @@ export default function NexProfilePage() {
                                 </p>
                                 
                                 {nexProfile.dangerLevel !== undefined && (
+                                    <>
                                     <div className="mt-6 flex items-center gap-4 pt-4 border-t border-[var(--cloud)]">
                                         <span className="text-xs font-bold uppercase tracking-widest text-[var(--sapphire-base)]">Risk Level:</span>
                                         <div className="flex gap-1.5 flex-1 max-w-[180px]">
@@ -471,6 +472,8 @@ export default function NexProfilePage() {
                                             {nexProfile.dangerLevel}/5
                                         </span>
                                     </div>
+                                    <p className="text-[10px] text-[var(--sapphire-light)] mt-2 italic">Self-reported 1–5 scale. Not a clinical or validated safety assessment.</p>
+                                    </>
                                 )}
                                 
                                 {nexProfile.detectedPatterns && nexProfile.detectedPatterns.length > 0 && (

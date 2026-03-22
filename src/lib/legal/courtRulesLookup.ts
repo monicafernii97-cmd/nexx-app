@@ -218,7 +218,16 @@ async function extractRulesWithAI(
 
         // Build sources list from known resources
         const sources: string[] = [];
-        if (localRulesUrl) sources.push(localRulesUrl);
+        if (localRulesUrl) {
+            try {
+                const parsed = new URL(localRulesUrl);
+                if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                    sources.push(parsed.href);
+                }
+            } catch {
+                // Invalid URL — don't include in sources
+            }
+        }
 
         return {
             rules: validatedRules,

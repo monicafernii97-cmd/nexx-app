@@ -226,8 +226,9 @@ export default function EFilingPage() {
     const [filingErrors, setFilingErrors] = useState<Record<string, string>>({});
     const filingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
     useEffect(() => {
+        const timeouts = filingTimeoutsRef.current;
         return () => {
-            filingTimeoutsRef.current.forEach(clearTimeout);
+            timeouts.forEach(clearTimeout);
         };
     }, []);
     const handleMarkAsFiled = useCallback(async (docId: Id<'generatedDocuments'>) => {
@@ -526,7 +527,12 @@ export default function EFilingPage() {
                                                 <button
                                                     className="btn-outline text-xs py-2.5 flex justify-center items-center gap-2"
                                                     onClick={() => {
-                                                        window.open(`${process.env.NEXT_PUBLIC_CONVEX_URL?.replace('.cloud', '.site')}/api/storage/${doc.storageId}`, '_blank');
+                                                        const baseUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+                                                        if (!baseUrl) return;
+                                                        const storageBase = baseUrl.includes('.cloud')
+                                                            ? baseUrl.replace('.cloud', '.site')
+                                                            : baseUrl;
+                                                        window.open(`${storageBase}/api/storage/${doc.storageId}`, '_blank');
                                                     }}
                                                 >
                                                     <DownloadSimple size={14} weight="bold" />

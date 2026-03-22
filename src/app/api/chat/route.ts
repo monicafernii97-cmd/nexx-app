@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
         if (dailyCap !== -1) { // -1 = unlimited
             const tierRl = checkRateLimit(userId, feature, dailyCap);
             if (!tierRl.allowed) {
-                const { body: rlBody, status } = rateLimitResponse(tierRl);
+                const { body: rlBody, status } = rateLimitResponse(tierRl, userTier);
                 return Response.json(rlBody, { status });
             }
         }

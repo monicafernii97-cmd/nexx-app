@@ -66,16 +66,23 @@ export async function POST(req: NextRequest) {
             const convex = await getAuthenticatedConvexClient();
             const nexProfile = await convex.query(api.nexProfiles.getByUser);
 
+            // Sanitize profile values: truncate and strip control characters
+            const sanitize = (arr: string[] | undefined, maxItems = 10, maxLen = 100) =>
+                arr?.slice(0, maxItems).map(s => String(s).slice(0, maxLen).replace(/[\r\n]+/g, ' ').trim()).filter(Boolean) ?? [];
+
             if (nexProfile) {
                 contextLines.push(`\n**[User's Recognized NEX Patterns]**`);
-                if (nexProfile.behaviors?.length) {
-                    contextLines.push(`- **Known Behaviors:** ${nexProfile.behaviors.join(', ')}`);
+                const behaviors = sanitize(nexProfile.behaviors);
+                if (behaviors.length) {
+                    contextLines.push(`- **Known Behaviors:** ${behaviors.join(', ')}`);
                 }
-                if (nexProfile.manipulationTactics?.length) {
-                    contextLines.push(`- **Known Manipulation Tactics:** ${nexProfile.manipulationTactics.join(', ')}`);
+                const tactics = sanitize(nexProfile.manipulationTactics);
+                if (tactics.length) {
+                    contextLines.push(`- **Known Manipulation Tactics:** ${tactics.join(', ')}`);
                 }
-                if (nexProfile.triggerPatterns?.length) {
-                    contextLines.push(`- **Known Trigger Patterns:** ${nexProfile.triggerPatterns.join(', ')}`);
+                const triggers = sanitize(nexProfile.triggerPatterns);
+                if (triggers.length) {
+                    contextLines.push(`- **Known Trigger Patterns:** ${triggers.join(', ')}`);
                 }
             }
         } catch (profileErr) {
@@ -186,15 +193,20 @@ Format your response EXACTLY as follows:
         });
     } catch (error) {
         console.error('Incident analysis error:', error);
+        const isRateLimited =
+            typeof error === 'object' &&
+            error !== null &&
+            'status' in error &&
+            (error as { status: number }).status === 429;
         const message =
             error instanceof Error && error.message.includes('OPENAI_API_KEY')
                 ? 'AI service is not configured. Please contact support.'
-                : typeof error === 'object' && error !== null && 'status' in error && (error as { status: number }).status === 429
+                : isRateLimited
                     ? 'Too many requests. Please wait a moment and try again.'
                     : 'Failed to analyze incident. Please try again.';
         return Response.json(
             { error: message },
-            { status: 500 }
+            { status: isRateLimited ? 429 : 500 }
         );
     }
 }

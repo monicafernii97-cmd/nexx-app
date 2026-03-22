@@ -501,11 +501,13 @@ export default function CourtSettingsPage() {
                     <label className="block text-xs font-semibold mb-3 text-[var(--sapphire-base)] uppercase tracking-wide">
                         Case Title Format
                     </label>
-                    <div className="space-y-2.5">
+                    <div className="space-y-2.5" role="radiogroup" aria-label="Case Title Format">
                         {CASE_TITLE_OPTIONS.map((option) => (
                             <button
                                 key={option.value}
                                 type="button"
+                                role="radio"
+                                aria-checked={caseTitleFormat === option.value}
                                 onClick={() => setCaseTitleFormat(option.value)}
                                 className={`w-full text-left p-3.5 rounded-xl transition-all border ${
                                     caseTitleFormat === option.value

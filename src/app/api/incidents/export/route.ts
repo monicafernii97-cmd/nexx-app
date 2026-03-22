@@ -4,27 +4,9 @@ import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '../../../../../convex/_generated/api';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
 import { getMergedRules } from '@/lib/legal/courtRules';
-import { INCIDENT_CATEGORIES } from '@/lib/constants';
-import { readFileSync } from 'fs';
-import { join } from 'path';
-
-let cachedCSS: string | null = null;
-function getLegalCSS(): string {
-    if (!cachedCSS) {
-        try {
-            cachedCSS = readFileSync(
-                join(process.cwd(), 'src/lib/legal/legalDocStyles.css'),
-                'utf-8'
-            );
-        } catch (err) {
-            console.error('[getLegalCSS] Failed to load legalDocStyles.css:', err);
-            cachedCSS = ''; // Fallback to empty styles
-        }
-    }
-    return cachedCSS;
-}
-
 import { escapeHtml } from '@/lib/utils/htmlUtils';
+import { getLegalCSS } from '@/lib/legal/pdfHelpers';
+import { INCIDENT_CATEGORIES } from '@/lib/constants';
 
 export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
 

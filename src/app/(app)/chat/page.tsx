@@ -261,44 +261,45 @@ export default function ChatListPage() {
                                 {archivedConversations.map((conv) => {
                                     const modeInfo = MODE_LABELS[conv.mode] || MODE_LABELS.general;
                                     return (
-                                        <Link
-                                            key={conv._id}
-                                            href={`/chat/${conv._id}`}
-                                            className="card-premium p-4 cursor-pointer block hover:bg-white transition-colors group/archived"
-                                        >
-                                            <div className="flex items-center gap-4">
-                                                <div
-                                                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                                                    style={{
-                                                        background: `color-mix(in srgb, ${modeInfo.color} 10%, white)`,
-                                                    }}
-                                                >
-                                                    <Archive size={14} weight="duotone" style={{ color: modeInfo.color }} />
+                                        <div key={conv._id} className="relative group/archived">
+                                            <Link
+                                                href={`/chat/${conv._id}`}
+                                                className="card-premium p-4 cursor-pointer block hover:bg-white transition-colors"
+                                            >
+                                                <div className="flex items-center gap-4 pr-10">
+                                                    <div
+                                                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                                                        style={{
+                                                            background: `color-mix(in srgb, ${modeInfo.color} 10%, white)`,
+                                                        }}
+                                                    >
+                                                        <Archive size={14} weight="duotone" style={{ color: modeInfo.color }} />
+                                                    </div>
+                                                    <p className="text-[14px] font-medium truncate flex-1 text-sapphire group-hover/archived:text-champagne transition-colors">
+                                                        {conv.title}
+                                                    </p>
+                                                    <span
+                                                        className="text-[10px] tracking-widest font-bold py-1 px-3 rounded-full border border-white/10 shadow-sm"
+                                                        style={{
+                                                            background: `color-mix(in srgb, ${modeInfo.color} 15%, transparent)`,
+                                                            backdropFilter: 'blur(8px)',
+                                                            color: modeInfo.color,
+                                                            borderColor: `color-mix(in srgb, ${modeInfo.color} 40%, transparent)`,
+                                                        }}
+                                                    >
+                                                        {modeInfo.label}
+                                                    </span>
                                                 </div>
-                                                <p className="text-[14px] font-medium truncate flex-1 text-sapphire group-hover/archived:text-champagne transition-colors">
-                                                    {conv.title}
-                                                </p>
-                                                <span
-                                                    className="text-[10px] tracking-widest font-bold py-1 px-3 rounded-full border border-white/10 shadow-sm mr-2"
-                                                    style={{
-                                                        background: `color-mix(in srgb, ${modeInfo.color} 15%, transparent)`,
-                                                        backdropFilter: 'blur(8px)',
-                                                        color: modeInfo.color,
-                                                        borderColor: `color-mix(in srgb, ${modeInfo.color} 40%, transparent)`,
-                                                    }}
-                                                >
-                                                    {modeInfo.label}
-                                                </span>
-                                                <button
-                                                    onClick={(e) => handleDelete(e, conv._id)}
-                                                    disabled={!!deletingId}
-                                                    title="Delete Chat"
-                                                    className="w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover/archived:opacity-100 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                >
-                                                    <Trash size={14} weight="duotone" />
-                                                </button>
-                                            </div>
-                                        </Link>
+                                            </Link>
+                                            <button
+                                                onClick={(e) => handleDelete(e, conv._id)}
+                                                disabled={!!deletingId}
+                                                title="Delete Chat"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover/archived:opacity-100 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud shrink-0 disabled:opacity-50 disabled:cursor-not-allowed z-20"
+                                            >
+                                                <Trash size={14} weight="duotone" />
+                                            </button>
+                                        </div>
                                     );
                                 })}
                             </motion.div>

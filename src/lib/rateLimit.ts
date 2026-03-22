@@ -211,8 +211,9 @@ export function checkRateLimit(
 
 /**
  * Build a standard 429 JSON response for rate limit rejections.
+ * @param tier - The user's subscription tier, used for contextual messaging.
  */
-export function rateLimitResponse(result: RateLimitResult) {
+export function rateLimitResponse(result: RateLimitResult, tier: 'free' | 'pro' | 'premium' | 'executive' = 'free') {
     const resetMinutes = Math.ceil(result.resetInMs / (60 * 1000));
     const resetHours = Math.ceil(result.resetInMs / (60 * 60 * 1000));
     const resetDisplay = resetHours > 24
@@ -221,14 +222,21 @@ export function rateLimitResponse(result: RateLimitResult) {
             ? `${resetHours} hours`
             : `${resetMinutes} minutes`;
 
+    const tierLabel = tier === 'free' ? 'free' : tier;
+    const upgradeHint = tier === 'executive'
+        ? 'You have reached your executive plan limit. Contact support for custom limits.'
+        : tier === 'premium'
+            ? 'Upgrade to Executive for higher limits.'
+            : 'Upgrade to Premium for unlimited access.';
+
     return {
         body: {
             error: 'Rate limit exceeded',
-            message: `You've used ${result.current}/${result.limit} free ${result.featureLabel} this period. Resets in ${resetDisplay}.`,
+            message: `You've used ${result.current}/${result.limit} ${tierLabel} ${result.featureLabel} this period. Resets in ${resetDisplay}.`,
             current: result.current,
             limit: result.limit,
             resetInMs: result.resetInMs,
-            upgradeHint: 'Upgrade to Premium for unlimited access.',
+            upgradeHint,
         },
         status: 429,
     };

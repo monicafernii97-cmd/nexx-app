@@ -244,7 +244,7 @@ function DocuVaultPageInner() {
 
                             pdfUrlRef.current = url;
                             setGeneratedPdfUrl(url);
-                            setCaseNumber(Math.random().toString(36).substring(2, 8).toUpperCase());
+                            setCaseNumber(`DRAFT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`);
                             setView('result');
                         } catch (decodeErr) {
                             console.error('[DocuVault] Failed to decode PDF:', decodeErr);
@@ -763,7 +763,7 @@ function DocuVaultPageInner() {
                             <div className="flex items-center gap-2 mt-2">
                                 {caseNumber && (
                                     <span className="text-[13px] font-bold px-3 py-1 rounded-md bg-white/10 border border-white/20 text-white uppercase tracking-wider">
-                                        Case #{caseNumber}
+                                        Ref: {caseNumber}
                                     </span>
                                 )}
                             </div>

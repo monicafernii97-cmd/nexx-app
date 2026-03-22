@@ -170,8 +170,9 @@ export default function ChatListPage() {
                                     initial={{ opacity: 0, y: 8 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.05 * i }}
+                                    className="relative group"
                                 >
-                                    <Link href={`/chat/${conv._id}`} className="card-premium p-5 cursor-pointer group block border hover:border-sapphire/20 transition-all shadow-sm hover:shadow-md">
+                                    <Link href={`/chat/${conv._id}`} className="card-premium p-5 cursor-pointer block border hover:border-sapphire/20 transition-all shadow-sm hover:shadow-md">
                                         <div className="flex items-start gap-4">
                                             <div
                                                 className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
@@ -222,7 +223,7 @@ export default function ChatListPage() {
                                         onClick={(e) => handleDelete(e, conv._id)}
                                         disabled={!!deletingId}
                                         title="Delete Chat"
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud z-20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud z-20 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <Trash size={16} weight="duotone" />
                                     </button>

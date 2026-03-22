@@ -37,7 +37,7 @@ export default function DashboardPage() {
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
 
     const incidentCount = incidents?.length ?? 0;
-    const conversationCount = conversations?.length ?? 0;
+    const conversationCount = conversations?.filter((c) => c.status === 'active').length ?? 0;
     const confirmedCount = incidents?.filter((i) => i.status === 'confirmed').length ?? 0;
 
     /** Summary statistics displayed in the dashboard header bento grid. */

@@ -39,20 +39,18 @@ export default function IncidentReportPage() {
         return true;
     });
 
-    // Group incidents by tag for Pattern Detected section
+    // Group incidents by tag for Pattern Detected section (driven by filtered set)
     const patternsMap = new Map<string, Array<{ id: Id<'incidents'>, date: Date, narrative: string }>>();
-    if (incidents) {
-        incidents.forEach(incident => {
-            if (incident.tags && incident.tags.length > 0) {
-                const date = parseLocalDate(incident.date);
-                const narrative = incident.courtSummary || incident.narrative;
-                incident.tags.forEach(tag => {
-                    if (!patternsMap.has(tag)) patternsMap.set(tag, []);
-                    patternsMap.get(tag)!.push({ id: incident._id, date, narrative });
-                });
-            }
-        });
-    }
+    filteredIncidents.forEach(incident => {
+        if (incident.tags && incident.tags.length > 0) {
+            const date = parseLocalDate(incident.date);
+            const narrative = incident.courtSummary || incident.narrative;
+            incident.tags.forEach(tag => {
+                if (!patternsMap.has(tag)) patternsMap.set(tag, []);
+                patternsMap.get(tag)!.push({ id: incident._id, date, narrative });
+            });
+        }
+    });
 
     const handleDelete = async () => {
         if (!deleteId) return;
@@ -289,7 +287,7 @@ export default function IncidentReportPage() {
                                     {/* Reveal Delete Button on hover */}
                                     <button
                                         onClick={() => setDeleteId(incident._id)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex items-center justify-center w-10 h-10 rounded-full bg-rose/10 text-rose hover:bg-rose hover:text-white transition-all duration-300 shadow-sm cursor-pointer border border-rose/20"
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 rounded-full bg-rose/10 text-rose hover:bg-rose hover:text-white transition-all duration-300 shadow-sm cursor-pointer border border-rose/20 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose/60"
                                         title="Delete incident"
                                         aria-label="Delete incident"
                                     >
@@ -302,7 +300,7 @@ export default function IncidentReportPage() {
                 )}
 
                 {/* Pattern Detected Section */}
-                {incidents && incidents.length > 0 && Array.from(patternsMap.keys()).length > 0 && (
+                {filteredIncidents.length > 0 && patternsMap.size > 0 && (
                     <div className="mt-16 mb-8">
                         <h2 className="text-[13px] font-bold tracking-[0.2em] uppercase text-rose flex items-center gap-2 mb-6">
                             <Tag size={18} weight="duotone" /> Pattern Detected

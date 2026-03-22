@@ -89,7 +89,8 @@ export default function CourtSettingsPage() {
         initializedRef.current = true;
     }, [existingSettings]);
 
-    // Auto-populate respondent name from NEX profile if not already set
+    // Auto-populate opposing party name from NEX profile if not already set
+    // nexProfile.legalName is the NEX (opposing party), not the current user
     const autofilledRef = useRef(false);
     useEffect(() => {
         if (nexProfile?.legalName && !respondentLegalName && initializedRef.current && !autofilledRef.current) {
@@ -477,7 +478,7 @@ export default function CourtSettingsPage() {
                                 onClick={() => setRespondentLegalName(nexProfile.legalName!)}
                                 className="text-[11px] text-[var(--champagne)] mt-1.5 hover:underline"
                             >
-                                Sync from NEX Profile: {nexProfile.legalName}
+                                Sync opposing party from NEX Profile: {nexProfile.legalName}
                             </button>
                         )}
                     </div>
@@ -557,20 +558,21 @@ export default function CourtSettingsPage() {
                     <div className="bg-[#0A1128] rounded-xl p-5 border border-[rgba(255,255,255,0.1)]">
                         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-3">Caption Preview</p>
                         <div className="font-mono text-[12px] text-white/80 leading-relaxed whitespace-pre-line">
-                            {caseTitleFormat === 'name_v_name' && (
-                                <>
-                                    {nexProfile?.partyRole === 'respondent' ? (
-                                        // User is petitioner (they filed), NEX is respondent
-                                        <>{('[YOUR NAME]').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(nexProfile?.legalName || respondentLegalName || 'RESPONDENT').toUpperCase()}, Respondent</>
-                                    ) : nexProfile?.partyRole === 'petitioner' ? (
-                                        // NEX is petitioner (they filed), user is respondent
-                                        <>{(nexProfile?.legalName || respondentLegalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{('[YOUR NAME]').toUpperCase()}, Respondent</>
-                                    ) : (
-                                        // No role set — generic fallback
-                                        <>{(respondentLegalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(nexProfile?.legalName || 'RESPONDENT').toUpperCase()}, Respondent</>
-                                    )}
-                                </>
-                            )}
+                            {caseTitleFormat === 'name_v_name' && (() => {
+                                const opposingName = (respondentLegalName || nexProfile?.legalName || '[OPPOSING PARTY]').toUpperCase();
+                                const userName = '[YOUR NAME]';
+                                if (nexProfile?.partyRole === 'respondent') {
+                                    // NEX's partyRole = respondent → NEX is the respondent, user is petitioner
+                                    return <>{userName}, Petitioner{'\n'}v.{'\n'}{opposingName}, Respondent</>;
+                                } else if (nexProfile?.partyRole === 'petitioner') {
+                                    // NEX's partyRole = petitioner → NEX is petitioner, user is respondent
+                                    return <>{opposingName}, Petitioner{'\n'}v.{'\n'}{userName}, Respondent</>;
+                                } else {
+                                    // No role set — generic fallback
+                                    return <>{userName}, Petitioner{'\n'}v.{'\n'}{opposingName}, Respondent</>;
+                                }
+                            })()}
+
                             {caseTitleFormat === 'in_interest_of' && (
                                 <>IN THE INTEREST OF{'\n'}[CHILD NAME(S)],{'\n'}A CHILD / CHILDREN</>
                             )}

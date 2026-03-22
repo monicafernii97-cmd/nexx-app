@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Validate input before consuming rate limit ──
-        if (!messages || messages.length === 0) {
+        if (!Array.isArray(messages) || messages.length === 0) {
             return Response.json({ error: 'Messages are required' }, { status: 400 });
         }
 
@@ -59,11 +59,16 @@ export async function POST(req: NextRequest) {
             return Response.json({ error: 'Too many messages' }, { status: 400 });
         }
 
-        for (const msg of messages) {
-            if (!msg.role || !['user', 'assistant'].includes(msg.role)) {
+        for (const msg of messages as unknown[]) {
+            if (!msg || typeof msg !== 'object') {
+                return Response.json({ error: 'Invalid message payload' }, { status: 400 });
+            }
+
+            const { role, content } = msg as { role?: unknown; content?: unknown };
+            if (role !== 'user' && role !== 'assistant') {
                 return Response.json({ error: 'Invalid message role' }, { status: 400 });
             }
-            if (typeof msg.content !== 'string' || msg.content.length > MAX_MESSAGE_LENGTH) {
+            if (typeof content !== 'string' || content.length > MAX_MESSAGE_LENGTH) {
                 return Response.json({ error: 'Invalid message content' }, { status: 400 });
             }
         }

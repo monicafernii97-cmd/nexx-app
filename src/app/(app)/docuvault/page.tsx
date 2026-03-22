@@ -34,6 +34,14 @@ interface ProgressStep {
     status: 'pending' | 'active' | 'complete';
 }
 
+/** Truncate text to maxLen characters, breaking at word boundary when possible. */
+const truncateText = (text: string, maxLen = 100) => {
+    if (text.length <= maxLen) return text;
+    const truncated = text.slice(0, maxLen);
+    const lastSpace = truncated.lastIndexOf(' ');
+    return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated) + '...';
+};
+
 /** Wrapper with Suspense boundary for useSearchParams */
 export default function DocuVaultPage() {
     return (
@@ -322,7 +330,7 @@ function DocuVaultPageInner() {
                 >
                     {/* Header */}
                     <PageHeader
-                        icon={Bank as React.ElementType}
+                        icon={Bank}
                         title="DocuVault"
                         description="Turn your reality into bulletproof legal strategy. Generate court-ready documents in seconds with powerful precision."
                     />
@@ -717,13 +725,7 @@ function DocuVaultPageInner() {
                                 Context
                             </p>
                             <p className="text-[15px] italic leading-relaxed text-white drop-shadow-sm border-l-2 border-[#60A5FA] pl-4">
-                                &ldquo;{selectedTemplate?.title ?? (() => {
-                                    const text = documentContent;
-                                    if (text.length <= 100) return text;
-                                    const truncated = text.slice(0, 100);
-                                    const lastSpace = truncated.lastIndexOf(' ');
-                                    return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated) + '...';
-                                })()}&rdquo;
+                                &ldquo;{selectedTemplate?.title ?? truncateText(documentContent)}&rdquo;
                             </p>
                         </div>
                     </div>

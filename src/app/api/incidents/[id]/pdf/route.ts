@@ -113,7 +113,7 @@ export async function GET(
 </html>`;
 
         // Generate the PDF using core PDF renderer
-        const rules = getMergedRules('', '', {});
+        const rules = getMergedRules(undefined, undefined, {});
         const pdfBytes = await renderHTMLToPDF(html, rules);
 
         const filename = `Incident_Record_${id}.pdf`;

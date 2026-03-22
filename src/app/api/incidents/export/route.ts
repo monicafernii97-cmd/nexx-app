@@ -45,7 +45,11 @@ export async function GET() {
                 return hours * 60 + Number(match12[2]);
             }
             const match24 = normalized.match(/^(\d{1,2}):(\d{2})$/);
-            if (match24) return Number(match24[1]) * 60 + Number(match24[2]);
+            if (match24) {
+                const h = Number(match24[1]);
+                const m = Number(match24[2]);
+                if (h >= 0 && h <= 23 && m >= 0 && m <= 59) return h * 60 + m;
+            }
             return Number.POSITIVE_INFINITY;
         };
 
@@ -140,7 +144,7 @@ export async function GET() {
 </body>
 </html>`;
 
-        const rules = getMergedRules('', '', {});
+        const rules = getMergedRules(undefined, undefined, {});
         const pdfBytes = await renderHTMLToPDF(html, rules);
 
         const filename = 'NEXX_Comprehensive_Timeline.pdf';

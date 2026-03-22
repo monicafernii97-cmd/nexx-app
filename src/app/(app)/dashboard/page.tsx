@@ -181,7 +181,7 @@ export default function DashboardPage() {
                                 <p className="text-[13px] text-[rgba(255,255,255,0.6)] font-medium mb-6 max-w-[200px] leading-relaxed">
                                     Your activity feed is empty. Start a session to build your court-ready profile.
                                 </p>
-                                <Link href="/chat" className="btn-primary text-xs w-full shadow-md rounded-xl py-4 uppercase tracking-wider font-bold tracking-widest text-[#FFFFFF]">
+                                <Link href="/chat" className="btn-primary text-xs w-full shadow-md rounded-xl py-4 uppercase font-bold tracking-widest text-[#FFFFFF]">
                                     Begin Session
                                 </Link>
                             </div>

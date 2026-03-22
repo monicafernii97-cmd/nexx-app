@@ -50,18 +50,7 @@ export async function POST(req: NextRequest) {
             console.warn('[Chat] Failed to fetch user tier from Convex — defaulting to free:', err);
         }
 
-        // ── Tier-specific rate limit for the chosen model ──
-        const feature = premium ? 'chat_message_4o' as const : 'chat_message_mini' as const;
-        const dailyCap = getDailyLimit(userTier, model);
-
-        if (dailyCap !== -1) { // -1 = unlimited
-            const tierRl = checkRateLimit(userId, feature, dailyCap);
-            if (!tierRl.allowed) {
-                const { body: rlBody, status } = rateLimitResponse(tierRl);
-                return Response.json(rlBody, { status });
-            }
-        }
-
+        // ── Validate input before consuming rate limit ──
         if (!messages || messages.length === 0) {
             return Response.json({ error: 'Messages are required' }, { status: 400 });
         }
@@ -76,6 +65,18 @@ export async function POST(req: NextRequest) {
             }
             if (typeof msg.content !== 'string' || msg.content.length > MAX_MESSAGE_LENGTH) {
                 return Response.json({ error: 'Invalid message content' }, { status: 400 });
+            }
+        }
+
+        // ── Tier-specific rate limit for the chosen model ──
+        const feature = premium ? 'chat_message_4o' as const : 'chat_message_mini' as const;
+        const dailyCap = getDailyLimit(userTier, model);
+
+        if (dailyCap !== -1) { // -1 = unlimited
+            const tierRl = checkRateLimit(userId, feature, dailyCap);
+            if (!tierRl.allowed) {
+                const { body: rlBody, status } = rateLimitResponse(tierRl);
+                return Response.json(rlBody, { status });
             }
         }
 

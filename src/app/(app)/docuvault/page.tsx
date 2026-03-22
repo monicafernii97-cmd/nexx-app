@@ -793,8 +793,9 @@ function DocuVaultPageInner() {
                                 </p>
                             </div>
 
-                            {/* NEXXverification Badges — shown only as format indicators, not legal certifications */}
+                            {/* Format indicators — describe how the document was generated, not verified outcomes */}
                             <div className="space-y-4">
+                                <p className="text-[11px] font-medium text-white/40 uppercase tracking-widest">Document Format</p>
                                 <div className="p-5 flex items-start gap-4 border border-[#10B981]/40 bg-[#10B981]/10 rounded-[1.5rem] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(16,185,129,0.3),0_8px_24px_rgba(0,0,0,0.3)]">
                                     <div className="w-10 h-10 rounded-full bg-[#10B981] flex items-center justify-center shrink-0 shadow-sm mt-0.5 border border-[#10B981]/50">
                                         <CheckCircle size={24} weight="bold" className="text-white" />

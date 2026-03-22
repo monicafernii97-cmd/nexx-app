@@ -558,11 +558,11 @@ export default function CourtSettingsPage() {
                             {caseTitleFormat === 'name_v_name' && (
                                 <>
                                     {nexProfile?.partyRole === 'respondent' ? (
-                                        // NEX is respondent → opposing party filed, user is respondent
-                                        <>{(respondentLegalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(nexProfile?.legalName || 'RESPONDENT').toUpperCase()}, Respondent</>
+                                        // User is petitioner (they filed), NEX is respondent
+                                        <>{('[YOUR NAME]').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(nexProfile?.legalName || respondentLegalName || 'RESPONDENT').toUpperCase()}, Respondent</>
                                     ) : nexProfile?.partyRole === 'petitioner' ? (
-                                        // NEX is petitioner → user filed
-                                        <>{(nexProfile?.legalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(respondentLegalName || 'RESPONDENT').toUpperCase()}, Respondent</>
+                                        // NEX is petitioner (they filed), user is respondent
+                                        <>{(nexProfile?.legalName || respondentLegalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{('[YOUR NAME]').toUpperCase()}, Respondent</>
                                     ) : (
                                         // No role set — generic fallback
                                         <>{(respondentLegalName || 'PETITIONER').toUpperCase()}, Petitioner{'\n'}v.{'\n'}{(nexProfile?.legalName || 'RESPONDENT').toUpperCase()}, Respondent</>

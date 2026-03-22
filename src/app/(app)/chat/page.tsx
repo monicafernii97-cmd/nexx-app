@@ -220,7 +220,7 @@ export default function ChatListPage() {
                                     </Link>
                                     <button
                                         onClick={(e) => handleDelete(e, conv._id)}
-                                        disabled={deletingId === conv._id}
+                                        disabled={!!deletingId}
                                         title="Delete Chat"
                                         className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud z-20 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
@@ -242,7 +242,9 @@ export default function ChatListPage() {
                 >
                     <button
                         onClick={() => setIsArchiveOpen(!isArchiveOpen)}
-                        className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 flex items-center gap-2 text-sapphire-muted px-2 hover:text-sapphire transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#60A5FA] focus-visible:rounded-md"
+                        aria-expanded={isArchiveOpen}
+                        aria-controls="archived-conversations"
+                        className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 flex items-center gap-2 text-sapphire-muted px-2 hover:text-sapphire transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60A5FA] focus-visible:rounded-md"
                     >
                         {isArchiveOpen ? <CaretDown size={16} /> : <CaretRight size={16} />}
                         <Archive size={16} /> Archived ({archivedConversations.length})
@@ -250,6 +252,7 @@ export default function ChatListPage() {
                     <AnimatePresence>
                         {isArchiveOpen && (
                             <motion.div
+                                id="archived-conversations"
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: 'auto' }}
                                 exit={{ opacity: 0, height: 0 }}
@@ -288,7 +291,7 @@ export default function ChatListPage() {
                                                 </span>
                                                 <button
                                                     onClick={(e) => handleDelete(e, conv._id)}
-                                                    disabled={deletingId === conv._id}
+                                                    disabled={!!deletingId}
                                                     title="Delete Chat"
                                                     className="w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover/archived:opacity-100 transition-all duration-300 bg-white hover:bg-red-50 text-red-400 hover:text-red-500 shadow-sm border border-cloud shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >

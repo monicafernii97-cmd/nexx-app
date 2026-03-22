@@ -77,7 +77,7 @@ export default function SubscriptionPage() {
         },
         {
             tier: 'premium',
-            icon: Sparkle,
+            icon: Star,
             iconColor: '#E5A84A',
             description: 'Our most popular plan — built for parents actively navigating custody, family law, or high-conflict cases.',
             badge: 'Most Popular',

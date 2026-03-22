@@ -381,6 +381,59 @@ export default function WelcomePage() {
         </div>
       </div>
 
+      {/* ═══ Coming Soon Section ═══ */}
+      <div className="w-full z-10 relative py-16 md:py-24">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 xl:px-24">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-50px' }}
+            transition={{ duration: 0.8 }}
+            className="rounded-[2rem] p-8 md:p-10 border border-[rgba(255,255,255,0.06)] bg-gradient-to-b from-[#0F1D3D]/60 to-[#0A1128]/80 relative overflow-hidden"
+          >
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute bottom-[-20%] left-[-10%] w-[35%] h-[50%] bg-[#E5A84A]/5 rounded-full blur-[80px]" />
+            </div>
+            <div className="relative z-10">
+              <div className="text-center mb-8">
+                <p className="text-[11px] md:text-xs font-bold tracking-[0.25em] uppercase text-[var(--champagne)] mb-3">
+                  On the Horizon
+                </p>
+                <h2 className="text-3xl md:text-4xl font-serif font-bold italic text-white tracking-tight mb-3">
+                  What&apos;s Coming Next
+                </h2>
+                <p className="text-sm text-[rgba(255,255,255,0.4)] max-w-lg mx-auto leading-relaxed">
+                  NEXX is evolving. These features are in development and will be available in upcoming releases.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-4xl mx-auto">
+                {[
+                  'Voice-first AI conversations',
+                  'Court order upload & analysis',
+                  'Affidavit builder',
+                  'eFiling integration',
+                  'Attorney collaboration portal',
+                  'Therapist collaboration portal',
+                  'eSignature & notarization',
+                  'Court date countdown & prep coach',
+                  'Custody exchange logger',
+                  'Co-parent communication filter',
+                  'Mock trial prep integration',
+                ].map((feature) => (
+                  <div
+                    key={feature}
+                    className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)]"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--champagne)] opacity-50 shrink-0" />
+                    <span className="text-[12px] text-[rgba(255,255,255,0.45)]">{feature}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
       {/* Bottom Footer Text */}
       <div className="w-full py-8 z-10 relative">
         <p className="text-center text-[10px] md:text-xs tracking-[0.25em] font-semibold text-[rgba(255,255,255,0.3)] uppercase">

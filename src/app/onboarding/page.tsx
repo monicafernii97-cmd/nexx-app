@@ -18,6 +18,7 @@ import {
     Check,
 } from 'lucide-react';
 import { US_STATES, ONBOARDING_STEPS } from '@/lib/constants';
+import { PLANS, type PlanTier } from '@/lib/plans';
 
 /**
  * Onboarding flow for new NEXX users.
@@ -44,16 +45,22 @@ export default function OnboardingPage() {
             router.replace('/dashboard');
         }
     }, [currentUser, router]);
-
-    // Guard: if signed in but no Convex user record and no plan selected,
-    // redirect to the landing page pricing section instead of wasting
-    // time on 6 onboarding steps with no plan.
+    // Guard: if the user hasn't selected a plan yet, redirect to the
+    // landing page pricing section. ensureFromClerk auto-creates a Convex
+    // record on sign-in, so we check subscriptionTier + sessionStorage.
     useEffect(() => {
         if (!convexReady || convexLoading) return;
         if (currentUser === undefined) return; // still loading
-        if (currentUser !== null) return; // has a record
-        const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-        const validPlans = new Set(['free', 'pro', 'premium', 'executive']);
+        if (currentUser === null) {
+            router.replace('/#pricing');
+            return;
+        }
+        // currentUser exists but hasn't completed onboarding
+        if (currentUser.onboardingComplete) return; // returning user
+        const validPlans: Set<string> = new Set(PLANS.map((p) => p.tier));
+        if (currentUser.subscriptionTier && validPlans.has(currentUser.subscriptionTier)) return;
+        // No valid DB tier — check sessionStorage for a freshly selected plan
+        const selectedPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
         if (!selectedPlan || !validPlans.has(selectedPlan)) {
             router.replace('/#pricing');
         }
@@ -191,21 +198,27 @@ export default function OnboardingPage() {
                     'Other': 'none',
                 };
 
-                const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+                const validTierSet: Set<string> = new Set(PLANS.map((p) => p.tier));
+                const storedPlan =
+                    typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
+                const dbPlan = currentUser?.subscriptionTier ?? null;
+                // Prefer sessionStorage (latest user selection) over DB tier
+                const selectedPlan =
+                    storedPlan && validTierSet.has(storedPlan)
+                        ? storedPlan
+                        : dbPlan;
 
                 if (!selectedPlan) {
                     setSaveError('Please select a plan before completing onboarding.');
                     setIsSaving(false);
                     return;
                 }
-                const validTiers = ['free', 'pro', 'premium', 'executive'] as const;
-                type Tier = typeof validTiers[number];
-                if (!validTiers.includes(selectedPlan as Tier)) {
+                if (!validTierSet.has(selectedPlan)) {
                     setSaveError(`Invalid plan "${selectedPlan}". Please select a valid plan.`);
                     setIsSaving(false);
                     return;
                 }
-                const tier = selectedPlan as Tier;
+                const tier = selectedPlan as PlanTier;
 
                 await updateProfile({
                     id: userId,
@@ -223,7 +236,7 @@ export default function OnboardingPage() {
                 });
 
                 if (selectedPlan && typeof window !== 'undefined') {
-                    localStorage.removeItem('selectedPlan');
+                    sessionStorage.removeItem('selectedPlan');
                 }
 
                 // Create NEX profile with behaviors (backend mutation is idempotent)

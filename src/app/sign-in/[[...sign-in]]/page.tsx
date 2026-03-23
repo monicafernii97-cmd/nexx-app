@@ -41,7 +41,7 @@ export default function SignInPage() {
                         Your Sanctuary Awaits
                     </p>
                 </div>
-                <SignIn appearance={nexxClerkAppearance} />
+                <SignIn appearance={nexxClerkAppearance} fallbackRedirectUrl="/" />
             </div>
         </div>
     );

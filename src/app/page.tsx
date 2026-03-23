@@ -10,6 +10,10 @@ import { useEffect } from 'react';
 
 import { CaretDown } from '@phosphor-icons/react';
 import { PLANS } from '@/lib/plans';
+import { COMING_SOON_FEATURES } from '@/lib/coming-soon';
+
+/** Valid plan tier IDs, derived once from the PLANS constant. */
+const VALID_PLAN_TIERS: Set<string> = new Set(PLANS.map((p) => p.tier));
 
 /**
  * Welcome / landing page and auth-aware router.
@@ -32,22 +36,23 @@ export default function WelcomePage() {
   const { isAuthenticated: convexReady, isLoading: convexLoading } = useConvexAuth();
   const router = useRouter();
 
-  /** Valid plan tier IDs, derived once from the PLANS constant. */
-  const VALID_PLAN_TIERS = new Set(PLANS.map((p) => p.tier));
-
   // Only query when Convex auth is fully synced (not just Clerk signed-in)
   const currentUser = useQuery(
     api.users.me,
     convexReady ? {} : 'skip'
   );
 
-  // Derived: show "no account found" banner when signed in with no Convex record and no plan
+  // Derived: show "choose a plan" banner when signed in but no plan selected.
+  // When currentUser is null (Convex record not yet created), show the banner.
+  // When currentUser exists but lacks a subscriptionTier and sessionStorage plan, show the banner.
   const showNoPlanBanner = (() => {
     if (!clerkLoaded || !isSignedIn || convexLoading || !convexReady) return false;
-    if (currentUser !== null) return false;
-    if (currentUser === undefined) return false;
-    const plan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-    return !plan || !VALID_PLAN_TIERS.has(plan);
+    if (currentUser === undefined) return false; // still loading
+    if (currentUser === null) return true; // no Convex record — show the banner
+    if (currentUser.onboardingComplete) return false; // returning user
+    if (currentUser.subscriptionTier && VALID_PLAN_TIERS.has(currentUser.subscriptionTier)) return false;
+    const plan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
+    return !plan || !VALID_PLAN_TIERS.has(plan); // no valid plan anywhere
   })();
 
   // Terminal state: Clerk is signed in but Convex auth failed to sync
@@ -69,25 +74,25 @@ export default function WelcomePage() {
     if (currentUser === undefined) return; // Still loading
 
     if (currentUser === null) {
-      // Signed in but no Convex record yet — new user
-      const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
-      if (!selectedPlan || !VALID_PLAN_TIERS.has(selectedPlan)) {
-        localStorage.removeItem('selectedPlan');
-        // No valid plan selected — scroll to pricing so they pick a plan first
-        requestAnimationFrame(() => {
-          document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
-        });
-        return; // Stay on welcome page — don't redirect
-      } else {
-        // Plan selected — proceed to onboarding
-        router.replace('/onboarding');
-      }
+      // No Convex record yet — stay on landing page and let the banner handle it.
+      return;
     } else if (currentUser.onboardingComplete) {
       // Returning user — straight to dashboard
       router.replace('/dashboard');
     } else {
-      // Has account but hasn't finished onboarding
-      router.replace('/onboarding');
+      // Only proceed if they have a plan (in sessionStorage or DB).
+      const selectedPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
+      const hasPlan =
+        (currentUser.subscriptionTier && VALID_PLAN_TIERS.has(currentUser.subscriptionTier)) ||
+        (selectedPlan && VALID_PLAN_TIERS.has(selectedPlan));
+      if (hasPlan) {
+        router.replace('/onboarding');
+      } else {
+        // No plan selected — stay on welcome page, scroll to pricing
+        requestAnimationFrame(() => {
+          document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+        });
+      }
     }
   }, [clerkLoaded, isSignedIn, convexLoading, convexReady, currentUser, router]);
 
@@ -170,6 +175,31 @@ export default function WelcomePage() {
           NEXX
         </motion.h1>
       </div>
+
+      {/* ═══ No-Plan Banner (top of page) ═══ */}
+      {showNoPlanBanner && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="w-full z-20 relative pt-6 px-6 md:px-12"
+        >
+          <div className="max-w-2xl mx-auto rounded-2xl p-5 border border-[rgba(229,168,74,0.4)] bg-gradient-to-b from-[rgba(229,168,74,0.12)] to-[rgba(229,168,74,0.04)] shadow-[0_8px_30px_rgba(229,168,74,0.1)] backdrop-blur-md text-center">
+            <p className="text-sm font-bold text-[var(--champagne)] mb-1.5 tracking-wide">
+              Choose a plan to continue
+            </p>
+            <p className="text-[13px] text-[rgba(255,255,255,0.7)] leading-relaxed mb-3">
+              You need to select a plan before you can continue. Choose one below to get started.
+            </p>
+            <button
+              onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+              className="px-5 py-2 rounded-xl text-[12px] font-bold tracking-wide uppercase bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] hover:shadow-[0_4px_20px_rgba(229,168,74,0.4)] transition-all"
+            >
+              View Plans
+            </button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Ambient Radial Gradients */}
       <div className="absolute inset-0 pointer-events-none z-0">
@@ -278,22 +308,7 @@ export default function WelcomePage() {
             transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
-            {/* Account Not Found Banner */}
-            {showNoPlanBanner && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="mb-10 mx-auto max-w-lg rounded-2xl p-5 border border-[rgba(229,168,74,0.4)] bg-gradient-to-b from-[rgba(229,168,74,0.12)] to-[rgba(229,168,74,0.04)] shadow-[0_8px_30px_rgba(229,168,74,0.1)] backdrop-blur-md"
-              >
-                <p className="text-sm font-bold text-[var(--champagne)] mb-1.5 tracking-wide">
-                  No account found
-                </p>
-                <p className="text-[13px] text-[rgba(255,255,255,0.7)] leading-relaxed">
-                  It looks like you don&apos;t have an account yet. Select a plan below to get started.
-                </p>
-              </motion.div>
-            )}
+
             <p className="text-[11px] md:text-xs font-bold tracking-[0.25em] uppercase text-[var(--champagne)] mb-4">
               Choose Your Arsenal
             </p>
@@ -360,7 +375,7 @@ export default function WelcomePage() {
                 {/* CTA */}
                 <button
                   onClick={() => {
-                    localStorage.setItem('selectedPlan', plan.tier);
+                    sessionStorage.setItem('selectedPlan', plan.tier);
                     router.push(isSignedIn ? '/onboarding' : '/sign-up');
                   }}
                   className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all ${
@@ -374,6 +389,47 @@ export default function WelcomePage() {
               </motion.div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* ═══ Coming Soon Section ═══ */}
+      <div className="w-full z-10 relative py-16 md:py-24">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 xl:px-24">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-50px' }}
+            transition={{ duration: 0.8 }}
+            className="rounded-[2rem] p-8 md:p-10 border border-[rgba(255,255,255,0.06)] bg-gradient-to-b from-[#0F1D3D]/60 to-[#0A1128]/80 relative overflow-hidden"
+          >
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute bottom-[-20%] left-[-10%] w-[35%] h-[50%] bg-[#E5A84A]/5 rounded-full blur-[80px]" />
+            </div>
+            <div className="relative z-10">
+              <div className="text-center mb-8">
+                <p className="text-[11px] md:text-xs font-bold tracking-[0.25em] uppercase text-[var(--champagne)] mb-3">
+                  On the Horizon
+                </p>
+                <h2 className="text-3xl md:text-4xl font-serif font-bold italic text-white tracking-tight mb-3">
+                  What&apos;s Coming Next
+                </h2>
+                <p className="text-sm text-[rgba(255,255,255,0.4)] max-w-lg mx-auto leading-relaxed">
+                  NEXX is evolving. These features are in development and will be available in upcoming releases.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-4xl mx-auto">
+                {COMING_SOON_FEATURES.map((feature) => (
+                  <div
+                    key={feature}
+                    className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)]"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--champagne)] opacity-50 shrink-0" />
+                    <span className="text-[12px] text-[rgba(255,255,255,0.45)]">{feature}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
         </div>
       </div>
 

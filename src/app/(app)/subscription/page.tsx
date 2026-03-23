@@ -7,7 +7,7 @@ import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import {
     Crown,
     Lightning,
-    Sparkle,
+    Star,
     Shield,
     ChatCircleText,
     FileText,
@@ -15,6 +15,8 @@ import {
     Check,
 } from '@phosphor-icons/react';
 import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
+import { COMING_SOON_FEATURES } from '@/lib/coming-soon';
+import { PLANS, type PlanTier } from '@/lib/plans';
 
 /** Subscription management page — shows current plan and upgrade options. */
 export default function SubscriptionPage() {
@@ -31,9 +33,9 @@ export default function SubscriptionPage() {
         );
     }
 
-    const validTiers: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
+    const validTiers = new Set(PLANS.map((p) => p.tier));
     const rawTier = user?.subscriptionTier as string | undefined;
-    const currentTier: SubscriptionTier = rawTier && validTiers.includes(rawTier as SubscriptionTier)
+    const currentTier: SubscriptionTier = rawTier && validTiers.has(rawTier as PlanTier)
         ? (rawTier as SubscriptionTier)
         : 'free';
     const currentConfig = TIER_LIMITS[currentTier];
@@ -77,7 +79,7 @@ export default function SubscriptionPage() {
         },
         {
             tier: 'premium',
-            icon: Sparkle,
+            icon: Star,
             iconColor: '#E5A84A',
             description: 'Our most popular plan — built for parents actively navigating custody, family law, or high-conflict cases.',
             badge: 'Most Popular',
@@ -280,7 +282,7 @@ export default function SubscriptionPage() {
                 </div>
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-4">
-                        <Sparkle size={20} weight="fill" className="text-[var(--champagne)]" />
+                        <Star size={20} weight="fill" className="text-[var(--champagne)]" />
                         <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--champagne)]">
                             Coming Soon
                         </h3>
@@ -289,25 +291,12 @@ export default function SubscriptionPage() {
                         NEXX is evolving. These features are in development and will be available in upcoming releases.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {[
-                            'Voice-first AI conversations',
-                            'Court order upload & analysis',
-                            'Affidavit builder',
-                            'eFiling integration',
-                            'Attorney collaboration portal',
-                            'Therapist collaboration portal',
-                            'eSignature & notarization',
-                            'Court date countdown & prep coach',
-                            'Custody exchange logger',
-                            'Children\'s wellbeing tracker',
-                            'Financial abuse tracker',
-                            'Co-parent communication filter',
-                        ].map((feature) => (
+                        {COMING_SOON_FEATURES.map((feature) => (
                             <div
                                 key={feature}
                                 className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06]"
                             >
-                                <Sparkle size={12} weight="fill" className="text-[var(--champagne)]/50 shrink-0" />
+                                <Star size={12} weight="fill" className="text-[var(--champagne)]/50 shrink-0" />
                                 <span className="text-[12px] text-white/40">{feature}</span>
                             </div>
                         ))}

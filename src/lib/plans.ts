@@ -5,7 +5,7 @@
 
 export interface PlanDefinition {
     name: string;
-    tier: string;
+    tier: PlanTier;
     price: string;
     period: string;
     description: string;
@@ -16,6 +16,9 @@ export interface PlanDefinition {
     borderAccent: string;
     popular: boolean;
 }
+
+/** The canonical set of plan tier identifiers. Add new tiers here. */
+export type PlanTier = 'free' | 'pro' | 'premium' | 'executive';
 
 export const PLANS: PlanDefinition[] = [
     {

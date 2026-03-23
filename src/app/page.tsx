@@ -50,7 +50,7 @@ export default function WelcomePage() {
   const showNoPlanBanner = (() => {
     if (!clerkLoaded || !isSignedIn || convexLoading || !convexReady) return false;
     if (currentUser === undefined) return false; // still loading
-    if (currentUser === null) return false; // shouldn't happen, but safe
+    if (currentUser === null) return true; // no Convex record — show the banner
     if (currentUser.onboardingComplete) return false; // returning user
     if (currentUser.subscriptionTier) return false; // already has a plan in DB
     const plan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
@@ -76,8 +76,7 @@ export default function WelcomePage() {
     if (currentUser === undefined) return; // Still loading
 
     if (currentUser === null) {
-      // No Convex record yet — shouldn't normally happen (ensureFromClerk runs),
-      // but handle it gracefully by staying on the landing page.
+      // No Convex record yet — stay on landing page and let the banner handle it.
       return;
     } else if (currentUser.onboardingComplete) {
       // Returning user — straight to dashboard
@@ -188,7 +187,7 @@ export default function WelcomePage() {
         >
           <div className="max-w-2xl mx-auto rounded-2xl p-5 border border-[rgba(229,168,74,0.4)] bg-gradient-to-b from-[rgba(229,168,74,0.12)] to-[rgba(229,168,74,0.04)] shadow-[0_8px_30px_rgba(229,168,74,0.1)] backdrop-blur-md text-center">
             <p className="text-sm font-bold text-[var(--champagne)] mb-1.5 tracking-wide">
-              Please sign up first
+              Choose a plan to continue
             </p>
             <p className="text-[13px] text-[rgba(255,255,255,0.7)] leading-relaxed mb-3">
               You need to select a plan before you can continue. Choose one below to get started.

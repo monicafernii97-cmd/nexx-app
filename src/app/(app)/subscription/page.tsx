@@ -195,7 +195,7 @@ export default function SubscriptionPage() {
                             {/* Badge */}
                             {(plan.badge || isCurrent) && (
                                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                                    <span className={`px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm ${
+                                    <span className={`whitespace-nowrap px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm ${
                                         isCurrent
                                             ? 'bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128]'
                                             : 'bg-[#1A4B9B] text-white/80'

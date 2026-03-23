@@ -36,6 +36,15 @@ export default function SettingsPage() {
                 transition={{ delay: 0.1 }}
                 className="overflow-hidden rounded-[2rem] border border-white/20 bg-[linear-gradient(135deg,#1E3A8A_0%,rgba(255,255,255,0.15)_100%)] backdrop-blur-3xl motion-reduce:backdrop-blur-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_24px_64px_rgba(0,0,0,0.6)]"
             >
+                {/* Global override for stubborn dark text inside Clerk UserProfile */}
+                <style jsx global>{`
+                    .cl-profilePage h1, .cl-profilePage h2, .cl-profilePage h3, .cl-profilePage h4, .cl-profilePage p, .cl-profilePage span {
+                        color: white !important;
+                    }
+                    .cl-navbar, .cl-navbarButton {
+                        color: white !important;
+                    }
+                `}</style>
                 <UserProfile
                     appearance={{
                         ...nexxClerkAppearance,

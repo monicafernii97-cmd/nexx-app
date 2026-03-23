@@ -12,6 +12,9 @@ import { CaretDown } from '@phosphor-icons/react';
 import { PLANS } from '@/lib/plans';
 import { COMING_SOON_FEATURES } from '@/lib/coming-soon';
 
+/** Valid plan tier IDs, derived once from the PLANS constant. */
+const VALID_PLAN_TIERS = new Set(PLANS.map((p) => p.tier));
+
 /**
  * Welcome / landing page and auth-aware router.
  *
@@ -33,8 +36,7 @@ export default function WelcomePage() {
   const { isAuthenticated: convexReady, isLoading: convexLoading } = useConvexAuth();
   const router = useRouter();
 
-  /** Valid plan tier IDs, derived once from the PLANS constant. */
-  const VALID_PLAN_TIERS = new Set(PLANS.map((p) => p.tier));
+
 
   // Only query when Convex auth is fully synced (not just Clerk signed-in)
   const currentUser = useQuery(

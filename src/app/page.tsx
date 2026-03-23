@@ -50,7 +50,7 @@ export default function WelcomePage() {
     if (currentUser === undefined) return false; // still loading
     if (currentUser === null) return true; // no Convex record — show the banner
     if (currentUser.onboardingComplete) return false; // returning user
-    if (currentUser.subscriptionTier) return false; // already has a plan in DB
+    if (currentUser.subscriptionTier && VALID_PLAN_TIERS.has(currentUser.subscriptionTier)) return false;
     const plan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
     return !plan || !VALID_PLAN_TIERS.has(plan); // no valid plan anywhere
   })();
@@ -82,7 +82,9 @@ export default function WelcomePage() {
     } else {
       // Only proceed if they have a plan (in sessionStorage or DB).
       const selectedPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
-      const hasPlan = currentUser.subscriptionTier || (selectedPlan && VALID_PLAN_TIERS.has(selectedPlan));
+      const hasPlan =
+        (currentUser.subscriptionTier && VALID_PLAN_TIERS.has(currentUser.subscriptionTier)) ||
+        (selectedPlan && VALID_PLAN_TIERS.has(selectedPlan));
       if (hasPlan) {
         router.replace('/onboarding');
       } else {

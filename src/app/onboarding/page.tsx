@@ -18,7 +18,7 @@ import {
     Check,
 } from 'lucide-react';
 import { US_STATES, ONBOARDING_STEPS } from '@/lib/constants';
-import { PLANS } from '@/lib/plans';
+import { PLANS, type PlanTier } from '@/lib/plans';
 
 /**
  * Onboarding flow for new NEXX users.
@@ -218,7 +218,7 @@ export default function OnboardingPage() {
                     setIsSaving(false);
                     return;
                 }
-                const tier = selectedPlan as 'free' | 'pro' | 'premium' | 'executive';
+                const tier = selectedPlan as PlanTier;
 
                 await updateProfile({
                     id: userId,

@@ -57,10 +57,10 @@ export default function OnboardingPage() {
         }
         // currentUser exists but hasn't completed onboarding
         if (currentUser.onboardingComplete) return; // returning user
-        if (currentUser.subscriptionTier) return; // already has a plan in DB
-        // No DB tier — check localStorage for a freshly selected plan
-        const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
         const validPlans = new Set(PLANS.map((p) => p.tier));
+        if (currentUser.subscriptionTier && validPlans.has(currentUser.subscriptionTier)) return;
+        // No valid DB tier — check localStorage for a freshly selected plan
+        const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
         if (!selectedPlan || !validPlans.has(selectedPlan)) {
             router.replace('/#pricing');
         }

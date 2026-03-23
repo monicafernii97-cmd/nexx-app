@@ -51,9 +51,13 @@ export default function OnboardingPage() {
     useEffect(() => {
         if (!convexReady || convexLoading) return;
         if (currentUser === undefined) return; // still loading
-        // currentUser is null (rare) or exists but hasn't completed onboarding
-        if (currentUser?.onboardingComplete) return; // returning user
-        if (currentUser?.subscriptionTier) return; // already has a plan in DB
+        if (currentUser === null) {
+            router.replace('/#pricing');
+            return;
+        }
+        // currentUser exists but hasn't completed onboarding
+        if (currentUser.onboardingComplete) return; // returning user
+        if (currentUser.subscriptionTier) return; // already has a plan in DB
         // No DB tier — check localStorage for a freshly selected plan
         const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
         const validPlans = new Set(PLANS.map((p) => p.tier));

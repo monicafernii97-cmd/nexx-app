@@ -57,7 +57,7 @@ export default function OnboardingPage() {
         }
         // currentUser exists but hasn't completed onboarding
         if (currentUser.onboardingComplete) return; // returning user
-        const validPlans = new Set(PLANS.map((p) => p.tier));
+        const validPlans: Set<string> = new Set(PLANS.map((p) => p.tier));
         if (currentUser.subscriptionTier && validPlans.has(currentUser.subscriptionTier)) return;
         // No valid DB tier — check sessionStorage for a freshly selected plan
         const selectedPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
@@ -198,7 +198,7 @@ export default function OnboardingPage() {
                     'Other': 'none',
                 };
 
-                const validTierSet = new Set(PLANS.map((p) => p.tier));
+                const validTierSet: Set<string> = new Set(PLANS.map((p) => p.tier));
                 const storedPlan =
                     typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
                 const dbPlan = currentUser?.subscriptionTier ?? null;

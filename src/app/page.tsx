@@ -13,7 +13,7 @@ import { PLANS } from '@/lib/plans';
 import { COMING_SOON_FEATURES } from '@/lib/coming-soon';
 
 /** Valid plan tier IDs, derived once from the PLANS constant. */
-const VALID_PLAN_TIERS = new Set(PLANS.map((p) => p.tier));
+const VALID_PLAN_TIERS: Set<string> = new Set(PLANS.map((p) => p.tier));
 
 /**
  * Welcome / landing page and auth-aware router.
@@ -44,7 +44,7 @@ export default function WelcomePage() {
 
   // Derived: show "choose a plan" banner when signed in but no plan selected.
   // When currentUser is null (Convex record not yet created), show the banner.
-  // When currentUser exists but lacks a subscriptionTier and localStorage plan, show the banner.
+  // When currentUser exists but lacks a subscriptionTier and sessionStorage plan, show the banner.
   const showNoPlanBanner = (() => {
     if (!clerkLoaded || !isSignedIn || convexLoading || !convexReady) return false;
     if (currentUser === undefined) return false; // still loading

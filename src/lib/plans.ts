@@ -5,7 +5,7 @@
 
 export interface PlanDefinition {
     name: string;
-    tier: string;
+    tier: PlanTier;
     price: string;
     period: string;
     description: string;

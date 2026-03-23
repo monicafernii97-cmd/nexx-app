@@ -176,6 +176,31 @@ export default function WelcomePage() {
         </motion.h1>
       </div>
 
+      {/* ═══ No-Plan Banner (top of page) ═══ */}
+      {showNoPlanBanner && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="w-full z-20 relative pt-6 px-6 md:px-12"
+        >
+          <div className="max-w-2xl mx-auto rounded-2xl p-5 border border-[rgba(229,168,74,0.4)] bg-gradient-to-b from-[rgba(229,168,74,0.12)] to-[rgba(229,168,74,0.04)] shadow-[0_8px_30px_rgba(229,168,74,0.1)] backdrop-blur-md text-center">
+            <p className="text-sm font-bold text-[var(--champagne)] mb-1.5 tracking-wide">
+              Please sign up first
+            </p>
+            <p className="text-[13px] text-[rgba(255,255,255,0.7)] leading-relaxed mb-3">
+              You need to select a plan before you can continue. Choose one below to get started.
+            </p>
+            <button
+              onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+              className="px-5 py-2 rounded-xl text-[12px] font-bold tracking-wide uppercase bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] hover:shadow-[0_4px_20px_rgba(229,168,74,0.4)] transition-all"
+            >
+              View Plans
+            </button>
+          </div>
+        </motion.div>
+      )}
+
       {/* Ambient Radial Gradients */}
       <div className="absolute inset-0 pointer-events-none z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[var(--sapphire-base)]/20 rounded-full blur-[120px]" />
@@ -283,22 +308,7 @@ export default function WelcomePage() {
             transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
-            {/* Account Not Found Banner */}
-            {showNoPlanBanner && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="mb-10 mx-auto max-w-lg rounded-2xl p-5 border border-[rgba(229,168,74,0.4)] bg-gradient-to-b from-[rgba(229,168,74,0.12)] to-[rgba(229,168,74,0.04)] shadow-[0_8px_30px_rgba(229,168,74,0.1)] backdrop-blur-md"
-              >
-                <p className="text-sm font-bold text-[var(--champagne)] mb-1.5 tracking-wide">
-                  No plan selected
-                </p>
-                <p className="text-[13px] text-[rgba(255,255,255,0.7)] leading-relaxed">
-                  You need to select a plan to get started. Choose one below.
-                </p>
-              </motion.div>
-            )}
+
             <p className="text-[11px] md:text-xs font-bold tracking-[0.25em] uppercase text-[var(--champagne)] mb-4">
               Choose Your Arsenal
             </p>

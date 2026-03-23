@@ -23,6 +23,7 @@ export const upsert = mutation({
         )),
         caseTitleCustom: v.optional(v.string()),
         respondentLegalName: v.optional(v.string()),
+        childName: v.optional(v.string()),
         formattingOverrides: v.optional(v.any()),
     },
     handler: async (ctx, args) => {

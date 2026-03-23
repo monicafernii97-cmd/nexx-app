@@ -201,6 +201,8 @@ export default defineSchema({
         caseTitleCustom: v.optional(v.string()),
         /** Respondent/opposing party legal name for document generation */
         respondentLegalName: v.optional(v.string()),
+        /** Child name(s) for documents in the interest of a child */
+        childName: v.optional(v.string()),
         /** User-verified formatting overrides (merged on top of state/county defaults) */
         formattingOverrides: v.optional(v.any()),
         /** Whether the user has verified these settings via AI lookup */

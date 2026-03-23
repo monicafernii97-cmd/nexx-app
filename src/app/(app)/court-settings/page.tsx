@@ -46,6 +46,7 @@ export default function CourtSettingsPage() {
     const [caseTitleFormat, setCaseTitleFormat] = useState<CaseTitleFormat>('');
     const [caseTitleCustom, setCaseTitleCustom] = useState('');
     const [respondentLegalName, setRespondentLegalName] = useState('');
+    const [childName, setChildName] = useState('');
 
     // UI state
     const [countyQuery, setCountyQuery] = useState('');
@@ -85,6 +86,7 @@ export default function CourtSettingsPage() {
             setCaseTitleFormat((existingSettings.caseTitleFormat as CaseTitleFormat) || '');
             setCaseTitleCustom(existingSettings.caseTitleCustom || '');
             setRespondentLegalName(existingSettings.respondentLegalName || '');
+            setChildName(existingSettings.childName || '');
         }
         initializedRef.current = true;
     }, [existingSettings]);
@@ -143,6 +145,7 @@ export default function CourtSettingsPage() {
                 caseTitleFormat: caseTitleFormat || undefined,
                 caseTitleCustom: caseTitleCustom || undefined,
                 respondentLegalName: respondentLegalName || undefined,
+                childName: childName || undefined,
             });
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
@@ -166,7 +169,7 @@ export default function CourtSettingsPage() {
         } finally {
             setSaving(false);
         }
-    }, [state, county, courtName, causeNumber, assignedJudge, judicialDistrict, caseTitleFormat, caseTitleCustom, respondentLegalName, upsertSettings]);
+    }, [state, county, courtName, causeNumber, assignedJudge, judicialDistrict, caseTitleFormat, caseTitleCustom, respondentLegalName, childName, upsertSettings]);
 
     // AI Verify handler
     const handleVerify = useCallback(async () => {
@@ -497,6 +500,27 @@ export default function CourtSettingsPage() {
                     </div>
                 </div>
 
+                <div className="mb-6">
+                    <label htmlFor="child-name-input" className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
+                        Subject Child Name <span className="text-[var(--sapphire-light)] font-normal text-[10px] ml-1">(Optional, for IN THE INTEREST OF)</span>
+                    </label>
+                    <div className="relative">
+                        <User
+                            size={16}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sapphire-light)]"
+                            weight="bold"
+                        />
+                        <input
+                            type="text"
+                            value={childName}
+                            onChange={(e) => setChildName(e.target.value)}
+                            placeholder="Full child name(s)"
+                            className="input-premium w-full !pl-10 pr-4 text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
+                            id="child-name-input"
+                        />
+                    </div>
+                </div>
+
                 {/* Case Title Format */}
                 <div className="mb-6">
                     <label className="block text-xs font-semibold mb-3 text-[var(--sapphire-base)] uppercase tracking-wide">
@@ -575,7 +599,7 @@ export default function CourtSettingsPage() {
                             })()}
 
                             {caseTitleFormat === 'in_interest_of' && (
-                                <>IN THE INTEREST OF{'\n'}[CHILD NAME(S)],{'\n'}A CHILD / CHILDREN</>
+                                <>IN THE INTEREST OF{'\n'}{(childName || '[CHILD NAME(S)]').toUpperCase()},{'\n'}A CHILD / CHILDREN</>
                             )}
                             {caseTitleFormat === 'in_matter_of_marriage' && (
                                 <>IN THE MATTER OF THE MARRIAGE OF{'\n'}{(respondentLegalName || 'PARTY 1').toUpperCase().split(' ').pop()} AND {(nexProfile?.legalName || 'PARTY 2').toUpperCase().split(' ').pop()}</>

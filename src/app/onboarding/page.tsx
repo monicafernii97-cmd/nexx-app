@@ -47,7 +47,7 @@ export default function OnboardingPage() {
     }, [currentUser, router]);
     // Guard: if the user hasn't selected a plan yet, redirect to the
     // landing page pricing section. ensureFromClerk auto-creates a Convex
-    // record on sign-in, so we check subscriptionTier + localStorage.
+    // record on sign-in, so we check subscriptionTier + sessionStorage.
     useEffect(() => {
         if (!convexReady || convexLoading) return;
         if (currentUser === undefined) return; // still loading

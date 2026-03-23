@@ -44,9 +44,9 @@ export default function WelcomePage() {
     convexReady ? {} : 'skip'
   );
 
-  // Derived: show "no plan selected" banner when signed in but no plan selected.
-  // UserProvider.ensureFromClerk auto-creates a Convex record on any sign-in,
-  // so currentUser is never null — we must check for a missing subscriptionTier instead.
+  // Derived: show "choose a plan" banner when signed in but no plan selected.
+  // When currentUser is null (Convex record not yet created), show the banner.
+  // When currentUser exists but lacks a subscriptionTier and localStorage plan, show the banner.
   const showNoPlanBanner = (() => {
     if (!clerkLoaded || !isSignedIn || convexLoading || !convexReady) return false;
     if (currentUser === undefined) return false; // still loading

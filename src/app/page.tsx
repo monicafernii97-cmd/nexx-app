@@ -51,7 +51,7 @@ export default function WelcomePage() {
     if (currentUser === null) return true; // no Convex record — show the banner
     if (currentUser.onboardingComplete) return false; // returning user
     if (currentUser.subscriptionTier) return false; // already has a plan in DB
-    const plan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+    const plan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
     return !plan || !VALID_PLAN_TIERS.has(plan); // no valid plan anywhere
   })();
 
@@ -80,9 +80,8 @@ export default function WelcomePage() {
       // Returning user — straight to dashboard
       router.replace('/dashboard');
     } else {
-      // Has account but hasn't finished onboarding.
-      // Only proceed if they have a plan (in localStorage or DB).
-      const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+      // Only proceed if they have a plan (in sessionStorage or DB).
+      const selectedPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
       const hasPlan = currentUser.subscriptionTier || (selectedPlan && VALID_PLAN_TIERS.has(selectedPlan));
       if (hasPlan) {
         router.replace('/onboarding');
@@ -374,7 +373,7 @@ export default function WelcomePage() {
                 {/* CTA */}
                 <button
                   onClick={() => {
-                    localStorage.setItem('selectedPlan', plan.tier);
+                    sessionStorage.setItem('selectedPlan', plan.tier);
                     router.push(isSignedIn ? '/onboarding' : '/sign-up');
                   }}
                   className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all ${

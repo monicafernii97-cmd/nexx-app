@@ -59,8 +59,8 @@ export default function OnboardingPage() {
         if (currentUser.onboardingComplete) return; // returning user
         const validPlans = new Set(PLANS.map((p) => p.tier));
         if (currentUser.subscriptionTier && validPlans.has(currentUser.subscriptionTier)) return;
-        // No valid DB tier — check localStorage for a freshly selected plan
-        const selectedPlan = typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+        // No valid DB tier — check sessionStorage for a freshly selected plan
+        const selectedPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
         if (!selectedPlan || !validPlans.has(selectedPlan)) {
             router.replace('/#pricing');
         }
@@ -200,9 +200,9 @@ export default function OnboardingPage() {
 
                 const validTierSet = new Set(PLANS.map((p) => p.tier));
                 const storedPlan =
-                    typeof window !== 'undefined' ? localStorage.getItem('selectedPlan') : null;
+                    typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
                 const dbPlan = currentUser?.subscriptionTier ?? null;
-                // Prefer localStorage (latest user selection) over DB tier
+                // Prefer sessionStorage (latest user selection) over DB tier
                 const selectedPlan =
                     storedPlan && validTierSet.has(storedPlan)
                         ? storedPlan
@@ -236,7 +236,7 @@ export default function OnboardingPage() {
                 });
 
                 if (selectedPlan && typeof window !== 'undefined') {
-                    localStorage.removeItem('selectedPlan');
+                    sessionStorage.removeItem('selectedPlan');
                 }
 
                 // Create NEX profile with behaviors (backend mutation is idempotent)

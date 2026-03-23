@@ -36,8 +36,6 @@ export default function WelcomePage() {
   const { isAuthenticated: convexReady, isLoading: convexLoading } = useConvexAuth();
   const router = useRouter();
 
-
-
   // Only query when Convex auth is fully synced (not just Clerk signed-in)
   const currentUser = useQuery(
     api.users.me,

@@ -16,6 +16,7 @@ import {
 } from '@phosphor-icons/react';
 import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
 import { COMING_SOON_FEATURES } from '@/lib/coming-soon';
+import { PLANS } from '@/lib/plans';
 
 /** Subscription management page — shows current plan and upgrade options. */
 export default function SubscriptionPage() {
@@ -32,9 +33,9 @@ export default function SubscriptionPage() {
         );
     }
 
-    const validTiers: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
+    const validTiers = PLANS.map((p) => p.tier);
     const rawTier = user?.subscriptionTier as string | undefined;
-    const currentTier: SubscriptionTier = rawTier && validTiers.includes(rawTier as SubscriptionTier)
+    const currentTier: SubscriptionTier = rawTier && validTiers.includes(rawTier)
         ? (rawTier as SubscriptionTier)
         : 'free';
     const currentConfig = TIER_LIMITS[currentTier];

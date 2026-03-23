@@ -308,6 +308,7 @@ export default function SubscriptionPage() {
                 <a href="mailto:support@nexxapp.com" className="text-[var(--champagne)] hover:underline opacity-80 hover:opacity-100 font-bold tracking-wide">support@nexxapp.com</a>
                 {' '}and we&apos;ll get you set up.
             </motion.p>
+
         </PageContainer>
     );
 }

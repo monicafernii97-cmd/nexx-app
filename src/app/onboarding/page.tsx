@@ -18,7 +18,8 @@ import {
     Check,
 } from 'lucide-react';
 import { US_STATES, ONBOARDING_STEPS } from '@/lib/constants';
-import { PLANS, type PlanTier } from '@/lib/plans';
+import { type PlanTier } from '@/lib/plans';
+import { isValidPlan, getValidSelectedPlan } from '@/lib/plan-validation';
 
 /**
  * Onboarding flow for new NEXX users.
@@ -57,11 +58,9 @@ export default function OnboardingPage() {
         }
         // currentUser exists but hasn't completed onboarding
         if (currentUser.onboardingComplete) return; // returning user
-        const validPlans: Set<string> = new Set(PLANS.map((p) => p.tier));
-        if (currentUser.subscriptionTier && validPlans.has(currentUser.subscriptionTier)) return;
+        if (isValidPlan(currentUser.subscriptionTier)) return;
         // No valid DB tier — check sessionStorage for a freshly selected plan
-        const selectedPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
-        if (!selectedPlan || !validPlans.has(selectedPlan)) {
+        if (!getValidSelectedPlan(currentUser)) {
             router.replace('/#pricing');
         }
     }, [convexReady, convexLoading, currentUser, router]);
@@ -198,23 +197,10 @@ export default function OnboardingPage() {
                     'Other': 'none',
                 };
 
-                const validTierSet: Set<string> = new Set(PLANS.map((p) => p.tier));
-                const storedPlan =
-                    typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
-                const dbPlan = currentUser?.subscriptionTier ?? null;
-                // Prefer sessionStorage (latest user selection) over DB tier
-                const selectedPlan =
-                    storedPlan && validTierSet.has(storedPlan)
-                        ? storedPlan
-                        : dbPlan;
+                const selectedPlan = getValidSelectedPlan(currentUser);
 
                 if (!selectedPlan) {
                     setSaveError('Please select a plan before completing onboarding.');
-                    setIsSaving(false);
-                    return;
-                }
-                if (!validTierSet.has(selectedPlan)) {
-                    setSaveError(`Invalid plan "${selectedPlan}". Please select a valid plan.`);
                     setIsSaving(false);
                     return;
                 }

@@ -669,11 +669,12 @@ export default function EFilingPage() {
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.4, duration: 0.5 }}
                         >
-                            <div className="flex items-center gap-3 mb-5">
-                                <div className="w-10 h-10 rounded-xl bg-white shadow-sm border border-[var(--cloud-light)] flex items-center justify-center">
-                                    <BookOpen size={20} className="text-[var(--sapphire-base)]" weight="duotone" />
+                            <div className="flex items-center gap-4 mb-5">
+                                <div className="w-12 h-12 rounded-2xl bg-white/5 backdrop-blur-2xl border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-center relative overflow-hidden shrink-0">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
+                                    <BookOpen size={24} className="text-white relative z-10 drop-shadow-[0_2px_10px_rgba(255,255,255,0.6)]" weight="duotone" />
                                 </div>
-                                <h2 className="text-base font-semibold tracking-widest uppercase text-[var(--sapphire-dark)]">
+                                <h2 className="text-base font-bold tracking-widest uppercase text-white drop-shadow-sm">
                                     Court Resources
                                 </h2>
                             </div>

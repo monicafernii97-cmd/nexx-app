@@ -64,7 +64,21 @@ export default function SettingsPage() {
                             },
                             pageScrollBox: {
                                 background: 'transparent',
-                            }
+                            },
+                            // Ensure profile page text elements are white
+                            // (replaces the removed global <style jsx> CSS override)
+                            profileSectionTitleText: {
+                                color: '#FFFFFF',
+                            },
+                            userPreviewMainIdentifier: {
+                                color: '#FFFFFF',
+                            },
+                            userPreviewSecondaryIdentifier: {
+                                color: 'rgba(255,255,255,0.7)',
+                            },
+                            accordionTriggerButton: {
+                                color: '#FFFFFF',
+                            },
                         },
                     }}
                 />

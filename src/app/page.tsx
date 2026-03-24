@@ -8,12 +8,11 @@ import { api } from '../../convex/_generated/api';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
-import { CaretDown } from '@phosphor-icons/react';
 import { PLANS } from '@/lib/plans';
 import { COMING_SOON_FEATURES } from '@/lib/coming-soon';
+import { isValidPlan, getSessionPlan } from '@/lib/plan-validation';
 
-/** Valid plan tier IDs, derived once from the PLANS constant. */
-const VALID_PLAN_TIERS: Set<string> = new Set(PLANS.map((p) => p.tier));
+import { CaretDown } from '@phosphor-icons/react';
 
 /**
  * Welcome / landing page and auth-aware router.
@@ -50,9 +49,8 @@ export default function WelcomePage() {
     if (currentUser === undefined) return false; // still loading
     if (currentUser === null) return true; // no Convex record — show the banner
     if (currentUser.onboardingComplete) return false; // returning user
-    if (currentUser.subscriptionTier && VALID_PLAN_TIERS.has(currentUser.subscriptionTier)) return false;
-    const plan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
-    return !plan || !VALID_PLAN_TIERS.has(plan); // no valid plan anywhere
+    if (isValidPlan(currentUser.subscriptionTier)) return false;
+    return !isValidPlan(getSessionPlan()); // no valid plan anywhere
   })();
 
   // Terminal state: Clerk is signed in but Convex auth failed to sync
@@ -82,9 +80,7 @@ export default function WelcomePage() {
     } else {
       // Only proceed if they have a plan (in sessionStorage or DB).
       const selectedPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
-      const hasPlan =
-        (currentUser.subscriptionTier && VALID_PLAN_TIERS.has(currentUser.subscriptionTier)) ||
-        (selectedPlan && VALID_PLAN_TIERS.has(selectedPlan));
+      const hasPlan = isValidPlan(currentUser.subscriptionTier) || isValidPlan(selectedPlan);
       if (hasPlan) {
         router.replace('/onboarding');
       } else {
@@ -338,7 +334,7 @@ export default function WelcomePage() {
                 {/* Badge */}
                 {plan.badge && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] shadow-[0_2px_12px_rgba(229,168,74,0.3)]">
+                    <span className="whitespace-nowrap px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] shadow-[0_2px_12px_rgba(229,168,74,0.3)]">
                       {plan.badge}
                     </span>
                   </div>
@@ -388,48 +384,44 @@ export default function WelcomePage() {
                 </button>
               </motion.div>
             ))}
-          </div>
-        </div>
-      </div>
 
-      {/* ═══ Coming Soon Section ═══ */}
-      <div className="w-full z-10 relative py-16 md:py-24">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 xl:px-24">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-50px' }}
-            transition={{ duration: 0.8 }}
-            className="rounded-[2rem] p-8 md:p-10 border border-[rgba(255,255,255,0.06)] bg-gradient-to-b from-[#0F1D3D]/60 to-[#0A1128]/80 relative overflow-hidden"
-          >
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute bottom-[-20%] left-[-10%] w-[35%] h-[50%] bg-[#E5A84A]/5 rounded-full blur-[80px]" />
-            </div>
-            <div className="relative z-10">
-              <div className="text-center mb-8">
-                <p className="text-[11px] md:text-xs font-bold tracking-[0.25em] uppercase text-[var(--champagne)] mb-3">
-                  On the Horizon
-                </p>
-                <h2 className="text-3xl md:text-4xl font-serif font-bold italic text-white tracking-tight mb-3">
-                  What&apos;s Coming Next
-                </h2>
-                <p className="text-sm text-[rgba(255,255,255,0.4)] max-w-lg mx-auto leading-relaxed">
-                  NEXX is evolving. These features are in development and will be available in upcoming releases.
-                </p>
+            {/* Integrated Coming Soon */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-50px' }}
+              transition={{ delay: 0.4, duration: 0.6 }}
+              className="md:col-span-2 lg:col-span-4 mt-4 rounded-[2rem] p-8 md:p-10 border border-[rgba(255,255,255,0.06)] bg-gradient-to-b from-[#0F1D3D]/60 to-[#0A1128]/80 relative overflow-hidden hover:border-[rgba(255,255,255,0.12)] transition-all shadow-[0_8px_40px_rgba(0,0,0,0.4)]"
+            >
+              <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute bottom-[-20%] left-[-10%] w-[35%] h-[50%] bg-[#E5A84A]/5 rounded-full blur-[80px]" />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-4xl mx-auto">
-                {COMING_SOON_FEATURES.map((feature) => (
-                  <div
-                    key={feature}
-                    className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)]"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--champagne)] opacity-50 shrink-0" />
-                    <span className="text-[12px] text-[rgba(255,255,255,0.45)]">{feature}</span>
-                  </div>
-                ))}
+              <div className="relative z-10 flex flex-col md:flex-row gap-8 items-center md:items-start">
+                <div className="md:w-1/3 text-center md:text-left shrink-0">
+                  <p className="text-[11px] font-bold tracking-[0.25em] uppercase text-[var(--champagne)] mb-3">
+                    On the Horizon
+                  </p>
+                  <h2 className="text-3xl lg:text-4xl font-serif font-bold italic text-white tracking-tight mb-3">
+                    Coming Next
+                  </h2>
+                  <p className="text-[13px] text-[rgba(255,255,255,0.4)] leading-relaxed md:max-w-xs mx-auto md:mx-0">
+                    NEXX is actively evolving. These strategic tools are currently in development for upcoming releases.
+                  </p>
+                </div>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full list-none m-0 p-0" aria-label="Upcoming features">
+                  {COMING_SOON_FEATURES.map((feature) => (
+                    <li
+                      key={feature}
+                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] shadow-sm hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--champagne)] shadow-[0_0_8px_rgba(229,168,74,0.6)] shrink-0" />
+                      <span className="text-[12px] text-[rgba(255,255,255,0.55)] leading-tight">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </div>
       </div>
 

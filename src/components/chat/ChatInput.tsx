@@ -17,17 +17,31 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
     const [input, setInput] = useState('');
     const [isListening, setIsListening] = useState(false);
     const [micError, setMicError] = useState<string | null>(null);
+    // Client-only: avoids hydration mismatch since server has no SpeechRecognition
+    const [isSpeechSupported, setIsSpeechSupported] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
-    // Tracks the current input value for the speech recognition callback,
-    // avoiding stale closures from useCallback memoization.
+    // Single source of truth for the current input value, readable from callbacks
+    // without stale closures. Always kept in sync via updateInput().
     const inputRef = useRef('');
 
-    // Keep inputRef in sync with every input change
+    /** Update both React state and the mutable ref in one call. */
     const updateInput = useCallback((value: string) => {
         inputRef.current = value;
         setInput(value);
     }, []);
+
+    const getSpeechRecognition = useCallback((): SpeechRecognitionCtor | null => {
+        if (typeof window === 'undefined') return null;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const w = window as any;
+        return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+    }, []);
+
+    // Detect speech support client-side only (after hydration)
+    useEffect(() => {
+        setIsSpeechSupported(getSpeechRecognition() !== null);
+    }, [getSpeechRecognition]);
 
     // Auto-resize textarea
     useEffect(() => {
@@ -72,13 +86,6 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         }
     }, [handleSend]);
 
-    const getSpeechRecognition = useCallback((): SpeechRecognitionCtor | null => {
-        if (typeof window === 'undefined') return null;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const w = window as any;
-        return w.SpeechRecognition || w.webkitSpeechRecognition || null;
-    }, []);
-
     const toggleListening = useCallback(() => {
         setMicError(null);
 
@@ -101,10 +108,6 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         recognition.lang = 'en-US';
         recognitionRef.current = recognition;
 
-        // Snapshot the current input as the base for dictation appending.
-        // inputRef is always current, so no stale closure issue.
-        const baseText = inputRef.current;
-
         recognition.onresult = (event: SpeechRecognitionEvent) => {
             let interimTranscript = '';
             let finalTranscript = '';
@@ -118,24 +121,14 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 }
             }
 
-            // Read the latest accumulated base from the ref
-            const base = inputRef.current;
-            // Only add a separator if speaking over existing text without a trailing space
-            const needsSep = base.length > 0
-                && !base.endsWith(' ')
-                && event.resultIndex === 0;
-            const separator = needsSep ? ' ' : '';
+            // Always read the latest value from inputRef (single source of truth)
+            const current = inputRef.current;
+            const separator = current.length > 0 && !current.endsWith(' ') ? ' ' : '';
+            const transcript = finalTranscript || interimTranscript;
 
-            if (finalTranscript) {
-                // Final result: append to real accumulated text
-                const newText = (event.resultIndex === 0 ? baseText : base) + separator + finalTranscript;
-                updateInput(newText);
-            } else {
-                // Interim result: show preview but don't commit to inputRef
-                // (updateInput writes to inputRef, so we use setInput directly for previews)
-                const preview = (event.resultIndex === 0 ? baseText : base) + separator + interimTranscript;
-                setInput(preview);
-            }
+            // For both interim and final: always use updateInput so inputRef
+            // stays in sync — no dual-buffer inconsistency.
+            updateInput(current + separator + transcript);
         };
 
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -155,8 +148,6 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         recognition.onend = () => {
             setIsListening(false);
             recognitionRef.current = null;
-            // Sync inputRef with whatever is currently displayed
-            // (interim text may not have been committed)
         };
 
         try {
@@ -169,7 +160,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         }
     }, [isListening, getSpeechRecognition, updateInput]);
 
-    const isSpeechSupported = getSpeechRecognition() !== null;
+    const micErrorId = micError ? 'chat-mic-error' : undefined;
 
     return (
         <div className="relative">
@@ -210,6 +201,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                                     : 'Voice input not supported in this browser'
                         }
                         aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
+                        aria-describedby={micErrorId}
                     >
                         {isListening && (
                             <span className="absolute inset-0 rounded-[14px] bg-red-400 animate-ping opacity-30" />
@@ -234,7 +226,14 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 </div>
             </div>
             {micError && (
-                <p className="text-[11px] font-medium text-red-500 mt-2 text-center px-4 animate-in fade-in">{micError}</p>
+                <p
+                    id="chat-mic-error"
+                    role="status"
+                    aria-live="polite"
+                    className="text-[11px] font-medium text-red-500 mt-2 text-center px-4 animate-in fade-in"
+                >
+                    {micError}
+                </p>
             )}
         </div>
     );

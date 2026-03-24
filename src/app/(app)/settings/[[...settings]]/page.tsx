@@ -36,26 +36,6 @@ export default function SettingsPage() {
                 transition={{ delay: 0.1 }}
                 className="overflow-hidden rounded-[2rem] border border-white/20 bg-[linear-gradient(135deg,#1E3A8A_0%,rgba(255,255,255,0.15)_100%)] backdrop-blur-3xl motion-reduce:backdrop-blur-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_24px_64px_rgba(0,0,0,0.6)]"
             >
-                {/*
-                  Clerk appearance.variables sets colorText: '#FFFFFF', but some
-                  dynamically-rendered inner elements (e.g. profile page descriptions,
-                  account identifiers) still inherit dark text. These narrowly-scoped
-                  overrides fill the gaps the theme API can't reach.
-                */}
-                <style jsx global>{`
-                    .cl-profilePage .cl-headerTitle,
-                    .cl-profilePage .cl-headerSubtitle,
-                    .cl-profilePage .cl-profileSectionTitleText,
-                    .cl-profilePage .cl-profileSectionContent__profile p,
-                    .cl-profilePage .cl-userPreviewMainIdentifier,
-                    .cl-profilePage .cl-userPreviewSecondaryIdentifier,
-                    .cl-profilePage .cl-accordionTriggerButton {
-                        color: white !important;
-                    }
-                    .cl-navbar .cl-navbarButton {
-                        color: white !important;
-                    }
-                `}</style>
                 <UserProfile
                     appearance={{
                         ...nexxClerkAppearance,
@@ -84,7 +64,21 @@ export default function SettingsPage() {
                             },
                             pageScrollBox: {
                                 background: 'transparent',
-                            }
+                            },
+                            // Ensure profile page text elements are white
+                            // (replaces the removed global <style jsx> CSS override)
+                            profileSectionTitleText: {
+                                color: '#FFFFFF',
+                            },
+                            userPreviewMainIdentifier: {
+                                color: '#FFFFFF',
+                            },
+                            userPreviewSecondaryIdentifier: {
+                                color: 'rgba(255,255,255,0.7)',
+                            },
+                            accordionTriggerButton: {
+                                color: '#FFFFFF',
+                            },
                         },
                     }}
                 />

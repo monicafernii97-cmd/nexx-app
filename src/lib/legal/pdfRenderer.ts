@@ -10,6 +10,11 @@
 
 import type { CourtFormattingRules } from './types';
 
+/** Must match the installed @sparticuz/chromium-min version in package.json. */
+const SPARTICUZ_CHROMIUM_VERSION = '143.0.4';
+const DEFAULT_CHROMIUM_BINARY_URL =
+  `https://github.com/Sparticuz/chromium/releases/download/v${SPARTICUZ_CHROMIUM_VERSION}/chromium-v${SPARTICUZ_CHROMIUM_VERSION}-pack.x64.tar`;
+
 /**
  * Render HTML to a PDF buffer.
  *
@@ -36,10 +41,7 @@ export async function renderHTMLToPDF(
       browser = await puppeteerCore.default.launch({
         args: chromium.default.args,
         executablePath: await chromium.default.executablePath(
-          // Chromium binary URL must match @sparticuz/chromium-min version
-          // Official Sparticuz releases: https://github.com/Sparticuz/chromium/releases
-          process.env.CHROMIUM_BINARY_URL ||
-          'https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar'
+          process.env.CHROMIUM_BINARY_URL || DEFAULT_CHROMIUM_BINARY_URL
         ),
         headless: true,
       });

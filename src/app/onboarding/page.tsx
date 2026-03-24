@@ -60,7 +60,7 @@ export default function OnboardingPage() {
         if (currentUser.onboardingComplete) return; // returning user
         if (isValidPlan(currentUser.subscriptionTier)) return;
         // No valid DB tier — check sessionStorage for a freshly selected plan
-        if (!isValidPlan(getValidSelectedPlan(currentUser))) {
+        if (!getValidSelectedPlan(currentUser)) {
             router.replace('/#pricing');
         }
     }, [convexReady, convexLoading, currentUser, router]);

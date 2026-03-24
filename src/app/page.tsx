@@ -10,7 +10,7 @@ import { useEffect } from 'react';
 
 import { PLANS } from '@/lib/plans';
 import { COMING_SOON_FEATURES } from '@/lib/coming-soon';
-import { isValidPlan, getSessionPlan, VALID_PLAN_TIERS } from '@/lib/plan-validation';
+import { isValidPlan, getSessionPlan } from '@/lib/plan-validation';
 
 import { CaretDown } from '@phosphor-icons/react';
 

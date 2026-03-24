@@ -9,14 +9,18 @@ import { join, resolve, dirname } from 'path';
 let cachedCSS: string | null = null;
 export function getLegalCSS(): string {
     if (cachedCSS === null) {
-        const candidates = [
+        const candidates: string[] = [
             // Standard local dev path
             join(process.cwd(), 'src/lib/legal/legalDocStyles.css'),
-            // Vercel serverless: __dirname-relative
-            resolve(dirname(__filename), 'legalDocStyles.css'),
             // Vercel .next/server path
             join(process.cwd(), '.next/server/src/lib/legal/legalDocStyles.css'),
         ];
+
+        // __filename is only available in CommonJS; guard to prevent ESM ReferenceError
+        if (typeof __filename !== 'undefined') {
+            candidates.splice(1, 0, resolve(dirname(__filename), 'legalDocStyles.css'));
+        }
+
         let loaded = false;
         for (const candidate of candidates) {
             try {

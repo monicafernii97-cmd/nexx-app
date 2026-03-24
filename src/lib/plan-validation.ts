@@ -1,4 +1,4 @@
-import { PLANS } from './plans';
+import { PLANS, type PlanTier } from './plans';
 
 /** Pre-built set of valid plan tier strings, derived from the PLANS constant. */
 const VALID_PLAN_TIERS: Set<string> = new Set(PLANS.map((p) => p.tier));
@@ -7,7 +7,7 @@ const VALID_PLAN_TIERS: Set<string> = new Set(PLANS.map((p) => p.tier));
  * Check whether a plan string is a valid, recognised tier.
  * Safely handles null / undefined.
  */
-export function isValidPlan(plan?: string | null): plan is string {
+export function isValidPlan(plan?: string | null): plan is PlanTier {
     return !!plan && VALID_PLAN_TIERS.has(plan);
 }
 
@@ -30,8 +30,8 @@ export function getValidSelectedPlan(
 ): string | null {
     const storedPlan = getSessionPlan();
     const dbPlan = currentUser?.subscriptionTier ?? null;
-    if (storedPlan && VALID_PLAN_TIERS.has(storedPlan)) return storedPlan;
-    if (dbPlan && VALID_PLAN_TIERS.has(dbPlan)) return dbPlan;
+    if (isValidPlan(storedPlan)) return storedPlan;
+    if (isValidPlan(dbPlan)) return dbPlan;
     return null;
 }
 

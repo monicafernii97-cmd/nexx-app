@@ -36,9 +36,10 @@ export async function renderHTMLToPDF(
       browser = await puppeteerCore.default.launch({
         args: chromium.default.args,
         executablePath: await chromium.default.executablePath(
-          // Chromium binary URL must match @sparticuz/chromium-min version (v143.0.4)
+          // Chromium binary URL must match @sparticuz/chromium-min version
+          // Official Sparticuz releases: https://github.com/Sparticuz/chromium/releases
           process.env.CHROMIUM_BINARY_URL ||
-          'https://github.com/nicholasgasior/puppeteer-chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.tar'
+          'https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar'
         ),
         headless: true,
       });

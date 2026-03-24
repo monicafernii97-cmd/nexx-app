@@ -8,12 +8,11 @@ import { api } from '../../convex/_generated/api';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
-import { CaretDown } from '@phosphor-icons/react';
 import { PLANS } from '@/lib/plans';
 import { COMING_SOON_FEATURES } from '@/lib/coming-soon';
+import { isValidPlan, getSessionPlan, VALID_PLAN_TIERS } from '@/lib/plan-validation';
 
-/** Valid plan tier IDs, derived once from the PLANS constant. */
-const VALID_PLAN_TIERS: Set<string> = new Set(PLANS.map((p) => p.tier));
+import { CaretDown } from '@phosphor-icons/react';
 
 /**
  * Welcome / landing page and auth-aware router.
@@ -50,9 +49,8 @@ export default function WelcomePage() {
     if (currentUser === undefined) return false; // still loading
     if (currentUser === null) return true; // no Convex record — show the banner
     if (currentUser.onboardingComplete) return false; // returning user
-    if (currentUser.subscriptionTier && VALID_PLAN_TIERS.has(currentUser.subscriptionTier)) return false;
-    const plan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
-    return !plan || !VALID_PLAN_TIERS.has(plan); // no valid plan anywhere
+    if (isValidPlan(currentUser.subscriptionTier)) return false;
+    return !isValidPlan(getSessionPlan()); // no valid plan anywhere
   })();
 
   // Terminal state: Clerk is signed in but Convex auth failed to sync
@@ -82,9 +80,7 @@ export default function WelcomePage() {
     } else {
       // Only proceed if they have a plan (in sessionStorage or DB).
       const selectedPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
-      const hasPlan =
-        (currentUser.subscriptionTier && VALID_PLAN_TIERS.has(currentUser.subscriptionTier)) ||
-        (selectedPlan && VALID_PLAN_TIERS.has(selectedPlan));
+      const hasPlan = isValidPlan(currentUser.subscriptionTier) || isValidPlan(selectedPlan);
       if (hasPlan) {
         router.replace('/onboarding');
       } else {
@@ -412,17 +408,17 @@ export default function WelcomePage() {
                     NEXX is actively evolving. These strategic tools are currently in development for upcoming releases.
                   </p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full">
+                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full list-none m-0 p-0" aria-label="Upcoming features">
                   {COMING_SOON_FEATURES.map((feature) => (
-                    <div
+                    <li
                       key={feature}
                       className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] shadow-sm hover:bg-[rgba(255,255,255,0.05)] transition-colors"
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-[var(--champagne)] shadow-[0_0_8px_rgba(229,168,74,0.6)] shrink-0" />
                       <span className="text-[12px] text-[rgba(255,255,255,0.55)] leading-tight">{feature}</span>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             </motion.div>
           </div>

@@ -17,8 +17,8 @@ export interface PlanDefinition {
     popular: boolean;
 }
 
-/** The canonical set of plan tier identifiers. Add new tiers here. */
-export type PlanTier = 'free' | 'pro' | 'premium' | 'executive';
+// Re-export canonical tier type from tiers.ts to avoid duplicate definitions
+export { type SubscriptionTier as PlanTier } from './tiers';
 
 export const PLANS: PlanDefinition[] = [
     {

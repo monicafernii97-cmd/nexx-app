@@ -29,6 +29,10 @@ export const upsert = mutation({
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
         const now = Date.now();
+        const normalizedArgs = {
+            ...args,
+            childName: args.childName?.trim() || undefined,
+        };
 
         // Validate: custom title format requires non-empty custom text
         if (args.caseTitleFormat === 'custom' && (!args.caseTitleCustom || !args.caseTitleCustom.trim())) {
@@ -44,7 +48,7 @@ export const upsert = mutation({
         if (existing) {
             // Update existing — reset AI verification since settings changed
             await ctx.db.patch(existing._id, {
-                ...args,
+                ...normalizedArgs,
                 aiVerified: false,
                 aiVerifiedAt: undefined,
                 updatedAt: now,
@@ -55,7 +59,7 @@ export const upsert = mutation({
         // Create new
         return await ctx.db.insert('userCourtSettings', {
             userId: user._id,
-            ...args,
+            ...normalizedArgs,
             createdAt: now,
             updatedAt: now,
         });

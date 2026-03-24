@@ -16,7 +16,7 @@ import {
 } from '@phosphor-icons/react';
 import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
 import { COMING_SOON_FEATURES } from '@/lib/coming-soon';
-import { PLANS, type PlanTier } from '@/lib/plans';
+import { PLANS } from '@/lib/plans';
 
 /** Subscription management page — shows current plan and upgrade options. */
 export default function SubscriptionPage() {
@@ -33,9 +33,9 @@ export default function SubscriptionPage() {
         );
     }
 
-    const validTiers = new Set(PLANS.map((p) => p.tier));
+    const validTiers: Set<string> = new Set(PLANS.map((p) => p.tier));
     const rawTier = user?.subscriptionTier as string | undefined;
-    const currentTier: SubscriptionTier = rawTier && validTiers.has(rawTier as PlanTier)
+    const currentTier: SubscriptionTier = rawTier && validTiers.has(rawTier)
         ? (rawTier as SubscriptionTier)
         : 'free';
     const currentConfig = TIER_LIMITS[currentTier];
@@ -282,17 +282,17 @@ export default function SubscriptionPage() {
                                 NEXX is actively evolving. These strategic tools are currently in development for upcoming releases.
                             </p>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full">
+                        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full list-none m-0 p-0" aria-label="Upcoming features">
                             {COMING_SOON_FEATURES.map((feature) => (
-                                <div
+                                <li
                                     key={feature}
                                     className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05] shadow-sm hover:bg-white/[0.04] transition-colors"
                                 >
                                     <span className="w-1.5 h-1.5 rounded-full bg-[var(--champagne)] shadow-[0_0_8px_rgba(229,168,74,0.6)] shrink-0" />
                                     <span className="text-[12px] text-white/60 leading-tight">{feature}</span>
-                                </div>
+                                </li>
                             ))}
-                        </div>
+                        </ul>
                     </div>
                 </motion.div>
             </div>

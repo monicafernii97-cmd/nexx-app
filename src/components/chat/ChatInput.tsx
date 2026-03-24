@@ -19,6 +19,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
     const [micError, setMicError] = useState<string | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
+    const accumulatedTextRef = useRef('');
 
     // Auto-resize textarea
     useEffect(() => {
@@ -80,8 +81,8 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         recognition.lang = 'en-US';
         recognitionRef.current = recognition;
 
-        // Track the text that was in the input BEFORE we started recording
-        const baseText = input;
+        // Initialize accumulated text with current input value
+        accumulatedTextRef.current = input;
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
             let interimTranscript = '';
@@ -96,9 +97,15 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 }
             }
 
-            // Append transcribed text after the base text
-            const separator = baseText && !baseText.endsWith(' ') ? ' ' : '';
-            const newText = baseText + separator + (finalTranscript || interimTranscript);
+            // Append transcribed text after the accumulated base text
+            const base = accumulatedTextRef.current;
+            const separator = base && !base.endsWith(' ') ? ' ' : '';
+            const newText = base + separator + (finalTranscript || interimTranscript);
+            // Update accumulated ref when results are finalized so subsequent
+            // results append correctly and user typing isn't overwritten
+            if (finalTranscript) {
+                accumulatedTextRef.current = newText;
+            }
             setInput(newText);
         };
 
@@ -127,8 +134,9 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         } catch (err) {
             console.error('Failed to start speech recognition:', err);
             setMicError('Failed to start voice input. Please try again.');
+            recognitionRef.current = null;
         }
-    }, [isListening, input, getSpeechRecognition]);
+    }, [isListening, getSpeechRecognition]);
 
     const isSpeechSupported = getSpeechRecognition() !== null;
 

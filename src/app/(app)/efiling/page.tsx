@@ -603,13 +603,14 @@ export default function EFilingPage() {
                                 <div className="flex items-start gap-3 mb-4 bg-white/5 p-4 rounded-xl border border-[rgba(255,255,255,0.1)] shadow-sm">
                                     <Warning size={20} className="shrink-0 text-[#E5A84A]" weight="duotone" />
                                     <p className="font-medium text-sm text-[rgba(255,255,255,0.9)] leading-relaxed">
-                                        These are general estimates. Filing fees vary significantly by court and case type. <strong className="text-white">Always verify exact costs with your local court clerk.</strong>
+                                        These are broad nationwide estimates. Fees vary widely by state and county. <strong className="text-white">Always verify exact costs with your local court clerk before filing.</strong>
                                     </p>
                                 </div>
                                 <ul className="space-y-3 list-disc pl-5 text-white/90">
-                                    <li><span className="font-semibold text-white">Initial petition:</span> Est. $100–$150</li>
-                                    <li><span className="font-semibold text-white">Response/answer:</span> Est. $50–$100</li>
-                                    <li><span className="font-semibold text-white">Motions:</span> Est. $15–$50 each</li>
+                                    <li><span className="font-semibold text-white">Initial petition/new suit:</span> Est. $200–$400</li>
+                                    <li><span className="font-semibold text-white">Response/answer:</span> Est. $0–$100</li>
+                                    <li><span className="font-semibold text-white">Motions (modification, etc.):</span> Est. $30–$100</li>
+                                    <li><span className="font-semibold text-white">Service of process:</span> Est. $50–$150</li>
                                 </ul>
                                 <div className="mt-5 p-3 rounded-lg bg-[rgba(16,185,129,0.1)] border border-[rgba(16,185,129,0.2)] flex items-center gap-2">
                                     <Info size={18} className="text-[#10B981] shrink-0" weight="bold" />

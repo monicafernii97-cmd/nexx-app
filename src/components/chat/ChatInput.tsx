@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { PaperPlaneRight, Microphone, MicrophoneSlash } from '@phosphor-icons/react';
 
 /** Augmented window type for vendor-prefixed SpeechRecognition. */
@@ -185,7 +185,8 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         }
     }, [isListening, getSpeechRecognition, updateInput]);
 
-    const micErrorId = micError ? 'chat-mic-error' : undefined;
+    const baseId = useId();
+    const micErrorId = micError ? `${baseId}-mic-error` : undefined;
 
     return (
         <div className="relative">
@@ -215,6 +216,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 />
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <button
+                        type="button"
                         onClick={toggleListening}
                         className={`w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer relative ${
                             isListening
@@ -249,8 +251,10 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                         )}
                     </button>
                     <button
+                        type="button"
                         onClick={handleSend}
                         disabled={!input.trim() || disabled}
+                        aria-label="Send message"
                         className={`w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-300 shadow-sm ${
                             input.trim() && !disabled
                                 ? 'bg-[linear-gradient(135deg,#60A5FA,#2563EB)] text-white hover:scale-105 hover:shadow-lg cursor-pointer'
@@ -263,7 +267,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
             </div>
             {micError && (
                 <p
-                    id="chat-mic-error"
+                    id={micErrorId}
                     role="status"
                     aria-live="polite"
                     className="text-[11px] font-medium text-red-500 mt-2 text-center px-4 animate-in fade-in"

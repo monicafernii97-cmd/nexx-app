@@ -3,6 +3,10 @@
  * the subscription/onboarding pages to keep pricing and features in sync.
  */
 
+import { type SubscriptionTier } from './tiers';
+
+/** Alias for SubscriptionTier — single source of truth lives in tiers.ts */
+export type PlanTier = SubscriptionTier;
 export interface PlanDefinition {
     name: string;
     tier: PlanTier;
@@ -16,9 +20,6 @@ export interface PlanDefinition {
     borderAccent: string;
     popular: boolean;
 }
-
-// Re-export canonical tier type from tiers.ts to avoid duplicate definitions
-export { type SubscriptionTier as PlanTier } from './tiers';
 
 export const PLANS: PlanDefinition[] = [
     {

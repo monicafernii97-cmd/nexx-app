@@ -22,8 +22,11 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     // Single source of truth for the current input value, readable from callbacks
-    // without stale closures. Always kept in sync via updateInput().
     const inputRef = useRef('');
+    // Text that existed before the current dictation session started
+    const prefixRef = useRef('');
+    // Accumulated dictated text for the current session (rebuilt on each onresult)
+    const dictatedRef = useRef('');
 
     /** Update both React state and the mutable ref in one call. */
     const updateInput = useCallback((value: string) => {
@@ -55,17 +58,20 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
     useEffect(() => {
         return () => {
             if (recognitionRef.current) {
-                recognitionRef.current.abort();
+                const instance = recognitionRef.current;
                 recognitionRef.current = null;
+                instance.abort();
             }
         };
     }, []);
 
-    /** Stop any active recognition session and reset the ref. */
+    /** Stop any active recognition session. Null ref BEFORE calling abort
+     *  to prevent the async onend/onerror callback from clearing a new session. */
     const stopRecognition = useCallback(() => {
         if (recognitionRef.current) {
-            recognitionRef.current.abort();
+            const active = recognitionRef.current;
             recognitionRef.current = null;
+            active.abort();
         }
         setIsListening(false);
     }, []);
@@ -77,10 +83,13 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         stopRecognition();
         onSend(text);
         updateInput('');
+        prefixRef.current = '';
+        dictatedRef.current = '';
     }, [disabled, onSend, stopRecognition, updateInput]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        // Don't send during IME composition (Japanese/Chinese/Korean input)
+        if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             handleSend();
         }
@@ -89,9 +98,11 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
     const toggleListening = useCallback(() => {
         setMicError(null);
 
-        // Stop if currently listening
+        // Stop if currently listening — null ref before stop()
         if (isListening && recognitionRef.current) {
-            recognitionRef.current.stop();
+            const active = recognitionRef.current;
+            recognitionRef.current = null;
+            active.stop();
             setIsListening(false);
             return;
         }
@@ -108,30 +119,42 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         recognition.lang = 'en-US';
         recognitionRef.current = recognition;
 
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
-            let interimTranscript = '';
-            let finalTranscript = '';
+        // Snapshot whatever the user typed before dictation as the prefix
+        prefixRef.current = inputRef.current;
+        dictatedRef.current = '';
 
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const transcript = event.results[i][0].transcript;
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+            // Guard: if a new session started, ignore stale events from this instance
+            if (recognitionRef.current !== recognition) return;
+
+            // Rebuild the FULL dictated text from the results array on every event.
+            // This avoids duplication: the API re-sends all results each time, so
+            // we reconstruct rather than append.
+            let fullFinal = '';
+            let currentInterim = '';
+
+            for (let i = 0; i < event.results.length; i++) {
                 if (event.results[i].isFinal) {
-                    finalTranscript += transcript;
+                    fullFinal += event.results[i][0].transcript;
                 } else {
-                    interimTranscript += transcript;
+                    currentInterim += event.results[i][0].transcript;
                 }
             }
 
-            // Always read the latest value from inputRef (single source of truth)
-            const current = inputRef.current;
-            const separator = current.length > 0 && !current.endsWith(' ') ? ' ' : '';
-            const transcript = finalTranscript || interimTranscript;
+            // dictatedRef = all finalized text so far
+            dictatedRef.current = fullFinal;
 
-            // For both interim and final: always use updateInput so inputRef
-            // stays in sync — no dual-buffer inconsistency.
-            updateInput(current + separator + transcript);
+            // Compose: prefix + separator + finalized dictation + interim preview
+            const prefix = prefixRef.current;
+            const separator = prefix.length > 0 && !prefix.endsWith(' ') ? ' ' : '';
+            const composed = prefix + separator + fullFinal + currentInterim;
+            updateInput(composed);
         };
 
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+            // Guard: ignore events from a replaced session
+            if (recognitionRef.current !== recognition) return;
+
             console.error('Speech recognition error:', event.error);
             setIsListening(false);
             recognitionRef.current = null;
@@ -146,6 +169,8 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         };
 
         recognition.onend = () => {
+            // Guard: ignore events from a replaced session
+            if (recognitionRef.current !== recognition) return;
             setIsListening(false);
             recognitionRef.current = null;
         };

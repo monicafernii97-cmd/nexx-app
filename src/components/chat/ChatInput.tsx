@@ -98,11 +98,11 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
     const toggleListening = useCallback(() => {
         setMicError(null);
 
-        // Stop if currently listening — null ref before stop()
+        // Stop if currently listening — stop() is graceful and lets pending
+        // onresult fire with final transcript before onend clears the ref.
+        // (Only abort() is immediate and needs null-before-call.)
         if (isListening && recognitionRef.current) {
-            const active = recognitionRef.current;
-            recognitionRef.current = null;
-            active.stop();
+            recognitionRef.current.stop();
             setIsListening(false);
             return;
         }
@@ -197,7 +197,12 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 <textarea
                     ref={textareaRef}
                     value={input}
-                    onChange={(e) => updateInput(e.target.value)}
+                    onChange={(e) => {
+                        // If user types while dictation is active, stop the session
+                        // to prevent prefixRef from going stale and overwriting edits.
+                        if (isListening) stopRecognition();
+                        updateInput(e.target.value);
+                    }}
                     onKeyDown={handleKeyDown}
                     placeholder={isListening ? 'Listening...' : (placeholder ?? 'Consult NEXX Intelligence...')}
                     rows={1}
@@ -225,7 +230,13 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                                     ? 'Start voice input'
                                     : 'Voice input not supported in this browser'
                         }
-                        aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
+                        aria-label={
+                            isListening
+                                ? 'Stop voice input'
+                                : isSpeechSupported
+                                    ? 'Start voice input'
+                                    : 'Voice input not supported in this browser'
+                        }
                         aria-describedby={micErrorId}
                     >
                         {isListening && (

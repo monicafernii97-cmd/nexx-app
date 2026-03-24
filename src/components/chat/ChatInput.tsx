@@ -19,7 +19,15 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
     const [micError, setMicError] = useState<string | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
-    const accumulatedTextRef = useRef('');
+    // Tracks the current input value for the speech recognition callback,
+    // avoiding stale closures from useCallback memoization.
+    const inputRef = useRef('');
+
+    // Keep inputRef in sync with every input change
+    const updateInput = useCallback((value: string) => {
+        inputRef.current = value;
+        setInput(value);
+    }, []);
 
     // Auto-resize textarea
     useEffect(() => {
@@ -39,18 +47,30 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         };
     }, []);
 
-    const handleSend = () => {
-        if (!input.trim() || disabled) return;
-        onSend(input.trim());
-        setInput('');
-    };
+    /** Stop any active recognition session and reset the ref. */
+    const stopRecognition = useCallback(() => {
+        if (recognitionRef.current) {
+            recognitionRef.current.abort();
+            recognitionRef.current = null;
+        }
+        setIsListening(false);
+    }, []);
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
+    const handleSend = useCallback(() => {
+        const text = inputRef.current.trim();
+        if (!text || disabled) return;
+        // Stop mic before sending to prevent onresult from repopulating the field
+        stopRecognition();
+        onSend(text);
+        updateInput('');
+    }, [disabled, onSend, stopRecognition, updateInput]);
+
+    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSend();
         }
-    };
+    }, [handleSend]);
 
     const getSpeechRecognition = useCallback((): SpeechRecognitionCtor | null => {
         if (typeof window === 'undefined') return null;
@@ -81,8 +101,9 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         recognition.lang = 'en-US';
         recognitionRef.current = recognition;
 
-        // Initialize accumulated text with current input value
-        accumulatedTextRef.current = input;
+        // Snapshot the current input as the base for dictation appending.
+        // inputRef is always current, so no stale closure issue.
+        const baseText = inputRef.current;
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
             let interimTranscript = '';
@@ -97,16 +118,24 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 }
             }
 
-            // Append transcribed text after the accumulated base text
-            const base = accumulatedTextRef.current;
-            const separator = base && !base.endsWith(' ') ? ' ' : '';
-            const newText = base + separator + (finalTranscript || interimTranscript);
-            // Update accumulated ref when results are finalized so subsequent
-            // results append correctly and user typing isn't overwritten
+            // Read the latest accumulated base from the ref
+            const base = inputRef.current;
+            // Only add a separator if speaking over existing text without a trailing space
+            const needsSep = base.length > 0
+                && !base.endsWith(' ')
+                && event.resultIndex === 0;
+            const separator = needsSep ? ' ' : '';
+
             if (finalTranscript) {
-                accumulatedTextRef.current = newText;
+                // Final result: append to real accumulated text
+                const newText = (event.resultIndex === 0 ? baseText : base) + separator + finalTranscript;
+                updateInput(newText);
+            } else {
+                // Interim result: show preview but don't commit to inputRef
+                // (updateInput writes to inputRef, so we use setInput directly for previews)
+                const preview = (event.resultIndex === 0 ? baseText : base) + separator + interimTranscript;
+                setInput(preview);
             }
-            setInput(newText);
         };
 
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -126,6 +155,8 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         recognition.onend = () => {
             setIsListening(false);
             recognitionRef.current = null;
+            // Sync inputRef with whatever is currently displayed
+            // (interim text may not have been committed)
         };
 
         try {
@@ -136,7 +167,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
             setMicError('Failed to start voice input. Please try again.');
             recognitionRef.current = null;
         }
-    }, [isListening, getSpeechRecognition]);
+    }, [isListening, getSpeechRecognition, updateInput]);
 
     const isSpeechSupported = getSpeechRecognition() !== null;
 
@@ -150,7 +181,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 <textarea
                     ref={textareaRef}
                     value={input}
-                    onChange={(e) => setInput(e.target.value)}
+                    onChange={(e) => updateInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={isListening ? 'Listening...' : (placeholder ?? 'Consult NEXX Intelligence...')}
                     rows={1}
@@ -164,13 +195,12 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                         onClick={toggleListening}
-                        disabled={!isSpeechSupported && !isListening}
                         className={`w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer relative ${
                             isListening
                                 ? 'bg-red-500 text-white shadow-md'
                                 : isSpeechSupported
                                     ? 'bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#0A1128]/50 hover:text-[#0A1128]'
-                                    : 'bg-[#F1F5F9] text-[#0A1128]/20 cursor-not-allowed'
+                                    : 'bg-[#F1F5F9] text-[#0A1128]/20'
                         }`}
                         title={
                             isListening
@@ -209,4 +239,3 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         </div>
     );
 }
-

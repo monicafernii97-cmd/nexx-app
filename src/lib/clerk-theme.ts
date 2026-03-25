@@ -8,8 +8,8 @@ export const nexxClerkAppearance = {
         colorBackground: 'transparent',   /* enforce true transparency for parent glass wrappers */
         colorInputBackground: 'rgba(255, 255, 255, 0.05)', /* true glass inputs */
         colorInputText: '#FFFFFF',        /* pure-white */
-        colorText: '#FFFFFF',             /* pure-white for high legibility */
-        colorTextSecondary: '#FFFFFF',    /* GUARANTEE pure white */
+        colorForeground: '#FFFFFF',       /* primary text — pure-white for high legibility */
+        colorMutedForeground: 'rgba(255, 255, 255, 0.75)', /* secondary text */
         borderRadius: '16px',
         fontFamily: 'Inter, system-ui, sans-serif', /* robust sans-serif instead of skinny */
         colorSuccess: '#10B981',
@@ -156,5 +156,43 @@ export const nexxClerkAppearance = {
         userButtonPopoverFooter: {
             background: 'rgba(255,255,255,0.05)',
         },
+    },
+} as const;
+
+/**
+ * Settings-page-specific Clerk appearance.
+ * Extends nexxClerkAppearance with transparent backgrounds and extra element
+ * overrides needed for the embedded UserProfile on a glassmorphic container.
+ * This is the single source of truth for all settings page theming.
+ */
+export const settingsClerkAppearance = {
+    ...nexxClerkAppearance,
+    elements: {
+        ...nexxClerkAppearance.elements,
+        rootBox: { width: '100%' },
+        cardBox: { width: '100%', boxShadow: 'none', background: 'transparent' },
+        card: { ...nexxClerkAppearance.elements.card, background: 'transparent' },
+        scrollBox: { background: 'transparent' },
+        navbar: {
+            borderRight: '1px solid rgba(255,255,255,0.1)',
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.05))',
+        },
+        // Extra elements that the shared theme doesn't need (UserProfile-specific)
+        page: { color: '#FFFFFF' },
+        pageHeader: { color: '#FFFFFF' },
+        profileSection: { color: '#FFFFFF' },
+        profileSectionSubtitle: { color: 'rgba(255,255,255,0.75)' },
+        userPreview: { color: '#FFFFFF' },
+        userPreviewTextContainer: { color: '#FFFFFF' },
+        accordionContent: { color: '#FFFFFF' },
+        tagPillContainer: { color: '#FFFFFF', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)' },
+        menuItem: { color: '#FFFFFF' },
+        menuList: { background: 'rgba(10,17,40,0.95)', border: '1px solid rgba(255,255,255,0.15)' },
+        footerActionText: { color: 'rgba(255,255,255,0.6)' },
+        tableHead: { color: 'rgba(255,255,255,0.6)' },
+        formFieldSuccessText: { color: '#10B981' },
+        formFieldErrorText: { color: '#F43F5E' },
+        formButtonReset: { color: '#60A5FA' },
+        alertText: { color: '#FFFFFF' },
     },
 } as const;

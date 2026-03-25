@@ -1,4 +1,9 @@
 import { dark } from '@clerk/themes';
+import type { UserProfile } from '@clerk/nextjs';
+import type { ComponentProps } from 'react';
+
+/** Appearance type derived from Clerk's UserProfile component props. */
+type Appearance = NonNullable<ComponentProps<typeof UserProfile>['appearance']>;
 
 /** NEXX-branded Clerk theme configuration with Galaxy luxury dark mode styling. */
 export const nexxClerkAppearance = {
@@ -157,7 +162,7 @@ export const nexxClerkAppearance = {
             background: 'rgba(255,255,255,0.05)',
         },
     },
-} as const;
+} as const satisfies Appearance;
 
 /**
  * Settings-page-specific Clerk appearance.
@@ -195,4 +200,4 @@ export const settingsClerkAppearance = {
         formButtonReset: { color: '#60A5FA' },
         alertText: { color: '#FFFFFF' },
     },
-} as const;
+} as const satisfies Appearance;

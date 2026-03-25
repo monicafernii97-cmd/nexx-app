@@ -185,6 +185,10 @@ export async function GET() {
     } catch (error) {
         console.error('[Timeline PDF Export Error]', error);
         const message = error instanceof Error ? error.message : 'Unknown error';
-        return new NextResponse(`Error generating PDF: ${message}`, { status: 500 });
+        const publicMessage =
+            process.env.NODE_ENV === 'development'
+                ? `Error generating PDF: ${message}`
+                : 'Error generating PDF';
+        return new NextResponse(publicMessage, { status: 500 });
     }
 }

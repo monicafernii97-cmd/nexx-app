@@ -128,6 +128,7 @@ export async function GET(
         });
     } catch (error) {
         console.error('[Incident PDF Generation Error]', error);
-        return new NextResponse('Error generating PDF', { status: 500 });
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return new NextResponse(`Error generating PDF: ${message}`, { status: 500 });
     }
 }

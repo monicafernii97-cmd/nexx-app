@@ -7,6 +7,13 @@ const nextConfig: NextConfig = {
     'puppeteer-core',
     '@sparticuz/chromium-min',
   ],
+  // Ensure non-imported files (read via fs.readFileSync at runtime)
+  // are included in the serverless function bundle for PDF generation.
+  outputFileTracingIncludes: {
+    '/api/incidents/\\[id\\]/pdf': ['./src/lib/legal/legalDocStyles.css'],
+    '/api/incidents/export': ['./src/lib/legal/legalDocStyles.css'],
+    '/api/documents/generate': ['./src/lib/legal/legalDocStyles.css'],
+  },
 };
 
 export default nextConfig;

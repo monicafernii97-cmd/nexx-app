@@ -1,7 +1,7 @@
 'use client';
 
 import { UserProfile } from '@clerk/nextjs';
-import { nexxClerkAppearance } from '@/lib/clerk-theme';
+import { settingsClerkAppearance } from '@/lib/clerk-theme';
 import { Gear } from '@phosphor-icons/react';
 import { motion } from 'framer-motion';
 
@@ -36,53 +36,9 @@ export default function SettingsPage() {
                 transition={{ delay: 0.1 }}
                 className="overflow-hidden rounded-[2rem] border border-white/20 bg-[linear-gradient(135deg,#1E3A8A_0%,rgba(255,255,255,0.15)_100%)] backdrop-blur-3xl motion-reduce:backdrop-blur-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_24px_64px_rgba(0,0,0,0.6)]"
             >
-                <UserProfile
-                    appearance={{
-                        ...nexxClerkAppearance,
-                        elements: {
-                            ...nexxClerkAppearance.elements,
-                            rootBox: {
-                                width: '100%',
-                            },
-                            cardBox: {
-                                width: '100%',
-                                boxShadow: 'none',
-                                background: 'transparent',
-                            },
-                            navbar: {
-                                borderRight: '1px solid rgba(255,255,255,0.1)',
-                                background: 'linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.05))',
-                            },
-                            navbarButton: {
-                                color: 'rgba(255,255,255,0.8)',
-                            },
-                            navbarButtonIcon: {
-                                color: 'rgba(255,255,255,0.8)',
-                            },
-                            scrollBox: {
-                                background: 'transparent',
-                            },
-                            pageScrollBox: {
-                                background: 'transparent',
-                            },
-                            // Ensure profile page text elements are white
-                            // (replaces the removed global <style jsx> CSS override)
-                            profileSectionTitleText: {
-                                color: '#FFFFFF',
-                            },
-                            userPreviewMainIdentifier: {
-                                color: '#FFFFFF',
-                            },
-                            userPreviewSecondaryIdentifier: {
-                                color: 'rgba(255,255,255,0.7)',
-                            },
-                            accordionTriggerButton: {
-                                color: '#FFFFFF',
-                            },
-                        },
-                    }}
-                />
+                <UserProfile appearance={settingsClerkAppearance} />
             </motion.div>
         </div>
     );
 }
+

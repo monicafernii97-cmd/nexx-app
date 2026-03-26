@@ -41,7 +41,11 @@ export default function SignInPage() {
                         Your Sanctuary Awaits
                     </p>
                 </div>
-                <SignIn appearance={nexxClerkAppearance} forceRedirectUrl="/" />
+                <SignIn
+                    appearance={nexxClerkAppearance}
+                    forceRedirectUrl="/"
+                    signUpForceRedirectUrl="/onboarding"
+                />
             </div>
         </div>
     );

@@ -48,7 +48,11 @@ export default function SignUpPage() {
                         Begin Your Journey
                     </p>
                 </div>
-                <SignUp appearance={nexxClerkAppearance} forceRedirectUrl={redirectUrl} />
+                <SignUp
+                    appearance={nexxClerkAppearance}
+                    forceRedirectUrl={redirectUrl}
+                    signInForceRedirectUrl={redirectUrl}
+                />
             </div>
         </div>
     );

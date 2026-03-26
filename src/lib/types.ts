@@ -11,8 +11,12 @@ export interface UserContext {
     nexBehaviors?: string[];
     tonePreference?: string;
     emotionalState?: string;
+    /** @deprecated Use children[] instead */
     childrenNames?: string[];
+    /** @deprecated Use children[] instead */
     childrenAges?: number[];
+    /** Consolidated children info */
+    children?: { name: string; age: number }[];
     courtCaseNumber?: string;
     hasAttorney?: boolean;
     hasTherapist?: boolean;

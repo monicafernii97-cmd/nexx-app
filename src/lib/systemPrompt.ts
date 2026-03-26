@@ -163,38 +163,36 @@ export function buildSystemPrompt(context?: BuildSystemPromptContext): string {
         }
 
         // ── Children Context ──
+        // Prefer new children[] objects; fall back to legacy parallel arrays.
         // In default mode, use initials only to minimize PII exposure.
         // Full names are passed only in explicit drafting flows.
-        if (context.childrenNames && context.childrenNames.length > 0) {
-            const ages = (context.childrenAges?.slice(0, 10) ?? [])
-                .map(age => (Number.isFinite(age) && age >= 0 && age <= 25 ? age : undefined));
+        const childList = context.children
+            ?? (context.childrenNames
+                ? context.childrenNames.map((n, i) => ({
+                    name: n,
+                    age: context.childrenAges?.[i] ?? 0,
+                }))
+                : undefined);
+
+        if (childList && childList.length > 0) {
+            const validChildren = childList.slice(0, 10).map(c => ({
+                name: sanitizeForPrompt(c.name, 50),
+                age: Number.isFinite(c.age) && c.age >= 0 && c.age <= 25 ? c.age : undefined,
+            }));
 
             if (context.isDraftingMode) {
                 // Drafting mode — include full names for court documents
-                const names = context.childrenNames
-                    .slice(0, 10)
-                    .map((n) => sanitizeForPrompt(n, 50));
-                const childInfo = names.map((name, i) =>
-                    ages[i] !== undefined ? `${name} (age ${ages[i]})` : name
+                const childInfo = validChildren.map(c =>
+                    c.age !== undefined ? `${c.name} (age ${c.age})` : c.name
                 );
                 parts.push(`Their children: ${childInfo.join(', ')}. Use the children's names when drafting documents.`);
             } else {
                 // Default mode — initials only
-                const initials = context.childrenNames
-                    .slice(0, 10)
-                    .map((n) => sanitizeForPrompt(n, 50))
-                    .map((n) => n.charAt(0).toUpperCase() + '.');
-                const childInfo = initials.map((initial, i) =>
-                    ages[i] !== undefined ? `${initial} (age ${ages[i]})` : initial
-                );
+                const childInfo = validChildren.map(c => {
+                    const initial = c.name.charAt(0).toUpperCase() + '.';
+                    return c.age !== undefined ? `${initial} (age ${c.age})` : initial;
+                });
                 parts.push(`Their children (initials): ${childInfo.join(', ')}. Refer to children generically unless the user uses their names first.`);
-            }
-        } else if (context.childrenAges && context.childrenAges.length > 0) {
-            const validAges = context.childrenAges
-                .slice(0, 10)
-                .filter(age => Number.isFinite(age) && age >= 0 && age <= 25);
-            if (validAges.length > 0) {
-                parts.push(`They have ${validAges.length} child(ren), ages: ${validAges.join(', ')}.`);
             }
         }
 

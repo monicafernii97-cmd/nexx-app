@@ -34,7 +34,9 @@ const CASE_TITLE_OPTIONS: { value: CaseTitleFormat; label: string; example: stri
 export default function CourtSettingsPage() {
     const existingSettings = useQuery(api.courtSettings.get);
     const nexProfile = useQuery(api.nexProfiles.getByUser);
+    const currentUser = useQuery(api.users.me);
     const upsertSettings = useMutation(api.courtSettings.upsert);
+    const updateProfile = useMutation(api.users.updateProfile);
 
     // Form state
     const [state, setState] = useState('');
@@ -46,7 +48,10 @@ export default function CourtSettingsPage() {
     const [caseTitleFormat, setCaseTitleFormat] = useState<CaseTitleFormat>('');
     const [caseTitleCustom, setCaseTitleCustom] = useState('');
     const [respondentLegalName, setRespondentLegalName] = useState('');
-    const [childName, setChildName] = useState('');
+    const [petitionerLegalName, setPetitionerLegalName] = useState('');
+    const [petitionerRole, setPetitionerRole] = useState<'' | 'petitioner' | 'respondent'>('');
+    const [childrenCount, setChildrenCount] = useState(0);
+    const [children, setChildren] = useState<{ name: string; age: string }[]>([]);
 
     // UI state
     const [countyQuery, setCountyQuery] = useState('');
@@ -75,6 +80,8 @@ export default function CourtSettingsPage() {
         if (initializedRef.current) return;
         // existingSettings is undefined while loading, null if no record exists
         if (existingSettings === undefined) return;
+        // Wait for currentUser to resolve before attempting autofill
+        if (existingSettings === null && currentUser === undefined) return;
 
         if (existingSettings) {
             setState(existingSettings.state || '');
@@ -86,10 +93,37 @@ export default function CourtSettingsPage() {
             setCaseTitleFormat((existingSettings.caseTitleFormat as CaseTitleFormat) || '');
             setCaseTitleCustom(existingSettings.caseTitleCustom || '');
             setRespondentLegalName(existingSettings.respondentLegalName || '');
-            setChildName(existingSettings.childName || '');
+            setPetitionerLegalName(existingSettings.petitionerLegalName || '');
+            setPetitionerRole((existingSettings.petitionerRole as '' | 'petitioner' | 'respondent') || '');
+            const existingChildren = existingSettings.children
+                ?? (existingSettings.childrenNames
+                    ? existingSettings.childrenNames.map((n: string, i: number) => ({
+                        name: n,
+                        age: existingSettings.childrenAges?.[i] ?? 0,
+                    }))
+                    : []);
+            const count = existingChildren.length || existingSettings.childrenCount || 0;
+            setChildrenCount(count);
+            setChildren(existingChildren.length > 0
+                ? existingChildren.map((c: Record<string, unknown>) => ({ name: String(c.name ?? ''), age: String(c.age ?? '') }))
+                : Array.from({ length: count }, () => ({ name: '', age: '' })));
+            initializedRef.current = true;
+        } else if (currentUser) {
+            // No court settings yet but user profile has children data — autofill
+            const userChildren = currentUser.children
+                ?? (currentUser.childrenNames
+                    ? currentUser.childrenNames.map((n: string, i: number) => ({
+                        name: n,
+                        age: currentUser.childrenAges?.[i] ?? 0,
+                    }))
+                    : []);
+            if (userChildren.length > 0) {
+                setChildrenCount(userChildren.length);
+                setChildren(userChildren.map((c: { name: string; age: number }) => ({ name: c.name, age: String(c.age) })));
+            }
+            initializedRef.current = true;
         }
-        initializedRef.current = true;
-    }, [existingSettings]);
+    }, [existingSettings, currentUser]);
 
     // Auto-populate opposing party name from NEX profile if not already set
     // nexProfile.legalName is the NEX (opposing party), not the current user
@@ -145,10 +179,29 @@ export default function CourtSettingsPage() {
                 caseTitleFormat: caseTitleFormat || undefined,
                 caseTitleCustom: caseTitleCustom || undefined,
                 respondentLegalName: respondentLegalName || undefined,
-                childName: childName || undefined,
+                petitionerLegalName: petitionerLegalName || undefined,
+                petitionerRole: petitionerRole || undefined,
+                children: children.length > 0
+                    ? children.map(c => ({ name: c.name, age: parseInt(c.age) || 0 }))
+                    : undefined,
             });
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
+
+            // Bidirectional sync: push children data back to users table
+            if (currentUser && children.length > 0) {
+                try {
+                    await updateProfile({
+                        id: currentUser._id,
+                        children: children.map(c => ({ name: c.name, age: parseInt(c.age) || 0 })),
+                        childrenCount: children.length,
+                        childrenNames: children.map(c => c.name),
+                        childrenAges: children.map(c => parseInt(c.age) || 0),
+                    });
+                } catch (e) {
+                    console.warn('[CourtSettings] User profile children sync failed (non-blocking):', e);
+                }
+            }
 
             // Fire-and-forget: refresh the Resources Hub for the new location.
             // The API route's upsert handles overwriting any existing cache.
@@ -169,7 +222,7 @@ export default function CourtSettingsPage() {
         } finally {
             setSaving(false);
         }
-    }, [state, county, courtName, causeNumber, assignedJudge, judicialDistrict, caseTitleFormat, caseTitleCustom, respondentLegalName, childName, upsertSettings]);
+    }, [state, county, courtName, causeNumber, assignedJudge, judicialDistrict, caseTitleFormat, caseTitleCustom, respondentLegalName, petitionerLegalName, petitionerRole, children, upsertSettings, currentUser, updateProfile]);
 
     // AI Verify handler
     const handleVerify = useCallback(async () => {
@@ -457,6 +510,50 @@ export default function CourtSettingsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
                     <div>
+                        <label htmlFor="petitioner-name-input" className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
+                            Your Legal Name
+                        </label>
+                        <div className="relative">
+                            <User
+                                size={16}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sapphire-light)]"
+                                weight="bold"
+                            />
+                            <input
+                                type="text"
+                                value={petitionerLegalName}
+                                onChange={(e) => setPetitionerLegalName(e.target.value)}
+                                placeholder="Your full legal name as it appears on court docs"
+                                className="input-premium w-full !pl-10 pr-4 text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
+                                id="petitioner-name-input"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
+                            Your Role in Case
+                        </label>
+                        <div className="flex gap-2">
+                            {(['petitioner', 'respondent'] as const).map((role) => (
+                                <button
+                                    key={role}
+                                    type="button"
+                                    onClick={() => setPetitionerRole(role)}
+                                    className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
+                                        petitionerRole === role
+                                            ? 'bg-[var(--champagne)]/15 border-[var(--champagne)]/40 text-[var(--sapphire-dark)] shadow-sm'
+                                            : 'bg-white/50 border-[var(--cloud)] text-[var(--sapphire-light)] hover:border-[var(--sapphire-light)]'
+                                    }`}
+                                >
+                                    {role === 'petitioner' ? '✦ Petitioner' : '✦ Respondent'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+                    <div>
                         <label htmlFor="respondent-name-input" className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
                             Opposing Party Legal Name
                         </label>
@@ -487,38 +584,88 @@ export default function CourtSettingsPage() {
                     </div>
                     <div>
                         <label className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
-                            Your Role
+                            Opposing Party Role
                         </label>
                         <div className="text-sm text-[var(--sapphire-dark)] p-3 rounded-xl bg-white/60 border border-[var(--cloud)]">
-                            {nexProfile?.partyRole === 'respondent'
-                                ? '✦ You are the Respondent'
-                                : nexProfile?.partyRole === 'petitioner'
-                                    ? '✦ You are the Petitioner (opposing party is Respondent)'
-                                    : '⚠ Set party roles in NEX Profile'
+                            {petitionerRole === 'petitioner'
+                                ? '✦ Respondent'
+                                : petitionerRole === 'respondent'
+                                    ? '✦ Petitioner'
+                                    : '⚠ Select your role above'
                             }
-                        </div>
-                    </div>
                 </div>
+            </div>
+        </div>
 
                 <div className="mb-6">
-                    <label htmlFor="child-name-input" className="block text-xs font-semibold mb-2 text-[var(--sapphire-base)] uppercase tracking-wide">
-                        Subject Child Name <span className="text-[var(--sapphire-light)] font-normal text-[10px] ml-1">(Optional, for IN THE INTEREST OF)</span>
+                    <label className="block text-xs font-semibold mb-3 text-[var(--sapphire-base)] uppercase tracking-wide">
+                        Children Involved
                     </label>
-                    <div className="relative">
-                        <User
-                            size={16}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sapphire-light)]"
-                            weight="bold"
-                        />
+                    <div className="flex items-center gap-3 mb-4">
+                        <label htmlFor="children-count-input" className="text-sm text-[var(--sapphire-base)]">
+                            How many children?
+                        </label>
                         <input
-                            type="text"
-                            value={childName}
-                            onChange={(e) => setChildName(e.target.value)}
-                            placeholder="Full child name(s)"
-                            className="input-premium w-full !pl-10 pr-4 text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
-                            id="child-name-input"
+                            type="number"
+                            min={0}
+                            max={12}
+                            value={childrenCount || ''}
+                            onChange={(e) => {
+                                const count = Math.max(0, Math.min(12, parseInt(e.target.value) || 0));
+                                setChildrenCount(count);
+                                // Grow or shrink the children array
+                                setChildren(prev => {
+                                    if (count > prev.length) return [...prev, ...Array.from({ length: count - prev.length }, () => ({ name: '', age: '' }))];
+                                    return prev.slice(0, count);
+                                });
+                            }}
+                            className="input-premium w-20 text-sm text-center bg-white/80 focus:bg-white text-[var(--sapphire-dark)]"
+                            id="children-count-input"
                         />
                     </div>
+                    {childrenCount > 0 && (
+                        <div className="space-y-3">
+                            {children.map((child, i) => (
+                                <div key={i} className="grid grid-cols-[1fr_80px] gap-3 items-end">
+                                    <div>
+                                        <label htmlFor={`child-name-${i}`} className="block text-[11px] font-semibold mb-1.5 text-[var(--sapphire-light)] uppercase tracking-wide">
+                                            Child {i + 1} — Full Legal Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={child.name}
+                                            onChange={(e) => {
+                                                const updated = [...children];
+                                                updated[i] = { ...updated[i], name: e.target.value };
+                                                setChildren(updated);
+                                            }}
+                                            placeholder={`Child ${i + 1} full name`}
+                                            className="input-premium w-full text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
+                                            id={`child-name-${i}`}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor={`child-age-${i}`} className="block text-[11px] font-semibold mb-1.5 text-[var(--sapphire-light)] uppercase tracking-wide">
+                                            Age
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={25}
+                                            value={child.age}
+                                            onChange={(e) => {
+                                                const updated = [...children];
+                                                updated[i] = { ...updated[i], age: e.target.value };
+                                                setChildren(updated);
+                                            }}
+                                            className="input-premium w-full text-sm text-center bg-white/80 focus:bg-white text-[var(--sapphire-dark)]"
+                                            id={`child-age-${i}`}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Case Title Format */}
@@ -584,29 +731,35 @@ export default function CourtSettingsPage() {
                         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-3">Caption Preview</p>
                         <div className="font-mono text-[12px] text-white/80 leading-relaxed whitespace-pre-line">
                             {caseTitleFormat === 'name_v_name' && (() => {
-                                const opposingName = (respondentLegalName || nexProfile?.legalName || '[OPPOSING PARTY]').toUpperCase();
-                                const userName = '[YOUR NAME]';
-                                if (nexProfile?.partyRole === 'respondent') {
-                                    // NEX's partyRole = respondent → NEX is the respondent, user is petitioner
+                                const opposingName = (respondentLegalName || '[OPPOSING PARTY]').toUpperCase();
+                                const userName = (petitionerLegalName || '[YOUR NAME]').toUpperCase();
+                                if (petitionerRole === 'petitioner') {
                                     return <>{userName}, Petitioner{'\n'}v.{'\n'}{opposingName}, Respondent</>;
-                                } else if (nexProfile?.partyRole === 'petitioner') {
-                                    // NEX's partyRole = petitioner → NEX is petitioner, user is respondent
+                                } else if (petitionerRole === 'respondent') {
                                     return <>{opposingName}, Petitioner{'\n'}v.{'\n'}{userName}, Respondent</>;
                                 } else {
-                                    // No role set — generic fallback
-                                    return <>{userName}, Petitioner{'\n'}v.{'\n'}{opposingName}, Respondent</>;
+                                    return <>{userName}, [ROLE]{'\n'}v.{'\n'}{opposingName}, [ROLE]</>;
                                 }
                             })()}
 
-                            {caseTitleFormat === 'in_interest_of' && (
-                                <>IN THE INTEREST OF{'\n'}{(childName || '[CHILD NAME(S)]').toUpperCase()},{'\n'}A CHILD / CHILDREN</>
-                            )}
-                            {caseTitleFormat === 'in_matter_of_marriage' && (
-                                <>IN THE MATTER OF THE MARRIAGE OF{'\n'}{(respondentLegalName || 'PARTY 1').toUpperCase().split(' ').pop()} AND {(nexProfile?.legalName || 'PARTY 2').toUpperCase().split(' ').pop()}</>
-                            )}
-                            {caseTitleFormat === 'in_re_marriage' && (
-                                <>IN RE MARRIAGE OF{'\n'}{(respondentLegalName || 'PARTY 1').toUpperCase().split(' ').pop()} AND {(nexProfile?.legalName || 'PARTY 2').toUpperCase().split(' ').pop()}</>
-                            )}
+                            {caseTitleFormat === 'in_interest_of' && (() => {
+                                const names = children.map(c => c.name).filter(Boolean);
+                                const childLabel = names.length > 0
+                                    ? names.map(n => n.toUpperCase()).join(', ')
+                                    : '[CHILD NAME(S)]';
+                                const pluralLabel = names.length > 1 ? 'CHILDREN' : 'A CHILD';
+                                return <>IN THE INTEREST OF{'\n'}{childLabel},{'\n'}{pluralLabel}</>;
+                            })()}
+                            {caseTitleFormat === 'in_matter_of_marriage' && (() => {
+                                const name1 = (petitionerLegalName || 'PARTY 1').toUpperCase().split(' ').pop();
+                                const name2 = (respondentLegalName || 'PARTY 2').toUpperCase().split(' ').pop();
+                                return <>IN THE MATTER OF THE MARRIAGE OF{'\n'}{name1} AND {name2}</>;
+                            })()}
+                            {caseTitleFormat === 'in_re_marriage' && (() => {
+                                const name1 = (petitionerLegalName || 'PARTY 1').toUpperCase().split(' ').pop();
+                                const name2 = (respondentLegalName || 'PARTY 2').toUpperCase().split(' ').pop();
+                                return <>IN RE MARRIAGE OF{'\n'}{name1} AND {name2}</>;
+                            })()}
                             {caseTitleFormat === 'custom' && (
                                 <>{caseTitleCustom || 'Your custom caption will appear here...'}</>
                             )}

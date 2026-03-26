@@ -23,15 +23,43 @@ export const upsert = mutation({
         )),
         caseTitleCustom: v.optional(v.string()),
         respondentLegalName: v.optional(v.string()),
+        petitionerLegalName: v.optional(v.string()),
+        petitionerRole: v.optional(v.union(v.literal('petitioner'), v.literal('respondent'))),
+        /** Primary: array of {name, age} objects */
+        children: v.optional(v.array(v.object({ name: v.string(), age: v.number() }))),
+        /** @deprecated — accepted for backward compat, prefer children[] */
         childName: v.optional(v.string()),
+        childrenCount: v.optional(v.number()),
+        childrenNames: v.optional(v.array(v.string())),
+        childrenAges: v.optional(v.array(v.number())),
         formattingOverrides: v.optional(v.any()),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
         const now = Date.now();
+
+        // Derive children[] from legacy parallel arrays if not provided directly
+        const children = args.children
+            ?? (args.childrenNames
+                ? args.childrenNames.map((name, i) => ({
+                    name,
+                    age: args.childrenAges?.[i] ?? 0,
+                }))
+                : undefined);
+
+        // Build backward-compat fields from children[]
+        const childrenNames = children?.map(c => c.name);
+        const childrenAges = children?.map(c => c.age);
+        const childrenCount = children?.length;
+        const derivedChildName = childrenNames?.filter(Boolean).join(', ') || args.childName?.trim() || undefined;
+
         const normalizedArgs = {
             ...args,
-            childName: args.childName?.trim() || undefined,
+            children,
+            childrenNames,
+            childrenAges,
+            childrenCount,
+            childName: derivedChildName,
         };
 
         // Validate: custom title format requires non-empty custom text

@@ -16,9 +16,17 @@ export default defineSchema({
         ),
         state: v.optional(v.string()),
         county: v.optional(v.string()),
+        /** @deprecated Use children[] instead */
         childrenCount: v.optional(v.number()),
+        /** @deprecated Use children[] instead */
         childrenAges: v.optional(v.array(v.number())),
+        /** @deprecated Use children[] instead */
         childrenNames: v.optional(v.array(v.string())),
+        /** Consolidated children info — each entry bundles name + age */
+        children: v.optional(v.array(v.object({
+            name: v.string(),
+            age: v.number(),
+        }))),
         courtCaseNumber: v.optional(v.string()),
         custodyType: v.optional(
             v.union(
@@ -201,8 +209,23 @@ export default defineSchema({
         caseTitleCustom: v.optional(v.string()),
         /** Respondent/opposing party legal name for document generation */
         respondentLegalName: v.optional(v.string()),
-        /** Child name(s) for documents in the interest of a child */
+        /** Your (filing party) legal name as it appears on court documents */
+        petitionerLegalName: v.optional(v.string()),
+        /** Your role in the case: petitioner or respondent */
+        petitionerRole: v.optional(v.union(v.literal('petitioner'), v.literal('respondent'))),
+        /** @deprecated Use children[] instead */
         childName: v.optional(v.string()),
+        /** @deprecated Use children[] instead */
+        childrenCount: v.optional(v.number()),
+        /** @deprecated Use children[] instead */
+        childrenNames: v.optional(v.array(v.string())),
+        /** @deprecated Use children[] instead */
+        childrenAges: v.optional(v.array(v.number())),
+        /** Consolidated children info — each entry bundles name + age */
+        children: v.optional(v.array(v.object({
+            name: v.string(),
+            age: v.number(),
+        }))),
         /** User-verified formatting overrides (merged on top of state/county defaults) */
         formattingOverrides: v.optional(v.any()),
         /** Whether the user has verified these settings via AI lookup */

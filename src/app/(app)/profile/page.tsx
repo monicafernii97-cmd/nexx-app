@@ -40,7 +40,9 @@ type EmotionalState = 'calm' | 'anxious' | 'angry' | 'overwhelmed' | 'numb' | ''
 /** Ethereal User profile page for personal details, legal context, and tone preferences. */
 export default function ProfilePage() {
     const user = useQuery(api.users.me);
+    const courtSettings = useQuery(api.courtSettings.get);
     const updateProfile = useMutation(api.users.updateProfile);
+    const upsertCourtSettings = useMutation(api.courtSettings.upsert);
 
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
@@ -106,6 +108,32 @@ export default function ProfilePage() {
             });
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
+
+            // Bidirectional sync: push children data to court settings
+            if (courtSettings && (form.childrenCount > 0 || courtSettings.childrenCount)) {
+                try {
+                    const childrenObjects = form.childrenNames.map((name, i) => ({
+                        name,
+                        age: form.childrenAges[i] ?? 0,
+                    }));
+                    await upsertCourtSettings({
+                        state: courtSettings.state,
+                        county: courtSettings.county,
+                        courtName: courtSettings.courtName || undefined,
+                        causeNumber: courtSettings.causeNumber || undefined,
+                        assignedJudge: courtSettings.assignedJudge || undefined,
+                        judicialDistrict: courtSettings.judicialDistrict || undefined,
+                        caseTitleFormat: courtSettings.caseTitleFormat || undefined,
+                        caseTitleCustom: courtSettings.caseTitleCustom || undefined,
+                        respondentLegalName: courtSettings.respondentLegalName || undefined,
+                        petitionerLegalName: courtSettings.petitionerLegalName || undefined,
+                        petitionerRole: courtSettings.petitionerRole || undefined,
+                        children: childrenObjects.length > 0 ? childrenObjects : undefined,
+                    });
+                } catch (e) {
+                    console.warn('[Profile] Court settings children sync failed (non-blocking):', e);
+                }
+            }
         } catch (err) {
             console.error('Failed to save profile:', err);
             setError('Failed to save profile. Please try again.');

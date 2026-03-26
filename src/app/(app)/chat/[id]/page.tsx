@@ -184,17 +184,6 @@ export default function ConversationPage() {
                         {conversation?.title || 'NEXX Executive Intelligence'}
                     </h1>
                     <div className="flex items-center gap-3 mt-1">
-                        <span
-                            className="text-[10px] tracking-widest font-bold py-1 px-3 rounded-full border shadow-sm"
-                            style={{
-                                background: 'color-mix(in srgb, #5A8EC9 15%, transparent)',
-                                backdropFilter: 'blur(8px)',
-                                color: '#5A8EC9',
-                                borderColor: 'color-mix(in srgb, #5A8EC9 40%, transparent)',
-                            }}
-                        >
-                            FULL SPECTRUM
-                        </span>
                         <div className="flex items-center gap-1 text-[rgba(10,22,41,0.4)]">
                             <Lock size={12} weight="fill" />
                             <p className="text-[11px] font-bold tracking-widest uppercase truncate">

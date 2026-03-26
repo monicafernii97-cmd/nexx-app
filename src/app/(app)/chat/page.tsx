@@ -88,9 +88,6 @@ export default function ChatListPage() {
                         <h2 className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 text-sapphire flex items-center gap-2">
                             <ChatTeardropDots size={16} className="text-champagne" /> Start New Session
                         </h2>
-                        <p className="text-[13px] text-white/50 leading-relaxed">
-                            Full legal analysis, behavioral pattern recognition, strategic communication support, and court-ready documentation — all in every conversation.
-                        </p>
                     </div>
                     
                     <button

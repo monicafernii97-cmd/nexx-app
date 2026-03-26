@@ -206,7 +206,7 @@ export default function CourtSettingsPage() {
         } finally {
             setSaving(false);
         }
-    }, [state, county, courtName, causeNumber, assignedJudge, judicialDistrict, caseTitleFormat, caseTitleCustom, respondentLegalName, petitionerLegalName, petitionerRole, childrenCount, childrenNames, childrenAges, upsertSettings]);
+    }, [state, county, courtName, causeNumber, assignedJudge, judicialDistrict, caseTitleFormat, caseTitleCustom, respondentLegalName, petitionerLegalName, petitionerRole, childrenCount, childrenNames, childrenAges, upsertSettings, currentUser, updateProfile]);
 
     // AI Verify handler
     const handleVerify = useCallback(async () => {
@@ -639,7 +639,7 @@ export default function CourtSettingsPage() {
                                         <input
                                             type="number"
                                             min={0}
-                                            max={18}
+                                            max={25}
                                             value={childrenAges[i] || ''}
                                             onChange={(e) => {
                                                 const updated = [...childrenAges];

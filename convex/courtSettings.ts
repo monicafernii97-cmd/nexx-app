@@ -46,6 +46,16 @@ export const upsert = mutation({
             throw new Error('Custom case title text is required when format is set to "custom".');
         }
 
+        // Validate: parallel array invariant — names and ages must match count
+        if (args.childrenCount) {
+            if (args.childrenNames && args.childrenNames.length !== args.childrenCount) {
+                throw new Error(`childrenNames length (${args.childrenNames.length}) must match childrenCount (${args.childrenCount}).`);
+            }
+            if (args.childrenAges && args.childrenAges.length !== args.childrenCount) {
+                throw new Error(`childrenAges length (${args.childrenAges.length}) must match childrenCount (${args.childrenCount}).`);
+            }
+        }
+
         // Check if user already has settings
         const existing = await ctx.db
             .query('userCourtSettings')

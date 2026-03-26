@@ -207,7 +207,7 @@ export default defineSchema({
         petitionerRole: v.optional(v.union(v.literal('petitioner'), v.literal('respondent'))),
         /** @deprecated Use childrenNames instead */
         childName: v.optional(v.string()),
-        /** Number of children involved in the case */
+        /** Number of children involved — must equal childrenNames.length and childrenAges.length when those are present */
         childrenCount: v.optional(v.number()),
         /** Full legal names of each child */
         childrenNames: v.optional(v.array(v.string())),

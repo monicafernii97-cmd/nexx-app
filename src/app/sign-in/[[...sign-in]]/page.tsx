@@ -1,10 +1,16 @@
 'use client';
 
 import { SignIn } from '@clerk/nextjs';
+import { useSearchParams } from 'next/navigation';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 
 /** Branded sign-in page with ambient glow background and Clerk SignIn component. */
 export default function SignInPage() {
+    const searchParams = useSearchParams();
+    const plan = searchParams.get('plan');
+    // Preserve the plan parameter when a sign-in user clicks "Sign up"
+    const signUpRedirectUrl = plan ? `/onboarding?plan=${plan}` : '/onboarding';
+
     return (
         <div
             className="bg-[#0A1128] min-h-screen flex items-center justify-center relative overflow-hidden"
@@ -44,7 +50,7 @@ export default function SignInPage() {
                 <SignIn
                     appearance={nexxClerkAppearance}
                     fallbackRedirectUrl="/"
-                    signUpForceRedirectUrl="/onboarding"
+                    signUpForceRedirectUrl={signUpRedirectUrl}
                 />
             </div>
         </div>

@@ -138,8 +138,9 @@ export default function WelcomePage() {
     );
   }
 
-  // Show loading state while checking auth
-  if (!clerkLoaded || convexLoading || (isSignedIn && currentUser === undefined)) {
+  // Show loading state while checking auth or setting up account
+  const accountSyncing = isSignedIn && convexReady && currentUser === null;
+  if (!clerkLoaded || convexLoading || (isSignedIn && currentUser === undefined) || accountSyncing) {
     return (
       <div className="silk-bg min-h-screen flex items-center justify-center">
         <motion.div
@@ -153,7 +154,9 @@ export default function WelcomePage() {
               <i>N</i>
             </span>
           </div>
-          <p className="text-sm font-bold text-[#F7F2EB] tracking-[0.2em] uppercase drop-shadow-md">Loading...</p>
+          <p className="text-sm font-bold text-[#F7F2EB] tracking-[0.2em] uppercase drop-shadow-md">
+            {accountSyncing ? 'Finishing account setup…' : 'Loading…'}
+          </p>
         </motion.div>
       </div>
     );

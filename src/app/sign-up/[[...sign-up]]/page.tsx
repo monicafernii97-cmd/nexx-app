@@ -41,7 +41,7 @@ export default function SignUpPage() {
                         Begin Your Journey
                     </p>
                 </div>
-                <SignUp appearance={nexxClerkAppearance} fallbackRedirectUrl="/" />
+                <SignUp appearance={nexxClerkAppearance} fallbackRedirectUrl="/onboarding" />
             </div>
         </div>
     );

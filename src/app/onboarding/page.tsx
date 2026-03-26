@@ -53,7 +53,10 @@ export default function OnboardingPage() {
         if (!convexReady || convexLoading) return;
         if (currentUser === undefined) return; // still loading
         if (currentUser === null) {
-            router.replace('/#pricing');
+            // Convex record not created yet — UserProvider is syncing via
+            // ensureFromClerk. Wait for the record to appear rather than
+            // bouncing the user back to pricing. The query will reactively
+            // update once the mutation completes.
             return;
         }
         // currentUser exists but hasn't completed onboarding

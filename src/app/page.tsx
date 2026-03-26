@@ -47,7 +47,7 @@ export default function WelcomePage() {
   const showNoPlanBanner = (() => {
     if (!clerkLoaded || !isSignedIn || convexLoading || !convexReady) return false;
     if (currentUser === undefined) return false; // still loading
-    if (currentUser === null) return true; // no Convex record — show the banner
+    if (currentUser === null) return !isValidPlan(getSessionPlan()); // no Convex record — only show banner if no plan in sessionStorage either
     if (currentUser.onboardingComplete) return false; // returning user
     if (isValidPlan(currentUser.subscriptionTier)) return false;
     return !isValidPlan(getSessionPlan()); // no valid plan anywhere
@@ -72,7 +72,11 @@ export default function WelcomePage() {
     if (currentUser === undefined) return; // Still loading
 
     if (currentUser === null) {
-      // No Convex record yet — stay on landing page and let the banner handle it.
+      // No Convex record yet — UserProvider is calling ensureFromClerk.
+      // If the user already picked a plan (sessionStorage), just wait:
+      // once ensureFromClerk finishes, users.me will reactively update
+      // and the redirect below will fire on the next effect cycle.
+      // If no plan exists, stay here and show the banner.
       return;
     } else if (currentUser.onboardingComplete) {
       // Returning user — straight to dashboard

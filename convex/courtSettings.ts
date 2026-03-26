@@ -23,15 +23,22 @@ export const upsert = mutation({
         )),
         caseTitleCustom: v.optional(v.string()),
         respondentLegalName: v.optional(v.string()),
+        petitionerLegalName: v.optional(v.string()),
+        petitionerRole: v.optional(v.union(v.literal('petitioner'), v.literal('respondent'))),
         childName: v.optional(v.string()),
+        childrenCount: v.optional(v.number()),
+        childrenNames: v.optional(v.array(v.string())),
+        childrenAges: v.optional(v.array(v.number())),
         formattingOverrides: v.optional(v.any()),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
         const now = Date.now();
+        // Build a backward-compatible childName from childrenNames if not provided
+        const derivedChildName = args.childrenNames?.filter(Boolean).join(', ') || args.childName?.trim() || undefined;
         const normalizedArgs = {
             ...args,
-            childName: args.childName?.trim() || undefined,
+            childName: derivedChildName,
         };
 
         // Validate: custom title format requires non-empty custom text

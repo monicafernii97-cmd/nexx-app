@@ -201,8 +201,18 @@ export default defineSchema({
         caseTitleCustom: v.optional(v.string()),
         /** Respondent/opposing party legal name for document generation */
         respondentLegalName: v.optional(v.string()),
-        /** Child name(s) for documents in the interest of a child */
+        /** Your (filing party) legal name as it appears on court documents */
+        petitionerLegalName: v.optional(v.string()),
+        /** Your role in the case: petitioner or respondent */
+        petitionerRole: v.optional(v.union(v.literal('petitioner'), v.literal('respondent'))),
+        /** @deprecated Use childrenNames instead */
         childName: v.optional(v.string()),
+        /** Number of children involved in the case */
+        childrenCount: v.optional(v.number()),
+        /** Full legal names of each child */
+        childrenNames: v.optional(v.array(v.string())),
+        /** Ages of each child (parallel array to childrenNames) */
+        childrenAges: v.optional(v.array(v.number())),
         /** User-verified formatting overrides (merged on top of state/county defaults) */
         formattingOverrides: v.optional(v.any()),
         /** Whether the user has verified these settings via AI lookup */

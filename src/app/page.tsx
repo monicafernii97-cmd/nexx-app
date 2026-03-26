@@ -29,6 +29,12 @@ import { CaretDown } from '@phosphor-icons/react';
 export default function WelcomePage() {
   const { isSignedIn, isLoaded: clerkLoaded } = useAuth();
   const { signOut } = useClerk();
+
+  /** Sign out and clear stale plan selection. */
+  const handleSignOut = () => {
+    sessionStorage.removeItem('selectedPlan');
+    signOut({ redirectUrl: '/' });
+  };
   // useConvexAuth waits for the Clerk JWT to be synced to Convex.
   // This prevents a race where Clerk says "signed in" but Convex
   // hasn't received the token yet, causing users.me to return null.
@@ -47,7 +53,7 @@ export default function WelcomePage() {
   const showNoPlanBanner = (() => {
     if (!clerkLoaded || !isSignedIn || convexLoading || !convexReady) return false;
     if (currentUser === undefined) return false; // still loading
-    if (currentUser === null) return true; // no Convex record — show the banner
+    if (currentUser === null) return !isValidPlan(getSessionPlan()); // no Convex record — only show banner if no plan in sessionStorage either
     if (currentUser.onboardingComplete) return false; // returning user
     if (isValidPlan(currentUser.subscriptionTier)) return false;
     return !isValidPlan(getSessionPlan()); // no valid plan anywhere
@@ -72,7 +78,11 @@ export default function WelcomePage() {
     if (currentUser === undefined) return; // Still loading
 
     if (currentUser === null) {
-      // No Convex record yet — stay on landing page and let the banner handle it.
+      // No Convex record yet — UserProvider is calling ensureFromClerk.
+      // If the user already picked a plan (sessionStorage), just wait:
+      // once ensureFromClerk finishes, users.me will reactively update
+      // and the redirect below will fire on the next effect cycle.
+      // If no plan exists, stay here and show the banner.
       return;
     } else if (currentUser.onboardingComplete) {
       // Returning user — straight to dashboard
@@ -82,7 +92,8 @@ export default function WelcomePage() {
       const selectedPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
       const hasPlan = isValidPlan(currentUser.subscriptionTier) || isValidPlan(selectedPlan);
       if (hasPlan) {
-        router.replace('/onboarding');
+        const plan = selectedPlan || currentUser.subscriptionTier || '';
+        router.replace(`/onboarding?plan=${plan}`);
       } else {
         // No plan selected — stay on welcome page, scroll to pricing
         requestAnimationFrame(() => {
@@ -117,7 +128,7 @@ export default function WelcomePage() {
             We couldn&apos;t sync your session. Please try signing in again.
           </p>
           <button
-            onClick={() => signOut({ redirectUrl: '/' })}
+            onClick={() => handleSignOut()}
             className="btn-outline text-xs"
           >
             Sign in again
@@ -127,8 +138,9 @@ export default function WelcomePage() {
     );
   }
 
-  // Show loading state while checking auth
-  if (!clerkLoaded || convexLoading || (isSignedIn && currentUser === undefined)) {
+  // Show loading state while checking auth or setting up account
+  const accountSyncing = isSignedIn && convexReady && currentUser === null;
+  if (!clerkLoaded || convexLoading || (isSignedIn && currentUser === undefined) || accountSyncing) {
     return (
       <div className="silk-bg min-h-screen flex items-center justify-center">
         <motion.div
@@ -142,7 +154,9 @@ export default function WelcomePage() {
               <i>N</i>
             </span>
           </div>
-          <p className="text-sm font-bold text-[#F7F2EB] tracking-[0.2em] uppercase drop-shadow-md">Loading...</p>
+          <p className="text-sm font-bold text-[#F7F2EB] tracking-[0.2em] uppercase drop-shadow-md">
+            {accountSyncing ? 'Finishing account setup…' : 'Loading…'}
+          </p>
         </motion.div>
       </div>
     );
@@ -372,7 +386,7 @@ export default function WelcomePage() {
                 <button
                   onClick={() => {
                     sessionStorage.setItem('selectedPlan', plan.tier);
-                    router.push(isSignedIn ? '/onboarding' : '/sign-up');
+                    router.push(isSignedIn ? `/onboarding?plan=${plan.tier}` : `/sign-up?plan=${plan.tier}`);
                   }}
                   className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all ${
                     plan.popular

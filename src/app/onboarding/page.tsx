@@ -46,23 +46,37 @@ export default function OnboardingPage() {
             router.replace('/dashboard');
         }
     }, [currentUser, router]);
+    // On mount, read the plan from URL params and persist to sessionStorage.
+    // This ensures the plan survives even if sessionStorage was lost during OAuth.
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const urlPlan = new URLSearchParams(window.location.search).get('plan');
+        if (urlPlan && isValidPlan(urlPlan)) {
+            sessionStorage.setItem('selectedPlan', urlPlan);
+        }
+    }, []);
+
     // Guard: if the user hasn't selected a plan yet, redirect to the
     // landing page pricing section. ensureFromClerk auto-creates a Convex
-    // record on sign-in, so we check subscriptionTier + sessionStorage.
+    // record on sign-in, so we check subscriptionTier + sessionStorage + URL.
     useEffect(() => {
         if (!convexReady || convexLoading) return;
         if (currentUser === undefined) return; // still loading
         if (currentUser === null) {
-            router.replace('/#pricing');
+            // Convex record not created yet — UserProvider is syncing via
+            // ensureFromClerk. Wait for the record to appear rather than
+            // bouncing the user back to pricing.
             return;
         }
         // currentUser exists but hasn't completed onboarding
         if (currentUser.onboardingComplete) return; // returning user
         if (isValidPlan(currentUser.subscriptionTier)) return;
-        // No valid DB tier — check sessionStorage for a freshly selected plan
-        if (!getValidSelectedPlan(currentUser)) {
-            router.replace('/#pricing');
-        }
+        // Check URL param → sessionStorage → default to 'free'
+        const urlPlan = new URLSearchParams(window.location.search).get('plan');
+        if (isValidPlan(urlPlan)) return; // plan in URL — all good
+        if (getValidSelectedPlan(currentUser)) return; // plan in sessionStorage
+        // No plan found anywhere — default to 'free' instead of looping
+        sessionStorage.setItem('selectedPlan', 'free');
     }, [convexReady, convexLoading, currentUser, router]);
 
     // ─── Form state (must be declared before any early returns) ───
@@ -94,10 +108,11 @@ export default function OnboardingPage() {
     /** Terminal state: Clerk signed in but Convex auth failed to sync. */
     const convexAuthFailed = !convexLoading && !convexReady && !!clerkUser;
 
-    // Show loading state while Convex auth is syncing
+    // Show loading state while Convex auth is syncing or user record being created
     if (
         convexLoading ||
         (convexReady && currentUser === undefined) ||
+        (convexReady && currentUser === null && !userError) ||
         currentUser?.onboardingComplete
     ) {
         return (
@@ -109,7 +124,41 @@ export default function OnboardingPage() {
                             <i>N</i>
                         </span>
                     </div>
-                    <p className="text-sm font-bold text-[#F7F2EB] tracking-[0.2em] uppercase drop-shadow-md">Loading...</p>
+                    <p className="text-sm font-bold text-[#F7F2EB] tracking-[0.2em] uppercase drop-shadow-md">
+                        {currentUser === null ? 'Finishing account setup…' : 'Loading…'}
+                    </p>
+                </motion.div>
+            </div>
+        );
+    }
+
+    // Error state: ensureFromClerk failed — show retry UI
+    if (userError && currentUser === null) {
+        return (
+            <div className="silk-bg min-h-screen flex items-center justify-center">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center max-w-sm px-6">
+                    <div
+                        className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
+                        style={{ background: 'rgba(199, 90, 90, 0.15)', border: '1px solid rgba(199, 90, 90, 0.3)' }}
+                    >
+                        <span className="text-lg" style={{ color: '#C75A5A' }}>!</span>
+                    </div>
+                    <p className="text-sm font-semibold mb-2" style={{ color: '#F7F2EB' }}>Account setup failed</p>
+                    <p className="text-xs mb-5" style={{ color: '#FFF9F0' }}>
+                        We couldn&apos;t create your account. Please try again.
+                    </p>
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="btn-primary text-xs px-5 py-2 mr-2"
+                    >
+                        Try Again
+                    </button>
+                    <button
+                        onClick={() => { sessionStorage.removeItem('selectedPlan'); signOut({ redirectUrl: '/' }); }}
+                        className="btn-outline text-xs px-5 py-2"
+                    >
+                        Sign Out
+                    </button>
                 </motion.div>
             </div>
         );

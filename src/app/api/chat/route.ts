@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
             legalContext,
         });
 
-        // Stream response from OpenAI (model determined by conversation mode + tier)
+        // Stream response from OpenAI (all chats use gpt-4o for maximum quality)
         const stream = await getOpenAI().chat.completions.create({
             model,
             messages: [

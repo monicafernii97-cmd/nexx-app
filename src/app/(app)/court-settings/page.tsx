@@ -51,8 +51,7 @@ export default function CourtSettingsPage() {
     const [petitionerLegalName, setPetitionerLegalName] = useState('');
     const [petitionerRole, setPetitionerRole] = useState<'' | 'petitioner' | 'respondent'>('');
     const [childrenCount, setChildrenCount] = useState(0);
-    const [childrenNames, setChildrenNames] = useState<string[]>([]);
-    const [childrenAges, setChildrenAges] = useState<string[]>([]);
+    const [children, setChildren] = useState<{ name: string; age: string }[]>([]);
 
     // UI state
     const [countyQuery, setCountyQuery] = useState('');
@@ -94,17 +93,31 @@ export default function CourtSettingsPage() {
             setRespondentLegalName(existingSettings.respondentLegalName || '');
             setPetitionerLegalName(existingSettings.petitionerLegalName || '');
             setPetitionerRole((existingSettings.petitionerRole as '' | 'petitioner' | 'respondent') || '');
-            const count = existingSettings.childrenCount || 0;
+            const existingChildren = existingSettings.children
+                ?? (existingSettings.childrenNames
+                    ? existingSettings.childrenNames.map((n: string, i: number) => ({
+                        name: n,
+                        age: existingSettings.childrenAges?.[i] ?? 0,
+                    }))
+                    : []);
+            const count = existingChildren.length || existingSettings.childrenCount || 0;
             setChildrenCount(count);
-            setChildrenNames(existingSettings.childrenNames || Array(count).fill(''));
-            setChildrenAges((existingSettings.childrenAges || Array(count).fill(0)).map(String));
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setChildren(existingChildren.length > 0
+                ? existingChildren.map((c: any) => ({ name: String(c.name ?? ''), age: String(c.age ?? '') }))
+                : Array(count).fill({ name: '', age: '' }));
         } else if (currentUser) {
             // No court settings yet but user profile has children data — autofill
-            const count = currentUser.childrenCount || 0;
-            if (count > 0) {
-                setChildrenCount(count);
-                setChildrenNames(currentUser.childrenNames || Array(count).fill(''));
-                setChildrenAges((currentUser.childrenAges || Array(count).fill(0)).map(String));
+            const userChildren = currentUser.children
+                ?? (currentUser.childrenNames
+                    ? currentUser.childrenNames.map((n: string, i: number) => ({
+                        name: n,
+                        age: currentUser.childrenAges?.[i] ?? 0,
+                    }))
+                    : []);
+            if (userChildren.length > 0) {
+                setChildrenCount(userChildren.length);
+                setChildren(userChildren.map((c: { name: string; age: number }) => ({ name: c.name, age: String(c.age) })));
             }
         }
         initializedRef.current = true;
@@ -166,21 +179,22 @@ export default function CourtSettingsPage() {
                 respondentLegalName: respondentLegalName || undefined,
                 petitionerLegalName: petitionerLegalName || undefined,
                 petitionerRole: petitionerRole || undefined,
-                childrenCount: childrenCount || undefined,
-                childrenNames: childrenNames.length > 0 ? childrenNames : undefined,
-                childrenAges: childrenAges.length > 0 ? childrenAges.map(a => parseInt(a) || 0) : undefined,
+                children: children.length > 0
+                    ? children.map(c => ({ name: c.name, age: parseInt(c.age) || 0 }))
+                    : undefined,
             });
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
 
             // Bidirectional sync: push children data back to users table
-            if (currentUser && childrenCount > 0) {
+            if (currentUser && children.length > 0) {
                 try {
                     await updateProfile({
                         id: currentUser._id,
-                        childrenCount,
-                        childrenNames: childrenNames.length > 0 ? childrenNames : undefined,
-                        childrenAges: childrenAges.length > 0 ? childrenAges.map(a => parseInt(a) || 0) : undefined,
+                        children: children.map(c => ({ name: c.name, age: parseInt(c.age) || 0 })),
+                        childrenCount: children.length,
+                        childrenNames: children.map(c => c.name),
+                        childrenAges: children.map(c => parseInt(c.age) || 0),
                     });
                 } catch (e) {
                     console.warn('[CourtSettings] User profile children sync failed (non-blocking):', e);
@@ -206,7 +220,7 @@ export default function CourtSettingsPage() {
         } finally {
             setSaving(false);
         }
-    }, [state, county, courtName, causeNumber, assignedJudge, judicialDistrict, caseTitleFormat, caseTitleCustom, respondentLegalName, petitionerLegalName, petitionerRole, childrenCount, childrenNames, childrenAges, upsertSettings, currentUser, updateProfile]);
+    }, [state, county, courtName, causeNumber, assignedJudge, judicialDistrict, caseTitleFormat, caseTitleCustom, respondentLegalName, petitionerLegalName, petitionerRole, children, upsertSettings, currentUser, updateProfile]);
 
     // AI Verify handler
     const handleVerify = useCallback(async () => {
@@ -597,13 +611,9 @@ export default function CourtSettingsPage() {
                             onChange={(e) => {
                                 const count = Math.max(0, Math.min(12, parseInt(e.target.value) || 0));
                                 setChildrenCount(count);
-                                // Grow or shrink the names/ages arrays
-                                setChildrenNames(prev => {
-                                    if (count > prev.length) return [...prev, ...Array(count - prev.length).fill('')];
-                                    return prev.slice(0, count);
-                                });
-                                setChildrenAges(prev => {
-                                    if (count > prev.length) return [...prev, ...Array(count - prev.length).fill('')];
+                                // Grow or shrink the children array
+                                setChildren(prev => {
+                                    if (count > prev.length) return [...prev, ...Array(count - prev.length).fill({ name: '', age: '' })];
                                     return prev.slice(0, count);
                                 });
                             }}
@@ -613,7 +623,7 @@ export default function CourtSettingsPage() {
                     </div>
                     {childrenCount > 0 && (
                         <div className="space-y-3">
-                            {Array.from({ length: childrenCount }).map((_, i) => (
+                            {children.map((child, i) => (
                                 <div key={i} className="grid grid-cols-[1fr_80px] gap-3 items-end">
                                     <div>
                                         <label htmlFor={`child-name-${i}`} className="block text-[11px] font-semibold mb-1.5 text-[var(--sapphire-light)] uppercase tracking-wide">
@@ -621,11 +631,11 @@ export default function CourtSettingsPage() {
                                         </label>
                                         <input
                                             type="text"
-                                            value={childrenNames[i] || ''}
+                                            value={child.name}
                                             onChange={(e) => {
-                                                const updated = [...childrenNames];
-                                                updated[i] = e.target.value;
-                                                setChildrenNames(updated);
+                                                const updated = [...children];
+                                                updated[i] = { ...updated[i], name: e.target.value };
+                                                setChildren(updated);
                                             }}
                                             placeholder={`Child ${i + 1} full name`}
                                             className="input-premium w-full text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
@@ -640,11 +650,11 @@ export default function CourtSettingsPage() {
                                             type="number"
                                             min={0}
                                             max={25}
-                                            value={childrenAges[i] || ''}
+                                            value={child.age}
                                             onChange={(e) => {
-                                                const updated = [...childrenAges];
-                                                updated[i] = e.target.value;
-                                                setChildrenAges(updated);
+                                                const updated = [...children];
+                                                updated[i] = { ...updated[i], age: e.target.value };
+                                                setChildren(updated);
                                             }}
                                             className="input-premium w-full text-sm text-center bg-white/80 focus:bg-white text-[var(--sapphire-dark)]"
                                             id={`child-age-${i}`}
@@ -731,7 +741,7 @@ export default function CourtSettingsPage() {
                             })()}
 
                             {caseTitleFormat === 'in_interest_of' && (() => {
-                                const names = childrenNames.filter(Boolean);
+                                const names = children.map(c => c.name).filter(Boolean);
                                 const childLabel = names.length > 0
                                     ? names.map(n => n.toUpperCase()).join(', ')
                                     : '[CHILD NAME(S)]';

@@ -25,6 +25,9 @@ export const upsert = mutation({
         respondentLegalName: v.optional(v.string()),
         petitionerLegalName: v.optional(v.string()),
         petitionerRole: v.optional(v.union(v.literal('petitioner'), v.literal('respondent'))),
+        /** Primary: array of {name, age} objects */
+        children: v.optional(v.array(v.object({ name: v.string(), age: v.number() }))),
+        /** @deprecated — accepted for backward compat, prefer children[] */
         childName: v.optional(v.string()),
         childrenCount: v.optional(v.number()),
         childrenNames: v.optional(v.array(v.string())),
@@ -34,26 +37,34 @@ export const upsert = mutation({
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
         const now = Date.now();
-        // Build a backward-compatible childName from childrenNames if not provided
-        const derivedChildName = args.childrenNames?.filter(Boolean).join(', ') || args.childName?.trim() || undefined;
+
+        // Derive children[] from legacy parallel arrays if not provided directly
+        const children = args.children
+            ?? (args.childrenNames
+                ? args.childrenNames.map((name, i) => ({
+                    name,
+                    age: args.childrenAges?.[i] ?? 0,
+                }))
+                : undefined);
+
+        // Build backward-compat fields from children[]
+        const childrenNames = children?.map(c => c.name);
+        const childrenAges = children?.map(c => c.age);
+        const childrenCount = children?.length;
+        const derivedChildName = childrenNames?.filter(Boolean).join(', ') || args.childName?.trim() || undefined;
+
         const normalizedArgs = {
             ...args,
+            children,
+            childrenNames,
+            childrenAges,
+            childrenCount,
             childName: derivedChildName,
         };
 
         // Validate: custom title format requires non-empty custom text
         if (args.caseTitleFormat === 'custom' && (!args.caseTitleCustom || !args.caseTitleCustom.trim())) {
             throw new Error('Custom case title text is required when format is set to "custom".');
-        }
-
-        // Validate: parallel array invariant — names and ages must match count
-        if (args.childrenCount) {
-            if (args.childrenNames && args.childrenNames.length !== args.childrenCount) {
-                throw new Error(`childrenNames length (${args.childrenNames.length}) must match childrenCount (${args.childrenCount}).`);
-            }
-            if (args.childrenAges && args.childrenAges.length !== args.childrenCount) {
-                throw new Error(`childrenAges length (${args.childrenAges.length}) must match childrenCount (${args.childrenCount}).`);
-            }
         }
 
         // Check if user already has settings

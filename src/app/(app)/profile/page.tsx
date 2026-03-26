@@ -112,6 +112,10 @@ export default function ProfilePage() {
             // Bidirectional sync: push children data to court settings
             if (courtSettings && (form.childrenCount > 0 || courtSettings.childrenCount)) {
                 try {
+                    const childrenObjects = form.childrenNames.map((name, i) => ({
+                        name,
+                        age: form.childrenAges[i] ?? 0,
+                    }));
                     await upsertCourtSettings({
                         state: courtSettings.state,
                         county: courtSettings.county,
@@ -124,9 +128,7 @@ export default function ProfilePage() {
                         respondentLegalName: courtSettings.respondentLegalName || undefined,
                         petitionerLegalName: courtSettings.petitionerLegalName || undefined,
                         petitionerRole: courtSettings.petitionerRole || undefined,
-                        childrenCount: form.childrenCount || undefined,
-                        childrenNames: form.childrenNames.length > 0 ? form.childrenNames : undefined,
-                        childrenAges: form.childrenAges.length > 0 ? form.childrenAges : undefined,
+                        children: childrenObjects.length > 0 ? childrenObjects : undefined,
                     });
                 } catch (e) {
                     console.warn('[Profile] Court settings children sync failed (non-blocking):', e);

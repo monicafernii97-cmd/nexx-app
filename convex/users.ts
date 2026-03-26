@@ -86,6 +86,7 @@ export const updateProfile = mutation({
         childrenCount: v.optional(v.union(v.number(), v.null())),
         childrenAges: v.optional(v.union(v.array(v.number()), v.null())),
         childrenNames: v.optional(v.union(v.array(v.string()), v.null())),
+        children: v.optional(v.union(v.array(v.object({ name: v.string(), age: v.number() })), v.null())),
         courtCaseNumber: v.optional(v.union(v.string(), v.null())),
         custodyType: v.optional(
             v.union(

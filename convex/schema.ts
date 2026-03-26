@@ -16,9 +16,17 @@ export default defineSchema({
         ),
         state: v.optional(v.string()),
         county: v.optional(v.string()),
+        /** @deprecated Use children[] instead */
         childrenCount: v.optional(v.number()),
+        /** @deprecated Use children[] instead */
         childrenAges: v.optional(v.array(v.number())),
+        /** @deprecated Use children[] instead */
         childrenNames: v.optional(v.array(v.string())),
+        /** Consolidated children info — each entry bundles name + age */
+        children: v.optional(v.array(v.object({
+            name: v.string(),
+            age: v.number(),
+        }))),
         courtCaseNumber: v.optional(v.string()),
         custodyType: v.optional(
             v.union(
@@ -205,14 +213,19 @@ export default defineSchema({
         petitionerLegalName: v.optional(v.string()),
         /** Your role in the case: petitioner or respondent */
         petitionerRole: v.optional(v.union(v.literal('petitioner'), v.literal('respondent'))),
-        /** @deprecated Use childrenNames instead */
+        /** @deprecated Use children[] instead */
         childName: v.optional(v.string()),
-        /** Number of children involved — must equal childrenNames.length and childrenAges.length when those are present */
+        /** @deprecated Use children[] instead */
         childrenCount: v.optional(v.number()),
-        /** Full legal names of each child */
+        /** @deprecated Use children[] instead */
         childrenNames: v.optional(v.array(v.string())),
-        /** Ages of each child (parallel array to childrenNames) */
+        /** @deprecated Use children[] instead */
         childrenAges: v.optional(v.array(v.number())),
+        /** Consolidated children info — each entry bundles name + age */
+        children: v.optional(v.array(v.object({
+            name: v.string(),
+            age: v.number(),
+        }))),
         /** User-verified formatting overrides (merged on top of state/county defaults) */
         formattingOverrides: v.optional(v.any()),
         /** Whether the user has verified these settings via AI lookup */

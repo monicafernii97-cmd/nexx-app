@@ -80,6 +80,8 @@ export default function CourtSettingsPage() {
         if (initializedRef.current) return;
         // existingSettings is undefined while loading, null if no record exists
         if (existingSettings === undefined) return;
+        // Wait for currentUser to resolve before attempting autofill
+        if (existingSettings === null && currentUser === undefined) return;
 
         if (existingSettings) {
             setState(existingSettings.state || '');
@@ -104,7 +106,8 @@ export default function CourtSettingsPage() {
             setChildrenCount(count);
             setChildren(existingChildren.length > 0
                 ? existingChildren.map((c: Record<string, unknown>) => ({ name: String(c.name ?? ''), age: String(c.age ?? '') }))
-                : Array(count).fill({ name: '', age: '' }));
+                : Array.from({ length: count }, () => ({ name: '', age: '' })));
+            initializedRef.current = true;
         } else if (currentUser) {
             // No court settings yet but user profile has children data — autofill
             const userChildren = currentUser.children
@@ -118,8 +121,8 @@ export default function CourtSettingsPage() {
                 setChildrenCount(userChildren.length);
                 setChildren(userChildren.map((c: { name: string; age: number }) => ({ name: c.name, age: String(c.age) })));
             }
+            initializedRef.current = true;
         }
-        initializedRef.current = true;
     }, [existingSettings, currentUser]);
 
     // Auto-populate opposing party name from NEX profile if not already set
@@ -612,7 +615,7 @@ export default function CourtSettingsPage() {
                                 setChildrenCount(count);
                                 // Grow or shrink the children array
                                 setChildren(prev => {
-                                    if (count > prev.length) return [...prev, ...Array(count - prev.length).fill({ name: '', age: '' })];
+                                    if (count > prev.length) return [...prev, ...Array.from({ length: count - prev.length }, () => ({ name: '', age: '' }))];
                                     return prev.slice(0, count);
                                 });
                             }}

@@ -49,20 +49,17 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierConfig> = {
 
 // ── Model Routing ──
 
-export type ChatMode = 'therapeutic' | 'legal' | 'strategic' | 'general';
+export type ChatMode = 'general';
 
 const PREMIUM_MODEL = 'gpt-4o' as const;
-const STANDARD_MODEL = 'gpt-4o-mini' as const;
 
 /**
- * Determine the OpenAI model to use based on the conversation mode.
- * Legal & strategic modes get GPT-4o; therapeutic & general get GPT-4o-mini.
+ * Determine the OpenAI model to use.
+ * All conversations now use GPT-4o for maximum response quality.
+ * @deprecated Mode parameter is no longer used — kept for API backward compat.
  */
-export function getModelForMode(mode?: string): typeof PREMIUM_MODEL | typeof STANDARD_MODEL {
-    if (mode === 'legal' || mode === 'strategic') {
-        return PREMIUM_MODEL;
-    }
-    return STANDARD_MODEL;
+export function getModelForMode(): typeof PREMIUM_MODEL {
+    return PREMIUM_MODEL;
 }
 
 /**

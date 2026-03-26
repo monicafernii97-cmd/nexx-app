@@ -33,16 +33,14 @@ export async function POST(req: NextRequest) {
         }
         const {
             messages,
-            conversationMode,
             userContext,
         } = body as {
             messages: { role: 'user' | 'assistant'; content: string }[];
-            conversationMode?: string;
             userContext?: UserContext;
         };
 
-        // ── Determine model from conversation mode ──
-        const model = getModelForMode(conversationMode);
+        // All conversations use the premium model for maximum quality
+        const model = getModelForMode();
         const premium = isPremiumModel(model);
 
         // ── Fetch user tier from Convex ──
@@ -143,7 +141,6 @@ export async function POST(req: NextRequest) {
         // Build context-enriched system prompt (now with legal citations when available)
         const systemPrompt = buildSystemPrompt({
             ...userContext,
-            conversationMode,
             legalContext,
         });
 
@@ -156,7 +153,7 @@ export async function POST(req: NextRequest) {
             ],
             stream: true,
             temperature: 0.7,
-            max_tokens: 2000,
+            max_tokens: 4096,
         });
 
         // Create a ReadableStream for the response

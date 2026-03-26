@@ -27,7 +27,6 @@ export default function ChatListPage() {
     const conversations = useQuery(api.conversations.list, {});
     const createConversation = useMutation(api.conversations.create);
     const removeConversation = useMutation(api.conversations.remove);
-    const [selectedMode, setSelectedMode] = useState<'therapeutic' | 'legal' | 'strategic' | 'general'>('general');
     const [isCreating, setIsCreating] = useState(false);
     const [isArchiveOpen, setIsArchiveOpen] = useState(false);
     const [deletingId, setDeletingId] = useState<Id<'conversations'> | null>(null);
@@ -53,7 +52,7 @@ export default function ChatListPage() {
         try {
             const id = await createConversation({
                 title: 'New Conversation',
-                mode: selectedMode,
+                mode: 'general',
             });
             router.push(`/chat/${id}`);
         } catch (error) {
@@ -89,24 +88,9 @@ export default function ChatListPage() {
                         <h2 className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 text-sapphire flex items-center gap-2">
                             <ChatTeardropDots size={16} className="text-champagne" /> Start New Session
                         </h2>
-                        <div className="flex flex-wrap gap-2.5">
-                            {Object.entries(MODE_LABELS).map(([key, { label, color }]) => (
-                                <button
-                                    key={key}
-                                    onClick={() => setSelectedMode(key as typeof selectedMode)}
-                                    aria-pressed={selectedMode === key}
-                                    className={`relative px-5 py-2.5 rounded-xl cursor-pointer font-bold tracking-wide transition-all duration-300 overflow-hidden active:scale-95 border backdrop-blur-xl hover:-translate-y-0.5 z-10`}
-                                    style={{
-                                        background: selectedMode === key ? `color-mix(in srgb, ${color} 40%, rgba(255,255,255,0.15))` : 'rgba(255,255,255,0.03)',
-                                        color: selectedMode === key ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
-                                        borderColor: selectedMode === key ? `rgba(255,255,255,0.4)` : 'rgba(255,255,255,0.1)',
-                                        boxShadow: selectedMode === key ? `inset 0 4px 15px rgba(255,255,255,0.1), inset 0 -4px 15px rgba(0,0,0,0.1), 0 8px 20px rgba(0,0,0,0.3)` : 'inset 0 2px 4px rgba(255,255,255,0.05), 0 4px 10px rgba(0,0,0,0.1)',
-                                    }}
-                                >
-                                    <span className="relative z-20 drop-shadow-md">{label}</span>
-                                </button>
-                            ))}
-                        </div>
+                        <p className="text-[13px] text-white/50 leading-relaxed">
+                            Full legal analysis, behavioral pattern recognition, strategic communication support, and court-ready documentation — all in every conversation.
+                        </p>
                     </div>
                     
                     <button

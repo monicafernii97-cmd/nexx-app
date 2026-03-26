@@ -9,7 +9,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Archive, Lock } from '@phosphor-icons/react';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
-import { MODE_LABELS } from '@/lib/constants';
+
 
 /** Premium full-screen chat interface for a single NEXX AI conversation. */
 export default function ConversationPage() {
@@ -77,7 +77,6 @@ export default function ConversationPage() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         messages: history,
-                        conversationMode: conversation?.mode ?? 'general',
                         userContext: {
                             userName: userProfile?.name,
                             state: userProfile?.state,
@@ -146,7 +145,7 @@ export default function ConversationPage() {
                 setStreamingContent('');
             }
         },
-        [conversationId, messages, conversation?.mode, sendMessage, isStreaming, isPending, isThreadReady, userProfile, nexProfile]
+        [conversationId, messages, sendMessage, isStreaming, isPending, isThreadReady, userProfile, nexProfile]
     );
 
     // Early return AFTER all hooks
@@ -163,7 +162,6 @@ export default function ConversationPage() {
         }
     };
 
-    const modeInfo = MODE_LABELS[conversation?.mode ?? 'general'] ?? MODE_LABELS.general;
 
     return (
         <div className="flex flex-col h-[calc(100vh-80px)] max-w-5xl mx-auto px-2 md:px-4 pt-4">
@@ -187,15 +185,15 @@ export default function ConversationPage() {
                     </h1>
                     <div className="flex items-center gap-3 mt-1">
                         <span
-                            className="text-[10px] tracking-widest font-bold py-1 px-3 rounded-full border border-white/10 shadow-sm"
+                            className="text-[10px] tracking-widest font-bold py-1 px-3 rounded-full border shadow-sm"
                             style={{
-                                background: `color-mix(in srgb, ${modeInfo.color} 15%, transparent)`,
+                                background: 'color-mix(in srgb, #5A8EC9 15%, transparent)',
                                 backdropFilter: 'blur(8px)',
-                                color: modeInfo.color,
-                                borderColor: `color-mix(in srgb, ${modeInfo.color} 40%, transparent)`,
+                                color: '#5A8EC9',
+                                borderColor: 'color-mix(in srgb, #5A8EC9 40%, transparent)',
                             }}
                         >
-                            {modeInfo.label} MODE
+                            FULL SPECTRUM
                         </span>
                         <div className="flex items-center gap-1 text-[rgba(10,22,41,0.4)]">
                             <Lock size={12} weight="fill" />

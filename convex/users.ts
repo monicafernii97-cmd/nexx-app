@@ -148,9 +148,12 @@ export const updateProfile = mutation({
         }
 
         const { id, ...updates } = args;
-        // undefined = no change; to clear a field, callers should set it to null
+        // Normalize: null → undefined (schema uses v.optional which doesn't accept null).
+        // undefined = no change, null = caller wants to clear the field.
         const filtered = Object.fromEntries(
-            Object.entries(updates).filter(([, val]) => val !== undefined)
+            Object.entries(updates)
+                .filter(([, val]) => val !== undefined)
+                .map(([key, val]) => [key, val === null ? undefined : val])
         );
         if (Object.keys(filtered).length > 0) {
             await ctx.db.patch(id, filtered);

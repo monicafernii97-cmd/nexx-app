@@ -102,9 +102,8 @@ export default function CourtSettingsPage() {
                     : []);
             const count = existingChildren.length || existingSettings.childrenCount || 0;
             setChildrenCount(count);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             setChildren(existingChildren.length > 0
-                ? existingChildren.map((c: any) => ({ name: String(c.name ?? ''), age: String(c.age ?? '') }))
+                ? existingChildren.map((c: Record<string, unknown>) => ({ name: String(c.name ?? ''), age: String(c.age ?? '') }))
                 : Array(count).fill({ name: '', age: '' }));
         } else if (currentUser) {
             // No court settings yet but user profile has children data — autofill

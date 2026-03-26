@@ -46,30 +46,37 @@ export default function OnboardingPage() {
             router.replace('/dashboard');
         }
     }, [currentUser, router]);
+    // On mount, read the plan from URL params and persist to sessionStorage.
+    // This ensures the plan survives even if sessionStorage was lost during OAuth.
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const urlPlan = new URLSearchParams(window.location.search).get('plan');
+        if (urlPlan && isValidPlan(urlPlan)) {
+            sessionStorage.setItem('selectedPlan', urlPlan);
+        }
+    }, []);
+
     // Guard: if the user hasn't selected a plan yet, redirect to the
     // landing page pricing section. ensureFromClerk auto-creates a Convex
-    // record on sign-in, so we check subscriptionTier + sessionStorage.
+    // record on sign-in, so we check subscriptionTier + sessionStorage + URL.
     useEffect(() => {
-        const debugSessionPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
-        console.log(`[Onboarding Guard] convexReady=${convexReady} convexLoading=${convexLoading} currentUser=${currentUser === undefined ? 'LOADING' : currentUser === null ? 'NULL' : JSON.stringify({tier: currentUser.subscriptionTier, onboarding: currentUser.onboardingComplete})} sessionPlan=${debugSessionPlan}`);
         if (!convexReady || convexLoading) return;
         if (currentUser === undefined) return; // still loading
         if (currentUser === null) {
             // Convex record not created yet — UserProvider is syncing via
             // ensureFromClerk. Wait for the record to appear rather than
-            // bouncing the user back to pricing. The query will reactively
-            // update once the mutation completes.
+            // bouncing the user back to pricing.
             return;
         }
         // currentUser exists but hasn't completed onboarding
         if (currentUser.onboardingComplete) return; // returning user
         if (isValidPlan(currentUser.subscriptionTier)) return;
-        // No valid DB tier — check sessionStorage for a freshly selected plan
-        const validPlan = getValidSelectedPlan(currentUser);
-        console.log(`[Onboarding Guard] validPlan=${validPlan}, redirecting=${!validPlan}`);
-        if (!validPlan) {
-            router.replace('/#pricing');
-        }
+        // Check URL param → sessionStorage → default to 'free'
+        const urlPlan = new URLSearchParams(window.location.search).get('plan');
+        if (isValidPlan(urlPlan)) return; // plan in URL — all good
+        if (getValidSelectedPlan(currentUser)) return; // plan in sessionStorage
+        // No plan found anywhere — default to 'free' instead of looping
+        sessionStorage.setItem('selectedPlan', 'free');
     }, [convexReady, convexLoading, currentUser, router]);
 
     // ─── Form state (must be declared before any early returns) ───

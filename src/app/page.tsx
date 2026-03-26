@@ -86,7 +86,8 @@ export default function WelcomePage() {
       const selectedPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
       const hasPlan = isValidPlan(currentUser.subscriptionTier) || isValidPlan(selectedPlan);
       if (hasPlan) {
-        router.replace('/onboarding');
+        const plan = selectedPlan || currentUser.subscriptionTier || '';
+        router.replace(`/onboarding?plan=${plan}`);
       } else {
         // No plan selected — stay on welcome page, scroll to pricing
         requestAnimationFrame(() => {
@@ -95,11 +96,6 @@ export default function WelcomePage() {
       }
     }
   }, [clerkLoaded, isSignedIn, convexLoading, convexReady, currentUser, router]);
-
-  // ──── TEMPORARY DEBUG (remove after fixing) ────
-  const debugSessionPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
-  const debugInfo = `[Landing] clerkLoaded=${clerkLoaded} isSignedIn=${isSignedIn} convexLoading=${convexLoading} convexReady=${convexReady} currentUser=${currentUser === undefined ? 'LOADING' : currentUser === null ? 'NULL' : `{tier:${currentUser.subscriptionTier},onboarding:${currentUser.onboardingComplete}}`} sessionPlan=${debugSessionPlan} showBanner=${showNoPlanBanner} path=${typeof window !== 'undefined' ? window.location.pathname : '?'}`;
-  if (typeof window !== 'undefined') console.log(debugInfo);
 
   // Terminal auth error: Clerk signed in but Convex token sync failed
   if (convexAuthFailed) {
@@ -381,7 +377,7 @@ export default function WelcomePage() {
                 <button
                   onClick={() => {
                     sessionStorage.setItem('selectedPlan', plan.tier);
-                    router.push(isSignedIn ? '/onboarding' : '/sign-up');
+                    router.push(isSignedIn ? `/onboarding?plan=${plan.tier}` : `/sign-up?plan=${plan.tier}`);
                   }}
                   className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all ${
                     plan.popular

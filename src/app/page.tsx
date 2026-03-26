@@ -96,6 +96,11 @@ export default function WelcomePage() {
     }
   }, [clerkLoaded, isSignedIn, convexLoading, convexReady, currentUser, router]);
 
+  // ──── TEMPORARY DEBUG (remove after fixing) ────
+  const debugSessionPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
+  const debugInfo = `[Landing] clerkLoaded=${clerkLoaded} isSignedIn=${isSignedIn} convexLoading=${convexLoading} convexReady=${convexReady} currentUser=${currentUser === undefined ? 'LOADING' : currentUser === null ? 'NULL' : `{tier:${currentUser.subscriptionTier},onboarding:${currentUser.onboardingComplete}}`} sessionPlan=${debugSessionPlan} showBanner=${showNoPlanBanner} path=${typeof window !== 'undefined' ? window.location.pathname : '?'}`;
+  if (typeof window !== 'undefined') console.log(debugInfo);
+
   // Terminal auth error: Clerk signed in but Convex token sync failed
   if (convexAuthFailed) {
     return (

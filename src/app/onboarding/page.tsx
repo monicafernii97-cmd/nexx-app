@@ -50,6 +50,8 @@ export default function OnboardingPage() {
     // landing page pricing section. ensureFromClerk auto-creates a Convex
     // record on sign-in, so we check subscriptionTier + sessionStorage.
     useEffect(() => {
+        const debugSessionPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
+        console.log(`[Onboarding Guard] convexReady=${convexReady} convexLoading=${convexLoading} currentUser=${currentUser === undefined ? 'LOADING' : currentUser === null ? 'NULL' : JSON.stringify({tier: currentUser.subscriptionTier, onboarding: currentUser.onboardingComplete})} sessionPlan=${debugSessionPlan}`);
         if (!convexReady || convexLoading) return;
         if (currentUser === undefined) return; // still loading
         if (currentUser === null) {
@@ -63,7 +65,9 @@ export default function OnboardingPage() {
         if (currentUser.onboardingComplete) return; // returning user
         if (isValidPlan(currentUser.subscriptionTier)) return;
         // No valid DB tier — check sessionStorage for a freshly selected plan
-        if (!getValidSelectedPlan(currentUser)) {
+        const validPlan = getValidSelectedPlan(currentUser);
+        console.log(`[Onboarding Guard] validPlan=${validPlan}, redirecting=${!validPlan}`);
+        if (!validPlan) {
             router.replace('/#pricing');
         }
     }, [convexReady, convexLoading, currentUser, router]);

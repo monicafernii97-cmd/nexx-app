@@ -128,6 +128,11 @@ export async function GET(
         });
     } catch (error) {
         console.error('[Incident PDF Generation Error]', error);
-        return new NextResponse('Error generating PDF', { status: 500 });
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        const publicMessage =
+            process.env.NODE_ENV === 'development'
+                ? `Error generating PDF: ${message}`
+                : 'Error generating PDF';
+        return new NextResponse(publicMessage, { status: 500 });
     }
 }

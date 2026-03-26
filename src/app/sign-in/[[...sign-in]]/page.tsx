@@ -43,7 +43,7 @@ export default function SignInPage() {
                 </div>
                 <SignIn
                     appearance={nexxClerkAppearance}
-                    forceRedirectUrl="/"
+                    fallbackRedirectUrl="/"
                     signUpForceRedirectUrl="/onboarding"
                 />
             </div>

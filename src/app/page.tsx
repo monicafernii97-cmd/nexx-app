@@ -29,6 +29,12 @@ import { CaretDown } from '@phosphor-icons/react';
 export default function WelcomePage() {
   const { isSignedIn, isLoaded: clerkLoaded } = useAuth();
   const { signOut } = useClerk();
+
+  /** Sign out and clear stale plan selection. */
+  const handleSignOut = () => {
+    sessionStorage.removeItem('selectedPlan');
+    signOut({ redirectUrl: '/' });
+  };
   // useConvexAuth waits for the Clerk JWT to be synced to Convex.
   // This prevents a race where Clerk says "signed in" but Convex
   // hasn't received the token yet, causing users.me to return null.
@@ -122,7 +128,7 @@ export default function WelcomePage() {
             We couldn&apos;t sync your session. Please try signing in again.
           </p>
           <button
-            onClick={() => signOut({ redirectUrl: '/' })}
+            onClick={() => handleSignOut()}
             className="btn-outline text-xs"
           >
             Sign in again

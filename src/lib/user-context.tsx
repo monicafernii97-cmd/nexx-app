@@ -91,6 +91,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (clerkUser.id !== prevClerkId.current) {
             hasSynced.current = false;
             prevClerkId.current = clerkUser.id;
+            // Clear stale plan selection from a prior session/identity
+            if (typeof window !== 'undefined') {
+                sessionStorage.removeItem('selectedPlan');
+            }
         }
 
         // Skip if already synced for this identity

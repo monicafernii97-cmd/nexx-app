@@ -1,9 +1,12 @@
 /**
  * Shared plan definitions used on the landing page and potentially
  * the subscription/onboarding pages to keep pricing and features in sync.
+ *
+ * Quota feature strings (premium/standard AI responses) are derived
+ * from TIER_LIMITS so there is a single source of truth for limits.
  */
 
-import { type SubscriptionTier } from './tiers';
+import { TIER_LIMITS, type SubscriptionTier } from './tiers';
 
 /** Alias for SubscriptionTier — single source of truth lives in tiers.ts */
 export type PlanTier = SubscriptionTier;
@@ -21,6 +24,23 @@ export interface PlanDefinition {
     popular: boolean;
 }
 
+/** Format a daily limit value for plan feature display. */
+function formatLimit(limit: number, label: string): string {
+    return limit === -1 ? `Unlimited ${label}` : `${limit} ${label}`;
+}
+
+/** Build the AI quota feature lines from TIER_LIMITS for a given tier. */
+function buildAIQuotaFeatures(tier: PlanTier): string[] {
+    const config = TIER_LIMITS[tier];
+    const premiumLine = formatLimit(config.gpt4oDailyLimit, 'premium AI responses per day');
+    // Only show the standard line if it differs from the premium line (i.e. there IS a cap)
+    if (config.gpt4oDailyLimit === -1) {
+        return [premiumLine];
+    }
+    const standardLine = formatLimit(config.gpt4oMiniDailyLimit, 'standard AI responses');
+    return [premiumLine, standardLine];
+}
+
 export const PLANS: PlanDefinition[] = [
     {
         name: 'Free',
@@ -30,8 +50,7 @@ export const PLANS: PlanDefinition[] = [
         description: 'Start documenting incidents and explore what NEXX can do — completely free.',
         badge: null,
         features: [
-            '10 premium AI responses per day',
-            'Unlimited standard AI responses',
+            ...buildAIQuotaFeatures('free'),
             '3 legal document generations per month',
             '3 court rules lookups per month',
             'Basic incident reporting & analysis',
@@ -49,8 +68,7 @@ export const PLANS: PlanDefinition[] = [
         description: 'For parents ready to build a strong, evidence-backed case with expanded access to every tool.',
         badge: null,
         features: [
-            '75 premium AI responses per day',
-            'Unlimited standard AI responses',
+            ...buildAIQuotaFeatures('pro'),
             'Unlimited legal document generation',
             'Unlimited incident analysis & timeline reports',
             'Full county resource finder & court rules lookup',
@@ -68,8 +86,7 @@ export const PLANS: PlanDefinition[] = [
         description: 'Our most popular plan — built for parents actively navigating custody, family law, or high-conflict cases.',
         badge: 'Most Popular',
         features: [
-            '200 premium AI responses per day',
-            'Unlimited standard AI responses',
+            ...buildAIQuotaFeatures('premium'),
             'Unlimited document generation & DocuVault access',
             'Advanced court compliance verification',
             'Unlimited access to local legal resources',
@@ -87,7 +104,7 @@ export const PLANS: PlanDefinition[] = [
         description: 'No daily caps. No restrictions. Full, unrestricted access to every NEXX feature.',
         badge: 'Elite',
         features: [
-            'Unlimited premium AI responses',
+            ...buildAIQuotaFeatures('executive'),
             'Unlimited document generation & template gallery',
             'Unlimited incident analysis & timeline reports',
             'Unlimited compliance verification & court rule lookups',

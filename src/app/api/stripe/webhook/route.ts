@@ -4,6 +4,13 @@ import { getConvexClient } from '@/lib/convexServer';
 import { api } from '../../../../../convex/_generated/api';
 import type Stripe from 'stripe';
 
+/** Safely extract a string customer ID from Stripe's customer field. */
+function resolveCustomerId(customer: string | Stripe.Customer | Stripe.DeletedCustomer | null): string {
+    if (typeof customer === 'string') return customer;
+    if (customer && 'id' in customer) return customer.id;
+    return '';
+}
+
 /** Stripe webhook handler — processes subscription lifecycle events. */
 export async function POST(req: NextRequest) {
     const body = await req.text();
@@ -30,14 +37,21 @@ export async function POST(req: NextRequest) {
                 const clerkId = session.metadata?.clerkId;
                 const tier = session.metadata?.tier;
 
-                if (clerkId && tier && session.subscription) {
+                if (!clerkId) {
+                    console.warn('[Stripe Webhook] checkout.session.completed missing clerkId in metadata', {
+                        sessionId: session.id,
+                    });
+                    break;
+                }
+
+                if (tier && session.subscription) {
                     const subscriptionId = typeof session.subscription === 'string'
                         ? session.subscription
                         : session.subscription.id;
 
                     await convex.mutation(api.stripe.updateSubscription, {
                         clerkId,
-                        stripeCustomerId: session.customer as string,
+                        stripeCustomerId: resolveCustomerId(session.customer),
                         stripeSubscriptionId: subscriptionId,
                         stripePriceId: '',  // Will be set by subscription.updated
                         subscriptionTier: tier,
@@ -53,26 +67,30 @@ export async function POST(req: NextRequest) {
                 const priceId = subscription.items.data[0]?.price?.id;
                 const tier = priceId ? getTierForPriceId(priceId) : undefined;
 
-                if (clerkId) {
-                    const status = subscription.status === 'active' || subscription.status === 'trialing'
-                        ? 'active'
-                        : subscription.status === 'past_due'
-                            ? 'past_due'
-                            : subscription.status === 'canceled'
-                                ? 'canceled'
-                                : 'active';
-
-                    await convex.mutation(api.stripe.updateSubscription, {
-                        clerkId,
-                        stripeCustomerId: typeof subscription.customer === 'string'
-                            ? subscription.customer
-                            : subscription.customer.id,
-                        stripeSubscriptionId: subscription.id,
-                        stripePriceId: priceId ?? '',
-                        subscriptionTier: tier ?? 'free',
-                        subscriptionStatus: status,
+                if (!clerkId) {
+                    console.warn('[Stripe Webhook] subscription.updated missing clerkId in metadata', {
+                        subscriptionId: subscription.id,
+                        customerId: resolveCustomerId(subscription.customer),
                     });
+                    break;
                 }
+
+                const status = subscription.status === 'active' || subscription.status === 'trialing'
+                    ? 'active'
+                    : subscription.status === 'past_due'
+                        ? 'past_due'
+                        : subscription.status === 'canceled'
+                            ? 'canceled'
+                            : 'active';
+
+                await convex.mutation(api.stripe.updateSubscription, {
+                    clerkId,
+                    stripeCustomerId: resolveCustomerId(subscription.customer),
+                    stripeSubscriptionId: subscription.id,
+                    stripePriceId: priceId ?? '',
+                    subscriptionTier: tier ?? 'free',
+                    subscriptionStatus: status,
+                });
                 break;
             }
 
@@ -80,49 +98,65 @@ export async function POST(req: NextRequest) {
                 const subscription = event.data.object as Stripe.Subscription;
                 const clerkId = subscription.metadata?.clerkId;
 
-                if (clerkId) {
-                    await convex.mutation(api.stripe.updateSubscription, {
-                        clerkId,
-                        stripeCustomerId: typeof subscription.customer === 'string'
-                            ? subscription.customer
-                            : subscription.customer.id,
-                        stripeSubscriptionId: '',
-                        stripePriceId: '',
-                        subscriptionTier: 'free',
-                        subscriptionStatus: 'canceled',
+                if (!clerkId) {
+                    console.warn('[Stripe Webhook] subscription.deleted missing clerkId in metadata', {
+                        subscriptionId: subscription.id,
+                        customerId: resolveCustomerId(subscription.customer),
                     });
+                    break;
                 }
+
+                await convex.mutation(api.stripe.updateSubscription, {
+                    clerkId,
+                    stripeCustomerId: resolveCustomerId(subscription.customer),
+                    stripeSubscriptionId: '',
+                    stripePriceId: '',
+                    subscriptionTier: 'free',
+                    subscriptionStatus: 'canceled',
+                });
                 break;
             }
 
             case 'invoice.payment_failed': {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const invoice = event.data.object as any;
-                const subscriptionId = typeof invoice.subscription === 'string'
-                    ? invoice.subscription
-                    : invoice.subscription?.id;
+                const invoice = event.data.object as Stripe.Invoice;
+                // Invoice.subscription can be string | Stripe.Subscription | null
+                const rawSub = (invoice as unknown as Record<string, unknown>).subscription;
+                const subscriptionId = typeof rawSub === 'string'
+                    ? rawSub
+                    : typeof rawSub === 'object' && rawSub !== null && 'id' in rawSub
+                        ? (rawSub as { id: string }).id
+                        : undefined;
 
-                if (subscriptionId) {
-                    // Fetch subscription to get clerkId from metadata
-                    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-                    const clerkId = subscription.metadata?.clerkId;
-
-                    if (clerkId) {
-                        const priceId = subscription.items.data[0]?.price?.id;
-                        const tier = priceId ? getTierForPriceId(priceId) : 'free';
-
-                        await convex.mutation(api.stripe.updateSubscription, {
-                            clerkId,
-                            stripeCustomerId: typeof subscription.customer === 'string'
-                                ? subscription.customer
-                                : subscription.customer.id,
-                            stripeSubscriptionId: subscription.id,
-                            stripePriceId: priceId ?? '',
-                            subscriptionTier: tier ?? 'free',
-                            subscriptionStatus: 'past_due',
-                        });
-                    }
+                if (!subscriptionId) {
+                    console.warn('[Stripe Webhook] invoice.payment_failed has no subscription', {
+                        invoiceId: invoice.id,
+                    });
+                    break;
                 }
+
+                // Fetch subscription to get clerkId from metadata
+                const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+                const clerkId = subscription.metadata?.clerkId;
+
+                if (!clerkId) {
+                    console.warn('[Stripe Webhook] invoice.payment_failed subscription missing clerkId', {
+                        subscriptionId,
+                        customerId: resolveCustomerId(subscription.customer),
+                    });
+                    break;
+                }
+
+                const priceId = subscription.items.data[0]?.price?.id;
+                const tier = priceId ? getTierForPriceId(priceId) : 'free';
+
+                await convex.mutation(api.stripe.updateSubscription, {
+                    clerkId,
+                    stripeCustomerId: resolveCustomerId(subscription.customer),
+                    stripeSubscriptionId: subscription.id,
+                    stripePriceId: priceId ?? '',
+                    subscriptionTier: tier ?? 'free',
+                    subscriptionStatus: 'past_due',
+                });
                 break;
             }
 

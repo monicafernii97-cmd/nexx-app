@@ -1,9 +1,9 @@
 'use client';
 
-import { Suspense, useState, useCallback } from 'react';
+import { Suspense, useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery } from 'convex/react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '../../../../convex/_generated/api';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import {
@@ -37,11 +37,24 @@ export default function SubscriptionPage() {
 function SubscriptionContent() {
     const user = useQuery(api.users.me);
     const searchParams = useSearchParams();
+    const router = useRouter();
     const [loadingTier, setLoadingTier] = useState<string | null>(null);
     const [portalLoading, setPortalLoading] = useState(false);
+    const [showToast, setShowToast] = useState(false);
 
     const isSuccess = searchParams.get('success') === 'true';
     const isCanceled = searchParams.get('canceled') === 'true';
+
+    // Auto-dismiss toasts after 5 seconds and clean up URL query params
+    useEffect(() => {
+        if (!isSuccess && !isCanceled) return;
+        setShowToast(true);
+        const timer = setTimeout(() => {
+            setShowToast(false);
+            router.replace('/subscription', { scroll: false });
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, [isSuccess, isCanceled, router]);
 
     const handleUpgrade = useCallback(async (tier: string) => {
         setLoadingTier(tier);
@@ -347,19 +360,25 @@ function SubscriptionContent() {
             </div>
 
             {/* Success/Cancel Toast */}
-            {isSuccess && (
+            {showToast && isSuccess && (
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    role="status"
+                    aria-live="polite"
                     className="fixed bottom-6 right-6 bg-green-500/20 border border-green-500/40 text-green-300 px-6 py-3 rounded-xl text-sm font-bold backdrop-blur-xl shadow-lg z-50"
                 >
                     ✓ Subscription activated! Your plan has been upgraded.
                 </motion.div>
             )}
-            {isCanceled && (
+            {showToast && isCanceled && (
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    role="status"
+                    aria-live="polite"
                     className="fixed bottom-6 right-6 bg-amber-500/20 border border-amber-500/40 text-amber-300 px-6 py-3 rounded-xl text-sm font-bold backdrop-blur-xl shadow-lg z-50"
                 >
                     Checkout canceled. No charges were made.

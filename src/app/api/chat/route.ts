@@ -84,16 +84,17 @@ export async function POST(req: NextRequest) {
         // ── Tier-specific rate limit with graceful fallback ──
         // When the gpt-4o daily limit is reached, silently fall back to gpt-4o-mini
         // instead of blocking the user. This ensures users always get a response.
+        // When tier lookup fails (tierResolved=false), use free-tier limits as a
+        // safe default to prevent uncapped gpt-4o access during DB outages.
         let resolvedModel: string = model;
-        if (tierResolved) {
-            const dailyCap = getDailyLimit(userTier, model);
+        const effectiveTier = tierResolved ? userTier : 'free';
+        const dailyCap = getDailyLimit(effectiveTier, model);
 
-            if (dailyCap !== -1) { // -1 = unlimited
-                const tierRl = checkRateLimit(userId, 'chat_message_4o' as const, dailyCap);
-                if (!tierRl.allowed) {
-                    // Graceful fallback: switch to gpt-4o-mini instead of blocking
-                    resolvedModel = 'gpt-4o-mini';
-                }
+        if (dailyCap !== -1) { // -1 = unlimited
+            const tierRl = checkRateLimit(userId, 'chat_message_4o' as const, dailyCap);
+            if (!tierRl.allowed) {
+                // Graceful fallback: switch to gpt-4o-mini instead of blocking
+                resolvedModel = 'gpt-4o-mini';
             }
         }
 

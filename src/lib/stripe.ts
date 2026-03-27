@@ -18,7 +18,11 @@ export function getStripe(): Stripe {
     return _stripe;
 }
 
-/** @deprecated Use getStripe() instead — kept for convenience in route files. */
+/**
+ * Proxy-based Stripe client for convenience — delegates to getStripe().
+ * TODO: Remove this proxy once all route files have been migrated to use
+ * getStripe() directly. Tracked for removal in the next major refactor.
+ */
 export const stripe = new Proxy({} as Stripe, {
     get(_target, prop) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -28,22 +32,23 @@ export const stripe = new Proxy({} as Stripe, {
 
 // ── Tier ↔ Stripe Price ID mapping ──
 
-function getPriceMap(): Record<string, string> {
+function getPriceMap(): Record<string, string | undefined> {
     return {
-        pro: process.env.STRIPE_PRICE_PRO ?? '',
-        premium: process.env.STRIPE_PRICE_PREMIUM ?? '',
-        executive: process.env.STRIPE_PRICE_EXECUTIVE ?? '',
+        pro: process.env.STRIPE_PRICE_PRO || undefined,
+        premium: process.env.STRIPE_PRICE_PREMIUM || undefined,
+        executive: process.env.STRIPE_PRICE_EXECUTIVE || undefined,
     };
 }
 
-/** Get the Stripe Price ID for a given subscription tier. */
+/** Get the Stripe Price ID for a given subscription tier. Returns undefined if unset. */
 export function getPriceIdForTier(tier: string): string | undefined {
     return getPriceMap()[tier];
 }
 
-/** Get the subscription tier for a given Stripe Price ID. */
+/** Get the subscription tier for a given Stripe Price ID. Ignores unset env vars. */
 export function getTierForPriceId(priceId: string): string | undefined {
+    if (!priceId) return undefined;
     const map = getPriceMap();
-    const entry = Object.entries(map).find(([, id]) => id === priceId);
+    const entry = Object.entries(map).find(([, id]) => id && id === priceId);
     return entry?.[0];
 }

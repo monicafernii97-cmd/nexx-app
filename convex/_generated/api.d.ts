@@ -17,6 +17,7 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as messages from "../messages.js";
 import type * as nexProfiles from "../nexProfiles.js";
 import type * as resourcesCache from "../resourcesCache.js";
+import type * as stripe from "../stripe.js";
 import type * as users from "../users.js";
 
 import type {
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   messages: typeof messages;
   nexProfiles: typeof nexProfiles;
   resourcesCache: typeof resourcesCache;
+  stripe: typeof stripe;
   users: typeof users;
 }>;
 

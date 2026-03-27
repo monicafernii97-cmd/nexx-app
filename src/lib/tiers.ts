@@ -9,6 +9,15 @@
 
 export type SubscriptionTier = 'free' | 'pro' | 'premium' | 'executive';
 
+/** Paid tiers only — used for checkout validation. */
+export type PaidSubscriptionTier = Exclude<SubscriptionTier, 'free'>;
+export const PAID_TIERS: PaidSubscriptionTier[] = ['pro', 'premium', 'executive'];
+
+/** Check if a tier string is a valid paid tier. */
+export function isPaidTier(tier: string): tier is PaidSubscriptionTier {
+    return PAID_TIERS.includes(tier as PaidSubscriptionTier);
+}
+
 interface TierConfig {
     /** Display name for UI */
     label: string;
@@ -24,25 +33,25 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierConfig> = {
     free: {
         label: 'Free',
         priceUsd: 0,
-        gpt4oDailyLimit: 5,
-        gpt4oMiniDailyLimit: 50,
+        gpt4oDailyLimit: 10,
+        gpt4oMiniDailyLimit: -1, // unlimited fallback
     },
     pro: {
         label: 'Pro',
         priceUsd: 29.99,
-        gpt4oDailyLimit: 50,
-        gpt4oMiniDailyLimit: -1, // unlimited
+        gpt4oDailyLimit: 75,
+        gpt4oMiniDailyLimit: -1, // unlimited fallback
     },
     premium: {
         label: 'Premium',
         priceUsd: 49.99,
-        gpt4oDailyLimit: 100,
-        gpt4oMiniDailyLimit: -1,
+        gpt4oDailyLimit: 200,
+        gpt4oMiniDailyLimit: -1, // unlimited fallback
     },
     executive: {
         label: 'Executive',
         priceUsd: 149.99,
-        gpt4oDailyLimit: -1,
+        gpt4oDailyLimit: -1, // unlimited
         gpt4oMiniDailyLimit: -1,
     },
 };
@@ -51,7 +60,8 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierConfig> = {
 
 export type ChatMode = 'general';
 
-const PREMIUM_MODEL = 'gpt-4o' as const;
+export const PREMIUM_MODEL = 'gpt-4o' as const;
+export const FALLBACK_MODEL = 'gpt-4o-mini' as const;
 
 /**
  * Determine the OpenAI model to use.
@@ -71,9 +81,13 @@ export function isPremiumModel(model: string): boolean {
 
 /**
  * Get the daily message cap for a given tier and model.
- * Returns -1 for unlimited.
+ * Returns -1 for unlimited, 0 for unknown/unsupported models (fail-closed).
  */
 export function getDailyLimit(tier: SubscriptionTier, model: string): number {
     const config = TIER_LIMITS[tier] ?? TIER_LIMITS.free;
-    return model === PREMIUM_MODEL ? config.gpt4oDailyLimit : config.gpt4oMiniDailyLimit;
+    if (model === PREMIUM_MODEL) return config.gpt4oDailyLimit;
+    if (model === FALLBACK_MODEL) return config.gpt4oMiniDailyLimit;
+    // Unknown model — fail-closed to prevent bypassing quota
+    console.warn('[Tiers] getDailyLimit called with unknown model:', model);
+    return 0;
 }

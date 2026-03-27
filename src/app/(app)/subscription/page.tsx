@@ -1,7 +1,9 @@
 'use client';
 
+import { Suspense, useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery } from 'convex/react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '../../../../convex/_generated/api';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import {
@@ -10,7 +12,6 @@ import {
     Star,
     Shield,
     ChatCircleText,
-    FileText,
     ArrowRight,
     Check,
 } from '@phosphor-icons/react';
@@ -20,7 +21,86 @@ import { PLANS } from '@/lib/plans';
 
 /** Subscription management page — shows current plan and upgrade options. */
 export default function SubscriptionPage() {
+    return (
+        <Suspense fallback={
+            <PageContainer>
+                <div className="flex items-center justify-center h-64">
+                    <div className="w-10 h-10 rounded-full border-2 border-[#60A5FA] border-t-transparent animate-spin" />
+                </div>
+            </PageContainer>
+        }>
+            <SubscriptionContent />
+        </Suspense>
+    );
+}
+
+function SubscriptionContent() {
     const user = useQuery(api.users.me);
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const [loadingTier, setLoadingTier] = useState<string | null>(null);
+    const [portalLoading, setPortalLoading] = useState(false);
+    const [showToast, setShowToast] = useState(false);
+
+    const isSuccess = searchParams.get('success') === 'true';
+    const isCanceled = searchParams.get('canceled') === 'true';
+
+    // Auto-dismiss toasts after 5 seconds and clean up URL query params
+    useEffect(() => {
+        if (!isSuccess && !isCanceled) return;
+        setShowToast(true);
+        const timer = setTimeout(() => {
+            setShowToast(false);
+            router.replace('/subscription', { scroll: false });
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, [isSuccess, isCanceled, router]);
+
+    const handleUpgrade = useCallback(async (tier: string) => {
+        setLoadingTier(tier);
+        try {
+            const res = await fetch('/api/stripe/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tier }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                console.error('Checkout API error:', data);
+                alert(data.error ?? 'Something went wrong. Please try again.');
+                return;
+            }
+            if (data.url) {
+                window.location.href = data.url;
+            }
+        } catch (error) {
+            console.error('Checkout failed:', error);
+            alert('Network error — please check your connection and try again.');
+        } finally {
+            setLoadingTier(null);
+        }
+    }, []);
+
+    const handleManageBilling = useCallback(async () => {
+        setPortalLoading(true);
+        try {
+            const res = await fetch('/api/stripe/portal', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) {
+                console.error('Portal API error:', data);
+                alert(data.error ?? 'Unable to open billing portal. Please try again.');
+                return;
+            }
+            if (data.url) {
+                window.location.href = data.url;
+            }
+        } catch (error) {
+            console.error('Portal failed:', error);
+            alert('Network error — please check your connection and try again.');
+        } finally {
+            setPortalLoading(false);
+        }
+    }, []);
 
     // Show loading spinner while user data is being fetched
     if (user === undefined) {
@@ -55,8 +135,8 @@ export default function SubscriptionPage() {
             iconColor: 'rgba(255,255,255,0.5)',
             description: 'Start documenting incidents and explore what NEXX can do — completely free.',
             features: [
-                '5 legal guidance messages per day',
-                '50 NEXX Chat messages per day',
+                '10 premium AI responses per day',
+                'Unlimited standard AI responses',
                 '3 legal document generations per month',
                 '3 court rules lookups per month',
                 'Basic incident reporting & analysis',
@@ -69,8 +149,8 @@ export default function SubscriptionPage() {
             iconColor: '#60A5FA',
             description: 'For parents ready to build a strong, evidence-backed case with expanded access to every tool.',
             features: [
-                '50 legal guidance messages per day',
-                'Unlimited NEXX Chat',
+                '75 premium AI responses per day',
+                'Unlimited standard AI responses',
                 'Unlimited legal document generation',
                 'Unlimited incident analysis & timeline reports',
                 'Full county resource finder & court rules lookup',
@@ -84,8 +164,8 @@ export default function SubscriptionPage() {
             description: 'Our most popular plan — built for parents actively navigating custody, family law, or high-conflict cases.',
             badge: 'Most Popular',
             features: [
-                '100 legal guidance messages per day',
-                'Unlimited NEXX Chat',
+                '200 premium AI responses per day',
+                'Unlimited standard AI responses',
                 'Unlimited document generation & DocuVault access',
                 'Advanced court compliance verification',
                 'Unlimited access to local legal resources',
@@ -99,7 +179,7 @@ export default function SubscriptionPage() {
             description: 'No daily caps. No restrictions. Full, unrestricted access to every NEXX feature — built for your most demanding legal needs.',
             badge: 'Elite',
             features: [
-                'Unlimited legal guidance messages',
+                'Unlimited premium AI responses',
                 'Unlimited document generation & template gallery',
                 'Unlimited incident analysis & timeline reports',
                 'Unlimited compliance verification & court rule lookups',
@@ -149,19 +229,10 @@ export default function SubscriptionPage() {
                         <div className="rounded-2xl bg-[#0A1128] border border-[rgba(255,255,255,0.08)] px-5 py-3 text-center min-w-[120px]">
                             <div className="flex items-center justify-center gap-2 mb-1">
                                 <ChatCircleText size={16} weight="fill" color="#60A5FA" />
-                                <span className="text-[10px] font-bold tracking-wider uppercase text-white/40">Legal Guidance / Day</span>
+                                <span className="text-[10px] font-bold tracking-wider uppercase text-white/40">Premium AI / Day</span>
                             </div>
                             <p className="text-xl font-serif font-bold text-white">
                                 {currentConfig.gpt4oDailyLimit === -1 ? '∞' : currentConfig.gpt4oDailyLimit}
-                            </p>
-                        </div>
-                        <div className="rounded-2xl bg-[#0A1128] border border-[rgba(255,255,255,0.08)] px-5 py-3 text-center min-w-[120px]">
-                            <div className="flex items-center justify-center gap-2 mb-1">
-                                <FileText size={16} weight="fill" color="#60A5FA" />
-                                <span className="text-[10px] font-bold tracking-wider uppercase text-white/40">NEXX Chat / Day</span>
-                            </div>
-                            <p className="text-xl font-serif font-bold text-white">
-                                {currentConfig.gpt4oMiniDailyLimit === -1 ? '∞' : currentConfig.gpt4oMiniDailyLimit}
                             </p>
                         </div>
                     </div>
@@ -240,7 +311,8 @@ export default function SubscriptionPage() {
 
                             {/* CTA */}
                             <button
-                                disabled={isCurrent || !isUpgrade}
+                                disabled={isCurrent || !isUpgrade || loadingTier === plan.tier}
+                                onClick={() => isUpgrade && handleUpgrade(plan.tier)}
                                 className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all flex items-center justify-center gap-2 ${
                                     isCurrent
                                         ? 'bg-[rgba(255,255,255,0.05)] text-white/30 cursor-default'
@@ -249,7 +321,9 @@ export default function SubscriptionPage() {
                                             : 'bg-[rgba(255,255,255,0.03)] text-white/20 cursor-default'
                                 }`}
                             >
-                                {isCurrent ? 'Current Plan' : isUpgrade ? (
+                                {loadingTier === plan.tier ? (
+                                    <div className="w-4 h-4 rounded-full border-2 border-[#0A1128] border-t-transparent animate-spin" />
+                                ) : isCurrent ? 'Current Plan' : isUpgrade ? (
                                     <>Upgrade <ArrowRight size={14} weight="bold" /></>
                                 ) : 'Included'}
                             </button>
@@ -297,17 +371,49 @@ export default function SubscriptionPage() {
                 </motion.div>
             </div>
 
-            {/* Info notice */}
-            <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.8, duration: 0.6 }}
-                className="text-center text-[11px] text-white/30 mt-8 mb-4 max-w-sm mx-auto"
-            >
-                Ready to upgrade? Reach out to{' '}
-                <a href="mailto:support@nexxapp.com" className="text-[var(--champagne)] hover:underline opacity-80 hover:opacity-100 font-bold tracking-wide">support@nexxapp.com</a>
-                {' '}and we&apos;ll get you set up.
-            </motion.p>
+            {/* Success/Cancel Toast */}
+            {showToast && isSuccess && (
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    role="status"
+                    aria-live="polite"
+                    className="fixed bottom-6 right-6 bg-green-500/20 border border-green-500/40 text-green-300 px-6 py-3 rounded-xl text-sm font-bold backdrop-blur-xl shadow-lg z-50"
+                >
+                    ✓ Subscription activated! Your plan has been upgraded.
+                </motion.div>
+            )}
+            {showToast && isCanceled && (
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    role="status"
+                    aria-live="polite"
+                    className="fixed bottom-6 right-6 bg-amber-500/20 border border-amber-500/40 text-amber-300 px-6 py-3 rounded-xl text-sm font-bold backdrop-blur-xl shadow-lg z-50"
+                >
+                    Checkout canceled. No charges were made.
+                </motion.div>
+            )}
+
+            {/* Manage Billing */}
+            {user?.stripeCustomerId && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.8, duration: 0.6 }}
+                    className="text-center mt-8 mb-4"
+                >
+                    <button
+                        onClick={handleManageBilling}
+                        disabled={portalLoading}
+                        className="text-[12px] text-[var(--champagne)] hover:underline opacity-80 hover:opacity-100 font-bold tracking-wide uppercase cursor-pointer transition-all"
+                    >
+                        {portalLoading ? 'Opening...' : 'Manage Billing & Invoices →'}
+                    </button>
+                </motion.div>
+            )}
 
         </PageContainer>
     );

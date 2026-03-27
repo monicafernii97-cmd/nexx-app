@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { Suspense, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery } from 'convex/react';
 import { useSearchParams } from 'next/navigation';
@@ -21,6 +21,20 @@ import { PLANS } from '@/lib/plans';
 
 /** Subscription management page — shows current plan and upgrade options. */
 export default function SubscriptionPage() {
+    return (
+        <Suspense fallback={
+            <PageContainer>
+                <div className="flex items-center justify-center h-64">
+                    <div className="w-10 h-10 rounded-full border-2 border-[#60A5FA] border-t-transparent animate-spin" />
+                </div>
+            </PageContainer>
+        }>
+            <SubscriptionContent />
+        </Suspense>
+    );
+}
+
+function SubscriptionContent() {
     const user = useQuery(api.users.me);
     const searchParams = useSearchParams();
     const [loadingTier, setLoadingTier] = useState<string | null>(null);

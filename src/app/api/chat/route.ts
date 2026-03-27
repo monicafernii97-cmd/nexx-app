@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
         // All conversations use the premium model for maximum quality
         const model = getModelForMode();
 
+
         // ── Fetch user tier from Convex ──
         const validTiers: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
         let userTier: SubscriptionTier = 'free';

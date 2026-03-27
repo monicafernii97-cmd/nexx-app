@@ -4,6 +4,14 @@ import { getConvexClient } from '@/lib/convexServer';
 import { api } from '../../../../../convex/_generated/api';
 import type Stripe from 'stripe';
 
+type SubscriptionTier = 'free' | 'pro' | 'premium' | 'executive';
+const VALID_TIERS: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
+
+/** Type guard to validate a string is a valid subscription tier. */
+function isValidTier(tier: string): tier is SubscriptionTier {
+    return VALID_TIERS.includes(tier as SubscriptionTier);
+}
+
 /** Safely extract a string customer ID from Stripe's customer field. */
 function resolveCustomerId(customer: string | Stripe.Customer | Stripe.DeletedCustomer | null): string {
     if (typeof customer === 'string') return customer;
@@ -54,7 +62,7 @@ export async function POST(req: NextRequest) {
                         stripeCustomerId: resolveCustomerId(session.customer),
                         stripeSubscriptionId: subscriptionId,
                         stripePriceId: '',  // Will be set by subscription.updated
-                        subscriptionTier: tier,
+                        subscriptionTier: isValidTier(tier) ? tier : 'free',
                         subscriptionStatus: 'active',
                     });
                 }
@@ -75,21 +83,24 @@ export async function POST(req: NextRequest) {
                     break;
                 }
 
-                const status = subscription.status === 'active' || subscription.status === 'trialing'
-                    ? 'active'
-                    : subscription.status === 'past_due'
-                        ? 'past_due'
-                        : subscription.status === 'canceled'
-                            ? 'canceled'
-                            : 'active';
+                // Preserve the raw Stripe status — schema supports all 8 values
+                const validStatuses = ['active', 'canceled', 'past_due', 'trialing', 'incomplete', 'incomplete_expired', 'unpaid', 'paused'] as const;
+                type StripeStatus = typeof validStatuses[number];
+                const rawStatus = subscription.status as string;
+                const status: StripeStatus = validStatuses.includes(rawStatus as StripeStatus)
+                    ? (rawStatus as StripeStatus)
+                    : (() => {
+                        console.warn('[Stripe Webhook] Unknown subscription status:', rawStatus);
+                        return 'active' as StripeStatus;
+                    })();
 
                 await convex.mutation(api.stripe.updateSubscription, {
                     clerkId,
                     stripeCustomerId: resolveCustomerId(subscription.customer),
                     stripeSubscriptionId: subscription.id,
                     stripePriceId: priceId ?? '',
-                    subscriptionTier: tier ?? 'free',
-                    subscriptionStatus: status,
+                    subscriptionTier: (tier && isValidTier(tier)) ? tier : 'free',
+                    subscriptionStatus: status as 'active' | 'canceled' | 'past_due' | 'trialing' | 'incomplete' | 'incomplete_expired' | 'unpaid' | 'paused',
                 });
                 break;
             }
@@ -154,7 +165,7 @@ export async function POST(req: NextRequest) {
                     stripeCustomerId: resolveCustomerId(subscription.customer),
                     stripeSubscriptionId: subscription.id,
                     stripePriceId: priceId ?? '',
-                    subscriptionTier: tier ?? 'free',
+                    subscriptionTier: (typeof tier === 'string' && isValidTier(tier)) ? tier : 'free',
                     subscriptionStatus: 'past_due',
                 });
                 break;

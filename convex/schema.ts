@@ -79,7 +79,11 @@ export default defineSchema({
             v.literal('active'),
             v.literal('canceled'),
             v.literal('past_due'),
-            v.literal('trialing')
+            v.literal('trialing'),
+            v.literal('incomplete'),
+            v.literal('incomplete_expired'),
+            v.literal('unpaid'),
+            v.literal('paused')
         )),
         onboardingComplete: v.boolean(),
         primaryGoals: v.optional(v.array(v.string())),

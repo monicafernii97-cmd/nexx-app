@@ -65,11 +65,17 @@ function SubscriptionContent() {
                 body: JSON.stringify({ tier }),
             });
             const data = await res.json();
+            if (!res.ok) {
+                console.error('Checkout API error:', data);
+                alert(data.error ?? 'Something went wrong. Please try again.');
+                return;
+            }
             if (data.url) {
                 window.location.href = data.url;
             }
         } catch (error) {
             console.error('Checkout failed:', error);
+            alert('Network error — please check your connection and try again.');
         } finally {
             setLoadingTier(null);
         }
@@ -80,11 +86,17 @@ function SubscriptionContent() {
         try {
             const res = await fetch('/api/stripe/portal', { method: 'POST' });
             const data = await res.json();
+            if (!res.ok) {
+                console.error('Portal API error:', data);
+                alert(data.error ?? 'Unable to open billing portal. Please try again.');
+                return;
+            }
             if (data.url) {
                 window.location.href = data.url;
             }
         } catch (error) {
             console.error('Portal failed:', error);
+            alert('Network error — please check your connection and try again.');
         } finally {
             setPortalLoading(false);
         }

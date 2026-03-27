@@ -37,7 +37,12 @@ export async function POST(req: NextRequest) {
         // ── Fetch user record from Convex ──
         const convex = await getAuthenticatedConvexClient();
         const user = await convex.query(api.users.getByClerkId, { clerkId: userId });
-        let customerId = user?.stripeCustomerId;
+
+        if (!user) {
+            return Response.json({ error: 'User record not found — please complete onboarding first' }, { status: 404 });
+        }
+
+        let customerId = user.stripeCustomerId;
 
         // ── Create Stripe customer if needed & persist immediately ──
         if (!customerId) {
@@ -47,16 +52,14 @@ export async function POST(req: NextRequest) {
             customerId = customer.id;
 
             // Persist the new customer ID right away to prevent duplicate creation
-            if (user?._id) {
-                await convex.mutation(api.stripe.updateSubscription, {
-                    clerkId: userId,
-                    stripeCustomerId: customerId,
-                    stripeSubscriptionId: '',
-                    stripePriceId: '',
-                    subscriptionTier: user.subscriptionTier ?? 'free',
-                    subscriptionStatus: user.subscriptionStatus ?? 'active',
-                });
-            }
+            await convex.mutation(api.stripe.updateSubscription, {
+                clerkId: userId,
+                stripeCustomerId: customerId,
+                stripeSubscriptionId: '',
+                stripePriceId: '',
+                subscriptionTier: user.subscriptionTier ?? 'free',
+                subscriptionStatus: user.subscriptionStatus ?? 'active',
+            });
         }
 
         // ── If user already has an active subscription, open the portal ──

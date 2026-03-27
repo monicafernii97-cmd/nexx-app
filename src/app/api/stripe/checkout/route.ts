@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { stripe, getPriceIdForTier } from '@/lib/stripe';
+import { isPaidTier } from '@/lib/tiers';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '../../../../../convex/_generated/api';
 
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { tier } = body as { tier?: string };
-    if (!tier || typeof tier !== 'string' || !['pro', 'premium', 'executive'].includes(tier)) {
+    if (!tier || typeof tier !== 'string' || !isPaidTier(tier)) {
         return Response.json({ error: 'Invalid tier — must be pro, premium, or executive' }, { status: 400 });
     }
 
@@ -55,6 +56,8 @@ export async function POST(req: NextRequest) {
         if (!customerId) {
             const customer = await stripe.customers.create({
                 metadata: { clerkId: userId },
+            }, {
+                idempotencyKey: `stripe-customer:${userId}`,
             });
             customerId = customer.id;
 
@@ -99,6 +102,8 @@ export async function POST(req: NextRequest) {
             subscription_data: {
                 metadata: { clerkId: userId, tier },
             },
+        }, {
+            idempotencyKey: `stripe-checkout:${userId}:${tier}`,
         });
 
         if (!session.url) {

@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
         return Response.json({ error: 'Malformed request body' }, { status: 400 });
     }
 
-    if (!body || typeof body !== 'object') {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
         return Response.json({ error: 'Request body must be a JSON object' }, { status: 400 });
     }
 
@@ -60,17 +60,22 @@ export async function POST(req: NextRequest) {
 
             // Persist the new customer ID right away to prevent duplicate creation
             const serverSecret = process.env.STRIPE_WEBHOOK_SECRET;
-            if (serverSecret) {
-                await convex.mutation(api.stripe.updateSubscription, {
-                    serverSecret,
-                    clerkId: userId,
-                    stripeCustomerId: customerId,
-                    stripeSubscriptionId: '',
-                    stripePriceId: '',
-                    subscriptionTier: user.subscriptionTier ?? 'free',
-                    subscriptionStatus: user.subscriptionStatus ?? 'active',
-                });
+            if (!serverSecret) {
+                // Clean up the orphaned customer we just created
+                await stripe.customers.del(customerId);
+                console.error('[Stripe Checkout] STRIPE_WEBHOOK_SECRET not configured');
+                return Response.json({ error: 'Server configuration error' }, { status: 500 });
             }
+
+            await convex.mutation(api.stripe.updateSubscription, {
+                serverSecret,
+                clerkId: userId,
+                stripeCustomerId: customerId,
+                stripeSubscriptionId: '',
+                stripePriceId: '',
+                subscriptionTier: user.subscriptionTier ?? 'free',
+                subscriptionStatus: user.subscriptionStatus ?? 'active',
+            });
         }
 
         // ── If user already has an active subscription, open the portal ──

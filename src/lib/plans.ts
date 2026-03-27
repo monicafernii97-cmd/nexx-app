@@ -30,8 +30,8 @@ export const PLANS: PlanDefinition[] = [
         description: 'Start documenting incidents and explore what NEXX can do — completely free.',
         badge: null,
         features: [
-            '5 legal guidance messages per day',
-            '50 NEXX Chat messages per day',
+            '10 premium AI responses per day',
+            'Unlimited standard AI responses',
             '3 legal document generations per month',
             '3 court rules lookups per month',
             'Basic incident reporting & analysis',
@@ -49,8 +49,8 @@ export const PLANS: PlanDefinition[] = [
         description: 'For parents ready to build a strong, evidence-backed case with expanded access to every tool.',
         badge: null,
         features: [
-            '50 legal guidance messages per day',
-            'Unlimited NEXX Chat',
+            '75 premium AI responses per day',
+            'Unlimited standard AI responses',
             'Unlimited legal document generation',
             'Unlimited incident analysis & timeline reports',
             'Full county resource finder & court rules lookup',
@@ -68,8 +68,8 @@ export const PLANS: PlanDefinition[] = [
         description: 'Our most popular plan — built for parents actively navigating custody, family law, or high-conflict cases.',
         badge: 'Most Popular',
         features: [
-            '100 legal guidance messages per day',
-            'Unlimited NEXX Chat',
+            '200 premium AI responses per day',
+            'Unlimited standard AI responses',
             'Unlimited document generation & DocuVault access',
             'Advanced court compliance verification',
             'Unlimited access to local legal resources',
@@ -87,7 +87,7 @@ export const PLANS: PlanDefinition[] = [
         description: 'No daily caps. No restrictions. Full, unrestricted access to every NEXX feature.',
         badge: 'Elite',
         features: [
-            'Unlimited legal guidance messages',
+            'Unlimited premium AI responses',
             'Unlimited document generation & template gallery',
             'Unlimited incident analysis & timeline reports',
             'Unlimited compliance verification & court rule lookups',

@@ -24,25 +24,25 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierConfig> = {
     free: {
         label: 'Free',
         priceUsd: 0,
-        gpt4oDailyLimit: 5,
-        gpt4oMiniDailyLimit: 50,
+        gpt4oDailyLimit: 10,
+        gpt4oMiniDailyLimit: -1, // unlimited fallback
     },
     pro: {
         label: 'Pro',
         priceUsd: 29.99,
-        gpt4oDailyLimit: 50,
-        gpt4oMiniDailyLimit: -1, // unlimited
+        gpt4oDailyLimit: 75,
+        gpt4oMiniDailyLimit: -1, // unlimited fallback
     },
     premium: {
         label: 'Premium',
         priceUsd: 49.99,
-        gpt4oDailyLimit: 100,
-        gpt4oMiniDailyLimit: -1,
+        gpt4oDailyLimit: 200,
+        gpt4oMiniDailyLimit: -1, // unlimited fallback
     },
     executive: {
         label: 'Executive',
         priceUsd: 149.99,
-        gpt4oDailyLimit: -1,
+        gpt4oDailyLimit: -1, // unlimited
         gpt4oMiniDailyLimit: -1,
     },
 };

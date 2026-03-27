@@ -71,6 +71,16 @@ export default defineSchema({
             v.literal('premium'),
             v.literal('executive')
         )),
+        // ── Stripe billing fields ──
+        stripeCustomerId: v.optional(v.string()),
+        stripeSubscriptionId: v.optional(v.string()),
+        stripePriceId: v.optional(v.string()),
+        subscriptionStatus: v.optional(v.union(
+            v.literal('active'),
+            v.literal('canceled'),
+            v.literal('past_due'),
+            v.literal('trialing')
+        )),
         onboardingComplete: v.boolean(),
         primaryGoals: v.optional(v.array(v.string())),
         createdAt: v.number(),

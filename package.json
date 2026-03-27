@@ -14,6 +14,7 @@
     "@clerk/themes": "^2.4.57",
     "@phosphor-icons/react": "^2.1.10",
     "@sparticuz/chromium-min": "^143.0.4",
+    "@stripe/stripe-js": "^9.0.0",
     "@tavily/core": "^0.7.2",
     "ai": "^6.0.116",
     "clsx": "^2.1.1",
@@ -29,7 +30,8 @@
     "pdf-parse": "^2.4.5",
     "puppeteer-core": "^24.39.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "stripe": "^21.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

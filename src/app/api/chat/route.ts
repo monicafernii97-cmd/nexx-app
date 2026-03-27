@@ -4,8 +4,8 @@ import { getOpenAI } from '@/lib/openai';
 import { buildSystemPrompt } from '@/lib/systemPrompt';
 import type { UserContext, LegalSearchResult } from '@/lib/types';
 import { detectLegalTopic, extractLegalQuery, searchStatutes } from '@/lib/legal/search';
-import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
-import { getModelForMode, isPremiumModel, getDailyLimit, type SubscriptionTier } from '@/lib/tiers';
+import { checkRateLimit } from '@/lib/rateLimit';
+import { getModelForMode, getDailyLimit, type SubscriptionTier } from '@/lib/tiers';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '../../../../convex/_generated/api';
 
@@ -41,7 +41,6 @@ export async function POST(req: NextRequest) {
 
         // All conversations use the premium model for maximum quality
         const model = getModelForMode();
-        const premium = isPremiumModel(model);
 
         // ── Fetch user tier from Convex ──
         const validTiers: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
@@ -81,19 +80,18 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // ── Tier-specific rate limit for the chosen model ──
-        // Only enforce when the tier was successfully resolved from the DB.
-        // If the lookup failed, we skip rate limiting to avoid penalizing paid
-        // users with free-tier limits during transient outages.
+        // ── Tier-specific rate limit with graceful fallback ──
+        // When the gpt-4o daily limit is reached, silently fall back to gpt-4o-mini
+        // instead of blocking the user. This ensures users always get a response.
+        let resolvedModel: string = model;
         if (tierResolved) {
-            const feature = premium ? 'chat_message_4o' as const : 'chat_message_mini' as const;
             const dailyCap = getDailyLimit(userTier, model);
 
             if (dailyCap !== -1) { // -1 = unlimited
-                const tierRl = checkRateLimit(userId, feature, dailyCap);
+                const tierRl = checkRateLimit(userId, 'chat_message_4o' as const, dailyCap);
                 if (!tierRl.allowed) {
-                    const { body: rlBody, status } = rateLimitResponse(tierRl, userTier);
-                    return Response.json(rlBody, { status });
+                    // Graceful fallback: switch to gpt-4o-mini instead of blocking
+                    resolvedModel = 'gpt-4o-mini';
                 }
             }
         }
@@ -144,9 +142,9 @@ export async function POST(req: NextRequest) {
             legalContext,
         });
 
-        // Stream response from OpenAI (all chats use gpt-4o for maximum quality)
+        // Stream response from OpenAI (gpt-4o by default, gpt-4o-mini fallback when limit reached)
         const stream = await getOpenAI().chat.completions.create({
-            model,
+            model: resolvedModel,
             messages: [
                 { role: 'system', content: systemPrompt },
                 ...messages,

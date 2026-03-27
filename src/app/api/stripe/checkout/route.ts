@@ -64,8 +64,12 @@ export async function POST(req: NextRequest) {
             // Persist the new customer ID right away to prevent duplicate creation
             const serverSecret = process.env.STRIPE_WEBHOOK_SECRET;
             if (!serverSecret) {
-                // Clean up the orphaned customer we just created
-                await stripe.customers.del(customerId);
+                // Best-effort cleanup — don't let deletion failure mask the config error
+                try {
+                    await stripe.customers.del(customerId);
+                } catch (delError) {
+                    console.error('[Stripe Checkout] Failed to clean up orphaned customer', { customerId, error: delError });
+                }
                 console.error('[Stripe Checkout] STRIPE_WEBHOOK_SECRET not configured');
                 return Response.json({ error: 'Server configuration error' }, { status: 500 });
             }
@@ -81,9 +85,13 @@ export async function POST(req: NextRequest) {
                     subscriptionStatus: user.subscriptionStatus ?? 'active',
                 });
             } catch (persistError) {
-                // Mutation failed — delete the orphaned Stripe customer before surfacing error
-                console.error('[Stripe Checkout] Failed to persist customer ID, cleaning up', { userId, customerId, error: persistError });
-                await stripe.customers.del(customerId);
+                // Mutation failed — best-effort cleanup of the orphaned Stripe customer
+                console.error('[Stripe Checkout] Failed to persist customer ID', { userId, customerId, error: persistError });
+                try {
+                    await stripe.customers.del(customerId);
+                } catch (delError) {
+                    console.error('[Stripe Checkout] Failed to clean up orphaned customer during rollback', { customerId, error: delError });
+                }
                 return Response.json({ error: 'Failed to save billing record — please try again' }, { status: 500 });
             }
         }

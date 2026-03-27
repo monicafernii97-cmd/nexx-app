@@ -10,11 +10,12 @@
 export type SubscriptionTier = 'free' | 'pro' | 'premium' | 'executive';
 
 /** Paid tiers only — used for checkout validation. */
-export const PAID_TIERS: SubscriptionTier[] = ['pro', 'premium', 'executive'];
+export type PaidSubscriptionTier = Exclude<SubscriptionTier, 'free'>;
+export const PAID_TIERS: PaidSubscriptionTier[] = ['pro', 'premium', 'executive'];
 
 /** Check if a tier string is a valid paid tier. */
-export function isPaidTier(tier: string): tier is SubscriptionTier {
-    return PAID_TIERS.includes(tier as SubscriptionTier);
+export function isPaidTier(tier: string): tier is PaidSubscriptionTier {
+    return PAID_TIERS.includes(tier as PaidSubscriptionTier);
 }
 
 interface TierConfig {

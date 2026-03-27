@@ -101,6 +101,11 @@ export async function POST(req: NextRequest) {
             },
         });
 
+        if (!session.url) {
+            console.error('[Stripe Checkout] Session created without URL', { sessionId: session.id });
+            return Response.json({ error: 'Failed to create checkout session' }, { status: 500 });
+        }
+
         return Response.json({ url: session.url });
     } catch (error) {
         console.error('[Stripe Checkout] Error:', error);

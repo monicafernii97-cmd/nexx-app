@@ -70,15 +70,22 @@ export async function POST(req: NextRequest) {
                 return Response.json({ error: 'Server configuration error' }, { status: 500 });
             }
 
-            await convex.mutation(api.stripe.updateSubscription, {
-                serverSecret,
-                clerkId: userId,
-                stripeCustomerId: customerId,
-                stripeSubscriptionId: '',
-                stripePriceId: '',
-                subscriptionTier: user.subscriptionTier ?? 'free',
-                subscriptionStatus: user.subscriptionStatus ?? 'active',
-            });
+            try {
+                await convex.mutation(api.stripe.updateSubscription, {
+                    serverSecret,
+                    clerkId: userId,
+                    stripeCustomerId: customerId,
+                    stripeSubscriptionId: '',
+                    stripePriceId: '',
+                    subscriptionTier: user.subscriptionTier ?? 'free',
+                    subscriptionStatus: user.subscriptionStatus ?? 'active',
+                });
+            } catch (persistError) {
+                // Mutation failed — delete the orphaned Stripe customer before surfacing error
+                console.error('[Stripe Checkout] Failed to persist customer ID, cleaning up', { userId, customerId, error: persistError });
+                await stripe.customers.del(customerId);
+                return Response.json({ error: 'Failed to save billing record — please try again' }, { status: 500 });
+            }
         }
 
         // ── If user already has an active subscription, open the portal ──

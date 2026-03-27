@@ -80,9 +80,13 @@ export function isPremiumModel(model: string): boolean {
 
 /**
  * Get the daily message cap for a given tier and model.
- * Returns -1 for unlimited.
+ * Returns -1 for unlimited, 0 for unknown/unsupported models (fail-closed).
  */
 export function getDailyLimit(tier: SubscriptionTier, model: string): number {
     const config = TIER_LIMITS[tier] ?? TIER_LIMITS.free;
-    return model === PREMIUM_MODEL ? config.gpt4oDailyLimit : config.gpt4oMiniDailyLimit;
+    if (model === PREMIUM_MODEL) return config.gpt4oDailyLimit;
+    if (model === FALLBACK_MODEL) return config.gpt4oMiniDailyLimit;
+    // Unknown model — fail-closed to prevent bypassing quota
+    console.warn('[Tiers] getDailyLimit called with unknown model:', model);
+    return 0;
 }

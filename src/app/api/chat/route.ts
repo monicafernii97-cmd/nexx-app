@@ -5,7 +5,7 @@ import { buildSystemPrompt } from '@/lib/systemPrompt';
 import type { UserContext, LegalSearchResult } from '@/lib/types';
 import { detectLegalTopic, extractLegalQuery, searchStatutes } from '@/lib/legal/search';
 import { checkRateLimit } from '@/lib/rateLimit';
-import { getModelForMode, getDailyLimit, type SubscriptionTier } from '@/lib/tiers';
+import { getModelForMode, getDailyLimit, FALLBACK_MODEL, type SubscriptionTier } from '@/lib/tiers';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '../../../../convex/_generated/api';
 
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
             const tierRl = checkRateLimit(userId, 'chat_message_4o' as const, dailyCap);
             if (!tierRl.allowed) {
                 // Graceful fallback: switch to gpt-4o-mini instead of blocking
-                resolvedModel = 'gpt-4o-mini';
+                resolvedModel = FALLBACK_MODEL;
             }
         }
 

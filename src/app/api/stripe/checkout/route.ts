@@ -42,6 +42,13 @@ export async function POST(req: NextRequest) {
             return Response.json({ error: 'User record not found — please complete onboarding first' }, { status: 404 });
         }
 
+        // ── Reject billing mismatch: subscriptionId exists but no customerId ──
+        // This prevents creating a fresh Stripe customer when one should already exist.
+        if (user.stripeSubscriptionId && !user.stripeCustomerId) {
+            console.error('[Stripe Checkout] User has subscriptionId but no customerId', { userId });
+            return Response.json({ error: 'Billing account mismatch — contact support' }, { status: 400 });
+        }
+
         let customerId = user.stripeCustomerId;
 
         // ── Create Stripe customer if needed & persist immediately ──
@@ -52,22 +59,22 @@ export async function POST(req: NextRequest) {
             customerId = customer.id;
 
             // Persist the new customer ID right away to prevent duplicate creation
-            await convex.mutation(api.stripe.updateSubscription, {
-                clerkId: userId,
-                stripeCustomerId: customerId,
-                stripeSubscriptionId: '',
-                stripePriceId: '',
-                subscriptionTier: user.subscriptionTier ?? 'free',
-                subscriptionStatus: user.subscriptionStatus ?? 'active',
-            });
+            const serverSecret = process.env.STRIPE_WEBHOOK_SECRET;
+            if (serverSecret) {
+                await convex.mutation(api.stripe.updateSubscription, {
+                    serverSecret,
+                    clerkId: userId,
+                    stripeCustomerId: customerId,
+                    stripeSubscriptionId: '',
+                    stripePriceId: '',
+                    subscriptionTier: user.subscriptionTier ?? 'free',
+                    subscriptionStatus: user.subscriptionStatus ?? 'active',
+                });
+            }
         }
 
         // ── If user already has an active subscription, open the portal ──
-        if (user?.stripeSubscriptionId) {
-            if (!customerId) {
-                console.error('[Stripe Checkout] User has subscriptionId but no customerId', { userId });
-                return Response.json({ error: 'Billing account mismatch — contact support' }, { status: 400 });
-            }
+        if (user.stripeSubscriptionId) {
             const portalSession = await stripe.billingPortal.sessions.create({
                 customer: customerId,
                 return_url: `${req.nextUrl.origin}/subscription`,

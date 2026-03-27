@@ -20,13 +20,17 @@ export function getStripe(): Stripe {
 
 /**
  * Proxy-based Stripe client for convenience — delegates to getStripe().
+ * Binds methods to the instance so destructured usage works correctly.
  * TODO: Remove this proxy once all route files have been migrated to use
  * getStripe() directly. Tracked for removal in the next major refactor.
  */
 export const stripe = new Proxy({} as Stripe, {
     get(_target, prop) {
+        const instance = getStripe();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return (getStripe() as any)[prop];
+        const val = (instance as any)[prop];
+        // Bind functions to the Stripe instance to preserve `this` context
+        return typeof val === 'function' ? val.bind(instance) : val;
     },
 });
 

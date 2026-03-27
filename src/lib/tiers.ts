@@ -51,7 +51,8 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierConfig> = {
 
 export type ChatMode = 'general';
 
-const PREMIUM_MODEL = 'gpt-4o' as const;
+export const PREMIUM_MODEL = 'gpt-4o' as const;
+export const FALLBACK_MODEL = 'gpt-4o-mini' as const;
 
 /**
  * Determine the OpenAI model to use.

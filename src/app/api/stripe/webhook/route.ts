@@ -12,11 +12,25 @@ function isValidTier(tier: string): tier is SubscriptionTier {
     return VALID_TIERS.includes(tier as SubscriptionTier);
 }
 
-/** Safely extract a string customer ID from Stripe's customer field. */
-function resolveCustomerId(customer: string | Stripe.Customer | Stripe.DeletedCustomer | null): string {
+/** All 8 Stripe subscription statuses. */
+const VALID_STATUSES = ['active', 'canceled', 'past_due', 'trialing', 'incomplete', 'incomplete_expired', 'unpaid', 'paused'] as const;
+type StripeStatus = typeof VALID_STATUSES[number];
+
+/**
+ * Safely extract a string customer ID from Stripe's customer field.
+ * Returns null when the customer cannot be resolved.
+ */
+function resolveCustomerId(customer: string | Stripe.Customer | Stripe.DeletedCustomer | null): string | null {
     if (typeof customer === 'string') return customer;
     if (customer && 'id' in customer) return customer.id;
-    return '';
+    return null;
+}
+
+/** Get the server secret used for mutation authorization. */
+function getServerSecret(): string {
+    const secret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!secret) throw new Error('[Stripe Webhook] STRIPE_WEBHOOK_SECRET not configured');
+    return secret;
 }
 
 /** Stripe webhook handler — processes subscription lifecycle events. */
@@ -37,6 +51,7 @@ export async function POST(req: NextRequest) {
     }
 
     const convex = getConvexClient();
+    const serverSecret = getServerSecret();
 
     try {
         switch (event.type) {
@@ -57,9 +72,18 @@ export async function POST(req: NextRequest) {
                         ? session.subscription
                         : session.subscription.id;
 
+                    const customerId = resolveCustomerId(session.customer);
+                    if (!customerId) {
+                        console.error('[Stripe Webhook] checkout.session.completed missing customer ID', {
+                            sessionId: session.id,
+                        });
+                        break;
+                    }
+
                     await convex.mutation(api.stripe.updateSubscription, {
+                        serverSecret,
                         clerkId,
-                        stripeCustomerId: resolveCustomerId(session.customer),
+                        stripeCustomerId: customerId,
                         stripeSubscriptionId: subscriptionId,
                         stripePriceId: '',  // Will be set by subscription.updated
                         subscriptionTier: isValidTier(tier) ? tier : 'free',
@@ -83,11 +107,27 @@ export async function POST(req: NextRequest) {
                     break;
                 }
 
+                const customerId = resolveCustomerId(subscription.customer);
+                if (!customerId) {
+                    console.error('[Stripe Webhook] subscription.updated missing customer ID', {
+                        subscriptionId: subscription.id,
+                    });
+                    break;
+                }
+
+                // If priceId exists but tier mapping is unknown, log and skip
+                // to avoid silently downgrading a paid subscriber to free.
+                if (priceId && !tier) {
+                    console.warn('[Stripe Webhook] Unmapped priceId in subscription.updated — skipping tier update', {
+                        subscriptionId: subscription.id,
+                        priceId,
+                    });
+                    break;
+                }
+
                 // Preserve the raw Stripe status — schema supports all 8 values
-                const validStatuses = ['active', 'canceled', 'past_due', 'trialing', 'incomplete', 'incomplete_expired', 'unpaid', 'paused'] as const;
-                type StripeStatus = typeof validStatuses[number];
                 const rawStatus = subscription.status as string;
-                const status: StripeStatus = validStatuses.includes(rawStatus as StripeStatus)
+                const status: StripeStatus = VALID_STATUSES.includes(rawStatus as StripeStatus)
                     ? (rawStatus as StripeStatus)
                     : (() => {
                         console.warn('[Stripe Webhook] Unknown subscription status:', rawStatus);
@@ -95,12 +135,13 @@ export async function POST(req: NextRequest) {
                     })();
 
                 await convex.mutation(api.stripe.updateSubscription, {
+                    serverSecret,
                     clerkId,
-                    stripeCustomerId: resolveCustomerId(subscription.customer),
+                    stripeCustomerId: customerId,
                     stripeSubscriptionId: subscription.id,
                     stripePriceId: priceId ?? '',
                     subscriptionTier: (tier && isValidTier(tier)) ? tier : 'free',
-                    subscriptionStatus: status as 'active' | 'canceled' | 'past_due' | 'trialing' | 'incomplete' | 'incomplete_expired' | 'unpaid' | 'paused',
+                    subscriptionStatus: status,
                 });
                 break;
             }
@@ -117,9 +158,18 @@ export async function POST(req: NextRequest) {
                     break;
                 }
 
+                const customerId = resolveCustomerId(subscription.customer);
+                if (!customerId) {
+                    console.error('[Stripe Webhook] subscription.deleted missing customer ID', {
+                        subscriptionId: subscription.id,
+                    });
+                    break;
+                }
+
                 await convex.mutation(api.stripe.updateSubscription, {
+                    serverSecret,
                     clerkId,
-                    stripeCustomerId: resolveCustomerId(subscription.customer),
+                    stripeCustomerId: customerId,
                     stripeSubscriptionId: '',
                     stripePriceId: '',
                     subscriptionTier: 'free',
@@ -145,8 +195,19 @@ export async function POST(req: NextRequest) {
                     break;
                 }
 
-                // Fetch subscription to get clerkId from metadata
-                const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+                // Fetch subscription to get clerkId from metadata — wrapped in
+                // try/catch so a Stripe API failure doesn't cause a 500 and endless retries.
+                let subscription: Stripe.Subscription;
+                try {
+                    subscription = await stripe.subscriptions.retrieve(subscriptionId);
+                } catch (err) {
+                    console.error('[Stripe Webhook] Failed to retrieve subscription for payment_failed', {
+                        subscriptionId,
+                        error: err,
+                    });
+                    break; // Acknowledge webhook but skip update
+                }
+
                 const clerkId = subscription.metadata?.clerkId;
 
                 if (!clerkId) {
@@ -157,12 +218,30 @@ export async function POST(req: NextRequest) {
                     break;
                 }
 
+                const customerId = resolveCustomerId(subscription.customer);
+                if (!customerId) {
+                    console.error('[Stripe Webhook] invoice.payment_failed missing customer ID', {
+                        subscriptionId,
+                    });
+                    break;
+                }
+
                 const priceId = subscription.items.data[0]?.price?.id;
                 const tier = priceId ? getTierForPriceId(priceId) : 'free';
 
+                // Skip tier update if priceId exists but mapping is unknown
+                if (priceId && !tier) {
+                    console.warn('[Stripe Webhook] Unmapped priceId in payment_failed — skipping tier update', {
+                        subscriptionId,
+                        priceId,
+                    });
+                    break;
+                }
+
                 await convex.mutation(api.stripe.updateSubscription, {
+                    serverSecret,
                     clerkId,
-                    stripeCustomerId: resolveCustomerId(subscription.customer),
+                    stripeCustomerId: customerId,
                     stripeSubscriptionId: subscription.id,
                     stripePriceId: priceId ?? '',
                     subscriptionTier: (typeof tier === 'string' && isValidTier(tier)) ? tier : 'free',

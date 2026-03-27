@@ -23,11 +23,13 @@ const statusValidator = v.union(
 
 /**
  * Update a user's Stripe subscription fields.
- * Called by the Stripe webhook handler — uses unauthenticated Convex client
- * since webhooks originate from Stripe (no Clerk auth).
+ * Restricted to server-side callers via a serverSecret argument.
+ * The caller must pass a secret that matches the STRIPE_WEBHOOK_SECRET
+ * environment variable — only webhooks and checkout handlers know this.
  */
 export const updateSubscription = mutation({
     args: {
+        serverSecret: v.string(),
         clerkId: v.string(),
         stripeCustomerId: v.string(),
         stripeSubscriptionId: v.string(),
@@ -36,6 +38,12 @@ export const updateSubscription = mutation({
         subscriptionStatus: statusValidator,
     },
     handler: async (ctx, args) => {
+        // Verify the caller is a trusted server-side handler
+        const expectedSecret = process.env.STRIPE_WEBHOOK_SECRET;
+        if (!expectedSecret || args.serverSecret !== expectedSecret) {
+            throw new Error('Unauthorized: invalid server secret');
+        }
+
         const user = await ctx.db
             .query('users')
             .withIndex('by_clerk', (q) => q.eq('clerkId', args.clerkId))

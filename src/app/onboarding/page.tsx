@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useConvexAuth } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -40,14 +40,17 @@ export default function OnboardingPage() {
     // from querying before the Clerk JWT is available on the Convex side.
     const { isAuthenticated: convexReady, isLoading: convexLoading } = useConvexAuth();
 
-    // Guard: redirect returning users who already completed onboarding
+    // Guard: redirect returning users who already completed onboarding.
+    // The isHandoffInProgress ref suppresses this redirect while the paid
+    // checkout flow is being created — otherwise completeOnboarding fires
+    // first and this guard races the Stripe redirect to /dashboard.
     const currentUser = useQuery(api.users.me, convexReady ? {} : 'skip');
+    const isHandoffInProgress = useRef(false);
     useEffect(() => {
-        if (currentUser?.onboardingComplete) {
+        if (currentUser?.onboardingComplete && !isHandoffInProgress.current) {
             router.replace('/dashboard');
         }
     }, [currentUser, router]);
-    // No more sessionStorage plan guards — plan selection happens in step 5.
 
     // ─── Form state (must be declared before any early returns) ───
     const [currentStep, setCurrentStep] = useState(0);
@@ -67,7 +70,7 @@ export default function OnboardingPage() {
         nexBehaviors: [] as string[],
         nexDescription: '',
         primaryGoals: [] as string[],
-        selectedPlan: 'free' as PlanTier,
+        selectedPlan: null as PlanTier | null,
         acceptedDisclaimer: false,
     });
     const updateProfile = useMutation(api.users.updateProfile);
@@ -173,18 +176,21 @@ export default function OnboardingPage() {
         }));
     };
 
+    /** Step validators keyed by step ID — stays aligned if steps are reordered. */
+    const STEP_VALIDATORS: Record<string, () => boolean | string> = {
+        'welcome': () => true,
+        'about-you': () => formData.name.trim() && formData.state.trim(),
+        'situation': () => formData.custodyType,
+        'your-nex': () => formData.nexBehaviors.length > 0,
+        'goals': () => formData.primaryGoals.length > 0,
+        'choose-plan': () => !!formData.selectedPlan,
+        'disclaimer': () => formData.acceptedDisclaimer,
+    };
+
     /** Check whether the current onboarding step has valid, required data to proceed. */
     const canProceed = () => {
-        switch (currentStep) {
-            case 0: return true;
-            case 1: return formData.name.trim() && formData.state.trim();
-            case 2: return formData.custodyType;
-            case 3: return formData.nexBehaviors.length > 0;
-            case 4: return formData.primaryGoals.length > 0;
-            case 5: return !!formData.selectedPlan; // plan selection step
-            case 6: return formData.acceptedDisclaimer; // disclaimer step
-            default: return true;
-        }
+        const stepId = ONBOARDING_STEPS[currentStep]?.id;
+        return stepId ? !!(STEP_VALIDATORS[stepId]?.() ?? true) : true;
     };
 
     /** Advance to the next step or, on the final step, save profile data and redirect. */
@@ -219,7 +225,7 @@ export default function OnboardingPage() {
                 // Always save as 'free' initially — Stripe webhook will upgrade
                 // the tier after successful payment for paid plans.
                 const chosenPlan = formData.selectedPlan;
-                const saveTier: PlanTier = isPaidTier(chosenPlan) ? 'free' : chosenPlan;
+                const saveTier: PlanTier = (chosenPlan && isPaidTier(chosenPlan)) ? 'free' : (chosenPlan ?? 'free');
 
                 await updateProfile({
                     id: userId,
@@ -264,7 +270,11 @@ export default function OnboardingPage() {
 
                 // ── Paid plan? → Redirect to Stripe Checkout ──
                 // Free plan? → Go straight to dashboard.
-                if (isPaidTier(chosenPlan)) {
+                if (chosenPlan && isPaidTier(chosenPlan)) {
+                    // Suppress the onboardingComplete guard while we create
+                    // the Stripe checkout session — it would otherwise race
+                    // us to /dashboard since completeOnboarding just fired.
+                    isHandoffInProgress.current = true;
                     try {
                         const res = await fetch('/api/stripe/checkout', {
                             method: 'POST',
@@ -279,10 +289,12 @@ export default function OnboardingPage() {
                         // Checkout creation failed — send to subscription page with
                         // error context so the user can retry the upgrade there.
                         console.error('[Onboarding] Stripe checkout failed:', data);
+                        isHandoffInProgress.current = false;
                         router.replace(`/subscription?checkout=failed&tier=${encodeURIComponent(chosenPlan)}`);
                         return;
                     } catch (stripeErr) {
                         console.error('[Onboarding] Stripe checkout error:', stripeErr);
+                        isHandoffInProgress.current = false;
                         router.replace(`/subscription?checkout=failed&tier=${encodeURIComponent(chosenPlan)}`);
                         return;
                     }

@@ -91,12 +91,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (clerkUser.id !== prevClerkId.current) {
             hasSynced.current = false;
             prevClerkId.current = clerkUser.id;
-            // NOTE: We intentionally do NOT clear sessionStorage.selectedPlan here.
-            // During Google OAuth sign-up, the plan is set on the landing page
-            // before auth, and this effect fires when the new identity arrives.
-            // Wiping it here would lose the user's plan selection.
-            // The sign-out handler (handleSignOut on the landing page) already
-            // clears sessionStorage.selectedPlan when the user explicitly logs out.
+            // Plan selection now happens inside onboarding (not via sessionStorage
+            // from the landing page), so clear any stale values on identity change
+            // to prevent them leaking across different users or sessions.
+            if (typeof window !== 'undefined') {
+                sessionStorage.removeItem('selectedPlan');
+            }
         }
 
         // Skip if already synced for this identity

@@ -276,13 +276,15 @@ export default function OnboardingPage() {
                             window.location.href = data.url;
                             return; // Don't setIsSaving(false) — we're navigating away
                         }
-                        // Checkout creation failed — still go to dashboard on free tier.
-                        // User can upgrade later from the Subscription page.
+                        // Checkout creation failed — send to subscription page with
+                        // error context so the user can retry the upgrade there.
                         console.error('[Onboarding] Stripe checkout failed:', data);
-                        router.replace('/dashboard');
+                        router.replace(`/subscription?checkout=failed&tier=${encodeURIComponent(chosenPlan)}`);
+                        return;
                     } catch (stripeErr) {
                         console.error('[Onboarding] Stripe checkout error:', stripeErr);
-                        router.replace('/dashboard');
+                        router.replace(`/subscription?checkout=failed&tier=${encodeURIComponent(chosenPlan)}`);
+                        return;
                     }
                 } else {
                     router.replace('/dashboard');

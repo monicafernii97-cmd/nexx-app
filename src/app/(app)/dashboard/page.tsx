@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from 'convex/react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '../../../../convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import {
@@ -32,9 +33,25 @@ const quickActions = [
 /** Ethereal Luxury Dashboard showing quick actions, recent incidents, and activity overview in Bento 2.0 layout. */
 export default function DashboardPage() {
     const { userId } = useUser();
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const incidents = useQuery(api.incidents.list);
     const conversations = useQuery(api.conversations.list, {});
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
+
+    // ── Checkout success toast ──
+    const isCheckoutSuccess = searchParams.get('checkout') === 'success';
+    const [showCheckoutToast, setShowCheckoutToast] = useState(false);
+
+    useEffect(() => {
+        if (!isCheckoutSuccess) return;
+        setShowCheckoutToast(true);
+        const timer = setTimeout(() => {
+            setShowCheckoutToast(false);
+            router.replace('/dashboard', { scroll: false });
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, [isCheckoutSuccess, router]);
 
     const incidentCount = incidents === undefined ? null : incidents.length;
     const conversationCount = conversations === undefined ? null : conversations.filter((c) => c.status === 'active').length;
@@ -60,6 +77,21 @@ export default function DashboardPage() {
 
     return (
         <PageContainer>
+            {/* Checkout success toast */}
+            <AnimatePresence>
+                {showCheckoutToast && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-gradient-to-r from-[#10b981] to-[#059669] text-white text-sm font-bold tracking-wide shadow-[0_8px_30px_rgba(16,185,129,0.3)] flex items-center gap-2"
+                    >
+                        <span className="text-lg">✓</span>
+                        Subscription activated! Your plan has been upgraded.
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <PageHeader
                 icon={House}
                 title={

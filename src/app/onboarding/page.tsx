@@ -67,7 +67,7 @@ export default function OnboardingPage() {
         nexBehaviors: [] as string[],
         nexDescription: '',
         primaryGoals: [] as string[],
-        selectedPlan: 'free' as string,
+        selectedPlan: 'free' as PlanTier,
         acceptedDisclaimer: false,
     });
     const updateProfile = useMutation(api.users.updateProfile);
@@ -218,7 +218,7 @@ export default function OnboardingPage() {
                 // Use the plan selected in the onboarding form (step 5).
                 // Always save as 'free' initially — Stripe webhook will upgrade
                 // the tier after successful payment for paid plans.
-                const chosenPlan = formData.selectedPlan as PlanTier;
+                const chosenPlan = formData.selectedPlan;
                 const saveTier: PlanTier = isPaidTier(chosenPlan) ? 'free' : chosenPlan;
 
                 await updateProfile({

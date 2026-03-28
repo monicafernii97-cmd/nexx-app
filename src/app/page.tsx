@@ -10,7 +10,6 @@ import { useEffect } from 'react';
 
 import { PLANS } from '@/lib/plans';
 import { COMING_SOON_FEATURES } from '@/lib/coming-soon';
-import { isValidPlan, getSessionPlan } from '@/lib/plan-validation';
 
 import { CaretDown } from '@phosphor-icons/react';
 
@@ -47,21 +46,6 @@ export default function WelcomePage() {
     convexReady ? {} : 'skip'
   );
 
-  // Derived: show "choose a plan" banner when signed in but no plan selected.
-  // When currentUser is null (Convex record not yet created), show the banner.
-  // When currentUser exists but lacks a subscriptionTier and sessionStorage plan, show the banner.
-  const showNoPlanBanner = (() => {
-    if (!clerkLoaded || !isSignedIn || convexLoading || !convexReady) return false;
-    if (currentUser === undefined) return false; // still loading
-    if (currentUser === null) return !isValidPlan(getSessionPlan()); // no Convex record — only show banner if no plan in sessionStorage either
-    if (currentUser.onboardingComplete) return false; // returning user
-    if (isValidPlan(currentUser.subscriptionTier)) return false;
-    return !isValidPlan(getSessionPlan()); // no valid plan anywhere
-  })();
-
-  // Terminal state: Clerk is signed in but Convex auth failed to sync
-  const convexAuthFailed = clerkLoaded && isSignedIn && !convexLoading && !convexReady;
-
   // Smart redirect for returning users
   useEffect(() => {
     if (!clerkLoaded) return;
@@ -69,9 +53,6 @@ export default function WelcomePage() {
 
     // Wait for Convex auth to sync before making routing decisions
     if (convexLoading) return;
-
-    // If Convex auth settled as unauthenticated, don't route — the
-    // error UI below will handle this terminal state.
     if (!convexReady) return;
 
     // Signed in + Convex ready — wait for user data to load
@@ -79,29 +60,20 @@ export default function WelcomePage() {
 
     if (currentUser === null) {
       // No Convex record yet — UserProvider is calling ensureFromClerk.
-      // If the user already picked a plan (sessionStorage), just wait:
-      // once ensureFromClerk finishes, users.me will reactively update
-      // and the redirect below will fire on the next effect cycle.
-      // If no plan exists, stay here and show the banner.
+      // Wait for the record to appear.
       return;
     } else if (currentUser.onboardingComplete) {
       // Returning user — straight to dashboard
       router.replace('/dashboard');
     } else {
-      // Only proceed if they have a plan (in sessionStorage or DB).
-      const selectedPlan = typeof window !== 'undefined' ? sessionStorage.getItem('selectedPlan') : null;
-      const hasPlan = isValidPlan(currentUser.subscriptionTier) || isValidPlan(selectedPlan);
-      if (hasPlan) {
-        const plan = selectedPlan || currentUser.subscriptionTier || '';
-        router.replace(`/onboarding?plan=${plan}`);
-      } else {
-        // No plan selected — stay on welcome page, scroll to pricing
-        requestAnimationFrame(() => {
-          document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
-        });
-      }
+      // New user who hasn't completed onboarding — plan selection
+      // happens inside onboarding (step 5), no need to pass a plan param.
+      router.replace('/onboarding');
     }
   }, [clerkLoaded, isSignedIn, convexLoading, convexReady, currentUser, router]);
+
+  // Terminal state: Clerk is signed in but Convex auth failed to sync
+  const convexAuthFailed = clerkLoaded && isSignedIn && !convexLoading && !convexReady;
 
   // Terminal auth error: Clerk signed in but Convex token sync failed
   if (convexAuthFailed) {
@@ -186,30 +158,7 @@ export default function WelcomePage() {
         </motion.h1>
       </div>
 
-      {/* ═══ No-Plan Banner (top of page) ═══ */}
-      {showNoPlanBanner && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="w-full z-20 relative pt-6 px-6 md:px-12"
-        >
-          <div className="max-w-2xl mx-auto rounded-2xl p-5 border border-[rgba(229,168,74,0.4)] bg-gradient-to-b from-[rgba(229,168,74,0.12)] to-[rgba(229,168,74,0.04)] shadow-[0_8px_30px_rgba(229,168,74,0.1)] backdrop-blur-md text-center">
-            <p className="text-sm font-bold text-[var(--champagne)] mb-1.5 tracking-wide">
-              Choose a plan to continue
-            </p>
-            <p className="text-[13px] text-[rgba(255,255,255,0.7)] leading-relaxed mb-3">
-              You need to select a plan before you can continue. Choose one below to get started.
-            </p>
-            <button
-              onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-              className="px-5 py-2 rounded-xl text-[12px] font-bold tracking-wide uppercase bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] hover:shadow-[0_4px_20px_rgba(229,168,74,0.4)] transition-all"
-            >
-              View Plans
-            </button>
-          </div>
-        </motion.div>
-      )}
+      {/* ═══ No-Plan Banner removed — plan selection is now in onboarding step 5 ═══ */}
 
       {/* Ambient Radial Gradients */}
       <div className="absolute inset-0 pointer-events-none z-0">
@@ -382,20 +331,17 @@ export default function WelcomePage() {
                   ))}
                 </ul>
 
-                {/* CTA */}
-                <button
-                  onClick={() => {
-                    sessionStorage.setItem('selectedPlan', plan.tier);
-                    router.push(isSignedIn ? `/onboarding?plan=${plan.tier}` : `/sign-up?plan=${plan.tier}`);
-                  }}
-                  className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all ${
+                {/* CTA — display-only, links to sign-up */}
+                <Link
+                  href="/sign-up"
+                  className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all text-center block ${
                     plan.popular
                       ? 'bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] hover:shadow-[0_4px_20px_rgba(229,168,74,0.4)]'
                       : 'bg-[rgba(255,255,255,0.05)] text-[rgba(255,255,255,0.8)] border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.2)]'
                   }`}
                 >
-                  {plan.cta}
-                </button>
+                  Get Started
+                </Link>
               </motion.div>
             ))}
 

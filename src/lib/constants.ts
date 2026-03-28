@@ -36,6 +36,7 @@ export const ONBOARDING_STEPS = [
     { id: 'situation', title: 'Your Situation', description: 'Your custody & legal situation' },
     { id: 'your-nex', title: 'Your NEX', description: 'Describe what you\'re facing' },
     { id: 'goals', title: 'Your Goals', description: 'What you need help with' },
+    { id: 'choose-plan', title: 'Choose Your Plan', description: 'Select your subscription' },
     { id: 'disclaimer', title: 'Legal Notice', description: 'Important information' },
 ] as const;
 

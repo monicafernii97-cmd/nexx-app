@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useConvexAuth } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -16,10 +16,11 @@ import {
     Target,
     FileText,
     Check,
+    CreditCard,
 } from 'lucide-react';
 import { US_STATES, ONBOARDING_STEPS } from '@/lib/constants';
-import { type PlanTier } from '@/lib/plans';
-import { isValidPlan, getValidSelectedPlan } from '@/lib/plan-validation';
+import { PLANS, type PlanTier } from '@/lib/plans';
+import { isPaidTier } from '@/lib/tiers';
 
 /**
  * Onboarding flow for new NEXX users.
@@ -39,45 +40,17 @@ export default function OnboardingPage() {
     // from querying before the Clerk JWT is available on the Convex side.
     const { isAuthenticated: convexReady, isLoading: convexLoading } = useConvexAuth();
 
-    // Guard: redirect returning users who already completed onboarding
+    // Guard: redirect returning users who already completed onboarding.
+    // The isHandoffInProgress ref suppresses this redirect while the paid
+    // checkout flow is being created — otherwise completeOnboarding fires
+    // first and this guard races the Stripe redirect to /dashboard.
     const currentUser = useQuery(api.users.me, convexReady ? {} : 'skip');
+    const isHandoffInProgress = useRef(false);
     useEffect(() => {
-        if (currentUser?.onboardingComplete) {
+        if (currentUser?.onboardingComplete && !isHandoffInProgress.current) {
             router.replace('/dashboard');
         }
     }, [currentUser, router]);
-    // On mount, read the plan from URL params and persist to sessionStorage.
-    // This ensures the plan survives even if sessionStorage was lost during OAuth.
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        const urlPlan = new URLSearchParams(window.location.search).get('plan');
-        if (urlPlan && isValidPlan(urlPlan)) {
-            sessionStorage.setItem('selectedPlan', urlPlan);
-        }
-    }, []);
-
-    // Guard: if the user hasn't selected a plan yet, redirect to the
-    // landing page pricing section. ensureFromClerk auto-creates a Convex
-    // record on sign-in, so we check subscriptionTier + sessionStorage + URL.
-    useEffect(() => {
-        if (!convexReady || convexLoading) return;
-        if (currentUser === undefined) return; // still loading
-        if (currentUser === null) {
-            // Convex record not created yet — UserProvider is syncing via
-            // ensureFromClerk. Wait for the record to appear rather than
-            // bouncing the user back to pricing.
-            return;
-        }
-        // currentUser exists but hasn't completed onboarding
-        if (currentUser.onboardingComplete) return; // returning user
-        if (isValidPlan(currentUser.subscriptionTier)) return;
-        // Check URL param → sessionStorage → default to 'free'
-        const urlPlan = new URLSearchParams(window.location.search).get('plan');
-        if (isValidPlan(urlPlan)) return; // plan in URL — all good
-        if (getValidSelectedPlan(currentUser)) return; // plan in sessionStorage
-        // No plan found anywhere — default to 'free' instead of looping
-        sessionStorage.setItem('selectedPlan', 'free');
-    }, [convexReady, convexLoading, currentUser, router]);
 
     // ─── Form state (must be declared before any early returns) ───
     const [currentStep, setCurrentStep] = useState(0);
@@ -97,6 +70,7 @@ export default function OnboardingPage() {
         nexBehaviors: [] as string[],
         nexDescription: '',
         primaryGoals: [] as string[],
+        selectedPlan: null as PlanTier | null,
         acceptedDisclaimer: false,
     });
     const updateProfile = useMutation(api.users.updateProfile);
@@ -202,17 +176,21 @@ export default function OnboardingPage() {
         }));
     };
 
+    /** Step validators keyed by step ID — stays aligned if steps are reordered. */
+    const STEP_VALIDATORS: Record<string, () => boolean | string> = {
+        'welcome': () => true,
+        'about-you': () => formData.name.trim() && formData.state.trim(),
+        'situation': () => formData.custodyType,
+        'your-nex': () => formData.nexBehaviors.length > 0,
+        'goals': () => formData.primaryGoals.length > 0,
+        'choose-plan': () => !!formData.selectedPlan,
+        'disclaimer': () => formData.acceptedDisclaimer,
+    };
+
     /** Check whether the current onboarding step has valid, required data to proceed. */
     const canProceed = () => {
-        switch (currentStep) {
-            case 0: return true;
-            case 1: return formData.name.trim() && formData.state.trim();
-            case 2: return formData.custodyType;
-            case 3: return formData.nexBehaviors.length > 0;
-            case 4: return formData.primaryGoals.length > 0;
-            case 5: return formData.acceptedDisclaimer;
-            default: return true;
-        }
+        const stepId = ONBOARDING_STEPS[currentStep]?.id;
+        return stepId ? !!(STEP_VALIDATORS[stepId]?.() ?? true) : true;
     };
 
     /** Advance to the next step or, on the final step, save profile data and redirect. */
@@ -231,13 +209,10 @@ export default function OnboardingPage() {
             setIsSaving(true);
             setSaveError(null);
             try {
-                // Update user profile with onboarding data
-                // Convert childrenAges string to number array
                 const parsedAges = formData.childrenAges
                     ? formData.childrenAges.split(',').map((a) => parseInt(a.trim(), 10)).filter((n) => !isNaN(n))
                     : undefined;
 
-                // Map custodyType display values to schema enum
                 const custodyMap: Record<string, 'sole' | 'joint' | 'split' | 'visitation' | 'none' | 'pending'> = {
                     'Joint / Shared Custody': 'joint',
                     'Sole Custody': 'sole',
@@ -246,14 +221,11 @@ export default function OnboardingPage() {
                     'Other': 'none',
                 };
 
-                const selectedPlan = getValidSelectedPlan(currentUser);
-
-                if (!selectedPlan) {
-                    setSaveError('Please select a plan before completing onboarding.');
-                    setIsSaving(false);
-                    return;
-                }
-                const tier = selectedPlan as PlanTier;
+                // Use the plan selected in the onboarding form (step 5).
+                // Always save as 'free' initially — Stripe webhook will upgrade
+                // the tier after successful payment for paid plans.
+                const chosenPlan = formData.selectedPlan;
+                const saveTier: PlanTier = (chosenPlan && isPaidTier(chosenPlan)) ? 'free' : (chosenPlan ?? 'free');
 
                 await updateProfile({
                     id: userId,
@@ -267,12 +239,8 @@ export default function OnboardingPage() {
                     custodyType: formData.custodyType ? custodyMap[formData.custodyType] ?? undefined : undefined,
                     hasAttorney: formData.hasAttorney ? formData.hasAttorney === 'Yes' : undefined,
                     primaryGoals: formData.primaryGoals.length > 0 ? formData.primaryGoals : undefined,
-                    subscriptionTier: tier,
+                    subscriptionTier: saveTier,
                 });
-
-                if (selectedPlan && typeof window !== 'undefined') {
-                    sessionStorage.removeItem('selectedPlan');
-                }
 
                 // Create NEX profile with behaviors (backend mutation is idempotent)
                 if (formData.nexBehaviors.length > 0) {
@@ -286,7 +254,6 @@ export default function OnboardingPage() {
                 await completeOnboarding({ id: userId });
 
                 // Fire-and-forget: pre-populate the Resources Hub for the user's location.
-                // This runs in the background — failures don't block onboarding.
                 if (formData.state && formData.county) {
                     fetch('/api/resources/lookup', {
                         method: 'POST',
@@ -301,7 +268,39 @@ export default function OnboardingPage() {
                     }).catch((err) => console.warn('[Onboarding] Resource lookup failed (non-blocking):', err));
                 }
 
-                router.replace('/dashboard');
+                // ── Paid plan? → Redirect to Stripe Checkout ──
+                // Free plan? → Go straight to dashboard.
+                if (chosenPlan && isPaidTier(chosenPlan)) {
+                    // Suppress the onboardingComplete guard while we create
+                    // the Stripe checkout session — it would otherwise race
+                    // us to /dashboard since completeOnboarding just fired.
+                    isHandoffInProgress.current = true;
+                    try {
+                        const res = await fetch('/api/stripe/checkout', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ tier: chosenPlan }),
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.url) {
+                            window.location.href = data.url;
+                            return; // Don't setIsSaving(false) — we're navigating away
+                        }
+                        // Checkout creation failed — send to subscription page with
+                        // error context so the user can retry the upgrade there.
+                        console.error('[Onboarding] Stripe checkout failed:', data);
+                        isHandoffInProgress.current = false;
+                        router.replace(`/subscription?checkout=failed&tier=${encodeURIComponent(chosenPlan)}`);
+                        return;
+                    } catch (stripeErr) {
+                        console.error('[Onboarding] Stripe checkout error:', stripeErr);
+                        isHandoffInProgress.current = false;
+                        router.replace(`/subscription?checkout=failed&tier=${encodeURIComponent(chosenPlan)}`);
+                        return;
+                    }
+                } else {
+                    router.replace('/dashboard');
+                }
             } catch (error: unknown) {
                 const message = error instanceof Error ? error.message : String(error);
                 console.error('Failed to save onboarding data:', error);
@@ -621,8 +620,91 @@ export default function OnboardingPage() {
                             </div>
                         )}
 
-                        {/* Step 5: Disclaimer */}
+                        {/* Step 5: Choose Your Plan */}
                         {currentStep === 5 && (
+                            <div className="space-y-6 max-w-4xl mx-auto">
+                                <div className="flex items-center justify-center gap-3 mb-2">
+                                    <CreditCard size={24} className="text-white" />
+                                    <h2 className="font-serif text-2xl font-bold text-white">Choose Your Plan</h2>
+                                </div>
+                                <p className="text-[15px] font-medium text-white/60 text-center mb-6">
+                                    Select the plan that fits your needs. You can always upgrade later.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {PLANS.map((plan) => {
+                                        const isSelected = formData.selectedPlan === plan.tier;
+                                        return (
+                                            <button
+                                                key={plan.tier}
+                                                onClick={() => update('selectedPlan', plan.tier)}
+                                                className={`relative rounded-[1.5rem] p-5 flex flex-col text-left border transition-all hover:scale-[1.01] ${
+                                                    isSelected
+                                                        ? 'bg-gradient-to-b from-[#0F1D3D] to-[#0A1128] border-[var(--champagne)] shadow-[0_4px_30px_rgba(229,168,74,0.2)]'
+                                                        : plan.popular
+                                                            ? 'bg-gradient-to-b from-[#0F1D3D]/60 to-[#0A1128] border-[rgba(229,168,74,0.2)] hover:border-[rgba(229,168,74,0.4)]'
+                                                            : 'bg-[#0A1128] border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.2)]'
+                                                }`}
+                                            >
+                                                {/* Selected indicator */}
+                                                {isSelected && (
+                                                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                                                        <span className="px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] shadow-sm">
+                                                            Selected
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {/* Badge */}
+                                                {plan.badge && !isSelected && (
+                                                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                                                        <span className="px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-[#1A4B9B] text-white/80 shadow-sm">
+                                                            {plan.badge}
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                {/* Plan name + price */}
+                                                <div className={`flex items-baseline justify-between mb-2 ${(plan.badge || isSelected) ? 'mt-3' : 'mt-0'}`}>
+                                                    <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--champagne)]">
+                                                        {plan.name}
+                                                    </h3>
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="text-2xl font-serif font-bold text-white tracking-tight">{plan.price}</span>
+                                                        <span className="text-xs text-white/40">{plan.period}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Description */}
+                                                <p className="text-[12px] text-white/50 leading-relaxed mb-3">
+                                                    {plan.description}
+                                                </p>
+
+                                                {/* Features */}
+                                                <ul className="space-y-1.5">
+                                                    {plan.features.map((feature) => (
+                                                        <li key={feature} className="flex items-start gap-2">
+                                                            <Check size={12} strokeWidth={3} className="mt-0.5 shrink-0 text-[var(--champagne)]" />
+                                                            <span className="text-[11px] text-white/70 leading-snug">{feature}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+
+                                                {/* Selection ring */}
+                                                <div className={`mt-4 w-full py-2 rounded-xl text-center text-[12px] font-bold uppercase tracking-wider transition-all ${
+                                                    isSelected
+                                                        ? 'bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128]'
+                                                        : 'bg-white/5 text-white/40 border border-white/10'
+                                                }`}>
+                                                    {isSelected ? '✓ Selected' : 'Select Plan'}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Step 6: Disclaimer */}
+                        {currentStep === 6 && (
                             <div className="space-y-6 max-w-2xl mx-auto">
                                 <div className="flex items-center justify-center gap-3 mb-6">
                                     <FileText size={24} className="text-white" />

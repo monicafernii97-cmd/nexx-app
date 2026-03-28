@@ -1,16 +1,13 @@
 'use client';
 
 import { SignUp } from '@clerk/nextjs';
-import { useSearchParams } from 'next/navigation';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 
 /** Branded sign-up page with ambient glow background and Clerk SignUp component. */
 export default function SignUpPage() {
-    const searchParams = useSearchParams();
-    const plan = searchParams.get('plan');
-    // Build redirect: pass the selected plan to onboarding via URL so it
-    // survives OAuth redirects (sessionStorage can be lost across origins).
-    const redirectUrl = plan ? `/onboarding?plan=${plan}` : '/onboarding';
+    // Plan selection now happens inside onboarding (step 5), so we always
+    // redirect to /onboarding after sign-up — no plan param needed.
+    const redirectUrl = '/onboarding';
 
     return (
         <div

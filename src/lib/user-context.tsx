@@ -91,7 +91,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (clerkUser.id !== prevClerkId.current) {
             hasSynced.current = false;
             prevClerkId.current = clerkUser.id;
-            // Clear stale plan selection from a prior session/identity
+            // Plan selection now happens inside onboarding (not via sessionStorage
+            // from the landing page), so clear any stale values on identity change
+            // to prevent them leaking across different users or sessions.
             if (typeof window !== 'undefined') {
                 sessionStorage.removeItem('selectedPlan');
             }

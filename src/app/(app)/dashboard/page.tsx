@@ -23,7 +23,7 @@ import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { parseLocalDate } from '@/lib/dateUtils';
 
-/** Quick-action cards linking to primary user flows. */
+/** Quick-action cards linking to primary user flows (new chat, log incident, draft document). */
 const quickActions = [
     { label: 'New Chat', desc: 'Secure session with NEXX', href: '/chat', icon: Microphone, accent: 'var(--champagne)' },
     { label: 'Log Incident', desc: 'Document an event', href: '/incident-report/new', icon: Plus, accent: 'var(--emerald)' },
@@ -45,6 +45,7 @@ export default function DashboardPage() {
     );
 }
 
+/** Inner dashboard content — reads search params for checkout toast and renders the bento grid. */
 function DashboardContent() {
     const { userId } = useUser();
     const router = useRouter();

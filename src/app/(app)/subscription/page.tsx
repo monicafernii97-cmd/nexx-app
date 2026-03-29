@@ -34,6 +34,7 @@ export default function SubscriptionPage() {
     );
 }
 
+/** Inner subscription content — renders current plan, tier comparison, upgrade CTAs, and cancel toast. */
 function SubscriptionContent() {
     const user = useQuery(api.users.me);
     const searchParams = useSearchParams();

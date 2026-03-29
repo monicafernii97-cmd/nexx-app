@@ -347,7 +347,7 @@ export default function OnboardingPage() {
                 background: `repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 8px), linear-gradient(135deg, #2E5C9A 0%, #123D7E 40%, #0A1128 100%)` 
             }}
         >
-            <div className={`w-full mx-auto px-6 py-10 relative z-10 transition-all duration-500 ${currentStep === 5 ? 'max-w-6xl' : 'max-w-2xl'}`}>
+            <div className={`w-full mx-auto px-6 py-10 relative z-10 transition-all duration-500 ${currentStep === 5 ? 'max-w-4xl' : 'max-w-2xl'}`}>
                 {/* Progress Bar */}
                 <div className="flex items-center gap-1 mb-8">
                     {ONBOARDING_STEPS.map((_, i) => (
@@ -621,7 +621,7 @@ export default function OnboardingPage() {
 
                         {/* Step 5: Choose Your Plan */}
                         {currentStep === 5 && (
-                            <div className="space-y-6 max-w-6xl mx-auto">
+                            <div className="space-y-6 mx-auto">
                                 <div className="text-center mb-8">
                                     <p className="text-[11px] md:text-xs font-bold tracking-[0.25em] uppercase text-[var(--champagne)] mb-4">
                                         Choose Your Arsenal
@@ -633,7 +633,7 @@ export default function OnboardingPage() {
                                         Every tier is designed to arm you with the tools you need. Start free, upgrade when you&apos;re ready.
                                     </p>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {PLANS.map((plan) => {
                                         const isSelected = formData.selectedPlan === plan.tier;
                                         return (

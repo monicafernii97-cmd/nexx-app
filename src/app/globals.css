@@ -320,3 +320,22 @@ h1, h2, h3, h4, h5, h6, p, span, div {
   color: #FFFFFF !important;
   caret-color: #FFFFFF !important;
 }
+
+/* Clerk verification flow — ensure all text is white on dark bg */
+.cl-otpCodeFieldInput {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.cl-formResendCodeLink,
+.cl-footerActionLink,
+.cl-footerActionText,
+.cl-identityPreviewText,
+.cl-identityPreviewEditButton,
+.cl-formFieldAction,
+.cl-formHeaderTitle,
+.cl-formHeaderSubtitle,
+.cl-backLink,
+.cl-alternativeMethodsBlockButton {
+  color: #FFFFFF !important;
+}

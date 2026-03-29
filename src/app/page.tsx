@@ -224,12 +224,12 @@ export default function WelcomePage() {
           >
             Sign In
           </Link>
-          <button 
-            onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-            className="btn-outline w-full sm:w-auto px-8 py-3.5 text-[13px] hover:bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.9)] hover:border-[rgba(255,255,255,0.3)]"
+          <Link
+            href="/sign-up"
+            className="btn-outline w-full sm:w-auto px-8 py-3.5 text-[13px] hover:bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.9)] hover:border-[rgba(255,255,255,0.3)] inline-flex items-center justify-center"
           >
             Sign Up
-          </button>
+          </Link>
         </motion.div>
 
         {/* Bouncing Arrow Scroll hint */}

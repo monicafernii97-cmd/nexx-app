@@ -62,6 +62,18 @@ export const nexxClerkAppearance = {
             border: '1px solid rgba(255, 255, 255, 0.2)',
             color: '#FFFFFF',
             boxShadow: 'inset 0 2px 4px rgba(255, 255, 255, 0.05)',
+            fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+        },
+        otpCodeFieldInput: {
+            fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+            fontWeight: '600',
+            fontSize: '24px',
+            color: '#FFFFFF',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            background: 'rgba(255, 255, 255, 0.05)',
+        },
+        otpCodeField: {
+            fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
         },
         pageScrollBox: {
             background: 'transparent',

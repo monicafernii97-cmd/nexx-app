@@ -347,7 +347,7 @@ export default function OnboardingPage() {
                 background: `repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 8px), linear-gradient(135deg, #2E5C9A 0%, #123D7E 40%, #0A1128 100%)` 
             }}
         >
-            <div className={`w-full mx-auto px-6 py-10 relative z-10 transition-all duration-500 ${currentStep === 5 ? 'max-w-4xl' : 'max-w-2xl'}`}>
+            <div className={`w-full mx-auto px-6 py-10 relative z-10 transition-all duration-500 ${currentStep === 5 ? 'max-w-7xl' : 'max-w-2xl'}`}>
                 {/* Progress Bar */}
                 <div className="flex items-center gap-1 mb-8">
                     {ONBOARDING_STEPS.map((_, i) => (
@@ -622,33 +622,36 @@ export default function OnboardingPage() {
                         {/* Step 5: Choose Your Plan */}
                         {currentStep === 5 && (
                             <div className="space-y-6 mx-auto">
-                                <div className="text-center mb-8">
+                                <div className="text-center mb-16">
                                     <p className="text-[11px] md:text-xs font-bold tracking-[0.25em] uppercase text-[var(--champagne)] mb-4">
                                         Choose Your Arsenal
                                     </p>
-                                    <h2 className="text-3xl md:text-4xl font-serif font-bold italic text-white tracking-tight mb-3">
-                                        Select Your Plan
+                                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold italic text-white tracking-tight mb-4">
+                                        Plans Built for Battle
                                     </h2>
-                                    <p className="text-sm text-[rgba(255,255,255,0.5)] max-w-lg mx-auto leading-relaxed">
-                                        Every tier is designed to arm you with the tools you need. Start free, upgrade when you&apos;re ready.
+                                    <p className="text-base text-[rgba(255,255,255,0.5)] max-w-lg mx-auto leading-relaxed">
+                                        Every tier is designed to arm you with the tools you need. Start free, upgrade when you&apos;re ready to dominate.
                                     </p>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {PLANS.map((plan) => {
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                                    {PLANS.map((plan, i) => {
                                         const isSelected = formData.selectedPlan === plan.tier;
                                         return (
-                                            <button
+                                            <motion.button
                                                 key={plan.tier}
+                                                initial={{ opacity: 0, y: 30 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: i * 0.1, duration: 0.6 }}
                                                 onClick={() => update('selectedPlan', plan.tier)}
-                                                className={`relative rounded-[2rem] p-6 flex flex-col text-left border transition-all hover:scale-[1.02] ${
+                                                className={`relative rounded-[2rem] p-6 flex flex-col text-left border transition-all hover:scale-[1.02] hover:shadow-[0_8px_40px_rgba(26,75,155,0.2)] ${
                                                     isSelected
                                                         ? 'bg-gradient-to-b from-[#0F1D3D] to-[#0A1128] border-[var(--champagne)] shadow-[0_4px_30px_rgba(229,168,74,0.25)]'
                                                         : plan.popular
-                                                            ? 'bg-gradient-to-b from-[#0F1D3D] to-[#0A1128] border-[rgba(229,168,74,0.35)] shadow-[0_4px_30px_rgba(229,168,74,0.1)] hover:shadow-[0_8px_40px_rgba(26,75,155,0.2)]'
-                                                            : 'bg-[#0A1128] border-[rgba(255,255,255,0.08)] hover:shadow-[0_8px_40px_rgba(26,75,155,0.2)]'
+                                                            ? 'bg-gradient-to-b from-[#0F1D3D] to-[#0A1128] border-[rgba(229,168,74,0.35)] shadow-[0_4px_30px_rgba(229,168,74,0.1)]'
+                                                            : 'bg-[#0A1128] border-[rgba(255,255,255,0.08)]'
                                                 }`}
                                             >
-                                                {/* Badge / Selected indicator */}
+                                                {/* Badge */}
                                                 {isSelected ? (
                                                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                                                         <span className="whitespace-nowrap px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] shadow-[0_2px_12px_rgba(229,168,74,0.3)]">
@@ -691,15 +694,17 @@ export default function OnboardingPage() {
                                                     ))}
                                                 </ul>
 
-                                                {/* Selection CTA */}
-                                                <div className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all text-center ${
+                                                {/* CTA */}
+                                                <div className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all text-center block ${
                                                     isSelected
                                                         ? 'bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] shadow-[0_4px_20px_rgba(229,168,74,0.4)]'
-                                                        : 'bg-[rgba(255,255,255,0.05)] text-[rgba(255,255,255,0.8)] border border-[rgba(255,255,255,0.1)]'
+                                                        : plan.popular
+                                                            ? 'bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] hover:shadow-[0_4px_20px_rgba(229,168,74,0.4)]'
+                                                            : 'bg-[rgba(255,255,255,0.05)] text-[rgba(255,255,255,0.8)] border border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.2)]'
                                                 }`}>
                                                     {isSelected ? '✓ Selected' : 'Select Plan'}
                                                 </div>
-                                            </button>
+                                            </motion.button>
                                         );
                                     })}
                                 </div>

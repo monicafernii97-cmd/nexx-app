@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from 'convex/react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -32,6 +32,20 @@ const quickActions = [
 
 /** Ethereal Luxury Dashboard showing quick actions, recent incidents, and activity overview in Bento 2.0 layout. */
 export default function DashboardPage() {
+    return (
+        <Suspense fallback={
+            <PageContainer>
+                <div className="flex items-center justify-center h-64">
+                    <div className="w-10 h-10 rounded-full border-2 border-[#60A5FA] border-t-transparent animate-spin" />
+                </div>
+            </PageContainer>
+        }>
+            <DashboardContent />
+        </Suspense>
+    );
+}
+
+function DashboardContent() {
     const { userId } = useUser();
     const router = useRouter();
     const searchParams = useSearchParams();

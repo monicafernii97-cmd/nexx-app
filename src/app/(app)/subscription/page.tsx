@@ -41,20 +41,19 @@ function SubscriptionContent() {
     const [loadingTier, setLoadingTier] = useState<string | null>(null);
     const [portalLoading, setPortalLoading] = useState(false);
 
-    const isSuccess = searchParams.get('success') === 'true';
     const isCanceled = searchParams.get('canceled') === 'true';
     const [dismissedToast, setDismissedToast] = useState(false);
-    const showToast = (isSuccess || isCanceled) && !dismissedToast;
+    const showToast = isCanceled && !dismissedToast;
 
     // Auto-dismiss toasts after 5 seconds and clean up URL query params
     useEffect(() => {
-        if (!isSuccess && !isCanceled) return;
+        if (!isCanceled) return;
         const timer = setTimeout(() => {
             setDismissedToast(true);
             router.replace('/subscription', { scroll: false });
         }, 5000);
         return () => clearTimeout(timer);
-    }, [isSuccess, isCanceled, router]);
+    }, [isCanceled, router]);
 
     const handleUpgrade = useCallback(async (tier: string) => {
         setLoadingTier(tier);
@@ -371,20 +370,8 @@ function SubscriptionContent() {
                 </motion.div>
             </div>
 
-            {/* Success/Cancel Toast */}
-            {showToast && isSuccess && (
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 20 }}
-                    role="status"
-                    aria-live="polite"
-                    className="fixed bottom-6 right-6 bg-green-500/20 border border-green-500/40 text-green-300 px-6 py-3 rounded-xl text-sm font-bold backdrop-blur-xl shadow-lg z-50"
-                >
-                    ✓ Subscription activated! Your plan has been upgraded.
-                </motion.div>
-            )}
-            {showToast && isCanceled && (
+            {/* Cancel Toast */}
+            {showToast && (
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}

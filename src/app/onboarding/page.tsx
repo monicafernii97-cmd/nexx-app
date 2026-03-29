@@ -16,7 +16,6 @@ import {
     Target,
     FileText,
     Check,
-    CreditCard,
 } from 'lucide-react';
 import { US_STATES, ONBOARDING_STEPS } from '@/lib/constants';
 import { PLANS, type PlanTier } from '@/lib/plans';
@@ -622,77 +621,81 @@ export default function OnboardingPage() {
 
                         {/* Step 5: Choose Your Plan */}
                         {currentStep === 5 && (
-                            <div className="space-y-6 max-w-4xl mx-auto">
-                                <div className="flex items-center justify-center gap-3 mb-2">
-                                    <CreditCard size={24} className="text-white" />
-                                    <h2 className="font-serif text-2xl font-bold text-white">Choose Your Plan</h2>
+                            <div className="space-y-6 max-w-6xl mx-auto">
+                                <div className="text-center mb-8">
+                                    <p className="text-[11px] md:text-xs font-bold tracking-[0.25em] uppercase text-[var(--champagne)] mb-4">
+                                        Choose Your Arsenal
+                                    </p>
+                                    <h2 className="text-3xl md:text-4xl font-serif font-bold italic text-white tracking-tight mb-3">
+                                        Select Your Plan
+                                    </h2>
+                                    <p className="text-sm text-[rgba(255,255,255,0.5)] max-w-lg mx-auto leading-relaxed">
+                                        Every tier is designed to arm you with the tools you need. Start free, upgrade when you&apos;re ready.
+                                    </p>
                                 </div>
-                                <p className="text-[15px] font-medium text-white/60 text-center mb-6">
-                                    Select the plan that fits your needs. You can always upgrade later.
-                                </p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                                     {PLANS.map((plan) => {
                                         const isSelected = formData.selectedPlan === plan.tier;
                                         return (
                                             <button
                                                 key={plan.tier}
                                                 onClick={() => update('selectedPlan', plan.tier)}
-                                                className={`relative rounded-[1.5rem] p-5 flex flex-col text-left border transition-all hover:scale-[1.01] ${
+                                                className={`relative rounded-[2rem] p-6 flex flex-col text-left border transition-all hover:scale-[1.02] ${
                                                     isSelected
-                                                        ? 'bg-gradient-to-b from-[#0F1D3D] to-[#0A1128] border-[var(--champagne)] shadow-[0_4px_30px_rgba(229,168,74,0.2)]'
+                                                        ? 'bg-gradient-to-b from-[#0F1D3D] to-[#0A1128] border-[var(--champagne)] shadow-[0_4px_30px_rgba(229,168,74,0.25)]'
                                                         : plan.popular
-                                                            ? 'bg-gradient-to-b from-[#0F1D3D]/60 to-[#0A1128] border-[rgba(229,168,74,0.2)] hover:border-[rgba(229,168,74,0.4)]'
-                                                            : 'bg-[#0A1128] border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.2)]'
+                                                            ? 'bg-gradient-to-b from-[#0F1D3D] to-[#0A1128] border-[rgba(229,168,74,0.35)] shadow-[0_4px_30px_rgba(229,168,74,0.1)] hover:shadow-[0_8px_40px_rgba(26,75,155,0.2)]'
+                                                            : 'bg-[#0A1128] border-[rgba(255,255,255,0.08)] hover:shadow-[0_8px_40px_rgba(26,75,155,0.2)]'
                                                 }`}
                                             >
-                                                {/* Selected indicator */}
-                                                {isSelected && (
-                                                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
-                                                        <span className="px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] shadow-sm">
-                                                            Selected
+                                                {/* Badge / Selected indicator */}
+                                                {isSelected ? (
+                                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                                                        <span className="whitespace-nowrap px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] shadow-[0_2px_12px_rgba(229,168,74,0.3)]">
+                                                            ✓ Selected
                                                         </span>
                                                     </div>
-                                                )}
-                                                {/* Badge */}
-                                                {plan.badge && !isSelected && (
-                                                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
-                                                        <span className="px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-[#1A4B9B] text-white/80 shadow-sm">
+                                                ) : plan.badge ? (
+                                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                                                        <span className="whitespace-nowrap px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] shadow-[0_2px_12px_rgba(229,168,74,0.3)]">
                                                             {plan.badge}
                                                         </span>
                                                     </div>
-                                                )}
+                                                ) : null}
 
-                                                {/* Plan name + price */}
-                                                <div className={`flex items-baseline justify-between mb-2 ${(plan.badge || isSelected) ? 'mt-3' : 'mt-0'}`}>
-                                                    <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--champagne)]">
-                                                        {plan.name}
-                                                    </h3>
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className="text-2xl font-serif font-bold text-white tracking-tight">{plan.price}</span>
-                                                        <span className="text-xs text-white/40">{plan.period}</span>
-                                                    </div>
+                                                {/* Plan Name */}
+                                                <h3 className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--champagne)] mb-3 mt-1">
+                                                    {plan.name}
+                                                </h3>
+
+                                                {/* Price */}
+                                                <div className="flex items-baseline gap-1 mb-1">
+                                                    <span className="text-4xl font-serif font-bold text-white tracking-tight">{plan.price}</span>
+                                                    <span className="text-sm text-[rgba(255,255,255,0.4)]">{plan.period}</span>
                                                 </div>
 
                                                 {/* Description */}
-                                                <p className="text-[12px] text-white/50 leading-relaxed mb-3">
+                                                <p className="text-[13px] text-[rgba(255,255,255,0.5)] leading-relaxed mb-6">
                                                     {plan.description}
                                                 </p>
 
                                                 {/* Features */}
-                                                <ul className="space-y-1.5">
+                                                <ul className="flex-1 space-y-3 mb-8">
                                                     {plan.features.map((feature) => (
-                                                        <li key={feature} className="flex items-start gap-2">
-                                                            <Check size={12} strokeWidth={3} className="mt-0.5 shrink-0 text-[var(--champagne)]" />
-                                                            <span className="text-[11px] text-white/70 leading-snug">{feature}</span>
+                                                        <li key={feature} className="flex items-start gap-2.5">
+                                                            <span className="mt-0.5 w-4 h-4 rounded-full bg-[rgba(229,168,74,0.15)] flex items-center justify-center shrink-0">
+                                                                <span className="text-[10px] text-[var(--champagne)]">✓</span>
+                                                            </span>
+                                                            <span className="text-[13px] text-[rgba(255,255,255,0.7)] leading-snug">{feature}</span>
                                                         </li>
                                                     ))}
                                                 </ul>
 
-                                                {/* Selection ring */}
-                                                <div className={`mt-4 w-full py-2 rounded-xl text-center text-[12px] font-bold uppercase tracking-wider transition-all ${
+                                                {/* Selection CTA */}
+                                                <div className={`w-full py-3 rounded-xl text-[13px] font-bold tracking-wide uppercase transition-all text-center ${
                                                     isSelected
-                                                        ? 'bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128]'
-                                                        : 'bg-white/5 text-white/40 border border-white/10'
+                                                        ? 'bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128] shadow-[0_4px_20px_rgba(229,168,74,0.4)]'
+                                                        : 'bg-[rgba(255,255,255,0.05)] text-[rgba(255,255,255,0.8)] border border-[rgba(255,255,255,0.1)]'
                                                 }`}>
                                                     {isSelected ? '✓ Selected' : 'Select Plan'}
                                                 </div>

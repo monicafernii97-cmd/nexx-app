@@ -40,14 +40,16 @@ export default function DashboardPage() {
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
 
     // ── Checkout success toast ──
+    // Derive visibility from the URL param + a dismissal flag to avoid
+    // setting state synchronously inside an effect (react-hooks/set-state-in-effect).
     const isCheckoutSuccess = searchParams.get('checkout') === 'success';
-    const [showCheckoutToast, setShowCheckoutToast] = useState(false);
+    const [dismissedCheckoutToast, setDismissedCheckoutToast] = useState(false);
+    const showCheckoutToast = isCheckoutSuccess && !dismissedCheckoutToast;
 
     useEffect(() => {
         if (!isCheckoutSuccess) return;
-        setShowCheckoutToast(true);
         const timer = setTimeout(() => {
-            setShowCheckoutToast(false);
+            setDismissedCheckoutToast(true);
             router.replace('/dashboard', { scroll: false });
         }, 5000);
         return () => clearTimeout(timer);
@@ -84,6 +86,9 @@ export default function DashboardPage() {
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
+                        role="status"
+                        aria-live="polite"
+                        aria-atomic="true"
                         className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-gradient-to-r from-[#10b981] to-[#059669] text-white text-sm font-bold tracking-wide shadow-[0_8px_30px_rgba(16,185,129,0.3)] flex items-center gap-2"
                     >
                         <span className="text-lg">✓</span>

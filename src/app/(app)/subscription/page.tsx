@@ -40,17 +40,17 @@ function SubscriptionContent() {
     const router = useRouter();
     const [loadingTier, setLoadingTier] = useState<string | null>(null);
     const [portalLoading, setPortalLoading] = useState(false);
-    const [showToast, setShowToast] = useState(false);
 
     const isSuccess = searchParams.get('success') === 'true';
     const isCanceled = searchParams.get('canceled') === 'true';
+    const [dismissedToast, setDismissedToast] = useState(false);
+    const showToast = (isSuccess || isCanceled) && !dismissedToast;
 
     // Auto-dismiss toasts after 5 seconds and clean up URL query params
     useEffect(() => {
         if (!isSuccess && !isCanceled) return;
-        setShowToast(true);
         const timer = setTimeout(() => {
-            setShowToast(false);
+            setDismissedToast(true);
             router.replace('/subscription', { scroll: false });
         }, 5000);
         return () => clearTimeout(timer);

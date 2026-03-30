@@ -3,8 +3,8 @@
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 import { useQuery, useMutation } from 'convex/react';
-import { api } from '../../../../convex/_generated/api';
-import { Id } from '../../../../convex/_generated/dataModel';
+import { api } from '@convex/_generated/api';
+import { Id } from '@convex/_generated/dataModel';
 import {
     ClipboardText,
     Plus,

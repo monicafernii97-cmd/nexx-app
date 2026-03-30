@@ -18,7 +18,7 @@ import {
 } from '@phosphor-icons/react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from 'convex/react';
-import { api } from '../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import { UI_TABS, getTemplatesForTab } from '@/lib/legal/templateCategories';
 import type { UITabCategory } from '@/lib/legal/templateCategories';

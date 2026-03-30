@@ -2,8 +2,8 @@
  * Per-User Rate Limiter — In-Memory Sliding Window
  *
  * Provides per-user, per-feature rate limiting with configurable
- * window durations and max request counts. Designed for the free tier;
- * will be replaced/augmented by subscription-tier checks later.
+ * window durations and max request counts. Tier-specific limits are
+ * enforced at call sites via the optional `overrideMax` parameter.
  *
  * NOTE: In-memory — resets on process restart and is per-instance.
  * For multi-instance deployments, move to Redis or Convex-backed limits.
@@ -35,7 +35,7 @@ const ONE_MONTH_MS = 30 * ONE_DAY_MS;
 
 /**
  * Free-tier rate limits per feature.
- * Adjust these when implementing subscription tiers.
+ * Paid tiers override these via the `overrideMax` parameter at call sites.
  */
 export const FEATURE_LIMITS: Record<RateLimitFeature, FeatureLimit> = {
     court_rules_lookup: {

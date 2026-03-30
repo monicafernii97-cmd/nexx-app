@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from 'convex/react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { api } from '../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import {
     Note,

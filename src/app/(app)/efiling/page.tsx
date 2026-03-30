@@ -3,8 +3,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from 'convex/react';
-import { api } from '../../../../convex/_generated/api';
-import type { Id } from '../../../../convex/_generated/dataModel';
+import { api } from '@convex/_generated/api';
+import type { Id } from '@convex/_generated/dataModel';
 import { useUser } from '@/lib/user-context';
 import { titleCase } from '@/lib/utils/stringHelpers';
 import {
@@ -35,7 +35,7 @@ import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 //  Types
 // ═══════════════════════════════════════════
 
-import type { Doc } from '../../../../convex/_generated/dataModel';
+import type { Doc } from '@convex/_generated/dataModel';
 
 /** Shape of the full cached resources object from Convex. */
 type CachedResources = Doc<'resourcesCache'>['resources'];

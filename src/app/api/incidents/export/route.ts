@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
-import { api } from '../../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
 import { getMergedRules } from '@/lib/legal/courtRules';
 import { escapeHtml } from '@/lib/utils/htmlUtils';

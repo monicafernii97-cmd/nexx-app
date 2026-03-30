@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useConvexAuth } from 'convex/react';
-import { api } from '../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import { useClerk } from '@clerk/nextjs';
 import {
@@ -220,11 +220,11 @@ export default function OnboardingPage() {
                     'Other': 'none',
                 };
 
-                // Use the plan selected in the onboarding form (step 5).
-                // Always save as 'free' initially — Stripe webhook will upgrade
-                // the tier after successful payment for paid plans.
+                // NOTE: subscriptionTier is NOT set here. New users have no
+                // tier (treated as 'free' at query time via ?? 'free' fallback).
+                // The Stripe webhook upgrades the tier after successful payment
+                // — the client is never trusted to set its own tier.
                 const chosenPlan = formData.selectedPlan;
-                const saveTier: PlanTier = (chosenPlan && isPaidTier(chosenPlan)) ? 'free' : (chosenPlan ?? 'free');
 
                 await updateProfile({
                     id: userId,
@@ -238,7 +238,6 @@ export default function OnboardingPage() {
                     custodyType: formData.custodyType ? custodyMap[formData.custodyType] ?? undefined : undefined,
                     hasAttorney: formData.hasAttorney ? formData.hasAttorney === 'Yes' : undefined,
                     primaryGoals: formData.primaryGoals.length > 0 ? formData.primaryGoals : undefined,
-                    subscriptionTier: saveTier,
                 });
 
                 // Create NEX profile with behaviors (backend mutation is idempotent)

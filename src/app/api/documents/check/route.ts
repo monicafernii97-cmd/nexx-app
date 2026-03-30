@@ -4,7 +4,7 @@ import { getMergedRules, getCountyRequirements } from '@/lib/legal/courtRules';
 import { checkDocumentCompliance, quickComplianceCheck } from '@/lib/legal/complianceChecker';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
-import { api } from '../../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 
 export const maxDuration = 30;
 

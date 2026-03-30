@@ -7,7 +7,7 @@ import { detectLegalTopic, extractLegalQuery, searchStatutes } from '@/lib/legal
 import { checkRateLimit } from '@/lib/rateLimit';
 import { getModelForMode, getDailyLimit, FALLBACK_MODEL, type SubscriptionTier } from '@/lib/tiers';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
-import { api } from '../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_MESSAGES = 50;

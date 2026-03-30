@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { stripe, getTierForPriceId } from '@/lib/stripe';
 import { getConvexClient } from '@/lib/convexServer';
-import { api } from '../../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 import type Stripe from 'stripe';
 
 type SubscriptionTier = 'free' | 'pro' | 'premium' | 'executive';

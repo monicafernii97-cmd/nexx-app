@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useConvexAuth } from 'convex/react';
-import { api } from '../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import { useClerk } from '@clerk/nextjs';
 import {

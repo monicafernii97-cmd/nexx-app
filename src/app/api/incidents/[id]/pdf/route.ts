@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
-import { api } from '../../../../../../convex/_generated/api';
-import { Id } from '../../../../../../convex/_generated/dataModel';
+import { api } from '@convex/_generated/api';
+import { Id } from '@convex/_generated/dataModel';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
 import { getMergedRules } from '@/lib/legal/courtRules';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';

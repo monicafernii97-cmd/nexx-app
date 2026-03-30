@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { stripe, getPriceIdForTier } from '@/lib/stripe';
 import { isPaidTier } from '@/lib/tiers';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
-import { api } from '../../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 
 /** Create a Stripe Checkout session for upgrading to a paid plan. */
 export async function POST(req: NextRequest) {

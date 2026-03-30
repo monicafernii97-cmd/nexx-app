@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from 'convex/react';
-import { api } from '../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import { titleCase } from '@/lib/utils/stringHelpers';
 import {
@@ -44,7 +44,7 @@ import {
 // ═══════════════════════════════════════════
 
 /** Derive cache resource types from the Convex schema to prevent drift. */
-import type { Doc } from '../../../../convex/_generated/dataModel';
+import type { Doc } from '@convex/_generated/dataModel';
 
 /** Shape of a single AI-cached resource (court clerk, family division, etc.) */
 type CachedResource = NonNullable<Doc<'resourcesCache'>['resources']['courtClerk']>;

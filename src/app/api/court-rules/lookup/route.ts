@@ -14,8 +14,8 @@ import { lookupCourtRules, CACHE_TTL_MS } from '@/lib/legal/courtRulesLookup';
 import { titleCase } from '@/lib/utils/stringHelpers';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
-import { api } from '../../../../../convex/_generated/api';
-import type { Id } from '../../../../../convex/_generated/dataModel';
+import { api } from '@convex/_generated/api';
+import type { Id } from '@convex/_generated/dataModel';
 
 export const maxDuration = 30;
 

@@ -3,8 +3,8 @@
 import { createContext, useContext, ReactNode, useState, useCallback } from 'react';
 import { useUser as useClerkUser } from '@clerk/nextjs';
 import { useQuery, useMutation } from 'convex/react';
-import { api } from '../../convex/_generated/api';
-import { Id } from '../../convex/_generated/dataModel';
+import { api } from '@convex/_generated/api';
+import { Id } from '@convex/_generated/dataModel';
 import { useEffect, useRef } from 'react';
 
 interface UserContextType {

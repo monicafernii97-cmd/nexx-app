@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useAuth, useClerk } from '@clerk/nextjs';
 import { useQuery, useConvexAuth } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 

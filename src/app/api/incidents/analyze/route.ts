@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getOpenAI } from '@/lib/openai';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
-import { api } from '../../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 
 const MAX_NARRATIVE_LENGTH = 5000;
 

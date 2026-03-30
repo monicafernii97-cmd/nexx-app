@@ -13,7 +13,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getOpenAI } from '@/lib/openai';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
-import { api } from '../../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 import { titleCase } from '@/lib/utils/stringHelpers';
 
 /** Maximum state/county string length to prevent abuse. */

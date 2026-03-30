@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { stripe } from '@/lib/stripe';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
-import { api } from '../../../../../convex/_generated/api';
+import { api } from '@convex/_generated/api';
 
 /** Create a Stripe Customer Portal session for self-service billing management. */
 export async function POST(req: NextRequest) {

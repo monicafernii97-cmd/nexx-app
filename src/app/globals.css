@@ -58,6 +58,9 @@ html {
   /* ── Transitions & Physics ── */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── Clerk Component Fonts ── */
+  --clerk-input-font: Inter, system-ui, -apple-system, sans-serif;
 }
 
 @theme inline {
@@ -311,23 +314,29 @@ h1, h2, h3, h4, h5, h6, p, span, div {
   border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
 
-/* Clerk OTP / Email Verification Code Inputs */
-.cl-otpCodeFieldInput,
-.cl-otpCodeField input,
+/* Clerk form field inputs — email, password, etc. */
 .cl-formFieldInput[type="text"],
 .cl-formFieldInput[type="number"],
 .cl-formFieldInput {
   color: #FFFFFF !important;
   caret-color: #FFFFFF !important;
-  font-family: Inter, system-ui, -apple-system, sans-serif !important;
-  font-weight: 600 !important;
+  font-family: var(--clerk-input-font) !important;
 }
 
-/* Clerk verification flow — ensure all text is white on dark bg */
+/* Clerk OTP visual digit boxes — DO NOT target .cl-otpCodeField input
+   (the hidden native input), or we get double-rendered/overlapping digits. */
 .cl-otpCodeFieldInput {
+  color: #FFFFFF !important;
+  font-family: var(--clerk-input-font) !important;
+  font-weight: 600 !important;
   border-color: rgba(255, 255, 255, 0.2) !important;
   background: rgba(255, 255, 255, 0.05) !important;
-  font-family: Inter, system-ui, -apple-system, sans-serif !important;
+}
+
+/* Hide the underlying native input that Clerk positions behind the digit boxes */
+.cl-otpCodeField input[data-input-otp="true"] {
+  color: transparent !important;
+  caret-color: transparent !important;
 }
 
 .cl-formResendCodeLink,

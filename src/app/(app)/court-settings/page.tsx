@@ -93,7 +93,7 @@ export default function CourtSettingsPage() {
             setCaseTitleFormat((existingSettings.caseTitleFormat as CaseTitleFormat) || '');
             setCaseTitleCustom(existingSettings.caseTitleCustom || '');
             setRespondentLegalName(existingSettings.respondentLegalName || '');
-            setPetitionerLegalName(existingSettings.petitionerLegalName || '');
+            setPetitionerLegalName(existingSettings.petitionerLegalName || currentUser?.name || '');
             setPetitionerRole((existingSettings.petitionerRole as '' | 'petitioner' | 'respondent') || '');
             const existingChildren = existingSettings.children
                 ?? (existingSettings.childrenNames
@@ -109,6 +109,10 @@ export default function CourtSettingsPage() {
                 : Array.from({ length: count }, () => ({ name: '', age: '' })));
             initializedRef.current = true;
         } else if (currentUser) {
+            // Auto-populate petitioner name from user profile
+            if (currentUser.name) {
+                setPetitionerLegalName(currentUser.name);
+            }
             // No court settings yet but user profile has children data — autofill
             const userChildren = currentUser.children
                 ?? (currentUser.childrenNames

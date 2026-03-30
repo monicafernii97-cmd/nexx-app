@@ -221,7 +221,9 @@ export default defineSchema({
         )),
         /** Custom case title (used when caseTitleFormat is 'custom') */
         caseTitleCustom: v.optional(v.string()),
-        /** Respondent/opposing party legal name for document generation */
+        /** Opposing party's legal name as shown on court documents.
+         *  Named "respondent" historically but may be petitioner if the user is the respondent.
+         *  The UI label reads "Opposing Party Legal Name". */
         respondentLegalName: v.optional(v.string()),
         /** Your (filing party) legal name as it appears on court documents */
         petitionerLegalName: v.optional(v.string()),

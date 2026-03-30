@@ -129,13 +129,8 @@ export const updateProfile = mutation({
                 v.null()
             )
         ),
-        subscriptionTier: v.optional(v.union(
-            v.literal('free'),
-            v.literal('pro'),
-            v.literal('premium'),
-            v.literal('executive'),
-            v.null()
-        )),
+        // NOTE: subscriptionTier is intentionally NOT accepted here.
+        // Tier changes flow exclusively through stripe.updateSubscription.
         primaryGoals: v.optional(v.union(v.array(v.string()), v.null())),
     },
     handler: async (ctx, args) => {
@@ -193,27 +188,10 @@ export const getByClerkId = query({
     },
 });
 
-/** Admin mutation to set a user's subscription tier — restricted to the user's own record. */
-export const setSubscriptionTier = mutation({
-    args: {
-        id: v.id('users'),
-        tier: v.union(
-            v.literal('free'),
-            v.literal('pro'),
-            v.literal('premium'),
-            v.literal('executive')
-        ),
-    },
-    handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error('Not authenticated');
-
-        // Authorization: verify the caller owns this user record
-        const user = await ctx.db.get(args.id);
-        if (!user || user.clerkId !== identity.subject) {
-            throw new Error('Not authorized to modify this user');
-        }
-
-        await ctx.db.patch(args.id, { subscriptionTier: args.tier });
-    },
-});
+/**
+ * NOTE: Subscription tier changes are handled EXCLUSIVELY by the
+ * stripe.updateSubscription mutation (convex/stripe.ts), which requires
+ * a server secret matching STRIPE_WEBHOOK_SECRET. This prevents clients
+ * from self-assigning paid tiers. There is intentionally NO client-callable
+ * mutation for changing subscription tiers.
+ */

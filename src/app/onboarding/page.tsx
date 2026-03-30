@@ -220,11 +220,11 @@ export default function OnboardingPage() {
                     'Other': 'none',
                 };
 
-                // Use the plan selected in the onboarding form (step 5).
-                // Always save as 'free' initially — Stripe webhook will upgrade
-                // the tier after successful payment for paid plans.
+                // NOTE: subscriptionTier is NOT set here. All users start on
+                // 'free' (the schema default). The Stripe webhook upgrades the
+                // tier after successful payment — the client is never trusted
+                // to set its own tier.
                 const chosenPlan = formData.selectedPlan;
-                const saveTier: PlanTier = (chosenPlan && isPaidTier(chosenPlan)) ? 'free' : (chosenPlan ?? 'free');
 
                 await updateProfile({
                     id: userId,
@@ -238,7 +238,6 @@ export default function OnboardingPage() {
                     custodyType: formData.custodyType ? custodyMap[formData.custodyType] ?? undefined : undefined,
                     hasAttorney: formData.hasAttorney ? formData.hasAttorney === 'Yes' : undefined,
                     primaryGoals: formData.primaryGoals.length > 0 ? formData.primaryGoals : undefined,
-                    subscriptionTier: saveTier,
                 });
 
                 // Create NEX profile with behaviors (backend mutation is idempotent)

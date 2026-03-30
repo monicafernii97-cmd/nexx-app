@@ -220,10 +220,10 @@ export default function OnboardingPage() {
                     'Other': 'none',
                 };
 
-                // NOTE: subscriptionTier is NOT set here. All users start on
-                // 'free' (the schema default). The Stripe webhook upgrades the
-                // tier after successful payment — the client is never trusted
-                // to set its own tier.
+                // NOTE: subscriptionTier is NOT set here. New users have no
+                // tier (treated as 'free' at query time via ?? 'free' fallback).
+                // The Stripe webhook upgrades the tier after successful payment
+                // — the client is never trusted to set its own tier.
                 const chosenPlan = formData.selectedPlan;
 
                 await updateProfile({

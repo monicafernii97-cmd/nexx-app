@@ -47,7 +47,7 @@ export default function CourtSettingsPage() {
     const [judicialDistrict, setJudicialDistrict] = useState('');
     const [caseTitleFormat, setCaseTitleFormat] = useState<CaseTitleFormat>('');
     const [caseTitleCustom, setCaseTitleCustom] = useState('');
-    const [respondentLegalName, setRespondentLegalName] = useState('');
+    const [opposingPartyName, setOpposingPartyName] = useState('');
     const [petitionerLegalName, setPetitionerLegalName] = useState('');
     const [petitionerRole, setPetitionerRole] = useState<'' | 'petitioner' | 'respondent'>('');
     const [childrenCount, setChildrenCount] = useState(0);
@@ -80,10 +80,18 @@ export default function CourtSettingsPage() {
         if (initializedRef.current) return;
         // existingSettings is undefined while loading, null if no record exists
         if (existingSettings === undefined) return;
-        // Wait for currentUser to resolve before attempting autofill
-        if (existingSettings === null && currentUser === undefined) return;
+        // Wait for currentUser when we need it for petitioner fallback autofill
+        if (
+            (existingSettings === null && currentUser === undefined) ||
+            (existingSettings !== null &&
+                !existingSettings?.petitionerLegalName?.trim() &&
+                currentUser === undefined)
+        ) {
+            return;
+        }
 
         if (existingSettings) {
+            const existingPetitioner = existingSettings.petitionerLegalName?.trim();
             setState(existingSettings.state || '');
             setCounty(existingSettings.county || '');
             setCourtName(existingSettings.courtName || '');
@@ -92,8 +100,8 @@ export default function CourtSettingsPage() {
             setJudicialDistrict(existingSettings.judicialDistrict || '');
             setCaseTitleFormat((existingSettings.caseTitleFormat as CaseTitleFormat) || '');
             setCaseTitleCustom(existingSettings.caseTitleCustom || '');
-            setRespondentLegalName(existingSettings.respondentLegalName || '');
-            setPetitionerLegalName(existingSettings.petitionerLegalName || currentUser?.name || '');
+            setOpposingPartyName(existingSettings.respondentLegalName || '');
+            setPetitionerLegalName(existingPetitioner || currentUser?.name || '');
             setPetitionerRole((existingSettings.petitionerRole as '' | 'petitioner' | 'respondent') || '');
             const existingChildren = existingSettings.children
                 ?? (existingSettings.childrenNames
@@ -133,11 +141,11 @@ export default function CourtSettingsPage() {
     // nexProfile.legalName is the NEX (opposing party), not the current user
     const autofilledRef = useRef(false);
     useEffect(() => {
-        if (nexProfile?.legalName && !respondentLegalName && initializedRef.current && !autofilledRef.current) {
-            setRespondentLegalName(nexProfile.legalName);
+        if (nexProfile?.legalName && !opposingPartyName && initializedRef.current && !autofilledRef.current) {
+            setOpposingPartyName(nexProfile.legalName);
             autofilledRef.current = true;
         }
-    }, [nexProfile?.legalName, respondentLegalName]);
+    }, [nexProfile?.legalName, opposingPartyName]);
 
     // Filtered counties based on current typing
     const filteredCounties = state
@@ -182,7 +190,7 @@ export default function CourtSettingsPage() {
                 judicialDistrict: judicialDistrict || undefined,
                 caseTitleFormat: caseTitleFormat || undefined,
                 caseTitleCustom: caseTitleCustom || undefined,
-                respondentLegalName: respondentLegalName || undefined,
+                respondentLegalName: opposingPartyName || undefined,
                 petitionerLegalName: petitionerLegalName || undefined,
                 petitionerRole: petitionerRole || undefined,
                 children: children.length > 0
@@ -226,7 +234,7 @@ export default function CourtSettingsPage() {
         } finally {
             setSaving(false);
         }
-    }, [state, county, courtName, causeNumber, assignedJudge, judicialDistrict, caseTitleFormat, caseTitleCustom, respondentLegalName, petitionerLegalName, petitionerRole, children, upsertSettings, currentUser, updateProfile]);
+    }, [state, county, courtName, causeNumber, assignedJudge, judicialDistrict, caseTitleFormat, caseTitleCustom, opposingPartyName, petitionerLegalName, petitionerRole, children, upsertSettings, currentUser, updateProfile]);
 
     // AI Verify handler
     const handleVerify = useCallback(async () => {
@@ -569,17 +577,17 @@ export default function CourtSettingsPage() {
                             />
                             <input
                                 type="text"
-                                value={respondentLegalName}
-                                onChange={(e) => setRespondentLegalName(e.target.value)}
+                                value={opposingPartyName}
+                                onChange={(e) => setOpposingPartyName(e.target.value)}
                                 placeholder="Full legal name of the opposing party"
                                 className="input-premium w-full !pl-10 pr-4 text-sm bg-white/80 focus:bg-white text-[var(--sapphire-dark)] placeholder:text-[var(--sapphire-light)]"
                                 id="respondent-name-input"
                             />
                         </div>
-                        {nexProfile?.legalName && respondentLegalName !== nexProfile.legalName && (
+                        {nexProfile?.legalName && opposingPartyName !== nexProfile.legalName && (
                             <button
                                 type="button"
-                                onClick={() => setRespondentLegalName(nexProfile.legalName!)}
+                                onClick={() => setOpposingPartyName(nexProfile.legalName!)}
                                 className="text-[11px] text-[var(--champagne)] mt-1.5 hover:underline"
                             >
                                 Sync opposing party from NEX Profile: {nexProfile.legalName}
@@ -735,7 +743,7 @@ export default function CourtSettingsPage() {
                         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-3">Caption Preview</p>
                         <div className="font-mono text-[12px] text-white/80 leading-relaxed whitespace-pre-line">
                             {caseTitleFormat === 'name_v_name' && (() => {
-                                const opposingName = (respondentLegalName || '[OPPOSING PARTY]').toUpperCase();
+                                const opposingName = (opposingPartyName || '[OPPOSING PARTY]').toUpperCase();
                                 const userName = (petitionerLegalName || '[YOUR NAME]').toUpperCase();
                                 if (petitionerRole === 'petitioner') {
                                     return <>{userName}, Petitioner{'\n'}v.{'\n'}{opposingName}, Respondent</>;
@@ -756,12 +764,12 @@ export default function CourtSettingsPage() {
                             })()}
                             {caseTitleFormat === 'in_matter_of_marriage' && (() => {
                                 const name1 = (petitionerLegalName || 'PARTY 1').toUpperCase().split(' ').pop();
-                                const name2 = (respondentLegalName || 'PARTY 2').toUpperCase().split(' ').pop();
+                                const name2 = (opposingPartyName || 'PARTY 2').toUpperCase().split(' ').pop();
                                 return <>IN THE MATTER OF THE MARRIAGE OF{'\n'}{name1} AND {name2}</>;
                             })()}
                             {caseTitleFormat === 'in_re_marriage' && (() => {
                                 const name1 = (petitionerLegalName || 'PARTY 1').toUpperCase().split(' ').pop();
-                                const name2 = (respondentLegalName || 'PARTY 2').toUpperCase().split(' ').pop();
+                                const name2 = (opposingPartyName || 'PARTY 2').toUpperCase().split(' ').pop();
                                 return <>IN RE MARRIAGE OF{'\n'}{name1} AND {name2}</>;
                             })()}
                             {caseTitleFormat === 'custom' && (

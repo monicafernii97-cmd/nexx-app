@@ -249,6 +249,20 @@ export default function OnboardingPage() {
                     });
                 }
 
+                // Sync name to Clerk so the sidebar shows it immediately
+                if (formData.name && clerkUser) {
+                    const nameParts = formData.name.trim().split(/\s+/);
+                    try {
+                        await clerkUser.update({
+                            firstName: nameParts[0] || '',
+                            lastName: nameParts.slice(1).join(' ') || '',
+                        });
+                    } catch (err) {
+                        // Non-blocking — Convex already has the name
+                        console.warn('[Onboarding] Failed to sync name to Clerk:', err);
+                    }
+                }
+
                 // Mark onboarding complete
                 await completeOnboarding({ id: userId });
 

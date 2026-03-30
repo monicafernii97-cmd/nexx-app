@@ -46,11 +46,9 @@ const MAX_CACHE_SIZE = 500;
 /** Process-local cache keyed by "state|county" */
 const rulesCache = new Map<string, CacheEntry>();
 
-/** Build a cache key from lookup options. */
+/** Build a collision-safe cache key from lookup options via deterministic JSON serialization. */
 function getCacheKey({ state, county, courtName, localRulesUrl }: CourtRulesLookupOptions): string {
-    let key = courtName ? `${state}|${county}|${courtName}` : `${state}|${county}`;
-    if (localRulesUrl) key += `|${localRulesUrl}`;
-    return key;
+    return JSON.stringify({ state, county, courtName: courtName ?? null, localRulesUrl: localRulesUrl ?? null });
 }
 
 /** Return a cached lookup result if available and not expired; otherwise null. */

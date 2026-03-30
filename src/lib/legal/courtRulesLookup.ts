@@ -46,16 +46,16 @@ const MAX_CACHE_SIZE = 500;
 /** Process-local cache keyed by "state|county" */
 const rulesCache = new Map<string, CacheEntry>();
 
-/** Build a cache key from state, county, optional court name, and optional localRulesUrl. */
-function getCacheKey(state: string, county: string, courtName?: string, localRulesUrl?: string): string {
+/** Build a cache key from lookup options. */
+function getCacheKey({ state, county, courtName, localRulesUrl }: CourtRulesLookupOptions): string {
     let key = courtName ? `${state}|${county}|${courtName}` : `${state}|${county}`;
     if (localRulesUrl) key += `|${localRulesUrl}`;
     return key;
 }
 
 /** Return a cached lookup result if available and not expired; otherwise null. */
-function getCached(state: string, county: string, courtName?: string, localRulesUrl?: string): CourtRulesLookupResult | null {
-    const key = getCacheKey(state, county, courtName, localRulesUrl);
+function getCached(opts: CourtRulesLookupOptions): CourtRulesLookupResult | null {
+    const key = getCacheKey(opts);
     const entry = rulesCache.get(key);
     if (!entry) return null;
     if (Date.now() > entry.expiresAt) {
@@ -66,13 +66,13 @@ function getCached(state: string, county: string, courtName?: string, localRules
 }
 
 /** Store a lookup result in the process-local cache with TTL and FIFO eviction. */
-function setCache(state: string, county: string, result: CourtRulesLookupResult, courtName?: string, localRulesUrl?: string): void {
+function setCache(opts: CourtRulesLookupOptions, result: CourtRulesLookupResult): void {
     // Evict oldest entry if cache is full (FIFO)
     if (rulesCache.size >= MAX_CACHE_SIZE) {
         const oldestKey = rulesCache.keys().next().value;
         if (oldestKey) rulesCache.delete(oldestKey);
     }
-    rulesCache.set(getCacheKey(state, county, courtName, localRulesUrl), {
+    rulesCache.set(getCacheKey(opts), {
         result,
         expiresAt: Date.now() + CACHE_TTL_MS,
     });
@@ -166,10 +166,7 @@ interface ExtractionResult {
  * using model knowledge, optionally enhanced with cached resource URLs.
  */
 async function extractRulesWithAI(
-    state: string,
-    county: string,
-    courtName?: string,
-    localRulesUrl?: string,
+    { state, county, courtName, localRulesUrl }: CourtRulesLookupOptions,
 ): Promise<ExtractionResult> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -237,6 +234,20 @@ async function extractRulesWithAI(
 
 // ── Public API ──
 
+/** Options for court rules lookup — uses named fields instead of positional args. */
+export interface CourtRulesLookupOptions {
+    /** US state name (e.g. "Texas") */
+    state: string;
+    /** County name (e.g. "Fort Bend") */
+    county: string;
+    /** Optional specific court name */
+    courtName?: string;
+    /** Skip the cache and re-query AI sources */
+    forceRefresh?: boolean;
+    /** Optional URL from cached resources to enrich the LLM prompt */
+    localRulesUrl?: string;
+}
+
 export interface CourtRulesLookupResult {
     rules: Partial<CourtFormattingRules>;
     sources: string[];
@@ -246,32 +257,21 @@ export interface CourtRulesLookupResult {
 
 /**
  * Look up local court formatting rules for a given state/county.
- *
  * Results are cached in-memory for 30 days per state/county pair.
- * Use `forceRefresh` to bypass the cache and re-query AI sources.
  *
- * @param state - US state name (e.g. "Texas")
- * @param county - County name (e.g. "Fort Bend")
- * @param courtName - Optional specific court name
- * @param forceRefresh - Skip the cache and re-query
- * @param localRulesUrl - Optional URL from cached resources to enrich the LLM prompt
  * @returns Partial formatting rules discovered from official sources
  */
 export async function lookupCourtRules(
-    state: string,
-    county: string,
-    courtName?: string,
-    forceRefresh = false,
-    localRulesUrl?: string,
+    opts: CourtRulesLookupOptions,
 ): Promise<CourtRulesLookupResult> {
     // Step 1: Check cache (unless force-refreshing)
-    if (!forceRefresh) {
-        const cached = getCached(state, county, courtName, localRulesUrl);
+    if (!opts.forceRefresh) {
+        const cached = getCached(opts);
         if (cached) return cached;
     }
 
     // Step 2: Extract rules with GPT-4o (using model knowledge + optional localRulesUrl)
-    const extraction = await extractRulesWithAI(state, county, courtName, localRulesUrl);
+    const extraction = await extractRulesWithAI(opts);
 
     const result: CourtRulesLookupResult = {
         ...extraction,
@@ -280,7 +280,7 @@ export async function lookupCourtRules(
 
     // Step 3: Cache for future requests
     if (extraction.confidence > 0) {
-        setCache(state, county, result, courtName, localRulesUrl);
+        setCache(opts, result);
     }
 
     return result;

@@ -110,13 +110,13 @@ export async function POST(request: NextRequest) {
         }
 
         // Look up rules via GPT-4o (with in-memory cache)
-        const result = await lookupCourtRules(
-            normalizedState,
-            normalizedCounty,
-            normalizedCourtName,
-            forceRefresh,
+        const result = await lookupCourtRules({
+            state: normalizedState,
+            county: normalizedCounty,
+            courtName: normalizedCourtName,
+            forceRefresh: forceRefresh === true,
             localRulesUrl,
-        );
+        });
 
         // If settingsId provided and verification yielded results,
         // mark settings as NEXXverified via server-secret-gated action.

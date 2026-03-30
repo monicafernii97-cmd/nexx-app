@@ -58,6 +58,9 @@ html {
   /* ── Transitions & Physics ── */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── Clerk Component Fonts ── */
+  --clerk-input-font: Inter, system-ui, -apple-system, sans-serif;
 }
 
 @theme inline {
@@ -317,14 +320,14 @@ h1, h2, h3, h4, h5, h6, p, span, div {
 .cl-formFieldInput {
   color: #FFFFFF !important;
   caret-color: #FFFFFF !important;
-  font-family: Inter, system-ui, -apple-system, sans-serif !important;
+  font-family: var(--clerk-input-font) !important;
 }
 
 /* Clerk OTP visual digit boxes — DO NOT target .cl-otpCodeField input
    (the hidden native input), or we get double-rendered/overlapping digits. */
 .cl-otpCodeFieldInput {
   color: #FFFFFF !important;
-  font-family: Inter, system-ui, -apple-system, sans-serif !important;
+  font-family: var(--clerk-input-font) !important;
   font-weight: 600 !important;
   border-color: rgba(255, 255, 255, 0.2) !important;
   background: rgba(255, 255, 255, 0.05) !important;

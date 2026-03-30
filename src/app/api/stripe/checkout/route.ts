@@ -96,11 +96,17 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // ── If user already has an active subscription, open the portal ──
+        // ── If user already has an active subscription, open the portal for plan changes ──
         if (user.stripeSubscriptionId) {
             const portalSession = await stripe.billingPortal.sessions.create({
                 customer: customerId,
                 return_url: `${req.nextUrl.origin}/subscription`,
+                flow_data: {
+                    type: 'subscription_update',
+                    subscription_update: {
+                        subscription: user.stripeSubscriptionId,
+                    },
+                },
             });
             return Response.json({ url: portalSession.url });
         }

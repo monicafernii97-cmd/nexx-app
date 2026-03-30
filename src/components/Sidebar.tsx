@@ -20,11 +20,13 @@ import {
     FolderOpen,
     FileArrowUp,
     Crown,
+    Question,
     IconWeight,
 } from '@phosphor-icons/react';
 import { useState, useMemo, useCallback, type ComponentType, type CSSProperties } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
+import { restartTour } from '@/components/OnboardingTour';
 
 /** Child navigation item definition for sidebar sub-menus. */
 interface NavChild {
@@ -156,6 +158,7 @@ export default function Sidebar() {
                             <div className="flex items-center">
                                 <Link
                                     href={item.href}
+                                    id={`nav-${item.href.replace(/^\//,'').replace(/\//g, '-')}`}
                                     className="no-underline flex-1 min-w-0"
                                 >
                                     <motion.div
@@ -256,6 +259,27 @@ export default function Sidebar() {
             {/* Bottom User Section */}
             <div className="px-5 pb-6 pt-4 mt-auto">
                 <div className="primary-divider mb-4 opacity-50" />
+
+                {/* Tour replay button */}
+                <button
+                    onClick={restartTour}
+                    title="Replay onboarding tour"
+                    className={`flex items-center gap-3 w-full px-3.5 py-2.5 mb-3 rounded-2xl transition-all duration-300 cursor-pointer text-[#94A3B8] hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10 ${collapsed ? 'justify-center' : ''}`}
+                >
+                    <Question size={18} weight="bold" />
+                    <AnimatePresence mode="popLayout">
+                        {!collapsed && (
+                            <motion.span
+                                initial={{ opacity: 0, width: 0 }}
+                                animate={{ opacity: 1, width: 'auto' }}
+                                exit={{ opacity: 0, width: 0 }}
+                                className="text-[13px] font-semibold whitespace-nowrap overflow-hidden"
+                            >
+                                Take a Tour
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
+                </button>
 
                 {isLoaded && user ? (
                     <div className="relative group w-full">

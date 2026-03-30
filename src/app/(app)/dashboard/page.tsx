@@ -19,6 +19,7 @@ import {
     House,
 } from '@phosphor-icons/react';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
+import OnboardingTour from '@/components/OnboardingTour';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { parseLocalDate } from '@/lib/dateUtils';
@@ -112,6 +113,9 @@ function DashboardContent() {
                 )}
             </AnimatePresence>
 
+            {/* First-time user onboarding tour */}
+            <OnboardingTour />
+
             <PageHeader
                 icon={House}
                 title={
@@ -136,7 +140,7 @@ function DashboardContent() {
                 {/* Left Column: Quick Actions & Stats (Cols 1-8) */}
                 <div className="lg:col-span-8 space-y-6">
                     {/* Quick Actions Array - Horizontal Bento Row */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div id="quick-actions" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         {quickActions.map((action, i) => {
                             const Icon = action.icon;
                             return (

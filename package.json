@@ -21,6 +21,7 @@
     "convex": "^1.32.0",
     "date-fns": "^4.1.0",
     "dompurify": "^3.3.2",
+    "driver.js": "^1.4.0",
     "framer-motion": "^12.35.1",
     "jsdom": "^28.1.0",
     "lucide-react": "^0.577.0",

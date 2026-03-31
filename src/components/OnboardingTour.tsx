@@ -116,6 +116,7 @@ export default function OnboardingTour() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const driverRef = useRef<any>(null);
     const mountedRef = useRef(true);
+    const skipFocusRestoreRef = useRef(false);
 
     /** Cancel any pending startup timer to prevent it from re-opening the welcome modal. */
     const clearStartupTimer = useCallback(() => {
@@ -181,7 +182,6 @@ export default function OnboardingTour() {
             if (e.key === 'Escape') {
                 e.preventDefault();
                 setShowWelcome(false);
-                localStorage.setItem(TOUR_STORAGE_KEY, 'true');
                 return;
             }
 
@@ -211,7 +211,11 @@ export default function OnboardingTour() {
 
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
-            previousFocusRef.current?.focus();
+            // Don't restore focus when transitioning into the tour
+            if (!skipFocusRestoreRef.current) {
+                previousFocusRef.current?.focus();
+            }
+            skipFocusRestoreRef.current = false;
         };
     }, [showWelcome]);
 
@@ -227,6 +231,7 @@ export default function OnboardingTour() {
 
     const startTour = useCallback(async () => {
         clearStartupTimer();
+        skipFocusRestoreRef.current = true;
         setShowWelcome(false);
 
         // Persist "seen" flag before async imports so even if interrupted it won't re-show
@@ -267,6 +272,11 @@ export default function OnboardingTour() {
                     driverRef.current = driverObj;
                     driverObj.drive();
                 } catch (err) {
+                    // Cleanup partially-created driver before recovery
+                    if (driverRef.current) {
+                        driverRef.current.destroy();
+                        driverRef.current = null;
+                    }
                     handleTourStartFailure(err);
                 }
             });
@@ -278,7 +288,7 @@ export default function OnboardingTour() {
     const dismissWelcome = useCallback(() => {
         clearStartupTimer();
         setShowWelcome(false);
-        localStorage.setItem(TOUR_STORAGE_KEY, 'true');
+        // Don't persist — "Skip for Now" means the tour will return next session
     }, [clearStartupTimer]);
 
     if (!showWelcome) return null;

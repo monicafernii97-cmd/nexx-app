@@ -26,7 +26,7 @@ import {
 import { useState, useMemo, useCallback, type ComponentType, type CSSProperties } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
-import { restartTour } from '@/lib/tourUtils';
+import { restartTour, navIdSelector } from '@/lib/tourUtils';
 
 /** Child navigation item definition for sidebar sub-menus. */
 interface NavChild {
@@ -158,7 +158,7 @@ export default function Sidebar() {
                             <div className="flex items-center">
                                 <Link
                                     href={item.href}
-                                    id={`nav-${item.href.replace(/^\//,'').replace(/\//g, '-')}`}
+                                    id={navIdSelector(item.href).slice(1)}
                                     className="no-underline flex-1 min-w-0"
                                 >
                                     <motion.div

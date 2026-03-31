@@ -8,6 +8,17 @@ export const TOUR_PENDING_KEY = 'nexx-tour-pending';
 export const RESTART_EVENT = 'restart-nexx-tour';
 
 /**
+ * Convert a route href to a nav element ID selector.
+ * Must match the ID generation logic in Sidebar.tsx.
+ *
+ * @example navIdSelector('/court-settings') → '#nav-court-settings'
+ * @example navIdSelector('/docuvault') → '#nav-docuvault'
+ */
+export function navIdSelector(href: string): string {
+    return `#nav-${href.replace(/^\//, '').replace(/\//g, '-')}`;
+}
+
+/**
  * Restart the onboarding tour from anywhere in the app.
  *
  * If the user is NOT on /dashboard, sets a pending flag and navigates there.

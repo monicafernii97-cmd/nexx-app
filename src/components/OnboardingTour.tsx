@@ -1,17 +1,20 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { TOUR_STORAGE_KEY, TOUR_PENDING_KEY, RESTART_EVENT } from '@/lib/tourUtils';
+import {
+    TOUR_STORAGE_KEY,
+    TOUR_PENDING_KEY,
+    RESTART_EVENT,
+    navIdSelector,
+} from '@/lib/tourUtils';
 
 const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
-/** Tour step config — defined as a function so descriptions
- *  aren't allocated until the tour actually starts. */
+/** Tour step config — uses navIdSelector so selectors stay in sync with Sidebar IDs. */
 function getTourSteps() {
-    // Lazy-import avoids pulling driver.js into the initial bundle
     return [
         {
-            element: '#nav-dashboard',
+            element: navIdSelector('/dashboard'),
             popover: {
                 title: '📊 Dashboard',
                 description: 'Your command center — stats, recent incidents, quick actions, and an overview of your entire case at a glance.',
@@ -20,7 +23,7 @@ function getTourSteps() {
             },
         },
         {
-            element: '#nav-chat',
+            element: navIdSelector('/chat'),
             popover: {
                 title: '💬 Chat with NEXX',
                 description: 'Your secure session with NEXX — get strategic guidance on how to handle your situation, draft court-ready documents tailored to your specific case, and receive step-by-step direction on what filings and processes you\'ll need.',
@@ -29,7 +32,7 @@ function getTourSteps() {
             },
         },
         {
-            element: '#nav-docuvault',
+            element: navIdSelector('/docuvault'),
             popover: {
                 title: '🏛 DocuVault',
                 description: 'Browse dozens of court-specific legal templates. DocuVault takes the content NEXX drafted for your case and creates fully formatted, print-ready PDFs for court filings — ready to download, print, and submit.',
@@ -38,7 +41,7 @@ function getTourSteps() {
             },
         },
         {
-            element: '#nav-incident-report',
+            element: navIdSelector('/incident-report'),
             popover: {
                 title: '📋 Incident Report',
                 description: 'Write what happened in your own words. NEXX takes your raw account and generates a court-safe, timestamped timeline — with PDF download and print options, ready to exhibit in court if necessary.',
@@ -47,7 +50,7 @@ function getTourSteps() {
             },
         },
         {
-            element: '#nav-nex-profile',
+            element: navIdSelector('/nex-profile'),
             popover: {
                 title: '⚠️ NEX Profile',
                 description: 'Map your opposing party\'s behavior patterns and tendencies. NEXX uses this profile to sharpen your strategy and anticipate their next moves.',
@@ -56,7 +59,7 @@ function getTourSteps() {
             },
         },
         {
-            element: '#nav-court-settings',
+            element: navIdSelector('/court-settings'),
             popover: {
                 title: '⚖️ Legal Suite',
                 description: 'Configure your court settings — state, county, judge, case caption, and parties. This powers every document NEXX generates for you.',
@@ -65,7 +68,7 @@ function getTourSteps() {
             },
         },
         {
-            element: '#nav-efiling',
+            element: navIdSelector('/efiling'),
             popover: {
                 title: '📤 eFiling',
                 description: 'Your guided filing checklist — track what\'s been submitted, what\'s pending, and access your county\'s electronic filing portal directly.',
@@ -74,7 +77,7 @@ function getTourSteps() {
             },
         },
         {
-            element: '#nav-resources',
+            element: navIdSelector('/resources'),
             popover: {
                 title: '📚 Resources',
                 description: 'Discover local resources for your jurisdiction — court clerks, legal aid organizations, and eFiling portals, all curated by NEXX for your county.',
@@ -102,25 +105,30 @@ export default function OnboardingTour() {
     const [showWelcome, setShowWelcome] = useState(false);
     const dialogRef = useRef<HTMLDivElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
+    const startupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Show tour for first-time users
+    // Consolidated startup: check both first-run and pending-replay in a single effect.
+    // Schedules at most one timer to prevent overlapping show calls.
     useEffect(() => {
         if (typeof window === 'undefined') return;
-        const seen = localStorage.getItem(TOUR_STORAGE_KEY);
-        if (!seen) {
-            const timer = setTimeout(() => setShowWelcome(true), 800);
-            return () => clearTimeout(timer);
-        }
-    }, []);
 
-    // Check for pending tour (navigated here from another route via ? button)
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
+        // Pending replay (navigated here from another route via ? button)
         const pending = localStorage.getItem(TOUR_PENDING_KEY);
         if (pending) {
             localStorage.removeItem(TOUR_PENDING_KEY);
-            const timer = setTimeout(() => setShowWelcome(true), 500);
-            return () => clearTimeout(timer);
+            startupTimerRef.current = setTimeout(() => setShowWelcome(true), 500);
+            return () => {
+                if (startupTimerRef.current) clearTimeout(startupTimerRef.current);
+            };
+        }
+
+        // First-time user (hasn't seen tour yet)
+        const seen = localStorage.getItem(TOUR_STORAGE_KEY);
+        if (!seen) {
+            startupTimerRef.current = setTimeout(() => setShowWelcome(true), 800);
+            return () => {
+                if (startupTimerRef.current) clearTimeout(startupTimerRef.current);
+            };
         }
     }, []);
 
@@ -211,6 +219,11 @@ export default function OnboardingTour() {
     }, []);
 
     const dismissWelcome = useCallback(() => {
+        // Clear any pending startup timer to prevent double-show
+        if (startupTimerRef.current) {
+            clearTimeout(startupTimerRef.current);
+            startupTimerRef.current = null;
+        }
         setShowWelcome(false);
         localStorage.setItem(TOUR_STORAGE_KEY, 'true');
     }, []);

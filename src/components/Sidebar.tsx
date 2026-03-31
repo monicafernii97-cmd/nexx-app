@@ -145,8 +145,8 @@ export default function Sidebar() {
             {/* Divider */}
             <div className="mx-6 primary-divider opacity-50" />
 
-            {/* Navigation */}
-            <nav className="flex-1 py-6 px-4 space-y-1.5 overflow-y-auto overflow-x-hidden no-scrollbar">
+            {/* Navigation — CSS override for overflow when driver.js tour is active (see globals.css) */}
+            <nav className="flex-1 py-6 px-4 space-y-1.5 overflow-y-auto overflow-x-hidden no-scrollbar sidebar-nav">
                 {navItems.map((item) => {
                     const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
                     const hasChildren = item.children && item.children.length > 0;
@@ -264,6 +264,7 @@ export default function Sidebar() {
                 <button
                     onClick={restartTour}
                     title="Replay onboarding tour"
+                    aria-label="Replay onboarding tour"
                     className={`flex items-center gap-3 w-full px-3.5 py-2.5 mb-3 rounded-2xl transition-all duration-300 cursor-pointer text-[#94A3B8] hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10 ${collapsed ? 'justify-center' : ''}`}
                 >
                     <Question size={18} weight="bold" />

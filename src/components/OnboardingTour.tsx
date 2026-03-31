@@ -5,6 +5,7 @@ import { driver, type DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
 
 const TOUR_STORAGE_KEY = 'nexx-tour-seen';
+const RESTART_EVENT = 'restart-nexx-tour';
 
 /** Tour step definitions targeting sidebar nav IDs and dashboard elements. */
 const tourSteps: DriveStep[] = [
@@ -12,7 +13,7 @@ const tourSteps: DriveStep[] = [
         element: '#nav-dashboard',
         popover: {
             title: '📊 Dashboard',
-            description: 'Your command center. See stats, recent incidents, and quick actions at a glance.',
+            description: 'Your command center — stats, recent incidents, quick actions, and an overview of your entire case at a glance.',
             side: 'right',
             align: 'center',
         },
@@ -21,7 +22,7 @@ const tourSteps: DriveStep[] = [
         element: '#nav-chat',
         popover: {
             title: '💬 Chat with NEXX',
-            description: 'Talk to your AI legal strategist — voice or text. Get real-time legal citations and tailored advice.',
+            description: 'Your secure session with NEXX. Draft court-ready documents tailored to your specific case, get step-by-step guidance on what filings you need, and receive strategic legal advice — all in one conversation.',
             side: 'right',
             align: 'center',
         },
@@ -30,7 +31,7 @@ const tourSteps: DriveStep[] = [
         element: '#nav-docuvault',
         popover: {
             title: '🏛 DocuVault',
-            description: 'Generate court-ready legal documents from templates calibrated to your jurisdiction.',
+            description: 'Choose from dozens of legal templates, then generate formatted, print-ready PDF documents powered by the content NEXX drafted for your case. Ready to file or present in court.',
             side: 'right',
             align: 'center',
         },
@@ -39,7 +40,7 @@ const tourSteps: DriveStep[] = [
         element: '#nav-incident-report',
         popover: {
             title: '📋 Incident Report',
-            description: 'Log incidents with AI-powered analysis. Build an airtight evidence timeline.',
+            description: 'Share what happened in your own words — NEXX transforms your raw account into a court-safe, timestamped timeline. Download as PDF, print, and exhibit in court when needed.',
             side: 'right',
             align: 'center',
         },
@@ -48,7 +49,7 @@ const tourSteps: DriveStep[] = [
         element: '#nav-nex-profile',
         popover: {
             title: '⚠️ NEX Profile',
-            description: 'Map your opposing party\'s behavior patterns. NEXX uses this to tailor your strategy.',
+            description: 'Map your opposing party\'s behavior patterns and tendencies. NEXX uses this profile to sharpen your strategy and anticipate their moves.',
             side: 'right',
             align: 'center',
         },
@@ -57,7 +58,16 @@ const tourSteps: DriveStep[] = [
         element: '#nav-court-settings',
         popover: {
             title: '⚖️ Legal Suite',
-            description: 'Configure your court settings — state, county, judge, case caption. Powers all your documents.',
+            description: 'Configure your court settings — state, county, judge, case caption, and parties. This powers every document NEXX generates for you.',
+            side: 'right',
+            align: 'center',
+        },
+    },
+    {
+        element: '#nav-efiling',
+        popover: {
+            title: '📤 eFiling',
+            description: 'Your guided filing checklist — track what\'s been submitted, what\'s pending, and access your county\'s electronic filing portal directly.',
             side: 'right',
             align: 'center',
         },
@@ -66,7 +76,7 @@ const tourSteps: DriveStep[] = [
         element: '#nav-resources',
         popover: {
             title: '📚 Resources',
-            description: 'AI-discovered local resources — court clerks, legal aid, and eFiling portals for your jurisdiction.',
+            description: 'Discover local resources for your jurisdiction — court clerks, legal aid organizations, and eFiling portals, all curated by NEXX for your county.',
             side: 'right',
             align: 'center',
         },
@@ -98,6 +108,13 @@ export default function OnboardingTour() {
             const timer = setTimeout(() => setShowWelcome(true), 800);
             return () => clearTimeout(timer);
         }
+    }, []);
+
+    // Listen for restart event from the sidebar ? button (no full-page reload)
+    useEffect(() => {
+        const handleRestart = () => setShowWelcome(true);
+        window.addEventListener(RESTART_EVENT, handleRestart);
+        return () => window.removeEventListener(RESTART_EVENT, handleRestart);
     }, []);
 
     const startTour = useCallback(() => {
@@ -205,9 +222,8 @@ export default function OnboardingTour() {
     );
 }
 
-/** Trigger function to restart the tour programmatically (from the ? button). */
+/** Trigger function to restart the tour without a full page reload. */
 export function restartTour() {
     localStorage.removeItem(TOUR_STORAGE_KEY);
-    // Reload so the tour component re-mounts fresh
-    window.location.reload();
+    window.dispatchEvent(new CustomEvent(RESTART_EVENT));
 }

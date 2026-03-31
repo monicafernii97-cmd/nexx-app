@@ -353,6 +353,14 @@ h1, h2, h3, h4, h5, h6, p, span, div {
 }
 
 /* ── Driver.js Tour Overrides ── */
+
+/* When tour is active, disable sidebar nav overflow clipping so that
+   the spotlight overlay can render correctly on items near the bottom
+   (e.g. eFiling, Resources). driver.js adds .driver-active to <body>. */
+.driver-active .sidebar-nav {
+  overflow: visible !important;
+}
+
 .driver-popover.nexx-tour-popover {
   background: linear-gradient(160deg, #0D1B3E 0%, #0A1128 40%, #132042 100%) !important;
   border: 1px solid rgba(255, 255, 255, 0.15) !important;

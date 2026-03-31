@@ -86,10 +86,19 @@ function getTourSteps() {
             },
         },
         {
-            // No element target — shows as a centered popover for a clean finish
+            element: '#quick-actions',
+            popover: {
+                title: '⚡ Quick Actions',
+                description: 'Jump right in — start a new chat, log an incident, or draft a document. These shortcuts get you moving fast.',
+                side: 'top' as const,
+                align: 'center' as const,
+            },
+        },
+        {
+            // No element target — centered popover for a clean finish
             popover: {
                 title: '🚀 You\'re All Set!',
-                description: 'Start a chat session, log your first incident, or generate a document. NEXX is ready when you are.',
+                description: 'You\'ve seen it all — NEXX is ready when you are. You can replay this tour anytime from the sidebar.',
             },
         },
     ];

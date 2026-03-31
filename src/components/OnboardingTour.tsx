@@ -108,6 +108,14 @@ export default function OnboardingTour() {
     const driverRef = useRef<any>(null);
     const mountedRef = useRef(true);
 
+    /** Cancel any pending startup timer to prevent it from re-opening the welcome modal. */
+    const clearStartupTimer = useCallback(() => {
+        if (startupTimerRef.current) {
+            clearTimeout(startupTimerRef.current);
+            startupTimerRef.current = null;
+        }
+    }, []);
+
     // Track mounted state and cleanup driver instance on unmount
     useEffect(() => {
         mountedRef.current = true;
@@ -145,10 +153,13 @@ export default function OnboardingTour() {
 
     // Listen for restart event (fired when already on /dashboard)
     useEffect(() => {
-        const handleRestart = () => setShowWelcome(true);
+        const handleRestart = () => {
+            clearStartupTimer();
+            setShowWelcome(true);
+        };
         window.addEventListener(RESTART_EVENT, handleRestart);
         return () => window.removeEventListener(RESTART_EVENT, handleRestart);
-    }, []);
+    }, [clearStartupTimer]);
 
     // Focus trap + Escape key handling for accessibility
     useEffect(() => {
@@ -196,6 +207,7 @@ export default function OnboardingTour() {
     }, [showWelcome]);
 
     const startTour = useCallback(async () => {
+        clearStartupTimer();
         setShowWelcome(false);
 
         // Persist "seen" flag before async imports so even if interrupted it won't re-show
@@ -234,17 +246,13 @@ export default function OnboardingTour() {
             driverRef.current = driverObj;
             driverObj.drive();
         });
-    }, []);
+    }, [clearStartupTimer]);
 
     const dismissWelcome = useCallback(() => {
-        // Clear any pending startup timer to prevent double-show
-        if (startupTimerRef.current) {
-            clearTimeout(startupTimerRef.current);
-            startupTimerRef.current = null;
-        }
+        clearStartupTimer();
         setShowWelcome(false);
         localStorage.setItem(TOUR_STORAGE_KEY, 'true');
-    }, []);
+    }, [clearStartupTimer]);
 
     if (!showWelcome) return null;
 

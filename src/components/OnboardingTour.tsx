@@ -206,6 +206,16 @@ export default function OnboardingTour() {
         };
     }, [showWelcome]);
 
+    /** Shared recovery handler — reverts storage key and re-shows welcome so user can retry. */
+    const handleTourStartFailure = useCallback((err: unknown) => {
+        console.error('[NEXX Tour] Failed to start tour:', err);
+        driverRef.current = null;
+        localStorage.removeItem(TOUR_STORAGE_KEY);
+        if (mountedRef.current) {
+            setShowWelcome(true);
+        }
+    }, []);
+
     const startTour = useCallback(async () => {
         clearStartupTimer();
         setShowWelcome(false);
@@ -225,37 +235,36 @@ export default function OnboardingTour() {
             requestAnimationFrame(() => {
                 if (!mountedRef.current) return;
 
-                const driverObj = driver({
-                    showProgress: true,
-                    animate: true,
-                    smoothScroll: true,
-                    allowClose: true,
-                    stagePadding: 6,
-                    stageRadius: 16,
-                    popoverClass: 'nexx-tour-popover',
-                    progressText: '{{current}} of {{total}}',
-                    nextBtnText: 'Next →',
-                    prevBtnText: '← Back',
-                    doneBtnText: 'Let\'s Go!',
-                    steps: getTourSteps(),
-                    onDestroyStarted: () => {
-                        driverObj.destroy();
-                        driverRef.current = null;
-                    },
-                });
+                try {
+                    const driverObj = driver({
+                        showProgress: true,
+                        animate: true,
+                        smoothScroll: true,
+                        allowClose: true,
+                        stagePadding: 6,
+                        stageRadius: 16,
+                        popoverClass: 'nexx-tour-popover',
+                        progressText: '{{current}} of {{total}}',
+                        nextBtnText: 'Next →',
+                        prevBtnText: '← Back',
+                        doneBtnText: 'Let\'s Go!',
+                        steps: getTourSteps(),
+                        onDestroyStarted: () => {
+                            driverObj.destroy();
+                            driverRef.current = null;
+                        },
+                    });
 
-                driverRef.current = driverObj;
-                driverObj.drive();
+                    driverRef.current = driverObj;
+                    driverObj.drive();
+                } catch (err) {
+                    handleTourStartFailure(err);
+                }
             });
         } catch (err) {
-            // If driver.js fails to load, revert so the tour can be retried later
-            console.error('[NEXX Tour] Failed to load tour module:', err);
-            localStorage.removeItem(TOUR_STORAGE_KEY);
-            if (mountedRef.current) {
-                setShowWelcome(true);
-            }
+            handleTourStartFailure(err);
         }
-    }, [clearStartupTimer]);
+    }, [clearStartupTimer, handleTourStartFailure]);
 
     const dismissWelcome = useCallback(() => {
         clearStartupTimer();

@@ -26,7 +26,7 @@ function getTourSteps() {
             element: navIdSelector('/chat'),
             popover: {
                 title: '💬 Chat with NEXX',
-                description: 'Your secure session with NEXX — get strategic guidance on how to handle your situation, draft court-ready documents tailored to your specific case, and receive step-by-step direction on what filings and processes you\'ll need.',
+                description: 'Type or use your voice — get strategic guidance on how to handle your situation, draft court-ready documents tailored to your specific case, and receive step-by-step direction on what filings and processes you\'ll need.',
                 side: 'right' as const,
                 align: 'center' as const,
             },
@@ -44,7 +44,7 @@ function getTourSteps() {
             element: navIdSelector('/incident-report'),
             popover: {
                 title: '📋 Incident Report',
-                description: 'Write what happened in your own words. NEXX takes your raw account and generates a court-safe, timestamped timeline — with PDF download and print options, ready to exhibit in court if necessary.',
+                description: 'Write or speak what happened in your own words. NEXX logs each incident into a court-safe, timestamped timeline — designed to track patterns and document incidents across time. Download as PDF, print, and exhibit in court when needed.',
                 side: 'right' as const,
                 align: 'center' as const,
             },
@@ -86,12 +86,10 @@ function getTourSteps() {
             },
         },
         {
-            element: '#quick-actions',
+            // No element target — shows as a centered popover for a clean finish
             popover: {
                 title: '🚀 You\'re All Set!',
                 description: 'Start a chat session, log your first incident, or generate a document. NEXX is ready when you are.',
-                side: 'top' as const,
-                align: 'center' as const,
             },
         },
     ];

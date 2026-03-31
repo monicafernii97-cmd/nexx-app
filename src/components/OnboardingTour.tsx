@@ -146,20 +146,16 @@ export default function OnboardingTour() {
         if (pending) {
             localStorage.removeItem(TOUR_PENDING_KEY);
             startupTimerRef.current = setTimeout(() => setShowWelcome(true), 500);
-            return () => {
-                if (startupTimerRef.current) clearTimeout(startupTimerRef.current);
-            };
+            return clearStartupTimer;
         }
 
         // First-time user (hasn't seen tour yet)
         const seen = localStorage.getItem(TOUR_STORAGE_KEY);
         if (!seen) {
             startupTimerRef.current = setTimeout(() => setShowWelcome(true), 800);
-            return () => {
-                if (startupTimerRef.current) clearTimeout(startupTimerRef.current);
-            };
+            return clearStartupTimer;
         }
-    }, []);
+    }, [clearStartupTimer]);
 
     // Listen for restart event (fired when already on /dashboard)
     useEffect(() => {

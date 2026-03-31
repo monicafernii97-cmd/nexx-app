@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { driver, type DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
 
@@ -22,7 +22,7 @@ const tourSteps: DriveStep[] = [
         element: '#nav-chat',
         popover: {
             title: '💬 Chat with NEXX',
-            description: 'Your secure session with NEXX. Draft court-ready documents tailored to your specific case, get step-by-step guidance on what filings you need, and receive strategic legal advice — all in one conversation.',
+            description: 'Your secure session with NEXX — get strategic guidance on how to handle your situation, draft court-ready documents tailored to your specific case, and receive step-by-step direction on what filings and processes you\'ll need.',
             side: 'right',
             align: 'center',
         },
@@ -31,7 +31,7 @@ const tourSteps: DriveStep[] = [
         element: '#nav-docuvault',
         popover: {
             title: '🏛 DocuVault',
-            description: 'Choose from dozens of legal templates, then generate formatted, print-ready PDF documents powered by the content NEXX drafted for your case. Ready to file or present in court.',
+            description: 'Browse dozens of court-specific legal templates. DocuVault takes the content NEXX drafted for your case and creates fully formatted, print-ready PDFs for court filings — ready to download, print, and submit.',
             side: 'right',
             align: 'center',
         },
@@ -40,7 +40,7 @@ const tourSteps: DriveStep[] = [
         element: '#nav-incident-report',
         popover: {
             title: '📋 Incident Report',
-            description: 'Share what happened in your own words — NEXX transforms your raw account into a court-safe, timestamped timeline. Download as PDF, print, and exhibit in court when needed.',
+            description: 'Write what happened in your own words. NEXX takes your raw account and generates a court-safe, timestamped timeline — with PDF download and print options, ready to exhibit in court if necessary.',
             side: 'right',
             align: 'center',
         },
@@ -49,7 +49,7 @@ const tourSteps: DriveStep[] = [
         element: '#nav-nex-profile',
         popover: {
             title: '⚠️ NEX Profile',
-            description: 'Map your opposing party\'s behavior patterns and tendencies. NEXX uses this profile to sharpen your strategy and anticipate their moves.',
+            description: 'Map your opposing party\'s behavior patterns and tendencies. NEXX uses this profile to sharpen your strategy and anticipate their next moves.',
             side: 'right',
             align: 'center',
         },
@@ -98,6 +98,8 @@ const tourSteps: DriveStep[] = [
  */
 export default function OnboardingTour() {
     const [showWelcome, setShowWelcome] = useState(false);
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const previousFocusRef = useRef<HTMLElement | null>(null);
 
     useEffect(() => {
         // Only show for first-time users
@@ -116,6 +118,32 @@ export default function OnboardingTour() {
         window.addEventListener(RESTART_EVENT, handleRestart);
         return () => window.removeEventListener(RESTART_EVENT, handleRestart);
     }, []);
+
+    // Focus trap + Escape key handling for accessibility
+    useEffect(() => {
+        if (!showWelcome) return;
+
+        // Save previously focused element to restore later
+        previousFocusRef.current = document.activeElement as HTMLElement;
+
+        // Focus the dialog on open
+        requestAnimationFrame(() => dialogRef.current?.focus());
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                setShowWelcome(false);
+                localStorage.setItem(TOUR_STORAGE_KEY, 'true');
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+            // Restore focus when dialog closes
+            previousFocusRef.current?.focus();
+        };
+    }, [showWelcome]);
 
     const startTour = useCallback(() => {
         setShowWelcome(false);
@@ -155,7 +183,13 @@ export default function OnboardingTour() {
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
             <div
-                className="relative w-[90%] max-w-md rounded-3xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.5)]"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="welcome-title"
+                aria-describedby="welcome-description"
+                tabIndex={-1}
+                className="relative w-[90%] max-w-md rounded-3xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.5)] outline-none"
                 style={{
                     background: 'linear-gradient(160deg, #0D1B3E 0%, #0A1128 40%, #132042 100%)',
                     border: '1px solid rgba(255, 255, 255, 0.15)',
@@ -188,10 +222,10 @@ export default function OnboardingTour() {
                         </span>
                     </div>
 
-                    <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">
+                    <h2 id="welcome-title" className="text-2xl font-bold text-white mb-2 tracking-tight">
                         Welcome to <span className="font-serif italic">NEXX</span>
                     </h2>
-                    <p className="text-[15px] text-white/70 font-medium leading-relaxed mb-8">
+                    <p id="welcome-description" className="text-[15px] text-white/70 font-medium leading-relaxed mb-8">
                         Want a quick tour? We&apos;ll walk you through everything in under a minute.
                     </p>
 

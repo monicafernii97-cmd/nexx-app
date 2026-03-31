@@ -213,39 +213,48 @@ export default function OnboardingTour() {
         // Persist "seen" flag before async imports so even if interrupted it won't re-show
         localStorage.setItem(TOUR_STORAGE_KEY, 'true');
 
-        // Lazy-load driver.js only when starting the tour (keeps initial bundle small)
-        const { driver } = await import('driver.js');
-        if (!mountedRef.current) return;
-
-        // @ts-expect-error -- CSS module has no type declarations for dynamic import
-        await import('driver.js/dist/driver.css');
-        if (!mountedRef.current) return;
-
-        requestAnimationFrame(() => {
+        try {
+            // Lazy-load driver.js only when starting the tour (keeps initial bundle small)
+            const { driver } = await import('driver.js');
             if (!mountedRef.current) return;
 
-            const driverObj = driver({
-                showProgress: true,
-                animate: true,
-                smoothScroll: true,
-                allowClose: true,
-                stagePadding: 6,
-                stageRadius: 16,
-                popoverClass: 'nexx-tour-popover',
-                progressText: '{{current}} of {{total}}',
-                nextBtnText: 'Next →',
-                prevBtnText: '← Back',
-                doneBtnText: 'Let\'s Go!',
-                steps: getTourSteps(),
-                onDestroyStarted: () => {
-                    driverObj.destroy();
-                    driverRef.current = null;
-                },
-            });
+            // @ts-expect-error -- CSS module has no type declarations for dynamic import
+            await import('driver.js/dist/driver.css');
+            if (!mountedRef.current) return;
 
-            driverRef.current = driverObj;
-            driverObj.drive();
-        });
+            requestAnimationFrame(() => {
+                if (!mountedRef.current) return;
+
+                const driverObj = driver({
+                    showProgress: true,
+                    animate: true,
+                    smoothScroll: true,
+                    allowClose: true,
+                    stagePadding: 6,
+                    stageRadius: 16,
+                    popoverClass: 'nexx-tour-popover',
+                    progressText: '{{current}} of {{total}}',
+                    nextBtnText: 'Next →',
+                    prevBtnText: '← Back',
+                    doneBtnText: 'Let\'s Go!',
+                    steps: getTourSteps(),
+                    onDestroyStarted: () => {
+                        driverObj.destroy();
+                        driverRef.current = null;
+                    },
+                });
+
+                driverRef.current = driverObj;
+                driverObj.drive();
+            });
+        } catch (err) {
+            // If driver.js fails to load, revert so the tour can be retried later
+            console.error('[NEXX Tour] Failed to load tour module:', err);
+            localStorage.removeItem(TOUR_STORAGE_KEY);
+            if (mountedRef.current) {
+                setShowWelcome(true);
+            }
+        }
     }, [clearStartupTimer]);
 
     const dismissWelcome = useCallback(() => {
@@ -272,13 +281,13 @@ export default function OnboardingTour() {
                 }}
             >
                 {/* Decorative glow */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full opacity-20 blur-[80px]"
+                <div aria-hidden="true" className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full opacity-20 blur-[80px]"
                     style={{ background: 'radial-gradient(circle, #60A5FA, transparent)' }}
                 />
 
                 <div className="relative px-8 pt-10 pb-8 text-center">
                     {/* Logo mark */}
-                    <div className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-lg"
+                    <div aria-hidden="true" className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-lg"
                         style={{
                             background: 'linear-gradient(135deg, #FFFFFF 0%, #F1F5F9 100%)',
                             border: '1px solid rgba(255, 255, 255, 0.4)',

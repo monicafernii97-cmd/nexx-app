@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { driver, type DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
 
@@ -92,6 +93,8 @@ const tourSteps: DriveStep[] = [
     },
 ];
 
+const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
 /**
  * Onboarding tour component — shows a welcome dialog for first-time users
  * then walks them through the sidebar navigation. Persisted via localStorage.
@@ -100,6 +103,8 @@ export default function OnboardingTour() {
     const [showWelcome, setShowWelcome] = useState(false);
     const dialogRef = useRef<HTMLDivElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
+    const router = useRouter();
+    const pathname = usePathname();
 
     useEffect(() => {
         // Only show for first-time users
@@ -112,12 +117,33 @@ export default function OnboardingTour() {
         }
     }, []);
 
-    // Listen for restart event from the sidebar ? button (no full-page reload)
+    // Listen for restart event from the sidebar ? button.
+    // If not on dashboard, navigate there first so tour targets exist.
     useEffect(() => {
-        const handleRestart = () => setShowWelcome(true);
+        const handleRestart = () => {
+            if (pathname !== '/dashboard') {
+                // Navigate to dashboard, then show tour after mount
+                localStorage.setItem('nexx-tour-pending', 'true');
+                router.push('/dashboard');
+            } else {
+                setShowWelcome(true);
+            }
+        };
         window.addEventListener(RESTART_EVENT, handleRestart);
         return () => window.removeEventListener(RESTART_EVENT, handleRestart);
-    }, []);
+    }, [pathname, router]);
+
+    // Check for pending tour after navigating to dashboard
+    useEffect(() => {
+        if (pathname === '/dashboard' && typeof window !== 'undefined') {
+            const pending = localStorage.getItem('nexx-tour-pending');
+            if (pending) {
+                localStorage.removeItem('nexx-tour-pending');
+                const timer = setTimeout(() => setShowWelcome(true), 500);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [pathname]);
 
     // Focus trap + Escape key handling for accessibility
     useEffect(() => {
@@ -134,6 +160,32 @@ export default function OnboardingTour() {
                 e.preventDefault();
                 setShowWelcome(false);
                 localStorage.setItem(TOUR_STORAGE_KEY, 'true');
+                return;
+            }
+
+            // Focus trap: cycle Tab through focusable elements inside the dialog
+            if (e.key === 'Tab' && dialogRef.current) {
+                const focusable = Array.from(
+                    dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+                );
+                if (focusable.length === 0) return;
+
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+
+                if (e.shiftKey) {
+                    // Shift+Tab on first element → wrap to last
+                    if (document.activeElement === first || document.activeElement === dialogRef.current) {
+                        e.preventDefault();
+                        last.focus();
+                    }
+                } else {
+                    // Tab on last element → wrap to first
+                    if (document.activeElement === last) {
+                        e.preventDefault();
+                        first.focus();
+                    }
+                }
             }
         };
         document.addEventListener('keydown', handleKeyDown);
@@ -150,6 +202,10 @@ export default function OnboardingTour() {
 
         // Wait a tick for the dialog to close before starting the tour
         requestAnimationFrame(() => {
+            // Persist "seen" flag immediately so even if the tour is interrupted
+            // (tab refresh, route change), the user won't be shown it again
+            localStorage.setItem(TOUR_STORAGE_KEY, 'true');
+
             const driverObj = driver({
                 showProgress: true,
                 animate: true,
@@ -164,7 +220,6 @@ export default function OnboardingTour() {
                 doneBtnText: 'Let\'s Go!',
                 steps: tourSteps,
                 onDestroyStarted: () => {
-                    localStorage.setItem(TOUR_STORAGE_KEY, 'true');
                     driverObj.destroy();
                 },
             });

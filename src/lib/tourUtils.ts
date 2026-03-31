@@ -26,6 +26,8 @@ export function navIdSelector(href: string): string {
  * OnboardingTour component can re-show the welcome dialog.
  */
 export function restartTour() {
+    if (typeof window === 'undefined') return;
+
     localStorage.removeItem(TOUR_STORAGE_KEY);
 
     // Check if we're on dashboard — if not, navigate there first

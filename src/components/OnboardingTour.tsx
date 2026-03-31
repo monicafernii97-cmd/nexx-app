@@ -106,6 +106,19 @@ export default function OnboardingTour() {
     const dialogRef = useRef<HTMLDivElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
     const startupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const driverRef = useRef<any>(null);
+    const mountedRef = useRef(true);
+
+    // Track mounted state and cleanup driver instance on unmount
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            driverRef.current?.destroy();
+            driverRef.current = null;
+        };
+    }, []);
 
     // Consolidated startup: check both first-run and pending-replay in a single effect.
     // Schedules at most one timer to prevent overlapping show calls.
@@ -187,15 +200,20 @@ export default function OnboardingTour() {
     const startTour = useCallback(async () => {
         setShowWelcome(false);
 
-        // Lazy-load driver.js only when starting the tour (keeps initial bundle small)
-        const { driver } = await import('driver.js');
-        // @ts-expect-error -- CSS module has no type declarations for dynamic import
-        await import('driver.js/dist/driver.css');
-
-        // Persist "seen" flag immediately so interruptions don't re-show
+        // Persist "seen" flag before async imports so even if interrupted it won't re-show
         localStorage.setItem(TOUR_STORAGE_KEY, 'true');
 
+        // Lazy-load driver.js only when starting the tour (keeps initial bundle small)
+        const { driver } = await import('driver.js');
+        if (!mountedRef.current) return;
+
+        // @ts-expect-error -- CSS module has no type declarations for dynamic import
+        await import('driver.js/dist/driver.css');
+        if (!mountedRef.current) return;
+
         requestAnimationFrame(() => {
+            if (!mountedRef.current) return;
+
             const driverObj = driver({
                 showProgress: true,
                 animate: true,
@@ -211,9 +229,11 @@ export default function OnboardingTour() {
                 steps: getTourSteps(),
                 onDestroyStarted: () => {
                     driverObj.destroy();
+                    driverRef.current = null;
                 },
             });
 
+            driverRef.current = driverObj;
             driverObj.drive();
         });
     }, []);

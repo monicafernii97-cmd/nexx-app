@@ -1,99 +1,98 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { driver, type DriveStep } from 'driver.js';
-import 'driver.js/dist/driver.css';
-
-const TOUR_STORAGE_KEY = 'nexx-tour-seen';
-const RESTART_EVENT = 'restart-nexx-tour';
-
-/** Tour step definitions targeting sidebar nav IDs and dashboard elements. */
-const tourSteps: DriveStep[] = [
-    {
-        element: '#nav-dashboard',
-        popover: {
-            title: '📊 Dashboard',
-            description: 'Your command center — stats, recent incidents, quick actions, and an overview of your entire case at a glance.',
-            side: 'right',
-            align: 'center',
-        },
-    },
-    {
-        element: '#nav-chat',
-        popover: {
-            title: '💬 Chat with NEXX',
-            description: 'Your secure session with NEXX — get strategic guidance on how to handle your situation, draft court-ready documents tailored to your specific case, and receive step-by-step direction on what filings and processes you\'ll need.',
-            side: 'right',
-            align: 'center',
-        },
-    },
-    {
-        element: '#nav-docuvault',
-        popover: {
-            title: '🏛 DocuVault',
-            description: 'Browse dozens of court-specific legal templates. DocuVault takes the content NEXX drafted for your case and creates fully formatted, print-ready PDFs for court filings — ready to download, print, and submit.',
-            side: 'right',
-            align: 'center',
-        },
-    },
-    {
-        element: '#nav-incident-report',
-        popover: {
-            title: '📋 Incident Report',
-            description: 'Write what happened in your own words. NEXX takes your raw account and generates a court-safe, timestamped timeline — with PDF download and print options, ready to exhibit in court if necessary.',
-            side: 'right',
-            align: 'center',
-        },
-    },
-    {
-        element: '#nav-nex-profile',
-        popover: {
-            title: '⚠️ NEX Profile',
-            description: 'Map your opposing party\'s behavior patterns and tendencies. NEXX uses this profile to sharpen your strategy and anticipate their next moves.',
-            side: 'right',
-            align: 'center',
-        },
-    },
-    {
-        element: '#nav-court-settings',
-        popover: {
-            title: '⚖️ Legal Suite',
-            description: 'Configure your court settings — state, county, judge, case caption, and parties. This powers every document NEXX generates for you.',
-            side: 'right',
-            align: 'center',
-        },
-    },
-    {
-        element: '#nav-efiling',
-        popover: {
-            title: '📤 eFiling',
-            description: 'Your guided filing checklist — track what\'s been submitted, what\'s pending, and access your county\'s electronic filing portal directly.',
-            side: 'right',
-            align: 'center',
-        },
-    },
-    {
-        element: '#nav-resources',
-        popover: {
-            title: '📚 Resources',
-            description: 'Discover local resources for your jurisdiction — court clerks, legal aid organizations, and eFiling portals, all curated by NEXX for your county.',
-            side: 'right',
-            align: 'center',
-        },
-    },
-    {
-        element: '#quick-actions',
-        popover: {
-            title: '🚀 You\'re All Set!',
-            description: 'Start a chat session, log your first incident, or generate a document. NEXX is ready when you are.',
-            side: 'top',
-            align: 'center',
-        },
-    },
-];
+import { TOUR_STORAGE_KEY, TOUR_PENDING_KEY, RESTART_EVENT } from '@/lib/tourUtils';
 
 const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+/** Tour step config — defined as a function so descriptions
+ *  aren't allocated until the tour actually starts. */
+function getTourSteps() {
+    // Lazy-import avoids pulling driver.js into the initial bundle
+    return [
+        {
+            element: '#nav-dashboard',
+            popover: {
+                title: '📊 Dashboard',
+                description: 'Your command center — stats, recent incidents, quick actions, and an overview of your entire case at a glance.',
+                side: 'right' as const,
+                align: 'center' as const,
+            },
+        },
+        {
+            element: '#nav-chat',
+            popover: {
+                title: '💬 Chat with NEXX',
+                description: 'Your secure session with NEXX — get strategic guidance on how to handle your situation, draft court-ready documents tailored to your specific case, and receive step-by-step direction on what filings and processes you\'ll need.',
+                side: 'right' as const,
+                align: 'center' as const,
+            },
+        },
+        {
+            element: '#nav-docuvault',
+            popover: {
+                title: '🏛 DocuVault',
+                description: 'Browse dozens of court-specific legal templates. DocuVault takes the content NEXX drafted for your case and creates fully formatted, print-ready PDFs for court filings — ready to download, print, and submit.',
+                side: 'right' as const,
+                align: 'center' as const,
+            },
+        },
+        {
+            element: '#nav-incident-report',
+            popover: {
+                title: '📋 Incident Report',
+                description: 'Write what happened in your own words. NEXX takes your raw account and generates a court-safe, timestamped timeline — with PDF download and print options, ready to exhibit in court if necessary.',
+                side: 'right' as const,
+                align: 'center' as const,
+            },
+        },
+        {
+            element: '#nav-nex-profile',
+            popover: {
+                title: '⚠️ NEX Profile',
+                description: 'Map your opposing party\'s behavior patterns and tendencies. NEXX uses this profile to sharpen your strategy and anticipate their next moves.',
+                side: 'right' as const,
+                align: 'center' as const,
+            },
+        },
+        {
+            element: '#nav-court-settings',
+            popover: {
+                title: '⚖️ Legal Suite',
+                description: 'Configure your court settings — state, county, judge, case caption, and parties. This powers every document NEXX generates for you.',
+                side: 'right' as const,
+                align: 'center' as const,
+            },
+        },
+        {
+            element: '#nav-efiling',
+            popover: {
+                title: '📤 eFiling',
+                description: 'Your guided filing checklist — track what\'s been submitted, what\'s pending, and access your county\'s electronic filing portal directly.',
+                side: 'right' as const,
+                align: 'center' as const,
+            },
+        },
+        {
+            element: '#nav-resources',
+            popover: {
+                title: '📚 Resources',
+                description: 'Discover local resources for your jurisdiction — court clerks, legal aid organizations, and eFiling portals, all curated by NEXX for your county.',
+                side: 'right' as const,
+                align: 'center' as const,
+            },
+        },
+        {
+            element: '#quick-actions',
+            popover: {
+                title: '🚀 You\'re All Set!',
+                description: 'Start a chat session, log your first incident, or generate a document. NEXX is ready when you are.',
+                side: 'top' as const,
+                align: 'center' as const,
+            },
+        },
+    ];
+}
 
 /**
  * Onboarding tour component — shows a welcome dialog for first-time users
@@ -103,56 +102,40 @@ export default function OnboardingTour() {
     const [showWelcome, setShowWelcome] = useState(false);
     const dialogRef = useRef<HTMLDivElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
-    const router = useRouter();
-    const pathname = usePathname();
 
+    // Show tour for first-time users
     useEffect(() => {
-        // Only show for first-time users
         if (typeof window === 'undefined') return;
         const seen = localStorage.getItem(TOUR_STORAGE_KEY);
         if (!seen) {
-            // Small delay to let the dashboard/sidebar render first
             const timer = setTimeout(() => setShowWelcome(true), 800);
             return () => clearTimeout(timer);
         }
     }, []);
 
-    // Listen for restart event from the sidebar ? button.
-    // If not on dashboard, navigate there first so tour targets exist.
+    // Check for pending tour (navigated here from another route via ? button)
     useEffect(() => {
-        const handleRestart = () => {
-            if (pathname !== '/dashboard') {
-                // Navigate to dashboard, then show tour after mount
-                localStorage.setItem('nexx-tour-pending', 'true');
-                router.push('/dashboard');
-            } else {
-                setShowWelcome(true);
-            }
-        };
+        if (typeof window === 'undefined') return;
+        const pending = localStorage.getItem(TOUR_PENDING_KEY);
+        if (pending) {
+            localStorage.removeItem(TOUR_PENDING_KEY);
+            const timer = setTimeout(() => setShowWelcome(true), 500);
+            return () => clearTimeout(timer);
+        }
+    }, []);
+
+    // Listen for restart event (fired when already on /dashboard)
+    useEffect(() => {
+        const handleRestart = () => setShowWelcome(true);
         window.addEventListener(RESTART_EVENT, handleRestart);
         return () => window.removeEventListener(RESTART_EVENT, handleRestart);
-    }, [pathname, router]);
-
-    // Check for pending tour after navigating to dashboard
-    useEffect(() => {
-        if (pathname === '/dashboard' && typeof window !== 'undefined') {
-            const pending = localStorage.getItem('nexx-tour-pending');
-            if (pending) {
-                localStorage.removeItem('nexx-tour-pending');
-                const timer = setTimeout(() => setShowWelcome(true), 500);
-                return () => clearTimeout(timer);
-            }
-        }
-    }, [pathname]);
+    }, []);
 
     // Focus trap + Escape key handling for accessibility
     useEffect(() => {
         if (!showWelcome) return;
 
-        // Save previously focused element to restore later
         previousFocusRef.current = document.activeElement as HTMLElement;
-
-        // Focus the dialog on open
         requestAnimationFrame(() => dialogRef.current?.focus());
 
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -163,7 +146,6 @@ export default function OnboardingTour() {
                 return;
             }
 
-            // Focus trap: cycle Tab through focusable elements inside the dialog
             if (e.key === 'Tab' && dialogRef.current) {
                 const focusable = Array.from(
                     dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
@@ -174,13 +156,11 @@ export default function OnboardingTour() {
                 const last = focusable[focusable.length - 1];
 
                 if (e.shiftKey) {
-                    // Shift+Tab on first element → wrap to last
                     if (document.activeElement === first || document.activeElement === dialogRef.current) {
                         e.preventDefault();
                         last.focus();
                     }
                 } else {
-                    // Tab on last element → wrap to first
                     if (document.activeElement === last) {
                         e.preventDefault();
                         first.focus();
@@ -192,20 +172,22 @@ export default function OnboardingTour() {
 
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
-            // Restore focus when dialog closes
             previousFocusRef.current?.focus();
         };
     }, [showWelcome]);
 
-    const startTour = useCallback(() => {
+    const startTour = useCallback(async () => {
         setShowWelcome(false);
 
-        // Wait a tick for the dialog to close before starting the tour
-        requestAnimationFrame(() => {
-            // Persist "seen" flag immediately so even if the tour is interrupted
-            // (tab refresh, route change), the user won't be shown it again
-            localStorage.setItem(TOUR_STORAGE_KEY, 'true');
+        // Lazy-load driver.js only when starting the tour (keeps initial bundle small)
+        const { driver } = await import('driver.js');
+        // @ts-expect-error -- CSS module has no type declarations for dynamic import
+        await import('driver.js/dist/driver.css');
 
+        // Persist "seen" flag immediately so interruptions don't re-show
+        localStorage.setItem(TOUR_STORAGE_KEY, 'true');
+
+        requestAnimationFrame(() => {
             const driverObj = driver({
                 showProgress: true,
                 animate: true,
@@ -218,7 +200,7 @@ export default function OnboardingTour() {
                 nextBtnText: 'Next →',
                 prevBtnText: '← Back',
                 doneBtnText: 'Let\'s Go!',
-                steps: tourSteps,
+                steps: getTourSteps(),
                 onDestroyStarted: () => {
                     driverObj.destroy();
                 },
@@ -309,10 +291,4 @@ export default function OnboardingTour() {
             </div>
         </div>
     );
-}
-
-/** Trigger function to restart the tour without a full page reload. */
-export function restartTour() {
-    localStorage.removeItem(TOUR_STORAGE_KEY);
-    window.dispatchEvent(new CustomEvent(RESTART_EVENT));
 }

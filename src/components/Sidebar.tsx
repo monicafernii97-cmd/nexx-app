@@ -26,7 +26,7 @@ import {
 import { useState, useMemo, useCallback, type ComponentType, type CSSProperties } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
-import { restartTour } from '@/components/OnboardingTour';
+import { restartTour } from '@/lib/tourUtils';
 
 /** Child navigation item definition for sidebar sub-menus. */
 interface NavChild {

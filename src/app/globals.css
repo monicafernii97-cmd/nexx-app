@@ -351,3 +351,102 @@ h1, h2, h3, h4, h5, h6, p, span, div {
 .cl-alternativeMethodsBlockButton {
   color: #FFFFFF !important;
 }
+
+/* ── Driver.js Tour Overrides ── */
+
+/* When tour is active, disable sidebar nav overflow clipping so that
+   the spotlight overlay can render correctly on items near the bottom
+   (e.g. eFiling, Resources). driver.js adds .driver-active to <body>. */
+.driver-active .sidebar-nav {
+  overflow: visible !important;
+}
+
+.driver-popover.nexx-tour-popover {
+  background: linear-gradient(160deg, #0D1B3E 0%, #0A1128 40%, #132042 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 1.25rem !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  color: #FFFFFF !important;
+  padding: 1.25rem 1.5rem !important;
+  max-width: 340px !important;
+}
+
+.driver-popover.nexx-tour-popover .driver-popover-title {
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  color: #FFFFFF !important;
+  letter-spacing: -0.01em !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.driver-popover.nexx-tour-popover .driver-popover-description {
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  line-height: 1.6 !important;
+}
+
+.driver-popover.nexx-tour-popover .driver-popover-progress-text {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: rgba(255, 255, 255, 0.4) !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+}
+
+.driver-popover.nexx-tour-popover .driver-popover-prev-btn,
+.driver-popover.nexx-tour-popover .driver-popover-next-btn {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  border-radius: 0.75rem !important;
+  padding: 0.5rem 1.25rem !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  text-shadow: none !important;
+}
+
+.driver-popover.nexx-tour-popover .driver-popover-next-btn {
+  background: linear-gradient(135deg, #1A4B9B, #123D7E) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 12px rgba(26, 75, 155, 0.4) !important;
+}
+
+.driver-popover.nexx-tour-popover .driver-popover-next-btn:hover {
+  box-shadow: 0 6px 20px rgba(26, 75, 155, 0.6) !important;
+  transform: translateY(-1px) !important;
+}
+
+.driver-popover.nexx-tour-popover .driver-popover-prev-btn {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.driver-popover.nexx-tour-popover .driver-popover-prev-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #FFFFFF !important;
+}
+
+.driver-popover.nexx-tour-popover .driver-popover-close-btn {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.driver-popover.nexx-tour-popover .driver-popover-close-btn:hover {
+  color: #FFFFFF !important;
+}
+
+.driver-popover.nexx-tour-popover .driver-popover-arrow-side-right {
+  border-right-color: #0D1B3E !important;
+}
+
+.driver-popover.nexx-tour-popover .driver-popover-arrow-side-left {
+  border-left-color: #0D1B3E !important;
+}
+
+.driver-popover.nexx-tour-popover .driver-popover-arrow-side-top {
+  border-top-color: #0D1B3E !important;
+}
+
+.driver-popover.nexx-tour-popover .driver-popover-arrow-side-bottom {
+  border-bottom-color: #0D1B3E !important;
+}

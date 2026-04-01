@@ -20,11 +20,13 @@ import {
     FolderOpen,
     FileArrowUp,
     Crown,
+    Question,
     IconWeight,
 } from '@phosphor-icons/react';
 import { useState, useMemo, useCallback, type ComponentType, type CSSProperties } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
+import { restartTour, navIdSelector } from '@/lib/tourUtils';
 
 /** Child navigation item definition for sidebar sub-menus. */
 interface NavChild {
@@ -143,8 +145,8 @@ export default function Sidebar() {
             {/* Divider */}
             <div className="mx-6 primary-divider opacity-50" />
 
-            {/* Navigation */}
-            <nav className="flex-1 py-6 px-4 space-y-1.5 overflow-y-auto overflow-x-hidden no-scrollbar">
+            {/* Navigation — CSS override for overflow when driver.js tour is active (see globals.css) */}
+            <nav className="flex-1 py-6 px-4 space-y-1.5 overflow-y-auto overflow-x-hidden no-scrollbar sidebar-nav">
                 {navItems.map((item) => {
                     const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
                     const hasChildren = item.children && item.children.length > 0;
@@ -156,6 +158,7 @@ export default function Sidebar() {
                             <div className="flex items-center">
                                 <Link
                                     href={item.href}
+                                    id={navIdSelector(item.href).slice(1)}
                                     className="no-underline flex-1 min-w-0"
                                 >
                                     <motion.div
@@ -256,6 +259,28 @@ export default function Sidebar() {
             {/* Bottom User Section */}
             <div className="px-5 pb-6 pt-4 mt-auto">
                 <div className="primary-divider mb-4 opacity-50" />
+
+                {/* Tour replay button */}
+                <button
+                    onClick={restartTour}
+                    title="Replay onboarding tour"
+                    aria-label="Replay onboarding tour"
+                    className={`flex items-center gap-3 w-full px-3.5 py-2.5 mb-3 rounded-2xl transition-all duration-300 cursor-pointer text-[#94A3B8] hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10 ${collapsed ? 'justify-center' : ''}`}
+                >
+                    <Question size={18} weight="bold" />
+                    <AnimatePresence mode="popLayout">
+                        {!collapsed && (
+                            <motion.span
+                                initial={{ opacity: 0, width: 0 }}
+                                animate={{ opacity: 1, width: 'auto' }}
+                                exit={{ opacity: 0, width: 0 }}
+                                className="text-[13px] font-semibold whitespace-nowrap overflow-hidden"
+                            >
+                                Take a Tour
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
+                </button>
 
                 {isLoaded && user ? (
                     <div className="relative group w-full">

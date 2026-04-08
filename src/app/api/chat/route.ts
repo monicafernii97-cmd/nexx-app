@@ -12,6 +12,13 @@ import { api } from '@convex/_generated/api';
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_MESSAGES = 50;
 
+/**
+ * Extend the Vercel serverless function timeout for streaming AI responses.
+ * Default is 10s on Hobby, which is too short for GPT-4o streaming with
+ * conversation history. Hobby plan allows up to 60s.
+ */
+export const maxDuration = 60;
+
 /** Handle POST requests for AI chat — authenticates user, rate-limits, and streams GPT responses. */
 export async function POST(req: NextRequest) {
     console.log('[Chat Debug] POST /api/chat called');

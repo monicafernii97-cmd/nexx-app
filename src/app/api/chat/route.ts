@@ -14,9 +14,12 @@ const MAX_MESSAGES = 50;
 
 /** Handle POST requests for AI chat — authenticates user, rate-limits, and streams GPT responses. */
 export async function POST(req: NextRequest) {
+    console.log('[Chat Debug] POST /api/chat called');
     // ── Auth guard ──
     const { userId } = await auth();
+    console.log('[Chat Debug] userId:', userId ? `${userId.substring(0, 10)}...` : 'NULL');
     if (!userId) {
+        console.error('[Chat Debug] FAILED: No userId from auth()');
         return Response.json({ error: 'Authentication required' }, { status: 401 });
     }
 
@@ -48,14 +51,17 @@ export async function POST(req: NextRequest) {
         let userTier: SubscriptionTier = 'free';
         let tierResolved = false; // true = tier came from DB; false = lookup failed
         try {
+            console.log('[Chat Debug] Creating authenticated Convex client...');
             const convex = await getAuthenticatedConvexClient();
+            console.log('[Chat Debug] Convex client created, querying user tier...');
             const userRecord = await convex.query(api.users.getByClerkId, { clerkId: userId });
+            console.log('[Chat Debug] User record found:', !!userRecord, 'tier:', userRecord?.subscriptionTier);
             if (userRecord?.subscriptionTier && validTiers.includes(userRecord.subscriptionTier as SubscriptionTier)) {
                 userTier = userRecord.subscriptionTier as SubscriptionTier;
             }
             tierResolved = true;
         } catch (err) {
-            console.warn('[Chat] Failed to fetch user tier from Convex — skipping rate limit for this request:', err);
+            console.error('[Chat Debug] FAILED at Convex client/query:', err);
         }
 
         // ── Validate input before consuming rate limit ──
@@ -145,6 +151,7 @@ export async function POST(req: NextRequest) {
         });
 
         // Stream response from OpenAI (gpt-4o by default, gpt-4o-mini fallback when limit reached)
+        console.log('[Chat Debug] Calling OpenAI with model:', resolvedModel);
         const stream = await getOpenAI().chat.completions.create({
             model: resolvedModel,
             messages: [
@@ -155,6 +162,7 @@ export async function POST(req: NextRequest) {
             temperature: 0.7,
             max_tokens: 4096,
         });
+        console.log('[Chat Debug] OpenAI stream created successfully');
 
         // Create a ReadableStream for the response
         const encoder = new TextEncoder();
@@ -181,7 +189,7 @@ export async function POST(req: NextRequest) {
             },
         });
     } catch (error) {
-        console.error('Chat API error:', error);
+        console.error('[Chat Debug] TOP-LEVEL CATCH:', error);
         return Response.json(
             { error: 'Failed to generate response' },
             { status: 500 }

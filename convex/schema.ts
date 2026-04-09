@@ -139,8 +139,12 @@ export default defineSchema({
         role: v.union(v.literal('user'), v.literal('assistant')),
         content: v.string(),
         metadata: v.optional(v.any()),
+        /** Client-generated ID for idempotent persistence (prevents duplicate inserts on retry). */
+        requestId: v.optional(v.string()),
         createdAt: v.number(),
-    }).index('by_conversation', ['conversationId']),
+    })
+        .index('by_conversation', ['conversationId'])
+        .index('by_conversation_requestId', ['conversationId', 'requestId']),
 
     // ═══ Incidents (DocuVault) ═══
     incidents: defineTable({

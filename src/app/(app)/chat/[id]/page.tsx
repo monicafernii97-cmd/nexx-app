@@ -339,7 +339,7 @@ export default function ConversationPage() {
 
             {/* Messages Area */}
             <div className={`flex-1 overflow-y-auto w-full no-scrollbar pb-6 px-1 lg:px-6 relative scroll-smooth flex flex-col transition-colors duration-300 ${isLight ? 'bg-white' : ''}`}>
-                {(!messages || messages.length === 0) && !isStreaming && (
+                {messages?.length === 0 && !isStreaming && (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -386,12 +386,12 @@ export default function ConversationPage() {
                     />
                 ))}
 
-                {/* Streaming message */}
-                {isStreaming && streamingContent && (
+                {/* Streaming / preserved message */}
+                {streamingContent && (
                     <MessageBubble
                         role="assistant"
                         content={streamingContent}
-                        isStreaming
+                        isStreaming={isStreaming}
                         theme={theme}
                     />
                 )}

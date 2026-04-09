@@ -115,17 +115,19 @@ export default function ConversationPage() {
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
 
-            if (reader) {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    const chunk = decoder.decode(value, { stream: true });
-                    fullContent += chunk;
-                    setStreamingContent(fullContent);
-                }
-                fullContent += decoder.decode();
+            if (!reader) {
+                throw new Error('Chat response did not include a readable stream');
+            }
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                fullContent += chunk;
                 setStreamingContent(fullContent);
             }
+            fullContent += decoder.decode();
+            setStreamingContent(fullContent);
         } catch (error) {
             console.error('Streaming error:', error);
             // Only show fallback if we never received any content
@@ -135,8 +137,9 @@ export default function ConversationPage() {
                     role: 'assistant',
                     content: "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.",
                 }).catch(() => {});
+                setStreamingContent('');
             }
-            setStreamingContent('');
+            // If partial content exists, keep it visible so the user can read/copy it
             return;
         } finally {
             setIsStreaming(false);

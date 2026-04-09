@@ -362,7 +362,6 @@ export default function ConversationPage() {
                         key={msg._id}
                         role={msg.role}
                         content={msg.content}
-                        messageId={msg._id}
                         theme={theme}
                         onRetry={
                             msg.role === 'assistant' && !isStreaming && !isPending

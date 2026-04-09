@@ -12,7 +12,6 @@ interface MessageBubbleProps {
     role: 'user' | 'assistant';
     content: string;
     isStreaming?: boolean;
-    messageId?: string;
     theme?: ChatTheme;
     /** Called when user clicks Retry on an assistant message. */
     onRetry?: () => void;

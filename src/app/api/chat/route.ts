@@ -158,6 +158,8 @@ export async function POST(req: NextRequest) {
         });
 
         // Stream response from OpenAI (gpt-4o by default, gpt-4o-mini fallback when limit reached)
+        // max_tokens set to GPT-4o's maximum output (16,384) to allow comprehensive
+        // legal analysis, behavioral breakdowns, and strategic guidance without truncation.
         console.log('[Chat Debug] Calling OpenAI with model:', resolvedModel);
         const stream = await getOpenAI().chat.completions.create({
             model: resolvedModel,
@@ -167,7 +169,7 @@ export async function POST(req: NextRequest) {
             ],
             stream: true,
             temperature: 0.7,
-            max_tokens: 4096,
+            max_tokens: 16384,
         });
         console.log('[Chat Debug] OpenAI stream created successfully');
 

@@ -1,9 +1,10 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { ChatTeardropDots, User, Copy, Check } from '@phosphor-icons/react';
+import { User, Copy, Check, Sparkle } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
-import DOMPurify from 'dompurify';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface MessageBubbleProps {
     role: 'user' | 'assistant';
@@ -11,7 +12,6 @@ interface MessageBubbleProps {
     isStreaming?: boolean;
 }
 
-/** Ethereal Chat message bubble rendering user or assistant messages with copy-to-clipboard support. */
 export default function MessageBubble({ role, content, isStreaming }: MessageBubbleProps) {
     const [copied, setCopied] = useState(false);
     const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -41,93 +41,56 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
         }
     };
 
-    // Simple markdown-like rendering with XSS protection
-    const renderContent = (text: string) => {
-        // Escape HTML first to prevent XSS
-        const escaped = text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-        // Apply markdown-like transforms on safe escaped content
-        const transformed = escaped
-            .replace(/\*\*(.*?)\*\*/g, '<strong style="color:inherit; font-weight:700">$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em style="font-style:italic">$1</em>')
-            .replace(/🔴/g, '<span style="color:var(--rose)">🔴</span>')
-            .replace(/\n/g, '<br/>');
-        return DOMPurify.sanitize(transformed);
-    };
+    if (role === 'user') {
+        return (
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 }}
+                className="flex gap-3 w-full justify-end px-4 py-6"
+            >
+                <div className="max-w-[80%] rounded-3xl px-5 py-3 shadow-sm bg-[#F3F4F6] text-[#0A1128] font-medium text-[15px] leading-relaxed whitespace-pre-wrap">
+                    {content}
+                </div>
+            </motion.div>
+        );
+    }
 
+    // Assistant Message (Full width, markdown)
     return (
         <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className={`flex gap-3 w-full ${role === 'user' ? 'justify-end pl-12' : 'justify-start pr-12'}`}
+            className="flex gap-4 w-full justify-start px-4 sm:px-6 py-6 group"
         >
-            {role === 'assistant' && (
-                <div
-                    className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center mt-1 bg-[linear-gradient(135deg,#1E3A8A,#123D7E)] shadow-sm border border-white/20"
-                >
-                    <ChatTeardropDots size={18} weight="duotone" className="text-white" />
+            <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mt-1 bg-gradient-to-br from-blue-600 to-indigo-700 shadow-sm border border-indigo-500/20">
+                <Sparkle size={16} weight="fill" className="text-white" />
+            </div>
+
+            <div className="flex-1 max-w-4xl min-w-0 pr-4">
+                <div className="text-[15px] leading-7 text-[#1F2937] font-normal prose prose-blue max-w-none w-full break-words">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {content + (isStreaming ? ' ▍' : '')}
+                    </ReactMarkdown>
                 </div>
-            )}
 
-            <div
-                className={`max-w-[100%] rounded-[1.5rem] px-6 py-4 shadow-sm border ${
-                    role === 'user' ? 'rounded-br-sm' : 'rounded-tl-sm'
-                }`}
-                style={
-                    role === 'user'
-                        ? {
-                            background: '#FFFFFF',
-                            borderColor: 'transparent',
-                            color: '#0A1128',
-                        }
-                        : {
-                            background: 'linear-gradient(135deg, #1E3A8A, #123D7E)',
-                            backdropFilter: 'blur(12px)',
-                            WebkitBackdropFilter: 'blur(12px)',
-                            borderColor: 'rgba(255, 255, 255, 0.15)',
-                            color: '#FFFFFF',
-                        }
-                }
-            >
-                <div
-                    className={`text-[15px] leading-relaxed whitespace-pre-wrap font-medium ${role === 'user' ? 'text-[#0A1128]' : 'text-white'}`}
-                    dangerouslySetInnerHTML={{ __html: renderContent(content) }}
-                />
-
-                {role === 'assistant' && !isStreaming && (
-                    <div
-                        className="flex justify-end gap-2 mt-3 pt-2"
-                        style={{ borderTop: '1px solid rgba(255, 255, 255, 0.15)' }}
-                    >
+                {!isStreaming && (
+                    <div className="flex justify-start gap-2 mt-2 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                            className="bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors text-[11px] font-bold uppercase tracking-widest flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-white/5"
+                            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex items-center gap-1.5 p-1.5 rounded-md"
                             onClick={handleCopy}
                             aria-label={copied ? 'Copied to clipboard' : 'Copy message to clipboard'}
                         >
                             {copied ? (
-                                <>
-                                    <Check size={14} weight="bold" /> Copied
-                                </>
+                                <Check size={16} weight="bold" className="text-emerald-500" />
                             ) : (
-                                <>
-                                    <Copy size={14} weight="duotone" /> Copy
-                                </>
+                                <Copy size={16} weight="regular" />
                             )}
                         </button>
                     </div>
                 )}
             </div>
-
-            {role === 'user' && (
-                <div
-                    className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center mt-1 bg-white shadow-sm border border-[rgba(10,22,41,0.1)]"
-                >
-                    <User size={16} weight="duotone" className="text-[#0A1128]" />
-                </div>
-            )}
         </motion.div>
     );
 }

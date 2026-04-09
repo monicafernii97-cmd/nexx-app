@@ -49,7 +49,7 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
                 transition={{ delay: 0.05 }}
                 className="flex gap-3 w-full justify-end px-4 py-6"
             >
-                <div className="max-w-[80%] rounded-3xl px-5 py-3 shadow-sm bg-[#F3F4F6] text-[#0A1128] font-medium text-[15px] leading-relaxed whitespace-pre-wrap">
+                <div className="max-w-[80%] rounded-3xl px-5 py-3 shadow-sm bg-white/10 backdrop-blur-sm border border-white/15 text-white font-medium text-[15px] leading-relaxed whitespace-pre-wrap">
                     {content}
                 </div>
             </motion.div>
@@ -69,7 +69,7 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
             </div>
 
             <div className="flex-1 max-w-4xl min-w-0 pr-4">
-                <div className="text-[15px] leading-7 text-[#1F2937] font-normal prose prose-blue max-w-none w-full break-words">
+                <div className="text-[15px] leading-7 text-white/90 font-normal prose prose-invert max-w-none w-full break-words">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {content + (isStreaming ? ' ▍' : '')}
                     </ReactMarkdown>
@@ -78,12 +78,12 @@ export default function MessageBubble({ role, content, isStreaming }: MessageBub
                 {!isStreaming && (
                     <div className="flex justify-start gap-2 mt-2 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                            className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex items-center gap-1.5 p-1.5 rounded-md"
+                            className="text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors flex items-center gap-1.5 p-1.5 rounded-md"
                             onClick={handleCopy}
                             aria-label={copied ? 'Copied to clipboard' : 'Copy message to clipboard'}
                         >
                             {copied ? (
-                                <Check size={16} weight="bold" className="text-emerald-500" />
+                                <Check size={16} weight="bold" className="text-emerald-400" />
                             ) : (
                                 <Copy size={16} weight="regular" />
                             )}

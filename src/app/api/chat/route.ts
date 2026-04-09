@@ -9,8 +9,8 @@ import { getModelForMode, getDailyLimit, FALLBACK_MODEL, type SubscriptionTier }
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '@convex/_generated/api';
 
-const MAX_MESSAGE_LENGTH = 10000;
-const MAX_MESSAGES = 50;
+const MAX_MESSAGE_LENGTH = 100_000;
+const MAX_MESSAGES = 100;
 
 /**
  * Extend the Vercel serverless function timeout for streaming AI responses.

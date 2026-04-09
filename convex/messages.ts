@@ -36,7 +36,7 @@ export const send = mutation({
             conversationId: args.conversationId,
             role: args.role,
             content: args.content,
-            metadata: args.requestId ? { requestId: args.requestId } : args.metadata,
+            metadata: args.requestId ? { ...((args.metadata as Record<string, unknown>) ?? {}), requestId: args.requestId } : args.metadata,
             createdAt: Date.now(),
         });
 
@@ -127,11 +127,17 @@ export const prepareRegenerate = mutation({
                 }
             }
 
-            // Update messageCount
+            // Update messageCount and lastMessageAt
             const conversation = await ctx.db.get(args.conversationId);
             if (conversation) {
+                const remaining = await ctx.db
+                    .query('messages')
+                    .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
+                    .order('desc')
+                    .first();
                 await ctx.db.patch(args.conversationId, {
                     messageCount: Math.max(0, (conversation.messageCount ?? 0) - deletedCount),
+                    lastMessageAt: remaining?.createdAt ?? conversation.createdAt,
                 });
             }
         } else {
@@ -154,8 +160,14 @@ export const prepareRegenerate = mutation({
 
             const conversation = await ctx.db.get(args.conversationId);
             if (conversation) {
+                const remaining = await ctx.db
+                    .query('messages')
+                    .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
+                    .order('desc')
+                    .first();
                 await ctx.db.patch(args.conversationId, {
                     messageCount: Math.max(0, (conversation.messageCount ?? 0) - deletedCount),
+                    lastMessageAt: remaining?.createdAt ?? conversation.createdAt,
                 });
             }
         }

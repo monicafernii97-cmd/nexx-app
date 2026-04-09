@@ -6,8 +6,8 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Archive, Lock } from '@phosphor-icons/react';
-import MessageBubble from '@/components/chat/MessageBubble';
+import { ArrowLeft, Archive, Lock, Sun, Moon } from '@phosphor-icons/react';
+import MessageBubble, { type ChatTheme } from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
 
 
@@ -25,12 +25,29 @@ export default function ConversationPage() {
     const userProfile = useQuery(api.users.me);
     const nexProfile = useQuery(api.nexProfiles.getByUser);
     const sendMessage = useMutation(api.messages.send);
+    const updateMessageContent = useMutation(api.messages.updateContent);
+    const deleteMessagesAfter = useMutation(api.messages.deleteAfter);
     const archiveConversation = useMutation(api.conversations.archive);
 
     const [isStreaming, setIsStreaming] = useState(false);
     const [isPending, setIsPending] = useState(false);
     const [streamingContent, setStreamingContent] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // ── Theme state (persisted to localStorage) ──
+    const [theme, setTheme] = useState<ChatTheme>('dark');
+    useEffect(() => {
+        const saved = localStorage.getItem('nexx-chat-theme');
+        if (saved === 'light' || saved === 'dark') setTheme(saved);
+    }, []);
+    const toggleTheme = useCallback(() => {
+        setTheme((prev) => {
+            const next = prev === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('nexx-chat-theme', next);
+            return next;
+        });
+    }, []);
+    const isLight = theme === 'light';
 
     // Auto-scroll to bottom on new messages
     useEffect(() => {
@@ -46,106 +63,176 @@ export default function ConversationPage() {
 
     const isThreadReady = conversation !== undefined && messages !== undefined;
 
+    // ── Build user context payload (shared between send/retry/edit) ──
+    const buildUserContext = useCallback(() => ({
+        userName: userProfile?.name,
+        state: userProfile?.state,
+        county: userProfile?.county,
+        custodyType: userProfile?.custodyType,
+        children: userProfile?.children ?? (userProfile?.childrenNames?.map((n, i) => ({ name: n, age: userProfile?.childrenAges?.[i] ?? 0 }))),
+        courtCaseNumber: userProfile?.courtCaseNumber,
+        hasAttorney: userProfile?.hasAttorney,
+        hasTherapist: userProfile?.hasTherapist,
+        tonePreference: userProfile?.tonePreference,
+        emotionalState: userProfile?.emotionalState,
+        nexBehaviors: nexProfile?.behaviors,
+        nexNickname: nexProfile?.nickname,
+        nexCommunicationStyle: nexProfile?.communicationStyle,
+        nexManipulationTactics: nexProfile?.manipulationTactics,
+        nexTriggerPatterns: nexProfile?.triggerPatterns,
+        nexAiInsights: nexProfile?.aiInsights,
+        nexDangerLevel: nexProfile?.dangerLevel,
+        nexDetectedPatterns: nexProfile?.detectedPatterns,
+    }), [userProfile, nexProfile]);
+
+    // ── Stream AI response for a given message history ──
+    const streamAIResponse = useCallback(async (history: { role: 'user' | 'assistant'; content: string }[]) => {
+        setIsStreaming(true);
+        setStreamingContent('');
+
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: history,
+                    userContext: buildUserContext(),
+                }),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => '');
+                throw new Error(`Failed to get AI response: ${response.status} ${errorText}`);
+            }
+
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+            let fullContent = '';
+
+            if (reader) {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, { stream: true });
+                    fullContent += chunk;
+                    setStreamingContent(fullContent);
+                }
+                fullContent += decoder.decode();
+                setStreamingContent(fullContent);
+            }
+
+            if (fullContent) {
+                await sendMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: fullContent,
+                });
+            }
+        } catch (error) {
+            console.error('Streaming error:', error);
+            await sendMessage({
+                conversationId,
+                role: 'assistant',
+                content: "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.",
+            }).catch(() => {});
+        } finally {
+            setIsStreaming(false);
+            setStreamingContent('');
+        }
+    }, [conversationId, sendMessage, buildUserContext]);
+
+    // ── Send new message ──
     const handleSend = useCallback(
         async (input: string) => {
             if (isStreaming || isPending || !isThreadReady) return;
-
-            // Set pending immediately to prevent double-submit
             setIsPending(true);
 
             try {
-                // Save user message inside try so failures are caught
                 await sendMessage({
                     conversationId,
                     role: 'user',
                     content: input,
                 });
 
-                // Stream AI response
-                setIsStreaming(true);
-                setStreamingContent('');
-
-                // Build message history for the API
                 const history = (messages ?? []).map((m) => ({
                     role: m.role as 'user' | 'assistant',
                     content: m.content,
                 }));
                 history.push({ role: 'user', content: input });
 
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        messages: history,
-                        userContext: {
-                            userName: userProfile?.name,
-                            state: userProfile?.state,
-                            county: userProfile?.county,
-                            custodyType: userProfile?.custodyType,
-                            children: userProfile?.children ?? (userProfile?.childrenNames?.map((n, i) => ({ name: n, age: userProfile?.childrenAges?.[i] ?? 0 }))),
-                            courtCaseNumber: userProfile?.courtCaseNumber,
-                            hasAttorney: userProfile?.hasAttorney,
-                            hasTherapist: userProfile?.hasTherapist,
-                            tonePreference: userProfile?.tonePreference,
-                            emotionalState: userProfile?.emotionalState,
-                            nexBehaviors: nexProfile?.behaviors,
-                            nexNickname: nexProfile?.nickname,
-                            nexCommunicationStyle: nexProfile?.communicationStyle,
-                            nexManipulationTactics: nexProfile?.manipulationTactics,
-                            nexTriggerPatterns: nexProfile?.triggerPatterns,
-                            nexAiInsights: nexProfile?.aiInsights,
-                            nexDangerLevel: nexProfile?.dangerLevel,
-                            nexDetectedPatterns: nexProfile?.detectedPatterns,
-                        },
-                    }),
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text().catch(() => '');
-                    throw new Error(`Failed to get AI response: ${response.status} ${errorText}`);
-                }
-
-                const reader = response.body?.getReader();
-                const decoder = new TextDecoder();
-                let fullContent = '';
-
-                if (reader) {
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        const chunk = decoder.decode(value, { stream: true });
-                        fullContent += chunk;
-                        setStreamingContent(fullContent);
-                    }
-                    // Flush any remaining bytes from incomplete multi-byte sequences
-                    fullContent += decoder.decode();
-                    setStreamingContent(fullContent);
-                }
-
-                // Save the full AI response to Convex
-                if (fullContent) {
-                    await sendMessage({
-                        conversationId,
-                        role: 'assistant',
-                        content: fullContent,
-                    });
-                }
+                await streamAIResponse(history);
             } catch (error) {
-                console.error('Streaming error:', error);
-                // Save error message as fallback
-                await sendMessage({
-                    conversationId,
-                    role: 'assistant',
-                    content:
-                        "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.",
-                }).catch(() => { }); // Don't throw if fallback also fails
+                console.error('Send error:', error);
             } finally {
-                setIsStreaming(false);
                 setIsPending(false);
-                setStreamingContent('');
             }
         },
-        [conversationId, messages, sendMessage, isStreaming, isPending, isThreadReady, userProfile, nexProfile]
+        [conversationId, messages, sendMessage, isStreaming, isPending, isThreadReady, streamAIResponse]
+    );
+
+    // ── Retry last AI response ──
+    const handleRetry = useCallback(
+        async (assistantMessageId: Id<'messages'>) => {
+            if (isStreaming || isPending || !messages) return;
+            setIsPending(true);
+
+            try {
+                // Delete the assistant message we're retrying
+                await deleteMessagesAfter({ conversationId, afterMessageId: assistantMessageId });
+                // Also delete the assistant message itself by finding the message before it
+                // Actually, we should delete the message itself. Let's use deleteAfter on the user message before it.
+                // Find the user message that precedes this assistant message
+                const msgIndex = messages.findIndex((m) => m._id === assistantMessageId);
+                if (msgIndex > 0) {
+                    const userMsgBefore = messages[msgIndex - 1];
+                    await deleteMessagesAfter({ conversationId, afterMessageId: userMsgBefore._id });
+
+                    // Rebuild history up to (and including) the user message
+                    const history = messages.slice(0, msgIndex).map((m) => ({
+                        role: m.role as 'user' | 'assistant',
+                        content: m.content,
+                    }));
+
+                    await streamAIResponse(history);
+                }
+            } catch (error) {
+                console.error('Retry error:', error);
+            } finally {
+                setIsPending(false);
+            }
+        },
+        [conversationId, messages, isStreaming, isPending, deleteMessagesAfter, streamAIResponse]
+    );
+
+    // ── Edit user message and regenerate ──
+    const handleEdit = useCallback(
+        async (messageId: Id<'messages'>, newContent: string) => {
+            if (isStreaming || isPending || !messages) return;
+            setIsPending(true);
+
+            try {
+                // Update the message content in DB
+                await updateMessageContent({ messageId, content: newContent });
+
+                // Delete all messages after this one
+                await deleteMessagesAfter({ conversationId, afterMessageId: messageId });
+
+                // Rebuild history up to this edited message
+                const msgIndex = messages.findIndex((m) => m._id === messageId);
+                const history = messages.slice(0, msgIndex).map((m) => ({
+                    role: m.role as 'user' | 'assistant',
+                    content: m.content,
+                }));
+                history.push({ role: 'user', content: newContent });
+
+                await streamAIResponse(history);
+            } catch (error) {
+                console.error('Edit error:', error);
+            } finally {
+                setIsPending(false);
+            }
+        },
+        [conversationId, messages, isStreaming, isPending, updateMessageContent, deleteMessagesAfter, streamAIResponse]
     );
 
     // Early return AFTER all hooks
@@ -164,27 +251,33 @@ export default function ConversationPage() {
 
 
     return (
-        <div className="flex flex-col h-[calc(100vh-80px)] max-w-5xl mx-auto px-2 md:px-4 pt-4">
+        <div className={`flex flex-col h-[calc(100vh-80px)] max-w-5xl mx-auto px-2 md:px-4 pt-4 transition-colors duration-300 ${isLight ? 'bg-white' : ''}`}>
             {/* Header (Glass Morphism Pill) */}
             <motion.div
                 initial={{ opacity: 0, y: -12 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="glass-ethereal rounded-2xl p-4 flex items-center gap-4 mb-6 shadow-sm border-white shrink-0"
+                className={`rounded-2xl p-4 flex items-center gap-4 mb-6 shadow-sm shrink-0 transition-colors duration-300 ${isLight
+                    ? 'bg-white border border-gray-200 shadow-md'
+                    : 'glass-ethereal border-white'
+                    }`}
             >
                 <button
                     onClick={() => router.push('/chat')}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all hover:scale-105 bg-white shadow-sm border border-[rgba(10,22,41,0.05)] text-[#1E3A8A] hover:shadow"
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all hover:scale-105 shadow-sm border ${isLight
+                        ? 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                        : 'bg-white border-[rgba(10,22,41,0.05)] text-[#1E3A8A] hover:shadow'
+                        }`}
                     aria-label="Back to conversations"
                 >
                     <ArrowLeft size={18} weight="bold" />
                 </button>
                 
                 <div className="flex-1 min-w-0 pl-1">
-                    <h1 className="text-[17px] font-bold text-sapphire truncate">
+                    <h1 className={`text-[17px] font-bold truncate ${isLight ? 'text-gray-900' : 'text-sapphire'}`}>
                         {conversation?.title || 'NEXX Executive Intelligence'}
                     </h1>
                     <div className="flex items-center gap-3 mt-1">
-                        <div className="flex items-center gap-1 text-[rgba(10,22,41,0.4)]">
+                        <div className={`flex items-center gap-1 ${isLight ? 'text-gray-400' : 'text-[rgba(10,22,41,0.4)]'}`}>
                             <Lock size={12} weight="fill" />
                             <p className="text-[11px] font-bold tracking-widest uppercase truncate">
                                 Encrypted
@@ -193,9 +286,25 @@ export default function ConversationPage() {
                     </div>
                 </div>
 
+                {/* Theme toggle */}
+                <button
+                    onClick={toggleTheme}
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all hover:scale-105 border ${isLight
+                        ? 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                        : 'bg-white/10 border-white/15 text-white/70 hover:bg-white/20'
+                        }`}
+                    title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+                    aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+                >
+                    {isLight ? <Moon size={18} weight="duotone" /> : <Sun size={18} weight="duotone" />}
+                </button>
+
                 <button
                     onClick={handleArchive}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all bg-white hover:bg-cloud border border-transparent hover:border-[rgba(10,22,41,0.05)] text-sapphire-muted hover:text-sapphire"
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all border ${isLight
+                        ? 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                        : 'bg-white hover:bg-cloud border-transparent hover:border-[rgba(10,22,41,0.05)] text-sapphire-muted hover:text-sapphire'
+                        }`}
                     title="Archive Conversation"
                     aria-label="Archive Conversation"
                 >
@@ -204,23 +313,26 @@ export default function ConversationPage() {
             </motion.div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto w-full no-scrollbar pb-6 px-1 lg:px-6 relative scroll-smooth flex flex-col space-y-6">
+            <div className={`flex-1 overflow-y-auto w-full no-scrollbar pb-6 px-1 lg:px-6 relative scroll-smooth flex flex-col transition-colors duration-300 ${isLight ? 'bg-white' : ''}`}>
                 {(!messages || messages.length === 0) && !isStreaming && (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.3 }}
-                        className="flex flex-col items-center justify-center m-auto text-center px-6 py-12 card-premium max-w-md w-full"
+                        className={`flex flex-col items-center justify-center m-auto text-center px-6 py-12 max-w-md w-full rounded-2xl ${isLight
+                            ? 'bg-gray-50 border border-gray-200'
+                            : 'card-premium'
+                            }`}
                     >
                         <div
                             className="w-20 h-20 rounded-[24px] mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_8px_32px_rgba(18,61,126,0.3)] border border-white/10"
                         >
                             <span className="text-white font-serif font-bold text-[40px] drop-shadow-sm pb-2"><i>N</i></span>
                         </div>
-                        <h2 className="font-serif text-2xl font-bold mb-3 text-sapphire">
+                        <h2 className={`font-serif text-2xl font-bold mb-3 ${isLight ? 'text-gray-900' : 'text-sapphire'}`}>
                             Secure Counsel Authorized
                         </h2>
-                        <p className="text-[15px] max-w-sm text-sapphire-muted font-medium mb-6 leading-relaxed">
+                        <p className={`text-[15px] max-w-sm font-medium mb-6 leading-relaxed ${isLight ? 'text-gray-500' : 'text-sapphire-muted'}`}>
                             Share what&apos;s on your mind — an incident, a message from your NEX,
                             a legal concern, or your emotional state.
                         </p>
@@ -230,11 +342,23 @@ export default function ConversationPage() {
                     </motion.div>
                 )}
 
-                {messages?.map((msg) => (
+                {messages?.map((msg, index) => (
                     <MessageBubble
                         key={msg._id}
                         role={msg.role}
                         content={msg.content}
+                        messageId={msg._id}
+                        theme={theme}
+                        onRetry={
+                            msg.role === 'assistant' && !isStreaming && !isPending
+                                ? () => handleRetry(msg._id as Id<'messages'>)
+                                : undefined
+                        }
+                        onEdit={
+                            msg.role === 'user' && !isStreaming && !isPending
+                                ? (newContent) => handleEdit(msg._id as Id<'messages'>, newContent)
+                                : undefined
+                        }
                     />
                 ))}
 
@@ -244,6 +368,7 @@ export default function ConversationPage() {
                         role="assistant"
                         content={streamingContent}
                         isStreaming
+                        theme={theme}
                     />
                 )}
 
@@ -252,17 +377,20 @@ export default function ConversationPage() {
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="flex w-full justify-start pl-2"
+                        className="flex w-full justify-start px-4 sm:px-6 py-4"
                     >
-                        <div className="flex max-w-[85%] lg:max-w-[75%] gap-4">
-                            <div className="w-10 h-10 rounded-[12px] flex-shrink-0 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-md sticky top-2 z-10 border border-white/10">
-                                <span className="text-white font-serif font-bold text-[18px] drop-shadow-sm mb-0.5 animate-pulse"><i>N</i></span>
+                        <div className="flex gap-4 items-start">
+                            <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center shadow-sm border ${isLight
+                                ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-indigo-400/20'
+                                : 'bg-gradient-to-br from-blue-600 to-indigo-700 border-indigo-500/20'
+                                }`}>
+                                <span className="text-white font-serif font-bold text-[14px] animate-pulse"><i>N</i></span>
                             </div>
-                            <div className="card-premium p-5 rounded-tl-sm flex items-center gap-3 w-32 border-white bg-white/60">
+                            <div className={`flex items-center gap-2 px-4 py-3 rounded-2xl ${isLight ? 'bg-gray-100' : 'bg-white/10'}`}>
                                 {[0, 1, 2].map((j) => (
                                     <motion.div
                                         key={j}
-                                        className="w-2 h-2 rounded-full bg-sapphire"
+                                        className={`w-2 h-2 rounded-full ${isLight ? 'bg-blue-500' : 'bg-white'}`}
                                         animate={{ y: [0, -6, 0], opacity: [0.4, 1, 0.4] }}
                                         transition={{
                                             duration: 0.8,
@@ -288,10 +416,13 @@ export default function ConversationPage() {
                 transition={{ delay: 0.2 }}
                 className="pt-2 pb-6 px-1 lg:px-6 shrink-0 relative z-20"
             >
-                <div className="glass-ethereal rounded-[2rem] p-2 shadow-lg border-white">
+                <div className={`rounded-[2rem] p-2 shadow-lg transition-colors duration-300 ${isLight
+                    ? 'bg-white border border-gray-200 shadow-md'
+                    : 'glass-ethereal border-white'
+                    }`}>
                     <ChatInput onSend={handleSend} disabled={isStreaming || isPending || !isThreadReady} />
                 </div>
-                <p className="text-center text-[10px] font-bold tracking-[0.15em] uppercase mt-4 text-[#0A1128]/50 flex items-center justify-center">
+                <p className={`text-center text-[10px] font-bold tracking-[0.15em] uppercase mt-4 flex items-center justify-center ${isLight ? 'text-gray-400' : 'text-[#0A1128]/50'}`}>
                     NEXX provides strategic guidance, not formal legal advice.
                 </p>
             </motion.div>

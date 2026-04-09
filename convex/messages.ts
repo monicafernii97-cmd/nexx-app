@@ -20,14 +20,13 @@ export const send = mutation({
     handler: async (ctx, args) => {
         await getAuthenticatedUserAndConversation(ctx, args.conversationId);
 
-        // Idempotency: if requestId is provided, check for an existing message
+        // Idempotency: use compound index for efficient lookup
         if (args.requestId) {
             const existing = await ctx.db
                 .query('messages')
-                .withIndex('by_conversation', (q) =>
-                    q.eq('conversationId', args.conversationId)
+                .withIndex('by_conversation_requestId', (q) =>
+                    q.eq('conversationId', args.conversationId).eq('requestId', args.requestId)
                 )
-                .filter((q) => q.eq(q.field('metadata.requestId'), args.requestId))
                 .first();
             if (existing) return existing._id;
         }
@@ -36,7 +35,8 @@ export const send = mutation({
             conversationId: args.conversationId,
             role: args.role,
             content: args.content,
-            metadata: args.requestId ? { ...((args.metadata as Record<string, unknown>) ?? {}), requestId: args.requestId } : args.metadata,
+            metadata: args.metadata,
+            requestId: args.requestId,
             createdAt: Date.now(),
         });
 
@@ -107,6 +107,22 @@ export const prepareRegenerate = mutation({
             .order('asc')
             .collect();
 
+        /** Update conversation stats (messageCount + lastMessageAt) after deletions. */
+        const updateConversationStats = async (deletedCount: number) => {
+            const conversation = await ctx.db.get(args.conversationId);
+            if (conversation) {
+                const remaining = await ctx.db
+                    .query('messages')
+                    .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
+                    .order('desc')
+                    .first();
+                await ctx.db.patch(args.conversationId, {
+                    messageCount: Math.max(0, (conversation.messageCount ?? 0) - deletedCount),
+                    lastMessageAt: remaining?.createdAt ?? conversation.createdAt,
+                });
+            }
+        };
+
         if (args.newContent !== undefined) {
             // ── Edit flow: update content, delete everything after ──
             if (targetMessage.role !== 'user') {
@@ -127,21 +143,9 @@ export const prepareRegenerate = mutation({
                 }
             }
 
-            // Update messageCount and lastMessageAt
-            const conversation = await ctx.db.get(args.conversationId);
-            if (conversation) {
-                const remaining = await ctx.db
-                    .query('messages')
-                    .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
-                    .order('desc')
-                    .first();
-                await ctx.db.patch(args.conversationId, {
-                    messageCount: Math.max(0, (conversation.messageCount ?? 0) - deletedCount),
-                    lastMessageAt: remaining?.createdAt ?? conversation.createdAt,
-                });
-            }
+            await updateConversationStats(deletedCount);
         } else {
-            // ── Retry flow: find the user message before the target assistant message, delete from target onward ──
+            // ── Retry flow: delete from target onward ──
             if (targetMessage.role !== 'assistant') {
                 throw new Error('Can only retry assistant messages');
             }
@@ -158,18 +162,7 @@ export const prepareRegenerate = mutation({
                 }
             }
 
-            const conversation = await ctx.db.get(args.conversationId);
-            if (conversation) {
-                const remaining = await ctx.db
-                    .query('messages')
-                    .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
-                    .order('desc')
-                    .first();
-                await ctx.db.patch(args.conversationId, {
-                    messageCount: Math.max(0, (conversation.messageCount ?? 0) - deletedCount),
-                    lastMessageAt: remaining?.createdAt ?? conversation.createdAt,
-                });
-            }
+            await updateConversationStats(deletedCount);
         }
 
         // Return the message history up to (but not including) the deleted messages

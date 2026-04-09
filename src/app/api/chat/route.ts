@@ -14,8 +14,7 @@ const MAX_MESSAGES = 100;
 
 /**
  * Extend the Vercel serverless function timeout for streaming AI responses.
- * Default is 10s on Hobby, which is too short for GPT-4o streaming with
- * conversation history. Hobby plan allows up to 60s.
+ * Hobby plan maximum is 60s. For longer responses, consider Vercel Pro (300s).
  */
 export const maxDuration = 60;
 
@@ -169,7 +168,7 @@ export async function POST(req: NextRequest) {
             ],
             stream: true,
             temperature: 0.7,
-            max_tokens: 16384,
+            max_tokens: 8192,
         });
         console.log('[Chat Debug] OpenAI stream created successfully');
 

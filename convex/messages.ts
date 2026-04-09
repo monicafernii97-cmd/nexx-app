@@ -33,7 +33,7 @@ export const send = mutation({
     },
 });
 
-/** Update a message's content — auth-guarded, user must own the conversation */
+/** Update a user message's content — auth-guarded, only user messages can be edited. */
 export const updateContent = mutation({
     args: {
         messageId: v.id('messages'),
@@ -42,6 +42,9 @@ export const updateContent = mutation({
     handler: async (ctx, args) => {
         const message = await ctx.db.get(args.messageId);
         if (!message) throw new Error('Message not found');
+        if (message.role !== 'user') {
+            throw new Error('Only user messages can be edited');
+        }
 
         // Auth check: verify ownership
         await getAuthenticatedUserAndConversation(ctx, message.conversationId);
@@ -51,20 +54,31 @@ export const updateContent = mutation({
     },
 });
 
-/** Delete all messages in a conversation after a given message (by createdAt timestamp).
- *  Used for edit-and-regenerate: when a user edits an earlier message,
- *  all subsequent messages must be removed so the AI can re-answer fresh. */
-export const deleteAfter = mutation({
+/**
+ * Atomically prepare a conversation for retry or edit-and-regenerate.
+ *
+ * When `newContent` is provided (edit flow), the target user message is updated
+ * and all subsequent messages are deleted. When omitted (retry flow), the target
+ * assistant message and everything after it are deleted.
+ *
+ * This replaces separate `updateContent` + `deleteAfter` client calls to ensure
+ * the conversation is either fully rewritten or untouched on failure.
+ */
+export const prepareRegenerate = mutation({
     args: {
         conversationId: v.id('conversations'),
-        afterMessageId: v.id('messages'),
+        targetMessageId: v.id('messages'),
+        /** If provided, update the target message to this content before deleting subsequent messages (edit flow). */
+        newContent: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         // Auth check
         await getAuthenticatedUserAndConversation(ctx, args.conversationId);
 
-        const targetMessage = await ctx.db.get(args.afterMessageId);
-        if (!targetMessage) throw new Error('Message not found');
+        const targetMessage = await ctx.db.get(args.targetMessageId);
+        if (!targetMessage || targetMessage.conversationId !== args.conversationId) {
+            throw new Error('Message not found in conversation');
+        }
 
         // Get all messages in the conversation
         const allMessages = await ctx.db
@@ -75,29 +89,73 @@ export const deleteAfter = mutation({
             .order('asc')
             .collect();
 
-        // Delete everything after the target message
-        let foundTarget = false;
-        let deletedCount = 0;
-        for (const msg of allMessages) {
-            if (msg._id === args.afterMessageId) {
-                foundTarget = true;
-                continue; // Keep the target itself
+        if (args.newContent !== undefined) {
+            // ── Edit flow: update content, delete everything after ──
+            if (targetMessage.role !== 'user') {
+                throw new Error('Only user messages can be edited');
             }
-            if (foundTarget) {
-                await ctx.db.delete(msg._id);
-                deletedCount++;
+            await ctx.db.patch(args.targetMessageId, { content: args.newContent });
+
+            let foundTarget = false;
+            let deletedCount = 0;
+            for (const msg of allMessages) {
+                if (msg._id === args.targetMessageId) {
+                    foundTarget = true;
+                    continue;
+                }
+                if (foundTarget) {
+                    await ctx.db.delete(msg._id);
+                    deletedCount++;
+                }
+            }
+
+            // Update messageCount
+            const conversation = await ctx.db.get(args.conversationId);
+            if (conversation) {
+                await ctx.db.patch(args.conversationId, {
+                    messageCount: Math.max(0, (conversation.messageCount ?? 0) - deletedCount),
+                });
+            }
+        } else {
+            // ── Retry flow: find the user message before the target assistant message, delete from target onward ──
+            if (targetMessage.role !== 'assistant') {
+                throw new Error('Can only retry assistant messages');
+            }
+
+            let deletedCount = 0;
+            let foundTarget = false;
+            for (const msg of allMessages) {
+                if (msg._id === args.targetMessageId) {
+                    foundTarget = true;
+                }
+                if (foundTarget) {
+                    await ctx.db.delete(msg._id);
+                    deletedCount++;
+                }
+            }
+
+            const conversation = await ctx.db.get(args.conversationId);
+            if (conversation) {
+                await ctx.db.patch(args.conversationId, {
+                    messageCount: Math.max(0, (conversation.messageCount ?? 0) - deletedCount),
+                });
             }
         }
 
-        // Update conversation messageCount
-        const conversation = await ctx.db.get(args.conversationId);
-        if (conversation) {
-            await ctx.db.patch(args.conversationId, {
-                messageCount: Math.max(0, (conversation.messageCount ?? 0) - deletedCount),
-            });
-        }
+        // Return the message history up to (but not including) the deleted messages
+        // so the client can immediately stream without an extra query
+        const remainingMessages = await ctx.db
+            .query('messages')
+            .withIndex('by_conversation', (q) =>
+                q.eq('conversationId', args.conversationId)
+            )
+            .order('asc')
+            .collect();
 
-        return deletedCount;
+        return remainingMessages.map((m) => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+        }));
     },
 });
 

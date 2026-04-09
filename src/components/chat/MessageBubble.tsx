@@ -14,12 +14,38 @@ interface MessageBubbleProps {
     isStreaming?: boolean;
     messageId?: string;
     theme?: ChatTheme;
-    /** Called when user clicks Retry on an assistant message */
+    /** Called when user clicks Retry on an assistant message. */
     onRetry?: () => void;
-    /** Called when user saves an edited message — passes new content */
+    /** Called when user saves an edited message — passes new content. */
     onEdit?: (newContent: string) => void;
 }
 
+// ── Shared action button (declared OUTSIDE render to satisfy react-hooks/static-components) ──
+
+interface ActionButtonProps {
+    onClick: () => void;
+    label: string;
+    isLight: boolean;
+    children: React.ReactNode;
+}
+
+/** Small icon-only action button used in message toolbars (copy, retry, edit). */
+function ActionButton({ onClick, label, isLight, children }: ActionButtonProps) {
+    return (
+        <button
+            className={`${isLight
+                ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                : 'text-white/40 hover:text-white/80 hover:bg-white/10'
+                } transition-colors flex items-center gap-1.5 p-1.5 rounded-md`}
+            onClick={onClick}
+            aria-label={label}
+        >
+            {children}
+        </button>
+    );
+}
+
+/** Chat message bubble with ChatGPT-style actions (copy, retry, edit) and light/dark theme support. */
 export default function MessageBubble({
     role,
     content,
@@ -49,6 +75,7 @@ export default function MessageBubble({
         }
     }, [isEditing, editContent]);
 
+    /** Copy message content to the clipboard. */
     const handleCopy = useCallback(async () => {
         if (!window.isSecureContext || !navigator.clipboard?.writeText) return;
         try {
@@ -64,16 +91,19 @@ export default function MessageBubble({
         }
     }, [content]);
 
+    /** Enter inline edit mode, pre-filling the textarea with the current message content. */
     const handleStartEdit = useCallback(() => {
         setEditContent(content);
         setIsEditing(true);
     }, [content]);
 
+    /** Cancel editing and restore original content. */
     const handleCancelEdit = useCallback(() => {
         setIsEditing(false);
         setEditContent(content);
     }, [content]);
 
+    /** Save the edited content and trigger a re-generation via the parent callback. */
     const handleSaveEdit = useCallback(() => {
         const trimmed = editContent.trim();
         if (!trimmed || trimmed === content) {
@@ -84,6 +114,7 @@ export default function MessageBubble({
         setIsEditing(false);
     }, [editContent, content, onEdit, handleCancelEdit]);
 
+    /** Handle keyboard shortcuts in the edit textarea (Enter to save, Escape to cancel). */
     const handleEditKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
@@ -96,19 +127,8 @@ export default function MessageBubble({
 
     const isLight = theme === 'light';
 
-    // ── Action Button ──
-    const ActionButton = ({ onClick, label, children }: { onClick: () => void; label: string; children: React.ReactNode }) => (
-        <button
-            className={`${isLight
-                ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                : 'text-white/40 hover:text-white/80 hover:bg-white/10'
-                } transition-colors flex items-center gap-1.5 p-1.5 rounded-md`}
-            onClick={onClick}
-            aria-label={label}
-        >
-            {children}
-        </button>
-    );
+    // Responsive visibility: always visible on mobile, hover-reveal on desktop
+    const actionBarClass = 'flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity';
 
     // ── USER MESSAGE ──
     if (role === 'user') {
@@ -164,12 +184,12 @@ export default function MessageBubble({
                                 {content}
                             </div>
                             {/* User action bar */}
-                            <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <ActionButton onClick={handleCopy} label={copied ? 'Copied' : 'Copy message'}>
+                            <div className={`${actionBarClass} mt-1`}>
+                                <ActionButton onClick={handleCopy} label={copied ? 'Copied' : 'Copy message'} isLight={isLight}>
                                     {copied ? <Check size={14} weight="bold" className="text-emerald-400" /> : <Copy size={14} weight="regular" />}
                                 </ActionButton>
                                 {onEdit && (
-                                    <ActionButton onClick={handleStartEdit} label="Edit message">
+                                    <ActionButton onClick={handleStartEdit} label="Edit message" isLight={isLight}>
                                         <PencilSimple size={14} weight="regular" />
                                     </ActionButton>
                                 )}
@@ -208,12 +228,12 @@ export default function MessageBubble({
 
                 {/* Assistant action bar */}
                 {!isStreaming && (
-                    <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <ActionButton onClick={handleCopy} label={copied ? 'Copied' : 'Copy response'}>
+                    <div className={`${actionBarClass} mt-2`}>
+                        <ActionButton onClick={handleCopy} label={copied ? 'Copied' : 'Copy response'} isLight={isLight}>
                             {copied ? <Check size={14} weight="bold" className="text-emerald-400" /> : <Copy size={14} weight="regular" />}
                         </ActionButton>
                         {onRetry && (
-                            <ActionButton onClick={onRetry} label="Retry response">
+                            <ActionButton onClick={onRetry} label="Retry response" isLight={isLight}>
                                 <ArrowsClockwise size={14} weight="regular" />
                             </ActionButton>
                         )}

@@ -25,8 +25,7 @@ export default function ConversationPage() {
     const userProfile = useQuery(api.users.me);
     const nexProfile = useQuery(api.nexProfiles.getByUser);
     const sendMessage = useMutation(api.messages.send);
-    const updateMessageContent = useMutation(api.messages.updateContent);
-    const deleteMessagesAfter = useMutation(api.messages.deleteAfter);
+    const prepareRegenerate = useMutation(api.messages.prepareRegenerate);
     const archiveConversation = useMutation(api.conversations.archive);
 
     const [isStreaming, setIsStreaming] = useState(false);
@@ -40,6 +39,8 @@ export default function ConversationPage() {
         const saved = localStorage.getItem('nexx-chat-theme');
         if (saved === 'light' || saved === 'dark') setTheme(saved);
     }, []);
+
+    /** Toggle between light and dark chat themes, persisting the choice to localStorage. */
     const toggleTheme = useCallback(() => {
         setTheme((prev) => {
             const next = prev === 'dark' ? 'light' : 'dark';
@@ -63,7 +64,7 @@ export default function ConversationPage() {
 
     const isThreadReady = conversation !== undefined && messages !== undefined;
 
-    // ── Build user context payload (shared between send/retry/edit) ──
+    /** Build the user context payload sent to the chat API (shared between send/retry/edit). */
     const buildUserContext = useCallback(() => ({
         userName: userProfile?.name,
         state: userProfile?.state,
@@ -85,10 +86,16 @@ export default function ConversationPage() {
         nexDetectedPatterns: nexProfile?.detectedPatterns,
     }), [userProfile, nexProfile]);
 
-    // ── Stream AI response for a given message history ──
+    /**
+     * Stream an AI response for a given message history.
+     * Separates streaming failures from persistence failures so a completed
+     * response is never replaced with a generic fallback.
+     */
     const streamAIResponse = useCallback(async (history: { role: 'user' | 'assistant'; content: string }[]) => {
         setIsStreaming(true);
         setStreamingContent('');
+
+        let fullContent = '';
 
         try {
             const response = await fetch('/api/chat', {
@@ -107,7 +114,6 @@ export default function ConversationPage() {
 
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
-            let fullContent = '';
 
             if (reader) {
                 while (true) {
@@ -120,28 +126,48 @@ export default function ConversationPage() {
                 fullContent += decoder.decode();
                 setStreamingContent(fullContent);
             }
+        } catch (error) {
+            console.error('Streaming error:', error);
+            // Only show fallback if we never received any content
+            if (!fullContent) {
+                await sendMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.",
+                }).catch(() => {});
+            }
+            return;
+        } finally {
+            setIsStreaming(false);
+            setStreamingContent('');
+        }
 
-            if (fullContent) {
+        // Persist the completed response — separated from streaming try/catch
+        // so a successfully streamed answer is never replaced with the fallback.
+        if (fullContent) {
+            try {
                 await sendMessage({
                     conversationId,
                     role: 'assistant',
                     content: fullContent,
                 });
+            } catch (persistError) {
+                console.error('Failed to persist AI response:', persistError);
+                // Retry once
+                try {
+                    await sendMessage({
+                        conversationId,
+                        role: 'assistant',
+                        content: fullContent,
+                    });
+                } catch {
+                    console.error('Retry persistence also failed — response lost');
+                }
             }
-        } catch (error) {
-            console.error('Streaming error:', error);
-            await sendMessage({
-                conversationId,
-                role: 'assistant',
-                content: "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.",
-            }).catch(() => {});
-        } finally {
-            setIsStreaming(false);
-            setStreamingContent('');
         }
     }, [conversationId, sendMessage, buildUserContext]);
 
-    // ── Send new message ──
+    /** Send a new user message and stream the AI response. */
     const handleSend = useCallback(
         async (input: string) => {
             if (isStreaming || isPending || !isThreadReady) return;
@@ -170,60 +196,48 @@ export default function ConversationPage() {
         [conversationId, messages, sendMessage, isStreaming, isPending, isThreadReady, streamAIResponse]
     );
 
-    // ── Retry last AI response ──
+    /**
+     * Retry the last AI response — atomically deletes the assistant message
+     * and re-streams a fresh answer from the same conversation state.
+     */
     const handleRetry = useCallback(
         async (assistantMessageId: Id<'messages'>) => {
             if (isStreaming || isPending || !messages) return;
             setIsPending(true);
 
             try {
-                // Delete the assistant message we're retrying
-                await deleteMessagesAfter({ conversationId, afterMessageId: assistantMessageId });
-                // Also delete the assistant message itself by finding the message before it
-                // Actually, we should delete the message itself. Let's use deleteAfter on the user message before it.
-                // Find the user message that precedes this assistant message
-                const msgIndex = messages.findIndex((m) => m._id === assistantMessageId);
-                if (msgIndex > 0) {
-                    const userMsgBefore = messages[msgIndex - 1];
-                    await deleteMessagesAfter({ conversationId, afterMessageId: userMsgBefore._id });
+                // Atomic: delete the assistant message and get remaining history
+                const history = await prepareRegenerate({
+                    conversationId,
+                    targetMessageId: assistantMessageId,
+                });
 
-                    // Rebuild history up to (and including) the user message
-                    const history = messages.slice(0, msgIndex).map((m) => ({
-                        role: m.role as 'user' | 'assistant',
-                        content: m.content,
-                    }));
-
-                    await streamAIResponse(history);
-                }
+                await streamAIResponse(history);
             } catch (error) {
                 console.error('Retry error:', error);
             } finally {
                 setIsPending(false);
             }
         },
-        [conversationId, messages, isStreaming, isPending, deleteMessagesAfter, streamAIResponse]
+        [conversationId, messages, isStreaming, isPending, prepareRegenerate, streamAIResponse]
     );
 
-    // ── Edit user message and regenerate ──
+    /**
+     * Edit a user message and regenerate — atomically updates the message content,
+     * deletes all subsequent messages, and streams a fresh AI response.
+     */
     const handleEdit = useCallback(
         async (messageId: Id<'messages'>, newContent: string) => {
             if (isStreaming || isPending || !messages) return;
             setIsPending(true);
 
             try {
-                // Update the message content in DB
-                await updateMessageContent({ messageId, content: newContent });
-
-                // Delete all messages after this one
-                await deleteMessagesAfter({ conversationId, afterMessageId: messageId });
-
-                // Rebuild history up to this edited message
-                const msgIndex = messages.findIndex((m) => m._id === messageId);
-                const history = messages.slice(0, msgIndex).map((m) => ({
-                    role: m.role as 'user' | 'assistant',
-                    content: m.content,
-                }));
-                history.push({ role: 'user', content: newContent });
+                // Atomic: update content + delete subsequent messages, get remaining history
+                const history = await prepareRegenerate({
+                    conversationId,
+                    targetMessageId: messageId,
+                    newContent,
+                });
 
                 await streamAIResponse(history);
             } catch (error) {
@@ -232,12 +246,13 @@ export default function ConversationPage() {
                 setIsPending(false);
             }
         },
-        [conversationId, messages, isStreaming, isPending, updateMessageContent, deleteMessagesAfter, streamAIResponse]
+        [conversationId, messages, isStreaming, isPending, prepareRegenerate, streamAIResponse]
     );
 
     // Early return AFTER all hooks
     if (!isValidId) return null;
 
+    /** Archive the conversation after user confirmation. */
     const handleArchive = async () => {
         const confirmed = window.confirm('Archive this encrypted conversation? It will remain securely stored but removed from your active log.');
         if (!confirmed) return;
@@ -342,7 +357,7 @@ export default function ConversationPage() {
                     </motion.div>
                 )}
 
-                {messages?.map((msg, index) => (
+                {messages?.map((msg) => (
                     <MessageBubble
                         key={msg._id}
                         role={msg.role}

@@ -151,6 +151,7 @@ export default function MessageBubble({
                                 value={editContent}
                                 onChange={(e) => setEditContent(e.target.value)}
                                 onKeyDown={handleEditKeyDown}
+                                aria-label="Edit message"
                                 className={`w-full resize-none border-none outline-none text-[15px] leading-relaxed font-medium bg-transparent min-w-[280px] ${isLight ? 'text-gray-900 placeholder:text-gray-400' : 'text-white placeholder:text-white/40'
                                     }`}
                                 style={{ caretColor: isLight ? '#2563EB' : '#60A5FA' }}

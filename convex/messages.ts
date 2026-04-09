@@ -3,22 +3,40 @@ import { v } from 'convex/values';
 import { getAuthenticatedUserAndConversation } from './lib/auth';
 /** ── Mutations ── */
 
-/** Send a message — auth-guarded */
+/**
+ * Send a message — auth-guarded.
+ * Accepts an optional `requestId` for idempotent persistence: if a message
+ * with the same requestId already exists in the conversation, its ID is
+ * returned without inserting a duplicate.
+ */
 export const send = mutation({
     args: {
         conversationId: v.id('conversations'),
         role: v.union(v.literal('user'), v.literal('assistant')),
         content: v.string(),
         metadata: v.optional(v.any()),
+        requestId: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         await getAuthenticatedUserAndConversation(ctx, args.conversationId);
+
+        // Idempotency: if requestId is provided, check for an existing message
+        if (args.requestId) {
+            const existing = await ctx.db
+                .query('messages')
+                .withIndex('by_conversation', (q) =>
+                    q.eq('conversationId', args.conversationId)
+                )
+                .filter((q) => q.eq(q.field('metadata.requestId'), args.requestId))
+                .first();
+            if (existing) return existing._id;
+        }
 
         const messageId = await ctx.db.insert('messages', {
             conversationId: args.conversationId,
             role: args.role,
             content: args.content,
-            metadata: args.metadata,
+            metadata: args.requestId ? { requestId: args.requestId } : args.metadata,
             createdAt: Date.now(),
         });
 

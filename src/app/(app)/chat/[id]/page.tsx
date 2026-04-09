@@ -31,6 +31,8 @@ export default function ConversationPage() {
     const [isStreaming, setIsStreaming] = useState(false);
     const [isPending, setIsPending] = useState(false);
     const [streamingContent, setStreamingContent] = useState('');
+    /** Tracks an assistant reply that was streamed but failed to persist. */
+    const [unsavedReply, setUnsavedReply] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // ── Theme state (persisted to localStorage) ──
@@ -88,14 +90,16 @@ export default function ConversationPage() {
 
     /**
      * Stream an AI response for a given message history.
-     * Separates streaming failures from persistence failures so a completed
-     * response is never replaced with a generic fallback.
+     * Uses a stable requestId for idempotent persistence so retries
+     * never create duplicate messages.
      */
     const streamAIResponse = useCallback(async (history: { role: 'user' | 'assistant'; content: string }[]) => {
         setIsStreaming(true);
         setStreamingContent('');
+        setUnsavedReply(null);
 
         let fullContent = '';
+        const requestId = `${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
         try {
             const response = await fetch('/api/chat', {
@@ -130,7 +134,6 @@ export default function ConversationPage() {
             setStreamingContent(fullContent);
         } catch (error) {
             console.error('Streaming error:', error);
-            // Only show fallback if we never received any content
             if (!fullContent) {
                 await sendMessage({
                     conversationId,
@@ -138,37 +141,41 @@ export default function ConversationPage() {
                     content: "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.",
                 }).catch(() => {});
                 setStreamingContent('');
+            } else {
+                // Partial content: mark as unsaved so user can see and we block new sends
+                setUnsavedReply(fullContent);
             }
-            // If partial content exists, keep it visible so the user can read/copy it
             return;
         } finally {
             setIsStreaming(false);
         }
 
-        // Persist the completed response — separated from streaming try/catch
-        // so a successfully streamed answer is never replaced with the fallback.
-        // streamingContent is only cleared after successful save so the user
-        // can still see/copy the response if persistence fails.
+        // Persist with idempotent requestId — safe to retry without duplicates
         if (fullContent) {
             try {
                 await sendMessage({
                     conversationId,
                     role: 'assistant',
                     content: fullContent,
+                    requestId,
                 });
                 setStreamingContent('');
+                setUnsavedReply(null);
             } catch (persistError) {
                 console.error('Failed to persist AI response:', persistError);
-                // Retry once
                 try {
+                    // Retry with same requestId — idempotent, no duplicates
                     await sendMessage({
                         conversationId,
                         role: 'assistant',
                         content: fullContent,
+                        requestId,
                     });
                     setStreamingContent('');
+                    setUnsavedReply(null);
                 } catch {
-                    // Keep streamingContent visible so user can copy the response
+                    // Mark as unsaved — blocks new sends until resolved
+                    setUnsavedReply(fullContent);
                     console.error('Retry persistence also failed — response preserved in UI for manual copy');
                 }
             }
@@ -180,7 +187,8 @@ export default function ConversationPage() {
     /** Send a new user message and stream the AI response. */
     const handleSend = useCallback(
         async (input: string) => {
-            if (isStreaming || isPending || !isThreadReady) return;
+            // Block sends when there's an unsaved reply (UI/model context would diverge)
+            if (isStreaming || isPending || !isThreadReady || unsavedReply) return;
             setIsPending(true);
 
             try {
@@ -203,7 +211,7 @@ export default function ConversationPage() {
                 setIsPending(false);
             }
         },
-        [conversationId, messages, sendMessage, isStreaming, isPending, isThreadReady, streamAIResponse]
+        [conversationId, messages, sendMessage, isStreaming, isPending, isThreadReady, unsavedReply, streamAIResponse]
     );
 
     /**
@@ -216,7 +224,6 @@ export default function ConversationPage() {
             setIsPending(true);
 
             try {
-                // Atomic: delete the assistant message and get remaining history
                 const history = await prepareRegenerate({
                     conversationId,
                     targetMessageId: assistantMessageId,
@@ -242,7 +249,6 @@ export default function ConversationPage() {
             setIsPending(true);
 
             try {
-                // Atomic: update content + delete subsequent messages, get remaining history
                 const history = await prepareRegenerate({
                     conversationId,
                     targetMessageId: messageId,
@@ -259,6 +265,28 @@ export default function ConversationPage() {
         [conversationId, messages, isStreaming, isPending, prepareRegenerate, streamAIResponse]
     );
 
+    /** Dismiss an unsaved reply, clearing it from the UI. */
+    const handleDismissUnsaved = useCallback(() => {
+        setUnsavedReply(null);
+        setStreamingContent('');
+    }, []);
+
+    /** Retry persisting the unsaved reply. */
+    const handleRetryPersist = useCallback(async () => {
+        if (!unsavedReply) return;
+        try {
+            await sendMessage({
+                conversationId,
+                role: 'assistant',
+                content: unsavedReply,
+            });
+            setUnsavedReply(null);
+            setStreamingContent('');
+        } catch {
+            console.error('Retry persistence failed again');
+        }
+    }, [unsavedReply, conversationId, sendMessage]);
+
     // Early return AFTER all hooks
     if (!isValidId) return null;
 
@@ -273,6 +301,10 @@ export default function ConversationPage() {
             console.error('Failed to archive:', error);
         }
     };
+
+    // Helper: determine if a message is the latest of its role
+    const lastAssistantId = messages ? [...messages].reverse().find((m) => m.role === 'assistant')?._id : undefined;
+    const lastUserId = messages ? [...messages].reverse().find((m) => m.role === 'user')?._id : undefined;
 
 
     return (
@@ -374,13 +406,27 @@ export default function ConversationPage() {
                         content={msg.content}
                         theme={theme}
                         onRetry={
-                            msg.role === 'assistant' && !isStreaming && !isPending
-                                ? () => handleRetry(msg._id as Id<'messages'>)
+                            msg.role === 'assistant' && !isStreaming && !isPending && !unsavedReply
+                                ? () => {
+                                    // Confirm if retrying an older message (will delete later turns)
+                                    if (msg._id !== lastAssistantId) {
+                                        const ok = window.confirm('Retrying this response will delete all messages after it. Continue?');
+                                        if (!ok) return;
+                                    }
+                                    handleRetry(msg._id as Id<'messages'>);
+                                }
                                 : undefined
                         }
                         onEdit={
-                            msg.role === 'user' && !isStreaming && !isPending
-                                ? (newContent) => handleEdit(msg._id as Id<'messages'>, newContent)
+                            msg.role === 'user' && !isStreaming && !isPending && !unsavedReply
+                                ? (newContent) => {
+                                    // Confirm if editing an older message (will delete later turns)
+                                    if (msg._id !== lastUserId) {
+                                        const ok = window.confirm('Editing this message will delete all messages after it and regenerate. Continue?');
+                                        if (!ok) return;
+                                    }
+                                    handleEdit(msg._id as Id<'messages'>, newContent);
+                                }
                                 : undefined
                         }
                     />
@@ -394,6 +440,25 @@ export default function ConversationPage() {
                         isStreaming={isStreaming}
                         theme={theme}
                     />
+                )}
+
+                {/* Unsaved reply action bar */}
+                {unsavedReply && !isStreaming && (
+                    <div className={`flex items-center gap-2 px-6 py-2 text-xs font-semibold ${isLight ? 'text-amber-700' : 'text-amber-300'}`}>
+                        <span>⚠ Response could not be saved.</span>
+                        <button
+                            onClick={handleRetryPersist}
+                            className="underline hover:no-underline"
+                        >
+                            Retry
+                        </button>
+                        <button
+                            onClick={handleDismissUnsaved}
+                            className="underline hover:no-underline"
+                        >
+                            Dismiss
+                        </button>
+                    </div>
                 )}
 
                 {/* Loading indicator (Pre-stream) */}
@@ -444,7 +509,7 @@ export default function ConversationPage() {
                     ? 'bg-white border border-gray-200 shadow-md'
                     : 'glass-ethereal border-white'
                     }`}>
-                    <ChatInput onSend={handleSend} disabled={isStreaming || isPending || !isThreadReady} />
+                    <ChatInput onSend={handleSend} disabled={isStreaming || isPending || !isThreadReady || !!unsavedReply} />
                 </div>
                 <p className={`text-center text-[10px] font-bold tracking-[0.15em] uppercase mt-4 flex items-center justify-center ${isLight ? 'text-gray-400' : 'text-[#0A1128]/50'}`}>
                     NEXX provides strategic guidance, not formal legal advice.

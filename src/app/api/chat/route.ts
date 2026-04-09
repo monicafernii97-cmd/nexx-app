@@ -13,19 +13,17 @@ const MAX_MESSAGE_LENGTH = 100_000;
 const MAX_MESSAGES = 100;
 
 /**
- * Extend the Vercel serverless function timeout for streaming AI responses.
- * Hobby plan maximum is 60s. For longer responses, consider Vercel Pro (300s).
+ * Vercel Pro: 300s timeout for streaming AI responses.
+ * Allows GPT-4o to produce comprehensive, multi-section legal analysis
+ * without risk of timeout — even with long court documents as input.
  */
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /** Handle POST requests for AI chat — authenticates user, rate-limits, and streams GPT responses. */
 export async function POST(req: NextRequest) {
-    console.log('[Chat Debug] POST /api/chat called');
     // ── Auth guard ──
     const { userId } = await auth();
-    console.log('[Chat Debug] userId:', userId ? `${userId.substring(0, 10)}...` : 'NULL');
     if (!userId) {
-        console.error('[Chat Debug] FAILED: No userId from auth()');
         return Response.json({ error: 'Authentication required' }, { status: 401 });
     }
 
@@ -57,17 +55,14 @@ export async function POST(req: NextRequest) {
         let userTier: SubscriptionTier = 'free';
         let tierResolved = false; // true = tier came from DB; false = lookup failed
         try {
-            console.log('[Chat Debug] Creating authenticated Convex client...');
             const convex = await getAuthenticatedConvexClient();
-            console.log('[Chat Debug] Convex client created, querying user tier...');
             const userRecord = await convex.query(api.users.getByClerkId, { clerkId: userId });
-            console.log('[Chat Debug] User record found:', !!userRecord, 'tier:', userRecord?.subscriptionTier);
             if (userRecord?.subscriptionTier && validTiers.includes(userRecord.subscriptionTier as SubscriptionTier)) {
                 userTier = userRecord.subscriptionTier as SubscriptionTier;
             }
             tierResolved = true;
         } catch (err) {
-            console.error('[Chat Debug] FAILED at Convex client/query:', err);
+            console.warn('[Chat] Failed to fetch user tier from Convex — using free tier defaults:', err);
         }
 
         // ── Validate input before consuming rate limit ──
@@ -159,7 +154,6 @@ export async function POST(req: NextRequest) {
         // Stream response from OpenAI (gpt-4o by default, gpt-4o-mini fallback when limit reached)
         // max_tokens set to GPT-4o's maximum output (16,384) to allow comprehensive
         // legal analysis, behavioral breakdowns, and strategic guidance without truncation.
-        console.log('[Chat Debug] Calling OpenAI with model:', resolvedModel);
         const stream = await getOpenAI().chat.completions.create({
             model: resolvedModel,
             messages: [
@@ -168,9 +162,8 @@ export async function POST(req: NextRequest) {
             ],
             stream: true,
             temperature: 0.7,
-            max_tokens: 8192,
+            max_tokens: 16384,
         });
-        console.log('[Chat Debug] OpenAI stream created successfully');
 
         // Create a ReadableStream for the response
         const encoder = new TextEncoder();
@@ -197,7 +190,7 @@ export async function POST(req: NextRequest) {
             },
         });
     } catch (error) {
-        console.error('[Chat Debug] TOP-LEVEL CATCH:', error);
+        console.error('[Chat] API error:', error);
         return Response.json(
             { error: 'Failed to generate response' },
             { status: 500 }

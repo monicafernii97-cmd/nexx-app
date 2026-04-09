@@ -102,10 +102,8 @@ export default function ConversationPage() {
 
                 if (!response.ok) {
                     const errorText = await response.text().catch(() => '');
-                    console.error('[Chat Client] Fetch failed:', response.status, response.statusText, 'Body:', errorText, 'Headers:', Object.fromEntries(response.headers.entries()));
                     throw new Error(`Failed to get AI response: ${response.status} ${errorText}`);
                 }
-                console.log('[Chat Client] Fetch succeeded:', response.status);
 
                 const reader = response.body?.getReader();
                 const decoder = new TextDecoder();

@@ -136,14 +136,16 @@ export default function ConversationPage() {
                     content: "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.",
                 }).catch(() => {});
             }
+            setStreamingContent('');
             return;
         } finally {
             setIsStreaming(false);
-            setStreamingContent('');
         }
 
         // Persist the completed response — separated from streaming try/catch
         // so a successfully streamed answer is never replaced with the fallback.
+        // streamingContent is only cleared after successful save so the user
+        // can still see/copy the response if persistence fails.
         if (fullContent) {
             try {
                 await sendMessage({
@@ -151,6 +153,7 @@ export default function ConversationPage() {
                     role: 'assistant',
                     content: fullContent,
                 });
+                setStreamingContent('');
             } catch (persistError) {
                 console.error('Failed to persist AI response:', persistError);
                 // Retry once
@@ -160,10 +163,14 @@ export default function ConversationPage() {
                         role: 'assistant',
                         content: fullContent,
                     });
+                    setStreamingContent('');
                 } catch {
-                    console.error('Retry persistence also failed — response lost');
+                    // Keep streamingContent visible so user can copy the response
+                    console.error('Retry persistence also failed — response preserved in UI for manual copy');
                 }
             }
+        } else {
+            setStreamingContent('');
         }
     }, [conversationId, sendMessage, buildUserContext]);
 

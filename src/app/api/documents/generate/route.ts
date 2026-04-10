@@ -126,48 +126,60 @@ export async function POST(request: NextRequest) {
     // ── 4b. AI drafting — generate content when bodyContent is empty ──
     let bodyContent = body.bodyContent ?? [];
     if (bodyContent.length === 0) {
+      const { generateDraftContent } = await import('@/lib/nexx/documentDrafter');
+      const sectionIds = template.sections
+        .filter(s => s.type !== 'title' && s.type !== 'signature_block' && s.type !== 'caption')
+        .map(s => s.id || s.type);
+
+      // Build a lookup map from template so we can derive sectionType per section
+      const sectionTypeByKey = new Map(
+        template.sections.map(section => [section.id ?? section.type, section.type] as const)
+      );
+
+      // Build minimal case context from the request body for the AI drafter
+      const caseContext: Record<string, unknown> = {
+        caseType: body.caseType,
+        petitioner: body.petitioner?.name,
+        respondent: body.respondent?.name,
+        children: body.children?.map((c: { name: string; age?: number }) => c.name),
+        court: body.courtSettings?.courtName,
+        county: body.courtSettings?.county,
+        state: body.courtSettings?.state,
+      };
+
+      let drafted;
       try {
-        const { generateDraftContent } = await import('@/lib/nexx/documentDrafter');
-        const sectionIds = template.sections
-          .filter(s => s.type !== 'title' && s.type !== 'signature_block' && s.type !== 'caption')
-          .map(s => s.id || s.type);
-
-        // Build a lookup map from template so we can derive sectionType per section
-        const sectionTypeByKey = new Map(
-          template.sections.map(section => [section.id ?? section.type, section.type] as const)
-        );
-
-        // Build minimal case context from the request body for the AI drafter
-        const caseContext: Record<string, unknown> = {
-          caseType: body.caseType,
-          petitioner: body.petitioner?.name,
-          respondent: body.respondent?.name,
-          children: body.children?.map((c: { name: string; age?: number }) => c.name),
-          court: body.courtSettings?.courtName,
-          county: body.courtSettings?.county,
-          state: body.courtSettings?.state,
-        };
-
-        const drafted = await generateDraftContent({
+        drafted = await generateDraftContent({
           templateId: body.templateId,
           templateName: template.title,
           sections: sectionIds,
           courtRules: rules as unknown as Record<string, unknown>,
           caseGraph: caseContext as unknown as import('@/lib/nexx/caseGraph').CaseGraph,
         });
-
-        // Transform drafter output to GeneratedSection format, deriving sectionType from template
-        bodyContent = drafted.map(d => ({
-          sectionId: d.sectionId,
-          sectionType: sectionTypeByKey.get(d.sectionId ?? '') ?? 'body_sections',
-          heading: d.heading,
-          content: d.body,
-          numberedItems: d.numberedItems,
-        }));
-        console.log(`[DocuVault] AI drafted ${bodyContent.length} sections for template "${body.templateId}"`);
       } catch (draftError) {
-        console.error('[DocuVault] AI drafting failed, proceeding with empty content:', draftError);
+        console.error('[DocuVault] AI drafting failed:', draftError);
+        return NextResponse.json(
+          { error: 'AI drafting failed. Please provide bodyContent or try again.' },
+          { status: 422 }
+        );
       }
+
+      if (!drafted || drafted.length === 0) {
+        return NextResponse.json(
+          { error: 'AI drafting produced no sections. Please provide bodyContent or try again.' },
+          { status: 422 }
+        );
+      }
+
+      // Transform drafter output to GeneratedSection format, deriving sectionType from template
+      bodyContent = drafted.map(d => ({
+        sectionId: d.sectionId,
+        sectionType: sectionTypeByKey.get(d.sectionId ?? '') ?? 'body_sections',
+        heading: d.heading,
+        content: d.body,
+        numberedItems: d.numberedItems,
+      }));
+      console.log(`[DocuVault] AI drafted ${bodyContent.length} sections for template "${body.templateId}"`);
     }
 
     // ── 5. Render HTML ──

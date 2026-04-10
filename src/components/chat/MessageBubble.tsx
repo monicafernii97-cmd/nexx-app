@@ -47,6 +47,63 @@ function ActionButton({ onClick, label, isLight, children }: ActionButtonProps) 
     );
 }
 
+// ── Artifact Validation ──
+
+/** Ensure a value is an array of strings, defaulting to [] on mismatch. */
+function ensureStringArray(val: unknown): string[] {
+    return Array.isArray(val) ? val.filter((v): v is string => typeof v === 'string') : [];
+}
+
+/**
+ * Validate and normalize a parsed JSON payload into a safe NexxArtifacts object.
+ * Defaults missing arrays to [] and rejects non-object payloads entirely.
+ * This prevents runtime crashes from malformed or legacy persisted data.
+ */
+function normalizeNexxArtifacts(parsed: unknown): NexxArtifacts | null {
+    if (!parsed || typeof parsed !== 'object') return null;
+    const obj = parsed as Record<string, unknown>;
+
+    // Normalize each artifact field defensively
+    const confidence = obj.confidence && typeof obj.confidence === 'object'
+        ? {
+            confidence: String((obj.confidence as Record<string, unknown>).confidence ?? 'moderate') as 'high' | 'moderate' | 'low',
+            basis: String((obj.confidence as Record<string, unknown>).basis ?? ''),
+            evidenceSufficiency: String((obj.confidence as Record<string, unknown>).evidenceSufficiency ?? ''),
+            missingSupport: ensureStringArray((obj.confidence as Record<string, unknown>).missingSupport),
+        }
+        : null;
+
+    const judgeSimulation = obj.judgeSimulation && typeof obj.judgeSimulation === 'object'
+        ? {
+            credibilityScore: Number((obj.judgeSimulation as Record<string, unknown>).credibilityScore ?? 0),
+            neutralityScore: Number((obj.judgeSimulation as Record<string, unknown>).neutralityScore ?? 0),
+            clarityScore: Number((obj.judgeSimulation as Record<string, unknown>).clarityScore ?? 0),
+            strengths: ensureStringArray((obj.judgeSimulation as Record<string, unknown>).strengths),
+            weaknesses: ensureStringArray((obj.judgeSimulation as Record<string, unknown>).weaknesses),
+            likelyCourtInterpretation: String((obj.judgeSimulation as Record<string, unknown>).likelyCourtInterpretation ?? ''),
+            improvementSuggestions: ensureStringArray((obj.judgeSimulation as Record<string, unknown>).improvementSuggestions),
+        }
+        : null;
+
+    const oppositionSimulation = obj.oppositionSimulation && typeof obj.oppositionSimulation === 'object'
+        ? {
+            likelyAttackPoints: ensureStringArray((obj.oppositionSimulation as Record<string, unknown>).likelyAttackPoints),
+            framingRisks: ensureStringArray((obj.oppositionSimulation as Record<string, unknown>).framingRisks),
+            whatNeedsTightening: ensureStringArray((obj.oppositionSimulation as Record<string, unknown>).whatNeedsTightening),
+            preemptionSuggestions: ensureStringArray((obj.oppositionSimulation as Record<string, unknown>).preemptionSuggestions),
+        }
+        : null;
+
+    return {
+        draftReady: obj.draftReady ?? null,
+        timelineReady: obj.timelineReady ?? null,
+        exhibitReady: obj.exhibitReady ?? null,
+        judgeSimulation,
+        oppositionSimulation,
+        confidence,
+    } as NexxArtifacts;
+}
+
 // ── Artifact Sub-Components ──
 
 /** Confidence badge — colored pill with tooltip. */
@@ -116,6 +173,7 @@ function ArtifactPanel({
     accentColor?: string;
 }) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
+    const panelId = `artifact-panel-${label.toLowerCase().replace(/\s+/g, '-')}`;
 
     return (
         <motion.div
@@ -127,7 +185,10 @@ function ArtifactPanel({
                 }`}
         >
             <button
+                type="button"
                 onClick={() => setIsOpen(!isOpen)}
+                aria-expanded={isOpen}
+                aria-controls={panelId}
                 className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-colors cursor-pointer ${isLight
                     ? 'hover:bg-gray-100 text-gray-700'
                     : 'hover:bg-white/10 text-white/80'
@@ -144,6 +205,7 @@ function ArtifactPanel({
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
+                        id={panelId}
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
@@ -259,11 +321,12 @@ export default function MessageBubble({
     const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-    // Parse artifacts from serialized JSON
+    // Parse and validate artifacts from serialized JSON
     const artifacts = useMemo<NexxArtifacts | null>(() => {
         if (!artifactsJson) return null;
         try {
-            return JSON.parse(artifactsJson) as NexxArtifacts;
+            const parsed: unknown = JSON.parse(artifactsJson);
+            return normalizeNexxArtifacts(parsed);
         } catch {
             return null;
         }

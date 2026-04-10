@@ -43,8 +43,9 @@ export default function ConversationPage() {
     const [streamingContent, setStreamingContent] = useState('');
     /** Tracks an assistant reply that was streamed but failed to persist. */
     const [unsavedReply, setUnsavedReply] = useState<string | null>(null);
-    /** Tracks artifacts/mode for an unsaved reply so retry persistence restores the full message. */
+    /** Tracks artifacts/mode/requestId for an unsaved reply so retry persistence restores the full message. */
     const [unsavedResponseData, setUnsavedResponseData] = useState<{
+        requestId: string;
         artifactsJson?: string;
         mode?: RouteMode;
     } | null>(null);
@@ -179,7 +180,7 @@ export default function ConversationPage() {
                 } catch {
                     // Mark as unsaved — blocks new sends until resolved
                     setUnsavedReply(fullContent);
-                    setUnsavedResponseData({ artifactsJson, mode });
+                    setUnsavedResponseData({ requestId, artifactsJson, mode });
                     console.error('Retry persistence also failed — response preserved in UI for manual copy');
                 }
             }
@@ -284,7 +285,7 @@ export default function ConversationPage() {
         setStreamingContent('');
     }, []);
 
-    /** Retry persisting the unsaved reply with full artifacts and mode. */
+    /** Retry persisting the unsaved reply with full artifacts, mode, and requestId. */
     const handleRetryPersist = useCallback(async () => {
         if (!unsavedReply) return;
         try {
@@ -292,6 +293,7 @@ export default function ConversationPage() {
                 conversationId,
                 role: 'assistant',
                 content: unsavedReply,
+                requestId: unsavedResponseData?.requestId,
                 artifactsJson: unsavedResponseData?.artifactsJson,
                 mode: unsavedResponseData?.mode,
             });
@@ -456,6 +458,7 @@ export default function ConversationPage() {
                         content={streamingContent}
                         isStreaming={isStreaming}
                         theme={theme}
+                        artifactsJson={unsavedResponseData?.artifactsJson}
                     />
                 )}
 

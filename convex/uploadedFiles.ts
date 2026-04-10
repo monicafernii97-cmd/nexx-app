@@ -8,21 +8,22 @@ import { getAuthenticatedUser, getAuthenticatedUserAndConversation } from './lib
  * The actual file content lives in OpenAI's vector stores.
  *
  * Auth: server-derived. Not caller-supplied.
+ *
+ * Trust boundary:
+ * - `create` accepts only client-safe fields (filename, mimeType, conversationId).
+ *   Status is always set to 'uploaded' server-side — clients cannot inject
+ *   openaiFileId, vectorStoreId, or terminal statuses.
+ * - `updateStatus` is auth-guarded (caller must own the file) and restricted
+ *   to status transitions plus provider IDs. Since ConvexHttpClient calls
+ *   always go through the authenticated API route, this is server-only in practice.
  */
 
+/** Public: create a pending upload record. */
 export const create = mutation({
     args: {
         conversationId: v.optional(v.id('conversations')),
         filename: v.string(),
         mimeType: v.string(),
-        openaiFileId: v.optional(v.string()),
-        vectorStoreId: v.optional(v.string()),
-        status: v.union(
-            v.literal('uploaded'),
-            v.literal('processing'),
-            v.literal('ready'),
-            v.literal('failed')
-        ),
     },
     handler: async (ctx, args) => {
         // Server-derived auth
@@ -37,19 +38,22 @@ export const create = mutation({
             await getAuthenticatedUserAndConversation(ctx, args.conversationId);
         }
 
+        // Status is always 'uploaded' — clients cannot set terminal states
         return await ctx.db.insert('uploadedFiles', {
             clerkUserId,
             conversationId: args.conversationId,
             filename: args.filename,
             mimeType: args.mimeType,
-            openaiFileId: args.openaiFileId,
-            vectorStoreId: args.vectorStoreId,
-            status: args.status,
+            status: 'uploaded',
             createdAt: Date.now(),
         });
     },
 });
 
+/**
+ * Update status and attach provider IDs.
+ * Auth-guarded: caller must own the file (verified via clerkUserId match).
+ */
 export const updateStatus = mutation({
     args: {
         fileId: v.id('uploadedFiles'),

@@ -18,6 +18,12 @@ const MAX_PARSE_INPUT_CHARS = 8000;
  * 
  * Auth: Convex mutations derive the caller from the JWT set on the
  * authenticated ConvexHttpClient — no caller-supplied userId needed.
+ *
+ * Trust boundary:
+ * - `api.uploadedFiles.create` only accepts filename/mimeType/conversationId.
+ *   Status is always 'uploaded' — set server-side in the mutation.
+ * - `api.uploadedFiles.updateStatus` is auth-guarded (ownership check).
+ * - `api.conversations.getOrCreateVectorStoreId` is atomic — no race.
  */
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -27,12 +33,20 @@ export async function POST(req: NextRequest) {
 
   try {
     const formData = await req.formData();
-    const file = formData.get('file') as File | null;
-    const conversationId = formData.get('conversationId') as string | null;
 
-    if (!file) {
+    // Validate multipart field types before casting
+    const fileEntry = formData.get('file');
+    const conversationEntry = formData.get('conversationId');
+
+    if (!(fileEntry instanceof File)) {
       return Response.json({ error: 'No file provided' }, { status: 400 });
     }
+    if (conversationEntry !== null && typeof conversationEntry !== 'string') {
+      return Response.json({ error: 'Invalid conversationId' }, { status: 400 });
+    }
+
+    const file = fileEntry;
+    const conversationId = conversationEntry;
 
     // Validate file type
     const allowedTypes = [
@@ -61,32 +75,41 @@ export async function POST(req: NextRequest) {
       ? (conversationId as Id<'conversations'>)
       : undefined;
 
-    // Create Convex record — auth derived from JWT on the ConvexHttpClient
+    // Create pending Convex record (status set to 'uploaded' server-side)
     const fileRecordId = await convex.mutation(api.uploadedFiles.create, {
       conversationId: typedConversationId,
       filename: file.name,
       mimeType: file.type,
+    });
+
+    // Mark as processing
+    await convex.mutation(api.uploadedFiles.updateStatus, {
+      fileId: fileRecordId,
       status: 'processing',
     });
 
     try {
-      // Get or create vector store for this conversation
+      // Atomically get-or-create vector store for this conversation
       let vectorStoreId: string | undefined;
       if (typedConversationId) {
-        const conversation = await convex.query(api.conversations.get, { id: typedConversationId });
-        vectorStoreId = conversation?.vectorStoreId ?? undefined;
+        // Generate a candidate opaque name — only used if no store exists yet
+        const candidateId = `nexx-vs-${crypto.randomUUID()}`;
+        const result = await convex.mutation(api.conversations.getOrCreateVectorStoreId, {
+          conversationId: typedConversationId,
+          candidateId,
+        });
+        vectorStoreId = result.vectorStoreId;
+
+        // Only create the external store if we won the race
+        if (result.created) {
+          await createVectorStore(candidateId);
+        }
       }
 
       if (!vectorStoreId) {
-        // Use opaque name — don't leak internal IDs to the external provider
-        vectorStoreId = await createVectorStore(`nexx-vs-${crypto.randomUUID()}`);
-        // Persist vector store ID to conversation (auth derived from JWT)
-        if (typedConversationId) {
-          await convex.mutation(api.conversations.setVectorStoreId, {
-            conversationId: typedConversationId,
-            vectorStoreId,
-          });
-        }
+        // No conversation — create a standalone store
+        vectorStoreId = `nexx-vs-${crypto.randomUUID()}`;
+        await createVectorStore(vectorStoreId);
       }
 
       // Parse document for metadata (text files only, bounded to parser limit)
@@ -95,13 +118,11 @@ export async function POST(req: NextRequest) {
         try {
           const text = await file.text();
           // Truncate to parser limit so large documents degrade gracefully
-          // instead of silently skipping metadata extraction entirely
           const parseInput = text.length > MAX_PARSE_INPUT_CHARS
             ? text.slice(0, MAX_PARSE_INPUT_CHARS)
             : text;
           const parsed = await parseLegalDocument({ filename: file.name, text: parseInput });
-          // Build full metadata for Convex, then strip internal IDs before
-          // sending to the external vector store provider
+          // Strip internal IDs before sending to external provider
           const fullMetadata = buildDocumentMetadata(parsed, userId, conversationId ?? undefined);
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { userId: _uid, conversationId: _cid, ...safeMetadata } = fullMetadata;
@@ -119,7 +140,7 @@ export async function POST(req: NextRequest) {
         metadata
       );
 
-      // Update Convex record (auth derived from JWT)
+      // Update Convex record with provider IDs (auth-guarded)
       await convex.mutation(api.uploadedFiles.updateStatus, {
         fileId: fileRecordId,
         status: 'ready',
@@ -135,7 +156,7 @@ export async function POST(req: NextRequest) {
         filename: file.name,
       });
     } catch (error) {
-      // Mark as failed (auth derived from JWT)
+      // Mark as failed (auth-guarded)
       await convex.mutation(api.uploadedFiles.updateStatus, {
         fileId: fileRecordId,
         status: 'failed',

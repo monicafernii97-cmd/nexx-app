@@ -250,3 +250,26 @@ export const setVectorStoreId = mutation({
         });
     },
 });
+
+/**
+ * Atomically get-or-create a vector store ID for a conversation.
+ * If the conversation already has a vectorStoreId, return it.
+ * Otherwise, persist the candidateId and return it.
+ * This ensures concurrent uploads always converge on the same store.
+ */
+export const getOrCreateVectorStoreId = mutation({
+    args: {
+        conversationId: v.id('conversations'),
+        candidateId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const { conversation } = await getAuthenticatedUserAndConversation(ctx, args.conversationId);
+        if (conversation.vectorStoreId) {
+            return { vectorStoreId: conversation.vectorStoreId, created: false };
+        }
+        await ctx.db.patch(args.conversationId, {
+            vectorStoreId: args.candidateId,
+        });
+        return { vectorStoreId: args.candidateId, created: true };
+    },
+});

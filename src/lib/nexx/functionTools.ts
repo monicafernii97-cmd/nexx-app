@@ -22,7 +22,7 @@ export const NEXX_FUNCTION_TOOLS = [
       type: 'object',
       properties: {
         narrative: { type: 'string', description: 'The incident narrative' },
-        category: { type: 'string', description: 'Incident category (emotional_abuse, financial_abuse, parental_alienation, harassment, threats, manipulation, neglect, other)' },
+        category: { type: 'string', description: 'Incident category (emotional_abuse, financial_abuse, parental_alienation, custody_violation, harassment, threats, manipulation, neglect, other)' },
         date: { type: 'string', description: 'Date of the incident (ISO 8601)' },
       },
       required: ['narrative', 'category'],

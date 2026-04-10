@@ -4,8 +4,7 @@
  * Runs before every chat call. Classifies the user's message into one of 9
  * route modes and determines which tools to wire into the response.
  * 
- * Phase 1: Regex heuristics (fast, no API call)
- * Phase 2: Lightweight LLM classifier (gpt-5.4-mini)
+ * Current: Regex heuristics (fast, no API call)
  */
 
 import type { RouteMode, ToolPlan, RouterResult } from '../types';
@@ -15,8 +14,12 @@ import type { RouteMode, ToolPlan, RouterResult } from '../types';
 // ---------------------------------------------------------------------------
 
 const SAFETY_PATTERNS = [
-  /\b(danger|unsafe|emergency|911|protective order|violence|threaten|harm|hurt)\b/i,
-  /\b(call.*police|restraining order|safety plan)\b/i,
+  /\b(danger|unsafe|emergency|911|violence|threaten|harm|hurt)\b/i,
+  /\b(call.*police|safety plan)\b/i,
+  // 'protective order' / 'restraining order' only trigger safety when paired
+  // with imminent-risk words — otherwise they route to local_procedure
+  /\b(danger|emergency|threaten|harm|hurt|violence).{0,40}(protective order|restraining order)/i,
+  /\b(protective order|restraining order).{0,40}(danger|emergency|threaten|harm|hurt|violence)/i,
 ];
 
 const DRAFT_PATTERNS = [

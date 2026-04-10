@@ -1,10 +1,11 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { Copy, Check, Sparkle, ArrowsClockwise, PencilSimple, X, PaperPlaneRight } from '@phosphor-icons/react';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Copy, Check, Sparkle, ArrowsClockwise, PencilSimple, X, PaperPlaneRight, CaretDown, Shield, Scales, Sword, FileText, CalendarBlank, ListBullets } from '@phosphor-icons/react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import type { NexxArtifacts, LegalConfidence, JudgeSimulationResult, OppositionSimulationResult } from '@/lib/types';
 
 export type ChatTheme = 'dark' | 'light';
 
@@ -13,6 +14,8 @@ interface MessageBubbleProps {
     content: string;
     isStreaming?: boolean;
     theme?: ChatTheme;
+    /** Serialized JSON string of NexxArtifacts, attached to assistant messages. */
+    artifactsJson?: string;
     /** Called when user clicks Retry on an assistant message. */
     onRetry?: () => void;
     /** Called when user saves an edited message — passes new content. */
@@ -44,12 +47,209 @@ function ActionButton({ onClick, label, isLight, children }: ActionButtonProps) 
     );
 }
 
+// ── Artifact Sub-Components ──
+
+/** Confidence badge — colored pill with tooltip. */
+function ConfidenceBadge({ confidence, isLight }: { confidence: LegalConfidence; isLight: boolean }) {
+    const colorMap = {
+        high: { bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', text: 'text-emerald-600', dot: 'bg-emerald-500' },
+        moderate: { bg: 'bg-amber-500/15', border: 'border-amber-500/30', text: 'text-amber-600', dot: 'bg-amber-500' },
+        low: { bg: 'bg-red-500/15', border: 'border-red-500/30', text: 'text-red-500', dot: 'bg-red-500' },
+    };
+    const c = colorMap[confidence.confidence];
+    const [showTooltip, setShowTooltip] = useState(false);
+
+    return (
+        <div className="relative inline-block">
+            <button
+                onClick={() => setShowTooltip(!showTooltip)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase border ${c.bg} ${c.border} ${c.text} transition-all hover:scale-105 cursor-pointer`}
+                aria-label={`Confidence: ${confidence.confidence}`}
+            >
+                <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+                {confidence.confidence} confidence
+            </button>
+            <AnimatePresence>
+                {showTooltip && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        className={`absolute z-30 left-0 top-full mt-2 w-72 rounded-xl p-3 text-xs shadow-lg border ${isLight
+                            ? 'bg-white border-gray-200 text-gray-700'
+                            : 'bg-[#0A1128] border-white/20 text-white/80'
+                            }`}
+                    >
+                        <p className="font-semibold mb-1">{confidence.basis}</p>
+                        <p className="opacity-70 mb-2">{confidence.evidenceSufficiency}</p>
+                        {confidence.missingSupport.length > 0 && (
+                            <div>
+                                <p className="font-semibold text-[10px] uppercase tracking-wider opacity-50 mb-1">Missing Support</p>
+                                <ul className="list-disc pl-3 space-y-0.5 opacity-70">
+                                    {confidence.missingSupport.map((item, i) => (
+                                        <li key={i}>{item}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
+/** Collapsible artifact panel with icon, label, and content. */
+function ArtifactPanel({
+    icon: Icon,
+    label,
+    isLight,
+    children,
+    defaultOpen = false,
+    accentColor = '#5A8EC9',
+}: {
+    icon: React.ComponentType<{ size?: number; weight?: 'regular' | 'fill' | 'duotone'; className?: string }>;
+    label: string;
+    isLight: boolean;
+    children: React.ReactNode;
+    defaultOpen?: boolean;
+    accentColor?: string;
+}) {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`rounded-xl border overflow-hidden mt-3 ${isLight
+                ? 'bg-gray-50 border-gray-200'
+                : 'bg-white/5 border-white/10'
+                }`}
+        >
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-colors cursor-pointer ${isLight
+                    ? 'hover:bg-gray-100 text-gray-700'
+                    : 'hover:bg-white/10 text-white/80'
+                    }`}
+            >
+                <Icon size={16} weight="duotone" className="flex-shrink-0" />
+                <span className="text-[12px] font-bold tracking-wider uppercase flex-1" style={{ color: accentColor }}>
+                    {label}
+                </span>
+                <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                    <CaretDown size={14} className="opacity-50" />
+                </motion.div>
+            </button>
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div className={`px-4 pb-3 text-[13px] leading-relaxed ${isLight ? 'text-gray-600' : 'text-white/70'}`}>
+                            {children}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </motion.div>
+    );
+}
+
+/** Score bar for judge simulation scores (1-10). */
+function ScoreBar({ label, score, isLight }: { label: string; score: number; isLight: boolean }) {
+    const pct = Math.min(Math.max(score, 0), 10) * 10;
+    const color = score >= 7 ? '#22C55E' : score >= 4 ? '#F59E0B' : '#EF4444';
+    return (
+        <div className="flex items-center gap-3 py-1">
+            <span className={`text-[11px] font-semibold w-20 ${isLight ? 'text-gray-500' : 'text-white/50'}`}>{label}</span>
+            <div className={`flex-1 h-2 rounded-full overflow-hidden ${isLight ? 'bg-gray-200' : 'bg-white/10'}`}>
+                <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                    className="h-full rounded-full"
+                    style={{ backgroundColor: color }}
+                />
+            </div>
+            <span className="text-[11px] font-bold w-6 text-right" style={{ color }}>{score}</span>
+        </div>
+    );
+}
+
+/** Render the judge simulation artifact. */
+function JudgeSimulationPanel({ data, isLight }: { data: JudgeSimulationResult; isLight: boolean }) {
+    return (
+        <>
+            <div className="space-y-1 mb-3">
+                <ScoreBar label="Credibility" score={data.credibilityScore} isLight={isLight} />
+                <ScoreBar label="Neutrality" score={data.neutralityScore} isLight={isLight} />
+                <ScoreBar label="Clarity" score={data.clarityScore} isLight={isLight} />
+            </div>
+            <p className={`text-[12px] mb-2 ${isLight ? 'text-gray-700' : 'text-white/80'}`}>
+                <strong>Court Interpretation:</strong> {data.likelyCourtInterpretation}
+            </p>
+            {data.strengths.length > 0 && (
+                <div className="mb-2">
+                    <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`}>Strengths</p>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                        {data.strengths.map((s, i) => <li key={i}>{s}</li>)}
+                    </ul>
+                </div>
+            )}
+            {data.weaknesses.length > 0 && (
+                <div className="mb-2">
+                    <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-red-500' : 'text-red-400'}`}>Weaknesses</p>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                        {data.weaknesses.map((w, i) => <li key={i}>{w}</li>)}
+                    </ul>
+                </div>
+            )}
+            {data.improvementSuggestions.length > 0 && (
+                <div>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-blue-600' : 'text-blue-400'}`}>Suggestions</p>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                        {data.improvementSuggestions.map((s, i) => <li key={i}>{s}</li>)}
+                    </ul>
+                </div>
+            )}
+        </>
+    );
+}
+
+/** Render the opposition simulation artifact. */
+function OppositionSimulationPanel({ data, isLight }: { data: OppositionSimulationResult; isLight: boolean }) {
+    const sections = [
+        { label: 'Likely Attack Points', items: data.likelyAttackPoints, color: isLight ? 'text-red-600' : 'text-red-400' },
+        { label: 'Framing Risks', items: data.framingRisks, color: isLight ? 'text-amber-600' : 'text-amber-400' },
+        { label: 'Needs Tightening', items: data.whatNeedsTightening, color: isLight ? 'text-orange-600' : 'text-orange-400' },
+        { label: 'Preemption Suggestions', items: data.preemptionSuggestions, color: isLight ? 'text-emerald-600' : 'text-emerald-400' },
+    ];
+    return (
+        <div className="space-y-3">
+            {sections.map(({ label, items, color }) => items.length > 0 && (
+                <div key={label}>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${color}`}>{label}</p>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                        {items.map((item, i) => <li key={i}>{item}</li>)}
+                    </ul>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 /** Chat message bubble with ChatGPT-style actions (copy, retry, edit) and light/dark theme support. */
 export default function MessageBubble({
     role,
     content,
     isStreaming,
     theme = 'dark',
+    artifactsJson,
     onRetry,
     onEdit,
 }: MessageBubbleProps) {
@@ -58,6 +258,25 @@ export default function MessageBubble({
     const [editContent, setEditContent] = useState(content);
     const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // Parse artifacts from serialized JSON
+    const artifacts = useMemo<NexxArtifacts | null>(() => {
+        if (!artifactsJson) return null;
+        try {
+            return JSON.parse(artifactsJson) as NexxArtifacts;
+        } catch {
+            return null;
+        }
+    }, [artifactsJson]);
+
+    const hasAnyArtifact = artifacts && (
+        artifacts.confidence ||
+        artifacts.draftReady ||
+        artifacts.timelineReady ||
+        artifacts.exhibitReady ||
+        artifacts.judgeSimulation ||
+        artifacts.oppositionSimulation
+    );
 
     useEffect(() => {
         return () => {
@@ -217,6 +436,13 @@ export default function MessageBubble({
             </div>
 
             <div className="flex-1 max-w-4xl min-w-0 pr-4">
+                {/* Confidence badge — rendered above the message */}
+                {artifacts?.confidence && (
+                    <div className="mb-2">
+                        <ConfidenceBadge confidence={artifacts.confidence} isLight={isLight} />
+                    </div>
+                )}
+
                 <div className={`text-[15px] leading-7 font-normal prose max-w-none w-full break-words ${isLight
                     ? 'text-gray-800 prose-blue'
                     : 'text-white/90 prose-invert'
@@ -225,6 +451,69 @@ export default function MessageBubble({
                         {content + (isStreaming ? ' ▍' : '')}
                     </ReactMarkdown>
                 </div>
+
+                {/* ── Artifact Panels ── */}
+                {hasAnyArtifact && !isStreaming && (
+                    <div className="mt-4 space-y-1">
+                        {artifacts.draftReady && (
+                            <ArtifactPanel icon={FileText} label="Court-Ready Draft" isLight={isLight} accentColor="#C75A5A">
+                                <div className="prose prose-sm max-w-none">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {typeof artifacts.draftReady === 'object' && 'content' in artifacts.draftReady
+                                            ? String(artifacts.draftReady.content)
+                                            : JSON.stringify(artifacts.draftReady, null, 2)}
+                                    </ReactMarkdown>
+                                </div>
+                            </ArtifactPanel>
+                        )}
+
+                        {artifacts.timelineReady && (
+                            <ArtifactPanel icon={CalendarBlank} label="Timeline" isLight={isLight} accentColor="#7C6FA0">
+                                {Array.isArray((artifacts.timelineReady as Record<string, unknown>).events) ? (
+                                    <div className="space-y-2">
+                                        {((artifacts.timelineReady as Record<string, unknown>).events as Array<Record<string, unknown>>).map((evt, i) => (
+                                            <div key={i} className={`flex gap-3 items-start py-1.5 border-l-2 pl-3 ${isLight ? 'border-purple-300' : 'border-purple-500/50'}`}>
+                                                <span className={`text-[11px] font-bold whitespace-nowrap ${isLight ? 'text-purple-600' : 'text-purple-400'}`}>{String(evt.date || '')}</span>
+                                                <span>{String(evt.description || '')}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <pre className="text-[12px] whitespace-pre-wrap">{JSON.stringify(artifacts.timelineReady, null, 2)}</pre>
+                                )}
+                            </ArtifactPanel>
+                        )}
+
+                        {artifacts.exhibitReady && (
+                            <ArtifactPanel icon={ListBullets} label="Exhibit Index" isLight={isLight} accentColor="#5A9E6F">
+                                {Array.isArray((artifacts.exhibitReady as Record<string, unknown>).exhibits) ? (
+                                    <div className="space-y-2">
+                                        {((artifacts.exhibitReady as Record<string, unknown>).exhibits as Array<Record<string, unknown>>).map((ex, i) => (
+                                            <div key={i} className={`flex gap-3 py-1 ${isLight ? 'border-b border-gray-100' : 'border-b border-white/5'}`}>
+                                                <span className={`text-[11px] font-bold whitespace-nowrap ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`}>{String(ex.label || `Ex. ${i + 1}`)}</span>
+                                                <span>{String(ex.description || '')}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <pre className="text-[12px] whitespace-pre-wrap">{JSON.stringify(artifacts.exhibitReady, null, 2)}</pre>
+                                )}
+                            </ArtifactPanel>
+                        )}
+
+                        {artifacts.judgeSimulation && (
+                            <ArtifactPanel icon={Scales} label="Judge Perspective" isLight={isLight} accentColor="#E5A84A">
+                                <JudgeSimulationPanel data={artifacts.judgeSimulation} isLight={isLight} />
+                            </ArtifactPanel>
+                        )}
+
+                        {artifacts.oppositionSimulation && (
+                            <ArtifactPanel icon={Sword} label="Opposition Analysis" isLight={isLight} accentColor="#A85050">
+                                <OppositionSimulationPanel data={artifacts.oppositionSimulation} isLight={isLight} />
+                            </ArtifactPanel>
+                        )}
+                    </div>
+                )}
 
                 {/* Assistant action bar */}
                 {!isStreaming && (

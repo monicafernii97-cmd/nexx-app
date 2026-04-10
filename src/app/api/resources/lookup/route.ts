@@ -26,18 +26,24 @@ const MAX_INPUT_LEN = 100;
  */
 const pendingLookups = new Map<string, Promise<{ resources: Record<string, unknown>; sources: string[] }>>();
 
-const RESOURCE_JSON_SCHEMA = `{
-  "courtClerk": { "name": string, "description": string, "url": string, "phone": string, "address": string } | null,
-  "courtsWebsite": { "name": string, "description": string, "url": string } | null,
-  "familyDivision": { "name": string, "description": string, "url": string, "address": string } | null,
-  "localRules": { "name": string, "description": string, "url": string } | null,
-  "stateFamilyCode": { "name": string, "description": string, "url": string } | null,
-  "legalAid": [{ "name": string, "description": string, "url": string, "phone": string }],
-  "nonprofits": [{ "name": string, "description": string, "url": string, "phone": string }],
-  "caseSearch": { "name": string, "description": string, "url": string } | null,
-  "eFilingPortal": { "name": string, "description": string, "url": string, "provider": string } | null,
-  "sources": [string]
-}`;
+/**
+ * Known eFiling vendor domains.
+ * URLs whose host doesn't match any of these are treated as unverified
+ * and suppressed to avoid sending users to hallucinated or attacker-controlled sites.
+ */
+const TRUSTED_EFILING_HOSTS = [
+    'efiletexas.gov', 'www.efiletexas.gov',
+    'odysseyfileandserve.com', 'www.odysseyfileandserve.com',
+    'fileandservexpress.com', 'www.fileandservexpress.com',
+    'turbocourt.com', 'www.turbocourt.com',
+    'mycase.com', 'www.mycase.com',
+    'odysseyefileca.tylerhost.net', 'efiling.courts.ca.gov',
+    'efile.txcourts.gov', 'www.efile.txcourts.gov',
+    'efileil.com', 'www.efileil.com',
+    'efilingportal.com', 'www.efilingportal.com',
+    'ifile.flclerks.com', 'www.ifile.flclerks.com',
+    'myflcourtaccess.com', 'www.myflcourtaccess.com',
+];
 
 /**
  * Lightweight URL health check — returns true if the URL responds with a 2xx or 3xx.
@@ -216,38 +222,59 @@ export async function POST(req: NextRequest) {
         const abortCtrl = new AbortController();
         const timeoutId = setTimeout(() => abortCtrl.abort(), 30_000);
 
-        let completion;
+        let response;
         try {
-            completion = await openai.chat.completions.create({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            response = await (openai.responses as any).create({
                 model: 'gpt-4o',
-                response_format: { type: 'json_object' },
                 temperature: 0.2,
-                messages: [
+                input: [
                     {
-                        role: 'system',
-                        content: `You are a US legal resources researcher. Return ONLY valid JSON matching this schema:\n${RESOURCE_JSON_SCHEMA}\n\nCRITICAL RULES:\n- ONLY return URLs you are CERTAIN exist and are currently active. Do NOT guess, construct, or fabricate URLs.\n- If you are not confident a specific URL exists, set the "url" field to null — do NOT invent a plausible-looking URL.\n- Prefer official government websites (.gov, .us) over third-party sites.\n- Include real phone numbers and addresses when available.\n- For "sources", list 2-4 URLs you actually referenced.\n- If a resource doesn't exist for this location, set that entire field to null.\n- For arrays (legalAid, nonprofits), include 1-3 entries each, only with verified information.\n- All URLs must be complete (https://...).\n- Descriptions should be 1-2 sentences max.\n- When unsure about a URL, it is ALWAYS better to return null than to return a wrong URL that could lead to a 404 page.`,
+                        role: 'developer',
+                        content: `You are a US legal resources researcher.\n\nCRITICAL RULES:\n- ONLY return URLs you are CERTAIN exist and are currently active. Do NOT guess, construct, or fabricate URLs.\n- If you are not confident a specific URL exists, set the "url" field to null — do NOT invent a plausible-looking URL.\n- Prefer official government websites (.gov, .us) over third-party sites.\n- Include real phone numbers and addresses when available.\n- For "sources", list 2-4 URLs you actually referenced.\n- If a resource doesn't exist for this location, set that entire field to null.\n- For arrays (legalAid, nonprofits), include 1-3 entries each, only with verified information.\n- All URLs must be complete (https://...).\n- Descriptions should be 1-2 sentences max.\n- When unsure about a URL, it is ALWAYS better to return null than to return a wrong URL that could lead to a 404 page.`,
                     },
                     {
                         role: 'user',
                         content: buildUserPrompt(normCounty, normState),
                     },
                 ],
+                text: {
+                    format: {
+                        type: 'json_schema',
+                        name: 'resources_lookup_full',
+                        strict: true,
+                        schema: {
+                            type: 'object',
+                            additionalProperties: false,
+                            properties: {
+                                courtClerk: { type: ['object', 'null'] },
+                                courtsWebsite: { type: ['object', 'null'] },
+                                familyDivision: { type: ['object', 'null'] },
+                                localRules: { type: ['object', 'null'] },
+                                stateFamilyCode: { type: ['object', 'null'] },
+                                legalAid: { type: 'array', items: { type: 'object' } },
+                                nonprofits: { type: 'array', items: { type: 'object' } },
+                                caseSearch: { type: ['object', 'null'] },
+                                eFilingPortal: { type: ['object', 'null'] },
+                                sources: { type: 'array', items: { type: 'string' } },
+                            },
+                            required: ['courtClerk', 'courtsWebsite', 'familyDivision', 'localRules',
+                                       'stateFamilyCode', 'legalAid', 'nonprofits', 'caseSearch',
+                                       'eFilingPortal', 'sources'],
+                        },
+                    },
+                },
             }, { signal: abortCtrl.signal });
         } finally {
             clearTimeout(timeoutId);
         }
 
-        const raw = completion.choices[0]?.message?.content;
+        const raw = response.output_text;
         if (!raw) throw new Error('AI returned empty response');
 
-        let parsed: Record<string, unknown>;
-        try {
-            parsed = JSON.parse(raw);
-        } catch {
-            throw new Error('AI returned invalid JSON');
-        }
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
 
-        // Extract sources array before storing resources
+        // Extract sources array
         const rawSources = parsed.sources;
         const sources = Array.isArray(rawSources)
             ? (rawSources as unknown[])
@@ -255,29 +282,26 @@ export async function POST(req: NextRequest) {
                 .map((s) => safeUrl(s))
                 .filter((s): s is string => Boolean(s))
             : [];
-        if (Array.isArray(rawSources) && sources.length < rawSources.length) {
-            console.warn('[Resource Lookup] Dropped malformed/unsafe source entries:', rawSources.length - sources.length);
-        }
 
-        // Build a clean resources object matching the Convex schema
-        const resources = {
-            courtClerk: parsed.courtClerk && typeof parsed.courtClerk === 'object'
-                ? sanitizeResource(parsed.courtClerk as Record<string, unknown>, true) : undefined,
-            courtsWebsite: parsed.courtsWebsite && typeof parsed.courtsWebsite === 'object'
-                ? sanitizeResourceNoAddr(parsed.courtsWebsite as Record<string, unknown>) : undefined,
-            familyDivision: parsed.familyDivision && typeof parsed.familyDivision === 'object'
-                ? sanitizeFamilyDivision(parsed.familyDivision as Record<string, unknown>) : undefined,
-            localRules: parsed.localRules && typeof parsed.localRules === 'object'
-                ? sanitizeResourceNoAddr(parsed.localRules as Record<string, unknown>) : undefined,
-            stateFamilyCode: parsed.stateFamilyCode && typeof parsed.stateFamilyCode === 'object'
-                ? sanitizeResourceNoAddr(parsed.stateFamilyCode as Record<string, unknown>) : undefined,
-            legalAid: sanitizeArray(parsed.legalAid),
-            nonprofits: sanitizeArray(parsed.nonprofits),
-            caseSearch: parsed.caseSearch && typeof parsed.caseSearch === 'object'
-                ? sanitizeResourceNoAddr(parsed.caseSearch as Record<string, unknown>) : undefined,
-            eFilingPortal: parsed.eFilingPortal && typeof parsed.eFilingPortal === 'object'
-                ? sanitizeEFilingPortal(parsed.eFilingPortal as Record<string, unknown>) : undefined,
-        };
+        // Deep-scan all URL fields for safety (schema guarantees structure, but URLs need runtime validation)
+        const resources = { ...parsed } as Record<string, unknown>;
+        delete resources.sources;
+
+        // Verify eFiling portal against trusted hosts
+        if (resources.eFilingPortal && typeof resources.eFilingPortal === 'object') {
+            const portal = resources.eFilingPortal as Record<string, unknown>;
+            if (typeof portal.url === 'string') {
+                try {
+                    const host = new URL(portal.url).hostname.toLowerCase();
+                    if (!TRUSTED_EFILING_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) {
+                        console.warn(`[Resource Lookup] eFiling portal URL host "${host}" is not on the trusted vendor list — suppressing`);
+                        portal.url = undefined;
+                    }
+                } catch {
+                    portal.url = undefined;
+                }
+            }
+        }
 
         // ── Validate URLs before caching ──
         const validatedResources = await validateResourceUrls(resources, normCounty, normState);
@@ -330,13 +354,7 @@ function buildUserPrompt(
     return prompt;
 }
 
-// ── Sanitization helpers ──
-
-/** Extract string fields from an AI response object, filtering out non-strings. */
-function str(obj: Record<string, unknown>, key: string): string | undefined {
-    const val = obj[key];
-    return typeof val === 'string' && val.trim() ? val.trim() : undefined;
-}
+// ── URL safety ──
 
 /** Validate URL is http(s) only — defense-in-depth against malicious AI URLs. */
 function safeUrl(url: string | undefined): string | undefined {
@@ -347,116 +365,4 @@ function safeUrl(url: string | undefined): string | undefined {
     } catch {
         return undefined;
     }
-}
-
-/** Sanitize a full resource entry (with address). */
-function sanitizeResource(obj: Record<string, unknown>, includeAddress: boolean) {
-    const name = str(obj, 'name');
-    if (!name) return undefined;
-    return {
-        name,
-        description: str(obj, 'description'),
-        url: safeUrl(str(obj, 'url')),
-        phone: str(obj, 'phone'),
-        ...(includeAddress ? { address: str(obj, 'address') } : {}),
-    };
-}
-
-/** Sanitize a resource entry without address. */
-function sanitizeResourceNoAddr(obj: Record<string, unknown>) {
-    const name = str(obj, 'name');
-    if (!name) return undefined;
-    return {
-        name,
-        description: str(obj, 'description'),
-        url: safeUrl(str(obj, 'url')),
-    };
-}
-
-/**
- * Known eFiling vendor domains.
- * URLs whose host doesn't match any of these are treated as unverified
- * and suppressed (the CTA won't render) to avoid sending users to
- * hallucinated or attacker-controlled sites.
- */
-const TRUSTED_EFILING_HOSTS = [
-    'efiletexas.gov',
-    'www.efiletexas.gov',
-    'odysseyfileandserve.com',
-    'www.odysseyfileandserve.com',
-    'fileandservexpress.com',
-    'www.fileandservexpress.com',
-    'turbocourt.com',
-    'www.turbocourt.com',
-    'mycase.com',
-    'www.mycase.com',
-    'odysseyefileca.tylerhost.net',
-    'efiling.courts.ca.gov',
-    'efile.txcourts.gov',
-    'www.efile.txcourts.gov',
-    'efileil.com',
-    'www.efileil.com',
-    'efilingportal.com',
-    'www.efilingportal.com',
-    'ifile.flclerks.com',
-    'www.ifile.flclerks.com',
-    'myflcourtaccess.com',
-    'www.myflcourtaccess.com',
-];
-
-/** Sanitize an eFiling portal entry — verify URL against known vendor domains. */
-function sanitizeEFilingPortal(obj: Record<string, unknown>) {
-    const name = str(obj, 'name');
-    if (!name) return undefined;
-
-    let verifiedUrl = safeUrl(str(obj, 'url'));
-    if (verifiedUrl) {
-        try {
-            const host = new URL(verifiedUrl).hostname.toLowerCase();
-            if (!TRUSTED_EFILING_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) {
-                console.warn(`[Resource Lookup] eFiling portal URL host "${host}" is not on the trusted vendor list — suppressing CTA`);
-                verifiedUrl = undefined;
-            }
-        } catch {
-            verifiedUrl = undefined;
-        }
-    }
-
-    return {
-        name,
-        description: str(obj, 'description'),
-        url: verifiedUrl,
-        provider: str(obj, 'provider'),
-    };
-}
-
-/** Sanitize a family division entry (with address but no phone). */
-function sanitizeFamilyDivision(obj: Record<string, unknown>) {
-    const name = str(obj, 'name');
-    if (!name) return undefined;
-    return {
-        name,
-        description: str(obj, 'description'),
-        url: safeUrl(str(obj, 'url')),
-        address: str(obj, 'address'),
-    };
-}
-
-/** Sanitize an array of resource entries from the AI response. */
-function sanitizeArray(raw: unknown): { name: string; description?: string; url?: string; phone?: string }[] | undefined {
-    if (!Array.isArray(raw)) return undefined;
-    const result = raw
-        .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
-        .map((item) => {
-            const name = str(item, 'name');
-            if (!name) return null;
-            return {
-                name,
-                description: str(item, 'description'),
-                url: safeUrl(str(item, 'url')),
-                phone: str(item, 'phone'),
-            };
-        })
-        .filter((item): item is NonNullable<typeof item> => item !== null);
-    return result.length > 0 ? result : undefined;
 }

@@ -123,12 +123,42 @@ export async function POST(request: NextRequest) {
     // ── 4. Determine document title ──
     const titleText = template.sections.find(s => s.type === 'title')?.title ?? template.title;
 
+    // ── 4b. AI drafting — generate content when bodyContent is empty ──
+    let bodyContent = body.bodyContent ?? [];
+    if (bodyContent.length === 0) {
+      try {
+        const { generateDraftContent } = await import('@/lib/nexx/documentDrafter');
+        const sectionIds = template.sections
+          .filter(s => s.type !== 'title' && s.type !== 'signature_block' && s.type !== 'caption')
+          .map(s => s.id || s.type);
+
+        const drafted = await generateDraftContent({
+          templateId: body.templateId,
+          templateName: template.title,
+          sections: sectionIds,
+          courtRules: rules as unknown as Record<string, unknown>,
+        });
+
+        // Transform drafter output to GeneratedSection format
+        bodyContent = drafted.map(d => ({
+          sectionId: d.sectionId,
+          sectionType: 'body_sections' as const,
+          heading: d.heading,
+          content: d.body,
+          numberedItems: d.numberedItems,
+        }));
+        console.log(`[DocuVault] AI drafted ${bodyContent.length} sections for template "${body.templateId}"`);
+      } catch (draftError) {
+        console.error('[DocuVault] AI drafting failed, proceeding with empty content:', draftError);
+      }
+    }
+
     // ── 5. Render HTML ──
     const html = renderDocumentHTML({
       template,
       caption,
       titleText: titleText.toUpperCase(),
-      bodyContent: body.bodyContent ?? [],
+      bodyContent,
       petitioner: body.petitioner,
       respondentName: body.respondent?.name,
       exhibits: body.exhibits,

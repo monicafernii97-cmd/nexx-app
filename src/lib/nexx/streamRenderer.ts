@@ -2,10 +2,139 @@
  * Stream Renderer — client-side accumulator for streaming responses.
  * 
  * Phase 1: Non-streaming (structured output requires full response).
- * Phase 2: Will support streaming with [[NEXX_FINAL_REWRITE_START]] markers.
+ * Phase 2: Streaming hybrid with [[NEXX_FINAL_REWRITE_START]] markers.
+ * 
+ * The hybrid approach:
+ * 1. Model streams natural prose as a "draft" (shown live to user)
+ * 2. Server completes recovery/validation/suppression on the full response
+ * 3. Server sends [[NEXX_FINAL_REWRITE_START]] + polished JSON + [[NEXX_FINAL_REWRITE_END]]
+ * 4. Client swaps draft text with polished final + renders artifacts
  */
 
-import type { NexxAssistantResponse } from '../types';
+import type { NexxAssistantResponse, NexxArtifacts } from '../types';
+
+// ---------------------------------------------------------------------------
+// Markers — must match the chat API route
+// ---------------------------------------------------------------------------
+
+export const FINAL_REWRITE_START = '[[NEXX_FINAL_REWRITE_START]]';
+export const FINAL_REWRITE_END = '[[NEXX_FINAL_REWRITE_END]]';
+
+// ---------------------------------------------------------------------------
+// Stream State
+// ---------------------------------------------------------------------------
+
+export interface StreamState {
+  /** Live draft text being accumulated from stream chunks. */
+  liveText: string;
+  /** Final polished text (set after rewrite marker is received). */
+  finalText: string | null;
+  /** Parsed artifacts from the final rewrite. */
+  artifacts: NexxArtifacts | null;
+  /** Whether the final rewrite has been received and parsed. */
+  isFinal: boolean;
+  /** Raw rewrite buffer (internal — used during marker accumulation). */
+  _rewriteBuffer: string;
+  /** Whether we're inside the rewrite markers. */
+  _inRewrite: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Accumulator
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a new stream accumulator for managing a streaming response.
+ * Call `pushChunk()` for each SSE/stream chunk, then read state.
+ */
+export function createStreamAccumulator(): StreamState {
+  return {
+    liveText: '',
+    finalText: null,
+    artifacts: null,
+    isFinal: false,
+    _rewriteBuffer: '',
+    _inRewrite: false,
+  };
+}
+
+/**
+ * Push a new chunk into the accumulator.
+ * Detects [[NEXX_FINAL_REWRITE_START]] / [[NEXX_FINAL_REWRITE_END]] markers
+ * and transitions from draft to final state.
+ * 
+ * Returns a NEW state object (immutable pattern for React).
+ */
+export function pushChunk(state: StreamState, chunk: string): StreamState {
+  const next = { ...state };
+
+  // If we've already finalized, ignore further chunks
+  if (next.isFinal) return next;
+
+  // Append chunk to the appropriate buffer
+  if (next._inRewrite) {
+    next._rewriteBuffer += chunk;
+
+    // Check if we've received the end marker
+    const endIdx = next._rewriteBuffer.indexOf(FINAL_REWRITE_END);
+    if (endIdx !== -1) {
+      const rewriteJson = next._rewriteBuffer.slice(0, endIdx).trim();
+      try {
+        const parsed = JSON.parse(rewriteJson) as NexxAssistantResponse;
+        next.finalText = parsed.message;
+        next.artifacts = parsed.artifacts;
+        next.isFinal = true;
+      } catch {
+        // Parse failed — treat the raw rewrite as final text
+        next.finalText = rewriteJson;
+        next.isFinal = true;
+      }
+    }
+  } else {
+    // Accumulate draft text, checking for start marker
+    const combined = next.liveText + chunk;
+    const startIdx = combined.indexOf(FINAL_REWRITE_START);
+
+    if (startIdx !== -1) {
+      // Everything before the marker is draft text
+      next.liveText = combined.slice(0, startIdx);
+      // Everything after is the beginning of the rewrite
+      next._rewriteBuffer = combined.slice(startIdx + FINAL_REWRITE_START.length);
+      next._inRewrite = true;
+
+      // Check if end marker is already in the buffer (small responses)
+      const endIdx = next._rewriteBuffer.indexOf(FINAL_REWRITE_END);
+      if (endIdx !== -1) {
+        const rewriteJson = next._rewriteBuffer.slice(0, endIdx).trim();
+        try {
+          const parsed = JSON.parse(rewriteJson) as NexxAssistantResponse;
+          next.finalText = parsed.message;
+          next.artifacts = parsed.artifacts;
+          next.isFinal = true;
+        } catch {
+          next.finalText = rewriteJson;
+          next.isFinal = true;
+        }
+      }
+    } else {
+      next.liveText = combined;
+    }
+  }
+
+  return next;
+}
+
+/**
+ * Get the text that should be rendered in the UI.
+ * Returns final polished text when available, live draft otherwise.
+ */
+export function getRenderableText(state: StreamState): string {
+  return state.isFinal ? (state.finalText ?? state.liveText) : state.liveText;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 helpers (non-streaming)
+// ---------------------------------------------------------------------------
 
 /**
  * Parse a non-streaming response from the chat API.

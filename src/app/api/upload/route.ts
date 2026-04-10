@@ -251,7 +251,11 @@ export async function POST(req: NextRequest) {
 
       // Clean up orphaned standalone store if we created one
       if (createdStandaloneStoreId) {
-        await deleteVectorStore(createdStandaloneStoreId);
+        try {
+          await deleteVectorStore(createdStandaloneStoreId);
+        } catch (cleanupErr) {
+          console.error('[Upload] Failed to clean up standalone store:', cleanupErr);
+        }
       }
 
       throw error;

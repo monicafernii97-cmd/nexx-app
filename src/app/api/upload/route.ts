@@ -72,18 +72,16 @@ export async function POST(req: NextRequest) {
     const file = fileEntry;
     const conversationId = conversationEntry;
 
-    // Validate file type
+    // Validate file type (OpenAI File Search supported formats only)
     const allowedTypes = [
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
-      'image/jpeg',
-      'image/png',
     ];
     if (!allowedTypes.includes(file.type)) {
       return Response.json(
-        { error: 'Unsupported file type. Please upload PDF, DOCX, TXT, JPG, or PNG.' },
+        { error: 'Unsupported file type. Please upload PDF, DOC, DOCX, or TXT.' },
         { status: 400 }
       );
     }
@@ -164,7 +162,11 @@ export async function POST(req: NextRequest) {
               candidateId: externalStoreId,
             });
           } catch (casErr) {
-            await deleteVectorStore(externalStoreId);
+            try {
+              await deleteVectorStore(externalStoreId);
+            } catch (cleanupErr) {
+              console.error('[Upload] Failed to clean up orphaned store after CAS failure:', cleanupErr);
+            }
             throw casErr;
           }
 
@@ -174,7 +176,11 @@ export async function POST(req: NextRequest) {
           } else {
             // Another thread won — use the winner's store, delete our orphan
             vectorStoreId = result.vectorStoreId;
-            await deleteVectorStore(externalStoreId);
+            try {
+              await deleteVectorStore(externalStoreId);
+            } catch (cleanupErr) {
+              console.error('[Upload] Failed to clean up race-loser store:', cleanupErr);
+            }
           }
         }
       }

@@ -8,6 +8,8 @@ import type { Id } from '@convex/_generated/dataModel';
 
 export const maxDuration = 60;
 
+const MAX_PARSE_INPUT_CHARS = 8000;
+
 /**
  * File Upload API Route
  * 
@@ -54,7 +56,10 @@ export async function POST(req: NextRequest) {
     }
 
     const convex = await getAuthenticatedConvexClient();
-    const typedConversationId = conversationId as Id<'conversations'> | undefined;
+    // Normalize null → undefined so Convex v.optional() validation passes
+    const typedConversationId = conversationId
+      ? (conversationId as Id<'conversations'>)
+      : undefined;
 
     // Create Convex record — auth derived from JWT on the ConvexHttpClient
     const fileRecordId = await convex.mutation(api.uploadedFiles.create, {
@@ -73,7 +78,8 @@ export async function POST(req: NextRequest) {
       }
 
       if (!vectorStoreId) {
-        vectorStoreId = await createVectorStore(`nexx-${conversationId || userId}`);
+        // Use opaque name — don't leak internal IDs to the external provider
+        vectorStoreId = await createVectorStore(`nexx-vs-${crypto.randomUUID()}`);
         // Persist vector store ID to conversation (auth derived from JWT)
         if (typedConversationId) {
           await convex.mutation(api.conversations.setVectorStoreId, {
@@ -83,19 +89,25 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Parse document for metadata (text files only)
+      // Parse document for metadata (text files only, bounded to parser limit)
       let metadata: Record<string, string> = { source: 'user_upload' };
       if (file.type === 'text/plain' || file.type === 'application/pdf') {
         try {
           const text = await file.text();
-          const parsed = await parseLegalDocument({ filename: file.name, text });
+          // Truncate to parser limit so large documents degrade gracefully
+          // instead of silently skipping metadata extraction entirely
+          const parseInput = text.length > MAX_PARSE_INPUT_CHARS
+            ? text.slice(0, MAX_PARSE_INPUT_CHARS)
+            : text;
+          const parsed = await parseLegalDocument({ filename: file.name, text: parseInput });
           // Build full metadata for Convex, then strip internal IDs before
           // sending to the external vector store provider
           const fullMetadata = buildDocumentMetadata(parsed, userId, conversationId ?? undefined);
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { userId: _uid, conversationId: _cid, ...safeMetadata } = fullMetadata;
           metadata = safeMetadata;
-        } catch {
+        } catch (err) {
+          console.warn('[Upload] Metadata extraction failed:', err);
           // Non-fatal — upload without metadata
         }
       }

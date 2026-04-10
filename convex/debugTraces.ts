@@ -22,6 +22,10 @@ export const create = mutation({
     handler: async (ctx, args) => {
         // Server-derived auth
         const user = await getAuthenticatedUser(ctx);
+        if (!user.clerkId) {
+            throw new Error('Authenticated user is missing clerkId');
+        }
+        const clerkUserId = user.clerkId;
 
         // Verify conversation ownership if provided
         if (args.conversationId) {
@@ -32,7 +36,7 @@ export const create = mutation({
             traceId: args.traceId,
             route: args.route,
             routeMode: args.routeMode,
-            clerkUserId: user.clerkId ?? '',
+            clerkUserId,
             conversationId: args.conversationId,
             debugJson: args.debugJson,
             createdAt: Date.now(),

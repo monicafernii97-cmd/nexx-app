@@ -27,6 +27,10 @@ export const create = mutation({
     handler: async (ctx, args) => {
         // Server-derived auth
         const user = await getAuthenticatedUser(ctx);
+        if (!user.clerkId) {
+            throw new Error('Authenticated user is missing clerkId');
+        }
+        const clerkUserId = user.clerkId;
 
         // Verify conversation ownership if provided
         if (args.conversationId) {
@@ -34,7 +38,7 @@ export const create = mutation({
         }
 
         return await ctx.db.insert('uploadedFiles', {
-            clerkUserId: user.clerkId ?? '',
+            clerkUserId,
             conversationId: args.conversationId,
             filename: args.filename,
             mimeType: args.mimeType,
@@ -88,10 +92,14 @@ export const getByUser = query({
     handler: async (ctx) => {
         // Server-derived auth
         const user = await getAuthenticatedUser(ctx);
+        if (!user.clerkId) {
+            throw new Error('Authenticated user is missing clerkId');
+        }
+        const clerkUserId = user.clerkId;
 
         return await ctx.db
             .query('uploadedFiles')
-            .withIndex('by_clerkUserId', (q) => q.eq('clerkUserId', user.clerkId ?? ''))
+            .withIndex('by_clerkUserId', (q) => q.eq('clerkUserId', clerkUserId))
             .order('desc')
             .collect();
     },

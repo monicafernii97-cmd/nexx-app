@@ -79,10 +79,12 @@ export async function POST(req: NextRequest) {
       message,
       conversationId,
       userContext,
+      requestId,
     } = body as {
       message?: string;
       conversationId?: string;
       userContext?: Record<string, unknown>;
+      requestId?: string;
     };
 
     if (!message || typeof message !== 'string' || message.length > MAX_MESSAGE_LENGTH) {
@@ -93,15 +95,12 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'conversationId is required' }, { status: 400 });
     }
 
-    // Derive a deterministic per-turn request ID from stable turn data
-    // so retried HTTP requests produce the same key for de-duplication.
-    const encoder = new TextEncoder();
-    const hashBuffer = await crypto.subtle.digest(
-      'SHA-256',
-      encoder.encode(`${conversationId}:${clerkUserId}:${message}`)
-    );
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const turnRequestId = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    // Use client-supplied requestId for retry de-duplication.
+    // Fall back to a fresh UUID when absent (first attempt).
+    const turnRequestId =
+      typeof requestId === 'string' && requestId.trim().length > 0
+        ? requestId
+        : crypto.randomUUID();
 
     // ── Fetch user record + tier (fail-closed) ──
     const convex = await getAuthenticatedConvexClient();

@@ -20,7 +20,7 @@ const SAFETY_PATTERNS = [
 ];
 
 const DRAFT_PATTERNS = [
-  /\b(draft|write|motion|petition|declaration|pleading|template|document)\b/i,
+  /\b(draft|write|motion|petition|declaration|pleading|template)\b/i,
   /\b(court[-\s]?ready|filing|submit.*court)\b/i,
 ];
 

@@ -275,7 +275,7 @@ async function handleCreateIncident(
     : 'other';
 
   return {
-    success: true,
+    success: false,
     data: {
       incident: {
         narrative: String(args.narrative || ''),
@@ -284,8 +284,11 @@ async function handleCreateIncident(
         time: '00:00',
         severity: 1,
       },
+      status: 'pending',
+      requires_confirmation: true,
       note: 'Incident data extracted. User can review and confirm in Incident Log.',
     },
+    error: 'Incident was staged but not yet saved. User confirmation is required before persistence.',
   };
 }
 

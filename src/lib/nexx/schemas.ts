@@ -137,7 +137,7 @@ export const COMPLIANCE_REPORT_SCHEMA = {
     type: 'object',
     additionalProperties: false,
     properties: {
-      overallStatus: { type: 'string', enum: ['compliant', 'needs_review', 'non_compliant'] },
+      overallStatus: { type: 'string', enum: ['pass', 'warning', 'fail'] },
       checks: {
         type: 'array',
         items: {
@@ -146,14 +146,15 @@ export const COMPLIANCE_REPORT_SCHEMA = {
           properties: {
             rule: { type: 'string' },
             status: { type: 'string', enum: ['pass', 'warning', 'fail'] },
-            details: { type: 'string' },
+            detail: { type: 'string' },
+            fix: { type: ['string', 'null'] },
           },
-          required: ['rule', 'status', 'details'],
+          required: ['rule', 'status', 'detail'],
         },
       },
-      recommendations: { type: 'array', items: { type: 'string' } },
+      suggestions: { type: 'array', items: { type: 'string' } },
     },
-    required: ['overallStatus', 'checks', 'recommendations'],
+    required: ['overallStatus', 'checks', 'suggestions'],
   },
 };
 

@@ -123,12 +123,152 @@ export async function POST(request: NextRequest) {
     // ── 4. Determine document title ──
     const titleText = template.sections.find(s => s.type === 'title')?.title ?? template.title;
 
+    // ── 4b. AI drafting — generate content when bodyContent is empty ──
+    let bodyContent = body.bodyContent ?? [];
+    if (bodyContent.length === 0) {
+      // Only draft section types that actually read from bodyContent.
+      // court_address and certificate_of_service are rendered structurally
+      // by templateRenderer — sending them to the drafter causes false 422s.
+      const DRAFTABLE_TYPES = new Set([
+        'introduction',
+        'body_sections',
+        'body_numbered',
+        'prayer_for_relief',
+      ]);
+
+      const draftableSections = template.sections.filter(s => DRAFTABLE_TYPES.has(s.type));
+      const sectionIds = draftableSections.map(s => s.id || s.type);
+
+      // Guard against duplicate keys before Set/Map collapse them
+      const duplicateRequestedIds = sectionIds.filter((id, index, ids) => ids.indexOf(id) !== index);
+      if (duplicateRequestedIds.length > 0) {
+        console.error('[DocuVault] Template has non-unique draft section keys:', {
+          templateId: body.templateId,
+          duplicates: [...new Set(duplicateRequestedIds)],
+        });
+        return NextResponse.json(
+          { error: 'Template configuration has ambiguous draft section IDs. Please contact support.' },
+          { status: 422 }
+        );
+      }
+
+      // If the template has no body-backed sections, continue with empty bodyContent.
+      // Structural sections (caption, title, signature, court_address, etc.) still render.
+      if (sectionIds.length > 0) {
+        const { generateDraftContent } = await import('@/lib/nexx/documentDrafter');
+
+        // Build a lookup map from template so we can derive sectionType per section
+        // Use || (not ??) to match sectionIds — treats '' the same as undefined
+        const sectionTypeByKey = new Map(
+          template.sections.map(section => [section.id || section.type, section.type] as const)
+        );
+
+        // Build minimal case context from the request body for the AI drafter
+        const caseContext: Record<string, unknown> = {
+          caseType: body.caseType,
+          petitioner: body.petitioner?.name,
+          respondent: body.respondent?.name,
+          children: body.children?.map((c: { name: string; age?: number }) => ({
+            name: c.name,
+            age: c.age,
+          })),
+          court: body.courtSettings?.courtName,
+          county: body.courtSettings?.county,
+          state: body.courtSettings?.state,
+        };
+
+        let drafted;
+        try {
+          drafted = await generateDraftContent({
+            templateId: body.templateId,
+            templateName: template.title,
+            sections: sectionIds,
+            courtRules: rules as unknown as Record<string, unknown>,
+            caseGraph: caseContext,
+          });
+        } catch (draftError) {
+          // Sanitize: only log templateId + message, not raw error with case/party data
+          const message = draftError instanceof Error ? draftError.message : 'Unknown AI drafting error';
+          console.error('[DocuVault] AI drafting failed:', { templateId: body.templateId, message });
+          return NextResponse.json(
+            { error: 'AI drafting failed. Please provide bodyContent or try again.' },
+            { status: 422 }
+          );
+        }
+
+        if (!drafted || drafted.length === 0) {
+          return NextResponse.json(
+            { error: 'AI drafting produced no sections. Please provide bodyContent or try again.' },
+            { status: 422 }
+          );
+        }
+
+        // Reject drafts containing unresolved placeholder markers
+        const PLACEHOLDER_RE = /\[FACT NEEDED:[^\[\]]+\]/i;
+        const hasPlaceholders = drafted.some(section =>
+          PLACEHOLDER_RE.test(section.heading) ||
+          PLACEHOLDER_RE.test(section.body) ||
+          (section.numberedItems?.some(item => PLACEHOLDER_RE.test(item)) ?? false)
+        );
+        if (hasPlaceholders) {
+          return NextResponse.json(
+            { error: 'AI drafting needs more case facts before a court-ready document can be generated.' },
+            { status: 422 }
+          );
+        }
+
+        // Validate drafted section IDs against what was requested
+        const requestedIds = new Set(sectionIds);
+        const unknownIds = drafted.filter(d => !requestedIds.has(d.sectionId));
+        if (unknownIds.length > 0) {
+          console.error('[DocuVault] AI drafter returned unexpected section IDs:', unknownIds.map(d => d.sectionId));
+          return NextResponse.json(
+            { error: 'AI drafting returned invalid sections. Please try again.' },
+            { status: 422 }
+          );
+        }
+
+        // Reject duplicate sectionIds — schema doesn't enforce uniqueness
+        const duplicateIds = drafted
+          .map(d => d.sectionId)
+          .filter((id, index, ids) => ids.indexOf(id) !== index);
+        if (duplicateIds.length > 0) {
+          console.error('[DocuVault] AI drafter returned duplicate section IDs:', duplicateIds);
+          return NextResponse.json(
+            { error: 'AI drafting returned duplicate sections. Please try again.' },
+            { status: 422 }
+          );
+        }
+
+        // Validate all requested sections were drafted
+        const draftedIds = new Set(drafted.map(d => d.sectionId));
+        const missingIds = sectionIds.filter(id => !draftedIds.has(id));
+        if (missingIds.length > 0) {
+          console.error('[DocuVault] AI drafter omitted sections:', missingIds);
+          return NextResponse.json(
+            { error: 'AI drafting returned incomplete sections. Please try again.' },
+            { status: 422 }
+          );
+        }
+
+        // Transform drafter output to GeneratedSection format, deriving sectionType from template
+        bodyContent = drafted.map(d => ({
+          sectionId: d.sectionId,
+          sectionType: sectionTypeByKey.get(d.sectionId) ?? 'body_sections',
+          heading: d.heading,
+          content: d.body,
+          numberedItems: d.numberedItems,
+        }));
+        console.log(`[DocuVault] AI drafted ${bodyContent.length} sections for template "${body.templateId}"`);
+      }
+    }
+
     // ── 5. Render HTML ──
     const html = renderDocumentHTML({
       template,
       caption,
       titleText: titleText.toUpperCase(),
-      bodyContent: body.bodyContent ?? [],
+      bodyContent,
       petitioner: body.petitioner,
       respondentName: body.respondent?.name,
       exhibits: body.exhibits,

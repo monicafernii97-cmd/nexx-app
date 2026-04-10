@@ -77,46 +77,6 @@ function setCache(opts: CourtRulesLookupOptions, result: CourtRulesLookupResult)
     });
 }
 
-/** Whitelist of known CourtFormattingRules fields and their expected types. */
-const KNOWN_RULES_FIELDS: Record<string, 'number' | 'string' | 'boolean' | 'string[]'> = {
-    paperWidth: 'number',
-    paperHeight: 'number',
-    marginTop: 'number',
-    marginBottom: 'number',
-    marginLeft: 'number',
-    marginRight: 'number',
-    fontFamily: 'string',
-    fontSize: 'number',
-    lineSpacing: 'number',
-    pageNumbering: 'boolean',
-    pageNumberFormat: 'string',
-    pageNumberPosition: 'string',
-    captionStyle: 'string',
-    requiresSignatureBlock: 'boolean',
-    requiresCertificateOfService: 'boolean',
-    requiresVerification: 'boolean',
-    notes: 'string[]',
-};
-
-/**
- * Validate and whitelist model JSON output against known CourtFormattingRules fields.
- * Strips unknown fields and type-mismatched values to prevent bad data from being cached.
- */
-function validateCourtFormattingRules(raw: Record<string, unknown>): Partial<CourtFormattingRules> {
-    const validated: Record<string, unknown> = {};
-    for (const [key, expectedType] of Object.entries(KNOWN_RULES_FIELDS)) {
-        if (!(key in raw)) continue;
-        const value = raw[key];
-        if (expectedType === 'string[]') {
-            if (Array.isArray(value) && value.every((v) => typeof v === 'string')) {
-                validated[key] = value;
-            }
-        } else if (typeof value === expectedType) {
-            validated[key] = value;
-        }
-    }
-    return validated as Partial<CourtFormattingRules>;
-}
 
 // ── GPT-4o Rules Extraction (Direct Knowledge) ──
 
@@ -209,20 +169,20 @@ async function extractRulesWithAI(
             return { rules: {}, sources: [], confidence: 0 };
         }
 
-        // Validate/whitelist known fields before computing confidence
-        const validatedRules = validateCourtFormattingRules(parsed);
+        // Schema guarantees valid types — no need for manual whitelist validation
+        const rules = parsed;
 
-        // Calculate confidence based on how many valid fields were extracted
-        const fieldCount = Object.keys(validatedRules).length;
-        const maxFields = Object.keys(KNOWN_RULES_FIELDS).length;
-        const confidence = Math.min(fieldCount / maxFields, 1.0);
+        // Calculate confidence based on how many fields were extracted.
+        // 17 = count of fields requested in EXTRACTION_PROMPT, not the full interface.
+        const EXTRACTABLE_FIELD_COUNT = 17;
+        const fieldCount = Object.keys(rules).length;
+        const confidence = Math.min(fieldCount / EXTRACTABLE_FIELD_COUNT, 1.0);
 
         // Build sources list — only include URLs we actually retrieved content from.
-        // safeLocalRulesUrl was only mentioned in the prompt, not fetched, so it's not a verified source.
         const sources: string[] = [];
 
         return {
-            rules: validatedRules,
+            rules,
             sources,
             confidence,
         };

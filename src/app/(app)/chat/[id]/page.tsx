@@ -9,7 +9,17 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Archive, Lock, Sun, Moon } from '@phosphor-icons/react';
 import MessageBubble, { type ChatTheme } from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
+import type { NexxAssistantResponse, RouteMode } from '@/lib/types';
 
+const VALID_ROUTE_MODES: readonly RouteMode[] = [
+    'adaptive_chat', 'direct_legal_answer', 'local_procedure',
+    'document_analysis', 'judge_lens_strategy', 'court_ready_drafting',
+    'pattern_analysis', 'support_grounding', 'safety_escalation',
+] as const;
+
+function isValidRouteMode(value: unknown): value is RouteMode {
+    return typeof value === 'string' && VALID_ROUTE_MODES.includes(value as RouteMode);
+}
 
 /** Premium full-screen chat interface for a single NEXX AI conversation. */
 export default function ConversationPage() {
@@ -33,6 +43,12 @@ export default function ConversationPage() {
     const [streamingContent, setStreamingContent] = useState('');
     /** Tracks an assistant reply that was streamed but failed to persist. */
     const [unsavedReply, setUnsavedReply] = useState<string | null>(null);
+    /** Tracks artifacts/mode/requestId for an unsaved reply so retry persistence restores the full message. */
+    const [unsavedResponseData, setUnsavedResponseData] = useState<{
+        requestId: string;
+        artifactsJson?: string;
+        mode?: RouteMode;
+    } | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // ── Theme state (persisted to localStorage) ──
@@ -89,16 +105,16 @@ export default function ConversationPage() {
     }), [userProfile, nexProfile]);
 
     /**
-     * Stream an AI response for a given message history.
-     * Uses a stable requestId for idempotent persistence so retries
-     * never create duplicate messages.
+     * Call the NEXX chat API and persist the response.
+     * Uses the Responses API (non-streaming structured JSON) — the API
+     * returns `{ ok, response: NexxAssistantResponse, routeMode }`.
+     * A stable requestId guarantees idempotent persistence.
      */
-    const streamAIResponse = useCallback(async (history: { role: 'user' | 'assistant'; content: string }[]) => {
+    const callChatAPI = useCallback(async (history: { role: 'user' | 'assistant'; content: string }[]) => {
         setIsStreaming(true);
         setStreamingContent('');
         setUnsavedReply(null);
 
-        let fullContent = '';
         const requestId = `${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
         try {
@@ -108,6 +124,7 @@ export default function ConversationPage() {
                 body: JSON.stringify({
                     messages: history,
                     userContext: buildUserContext(),
+                    conversationId,
                 }),
             });
 
@@ -116,51 +133,35 @@ export default function ConversationPage() {
                 throw new Error(`Failed to get AI response: ${response.status} ${errorText}`);
             }
 
-            const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
+            const data = await response.json() as {
+                ok: boolean;
+                response?: NexxAssistantResponse;
+                routeMode?: string;
+                error?: string;
+            };
 
-            if (!reader) {
-                throw new Error('Chat response did not include a readable stream');
+            if (!data.ok || !data.response) {
+                throw new Error(data.error || 'Unknown error from chat API');
             }
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                const chunk = decoder.decode(value, { stream: true });
-                fullContent += chunk;
-                setStreamingContent(fullContent);
-            }
-            fullContent += decoder.decode();
+            const fullContent = data.response.message;
+            const artifactsJson = JSON.stringify(data.response.artifacts);
+            const mode = isValidRouteMode(data.routeMode) ? data.routeMode : undefined;
             setStreamingContent(fullContent);
-        } catch (error) {
-            console.error('Streaming error:', error);
-            if (!fullContent) {
-                await sendMessage({
-                    conversationId,
-                    role: 'assistant',
-                    content: "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.",
-                }).catch(() => {});
-                setStreamingContent('');
-            } else {
-                // Partial content: mark as unsaved so user can see and we block new sends
-                setUnsavedReply(fullContent);
-            }
-            return;
-        } finally {
-            setIsStreaming(false);
-        }
 
-        // Persist with idempotent requestId — safe to retry without duplicates
-        if (fullContent) {
+            // Persist the assistant response with artifacts
             try {
                 await sendMessage({
                     conversationId,
                     role: 'assistant',
                     content: fullContent,
                     requestId,
+                    artifactsJson,
+                    mode,
                 });
                 setStreamingContent('');
                 setUnsavedReply(null);
+                setUnsavedResponseData(null);
             } catch (persistError) {
                 console.error('Failed to persist AI response:', persistError);
                 try {
@@ -170,17 +171,39 @@ export default function ConversationPage() {
                         role: 'assistant',
                         content: fullContent,
                         requestId,
+                        artifactsJson,
+                        mode,
                     });
                     setStreamingContent('');
                     setUnsavedReply(null);
+                    setUnsavedResponseData(null);
                 } catch {
                     // Mark as unsaved — blocks new sends until resolved
                     setUnsavedReply(fullContent);
+                    setUnsavedResponseData({ requestId, artifactsJson, mode });
                     console.error('Retry persistence also failed — response preserved in UI for manual copy');
                 }
             }
-        } else {
-            setStreamingContent('');
+        } catch (error) {
+            console.error('Chat API error:', error);
+            const fallbackContent = "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.";
+            try {
+                await sendMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: fallbackContent,
+                });
+                setStreamingContent('');
+                setUnsavedReply(null);
+                setUnsavedResponseData(null);
+            } catch {
+                // Fallback persistence failed — preserve for retry
+                setUnsavedReply(fallbackContent);
+                setUnsavedResponseData({ requestId });
+                setStreamingContent(fallbackContent);
+            }
+        } finally {
+            setIsStreaming(false);
         }
     }, [conversationId, sendMessage, buildUserContext]);
 
@@ -204,14 +227,14 @@ export default function ConversationPage() {
                 }));
                 history.push({ role: 'user', content: input });
 
-                await streamAIResponse(history);
+                await callChatAPI(history);
             } catch (error) {
                 console.error('Send error:', error);
             } finally {
                 setIsPending(false);
             }
         },
-        [conversationId, messages, sendMessage, isStreaming, isPending, isThreadReady, unsavedReply, streamAIResponse]
+        [conversationId, messages, sendMessage, isStreaming, isPending, isThreadReady, unsavedReply, callChatAPI]
     );
 
     /**
@@ -229,14 +252,14 @@ export default function ConversationPage() {
                     targetMessageId: assistantMessageId,
                 });
 
-                await streamAIResponse(history);
+                await callChatAPI(history);
             } catch (error) {
                 console.error('Retry error:', error);
             } finally {
                 setIsPending(false);
             }
         },
-        [conversationId, messages, isStreaming, isPending, prepareRegenerate, streamAIResponse]
+        [conversationId, messages, isStreaming, isPending, prepareRegenerate, callChatAPI]
     );
 
     /**
@@ -255,37 +278,42 @@ export default function ConversationPage() {
                     newContent,
                 });
 
-                await streamAIResponse(history);
+                await callChatAPI(history);
             } catch (error) {
                 console.error('Edit error:', error);
             } finally {
                 setIsPending(false);
             }
         },
-        [conversationId, messages, isStreaming, isPending, prepareRegenerate, streamAIResponse]
+        [conversationId, messages, isStreaming, isPending, prepareRegenerate, callChatAPI]
     );
 
     /** Dismiss an unsaved reply, clearing it from the UI. */
     const handleDismissUnsaved = useCallback(() => {
         setUnsavedReply(null);
+        setUnsavedResponseData(null);
         setStreamingContent('');
     }, []);
 
-    /** Retry persisting the unsaved reply. */
+    /** Retry persisting the unsaved reply with full artifacts, mode, and requestId. */
     const handleRetryPersist = useCallback(async () => {
-        if (!unsavedReply) return;
+        if (!unsavedReply || !unsavedResponseData?.requestId) return;
         try {
             await sendMessage({
                 conversationId,
                 role: 'assistant',
                 content: unsavedReply,
+                requestId: unsavedResponseData.requestId,
+                artifactsJson: unsavedResponseData.artifactsJson,
+                mode: unsavedResponseData.mode,
             });
             setUnsavedReply(null);
+            setUnsavedResponseData(null);
             setStreamingContent('');
         } catch {
             console.error('Retry persistence failed again');
         }
-    }, [unsavedReply, conversationId, sendMessage]);
+    }, [unsavedReply, unsavedResponseData, conversationId, sendMessage]);
 
     // Early return AFTER all hooks
     if (!isValidId) return null;
@@ -405,6 +433,7 @@ export default function ConversationPage() {
                         role={msg.role}
                         content={msg.content}
                         theme={theme}
+                        artifactsJson={msg.artifactsJson}
                         onRetry={
                             msg.role === 'assistant' && !isStreaming && !isPending && !unsavedReply
                                 ? () => {
@@ -439,6 +468,7 @@ export default function ConversationPage() {
                         content={streamingContent}
                         isStreaming={isStreaming}
                         theme={theme}
+                        artifactsJson={unsavedResponseData?.artifactsJson}
                     />
                 )}
 

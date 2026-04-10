@@ -1,6 +1,20 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { getAuthenticatedUserAndConversation } from './lib/auth';
+
+/** Shared validator for route mode — used by both `send` and `createMessage`. */
+const routeModeValidator = v.union(
+    v.literal('adaptive_chat'),
+    v.literal('direct_legal_answer'),
+    v.literal('local_procedure'),
+    v.literal('document_analysis'),
+    v.literal('judge_lens_strategy'),
+    v.literal('court_ready_drafting'),
+    v.literal('pattern_analysis'),
+    v.literal('support_grounding'),
+    v.literal('safety_escalation')
+);
+
 /** ── Mutations ── */
 
 /**
@@ -16,6 +30,8 @@ export const send = mutation({
         content: v.string(),
         metadata: v.optional(v.any()),
         requestId: v.optional(v.string()),
+        artifactsJson: v.optional(v.string()),
+        mode: v.optional(routeModeValidator),
     },
     handler: async (ctx, args) => {
         await getAuthenticatedUserAndConversation(ctx, args.conversationId);
@@ -37,6 +53,8 @@ export const send = mutation({
             content: args.content,
             metadata: args.metadata,
             requestId: args.requestId,
+            artifactsJson: args.artifactsJson,
+            mode: args.mode,
             createdAt: Date.now(),
         });
 
@@ -224,17 +242,7 @@ export const createMessage = mutation({
         role: v.union(v.literal('user'), v.literal('assistant')),
         content: v.string(),
         metadata: v.optional(v.any()),
-        mode: v.optional(v.union(
-            v.literal('adaptive_chat'),
-            v.literal('direct_legal_answer'),
-            v.literal('local_procedure'),
-            v.literal('document_analysis'),
-            v.literal('judge_lens_strategy'),
-            v.literal('court_ready_drafting'),
-            v.literal('pattern_analysis'),
-            v.literal('support_grounding'),
-            v.literal('safety_escalation')
-        )),
+        mode: v.optional(routeModeValidator),
         artifactsJson: v.optional(v.string()),
         requestId: v.optional(v.string()),
     },

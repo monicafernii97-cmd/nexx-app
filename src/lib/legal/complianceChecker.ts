@@ -42,6 +42,7 @@ export async function checkDocumentCompliance(
   }
   try {
     const { default: OpenAI } = await import('openai');
+    const { COMPLIANCE_REPORT_SCHEMA } = await import('../nexx/schemas');
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -50,56 +51,38 @@ export async function checkDocumentCompliance(
     // Build the compliance rules checklist for the prompt
     const rulesChecklist = buildRulesChecklist(rules, countyInfo);
 
-    // Send the PDF as a file input to GPT-4o Vision
-    const response = await openai.chat.completions.create({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await (openai.responses as any).create({
       model: 'gpt-4o',
-      messages: [
+      temperature: 0.1,
+      input: [
         {
-          role: 'system',
-          content: `You are a legal document formatting compliance checker. You analyze legal documents and verify they meet specific court formatting requirements. Return your analysis as valid JSON only, no markdown.`,
+          role: 'developer',
+          content: `You are a legal document formatting compliance checker. You analyze legal documents and verify they meet specific court formatting requirements.`,
         },
         {
           role: 'user',
           content: [
             {
-              type: 'file',
-              file: {
-                filename: 'document.pdf',
-                file_data: `data:application/pdf;base64,${pdfBase64}`,
-              },
-            } as never, // type: 'file' is valid but not in all TS typings yet
+              type: 'input_file',
+              filename: 'document.pdf',
+              file_data: `data:application/pdf;base64,${pdfBase64}`,
+            },
             {
-              type: 'text',
+              type: 'input_text',
               text: `Analyze this legal document and verify it meets ALL of the following court formatting requirements. For each rule, determine if the document passes, has a warning, or fails.
 
 ${rulesChecklist}
-
-Return ONLY a JSON object with this exact structure:
-{
-  "overallStatus": "pass" | "warning" | "fail",
-  "checks": [
-    {
-      "rule": "Rule Name",
-      "status": "pass" | "warning" | "fail",
-      "detail": "What you observed",
-      "fix": "How to fix it (only if warning or fail)"
-    }
-  ],
-  "suggestions": ["Any additional suggestions for improving the document"]
-}
 
 Be thorough but practical. Minor deviations that don't affect court acceptance should be "warning" not "fail". Missing required sections should be "fail".`,
             },
           ],
         },
       ],
-      response_format: { type: 'json_object' },
-      max_tokens: 2000,
-      temperature: 0.1,
+      text: { format: COMPLIANCE_REPORT_SCHEMA },
     });
 
-    // Parse the response
-    const content = response.choices[0]?.message?.content;
+    const content = response.output_text;
     if (!content) {
       return {
         overallStatus: 'warning',
@@ -115,14 +98,8 @@ Be thorough but practical. Minor deviations that don't affect court acceptance s
       };
     }
 
-    const result = JSON.parse(content) as ComplianceReport;
-
-    // Validate the structure
-    if (!result.overallStatus || !Array.isArray(result.checks)) {
-      throw new Error('Invalid response structure');
-    }
-
-    return result;
+    // Schema guarantees valid structure — no manual validation needed
+    return JSON.parse(content) as ComplianceReport;
   } catch (error) {
     // Graceful fallback for any error: network, auth, rate-limit, parse, etc.
     console.error('[Compliance Check Error]', error instanceof Error ? error.message : error);

@@ -8,7 +8,7 @@
 import { openai } from '../openaiConversation';
 import { TEMPLATE_DRAFT_PLAN_SCHEMA, DOCUMENT_DRAFT_SCHEMA } from './schemas';
 import type { TemplateDraftPlan } from '../types';
-import type { CaseGraph } from './caseGraph';
+
 
 /**
  * Generate a draft plan for a template.
@@ -18,7 +18,7 @@ export async function generateDraftPlan(args: {
   templateId: string;
   templateName: string;
   templateSections: string[];
-  caseGraph?: CaseGraph;
+  caseGraph?: Record<string, unknown>;
   userContext?: Record<string, unknown>;
 }): Promise<TemplateDraftPlan> {
   const contextInfo = args.caseGraph
@@ -74,7 +74,7 @@ export async function generateDraftContent(args: {
   templateId: string;
   templateName: string;
   sections: string[];
-  caseGraph?: CaseGraph;
+  caseGraph?: Record<string, unknown>;
   courtRules?: Record<string, unknown>;
 }): Promise<Array<{ sectionId: string; heading: string; body: string; numberedItems?: string[] }>> {
   const contextParts: string[] = [];

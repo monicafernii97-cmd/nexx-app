@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useId } from 'react';
-import { PaperPlaneRight, Microphone, MicrophoneSlash } from '@phosphor-icons/react';
+import { PaperPlaneRight, Microphone, MicrophoneSlash, Paperclip, X } from '@phosphor-icons/react';
 
 /** Augmented window type for vendor-prefixed SpeechRecognition. */
 type SpeechRecognitionCtor = new () => SpeechRecognition;
 
 interface ChatInputProps {
-    onSend: (message: string) => void;
+    onSend: (message: string, file?: File) => void;
     disabled?: boolean;
     placeholder?: string;
 }
@@ -17,10 +17,13 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
     const [input, setInput] = useState('');
     const [isListening, setIsListening] = useState(false);
     const [micError, setMicError] = useState<string | null>(null);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
     // Client-only: avoids hydration mismatch since server has no SpeechRecognition
     const [isSpeechSupported, setIsSpeechSupported] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     // Single source of truth for the current input value, readable from callbacks
     const inputRef = useRef('');
     // Text that existed before the current dictation session started
@@ -185,11 +188,89 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         }
     }, [isListening, getSpeechRecognition, updateInput]);
 
+    // ── File attachment handler ──
+    const handleFileSelect = useCallback(() => {
+        fileInputRef.current?.click();
+    }, []);
+
+    const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const allowedTypes = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain',
+            'image/jpeg',
+            'image/png',
+        ];
+
+        if (!allowedTypes.includes(file.type)) {
+            setMicError('Unsupported file type. Upload PDF, DOCX, TXT, JPG, or PNG.');
+            return;
+        }
+
+        if (file.size > 25 * 1024 * 1024) {
+            setMicError('File too large. Maximum size is 25MB.');
+            return;
+        }
+
+        setSelectedFile(file);
+        setMicError(null);
+
+        // Reset the input so the same file can be re-selected
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }, []);
+
+    const removeFile = useCallback(() => {
+        setSelectedFile(null);
+    }, []);
+
+    const handleSendWithFile = useCallback(() => {
+        const trimmed = input.trim();
+        if (!trimmed && !selectedFile) return;
+        if (disabled || isUploading) return;
+
+        if (isListening) stopRecognition();
+        onSend(trimmed || (selectedFile ? `Analyze this file: ${selectedFile.name}` : ''), selectedFile ?? undefined);
+        updateInput('');
+        setSelectedFile(null);
+    }, [input, selectedFile, disabled, isUploading, isListening, stopRecognition, onSend, updateInput]);
+
     const baseId = useId();
     const micErrorId = micError ? `${baseId}-mic-error` : undefined;
 
     return (
         <div className="relative">
+            {/* File attachment chip */}
+            {selectedFile && (
+                <div className="flex items-center gap-2 px-4 py-2 mb-2 bg-blue-50 rounded-xl animate-in fade-in slide-in-from-bottom-2">
+                    <Paperclip size={14} className="text-blue-500 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-blue-700 truncate max-w-[200px]">
+                        {selectedFile.name}
+                    </span>
+                    <span className="text-[10px] text-blue-400">
+                        {(selectedFile.size / 1024).toFixed(0)}KB
+                    </span>
+                    <button
+                        type="button"
+                        onClick={removeFile}
+                        className="ml-auto w-5 h-5 rounded-full bg-blue-100 hover:bg-blue-200 flex items-center justify-center transition-colors"
+                        aria-label="Remove attached file"
+                    >
+                        <X size={10} weight="bold" className="text-blue-600" />
+                    </button>
+                </div>
+            )}
+            {/* Hidden file input */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                onChange={handleFileChange}
+            />
             <div
                 className={`flex items-end gap-3 rounded-[1.5rem] p-3 bg-white shadow-[0_4px_24px_rgba(208,227,255,0.4)] border transition-all focus-within:ring-2 focus-within:ring-champagne/30 ${
                     isListening ? 'border-red-300 ring-2 ring-red-200/50' : 'border-white'
@@ -215,6 +296,21 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                     }}
                 />
                 <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* File attachment button */}
+                    <button
+                        type="button"
+                        onClick={handleFileSelect}
+                        disabled={disabled || isUploading}
+                        className={`w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer ${
+                            selectedFile
+                                ? 'bg-blue-100 text-blue-600'
+                                : 'bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#0A1128]/50 hover:text-[#0A1128]'
+                        }`}
+                        title="Attach a file"
+                        aria-label="Attach a file"
+                    >
+                        <Paperclip size={18} weight="duotone" />
+                    </button>
                     <button
                         type="button"
                         onClick={toggleListening}
@@ -252,16 +348,16 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                     </button>
                     <button
                         type="button"
-                        onClick={handleSend}
-                        disabled={!input.trim() || disabled}
+                        onClick={handleSendWithFile}
+                        disabled={(!input.trim() && !selectedFile) || disabled}
                         aria-label="Send message"
                         className={`w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-300 shadow-sm ${
-                            input.trim() && !disabled
+                            (input.trim() || selectedFile) && !disabled
                                 ? 'bg-[linear-gradient(135deg,#60A5FA,#2563EB)] text-white hover:scale-105 hover:shadow-lg cursor-pointer'
                                 : 'bg-[#F1F5F9] text-[#0A1128]/30 cursor-not-allowed'
                         }`}
                     >
-                        <PaperPlaneRight size={18} weight={input.trim() && !disabled ? "fill" : "regular"} />
+                        <PaperPlaneRight size={18} weight={(input.trim() || selectedFile) && !disabled ? "fill" : "regular"} />
                     </button>
                 </div>
             </div>

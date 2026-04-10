@@ -18,6 +18,8 @@ export type RateLimitFeature =
     | 'chat_message'
     | 'chat_message_4o'
     | 'chat_message_mini'
+    | 'chat_message_5_4'
+    | 'chat_message_5_4_pro'
     | 'legal_search'
     | 'resource_lookup';
 
@@ -64,9 +66,19 @@ export const FEATURE_LIMITS: Record<RateLimitFeature, FeatureLimit> = {
         label: 'GPT-4o chat messages',
     },
     chat_message_mini: {
-        maxRequests: 50, // free-tier default; overridden by tier config at runtime
+        maxRequests: 50,
         windowMs: ONE_DAY_MS,
         label: 'chat messages',
+    },
+    chat_message_5_4: {
+        maxRequests: 10, // free-tier default; overridden by tier config at runtime
+        windowMs: ONE_DAY_MS,
+        label: 'GPT-5.4 chat messages',
+    },
+    chat_message_5_4_pro: {
+        maxRequests: 0, // free-tier: no pro access; overridden by tier config
+        windowMs: ONE_DAY_MS,
+        label: 'GPT-5.4-pro messages',
     },
     legal_search: {
         maxRequests: 10,

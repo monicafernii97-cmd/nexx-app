@@ -47,6 +47,6 @@ export async function ensureOpenAIConversation(
   // Create a new durable conversation via the Conversations API
   const client = getOpenAIClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const conversation = await (client as any).conversations.create();
+  const conversation = await (client.conversations as any).create();
   return conversation.id;
 }

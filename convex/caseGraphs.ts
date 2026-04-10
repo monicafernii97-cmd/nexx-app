@@ -12,6 +12,12 @@ export const upsert = mutation({
         graphJson: v.string(),
     },
     handler: async (ctx, args) => {
+        try {
+            JSON.parse(args.graphJson);
+        } catch {
+            throw new Error("Invalid graphJson: must be valid JSON");
+        }
+
         const existing = await ctx.db
             .query('caseGraphs')
             .withIndex('by_userId', (q) => q.eq('userId', args.userId))

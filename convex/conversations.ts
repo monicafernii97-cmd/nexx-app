@@ -174,3 +174,49 @@ export const get = query({
         return conversation;
     },
 });
+
+// ── NEW: Responses API + Conversations API state management ──
+
+/** Set the OpenAI Conversations API state on a conversation (called from the chat API route). */
+export const setOpenAIConversationState = mutation({
+    args: {
+        conversationId: v.id('conversations'),
+        openaiConversationId: v.string(),
+        openaiLastResponseId: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        await ctx.db.patch(args.conversationId, {
+            openaiConversationId: args.openaiConversationId,
+            openaiLastResponseId: args.openaiLastResponseId,
+            lastMessageAt: Date.now(),
+        });
+    },
+});
+
+/** Update the last response ID (for auditability / fallback chaining). */
+export const setLastResponseId = mutation({
+    args: {
+        conversationId: v.id('conversations'),
+        openaiLastResponseId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        await ctx.db.patch(args.conversationId, {
+            openaiLastResponseId: args.openaiLastResponseId,
+            lastMessageAt: Date.now(),
+        });
+    },
+});
+
+/** Update the route mode on a conversation (set by the router each turn). */
+export const setRouteMode = mutation({
+    args: {
+        conversationId: v.id('conversations'),
+        routeMode: v.string(),
+    },
+    handler: async (ctx, args) => {
+        await ctx.db.patch(args.conversationId, {
+            routeMode: args.routeMode,
+        });
+    },
+});
+

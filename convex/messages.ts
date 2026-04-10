@@ -210,3 +210,44 @@ export const list = query({
             .collect();
     },
 });
+
+// ── NEW: Server-side message creation (no auth guard) ──
+
+/**
+ * Create a message from the API route (server-side, no auth guard).
+ * The API route has already authenticated the user.
+ * Supports the new mode and artifactsJson fields.
+ */
+export const createMessage = mutation({
+    args: {
+        conversationId: v.id('conversations'),
+        role: v.union(v.literal('user'), v.literal('assistant')),
+        content: v.string(),
+        metadata: v.optional(v.any()),
+        mode: v.optional(v.string()),
+        artifactsJson: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const messageId = await ctx.db.insert('messages', {
+            conversationId: args.conversationId,
+            role: args.role,
+            content: args.content,
+            metadata: args.metadata,
+            mode: args.mode,
+            artifactsJson: args.artifactsJson,
+            createdAt: Date.now(),
+        });
+
+        // Update conversation stats
+        const conversation = await ctx.db.get(args.conversationId);
+        if (conversation) {
+            await ctx.db.patch(args.conversationId, {
+                lastMessageAt: Date.now(),
+                messageCount: (conversation.messageCount ?? 0) + 1,
+            });
+        }
+
+        return messageId;
+    },
+});
+

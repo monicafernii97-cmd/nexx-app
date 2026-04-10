@@ -139,6 +139,19 @@ export async function POST(request: NextRequest) {
       const draftableSections = template.sections.filter(s => DRAFTABLE_TYPES.has(s.type));
       const sectionIds = draftableSections.map(s => s.id || s.type);
 
+      // Guard against duplicate keys before Set/Map collapse them
+      const duplicateRequestedIds = sectionIds.filter((id, index, ids) => ids.indexOf(id) !== index);
+      if (duplicateRequestedIds.length > 0) {
+        console.error('[DocuVault] Template has non-unique draft section keys:', {
+          templateId: body.templateId,
+          duplicates: [...new Set(duplicateRequestedIds)],
+        });
+        return NextResponse.json(
+          { error: 'Template configuration has ambiguous draft section IDs. Please contact support.' },
+          { status: 422 }
+        );
+      }
+
       // If the template has no body-backed sections, continue with empty bodyContent.
       // Structural sections (caption, title, signature, court_address, etc.) still render.
       if (sectionIds.length > 0) {

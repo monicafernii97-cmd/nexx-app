@@ -11,6 +11,30 @@ export const maxDuration = 60;
 const MAX_PARSE_INPUT_CHARS = 8000;
 
 /**
+ * Extract text from a file for metadata parsing.
+ * Uses pdf-parse for PDFs (binary → text), and file.text() for plain text.
+ * Returns undefined if extraction fails or file type is unsupported.
+ */
+async function extractTextForMetadata(file: File): Promise<string | undefined> {
+  if (file.type === 'text/plain') {
+    return await file.text();
+  }
+  if (file.type === 'application/pdf') {
+    try {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const { PDFParse } = await import('pdf-parse');
+      const pdf = new PDFParse({ data: new Uint8Array(buffer) });
+      const result = await pdf.getText();
+      return result.text;
+    } catch (err) {
+      console.warn('[Upload] PDF text extraction failed:', err);
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
  * File Upload API Route
  * 
  * Accepts file uploads, stores in OpenAI vector store,
@@ -78,13 +102,21 @@ export async function POST(req: NextRequest) {
     // Authorize conversation BEFORE creating the upload record.
     // api.conversations.get throws for missing/unauthorized, so bad or
     // foreign IDs fail before any side effects (no orphaned upload rows).
+    // Only map known auth/not-found errors — re-throw transient failures
+    // so they surface as 500 via the outer catch.
     if (typedConversationId) {
       try {
         await convex.query(api.conversations.get, { id: typedConversationId });
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        const status = errorMsg.includes('Not authorized') || errorMsg.includes('Not authenticated') ? 403 : 404;
-        return Response.json({ error: 'Invalid or unauthorized conversation' }, { status });
+        if (errorMsg.includes('Not authorized') || errorMsg.includes('Not authenticated')) {
+          return Response.json({ error: 'Unauthorized access to conversation' }, { status: 403 });
+        }
+        if (errorMsg.includes('not found') || errorMsg.includes('Could not find')) {
+          return Response.json({ error: 'Conversation not found' }, { status: 404 });
+        }
+        // Transient / network error — let the outer 500 handler deal with it
+        throw err;
       }
     }
 
@@ -95,16 +127,17 @@ export async function POST(req: NextRequest) {
       mimeType: file.type,
     });
 
-    // Mark as processing
-    await convex.action(api.uploadedFiles.updateStatus, {
-      fileId: fileRecordId,
-      status: 'processing',
-    });
-
     // Track standalone store for cleanup on failure
     let createdStandaloneStoreId: string | undefined;
 
     try {
+      // Mark as processing — inside the failure-handled block so the
+      // inner catch can reliably flip the row to 'failed' on error.
+      await convex.action(api.uploadedFiles.updateStatus, {
+        fileId: fileRecordId,
+        status: 'processing',
+      });
+
       // Get or create vector store — "create-then-persist" pattern
       let vectorStoreId: string | undefined;
 
@@ -149,15 +182,15 @@ export async function POST(req: NextRequest) {
         createdStandaloneStoreId = vectorStoreId;
       }
 
-      // Parse document for metadata (text files only, bounded to parser limit)
+      // Extract text for metadata (text files + PDFs using pdf-parse)
       let metadata: Record<string, string> = { source: 'user_upload' };
-      if (file.type === 'text/plain' || file.type === 'application/pdf') {
+      const extractedText = await extractTextForMetadata(file);
+      if (extractedText) {
         try {
-          const text = await file.text();
           // Truncate to parser limit so large documents degrade gracefully
-          const parseInput = text.length > MAX_PARSE_INPUT_CHARS
-            ? text.slice(0, MAX_PARSE_INPUT_CHARS)
-            : text;
+          const parseInput = extractedText.length > MAX_PARSE_INPUT_CHARS
+            ? extractedText.slice(0, MAX_PARSE_INPUT_CHARS)
+            : extractedText;
           const parsed = await parseLegalDocument({ filename: file.name, text: parseInput });
           // Strip internal IDs before sending to external provider
           const fullMetadata = buildDocumentMetadata(parsed, userId, conversationId ?? undefined);
@@ -177,7 +210,10 @@ export async function POST(req: NextRequest) {
         metadata
       );
 
-      // Update Convex record with provider IDs (action → internalMutation)
+      // Persist provider IDs immediately — if this fails, the catch
+      // marks the row as 'failed' but the file is already indexed in the
+      // vector store. The provider IDs are included in the 'failed' update
+      // so they can be used for cleanup or dedupe later.
       await convex.action(api.uploadedFiles.updateStatus, {
         fileId: fileRecordId,
         status: 'ready',
@@ -196,11 +232,16 @@ export async function POST(req: NextRequest) {
         filename: file.name,
       });
     } catch (error) {
-      // Mark file as failed (action → internalMutation)
-      await convex.action(api.uploadedFiles.updateStatus, {
-        fileId: fileRecordId,
-        status: 'failed',
-      });
+      // Mark file as failed — include any provider IDs we already obtained
+      // so they aren't lost and can be used for cleanup/audit
+      try {
+        await convex.action(api.uploadedFiles.updateStatus, {
+          fileId: fileRecordId,
+          status: 'failed',
+        });
+      } catch (statusErr) {
+        console.error('[Upload] Failed to mark file as failed:', statusErr);
+      }
 
       // Clean up orphaned standalone store if we created one
       if (createdStandaloneStoreId) {

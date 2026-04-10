@@ -226,8 +226,20 @@ export const createMessage = mutation({
         metadata: v.optional(v.any()),
         mode: v.optional(v.string()),
         artifactsJson: v.optional(v.string()),
+        requestId: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
+        // De-dup: if requestId is provided, check for existing message
+        if (args.requestId) {
+            const existing = await ctx.db
+                .query('messages')
+                .withIndex('by_conversation_requestId', (q) =>
+                    q.eq('conversationId', args.conversationId).eq('requestId', args.requestId)
+                )
+                .first();
+            if (existing) return existing._id;
+        }
+
         const messageId = await ctx.db.insert('messages', {
             conversationId: args.conversationId,
             role: args.role,
@@ -235,6 +247,7 @@ export const createMessage = mutation({
             metadata: args.metadata,
             mode: args.mode,
             artifactsJson: args.artifactsJson,
+            requestId: args.requestId,
             createdAt: Date.now(),
         });
 

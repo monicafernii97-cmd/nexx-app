@@ -23,6 +23,12 @@ export async function POST(req: NextRequest) {
     if (!text || typeof text !== 'string') {
       return Response.json({ error: 'Document text is required' }, { status: 400 });
     }
+    if (text.length > 100_000) {
+      return Response.json(
+        { error: `Document text too long (max 100,000 chars, received ${text.length})` },
+        { status: 400 }
+      );
+    }
 
     const parsed = await parseLegalDocument({
       filename: filename || 'uploaded_document',

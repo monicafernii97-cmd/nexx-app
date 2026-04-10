@@ -113,14 +113,14 @@ export async function recoverStructuredOutput(
     }
   }
 
-  // Stage 4 — Fallback: wrap raw text as message with null artifacts
-  const fallbackMessage = rawText.length > 0
-    ? rawText
-    : 'I was unable to generate a structured response. Please try rephrasing your question.';
+  // Stage 4 — Fallback: safe generic message (never echo raw payload to client)
+  if (rawText.length > 0) {
+    console.warn('[Recovery] All stages failed. Raw text length:', rawText.length);
+  }
 
   return {
     data: {
-      message: fallbackMessage,
+      message: 'I was unable to generate a structured response. Please try rephrasing your question.',
       artifacts: EMPTY_ARTIFACTS,
     },
     stage: 'fallback',

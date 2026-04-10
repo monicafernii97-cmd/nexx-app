@@ -20,7 +20,7 @@ const SAFETY_PATTERNS = [
 ];
 
 const DRAFT_PATTERNS = [
-  /\b(draft|write|file|motion|petition|declaration|pleading|template|document)\b/i,
+  /\b(draft|write|motion|petition|declaration|pleading|template|document)\b/i,
   /\b(court[-\s]?ready|filing|submit.*court)\b/i,
 ];
 
@@ -87,6 +87,11 @@ export function classifyMessage(
     return buildResult('safety_escalation');
   }
 
+  // Local procedure — check BEFORE drafting so "how do I file" hits procedure
+  if (matchesAny(text, PROCEDURE_PATTERNS)) {
+    return buildResult('local_procedure');
+  }
+
   // Court-ready drafting
   if (matchesAny(text, DRAFT_PATTERNS)) {
     return buildResult('court_ready_drafting');
@@ -95,11 +100,6 @@ export function classifyMessage(
   // Judge lens
   if (matchesAny(text, JUDGE_LENS_PATTERNS)) {
     return buildResult('judge_lens_strategy');
-  }
-
-  // Local procedure
-  if (matchesAny(text, PROCEDURE_PATTERNS)) {
-    return buildResult('local_procedure');
   }
 
   // Document analysis

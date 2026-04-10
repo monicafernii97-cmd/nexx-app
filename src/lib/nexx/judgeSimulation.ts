@@ -17,14 +17,24 @@ export async function runJudgeSimulation(args: {
   model?: string;
 }): Promise<JudgeSimulationResult> {
   const model = args.model || 'gpt-5.4-pro';
+  const fallback: JudgeSimulationResult = {
+    credibilityScore: 5,
+    neutralityScore: 5,
+    clarityScore: 5,
+    strengths: ['Unable to complete assessment'],
+    weaknesses: ['Assessment incomplete — please retry'],
+    likelyCourtInterpretation: 'Assessment could not be completed.',
+    improvementSuggestions: ['Please retry the judge simulation.'],
+  };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const response = await (openai.responses as any).create({
-    model,
-    input: [
-      {
-        role: 'developer',
-        content: `You are a seasoned family court judge with 20 years of bench experience. You have seen thousands of custody cases and have developed strong instincts for:
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await (openai.responses as any).create({
+      model,
+      input: [
+        {
+          role: 'developer',
+          content: `You are a seasoned family court judge with 20 years of bench experience. You have seen thousands of custody cases and have developed strong instincts for:
 
 - CREDIBILITY: Is this person being truthful, exaggerating, or manipulating?
 - NEUTRALITY: Is this presentation fair and balanced, or emotionally charged?
@@ -40,27 +50,18 @@ Key principles:
 - Pattern documentation > isolated incidents
 
 ${args.context ? `\nCase context:\n${args.context}` : ''}`,
-      },
-      {
-        role: 'user',
-        content: `Evaluate this from a family court judge's perspective:\n\n${args.content}`,
-      },
-    ],
-    text: { format: JUDGE_SIMULATION_SCHEMA },
-  });
+        },
+        {
+          role: 'user',
+          content: `Evaluate this from a family court judge's perspective:\n\n${args.content}`,
+        },
+      ],
+      text: { format: JUDGE_SIMULATION_SCHEMA },
+    });
 
-  const text = response.output_text || '';
-  try {
+    const text = response.output_text || '';
     return JSON.parse(text) as JudgeSimulationResult;
   } catch {
-    return {
-      credibilityScore: 5,
-      neutralityScore: 5,
-      clarityScore: 5,
-      strengths: ['Unable to complete assessment'],
-      weaknesses: ['Assessment incomplete — please retry'],
-      likelyCourtInterpretation: 'Assessment could not be completed.',
-      improvementSuggestions: ['Please retry the judge simulation.'],
-    };
+    return fallback;
   }
 }

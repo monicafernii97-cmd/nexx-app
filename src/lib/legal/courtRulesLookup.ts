@@ -217,8 +217,9 @@ async function extractRulesWithAI(
         const maxFields = Object.keys(KNOWN_RULES_FIELDS).length;
         const confidence = Math.min(fieldCount / maxFields, 1.0);
 
-        // Build sources list from known resources
-        const sources: string[] = safeLocalRulesUrl ? [safeLocalRulesUrl] : [];
+        // Build sources list — only include URLs we actually retrieved content from.
+        // safeLocalRulesUrl was only mentioned in the prompt, not fetched, so it's not a verified source.
+        const sources: string[] = [];
 
         return {
             rules: validatedRules,

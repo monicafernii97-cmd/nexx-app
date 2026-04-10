@@ -39,11 +39,22 @@ export function buildProvenance(
   value: string,
   source: LocalCourtSource
 ): CourtRuleProvenance {
+  let confidence: CourtRuleProvenance['confidence'] = 'medium';
+
+  try {
+    const hostname = new URL(source.url).hostname.toLowerCase();
+    if (hostname.endsWith('.gov') || hostname.endsWith('.gov.us')) {
+      confidence = 'high';
+    }
+  } catch {
+    confidence = 'medium';
+  }
+
   return {
     field,
     value,
     sourceUrl: source.url,
     sourceSnippet: source.snippet.slice(0, 500),
-    confidence: source.url.includes('.gov') ? 'high' : 'medium',
+    confidence,
   };
 }

@@ -220,3 +220,15 @@ export const setRouteMode = mutation({
     },
 });
 
+/** Persist the vector store ID for file search on a conversation. */
+export const setVectorStoreId = mutation({
+    args: {
+        conversationId: v.id('conversations'),
+        vectorStoreId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        await ctx.db.patch(args.conversationId, {
+            vectorStoreId: args.vectorStoreId,
+        });
+    },
+});

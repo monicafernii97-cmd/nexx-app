@@ -30,13 +30,13 @@ export async function assessConfidence(
     }
   );
 
-  // Fast path: if we have strong context, confidence is likely high
-  if (hasRetrieval && hasJurisdiction && hasCaseData) {
+  // Only skip model assessment if no sources and no case data at all
+  if (!hasRetrieval && !hasCaseData && !hasJurisdiction) {
     return {
-      confidence: 'high',
-      basis: 'Response supported by retrieved sources and established case data.',
-      evidenceSufficiency: 'Adequate',
-      missingSupport: [],
+      confidence: 'low',
+      basis: 'No retrieved sources, case data, or jurisdiction information available.',
+      evidenceSufficiency: 'Insufficient',
+      missingSupport: ['No retrieved sources', 'No case data', 'Jurisdiction unknown'],
     };
   }
 

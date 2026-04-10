@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, after } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { openai, ensureOpenAIConversation } from '@/lib/openaiConversation';
 import { classifyMessage } from '@/lib/nexx/router';
@@ -17,7 +17,7 @@ import { assessConfidence } from '@/lib/nexx/confidenceLayer';
 import { NEXX_FUNCTION_TOOLS, executeFunctionTool } from '@/lib/nexx/functionTools';
 import { persistAfterResponse } from '@/lib/nexx/persistAfterResponse';
 import { checkRateLimit } from '@/lib/rateLimit';
-import { PRIMARY_MODEL, getDailyLimit, FALLBACK_MODEL_54, type SubscriptionTier } from '@/lib/tiers';
+import { getModelForRoute, getDailyLimit, type SubscriptionTier } from '@/lib/tiers';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
@@ -110,11 +110,16 @@ export async function POST(req: NextRequest) {
       console.warn('[Chat] Failed to fetch user tier:', err);
     }
 
-    // ── Rate limit check ──
-    const model = PRIMARY_MODEL;
+    // ── Router: classify the turn ──
+    const routerResult = classifyMessage(message);
+    const { mode: routeMode, toolPlan, temperature } = routerResult;
+
+    // ── Rate limit check (model-aware via router) ──
+    const model = getModelForRoute(userTier, routeMode === 'judge_lens_strategy' ? 'judge_sim' : 'chat');
     const dailyCap = getDailyLimit(userTier, model);
     if (dailyCap !== -1) {
-      const rl = checkRateLimit(clerkUserId, 'chat_message_5_4', dailyCap);
+      const rateLimitKey = model.includes('pro') ? 'chat_message_5_4_pro' as const : 'chat_message_5_4' as const;
+      const rl = checkRateLimit(clerkUserId, rateLimitKey, dailyCap);
       if (!rl.allowed) {
         return Response.json(
           { error: 'Daily message limit reached. Please upgrade your plan or try again tomorrow.' },
@@ -123,10 +128,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Router: classify the turn ──
-    const routerResult = classifyMessage(message);
-    const { mode: routeMode, toolPlan, temperature } = routerResult;
-
     // ── Step 2: Load conversation from Convex ──
     const typedConversationId = conversationId as Id<'conversations'>;
     let existingOpenAIConversationId: string | undefined;
@@ -134,8 +135,15 @@ export async function POST(req: NextRequest) {
 
     try {
       const conversation = await convex.query(api.conversations.get, { id: typedConversationId });
-      existingOpenAIConversationId = conversation?.openaiConversationId ?? undefined;
-      existingVectorStoreId = conversation?.vectorStoreId ?? undefined;
+      if (!conversation) {
+        return Response.json({ error: 'Conversation not found' }, { status: 404 });
+      }
+      // Verify ownership: conversation must belong to the authenticated user
+      if (convexUserId && conversation.userId !== convexUserId) {
+        return Response.json({ error: 'Unauthorized access to conversation' }, { status: 403 });
+      }
+      existingOpenAIConversationId = conversation.openaiConversationId ?? undefined;
+      existingVectorStoreId = conversation.vectorStoreId ?? undefined;
     } catch {
       // Conversation may not exist yet — continue
     }
@@ -194,7 +202,7 @@ export async function POST(req: NextRequest) {
 
     // Load conversation summary + case graph from Convex
     let existingCaseGraph: CaseGraph | undefined;
-    let retrievedSources: LocalCourtSource[] = [];
+    const retrievedSources: LocalCourtSource[] = [];
     try {
       const [summaryDoc, caseGraphDoc] = await Promise.all([
         convex.query(api.conversationSummaries.getByConversation, { conversationId: typedConversationId }),
@@ -281,6 +289,15 @@ export async function POST(req: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const functionOutputs: any[] = [];
       for (const fc of functionCalls) {
+        if (!convexUserId) {
+          functionOutputs.push({
+            type: 'function_call_output',
+            call_id: fc.call_id,
+            output: JSON.stringify({ success: false, error: 'User context unavailable for tool execution.' }),
+          });
+          continue;
+        }
+
         let parsedArgs: Record<string, unknown> = {};
         try {
           parsedArgs = JSON.parse(fc.arguments || '{}');
@@ -289,7 +306,7 @@ export async function POST(req: NextRequest) {
         const result = await executeFunctionTool(
           fc.name,
           parsedArgs,
-          { convex, userId: convexUserId!, conversationId: typedConversationId }
+          { convex, userId: convexUserId, conversationId: typedConversationId }
         );
 
         functionOutputs.push({
@@ -433,7 +450,7 @@ export async function POST(req: NextRequest) {
       });
     } catch { /* non-fatal */ }
 
-    // ── Step 17: persistAfterResponse (async — fire and forget) ──
+    // ── Step 17: persistAfterResponse (via Next.js after() hook) ──
     // Load all messages for summary compaction
     try {
       const allMessages = await convex.query(api.messages.list, { conversationId: typedConversationId });
@@ -442,29 +459,35 @@ export async function POST(req: NextRequest) {
         content: m.content,
       }));
 
-      // Fire and forget — don't await
-      persistAfterResponse({
-        conversationId,
-        messages: messageArray,
-        messageCount: messageArray.length,
-        existingSummary: contextPacket.conversationSummary,
-        existingCaseGraph,
-        saveSummary: async (summary, turnCount) => {
-          await convex.mutation(api.conversationSummaries.upsert, {
-            conversationId: typedConversationId,
-            summary: JSON.stringify(summary),
-            turnCount,
+      // Use after() for reliable execution even after response is sent
+      after(async () => {
+        try {
+          await persistAfterResponse({
+            conversationId,
+            messages: messageArray,
+            messageCount: messageArray.length,
+            existingSummary: contextPacket.conversationSummary,
+            existingCaseGraph,
+            saveSummary: async (summary, turnCount) => {
+              await convex.mutation(api.conversationSummaries.upsert, {
+                conversationId: typedConversationId,
+                summary: JSON.stringify(summary),
+                turnCount,
+              });
+            },
+            saveCaseGraph: async (graphJson) => {
+              if (convexUserId) {
+                await convex.mutation(api.caseGraphs.upsert, {
+                  userId: convexUserId,
+                  graphJson,
+                });
+              }
+            },
           });
-        },
-        saveCaseGraph: async (graphJson) => {
-          if (convexUserId) {
-            await convex.mutation(api.caseGraphs.upsert, {
-              userId: convexUserId,
-              graphJson,
-            });
-          }
-        },
-      }).catch((err) => console.warn('[Chat] persistAfterResponse error:', err));
+        } catch (err) {
+          console.warn('[Chat] persistAfterResponse error:', err);
+        }
+      });
     } catch { /* non-fatal */ }
 
     // ── Step 18: Return response ──

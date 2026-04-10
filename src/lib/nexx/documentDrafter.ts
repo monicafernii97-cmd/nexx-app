@@ -24,6 +24,9 @@ export async function generateDraftPlan(args: {
   const contextInfo = args.caseGraph
     ? `\nCase graph:\n${JSON.stringify(args.caseGraph, null, 2)}`
     : '';
+  const userContextInfo = args.userContext
+    ? `\nUser context:\n${JSON.stringify(args.userContext, null, 2)}`
+    : '';
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const response = await (openai.responses as any).create({
@@ -39,7 +42,8 @@ export async function generateDraftPlan(args: {
 
 Template: ${args.templateName}
 Sections: ${args.templateSections.join(', ')}
-${contextInfo}`,
+${contextInfo}
+${userContextInfo}`,
       },
       {
         role: 'user',

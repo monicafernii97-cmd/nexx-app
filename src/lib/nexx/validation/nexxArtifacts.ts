@@ -19,6 +19,7 @@ export function extractOutputText(response: unknown): string {
 
   // Nested output array format
   if (Array.isArray(r.output)) {
+    const parts: string[] = [];
     for (const item of r.output) {
       if (item && typeof item === 'object') {
         const outputItem = item as Record<string, unknown>;
@@ -27,13 +28,14 @@ export function extractOutputText(response: unknown): string {
             if (content && typeof content === 'object') {
               const c = content as Record<string, unknown>;
               if (c.type === 'output_text' && typeof c.text === 'string') {
-                return c.text;
+                parts.push(c.text);
               }
             }
           }
         }
       }
     }
+    if (parts.length > 0) return parts.join('');
   }
 
   return '';

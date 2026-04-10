@@ -49,7 +49,8 @@ export function hasArtifacts(response: NexxAssistantResponse): boolean {
     artifacts.timelineReady ||
     artifacts.exhibitReady ||
     artifacts.judgeSimulation ||
-    artifacts.oppositionSimulation
+    artifacts.oppositionSimulation ||
+    artifacts.confidence
   );
 }
 

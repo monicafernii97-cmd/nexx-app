@@ -459,5 +459,6 @@ export default defineSchema({
         inputJson: v.string(),
         outputJson: v.optional(v.string()),
         createdAt: v.number(),
+        expiresAt: v.optional(v.number()),
     }).index('by_conversationId', ['conversationId']),
 });

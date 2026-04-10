@@ -88,8 +88,11 @@ export function polishCourtDraft(text: string): string {
     }
   }
 
-  // Clean up double spaces from replacements
-  result = result.replace(/\s{2,}/g, ' ').replace(/\n\s+\n/g, '\n\n');
+  // Clean up double spaces from replacements (horizontal whitespace only)
+  result = result
+    .replace(/[^\S\n]{2,}/g, ' ')
+    .replace(/\n[^\S\n]+\n/g, '\n\n')
+    .replace(/\n{3,}/g, '\n\n');
 
   return result.trim();
 }

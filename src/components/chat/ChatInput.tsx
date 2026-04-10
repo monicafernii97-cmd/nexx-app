@@ -18,7 +18,6 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
     const [isListening, setIsListening] = useState(false);
     const [micError, setMicError] = useState<string | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [isUploading, setIsUploading] = useState(false);
     // Client-only: avoids hydration mismatch since server has no SpeechRecognition
     const [isSpeechSupported, setIsSpeechSupported] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -81,14 +80,16 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
 
     const handleSend = useCallback(() => {
         const text = inputRef.current.trim();
-        if (!text || disabled) return;
+        if (!text && !selectedFile) return;
+        if (disabled) return;
         // Stop mic before sending to prevent onresult from repopulating the field
         stopRecognition();
-        onSend(text);
+        onSend(text || (selectedFile ? `Analyze this file: ${selectedFile.name}` : ''), selectedFile ?? undefined);
         updateInput('');
+        setSelectedFile(null);
         prefixRef.current = '';
         dictatedRef.current = '';
-    }, [disabled, onSend, stopRecognition, updateInput]);
+    }, [disabled, selectedFile, onSend, stopRecognition, updateInput]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         // Don't send during IME composition (Japanese/Chinese/Korean input)
@@ -99,6 +100,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
     }, [handleSend]);
 
     const toggleListening = useCallback(() => {
+        if (disabled) return;
         setMicError(null);
 
         // Stop if currently listening — stop() is graceful and lets pending
@@ -186,7 +188,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
             setMicError('Failed to start voice input. Please try again.');
             recognitionRef.current = null;
         }
-    }, [isListening, getSpeechRecognition, updateInput]);
+    }, [disabled, isListening, getSpeechRecognition, updateInput]);
 
     // ── File attachment handler ──
     const handleFileSelect = useCallback(() => {
@@ -230,13 +232,13 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
     const handleSendWithFile = useCallback(() => {
         const trimmed = input.trim();
         if (!trimmed && !selectedFile) return;
-        if (disabled || isUploading) return;
+        if (disabled) return;
 
         if (isListening) stopRecognition();
         onSend(trimmed || (selectedFile ? `Analyze this file: ${selectedFile.name}` : ''), selectedFile ?? undefined);
         updateInput('');
         setSelectedFile(null);
-    }, [input, selectedFile, disabled, isUploading, isListening, stopRecognition, onSend, updateInput]);
+    }, [input, selectedFile, disabled, isListening, stopRecognition, onSend, updateInput]);
 
     const baseId = useId();
     const micErrorId = micError ? `${baseId}-mic-error` : undefined;
@@ -300,7 +302,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                     <button
                         type="button"
                         onClick={handleFileSelect}
-                        disabled={disabled || isUploading}
+                        disabled={disabled}
                         className={`w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer ${
                             selectedFile
                                 ? 'bg-blue-100 text-blue-600'
@@ -314,6 +316,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                     <button
                         type="button"
                         onClick={toggleListening}
+                        disabled={disabled}
                         className={`w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer relative ${
                             isListening
                                 ? 'bg-red-500 text-white shadow-md'

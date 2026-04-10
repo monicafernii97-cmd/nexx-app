@@ -7,7 +7,6 @@
  */
 
 import type { ConvexHttpClient } from 'convex/browser';
-import { api } from '../../../convex/_generated/api';
 import type { Id } from '../../../convex/_generated/dataModel';
 
 // ---------------------------------------------------------------------------
@@ -163,13 +162,13 @@ export async function executeFunctionTool(
       case 'generate_docuvault_draft':
         return await handleGenerateDraft(args, context);
       case 'save_case_note':
-        return { success: true, data: { note: args.note, saved: true } };
+        return { success: true, data: { note: args.note, prepared: true, requires_confirmation: true } };
       case 'mark_evidence_theme':
-        return { success: true, data: { theme: args.theme, marked: true } };
+        return { success: true, data: { theme: args.theme, prepared: true, requires_confirmation: true } };
       case 'create_exhibit_index':
-        return { success: true, data: { exhibits: args.exhibits, indexed: true } };
+        return { success: true, data: { exhibits: args.exhibits, prepared: true, requires_confirmation: true } };
       case 'link_incident_to_motion':
-        return { success: true, data: { linked: true, incident: args.incidentSummary, motion: args.motionType } };
+        return { success: true, data: { prepared: true, requires_confirmation: true, incident: args.incidentSummary, motion: args.motionType } };
       case 'fetch_user_court_settings':
         return await handleFetchCourtSettings(context);
       default:

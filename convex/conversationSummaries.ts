@@ -13,6 +13,10 @@ export const upsert = mutation({
         turnCount: v.number(),
     },
     handler: async (ctx, args) => {
+        if (!Number.isInteger(args.turnCount) || args.turnCount < 0) {
+            throw new Error("turnCount must be a non-negative integer");
+        }
+
         const existing = await ctx.db
             .query('conversationSummaries')
             .withIndex('by_conversationId', (q) => q.eq('conversationId', args.conversationId))

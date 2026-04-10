@@ -72,11 +72,11 @@ export async function POST(req: NextRequest) {
 
       if (!vectorStoreId) {
         vectorStoreId = await createVectorStore(`nexx-${conversationId || userId}`);
-        // Save vector store ID to conversation
+        // Persist vector store ID to conversation
         if (typedConversationId) {
-          await convex.mutation(api.conversations.setOpenAIConversationState, {
+          await convex.mutation(api.conversations.setVectorStoreId, {
             conversationId: typedConversationId,
-            openaiConversationId: '', // Don't overwrite existing
+            vectorStoreId,
           });
         }
       }
@@ -93,11 +93,11 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Upload to OpenAI vector store
+      // Upload to OpenAI vector store (with parsed legal metadata)
       const openaiFileId = await uploadToVectorStore(
         vectorStoreId,
         file,
-        { source: 'user_upload' }
+        metadata
       );
 
       // Update Convex record

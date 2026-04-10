@@ -22,7 +22,37 @@ export function evaluateResponse(
 ): EvalScore[] {
   const scores: EvalScore[] = [];
 
-  // 1. Message quality — is the message non-empty and substantive?
+  // 1. Mode match — does the response match the expected route mode?
+  // We check if the message content aligns with the expected mode characteristics
+  const modeKeywordMap: Record<string, RegExp> = {
+    safety_escalation: /\b(safety|crisis|emergency|danger)\b/i,
+    court_ready_drafting: /\b(draft|motion|petition|court[-\s]?ready)\b/i,
+    judge_lens_strategy: /\b(judge|credibility|neutrality|court.*perception)\b/i,
+    local_procedure: /\b(procedure|filing|deadline|local.*rule)\b/i,
+    document_analysis: /\b(document|order|analysis|interpret)\b/i,
+    pattern_analysis: /\b(pattern|trend|repeated|history)\b/i,
+    support_grounding: /\b(support|overwhelm|stress|anxious)\b/i,
+    direct_legal_answer: /\b(law|statute|legal|rights?|custody)\b/i,
+  };
+  const modePattern = modeKeywordMap[expectedMode];
+  if (modePattern) {
+    const matches = modePattern.test(response.message);
+    scores.push({
+      dimension: 'mode_match',
+      score: matches ? 1 : 0.5,
+      notes: matches
+        ? `Response content aligns with expected mode: ${expectedMode}`
+        : `Response may not match expected mode: ${expectedMode}`,
+    });
+  } else {
+    scores.push({
+      dimension: 'mode_match',
+      score: 0.5,
+      notes: `No keyword validation for mode: ${expectedMode}`,
+    });
+  }
+
+  // 2. Message quality — is the message non-empty and substantive?
   const messageLength = response.message.length;
   scores.push({
     dimension: 'message_substance',
@@ -30,7 +60,7 @@ export function evaluateResponse(
     notes: `Message length: ${messageLength} chars`,
   });
 
-  // 2. Filler detection — does the message start with generic filler?
+  // 3. Filler detection — does the message start with generic filler?
   const fillerPatterns = [
     /^Great question/i,
     /^I'd be happy to/i,
@@ -44,7 +74,7 @@ export function evaluateResponse(
     notes: hasFiller ? 'Response starts with filler' : 'Clean opening',
   });
 
-  // 3. Confidence present — is confidence assessment populated?
+  // 4. Confidence present — is confidence assessment populated?
   scores.push({
     dimension: 'confidence_present',
     score: response.artifacts.confidence ? 1 : 0,
@@ -53,7 +83,7 @@ export function evaluateResponse(
       : 'No confidence assessment',
   });
 
-  // 4. Next steps — does the message include actionable next steps?
+  // 5. Next steps — does the message include actionable next steps?
   const hasNextSteps = /next\s+steps?|action\s+items?|to\s+do|you\s+should/i.test(response.message);
   scores.push({
     dimension: 'next_steps',
@@ -61,7 +91,7 @@ export function evaluateResponse(
     notes: hasNextSteps ? 'Has next steps' : 'No explicit next steps',
   });
 
-  // 5. No fabricated citations
+  // 6. No fabricated citations
   const hasFakeCitations = /\d+\s+U\.S\.C\.\s+§\s+\d+|v\.\s+\w+,\s+\d+\s+\w+\.\s+\d+/i.test(response.message);
   scores.push({
     dimension: 'no_fake_citations',

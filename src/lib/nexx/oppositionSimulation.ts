@@ -18,13 +18,21 @@ export async function runOppositionSimulation(args: {
 }): Promise<OppositionSimulationResult> {
   const model = args.model || 'gpt-5.4-pro';
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const response = await (openai.responses as any).create({
-    model,
-    input: [
-      {
-        role: 'developer',
-        content: `You are an experienced family law attorney representing the OPPOSING party. Your job is to find every weakness, inconsistency, and vulnerability in the other side's position.
+  const fallback: OppositionSimulationResult = {
+    likelyAttackPoints: ['Assessment could not be completed'],
+    framingRisks: [],
+    whatNeedsTightening: [],
+    preemptionSuggestions: ['Please retry the opposition simulation.'],
+  };
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await (openai.responses as any).create({
+      model,
+      input: [
+        {
+          role: 'developer',
+          content: `You are an experienced family law attorney representing the OPPOSING party. Your job is to find every weakness, inconsistency, and vulnerability in the other side's position.
 
 Think like an adversary:
 - What factual claims are unsupported or exaggerated?
@@ -36,24 +44,18 @@ Think like an adversary:
 Be thorough but fair — identify real vulnerabilities, not bad-faith attacks.
 
 ${args.context ? `\nCase context:\n${args.context}` : ''}`,
-      },
-      {
-        role: 'user',
-        content: `Analyze this from the opposition's perspective:\n\n${args.content}`,
-      },
-    ],
-    text: { format: OPPOSITION_SIMULATION_SCHEMA },
-  });
+        },
+        {
+          role: 'user',
+          content: `Analyze this from the opposition's perspective:\n\n${args.content}`,
+        },
+      ],
+      text: { format: OPPOSITION_SIMULATION_SCHEMA },
+    });
 
-  const text = response.output_text || '';
-  try {
+    const text = response.output_text || '';
     return JSON.parse(text) as OppositionSimulationResult;
   } catch {
-    return {
-      likelyAttackPoints: ['Assessment could not be completed'],
-      framingRisks: [],
-      whatNeedsTightening: [],
-      preemptionSuggestions: ['Please retry the opposition simulation.'],
-    };
+    return fallback;
   }
 }

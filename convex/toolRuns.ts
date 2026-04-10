@@ -15,9 +15,25 @@ export const create = mutation({
         outputJson: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
+        // 30-day retention TTL
+        const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+        const createdAt = Date.now();
+
+        // Basic PII redaction: mask SSN, phone, email patterns in payloads
+        const redact = (json: string): string => {
+            return json
+                .replace(/\b\d{3}-\d{2}-\d{4}\b/g, '[SSN_REDACTED]')
+                .replace(/\b\d{10}\b/g, '[PHONE_REDACTED]')
+                .replace(/\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/g, '[EMAIL_REDACTED]');
+        };
+
         return await ctx.db.insert('toolRuns', {
-            ...args,
-            createdAt: Date.now(),
+            conversationId: args.conversationId,
+            toolType: args.toolType,
+            inputJson: redact(args.inputJson),
+            outputJson: args.outputJson ? redact(args.outputJson) : undefined,
+            createdAt,
+            expiresAt: createdAt + RETENTION_MS,
         });
     },
 });

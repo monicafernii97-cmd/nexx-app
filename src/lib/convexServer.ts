@@ -72,6 +72,5 @@ export async function convexMutation<T>(
 }
 
 // Type import for Convex function references
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type FunctionReference<T extends string> = any;
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+type FunctionReference<_T extends string> = any;

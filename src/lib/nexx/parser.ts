@@ -61,12 +61,11 @@ Be precise. Only extract what is explicitly stated. Do not infer.`,
 export function chunkLegalText(text: string): string[] {
   const chunks: string[] = [];
 
-  // Split on legal section markers
-  const sectionPattern = /(?:^|\n)(?:SECTION|ARTICLE|ORDERED|WHEREAS|IT IS (?:HEREBY )?ORDERED|(?:\d+\.)\s)/gi;
+  // Split on legal section markers using lookahead to preserve headers
+  const sectionPattern = /(?=^(?:SECTION|ARTICLE|ORDERED|WHEREAS|IT IS (?:HEREBY )?ORDERED|\d+\.\s))/gim;
   const sections = text.split(sectionPattern);
 
   const MAX_CHUNK_SIZE = 2000;
-  const OVERLAP = 200;
 
   for (const section of sections) {
     const trimmed = section.trim();

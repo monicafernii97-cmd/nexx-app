@@ -22,7 +22,7 @@ export const upsert = mutation({
             .withIndex('by_userId', (q) => q.eq('userId', args.userId))
             .first();
 
-        const { userId, ...profileFields } = args;
+        const { userId: _userId, ...profileFields } = args;
 
         if (existing) {
             await ctx.db.patch(existing._id, {

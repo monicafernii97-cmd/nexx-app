@@ -210,3 +210,67 @@ export const list = query({
             .collect();
     },
 });
+
+// ── Server-side message creation (auth-guarded) ──
+
+/**
+ * Create a message from the API route.
+ * Auth: server-derived via getAuthenticatedUserAndConversation().
+ * Supports idempotent writes via requestId de-duplication.
+ */
+export const createMessage = mutation({
+    args: {
+        conversationId: v.id('conversations'),
+        role: v.union(v.literal('user'), v.literal('assistant')),
+        content: v.string(),
+        metadata: v.optional(v.any()),
+        mode: v.optional(v.union(
+            v.literal('adaptive_chat'),
+            v.literal('direct_legal_answer'),
+            v.literal('local_procedure'),
+            v.literal('document_analysis'),
+            v.literal('judge_lens_strategy'),
+            v.literal('court_ready_drafting'),
+            v.literal('pattern_analysis'),
+            v.literal('support_grounding'),
+            v.literal('safety_escalation')
+        )),
+        artifactsJson: v.optional(v.string()),
+        requestId: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        // Server-derived auth — NOT caller-supplied
+        const { conversation } = await getAuthenticatedUserAndConversation(ctx, args.conversationId);
+
+        // De-dup: if requestId is provided, check for existing message
+        if (args.requestId) {
+            const existing = await ctx.db
+                .query('messages')
+                .withIndex('by_conversation_requestId', (q) =>
+                    q.eq('conversationId', args.conversationId).eq('requestId', args.requestId)
+                )
+                .first();
+            if (existing) return existing._id;
+        }
+
+        const messageId = await ctx.db.insert('messages', {
+            conversationId: args.conversationId,
+            role: args.role,
+            content: args.content,
+            metadata: args.metadata,
+            mode: args.mode,
+            artifactsJson: args.artifactsJson,
+            requestId: args.requestId,
+            createdAt: Date.now(),
+        });
+
+        // Update conversation stats
+        await ctx.db.patch(args.conversationId, {
+            lastMessageAt: Date.now(),
+            messageCount: (conversation.messageCount ?? 0) + 1,
+        });
+
+        return messageId;
+    },
+});
+

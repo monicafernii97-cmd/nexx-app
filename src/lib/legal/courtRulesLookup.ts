@@ -16,7 +16,8 @@
  * integrate the Convex courtRulesCache table for persistent cross-instance caching.
  */
 
-import OpenAI from 'openai';
+import { openai } from '../openaiConversation';
+import { COURT_FORMATTING_RULES_SCHEMA } from '../nexx/schemas';
 import type { CourtFormattingRules } from './types';
 
 /** Returns sanitized URL if valid http(s), otherwise undefined. */
@@ -172,7 +173,6 @@ async function extractRulesWithAI(
         return { rules: {}, sources: [], confidence: 0 };
     }
 
-    const openai = new OpenAI({ apiKey });
 
     // Build user prompt with optional enrichment from cached resources
     let userPrompt = `Provide the court filing formatting rules for ${county} County, ${state}.`;
@@ -187,24 +187,25 @@ async function extractRulesWithAI(
     }
 
     try {
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4o',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const response = await (openai.responses as any).create({
+            model: 'gpt-5.4',
             temperature: 0,
-            response_format: { type: 'json_object' },
-            messages: [
+            input: [
                 { role: 'system', content: EXTRACTION_PROMPT },
                 { role: 'user', content: userPrompt },
             ],
+            text: { format: COURT_FORMATTING_RULES_SCHEMA },
         });
 
-        const content = response.choices[0]?.message?.content;
+        const content = response.output_text;
         if (!content) return { rules: {}, sources: [], confidence: 0 };
 
         let parsed: Partial<CourtFormattingRules>;
         try {
             parsed = JSON.parse(content) as Partial<CourtFormattingRules>;
         } catch (parseError) {
-            console.warn('[courtRulesLookup] Failed to parse GPT response:', content.slice(0, 200), parseError);
+            console.warn('[courtRulesLookup] Failed to parse response:', content.slice(0, 200), parseError);
             return { rules: {}, sources: [], confidence: 0 };
         }
 
@@ -216,8 +217,9 @@ async function extractRulesWithAI(
         const maxFields = Object.keys(KNOWN_RULES_FIELDS).length;
         const confidence = Math.min(fieldCount / maxFields, 1.0);
 
-        // Build sources list from known resources
-        const sources: string[] = safeLocalRulesUrl ? [safeLocalRulesUrl] : [];
+        // Build sources list — only include URLs we actually retrieved content from.
+        // safeLocalRulesUrl was only mentioned in the prompt, not fetched, so it's not a verified source.
+        const sources: string[] = [];
 
         return {
             rules: validatedRules,

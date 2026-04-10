@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { getOpenAI } from '@/lib/openai';
+import { openai } from '@/lib/openaiConversation';
+import { INCIDENT_ANALYSIS_SCHEMA } from '@/lib/nexx/schemas';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '@convex/_generated/api';
@@ -103,9 +104,10 @@ export async function POST(req: NextRequest) {
             console.warn('Could not fetch NEX profile for enrichment:', profileErr);
         }
 
-        const completion = await getOpenAI().chat.completions.create({
-            model: 'gpt-4o',
-            messages: [
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const response = await (openai.responses as any).create({
+            model: 'gpt-5.4',
+            input: [
                 {
                     role: 'system',
                     content: `You are a professional legal documentation specialist preparing exhibits for family court. You must be NEUTRAL, FACTUAL, and PRECISE. You are NOT an advocate — you are a documentation professional who lets the facts speak for themselves.
@@ -121,90 +123,55 @@ export async function POST(req: NextRequest) {
 - NEVER fabricate, invent, or guess legal citations, statute numbers, court rules, dates, or facts not explicitly present in the user's narrative
 - Only reference information the user has provided — do NOT add details, embellish events, or assume facts not stated
 
-You must generate FOUR outputs:
-
-1. **Court-Ready Summary** — A neutral, fact-based, chronological account suitable for submission as a court exhibit. Requirements:
-   - Write in third person using "the reporting party" and "the other party"
-   - Only use role-specific labels such as "the father" or "the mother" when the user's narrative explicitly states that role
-   - State ONLY what happened: dates, times, locations, direct quotes, observable actions
-   - Do NOT interpret behavior, assign motives, or draw conclusions
-   - Do NOT use terms like "manipulation," "gaslighting," "coercive control," or "narcissistic" in this section
-   - Include all contextual details (location, witnesses, children present) as factual observations
-   - Keep it concise — 1-3 paragraphs maximum
-   - This should read like a professional paralegal's factual summary, not an argument
-
-2. **Behavioral Analysis** (For User's Personal Awareness ONLY — NOT for Court) — Provide educational insight on what patterns the described behavior *may* be consistent with. Requirements:
-   - Use careful, measured language: "This behavior may be consistent with..." or "This pattern could suggest..."
-   - NEVER state definitively — always use hedging language
-   - Reference behavioral frameworks only as educational context, not as diagnoses
-   - Explain WHY the behavior matters in a custody/family law context, but frame it as general awareness
-   - Be thorough but responsible — elaborate on what the user should understand about the dynamics
-   - End with: "⚠️ This analysis is for your personal awareness only. Do not include behavioral interpretations in court filings, as they may undermine your credibility. Use only the Court-Ready Summary for legal proceedings."
-
-3. **Strategic Response** — Provide 2-3 actionable recommendations for how to respond or document going forward. Requirements:
-   - Focus on what the user can control: documentation, communication strategy, boundaries
-   - Suggest neutral, professional communication language when applicable
-   - NEVER suggest assuming or accusing the other party of specific intent
-   - Frame as protective documentation strategy, not as adversarial tactics
-
-4. **Pattern Tags** — Return a comma-separated list of behavioral pattern tags that CLEARLY apply. Requirements:
-   - Use ONLY from this exact set: ${Array.from(ALLOWED_TAGS).join(', ')}
-   - Apply tags CONSERVATIVELY — only when behavior is clearly and unmistakably present
-   - It is perfectly acceptable to return fewer tags or even no tags if the incident does not clearly fit
-   - Do NOT tag based on assumptions or the user's characterization alone — base tags on the observable facts described
-   - Compare against the [User's Recognized NEX Patterns] if provided, but do not auto-assign tags just because a pattern profile exists
-
-Format your response EXACTLY as follows:
----COURT_SUMMARY---
-[Court-ready summary here]
----BEHAVIORAL_ANALYSIS---
-[Behavioral analysis here — must end with the disclaimer]
----STRATEGIC_RESPONSE---
-[Strategic recommendations here]
----PATTERN_TAGS---
-[comma-separated tags here, or "none" if no clear patterns detected]`,
+Generate a structured analysis with:
+- courtSummary: A neutral, fact-based, chronological account (1-3 paragraphs)
+- behavioralAnalysis: Educational behavioral pattern insight (NOT for court)
+- strategicResponse: 2-3 actionable recommendations
+- tags: Behavioral pattern tags from: ${Array.from(ALLOWED_TAGS).join(', ')}
+- timelineEvent: Structured event data (date, time, location, childImpact, evidenceType)
+- evidenceStrength: "weak", "moderate", or "strong"
+- missingEvidence: What additional documentation would strengthen the record`,
                 },
                 {
                     role: 'user',
                     content: `Please analyze the following incident:\n\n${contextLines.join('\n')}\n\n**Narrative:**\n${narrative}`,
                 },
             ],
+            text: { format: INCIDENT_ANALYSIS_SCHEMA },
             temperature: 0.4,
-            max_tokens: 2500,
         });
 
-        const responseText = completion.choices[0]?.message?.content || '';
+        const responseText = response.output_text || '';
 
-        // Parse the structured response
-        const courtSummaryMatch = responseText.match(
-            /---COURT_SUMMARY---\s*([\s\S]*?)(?=---BEHAVIORAL_ANALYSIS---|$)/
-        );
-        const behavioralAnalysisMatch = responseText.match(
-            /---BEHAVIORAL_ANALYSIS---\s*([\s\S]*?)(?=---STRATEGIC_RESPONSE---|$)/
-        );
-        const strategicResponseMatch = responseText.match(
-            /---STRATEGIC_RESPONSE---\s*([\s\S]*?)(?=---PATTERN_TAGS---|$)/
-        );
-        const patternTagsMatch = responseText.match(
-            /---PATTERN_TAGS---\s*([\s\S]*?)$/
-        );
+        try {
+            const parsed = JSON.parse(responseText);
 
-        // Parse and validate pattern tags against the strict allowlist
-        const rawTags = patternTagsMatch?.[1]?.trim() || '';
-        const tags = [...new Set(
-            rawTags
-                .split(/[,\n]/)
-                .map((t) => t.trim().toLowerCase().replace(/\s+/g, '_'))
-                .filter((t) => ALLOWED_TAGS.has(t))
-        )];
+            // Validate and filter tags against allowlist
+            const validatedTags = (parsed.tags || [])
+                .map((t: string) => t.trim().toLowerCase().replace(/\s+/g, '_'))
+                .filter((t: string) => ALLOWED_TAGS.has(t));
 
-        return Response.json({
-            courtSummary: courtSummaryMatch?.[1]?.trim() || responseText,
-            behavioralAnalysis: behavioralAnalysisMatch?.[1]?.trim() || '',
-            strategicResponse: strategicResponseMatch?.[1]?.trim() || '',
-            tags,
-            raw: responseText,
-        });
+            return Response.json({
+                courtSummary: parsed.courtSummary || '',
+                behavioralAnalysis: parsed.behavioralAnalysis || '',
+                strategicResponse: parsed.strategicResponse || '',
+                tags: [...new Set(validatedTags)],
+                timelineEvent: parsed.timelineEvent || null,
+                evidenceStrength: parsed.evidenceStrength || 'moderate',
+                missingEvidence: parsed.missingEvidence || [],
+            });
+        } catch {
+            // Fallback: return raw text as court summary
+            return Response.json({
+                courtSummary: responseText,
+                behavioralAnalysis: '',
+                strategicResponse: '',
+                tags: [],
+                timelineEvent: null,
+                evidenceStrength: 'moderate',
+                missingEvidence: [],
+            });
+        }
     } catch (error) {
         console.error('Incident analysis error:', error);
         const isRateLimited =

@@ -8,8 +8,11 @@
  * @module
  */
 
+import type * as caseGraphs from "../caseGraphs.js";
+import type * as conversationSummaries from "../conversationSummaries.js";
 import type * as conversations from "../conversations.js";
 import type * as courtSettings from "../courtSettings.js";
+import type * as debugTraces from "../debugTraces.js";
 import type * as documents from "../documents.js";
 import type * as generatedDocuments from "../generatedDocuments.js";
 import type * as incidents from "../incidents.js";
@@ -17,7 +20,11 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as messages from "../messages.js";
 import type * as nexProfiles from "../nexProfiles.js";
 import type * as resourcesCache from "../resourcesCache.js";
+import type * as retrievedSources from "../retrievedSources.js";
 import type * as stripe from "../stripe.js";
+import type * as toolRuns from "../toolRuns.js";
+import type * as uploadedFiles from "../uploadedFiles.js";
+import type * as userStyleProfiles from "../userStyleProfiles.js";
 import type * as users from "../users.js";
 
 import type {
@@ -27,8 +34,11 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  caseGraphs: typeof caseGraphs;
+  conversationSummaries: typeof conversationSummaries;
   conversations: typeof conversations;
   courtSettings: typeof courtSettings;
+  debugTraces: typeof debugTraces;
   documents: typeof documents;
   generatedDocuments: typeof generatedDocuments;
   incidents: typeof incidents;
@@ -36,7 +46,11 @@ declare const fullApi: ApiFromModules<{
   messages: typeof messages;
   nexProfiles: typeof nexProfiles;
   resourcesCache: typeof resourcesCache;
+  retrievedSources: typeof retrievedSources;
   stripe: typeof stripe;
+  toolRuns: typeof toolRuns;
+  uploadedFiles: typeof uploadedFiles;
+  userStyleProfiles: typeof userStyleProfiles;
   users: typeof users;
 }>;
 

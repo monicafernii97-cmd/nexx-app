@@ -1,9 +1,17 @@
 /**
- * NEXX AI System Prompt
- *
- * This is the core instruction set for the NEXX Strategic AI.
- * It frames every conversation with NPD-specialized counsel,
- * therapeutic support, legal information, and strategic analysis.
+ * @deprecated — Legacy monolithic system prompt.
+ * 
+ * This file is preserved for backward compatibility with routes that
+ * have not yet been migrated to the new 5-layer prompt architecture.
+ * 
+ * NEW routes should use:
+ * - src/lib/nexx/prompts/systemPrompt.ts  (Layer A — system policy)
+ * - src/lib/nexx/prompts/developerPrompt.ts (Layer B — developer behavior)
+ * - src/lib/nexx/prompts/featurePrompt.ts  (Layer C — feature/tool)
+ * - src/lib/nexx/prompts/artifactPrompt.ts (Layer D — artifacts)
+ * - src/lib/nexx/prompts/contextPrompt.ts  (Layer E — dynamic context)
+ * 
+ * Once all routes are migrated, this file can be deleted.
  */
 
 import type { BuildSystemPromptContext } from '@/lib/types';

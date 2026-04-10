@@ -29,6 +29,19 @@ export const MODE_LABELS: Record<string, { label: string; color: string }> = {
     general: { label: 'General', color: '#7096D1' },
 };
 
+/** Display labels and colors for the 9 per-turn route modes (set by the router). */
+export const ROUTE_MODE_LABELS: Record<string, { label: string; color: string }> = {
+    adaptive_chat: { label: 'Chat', color: '#7096D1' },
+    direct_legal_answer: { label: 'Legal', color: '#5A8EC9' },
+    local_procedure: { label: 'Procedure', color: '#5A9E6F' },
+    document_analysis: { label: 'Analysis', color: '#7C6FA0' },
+    judge_lens_strategy: { label: 'Judge Lens', color: '#E5A84A' },
+    court_ready_drafting: { label: 'Draft', color: '#C75A5A' },
+    pattern_analysis: { label: 'Pattern', color: '#A85050' },
+    support_grounding: { label: 'Support', color: '#5A9E6F' },
+    safety_escalation: { label: 'Safety', color: '#B04848' },
+};
+
 /** Onboarding wizard step definitions with IDs, titles, and descriptions. */
 export const ONBOARDING_STEPS = [
     { id: 'welcome', title: 'Welcome', description: 'Welcome to NEXX' },

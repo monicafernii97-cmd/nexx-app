@@ -129,6 +129,21 @@ export default defineSchema({
         messageCount: v.optional(v.number()),
         lastMessageAt: v.number(),
         createdAt: v.number(),
+        // ── NEW: Responses API + Conversations API state ──
+        openaiConversationId: v.optional(v.string()),
+        openaiLastResponseId: v.optional(v.string()),
+        vectorStoreId: v.optional(v.string()),
+        routeMode: v.optional(v.union(
+            v.literal('adaptive_chat'),
+            v.literal('direct_legal_answer'),
+            v.literal('local_procedure'),
+            v.literal('document_analysis'),
+            v.literal('judge_lens_strategy'),
+            v.literal('court_ready_drafting'),
+            v.literal('pattern_analysis'),
+            v.literal('support_grounding'),
+            v.literal('safety_escalation')
+        )),
     })
         .index('by_user', ['userId'])
         .index('by_user_status', ['userId', 'status']),
@@ -142,6 +157,19 @@ export default defineSchema({
         /** Client-generated ID for idempotent persistence (prevents duplicate inserts on retry). */
         requestId: v.optional(v.string()),
         createdAt: v.number(),
+        // ── NEW: Route mode + structured artifact storage ──
+        mode: v.optional(v.union(
+            v.literal('adaptive_chat'),
+            v.literal('direct_legal_answer'),
+            v.literal('local_procedure'),
+            v.literal('document_analysis'),
+            v.literal('judge_lens_strategy'),
+            v.literal('court_ready_drafting'),
+            v.literal('pattern_analysis'),
+            v.literal('support_grounding'),
+            v.literal('safety_escalation')
+        )),
+        artifactsJson: v.optional(v.string()),
     })
         .index('by_conversation', ['conversationId'])
         .index('by_conversation_requestId', ['conversationId', 'requestId']),
@@ -376,4 +404,81 @@ export default defineSchema({
         createdAt: v.number(),
         updatedAt: v.number(),
     }).index('by_state_county', ['state', 'county']),
+
+    // ═══ NEW: Conversation Summaries (compacted memory) ═══
+    conversationSummaries: defineTable({
+        conversationId: v.id('conversations'),
+        summary: v.string(),
+        turnCount: v.number(),
+        updatedAt: v.number(),
+    }).index('by_conversationId', ['conversationId']),
+
+    // ═══ NEW: Case Graphs (structured case intelligence) ═══
+    caseGraphs: defineTable({
+        userId: v.id('users'),
+        graphJson: v.string(),
+        updatedAt: v.number(),
+    }).index('by_userId', ['userId']),
+
+    // ═══ NEW: User Style Profiles (learned preferences) ═══
+    userStyleProfiles: defineTable({
+        userId: v.id('users'),
+        prefersJudgeLens: v.optional(v.boolean()),
+        prefersCourtReadyDefault: v.optional(v.boolean()),
+        prefersDetailedResponses: v.optional(v.boolean()),
+        prefersStepByStepProcess: v.optional(v.boolean()),
+        tonePreference: v.optional(v.string()),
+        updatedAt: v.number(),
+    }).index('by_userId', ['userId']),
+
+    // ═══ NEW: Debug Traces (auditability for every AI call) ═══
+    debugTraces: defineTable({
+        traceId: v.string(),
+        route: v.string(),
+        routeMode: v.string(),
+        clerkUserId: v.string(),
+        conversationId: v.optional(v.id('conversations')),
+        debugJson: v.string(),
+        createdAt: v.number(),
+    }).index('by_traceId', ['traceId'])
+      .index('by_conversationId', ['conversationId'])
+      .index('by_clerkUserId', ['clerkUserId']),
+
+    // ═══ NEW: Uploaded Files (metadata for user-uploaded documents) ═══
+    uploadedFiles: defineTable({
+        clerkUserId: v.string(),
+        conversationId: v.optional(v.id('conversations')),
+        filename: v.string(),
+        mimeType: v.string(),
+        openaiFileId: v.optional(v.string()),
+        vectorStoreId: v.optional(v.string()),
+        status: v.union(
+            v.literal('uploaded'),
+            v.literal('processing'),
+            v.literal('ready'),
+            v.literal('failed')
+        ),
+        createdAt: v.number(),
+    }).index('by_clerkUserId', ['clerkUserId'])
+      .index('by_conversationId', ['conversationId']),
+
+    // ═══ NEW: Retrieved Sources (legal sources retrieved per conversation) ═══
+    retrievedSources: defineTable({
+        conversationId: v.id('conversations'),
+        title: v.string(),
+        url: v.string(),
+        sourceType: v.string(),
+        snippet: v.string(),
+        createdAt: v.number(),
+    }).index('by_conversationId', ['conversationId']),
+
+    // ═══ NEW: Tool Runs (audit trail for tool executions) ═══
+    toolRuns: defineTable({
+        conversationId: v.id('conversations'),
+        toolType: v.string(),
+        inputJson: v.string(),
+        outputJson: v.optional(v.string()),
+        createdAt: v.number(),
+        expiresAt: v.optional(v.number()),
+    }).index('by_conversationId', ['conversationId']),
 });

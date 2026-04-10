@@ -75,6 +75,19 @@ export async function POST(req: NextRequest) {
       ? (conversationId as Id<'conversations'>)
       : undefined;
 
+    // Authorize conversation BEFORE creating the upload record.
+    // api.conversations.get throws for missing/unauthorized, so bad or
+    // foreign IDs fail before any side effects (no orphaned upload rows).
+    if (typedConversationId) {
+      try {
+        await convex.query(api.conversations.get, { id: typedConversationId });
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        const status = errorMsg.includes('Not authorized') || errorMsg.includes('Not authenticated') ? 403 : 404;
+        return Response.json({ error: 'Invalid or unauthorized conversation' }, { status });
+      }
+    }
+
     // Create pending Convex record (status set to 'uploaded' server-side)
     const fileRecordId = await convex.mutation(api.uploadedFiles.create, {
       conversationId: typedConversationId,
@@ -105,11 +118,18 @@ export async function POST(req: NextRequest) {
           const candidateId = `nexx-vs-${crypto.randomUUID()}`;
           const externalStoreId = await createVectorStore(candidateId);
 
-          // Atomically persist — only wins if still vacant
-          const result = await convex.mutation(api.conversations.compareAndSetVectorStoreId, {
-            conversationId: typedConversationId,
-            candidateId: externalStoreId,
-          });
+          // Atomically persist — only wins if still vacant.
+          // If CAS throws, clean up the orphaned external store.
+          let result;
+          try {
+            result = await convex.mutation(api.conversations.compareAndSetVectorStoreId, {
+              conversationId: typedConversationId,
+              candidateId: externalStoreId,
+            });
+          } catch (casErr) {
+            await deleteVectorStore(externalStoreId);
+            throw casErr;
+          }
 
           if (result.wasSet) {
             // We won the race

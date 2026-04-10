@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'Invalid message' }, { status: 400 });
     }
 
-    if (!conversationId) {
+    if (typeof conversationId !== 'string' || conversationId.trim().length === 0) {
       return Response.json({ error: 'conversationId is required' }, { status: 400 });
     }
 
@@ -160,22 +160,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Step 2: Load conversation from Convex (fail-closed) ──
+    // ── Step 2: Load conversation from Convex ──
+    // api.conversations.get already throws for missing/unauthorized, so we
+    // map the error to the correct 4xx status instead of surfacing as 500.
     const typedConversationId = conversationId as Id<'conversations'>;
 
     let conversation;
     try {
       conversation = await convex.query(api.conversations.get, { id: typedConversationId });
     } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      if (errorMsg.includes('Not authorized') || errorMsg.includes('Not authenticated')) {
+        return Response.json({ error: 'Unauthorized access to conversation' }, { status: 403 });
+      }
+      // Treat everything else as not-found or server error
       console.warn('[Chat] Failed to load conversation:', err);
-      return Response.json({ error: 'Failed to load conversation' }, { status: 500 });
-    }
-
-    if (!conversation) {
-      return Response.json({ error: 'Conversation not found' }, { status: 404 });
-    }
-    if (conversation.userId !== convexUserId) {
-      return Response.json({ error: 'Unauthorized access to conversation' }, { status: 403 });
+      return Response.json({ error: 'Conversation not found or inaccessible' }, { status: 404 });
     }
 
     const existingOpenAIConversationId = conversation.openaiConversationId ?? undefined;
@@ -204,10 +204,11 @@ export async function POST(req: NextRequest) {
         openaiConversationId = result.openaiConversationId;
         isFirstTurn = result.wasSet; // Only true for the thread that won the race
       } catch (err) {
-        console.warn('[Chat] Failed to save conversation state:', err);
-        // Fall back to the candidate — worst case is one turn in the wrong thread
-        openaiConversationId = candidateId;
-        isFirstTurn = true;
+        console.error('[Chat] Failed to initialize conversation state:', err);
+        return Response.json(
+          { error: 'Failed to initialize conversation state' },
+          { status: 503 }
+        );
       }
     }
 

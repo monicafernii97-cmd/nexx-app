@@ -172,9 +172,11 @@ async function extractRulesWithAI(
         // Schema guarantees valid types — no need for manual whitelist validation
         const rules = parsed;
 
-        // Calculate confidence based on how many fields were extracted
+        // Calculate confidence based on how many fields were extracted.
+        // 17 = count of fields requested in EXTRACTION_PROMPT, not the full interface.
+        const EXTRACTABLE_FIELD_COUNT = 17;
         const fieldCount = Object.keys(rules).length;
-        const confidence = Math.min(fieldCount / 17, 1.0); // 17 known CourtFormattingRules fields
+        const confidence = Math.min(fieldCount / EXTRACTABLE_FIELD_COUNT, 1.0);
 
         // Build sources list — only include URLs we actually retrieved content from.
         const sources: string[] = [];

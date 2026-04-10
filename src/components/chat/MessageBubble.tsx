@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Check, Sparkle, ArrowsClockwise, PencilSimple, X, PaperPlaneRight, CaretDown, Shield, Scales, Sword, FileText, CalendarBlank, ListBullets } from '@phosphor-icons/react';
+import { Copy, Check, Sparkle, ArrowsClockwise, PencilSimple, X, PaperPlaneRight, CaretDown, Scales, Sword, FileText, CalendarBlank, ListBullets } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -56,7 +56,7 @@ function ConfidenceBadge({ confidence, isLight }: { confidence: LegalConfidence;
         moderate: { bg: 'bg-amber-500/15', border: 'border-amber-500/30', text: 'text-amber-600', dot: 'bg-amber-500' },
         low: { bg: 'bg-red-500/15', border: 'border-red-500/30', text: 'text-red-500', dot: 'bg-red-500' },
     };
-    const c = colorMap[confidence.confidence];
+    const c = colorMap[confidence.confidence] ?? colorMap.moderate;
     const [showTooltip, setShowTooltip] = useState(false);
 
     return (

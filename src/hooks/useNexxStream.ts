@@ -30,6 +30,8 @@ interface UseNexxStreamReturn {
   isFinal: boolean;
   /** Whether a stream is currently in progress. */
   isStreaming: boolean;
+  /** Error from the most recent stream attempt (null if none). */
+  error: Error | null;
   /** Start a streaming request to the given URL with the given body. */
   startStream: (url: string, body: Record<string, unknown>) => Promise<StreamState>;
   /** Reset the stream state for a new message. */
@@ -39,6 +41,7 @@ interface UseNexxStreamReturn {
 export function useNexxStream(): UseNexxStreamReturn {
   const [state, setState] = useState<StreamState>(createStreamAccumulator);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const reset = useCallback(() => {
@@ -49,6 +52,7 @@ export function useNexxStream(): UseNexxStreamReturn {
     }
     setState(createStreamAccumulator());
     setIsStreaming(false);
+    setError(null);
   }, []);
 
   const startStream = useCallback(async (url: string, body: Record<string, unknown>): Promise<StreamState> => {
@@ -56,6 +60,7 @@ export function useNexxStream(): UseNexxStreamReturn {
     const initial = createStreamAccumulator();
     setState(initial);
     setIsStreaming(true);
+    setError(null);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -97,11 +102,13 @@ export function useNexxStream(): UseNexxStreamReturn {
         currentState = pushChunk(currentState, finalChunk);
         setState(currentState);
       }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
         // Stream was intentionally aborted — not an error
       } else {
-        console.error('[useNexxStream] Stream error:', error);
+        const streamError = err instanceof Error ? err : new Error(String(err));
+        setError(streamError);
+        console.error('[useNexxStream] Stream error:', streamError);
       }
     } finally {
       setIsStreaming(false);
@@ -116,6 +123,7 @@ export function useNexxStream(): UseNexxStreamReturn {
     artifacts: state.artifacts,
     isFinal: state.isFinal,
     isStreaming,
+    error,
     startStream,
     reset,
   };

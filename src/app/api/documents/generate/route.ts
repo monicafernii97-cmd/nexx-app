@@ -132,17 +132,34 @@ export async function POST(request: NextRequest) {
           .filter(s => s.type !== 'title' && s.type !== 'signature_block' && s.type !== 'caption')
           .map(s => s.id || s.type);
 
+        // Build a lookup map from template so we can derive sectionType per section
+        const sectionTypeByKey = new Map(
+          template.sections.map(section => [section.id ?? section.type, section.type] as const)
+        );
+
+        // Build minimal case context from the request body for the AI drafter
+        const caseContext: Record<string, unknown> = {
+          caseType: body.caseType,
+          petitioner: body.petitioner?.name,
+          respondent: body.respondent?.name,
+          children: body.children?.map((c: { name: string; age?: number }) => c.name),
+          court: body.courtSettings?.courtName,
+          county: body.courtSettings?.county,
+          state: body.courtSettings?.state,
+        };
+
         const drafted = await generateDraftContent({
           templateId: body.templateId,
           templateName: template.title,
           sections: sectionIds,
           courtRules: rules as unknown as Record<string, unknown>,
+          caseGraph: caseContext as unknown as import('@/lib/nexx/caseGraph').CaseGraph,
         });
 
-        // Transform drafter output to GeneratedSection format
+        // Transform drafter output to GeneratedSection format, deriving sectionType from template
         bodyContent = drafted.map(d => ({
           sectionId: d.sectionId,
-          sectionType: 'body_sections' as const,
+          sectionType: sectionTypeByKey.get(d.sectionId ?? '') ?? 'body_sections',
           heading: d.heading,
           content: d.body,
           numberedItems: d.numberedItems,

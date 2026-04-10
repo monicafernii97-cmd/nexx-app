@@ -9,8 +9,17 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Archive, Lock, Sun, Moon } from '@phosphor-icons/react';
 import MessageBubble, { type ChatTheme } from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
-import type { NexxAssistantResponse } from '@/lib/types';
+import type { NexxAssistantResponse, RouteMode } from '@/lib/types';
 
+const VALID_ROUTE_MODES: readonly RouteMode[] = [
+    'adaptive_chat', 'direct_legal_answer', 'local_procedure',
+    'document_analysis', 'judge_lens_strategy', 'court_ready_drafting',
+    'pattern_analysis', 'support_grounding', 'safety_escalation',
+] as const;
+
+function isValidRouteMode(value: unknown): value is RouteMode {
+    return typeof value === 'string' && VALID_ROUTE_MODES.includes(value as RouteMode);
+}
 
 /** Premium full-screen chat interface for a single NEXX AI conversation. */
 export default function ConversationPage() {
@@ -34,6 +43,11 @@ export default function ConversationPage() {
     const [streamingContent, setStreamingContent] = useState('');
     /** Tracks an assistant reply that was streamed but failed to persist. */
     const [unsavedReply, setUnsavedReply] = useState<string | null>(null);
+    /** Tracks artifacts/mode for an unsaved reply so retry persistence restores the full message. */
+    const [unsavedResponseData, setUnsavedResponseData] = useState<{
+        artifactsJson?: string;
+        mode?: RouteMode;
+    } | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // ── Theme state (persisted to localStorage) ──
@@ -131,6 +145,7 @@ export default function ConversationPage() {
 
             const fullContent = data.response.message;
             const artifactsJson = JSON.stringify(data.response.artifacts);
+            const mode = isValidRouteMode(data.routeMode) ? data.routeMode : undefined;
             setStreamingContent(fullContent);
 
             // Persist the assistant response with artifacts
@@ -141,10 +156,11 @@ export default function ConversationPage() {
                     content: fullContent,
                     requestId,
                     artifactsJson,
-                    mode: data.routeMode as import('@/lib/types').RouteMode,
+                    mode,
                 });
                 setStreamingContent('');
                 setUnsavedReply(null);
+                setUnsavedResponseData(null);
             } catch (persistError) {
                 console.error('Failed to persist AI response:', persistError);
                 try {
@@ -155,13 +171,15 @@ export default function ConversationPage() {
                         content: fullContent,
                         requestId,
                         artifactsJson,
-                        mode: data.routeMode as import('@/lib/types').RouteMode,
+                        mode,
                     });
                     setStreamingContent('');
                     setUnsavedReply(null);
+                    setUnsavedResponseData(null);
                 } catch {
                     // Mark as unsaved — blocks new sends until resolved
                     setUnsavedReply(fullContent);
+                    setUnsavedResponseData({ artifactsJson, mode });
                     console.error('Retry persistence also failed — response preserved in UI for manual copy');
                 }
             }
@@ -262,10 +280,11 @@ export default function ConversationPage() {
     /** Dismiss an unsaved reply, clearing it from the UI. */
     const handleDismissUnsaved = useCallback(() => {
         setUnsavedReply(null);
+        setUnsavedResponseData(null);
         setStreamingContent('');
     }, []);
 
-    /** Retry persisting the unsaved reply. */
+    /** Retry persisting the unsaved reply with full artifacts and mode. */
     const handleRetryPersist = useCallback(async () => {
         if (!unsavedReply) return;
         try {
@@ -273,13 +292,16 @@ export default function ConversationPage() {
                 conversationId,
                 role: 'assistant',
                 content: unsavedReply,
+                artifactsJson: unsavedResponseData?.artifactsJson,
+                mode: unsavedResponseData?.mode,
             });
             setUnsavedReply(null);
+            setUnsavedResponseData(null);
             setStreamingContent('');
         } catch {
             console.error('Retry persistence failed again');
         }
-    }, [unsavedReply, conversationId, sendMessage]);
+    }, [unsavedReply, unsavedResponseData, conversationId, sendMessage]);
 
     // Early return AFTER all hooks
     if (!isValidId) return null;

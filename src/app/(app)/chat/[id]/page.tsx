@@ -186,12 +186,22 @@ export default function ConversationPage() {
             }
         } catch (error) {
             console.error('Chat API error:', error);
-            await sendMessage({
-                conversationId,
-                role: 'assistant',
-                content: "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.",
-            }).catch(() => {});
-            setStreamingContent('');
+            const fallbackContent = "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.";
+            try {
+                await sendMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: fallbackContent,
+                });
+                setStreamingContent('');
+                setUnsavedReply(null);
+                setUnsavedResponseData(null);
+            } catch {
+                // Fallback persistence failed — preserve for retry
+                setUnsavedReply(fallbackContent);
+                setUnsavedResponseData({ requestId });
+                setStreamingContent(fallbackContent);
+            }
         } finally {
             setIsStreaming(false);
         }
@@ -287,15 +297,15 @@ export default function ConversationPage() {
 
     /** Retry persisting the unsaved reply with full artifacts, mode, and requestId. */
     const handleRetryPersist = useCallback(async () => {
-        if (!unsavedReply) return;
+        if (!unsavedReply || !unsavedResponseData?.requestId) return;
         try {
             await sendMessage({
                 conversationId,
                 role: 'assistant',
                 content: unsavedReply,
-                requestId: unsavedResponseData?.requestId,
-                artifactsJson: unsavedResponseData?.artifactsJson,
-                mode: unsavedResponseData?.mode,
+                requestId: unsavedResponseData.requestId,
+                artifactsJson: unsavedResponseData.artifactsJson,
+                mode: unsavedResponseData.mode,
             });
             setUnsavedReply(null);
             setUnsavedResponseData(null);

@@ -173,7 +173,10 @@ function ArtifactPanel({
     accentColor?: string;
 }) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
-    const panelId = `artifact-panel-${label.toLowerCase().replace(/\s+/g, '-')}`;
+    const panelIdRef = useRef(
+        `artifact-panel-${label.toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).slice(2, 8)}`
+    );
+    const panelId = panelIdRef.current;
 
     return (
         <motion.div

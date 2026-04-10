@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, Check, Sparkle, ArrowsClockwise, PencilSimple, X, PaperPlaneRight, CaretDown, Scales, Sword, FileText, CalendarBlank, ListBullets } from '@phosphor-icons/react';
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo, useId } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { NexxArtifacts, LegalConfidence, JudgeSimulationResult, OppositionSimulationResult } from '@/lib/types';
@@ -173,10 +173,8 @@ function ArtifactPanel({
     accentColor?: string;
 }) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
-    const panelIdRef = useRef(
-        `artifact-panel-${label.toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).slice(2, 8)}`
-    );
-    const panelId = panelIdRef.current;
+    const reactId = useId();
+    const panelId = `artifact-panel-${label.toLowerCase().replace(/\s+/g, '-')}-${reactId.replace(/:/g, '')}`;
 
     return (
         <motion.div

@@ -146,8 +146,9 @@ export async function POST(request: NextRequest) {
       }
 
       // Build a lookup map from template so we can derive sectionType per section
+      // Use || (not ??) to match sectionIds — treats '' the same as undefined
       const sectionTypeByKey = new Map(
-        template.sections.map(section => [section.id ?? section.type, section.type] as const)
+        template.sections.map(section => [section.id || section.type, section.type] as const)
       );
 
       // Build minimal case context from the request body for the AI drafter
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest) {
           templateName: template.title,
           sections: sectionIds,
           courtRules: rules as unknown as Record<string, unknown>,
-          caseGraph: caseContext as unknown as import('@/lib/nexx/caseGraph').CaseGraph,
+          caseGraph: caseContext,
         });
       } catch (draftError) {
         // Sanitize: only log templateId + message, not raw error with case/party data
@@ -198,10 +199,21 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Validate all requested sections were drafted
+      const draftedIds = new Set(drafted.map(d => d.sectionId));
+      const missingIds = sectionIds.filter(id => !draftedIds.has(id));
+      if (missingIds.length > 0) {
+        console.error('[DocuVault] AI drafter omitted sections:', missingIds);
+        return NextResponse.json(
+          { error: 'AI drafting returned incomplete sections. Please try again.' },
+          { status: 422 }
+        );
+      }
+
       // Transform drafter output to GeneratedSection format, deriving sectionType from template
       bodyContent = drafted.map(d => ({
         sectionId: d.sectionId,
-        sectionType: sectionTypeByKey.get(d.sectionId ?? '') ?? 'body_sections',
+        sectionType: sectionTypeByKey.get(d.sectionId) ?? 'body_sections',
         heading: d.heading,
         content: d.body,
         numberedItems: d.numberedItems,

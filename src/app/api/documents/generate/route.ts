@@ -156,7 +156,10 @@ export async function POST(request: NextRequest) {
         caseType: body.caseType,
         petitioner: body.petitioner?.name,
         respondent: body.respondent?.name,
-        children: body.children?.map((c: { name: string; age?: number }) => c.name),
+        children: body.children?.map((c: { name: string; age?: number }) => ({
+          name: c.name,
+          age: c.age,
+        })),
         court: body.courtSettings?.courtName,
         county: body.courtSettings?.county,
         state: body.courtSettings?.state,

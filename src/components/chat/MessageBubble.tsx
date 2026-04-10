@@ -54,6 +54,13 @@ function ensureStringArray(val: unknown): string[] {
     return Array.isArray(val) ? val.filter((v): v is string => typeof v === 'string') : [];
 }
 
+/** Coerce a value to a finite number clamped to 0–10, returning 0 for non-finite values. */
+function ensureScore(val: unknown): number {
+    const n = typeof val === 'number' ? val : Number(val);
+    if (!Number.isFinite(n)) return 0;
+    return Math.min(Math.max(n, 0), 10);
+}
+
 /**
  * Validate and normalize a parsed JSON payload into a safe NexxArtifacts object.
  * Defaults missing arrays to [] and rejects non-object payloads entirely.
@@ -75,9 +82,9 @@ function normalizeNexxArtifacts(parsed: unknown): NexxArtifacts | null {
 
     const judgeSimulation = obj.judgeSimulation && typeof obj.judgeSimulation === 'object'
         ? {
-            credibilityScore: Number((obj.judgeSimulation as Record<string, unknown>).credibilityScore ?? 0),
-            neutralityScore: Number((obj.judgeSimulation as Record<string, unknown>).neutralityScore ?? 0),
-            clarityScore: Number((obj.judgeSimulation as Record<string, unknown>).clarityScore ?? 0),
+            credibilityScore: ensureScore((obj.judgeSimulation as Record<string, unknown>).credibilityScore),
+            neutralityScore: ensureScore((obj.judgeSimulation as Record<string, unknown>).neutralityScore),
+            clarityScore: ensureScore((obj.judgeSimulation as Record<string, unknown>).clarityScore),
             strengths: ensureStringArray((obj.judgeSimulation as Record<string, unknown>).strengths),
             weaknesses: ensureStringArray((obj.judgeSimulation as Record<string, unknown>).weaknesses),
             likelyCourtInterpretation: String((obj.judgeSimulation as Record<string, unknown>).likelyCourtInterpretation ?? ''),
@@ -115,11 +122,15 @@ function ConfidenceBadge({ confidence, isLight }: { confidence: LegalConfidence;
     };
     const c = colorMap[confidence.confidence] ?? colorMap.moderate;
     const [showTooltip, setShowTooltip] = useState(false);
+    const tooltipId = useId();
 
     return (
         <div className="relative inline-block">
             <button
+                type="button"
                 onClick={() => setShowTooltip(!showTooltip)}
+                aria-expanded={showTooltip}
+                aria-controls={tooltipId}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase border ${c.bg} ${c.border} ${c.text} transition-all hover:scale-105 cursor-pointer`}
                 aria-label={`Confidence: ${confidence.confidence}`}
             >
@@ -129,6 +140,8 @@ function ConfidenceBadge({ confidence, isLight }: { confidence: LegalConfidence;
             <AnimatePresence>
                 {showTooltip && (
                     <motion.div
+                        id={tooltipId}
+                        role="tooltip"
                         initial={{ opacity: 0, y: -4 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}

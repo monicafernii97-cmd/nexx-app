@@ -211,7 +211,17 @@ export const setLastResponseId = mutation({
 export const setRouteMode = mutation({
     args: {
         conversationId: v.id('conversations'),
-        routeMode: v.string(),
+        routeMode: v.union(
+            v.literal('adaptive_chat'),
+            v.literal('direct_legal_answer'),
+            v.literal('local_procedure'),
+            v.literal('document_analysis'),
+            v.literal('judge_lens_strategy'),
+            v.literal('court_ready_drafting'),
+            v.literal('pattern_analysis'),
+            v.literal('support_grounding'),
+            v.literal('safety_escalation')
+        ),
     },
     handler: async (ctx, args) => {
         await ctx.db.patch(args.conversationId, {

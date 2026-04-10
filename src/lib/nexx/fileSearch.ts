@@ -30,8 +30,8 @@ export async function uploadToVectorStore(
     purpose: 'assistants',
   });
 
-  // Attach to vector store with metadata
-  await openai.vectorStores.files.create(vectorStoreId, {
+  // Attach to vector store with metadata — wait until indexing is complete
+  await openai.vectorStores.files.createAndPoll(vectorStoreId, {
     file_id: uploadedFile.id,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ...(metadata ? { metadata: metadata as any } : {}),

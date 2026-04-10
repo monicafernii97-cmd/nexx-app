@@ -133,7 +133,17 @@ export default defineSchema({
         openaiConversationId: v.optional(v.string()),
         openaiLastResponseId: v.optional(v.string()),
         vectorStoreId: v.optional(v.string()),
-        routeMode: v.optional(v.string()),
+        routeMode: v.optional(v.union(
+            v.literal('adaptive_chat'),
+            v.literal('direct_legal_answer'),
+            v.literal('local_procedure'),
+            v.literal('document_analysis'),
+            v.literal('judge_lens_strategy'),
+            v.literal('court_ready_drafting'),
+            v.literal('pattern_analysis'),
+            v.literal('support_grounding'),
+            v.literal('safety_escalation')
+        )),
     })
         .index('by_user', ['userId'])
         .index('by_user_status', ['userId', 'status']),
@@ -148,7 +158,17 @@ export default defineSchema({
         requestId: v.optional(v.string()),
         createdAt: v.number(),
         // ── NEW: Route mode + structured artifact storage ──
-        mode: v.optional(v.string()),
+        mode: v.optional(v.union(
+            v.literal('adaptive_chat'),
+            v.literal('direct_legal_answer'),
+            v.literal('local_procedure'),
+            v.literal('document_analysis'),
+            v.literal('judge_lens_strategy'),
+            v.literal('court_ready_drafting'),
+            v.literal('pattern_analysis'),
+            v.literal('support_grounding'),
+            v.literal('safety_escalation')
+        )),
         artifactsJson: v.optional(v.string()),
     })
         .index('by_conversation', ['conversationId'])

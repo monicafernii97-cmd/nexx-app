@@ -8,6 +8,7 @@ import { buildFeatureToolPrompt } from '@/lib/nexx/prompts/featurePrompt';
 import { buildArtifactPrompt } from '@/lib/nexx/prompts/artifactPrompt';
 import { buildContextPrompt, type ContextPacket } from '@/lib/nexx/prompts/contextPrompt';
 import { NEXX_RESPONSE_SCHEMA } from '@/lib/nexx/schemas';
+import { retrieveLocalSources } from '@/lib/nexx/legalRetriever';
 import { recoverStructuredOutput } from '@/lib/nexx/recovery/recoverStructuredOutput';
 import { suppressWeakArtifacts } from '@/lib/nexx/recovery/suppressWeakArtifacts';
 import { extractOutputText } from '@/lib/nexx/validation/nexxArtifacts';
@@ -202,7 +203,7 @@ export async function POST(req: NextRequest) {
 
     // Load conversation summary + case graph from Convex
     let existingCaseGraph: CaseGraph | undefined;
-    const retrievedSources: LocalCourtSource[] = [];
+    let retrievedSources: LocalCourtSource[] = [];
     try {
       const [summaryDoc, caseGraphDoc] = await Promise.all([
         convex.query(api.conversationSummaries.getByConversation, { conversationId: typedConversationId }),
@@ -223,6 +224,21 @@ export async function POST(req: NextRequest) {
       }
     } catch {
       // Non-fatal — continue without context
+    }
+
+    // ── Step 6b: Retrieve local court sources if router requests it ──
+    if (toolPlan.useLocalCourtRetriever && contextPacket.userProfile?.state) {
+      try {
+        retrievedSources = await retrieveLocalSources({
+          query: message,
+          state: contextPacket.userProfile.state,
+          county: contextPacket.userProfile.county,
+        });
+        // Also inject into context packet for prompt building
+        contextPacket.localSources = retrievedSources;
+      } catch {
+        // Non-fatal — continue without court sources
+      }
     }
 
     // ── Step 7: Build tools array ──

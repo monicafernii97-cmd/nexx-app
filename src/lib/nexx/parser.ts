@@ -12,14 +12,26 @@ import { openai } from '../openaiConversation';
 import { PARSED_LEGAL_DOCUMENT_SCHEMA } from './schemas';
 import type { ParsedLegalDocument } from '../types';
 
+const MAX_PARSE_INPUT_CHARS = 8000;
+
 /**
  * Parse a legal document and extract structured metadata.
  * Uses AI for document classification and key clause extraction.
+ * 
+ * Throws if document exceeds MAX_PARSE_INPUT_CHARS to prevent
+ * silent truncation that could omit key clauses or deadlines.
  */
 export async function parseLegalDocument(args: {
   filename: string;
   text: string;
 }): Promise<ParsedLegalDocument> {
+  if (args.text.length > MAX_PARSE_INPUT_CHARS) {
+    throw new Error(
+      `Document too long for parseLegalDocument (max ${MAX_PARSE_INPUT_CHARS}, received ${args.text.length}). ` +
+      `Use chunkLegalText() to split before parsing.`
+    );
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const response = await (openai.responses as any).create({
     model: 'gpt-5.4-mini',
@@ -40,7 +52,7 @@ Be precise. Only extract what is explicitly stated. Do not infer.`,
       },
       {
         role: 'user',
-        content: `Parse this document (${args.filename}):\n\n${args.text.slice(0, 8000)}`,
+        content: `Parse this document (${args.filename}):\n\n${args.text}`,
       },
     ],
     text: { format: PARSED_LEGAL_DOCUMENT_SCHEMA },
@@ -49,14 +61,17 @@ Be precise. Only extract what is explicitly stated. Do not infer.`,
   const text = response.output_text || '';
   try {
     return JSON.parse(text) as ParsedLegalDocument;
-  } catch {
-    return { title: args.filename };
+  } catch (error) {
+    throw new Error(
+      `parseLegalDocument: invalid structured output for ${args.filename}: ${String(error)}`
+    );
   }
 }
 
 /**
  * Legal-specific text chunking.
  * Splits on legal section boundaries while preserving paragraph integrity.
+ * Guarantees all chunks are <= MAX_CHUNK_SIZE.
  */
 export function chunkLegalText(text: string): string[] {
   const chunks: string[] = [];
@@ -79,6 +94,18 @@ export function chunkLegalText(text: string): string[] {
       let current = '';
 
       for (const para of paragraphs) {
+        // Hard-split oversized paragraphs to preserve chunk upper bound
+        if (para.length > MAX_CHUNK_SIZE) {
+          if (current) {
+            chunks.push(current.trim());
+            current = '';
+          }
+          for (let i = 0; i < para.length; i += MAX_CHUNK_SIZE) {
+            chunks.push(para.slice(i, i + MAX_CHUNK_SIZE).trim());
+          }
+          continue;
+        }
+
         if ((current + '\n\n' + para).length > MAX_CHUNK_SIZE && current) {
           chunks.push(current.trim());
           // Overlap: keep the last paragraph

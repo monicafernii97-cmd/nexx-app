@@ -44,33 +44,3 @@ export async function getAuthenticatedConvexClient(): Promise<ConvexHttpClient> 
     reqClient.setAuth(token);
     return reqClient;
 }
-
-// ── NEW: Convenience wrappers for API route usage ──
-
-/**
- * Run a Convex query from an API route with authentication.
- * Handles client creation and auth token setup automatically.
- */
-export async function convexQuery<T>(
-    queryFn: FunctionReference<'query'>,
-    args: Record<string, unknown>
-): Promise<T> {
-    const client = await getAuthenticatedConvexClient();
-    return await client.query(queryFn, args) as T;
-}
-
-/**
- * Run a Convex mutation from an API route with authentication.
- * Handles client creation and auth token setup automatically.
- */
-export async function convexMutation<T>(
-    mutationFn: FunctionReference<'mutation'>,
-    args: Record<string, unknown>
-): Promise<T> {
-    const client = await getAuthenticatedConvexClient();
-    return await client.mutation(mutationFn, args) as T;
-}
-
-// Type import for Convex function references
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-type FunctionReference<_T extends string> = any;

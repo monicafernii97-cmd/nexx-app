@@ -155,20 +155,54 @@ export async function executeFunctionTool(
 ): Promise<FunctionToolResult> {
   try {
     switch (toolName) {
-      case 'create_incident_from_chat':
+      case 'create_incident_from_chat': {
+        if (!args.narrative || typeof args.narrative !== 'string') {
+          return { success: false, error: 'Missing required field: narrative' };
+        }
         return await handleCreateIncident(args, context);
-      case 'append_to_timeline':
+      }
+      case 'append_to_timeline': {
+        if (!args.date || typeof args.date !== 'string') {
+          return { success: false, error: 'Missing required field: date' };
+        }
+        if (!args.description || typeof args.description !== 'string') {
+          return { success: false, error: 'Missing required field: description' };
+        }
         return await handleAppendTimeline(args, context);
-      case 'generate_docuvault_draft':
+      }
+      case 'generate_docuvault_draft': {
+        if (!args.templateId || typeof args.templateId !== 'string') {
+          return { success: false, error: 'Missing required field: templateId' };
+        }
         return await handleGenerateDraft(args, context);
-      case 'save_case_note':
-        return { success: true, data: { note: args.note, prepared: true, requires_confirmation: true } };
-      case 'mark_evidence_theme':
-        return { success: true, data: { theme: args.theme, prepared: true, requires_confirmation: true } };
-      case 'create_exhibit_index':
-        return { success: true, data: { exhibits: args.exhibits, prepared: true, requires_confirmation: true } };
-      case 'link_incident_to_motion':
-        return { success: true, data: { prepared: true, requires_confirmation: true, incident: args.incidentSummary, motion: args.motionType } };
+      }
+      case 'save_case_note': {
+        if (!args.note || typeof args.note !== 'string') {
+          return { success: false, error: 'Missing required field: note' };
+        }
+        return { success: true, data: { note: args.note, status: 'pending', requires_confirmation: true } };
+      }
+      case 'mark_evidence_theme': {
+        if (!args.theme || typeof args.theme !== 'string') {
+          return { success: false, error: 'Missing required field: theme' };
+        }
+        return { success: true, data: { theme: args.theme, status: 'pending', requires_confirmation: true } };
+      }
+      case 'create_exhibit_index': {
+        if (!args.exhibits || !Array.isArray(args.exhibits)) {
+          return { success: false, error: 'Missing required field: exhibits (array)' };
+        }
+        return { success: true, data: { exhibits: args.exhibits, status: 'pending', requires_confirmation: true } };
+      }
+      case 'link_incident_to_motion': {
+        if (!args.incidentSummary || typeof args.incidentSummary !== 'string') {
+          return { success: false, error: 'Missing required field: incidentSummary' };
+        }
+        if (!args.motionType || typeof args.motionType !== 'string') {
+          return { success: false, error: 'Missing required field: motionType' };
+        }
+        return { success: true, data: { status: 'pending', requires_confirmation: true, incident: args.incidentSummary, motion: args.motionType } };
+      }
       case 'fetch_user_court_settings':
         return await handleFetchCourtSettings(context);
       default:

@@ -93,22 +93,31 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'conversationId is required' }, { status: 400 });
     }
 
-    // ── Fetch user record + tier ──
+    // Generate stable per-turn request ID for idempotent message persistence
+    const turnRequestId = crypto.randomUUID();
+
+    // ── Fetch user record + tier (fail-closed) ──
     const convex = await getAuthenticatedConvexClient();
     const validTiers: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
     let userTier: SubscriptionTier = 'free';
-    let convexUserId: Id<'users'> | undefined;
+    let convexUserId: Id<'users'>;
 
+    let userRecord;
     try {
-      const userRecord = await convex.query(api.users.getByClerkId, { clerkId: clerkUserId });
-      if (userRecord) {
-        convexUserId = userRecord._id;
-        if (userRecord.subscriptionTier && validTiers.includes(userRecord.subscriptionTier as SubscriptionTier)) {
-          userTier = userRecord.subscriptionTier as SubscriptionTier;
-        }
-      }
+      userRecord = await convex.query(api.users.getByClerkId, { clerkId: clerkUserId });
     } catch (err) {
-      console.warn('[Chat] Failed to fetch user tier:', err);
+      console.warn('[Chat] Failed to fetch user record:', err);
+      return Response.json({ error: 'Failed to resolve user context' }, { status: 500 });
+    }
+
+    if (!userRecord) {
+      return Response.json({ error: 'User not found' }, { status: 403 });
+    }
+
+    // eslint-disable-next-line prefer-const
+    convexUserId = userRecord._id;
+    if (userRecord.subscriptionTier && validTiers.includes(userRecord.subscriptionTier as SubscriptionTier)) {
+      userTier = userRecord.subscriptionTier as SubscriptionTier;
     }
 
     // ── Router: classify the turn ──
@@ -116,7 +125,19 @@ export async function POST(req: NextRequest) {
     const { mode: routeMode, toolPlan, temperature } = routerResult;
 
     // ── Rate limit check (model-aware via router) ──
-    const model = getModelForRoute(userTier, routeMode === 'judge_lens_strategy' ? 'judge_sim' : 'chat');
+    const routeModeToFeature: Record<string, 'chat' | 'analysis' | 'judge_sim' | 'opposition_sim' | 'deep_draft' | 'memory' | 'confidence'> = {
+      adaptive_chat: 'chat',
+      direct_legal_answer: 'chat',
+      local_procedure: 'chat',
+      document_analysis: 'analysis',
+      judge_lens_strategy: 'judge_sim',
+      court_ready_drafting: 'deep_draft',
+      pattern_analysis: 'analysis',
+      support_grounding: 'chat',
+      safety_escalation: 'chat',
+    };
+    const modelFeature = routeModeToFeature[routeMode] ?? 'chat';
+    const model = getModelForRoute(userTier, modelFeature);
     const dailyCap = getDailyLimit(userTier, model);
     if (dailyCap !== -1) {
       const rateLimitKey = model.includes('pro') ? 'chat_message_5_4_pro' as const : 'chat_message_5_4' as const;
@@ -129,25 +150,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Step 2: Load conversation from Convex ──
+    // ── Step 2: Load conversation from Convex (fail-closed) ──
     const typedConversationId = conversationId as Id<'conversations'>;
-    let existingOpenAIConversationId: string | undefined;
-    let existingVectorStoreId: string | undefined;
 
+    let conversation;
     try {
-      const conversation = await convex.query(api.conversations.get, { id: typedConversationId });
-      if (!conversation) {
-        return Response.json({ error: 'Conversation not found' }, { status: 404 });
-      }
-      // Verify ownership: conversation must belong to the authenticated user
-      if (convexUserId && conversation.userId !== convexUserId) {
-        return Response.json({ error: 'Unauthorized access to conversation' }, { status: 403 });
-      }
-      existingOpenAIConversationId = conversation.openaiConversationId ?? undefined;
-      existingVectorStoreId = conversation.vectorStoreId ?? undefined;
-    } catch {
-      // Conversation may not exist yet — continue
+      conversation = await convex.query(api.conversations.get, { id: typedConversationId });
+    } catch (err) {
+      console.warn('[Chat] Failed to load conversation:', err);
+      return Response.json({ error: 'Failed to load conversation' }, { status: 500 });
     }
+
+    if (!conversation) {
+      return Response.json({ error: 'Conversation not found' }, { status: 404 });
+    }
+    if (conversation.userId !== convexUserId) {
+      return Response.json({ error: 'Unauthorized access to conversation' }, { status: 403 });
+    }
+
+    const existingOpenAIConversationId = conversation.openaiConversationId ?? undefined;
+    const existingVectorStoreId = conversation.vectorStoreId ?? undefined;
 
     // ── Step 3: Ensure OpenAI conversation ──
     const openaiConversationId = await ensureOpenAIConversation(existingOpenAIConversationId);
@@ -158,7 +180,6 @@ export async function POST(req: NextRequest) {
         await convex.mutation(api.conversations.setOpenAIConversationState, {
           conversationId: typedConversationId,
           openaiConversationId,
-          callerUserId: String(convexUserId ?? ''),
         });
       } catch (err) {
         console.warn('[Chat] Failed to save conversation state:', err);
@@ -208,7 +229,7 @@ export async function POST(req: NextRequest) {
     try {
       const [summaryDoc, caseGraphDoc] = await Promise.all([
         convex.query(api.conversationSummaries.getByConversation, { conversationId: typedConversationId }),
-        convexUserId ? convex.query(api.caseGraphs.getByUser, { userId: convexUserId }) : null,
+        convex.query(api.caseGraphs.getByUser, { userId: convexUserId }),
       ]);
 
       if (summaryDoc) {
@@ -306,14 +327,6 @@ export async function POST(req: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const functionOutputs: any[] = [];
       for (const fc of functionCalls) {
-        if (!convexUserId) {
-          functionOutputs.push({
-            type: 'function_call_output',
-            call_id: fc.call_id,
-            output: JSON.stringify({ success: false, error: 'User context unavailable for tool execution.' }),
-          });
-          continue;
-        }
 
         let parsedArgs: Record<string, unknown> = {};
         try {
@@ -339,7 +352,6 @@ export async function POST(req: NextRequest) {
             toolType: fc.name,
             inputJson: JSON.stringify(parsedArgs),
             outputJson: JSON.stringify(result),
-            callerUserId: String(convexUserId ?? ''),
           });
         } catch { /* non-fatal */ }
       }
@@ -412,7 +424,7 @@ export async function POST(req: NextRequest) {
         role: 'user',
         content: message,
         mode: routeMode,
-        callerUserId: String(convexUserId ?? ''),
+        requestId: `${turnRequestId}-user`,
       });
     } catch (err) {
       console.warn('[Chat] Failed to save user message:', err);
@@ -426,7 +438,7 @@ export async function POST(req: NextRequest) {
         content: parsedResponse.message,
         mode: routeMode,
         artifactsJson: JSON.stringify(parsedResponse.artifacts),
-        callerUserId: String(convexUserId ?? ''),
+        requestId: `${turnRequestId}-assistant`,
       });
     } catch (err) {
       console.warn('[Chat] Failed to save assistant message:', err);
@@ -439,7 +451,6 @@ export async function POST(req: NextRequest) {
         await convex.mutation(api.conversations.setLastResponseId, {
           conversationId: typedConversationId,
           openaiLastResponseId: responseId,
-          callerUserId: String(convexUserId ?? ''),
         });
       } catch { /* non-fatal */ }
     }
@@ -465,51 +476,46 @@ export async function POST(req: NextRequest) {
         traceId: finalTrace.traceId,
         route: '/api/chat',
         routeMode,
-        callerUserId: clerkUserId,
         conversationId: typedConversationId,
         debugJson: serializeTrace(finalTrace),
       });
     } catch { /* non-fatal */ }
 
     // ── Step 17: persistAfterResponse (via Next.js after() hook) ──
-    // Load all messages for summary compaction
-    try {
-      const allMessages = await convex.query(api.messages.list, { conversationId: typedConversationId });
-      const messageArray = allMessages.map((m: { role: string; content: string }) => ({
-        role: m.role,
-        content: m.content,
-      }));
+    // Use after() for reliable execution even after response is sent
+    after(async () => {
+      try {
+        // Load all messages inside the deferred callback to avoid blocking response
+        const allMessages = await convex.query(api.messages.list, { conversationId: typedConversationId });
+        const messageArray = allMessages.map((m: { role: string; content: string }) => ({
+          role: m.role,
+          content: m.content,
+        }));
 
-      // Use after() for reliable execution even after response is sent
-      after(async () => {
-        try {
-          await persistAfterResponse({
-            conversationId,
-            messages: messageArray,
-            messageCount: messageArray.length,
-            existingSummary: contextPacket.conversationSummary,
-            existingCaseGraph,
-            saveSummary: async (summary, turnCount) => {
-              await convex.mutation(api.conversationSummaries.upsert, {
-                conversationId: typedConversationId,
-                summary: JSON.stringify(summary),
-                turnCount,
-              });
-            },
-            saveCaseGraph: async (graphJson) => {
-              if (convexUserId) {
-                await convex.mutation(api.caseGraphs.upsert, {
-                  userId: convexUserId,
-                  graphJson,
-                });
-              }
-            },
-          });
-        } catch (err) {
-          console.warn('[Chat] persistAfterResponse error:', err);
-        }
-      });
-    } catch { /* non-fatal */ }
+        await persistAfterResponse({
+          conversationId,
+          messages: messageArray,
+          messageCount: messageArray.length,
+          existingSummary: contextPacket.conversationSummary,
+          existingCaseGraph,
+          saveSummary: async (summary, turnCount) => {
+            await convex.mutation(api.conversationSummaries.upsert, {
+              conversationId: typedConversationId,
+              summary: JSON.stringify(summary),
+              turnCount,
+            });
+          },
+          saveCaseGraph: async (graphJson) => {
+            await convex.mutation(api.caseGraphs.upsert, {
+              userId: convexUserId,
+              graphJson,
+            });
+          },
+        });
+      } catch (err) {
+        console.warn('[Chat] persistAfterResponse error:', err);
+      }
+    });
 
     // ── Step 18: Return response ──
     return Response.json({

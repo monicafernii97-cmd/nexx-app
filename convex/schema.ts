@@ -436,17 +436,17 @@ export default defineSchema({
         traceId: v.string(),
         route: v.string(),
         routeMode: v.string(),
-        userId: v.string(),
+        clerkUserId: v.string(),
         conversationId: v.optional(v.id('conversations')),
         debugJson: v.string(),
         createdAt: v.number(),
     }).index('by_traceId', ['traceId'])
       .index('by_conversationId', ['conversationId'])
-      .index('by_userId', ['userId']),
+      .index('by_clerkUserId', ['clerkUserId']),
 
     // ═══ NEW: Uploaded Files (metadata for user-uploaded documents) ═══
     uploadedFiles: defineTable({
-        userId: v.string(),
+        clerkUserId: v.string(),
         conversationId: v.optional(v.id('conversations')),
         filename: v.string(),
         mimeType: v.string(),
@@ -459,7 +459,7 @@ export default defineSchema({
             v.literal('failed')
         ),
         createdAt: v.number(),
-    }).index('by_userId', ['userId'])
+    }).index('by_clerkUserId', ['clerkUserId'])
       .index('by_conversationId', ['conversationId']),
 
     // ═══ NEW: Retrieved Sources (legal sources retrieved per conversation) ═══

@@ -1,17 +1,17 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { getAuthenticatedUser, getAuthenticatedUserAndConversation } from './lib/auth';
 
 /**
  * Uploaded Files — metadata for user-uploaded documents.
- * userId is a Clerk string (not v.id) for cross-service lookups.
+ * clerkUserId is resolved from ctx.auth (Clerk JWT), not from args.
  * The actual file content lives in OpenAI's vector stores.
  *
- * Ownership: callerUserId must match userId for writes and reads.
+ * Auth: server-derived. Not caller-supplied.
  */
 
 export const create = mutation({
     args: {
-        userId: v.string(),
         conversationId: v.optional(v.id('conversations')),
         filename: v.string(),
         mimeType: v.string(),
@@ -23,26 +23,24 @@ export const create = mutation({
             v.literal('ready'),
             v.literal('failed')
         ),
-        callerUserId: v.string(),
     },
     handler: async (ctx, args) => {
-        // Verify caller matches the userId
-        if (args.userId !== args.callerUserId) {
-            throw new Error('Unauthorized: caller does not match userId');
-        }
+        // Server-derived auth
+        const user = await getAuthenticatedUser(ctx);
 
         // Verify conversation ownership if provided
         if (args.conversationId) {
-            const conversation = await ctx.db.get(args.conversationId);
-            if (!conversation) throw new Error('Conversation not found');
-            if (String(conversation.userId) !== args.callerUserId) {
-                throw new Error('Unauthorized: caller does not own this conversation');
-            }
+            await getAuthenticatedUserAndConversation(ctx, args.conversationId);
         }
 
-        const { callerUserId: _caller, ...insertFields } = args;
         return await ctx.db.insert('uploadedFiles', {
-            ...insertFields,
+            clerkUserId: user.clerkId ?? '',
+            conversationId: args.conversationId,
+            filename: args.filename,
+            mimeType: args.mimeType,
+            openaiFileId: args.openaiFileId,
+            vectorStoreId: args.vectorStoreId,
+            status: args.status,
             createdAt: Date.now(),
         });
     },
@@ -59,33 +57,35 @@ export const updateStatus = mutation({
         ),
         openaiFileId: v.optional(v.string()),
         vectorStoreId: v.optional(v.string()),
-        callerUserId: v.string(),
     },
     handler: async (ctx, args) => {
+        // Server-derived auth
+        const user = await getAuthenticatedUser(ctx);
+
         // Verify caller owns the file
         const file = await ctx.db.get(args.fileId);
         if (!file) throw new Error('File not found');
-        if (file.userId !== args.callerUserId) {
+        if (file.clerkUserId !== user.clerkId) {
             throw new Error('Unauthorized: caller does not own this file');
         }
 
-        const { fileId, callerUserId: _caller, ...fields } = args;
-        await ctx.db.patch(fileId, fields);
+        await ctx.db.patch(args.fileId, {
+            status: args.status,
+            openaiFileId: args.openaiFileId,
+            vectorStoreId: args.vectorStoreId,
+        });
     },
 });
 
 export const getByUser = query({
-    args: {
-        userId: v.string(),
-        callerUserId: v.string(),
-    },
-    handler: async (ctx, args) => {
-        // Verify caller matches
-        if (args.userId !== args.callerUserId) return [];
+    args: {},
+    handler: async (ctx) => {
+        // Server-derived auth
+        const user = await getAuthenticatedUser(ctx);
 
         return await ctx.db
             .query('uploadedFiles')
-            .withIndex('by_userId', (q) => q.eq('userId', args.userId))
+            .withIndex('by_clerkUserId', (q) => q.eq('clerkUserId', user.clerkId ?? ''))
             .order('desc')
             .collect();
     },
@@ -94,14 +94,10 @@ export const getByUser = query({
 export const getByConversation = query({
     args: {
         conversationId: v.id('conversations'),
-        callerUserId: v.string(),
     },
     handler: async (ctx, args) => {
-        // Verify conversation ownership
-        const conversation = await ctx.db.get(args.conversationId);
-        if (!conversation || String(conversation.userId) !== args.callerUserId) {
-            return [];
-        }
+        // Server-derived auth
+        await getAuthenticatedUserAndConversation(ctx, args.conversationId);
 
         return await ctx.db
             .query('uploadedFiles')

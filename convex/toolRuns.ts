@@ -1,12 +1,13 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { getAuthenticatedUserAndConversation } from './lib/auth';
 
 /**
  * Tool Runs — audit trail for tool executions.
  * Records every function tool call made during a chat response,
  * including the input sent to the tool and the output received.
  *
- * Ownership: callerUserId must own the conversation.
+ * Auth: server-derived via ctx.auth (Clerk JWT). Not caller-supplied.
  */
 
 export const create = mutation({
@@ -15,26 +16,30 @@ export const create = mutation({
         toolType: v.string(),
         inputJson: v.string(),
         outputJson: v.optional(v.string()),
-        callerUserId: v.string(),
     },
     handler: async (ctx, args) => {
-        // Verify conversation ownership
-        const conversation = await ctx.db.get(args.conversationId);
-        if (!conversation) throw new Error('Conversation not found');
-        if (String(conversation.userId) !== args.callerUserId) {
-            throw new Error('Unauthorized: caller does not own this conversation');
-        }
+        // Server-derived auth
+        await getAuthenticatedUserAndConversation(ctx, args.conversationId);
 
         // 30-day retention TTL
         const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
         const createdAt = Date.now();
 
-        // Basic PII redaction: mask SSN, phone, email patterns in payloads
+        // PII redaction: mask known PII patterns in payloads before persistence
         const redact = (json: string): string => {
             return json
+                // SSN: 123-45-6789
                 .replace(/\b\d{3}-\d{2}-\d{4}\b/g, '[SSN_REDACTED]')
+                // Phone: 10-digit bare, formatted (xxx) xxx-xxxx, xxx-xxx-xxxx
                 .replace(/\b\d{10}\b/g, '[PHONE_REDACTED]')
-                .replace(/\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/g, '[EMAIL_REDACTED]');
+                .replace(/\(\d{3}\)\s*\d{3}[-.]?\d{4}/g, '[PHONE_REDACTED]')
+                .replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '[PHONE_REDACTED]')
+                // Email
+                .replace(/\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/g, '[EMAIL_REDACTED]')
+                // Date of birth patterns: DOB: mm/dd/yyyy, born mm/dd/yyyy
+                .replace(/\b(?:DOB|born|d\.o\.b\.?)\s*:?\s*\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}\b/gi, '[DOB_REDACTED]')
+                // US street addresses (rough pattern)
+                .replace(/\b\d{1,5}\s+(?:[A-Z][a-z]+\s+){1,3}(?:St(?:reet)?|Ave(?:nue)?|Blvd|Dr(?:ive)?|Ln|Rd|Ct|Way|Pl)\b\.?/gi, '[ADDRESS_REDACTED]');
         };
 
         return await ctx.db.insert('toolRuns', {
@@ -51,14 +56,10 @@ export const create = mutation({
 export const getByConversation = query({
     args: {
         conversationId: v.id('conversations'),
-        callerUserId: v.string(),
     },
     handler: async (ctx, args) => {
-        // Verify conversation ownership
-        const conversation = await ctx.db.get(args.conversationId);
-        if (!conversation || String(conversation.userId) !== args.callerUserId) {
-            return [];
-        }
+        // Server-derived auth
+        await getAuthenticatedUserAndConversation(ctx, args.conversationId);
 
         return await ctx.db
             .query('toolRuns')

@@ -237,15 +237,10 @@ export const createMessage = mutation({
         )),
         artifactsJson: v.optional(v.string()),
         requestId: v.optional(v.string()),
-        callerUserId: v.string(),
     },
     handler: async (ctx, args) => {
-        // Verify conversation ownership
-        const conversation = await ctx.db.get(args.conversationId);
-        if (!conversation) throw new Error('Conversation not found');
-        if (String(conversation.userId) !== args.callerUserId) {
-            throw new Error('Unauthorized: caller does not own this conversation');
-        }
+        // Server-derived auth — NOT caller-supplied
+        const { conversation } = await getAuthenticatedUserAndConversation(ctx, args.conversationId);
 
         // De-dup: if requestId is provided, check for existing message
         if (args.requestId) {

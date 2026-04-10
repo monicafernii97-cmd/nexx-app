@@ -13,6 +13,9 @@ export const maxDuration = 60;
  * 
  * Accepts file uploads, stores in OpenAI vector store,
  * extracts legal metadata, and saves to Convex.
+ * 
+ * Auth: Convex mutations derive the caller from the JWT set on the
+ * authenticated ConvexHttpClient — no caller-supplied userId needed.
  */
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -53,23 +56,12 @@ export async function POST(req: NextRequest) {
     const convex = await getAuthenticatedConvexClient();
     const typedConversationId = conversationId as Id<'conversations'> | undefined;
 
-    // Resolve Convex user ID for ownership checks on conversation mutations
-    let convexUserId: string | undefined;
-    try {
-      const userRecord = await convex.query(api.users.getByClerkId, { clerkId: userId });
-      convexUserId = userRecord ? String(userRecord._id) : undefined;
-    } catch {
-      // Non-fatal — ownership checks will fail gracefully
-    }
-
-    // Create Convex record
+    // Create Convex record — auth derived from JWT on the ConvexHttpClient
     const fileRecordId = await convex.mutation(api.uploadedFiles.create, {
-      userId,
       conversationId: typedConversationId,
       filename: file.name,
       mimeType: file.type,
       status: 'processing',
-      callerUserId: userId,
     });
 
     try {
@@ -82,12 +74,11 @@ export async function POST(req: NextRequest) {
 
       if (!vectorStoreId) {
         vectorStoreId = await createVectorStore(`nexx-${conversationId || userId}`);
-        // Persist vector store ID to conversation
+        // Persist vector store ID to conversation (auth derived from JWT)
         if (typedConversationId) {
           await convex.mutation(api.conversations.setVectorStoreId, {
             conversationId: typedConversationId,
             vectorStoreId,
-            callerUserId: convexUserId ?? '',
           });
         }
       }
@@ -111,13 +102,12 @@ export async function POST(req: NextRequest) {
         metadata
       );
 
-      // Update Convex record
+      // Update Convex record (auth derived from JWT)
       await convex.mutation(api.uploadedFiles.updateStatus, {
         fileId: fileRecordId,
         status: 'ready',
         openaiFileId,
         vectorStoreId,
-        callerUserId: userId,
       });
 
       return Response.json({
@@ -128,11 +118,10 @@ export async function POST(req: NextRequest) {
         filename: file.name,
       });
     } catch (error) {
-      // Mark as failed
+      // Mark as failed (auth derived from JWT)
       await convex.mutation(api.uploadedFiles.updateStatus, {
         fileId: fileRecordId,
         status: 'failed',
-        callerUserId: userId,
       });
       throw error;
     }

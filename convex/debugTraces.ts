@@ -1,13 +1,14 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { getAuthenticatedUser, getAuthenticatedUserAndConversation } from './lib/auth';
 
 /**
  * Debug Traces — auditability for every AI call.
  * Each trace captures the full lifecycle: request → generation → validation → recovery → outcome.
  * The debugJson field stores the serialized NexxTrace object.
  *
- * Ownership: create verifies conversationId belongs to callerUserId.
- * Read queries verify conversation ownership before returning data.
+ * Auth: server-derived via ctx.auth (Clerk JWT). Not caller-supplied.
+ * clerkUserId is recorded for audit — resolved from the auth context.
  */
 
 export const create = mutation({
@@ -15,25 +16,23 @@ export const create = mutation({
         traceId: v.string(),
         route: v.string(),
         routeMode: v.string(),
-        callerUserId: v.string(),
         conversationId: v.optional(v.id('conversations')),
         debugJson: v.string(),
     },
     handler: async (ctx, args) => {
+        // Server-derived auth
+        const user = await getAuthenticatedUser(ctx);
+
         // Verify conversation ownership if provided
         if (args.conversationId) {
-            const conversation = await ctx.db.get(args.conversationId);
-            if (!conversation) throw new Error('Conversation not found');
-            if (String(conversation.userId) !== args.callerUserId) {
-                throw new Error('Unauthorized: caller does not own this conversation');
-            }
+            await getAuthenticatedUserAndConversation(ctx, args.conversationId);
         }
 
         return await ctx.db.insert('debugTraces', {
             traceId: args.traceId,
             route: args.route,
             routeMode: args.routeMode,
-            userId: args.callerUserId,
+            clerkUserId: user.clerkId ?? '',
             conversationId: args.conversationId,
             debugJson: args.debugJson,
             createdAt: Date.now(),
@@ -44,14 +43,10 @@ export const create = mutation({
 export const getByConversation = query({
     args: {
         conversationId: v.id('conversations'),
-        callerUserId: v.string(),
     },
     handler: async (ctx, args) => {
-        // Verify ownership
-        const conversation = await ctx.db.get(args.conversationId);
-        if (!conversation || String(conversation.userId) !== args.callerUserId) {
-            return [];
-        }
+        // Server-derived auth
+        await getAuthenticatedUserAndConversation(ctx, args.conversationId);
 
         return await ctx.db
             .query('debugTraces')
@@ -64,16 +59,17 @@ export const getByConversation = query({
 export const getByTraceId = query({
     args: {
         traceId: v.string(),
-        callerUserId: v.string(),
     },
     handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+
         const trace = await ctx.db
             .query('debugTraces')
             .withIndex('by_traceId', (q) => q.eq('traceId', args.traceId))
             .first();
 
-        // Verify ownership via userId stored on the trace
-        if (!trace || trace.userId !== args.callerUserId) {
+        // Verify ownership via clerkUserId stored on the trace
+        if (!trace || trace.clerkUserId !== user.clerkId) {
             return null;
         }
 

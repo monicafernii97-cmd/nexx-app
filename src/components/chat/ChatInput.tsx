@@ -199,6 +199,10 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
         const file = e.target.files?.[0];
         if (!file) return;
 
+        const resetInput = () => {
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        };
+
         const allowedTypes = [
             'application/pdf',
             'application/msword',
@@ -210,35 +214,25 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
 
         if (!allowedTypes.includes(file.type)) {
             setMicError('Unsupported file type. Upload PDF, DOCX, TXT, JPG, or PNG.');
+            resetInput();
             return;
         }
 
         if (file.size > 25 * 1024 * 1024) {
             setMicError('File too large. Maximum size is 25MB.');
+            resetInput();
             return;
         }
 
         setSelectedFile(file);
         setMicError(null);
-
-        // Reset the input so the same file can be re-selected
-        if (fileInputRef.current) fileInputRef.current.value = '';
+        resetInput();
     }, []);
 
     const removeFile = useCallback(() => {
         setSelectedFile(null);
     }, []);
 
-    const handleSendWithFile = useCallback(() => {
-        const trimmed = input.trim();
-        if (!trimmed && !selectedFile) return;
-        if (disabled) return;
-
-        if (isListening) stopRecognition();
-        onSend(trimmed || (selectedFile ? `Analyze this file: ${selectedFile.name}` : ''), selectedFile ?? undefined);
-        updateInput('');
-        setSelectedFile(null);
-    }, [input, selectedFile, disabled, isListening, stopRecognition, onSend, updateInput]);
 
     const baseId = useId();
     const micErrorId = micError ? `${baseId}-mic-error` : undefined;
@@ -351,7 +345,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: ChatInputPr
                     </button>
                     <button
                         type="button"
-                        onClick={handleSendWithFile}
+                        onClick={handleSend}
                         disabled={(!input.trim() && !selectedFile) || disabled}
                         aria-label="Send message"
                         className={`w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-300 shadow-sm ${

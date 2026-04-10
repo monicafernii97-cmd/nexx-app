@@ -43,8 +43,9 @@ const DOCUMENT_ANALYSIS_PATTERNS = [
 ];
 
 const SUPPORT_PATTERNS = [
-  /\b(scared|overwhelmed|can't\s+do\s+this|feel|afraid|anxious|stressed|exhausted)\b/i,
-  /\b(what\s+do\s+i\s+do|help\s+me|don'?t\s+know\s+what)\b/i,
+  /\b(scared|overwhelmed|can't\s+do\s+this|afraid|anxious|stressed|exhausted)\b/i,
+  /\b(help\s+me|don'?t\s+know\s+what\s+to\s+do)\b/i,
+  /\bfeeling?\s+(scared|overwhelmed|afraid|anxious|stressed|lost|hopeless)\b/i,
 ];
 
 // ---------------------------------------------------------------------------

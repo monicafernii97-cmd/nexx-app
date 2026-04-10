@@ -115,6 +115,10 @@ export async function POST(req: NextRequest) {
         if (errorMsg.includes('not found') || errorMsg.includes('Could not find')) {
           return Response.json({ error: 'Conversation not found' }, { status: 404 });
         }
+        // Catch Convex v.id() validation errors (malformed ID strings)
+        if (errorMsg.includes('Invalid') || errorMsg.toLowerCase().includes('validation') || errorMsg.includes('is not a valid ID')) {
+          return Response.json({ error: 'Invalid conversationId' }, { status: 400 });
+        }
         // Transient / network error — let the outer 500 handler deal with it
         throw err;
       }
@@ -127,7 +131,10 @@ export async function POST(req: NextRequest) {
       mimeType: file.type,
     });
 
-    // Track standalone store for cleanup on failure
+    // Hoist provider IDs so the failure path can include them in the
+    // 'failed' status update for cleanup/audit/dedupe.
+    let vectorStoreId: string | undefined;
+    let openaiFileId: string | undefined;
     let createdStandaloneStoreId: string | undefined;
 
     try {
@@ -137,9 +144,6 @@ export async function POST(req: NextRequest) {
         fileId: fileRecordId,
         status: 'processing',
       });
-
-      // Get or create vector store — "create-then-persist" pattern
-      let vectorStoreId: string | undefined;
 
       if (typedConversationId) {
         // Check if conversation already has a store
@@ -204,7 +208,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Upload to OpenAI vector store (only non-identifying metadata)
-      const openaiFileId = await uploadToVectorStore(
+      openaiFileId = await uploadToVectorStore(
         vectorStoreId,
         file,
         metadata
@@ -238,6 +242,8 @@ export async function POST(req: NextRequest) {
         await convex.action(api.uploadedFiles.updateStatus, {
           fileId: fileRecordId,
           status: 'failed',
+          openaiFileId,
+          vectorStoreId,
         });
       } catch (statusErr) {
         console.error('[Upload] Failed to mark file as failed:', statusErr);

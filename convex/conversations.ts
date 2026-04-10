@@ -273,3 +273,24 @@ export const getOrCreateVectorStoreId = mutation({
         return { vectorStoreId: args.candidateId, created: true };
     },
 });
+
+/**
+ * Compensating rollback: clear vectorStoreId if external store creation failed.
+ * Only clears if the current value matches the stale ID,
+ * so a concurrent successful create is not accidentally wiped.
+ */
+export const clearVectorStoreId = mutation({
+    args: {
+        conversationId: v.id('conversations'),
+        staleId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const { conversation } = await getAuthenticatedUserAndConversation(ctx, args.conversationId);
+        // Only clear if it still points to the failed candidate
+        if (conversation.vectorStoreId === args.staleId) {
+            await ctx.db.patch(args.conversationId, {
+                vectorStoreId: undefined,
+            });
+        }
+    },
+});

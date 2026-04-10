@@ -102,7 +102,18 @@ export async function POST(req: NextRequest) {
 
         // Only create the external store if we won the race
         if (result.created) {
-          await createVectorStore(candidateId);
+          try {
+            await createVectorStore(candidateId);
+          } catch (storeError) {
+            // External store creation failed — roll back the Convex record
+            // so the conversation doesn't keep referencing a nonexistent store
+            console.error('[Upload] createVectorStore failed, rolling back:', storeError);
+            await convex.mutation(api.conversations.clearVectorStoreId, {
+              conversationId: typedConversationId,
+              staleId: candidateId,
+            });
+            throw storeError;
+          }
         }
       }
 

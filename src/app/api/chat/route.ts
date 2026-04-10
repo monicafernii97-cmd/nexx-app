@@ -295,6 +295,28 @@ export async function POST(req: NextRequest) {
     const artifactPrompt = buildArtifactPrompt();
     const contextPrompt = buildContextPrompt(contextPacket);
 
+    // Build input: only send full scaffolding on the FIRST turn.
+    // The Responses API persists system/developer messages in conversation
+    // history, so re-sending them on every turn causes duplicate instructions
+    // and inflates token usage. On subsequent turns we send only the dynamic
+    // context (which changes each turn) plus the user message.
+    const isFirstTurn = !existingOpenAIConversationId;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const input: any[] = isFirstTurn
+      ? [
+          { role: 'system', content: systemPrompt },
+          { role: 'developer', content: developerPrompt },
+          { role: 'developer', content: featurePrompt },
+          { role: 'developer', content: artifactPrompt },
+          { role: 'developer', content: contextPrompt },
+          { role: 'user', content: message },
+        ]
+      : [
+          // Dynamic context changes every turn (summary, case graph, sources)
+          { role: 'developer', content: contextPrompt },
+          { role: 'user', content: message },
+        ];
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let response: any;
     try {
@@ -304,14 +326,7 @@ export async function POST(req: NextRequest) {
         reasoning: { effort: 'medium' },
         temperature,
         conversation: openaiConversationId,
-        input: [
-          { role: 'system', content: systemPrompt },
-          { role: 'developer', content: developerPrompt },
-          { role: 'developer', content: featurePrompt },
-          { role: 'developer', content: artifactPrompt },
-          { role: 'developer', content: contextPrompt },
-          { role: 'user', content: message },
-        ],
+        input,
         tools: tools.length > 0 ? tools : undefined,
         text: { format: NEXX_RESPONSE_SCHEMA },
       });

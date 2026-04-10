@@ -69,11 +69,17 @@ export const updateStatus = mutation({
             throw new Error('Unauthorized: caller does not own this file');
         }
 
-        await ctx.db.patch(args.fileId, {
+        const patch: {
+            status: 'uploaded' | 'processing' | 'ready' | 'failed';
+            openaiFileId?: string;
+            vectorStoreId?: string;
+        } = {
             status: args.status,
-            openaiFileId: args.openaiFileId,
-            vectorStoreId: args.vectorStoreId,
-        });
+        };
+        if (args.openaiFileId !== undefined) patch.openaiFileId = args.openaiFileId;
+        if (args.vectorStoreId !== undefined) patch.vectorStoreId = args.vectorStoreId;
+
+        await ctx.db.patch(args.fileId, patch);
     },
 });
 

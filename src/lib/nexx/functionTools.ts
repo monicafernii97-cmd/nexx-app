@@ -159,6 +159,9 @@ export async function executeFunctionTool(
         if (!args.narrative || typeof args.narrative !== 'string') {
           return { success: false, error: 'Missing required field: narrative' };
         }
+        if (!args.category || typeof args.category !== 'string') {
+          return { success: false, error: 'Missing required field: category' };
+        }
         return await handleCreateIncident(args, context);
       }
       case 'append_to_timeline': {
@@ -168,31 +171,59 @@ export async function executeFunctionTool(
         if (!args.description || typeof args.description !== 'string') {
           return { success: false, error: 'Missing required field: description' };
         }
-        return await handleAppendTimeline(args, context);
+        return handleAppendTimeline(args);
       }
       case 'generate_docuvault_draft': {
         if (!args.templateId || typeof args.templateId !== 'string') {
           return { success: false, error: 'Missing required field: templateId' };
         }
-        return await handleGenerateDraft(args, context);
+        return handleGenerateDraft(args);
       }
       case 'save_case_note': {
         if (!args.note || typeof args.note !== 'string') {
           return { success: false, error: 'Missing required field: note' };
         }
-        return { success: true, data: { note: args.note, status: 'pending', requires_confirmation: true } };
+        return {
+          success: false,
+          data: { note: args.note, status: 'pending', requires_confirmation: true },
+          error: 'Action staged but not yet executed. User must confirm in the Incident Log to save.',
+        };
       }
       case 'mark_evidence_theme': {
         if (!args.theme || typeof args.theme !== 'string') {
           return { success: false, error: 'Missing required field: theme' };
         }
-        return { success: true, data: { theme: args.theme, status: 'pending', requires_confirmation: true } };
+        if (!args.strongPoints || !Array.isArray(args.strongPoints)) {
+          return { success: false, error: 'Missing required field: strongPoints (array)' };
+        }
+        return {
+          success: false,
+          data: { theme: args.theme, strongPoints: args.strongPoints, status: 'pending', requires_confirmation: true },
+          error: 'Action staged but not yet executed. Theme will be saved to case graph when user confirms.',
+        };
       }
       case 'create_exhibit_index': {
         if (!args.exhibits || !Array.isArray(args.exhibits)) {
           return { success: false, error: 'Missing required field: exhibits (array)' };
         }
-        return { success: true, data: { exhibits: args.exhibits, status: 'pending', requires_confirmation: true } };
+        // Validate each exhibit item has required shape
+        for (let i = 0; i < (args.exhibits as unknown[]).length; i++) {
+          const item = (args.exhibits as Record<string, unknown>[])[i];
+          if (!item || typeof item !== 'object') {
+            return { success: false, error: `exhibits[${i}] must be an object` };
+          }
+          if (!item.label || typeof item.label !== 'string') {
+            return { success: false, error: `exhibits[${i}] missing required field: label` };
+          }
+          if (!item.description || typeof item.description !== 'string') {
+            return { success: false, error: `exhibits[${i}] missing required field: description` };
+          }
+        }
+        return {
+          success: false,
+          data: { exhibits: args.exhibits, status: 'pending', requires_confirmation: true },
+          error: 'Action staged but not yet executed. Exhibit index will be created when user confirms.',
+        };
       }
       case 'link_incident_to_motion': {
         if (!args.incidentSummary || typeof args.incidentSummary !== 'string') {
@@ -201,10 +232,17 @@ export async function executeFunctionTool(
         if (!args.motionType || typeof args.motionType !== 'string') {
           return { success: false, error: 'Missing required field: motionType' };
         }
-        return { success: true, data: { status: 'pending', requires_confirmation: true, incident: args.incidentSummary, motion: args.motionType } };
+        if (!args.relevance || typeof args.relevance !== 'string') {
+          return { success: false, error: 'Missing required field: relevance' };
+        }
+        return {
+          success: false,
+          data: { status: 'pending', requires_confirmation: true, incident: args.incidentSummary, motion: args.motionType, relevance: args.relevance },
+          error: 'Action staged but not yet executed. Cross-reference will be saved when user confirms.',
+        };
       }
       case 'fetch_user_court_settings':
-        return await handleFetchCourtSettings(context);
+        return handleFetchCourtSettings();
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
     }
@@ -251,48 +289,43 @@ async function handleCreateIncident(
   };
 }
 
-async function handleAppendTimeline(
+function handleAppendTimeline(
   args: Record<string, unknown>,
-  _context: { convex: ConvexHttpClient }
-): Promise<FunctionToolResult> {
-  // Timeline events are stored via case graph updates
+): FunctionToolResult {
+  // Timeline events are staged — merged into case graph on next update cycle.
+  // The handler does NOT persist anything; it returns structured data for the model.
   return {
-    success: true,
+    success: false,
     data: {
       event: {
         date: args.date,
         description: args.description,
         significance: args.significance,
       },
-      note: 'Timeline event will be merged into case graph on next update cycle.',
     },
+    error: 'Timeline event staged but not yet persisted. It will be merged into the case graph on the next summary compaction cycle.',
   };
 }
 
-async function handleGenerateDraft(
+function handleGenerateDraft(
   args: Record<string, unknown>,
-  _context: { convex: ConvexHttpClient }
-): Promise<FunctionToolResult> {
+): FunctionToolResult {
+  // Draft generation is not yet implemented server-side.
+  // Returns structured data so the model can inform the user.
   return {
-    success: true,
+    success: false,
     data: {
       templateId: args.templateId,
-      status: 'draft_initiated',
-      note: 'Draft generation has been queued. The user can access it in DocuVault.',
     },
+    error: 'Draft generation is not yet automated. The user can create this document manually in DocuVault using the template.',
   };
 }
 
-async function handleFetchCourtSettings(
-  _context: { convex: ConvexHttpClient; userId: Id<'users'> }
-): Promise<FunctionToolResult> {
-  // Court settings are stored in the courtRulesCache or user preferences.
-  // For now, return a helpful message directing the user to set up court rules.
+function handleFetchCourtSettings(): FunctionToolResult {
+  // Court settings retrieval is not yet implemented server-side.
   return {
-    success: true,
-    data: {
-      note: 'Court settings can be configured in Settings > Court Rules. Default formatting rules apply.',
-    },
+    success: false,
+    data: {},
+    error: 'Court settings retrieval is not yet automated. The user can configure court rules in Settings > Court Rules.',
   };
 }
-

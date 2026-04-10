@@ -84,18 +84,23 @@ export async function POST(req: NextRequest) {
       }
 
       // Parse document for metadata (text files only)
-      let metadata: Record<string, string> = { source: 'user_upload', userId };
+      let metadata: Record<string, string> = { source: 'user_upload' };
       if (file.type === 'text/plain' || file.type === 'application/pdf') {
         try {
           const text = await file.text();
           const parsed = await parseLegalDocument({ filename: file.name, text });
-          metadata = buildDocumentMetadata(parsed, userId, conversationId ?? undefined);
+          // Build full metadata for Convex, then strip internal IDs before
+          // sending to the external vector store provider
+          const fullMetadata = buildDocumentMetadata(parsed, userId, conversationId ?? undefined);
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { userId: _uid, conversationId: _cid, ...safeMetadata } = fullMetadata;
+          metadata = safeMetadata;
         } catch {
           // Non-fatal — upload without metadata
         }
       }
 
-      // Upload to OpenAI vector store (with parsed legal metadata)
+      // Upload to OpenAI vector store (only non-identifying metadata)
       const openaiFileId = await uploadToVectorStore(
         vectorStoreId,
         file,

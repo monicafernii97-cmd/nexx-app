@@ -93,8 +93,15 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'conversationId is required' }, { status: 400 });
     }
 
-    // Generate stable per-turn request ID for idempotent message persistence
-    const turnRequestId = crypto.randomUUID();
+    // Derive a deterministic per-turn request ID from stable turn data
+    // so retried HTTP requests produce the same key for de-duplication.
+    const encoder = new TextEncoder();
+    const hashBuffer = await crypto.subtle.digest(
+      'SHA-256',
+      encoder.encode(`${conversationId}:${clerkUserId}:${message}`)
+    );
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const turnRequestId = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
     // ── Fetch user record + tier (fail-closed) ──
     const convex = await getAuthenticatedConvexClient();

@@ -62,8 +62,9 @@ Be precise. Only extract what is explicitly stated. Do not infer.`,
   try {
     return JSON.parse(text) as ParsedLegalDocument;
   } catch (error) {
+    const rawSnippet = text.length > 200 ? text.slice(0, 200) + '…' : text;
     throw new Error(
-      `parseLegalDocument: invalid structured output for ${args.filename}: ${String(error)}`
+      `parseLegalDocument: invalid structured output for ${args.filename}: ${String(error)}. Raw payload: ${rawSnippet}`
     );
   }
 }

@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthenticatedUserAndConversation } from './lib/auth';
 
@@ -8,6 +8,7 @@ import { getAuthenticatedUserAndConversation } from './lib/auth';
  * including the input sent to the tool and the output received.
  *
  * Auth: server-derived via ctx.auth (Clerk JWT). Not caller-supplied.
+ * Retention: 30-day TTL enforced on read + periodic cleanup.
  */
 
 export const create = mutation({
@@ -61,10 +62,35 @@ export const getByConversation = query({
         // Server-derived auth
         await getAuthenticatedUserAndConversation(ctx, args.conversationId);
 
-        return await ctx.db
+        const now = Date.now();
+        const allRuns = await ctx.db
             .query('toolRuns')
             .withIndex('by_conversationId', (q) => q.eq('conversationId', args.conversationId))
             .order('desc')
             .collect();
+
+        // Filter out expired rows on read
+        return allRuns.filter((run) => !run.expiresAt || run.expiresAt > now);
+    },
+});
+
+/**
+ * Scheduled cleanup — delete expired tool runs.
+ * Call via cron or internal action every 24h.
+ */
+export const deleteExpired = internalMutation({
+    args: {},
+    handler: async (ctx) => {
+        const now = Date.now();
+        const expired = await ctx.db
+            .query('toolRuns')
+            .filter((q) => q.lt(q.field('expiresAt'), now))
+            .take(500); // batch to avoid timeout
+
+        for (const run of expired) {
+            await ctx.db.delete(run._id);
+        }
+
+        return { deleted: expired.length };
     },
 });

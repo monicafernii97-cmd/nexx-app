@@ -211,12 +211,12 @@ export const list = query({
     },
 });
 
-// ── NEW: Server-side message creation (no auth guard) ──
+// ── Server-side message creation (auth-guarded) ──
 
 /**
- * Create a message from the API route (server-side, no auth guard).
- * The API route has already authenticated the user.
- * Supports the new mode and artifactsJson fields.
+ * Create a message from the API route.
+ * Auth: server-derived via getAuthenticatedUserAndConversation().
+ * Supports idempotent writes via requestId de-duplication.
  */
 export const createMessage = mutation({
     args: {

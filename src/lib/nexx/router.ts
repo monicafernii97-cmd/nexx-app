@@ -15,7 +15,7 @@ import type { RouteMode, ToolPlan, RouterResult } from '../types';
 // ---------------------------------------------------------------------------
 
 const SAFETY_PATTERNS = [
-  /\b(danger|unsafe|abuse|emergency|911|protective order|violence|threaten|harm|hurt)\b/i,
+  /\b(danger|unsafe|emergency|911|protective order|violence|threaten|harm|hurt)\b/i,
   /\b(call.*police|restraining order|safety plan)\b/i,
 ];
 

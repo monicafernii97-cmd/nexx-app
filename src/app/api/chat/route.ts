@@ -181,18 +181,33 @@ export async function POST(req: NextRequest) {
     const existingOpenAIConversationId = conversation.openaiConversationId ?? undefined;
     const existingVectorStoreId = conversation.vectorStoreId ?? undefined;
 
-    // ── Step 3: Ensure OpenAI conversation ──
-    const openaiConversationId = await ensureOpenAIConversation(existingOpenAIConversationId);
+    // ── Step 3: Ensure OpenAI conversation (atomic compare-and-set) ──
+    // Create externally first, then atomically persist only if still empty.
+    // If another thread already persisted one, use that thread instead.
+    // The loser's orphan is an empty OpenAI conversation — harmless.
+    let openaiConversationId: string;
+    let isFirstTurn: boolean;
 
-    // ── Step 4: Save openaiConversationId to Convex if first time ──
-    if (!existingOpenAIConversationId) {
+    if (existingOpenAIConversationId) {
+      openaiConversationId = existingOpenAIConversationId;
+      isFirstTurn = false;
+    } else {
+      // Create the OpenAI conversation externally first
+      const candidateId = await ensureOpenAIConversation(undefined);
+
+      // Atomically persist — only wins if conversation.openaiConversationId is still empty
       try {
-        await convex.mutation(api.conversations.setOpenAIConversationState, {
+        const result = await convex.mutation(api.conversations.getOrSetOpenAIConversationId, {
           conversationId: typedConversationId,
-          openaiConversationId,
+          candidateOpenAIId: candidateId,
         });
+        openaiConversationId = result.openaiConversationId;
+        isFirstTurn = result.wasSet; // Only true for the thread that won the race
       } catch (err) {
         console.warn('[Chat] Failed to save conversation state:', err);
+        // Fall back to the candidate — worst case is one turn in the wrong thread
+        openaiConversationId = candidateId;
+        isFirstTurn = true;
       }
     }
 
@@ -300,7 +315,7 @@ export async function POST(req: NextRequest) {
     // history, so re-sending them on every turn causes duplicate instructions
     // and inflates token usage. On subsequent turns we send only the dynamic
     // context (which changes each turn) plus the user message.
-    const isFirstTurn = !existingOpenAIConversationId;
+    // (isFirstTurn was determined in Step 3 from the compare-and-set result)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const input: any[] = isFirstTurn
       ? [

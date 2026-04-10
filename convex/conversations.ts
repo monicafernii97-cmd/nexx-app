@@ -252,12 +252,13 @@ export const setVectorStoreId = mutation({
 });
 
 /**
- * Atomically get-or-create a vector store ID for a conversation.
- * If the conversation already has a vectorStoreId, return it.
- * Otherwise, persist the candidateId and return it.
- * This ensures concurrent uploads always converge on the same store.
+ * Atomically set vectorStoreId only if not already present (compare-and-set).
+ * 
+ * Pattern: "create-then-persist" — the caller creates the external store FIRST,
+ * then calls this to persist. If another thread already persisted one,
+ * this returns the winner's ID so the caller can clean up its orphan.
  */
-export const getOrCreateVectorStoreId = mutation({
+export const compareAndSetVectorStoreId = mutation({
     args: {
         conversationId: v.id('conversations'),
         candidateId: v.string(),
@@ -265,32 +266,41 @@ export const getOrCreateVectorStoreId = mutation({
     handler: async (ctx, args) => {
         const { conversation } = await getAuthenticatedUserAndConversation(ctx, args.conversationId);
         if (conversation.vectorStoreId) {
-            return { vectorStoreId: conversation.vectorStoreId, created: false };
+            // Another thread won — return the winner's ID
+            return { vectorStoreId: conversation.vectorStoreId, wasSet: false };
         }
         await ctx.db.patch(args.conversationId, {
             vectorStoreId: args.candidateId,
         });
-        return { vectorStoreId: args.candidateId, created: true };
+        return { vectorStoreId: args.candidateId, wasSet: true };
     },
 });
 
 /**
- * Compensating rollback: clear vectorStoreId if external store creation failed.
- * Only clears if the current value matches the stale ID,
- * so a concurrent successful create is not accidentally wiped.
+ * Atomically set openaiConversationId only if not already present (compare-and-set).
+ * 
+ * Pattern: "create-then-persist" — the caller creates the OpenAI conversation
+ * FIRST, then calls this to persist. If another thread already persisted one,
+ * this returns the winner's ID so the caller uses the correct thread and
+ * the loser's orphan is harmless (empty OpenAI conversation, no data lost).
  */
-export const clearVectorStoreId = mutation({
+export const getOrSetOpenAIConversationId = mutation({
     args: {
         conversationId: v.id('conversations'),
-        staleId: v.string(),
+        candidateOpenAIId: v.string(),
+        openaiLastResponseId: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const { conversation } = await getAuthenticatedUserAndConversation(ctx, args.conversationId);
-        // Only clear if it still points to the failed candidate
-        if (conversation.vectorStoreId === args.staleId) {
-            await ctx.db.patch(args.conversationId, {
-                vectorStoreId: undefined,
-            });
+        if (conversation.openaiConversationId) {
+            // Another thread won — return the existing ID
+            return { openaiConversationId: conversation.openaiConversationId, wasSet: false };
         }
+        await ctx.db.patch(args.conversationId, {
+            openaiConversationId: args.candidateOpenAIId,
+            openaiLastResponseId: args.openaiLastResponseId,
+            lastMessageAt: Date.now(),
+        });
+        return { openaiConversationId: args.candidateOpenAIId, wasSet: true };
     },
 });

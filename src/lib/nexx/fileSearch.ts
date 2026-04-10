@@ -16,6 +16,20 @@ export async function createVectorStore(name: string): Promise<string> {
 }
 
 /**
+ * Delete a vector store. Used to clean up orphaned stores
+ * (race losers or failed standalone uploads).
+ */
+export async function deleteVectorStore(vectorStoreId: string): Promise<void> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (openai.vectorStores as any).del(vectorStoreId);
+  } catch (err) {
+    // Non-fatal — orphan will be cleaned up by OpenAI's retention policy
+    console.warn('[FileSearch] Failed to delete vector store:', vectorStoreId, err);
+  }
+}
+
+/**
  * Upload a file to OpenAI and attach it to a vector store.
  * Returns the OpenAI file ID.
  */

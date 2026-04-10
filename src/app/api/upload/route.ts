@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '@convex/_generated/api';
-import { createVectorStore, uploadToVectorStore } from '@/lib/nexx/fileSearch';
+import { createVectorStore, deleteVectorStore, uploadToVectorStore } from '@/lib/nexx/fileSearch';
 import { parseLegalDocument, buildDocumentMetadata } from '@/lib/nexx/parser';
 import type { Id } from '@convex/_generated/dataModel';
 
@@ -19,11 +19,11 @@ const MAX_PARSE_INPUT_CHARS = 8000;
  * Auth: Convex mutations derive the caller from the JWT set on the
  * authenticated ConvexHttpClient — no caller-supplied userId needed.
  *
- * Trust boundary:
- * - `api.uploadedFiles.create` only accepts filename/mimeType/conversationId.
- *   Status is always 'uploaded' — set server-side in the mutation.
- * - `api.uploadedFiles.updateStatus` is auth-guarded (ownership check).
- * - `api.conversations.getOrCreateVectorStoreId` is atomic — no race.
+ * Vector store pattern: "create-then-persist"
+ * 1. Create the external store first
+ * 2. Then atomically persist via compareAndSetVectorStoreId
+ * 3. If we lose the race, delete our orphan and use the winner's store
+ * This guarantees vectorStoreId in Convex always points to a real store.
  */
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -83,44 +83,50 @@ export async function POST(req: NextRequest) {
     });
 
     // Mark as processing
-    await convex.mutation(api.uploadedFiles.updateStatus, {
+    await convex.action(api.uploadedFiles.updateStatus, {
       fileId: fileRecordId,
       status: 'processing',
     });
 
-    try {
-      // Atomically get-or-create vector store for this conversation
-      let vectorStoreId: string | undefined;
-      if (typedConversationId) {
-        // Generate a candidate opaque name — only used if no store exists yet
-        const candidateId = `nexx-vs-${crypto.randomUUID()}`;
-        const result = await convex.mutation(api.conversations.getOrCreateVectorStoreId, {
-          conversationId: typedConversationId,
-          candidateId,
-        });
-        vectorStoreId = result.vectorStoreId;
+    // Track standalone store for cleanup on failure
+    let createdStandaloneStoreId: string | undefined;
 
-        // Only create the external store if we won the race
-        if (result.created) {
-          try {
-            await createVectorStore(candidateId);
-          } catch (storeError) {
-            // External store creation failed — roll back the Convex record
-            // so the conversation doesn't keep referencing a nonexistent store
-            console.error('[Upload] createVectorStore failed, rolling back:', storeError);
-            await convex.mutation(api.conversations.clearVectorStoreId, {
-              conversationId: typedConversationId,
-              staleId: candidateId,
-            });
-            throw storeError;
+    try {
+      // Get or create vector store — "create-then-persist" pattern
+      let vectorStoreId: string | undefined;
+
+      if (typedConversationId) {
+        // Check if conversation already has a store
+        const conversation = await convex.query(api.conversations.get, { id: typedConversationId });
+        vectorStoreId = conversation?.vectorStoreId ?? undefined;
+
+        if (!vectorStoreId) {
+          // No store yet — create external store FIRST, then persist atomically
+          const candidateId = `nexx-vs-${crypto.randomUUID()}`;
+          const externalStoreId = await createVectorStore(candidateId);
+
+          // Atomically persist — only wins if still vacant
+          const result = await convex.mutation(api.conversations.compareAndSetVectorStoreId, {
+            conversationId: typedConversationId,
+            candidateId: externalStoreId,
+          });
+
+          if (result.wasSet) {
+            // We won the race
+            vectorStoreId = externalStoreId;
+          } else {
+            // Another thread won — use the winner's store, delete our orphan
+            vectorStoreId = result.vectorStoreId;
+            await deleteVectorStore(externalStoreId);
           }
         }
       }
 
       if (!vectorStoreId) {
         // No conversation — create a standalone store
-        vectorStoreId = `nexx-vs-${crypto.randomUUID()}`;
-        await createVectorStore(vectorStoreId);
+        const standaloneId = `nexx-vs-${crypto.randomUUID()}`;
+        vectorStoreId = await createVectorStore(standaloneId);
+        createdStandaloneStoreId = vectorStoreId;
       }
 
       // Parse document for metadata (text files only, bounded to parser limit)
@@ -151,13 +157,16 @@ export async function POST(req: NextRequest) {
         metadata
       );
 
-      // Update Convex record with provider IDs (auth-guarded)
-      await convex.mutation(api.uploadedFiles.updateStatus, {
+      // Update Convex record with provider IDs (action → internalMutation)
+      await convex.action(api.uploadedFiles.updateStatus, {
         fileId: fileRecordId,
         status: 'ready',
         openaiFileId,
         vectorStoreId,
       });
+
+      // Standalone store successfully used — don't clean it up
+      createdStandaloneStoreId = undefined;
 
       return Response.json({
         ok: true,
@@ -167,11 +176,17 @@ export async function POST(req: NextRequest) {
         filename: file.name,
       });
     } catch (error) {
-      // Mark as failed (auth-guarded)
-      await convex.mutation(api.uploadedFiles.updateStatus, {
+      // Mark file as failed (action → internalMutation)
+      await convex.action(api.uploadedFiles.updateStatus, {
         fileId: fileRecordId,
         status: 'failed',
       });
+
+      // Clean up orphaned standalone store if we created one
+      if (createdStandaloneStoreId) {
+        await deleteVectorStore(createdStandaloneStoreId);
+      }
+
       throw error;
     }
   } catch (error) {

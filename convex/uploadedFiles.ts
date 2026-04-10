@@ -1,5 +1,6 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation, internalQuery, action } from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import { getAuthenticatedUser, getAuthenticatedUserAndConversation } from './lib/auth';
 
 /**
@@ -10,12 +11,12 @@ import { getAuthenticatedUser, getAuthenticatedUserAndConversation } from './lib
  * Auth: server-derived. Not caller-supplied.
  *
  * Trust boundary:
- * - `create` accepts only client-safe fields (filename, mimeType, conversationId).
- *   Status is always set to 'uploaded' server-side — clients cannot inject
- *   openaiFileId, vectorStoreId, or terminal statuses.
- * - `updateStatus` is auth-guarded (caller must own the file) and restricted
- *   to status transitions plus provider IDs. Since ConvexHttpClient calls
- *   always go through the authenticated API route, this is server-only in practice.
+ * - `create` is a public mutation. Only accepts client-safe fields
+ *   (filename, mimeType, conversationId). Status is always 'uploaded'.
+ * - `updateStatusAction` is a public action (callable from ConvexHttpClient).
+ *   Verifies auth + file ownership, then delegates to the internalMutation.
+ * - `_updateStatusInternal` is an internalMutation (not callable from clients).
+ *   Performs the actual DB patch — can set terminal statuses and provider IDs.
  */
 
 /** Public: create a pending upload record. */
@@ -51,10 +52,11 @@ export const create = mutation({
 });
 
 /**
- * Update status and attach provider IDs.
- * Auth-guarded: caller must own the file (verified via clerkUserId match).
+ * Internal: update status and attach provider IDs.
+ * NOT callable from browser clients (internalMutation).
+ * Called only from updateStatusAction after auth verification.
  */
-export const updateStatus = mutation({
+export const _updateStatusInternal = internalMutation({
     args: {
         fileId: v.id('uploadedFiles'),
         status: v.union(
@@ -67,15 +69,8 @@ export const updateStatus = mutation({
         vectorStoreId: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        // Server-derived auth
-        const user = await getAuthenticatedUser(ctx);
-
-        // Verify caller owns the file
         const file = await ctx.db.get(args.fileId);
         if (!file) throw new Error('File not found');
-        if (file.clerkUserId !== user.clerkId) {
-            throw new Error('Unauthorized: caller does not own this file');
-        }
 
         const patch: {
             status: 'uploaded' | 'processing' | 'ready' | 'failed';
@@ -88,6 +83,65 @@ export const updateStatus = mutation({
         if (args.vectorStoreId !== undefined) patch.vectorStoreId = args.vectorStoreId;
 
         await ctx.db.patch(args.fileId, patch);
+    },
+});
+
+/**
+ * Public action: update status (callable from ConvexHttpClient).
+ * Verifies auth + file ownership, then delegates to the internalMutation.
+ * Actions can call internalMutation — mutations cannot.
+ */
+export const updateStatus = action({
+    args: {
+        fileId: v.id('uploadedFiles'),
+        status: v.union(
+            v.literal('uploaded'),
+            v.literal('processing'),
+            v.literal('ready'),
+            v.literal('failed')
+        ),
+        openaiFileId: v.optional(v.string()),
+        vectorStoreId: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        // Verify auth
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) {
+            throw new Error('Authentication required');
+        }
+
+        // Verify file ownership via a query
+        const file = await ctx.runQuery(internal.uploadedFiles._getFileForOwnership, {
+            fileId: args.fileId,
+        });
+        if (!file) throw new Error('File not found');
+
+        // Compare clerkId from identity with file owner
+        const clerkId = identity.subject; // Clerk user ID from JWT
+        if (file.clerkUserId !== clerkId) {
+            throw new Error('Unauthorized: caller does not own this file');
+        }
+
+        // Delegate to internal mutation
+        await ctx.runMutation(internal.uploadedFiles._updateStatusInternal, {
+            fileId: args.fileId,
+            status: args.status,
+            openaiFileId: args.openaiFileId,
+            vectorStoreId: args.vectorStoreId,
+        });
+    },
+});
+
+/**
+ * Internal query: fetch file record for ownership check.
+ * Used by updateStatus action.
+ */
+export const _getFileForOwnership = internalQuery({
+    args: {
+        fileId: v.id('uploadedFiles'),
+    },
+    handler: async (ctx, args) => {
+        return await ctx.db.get(args.fileId);
     },
 });
 

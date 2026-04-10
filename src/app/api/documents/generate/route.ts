@@ -190,6 +190,20 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        // Reject drafts containing unresolved placeholder markers
+        const PLACEHOLDER_RE = /\[FACT NEEDED:[^\[\]]+\]/i;
+        const hasPlaceholders = drafted.some(section =>
+          PLACEHOLDER_RE.test(section.heading) ||
+          PLACEHOLDER_RE.test(section.body) ||
+          (section.numberedItems?.some(item => PLACEHOLDER_RE.test(item)) ?? false)
+        );
+        if (hasPlaceholders) {
+          return NextResponse.json(
+            { error: 'AI drafting needs more case facts before a court-ready document can be generated.' },
+            { status: 422 }
+          );
+        }
+
         // Validate drafted section IDs against what was requested
         const requestedIds = new Set(sectionIds);
         const unknownIds = drafted.filter(d => !requestedIds.has(d.sectionId));
@@ -197,6 +211,18 @@ export async function POST(request: NextRequest) {
           console.error('[DocuVault] AI drafter returned unexpected section IDs:', unknownIds.map(d => d.sectionId));
           return NextResponse.json(
             { error: 'AI drafting returned invalid sections. Please try again.' },
+            { status: 422 }
+          );
+        }
+
+        // Reject duplicate sectionIds — schema doesn't enforce uniqueness
+        const duplicateIds = drafted
+          .map(d => d.sectionId)
+          .filter((id, index, ids) => ids.indexOf(id) !== index);
+        if (duplicateIds.length > 0) {
+          console.error('[DocuVault] AI drafter returned duplicate section IDs:', duplicateIds);
+          return NextResponse.json(
+            { error: 'AI drafting returned duplicate sections. Please try again.' },
             { status: 422 }
           );
         }

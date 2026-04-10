@@ -53,6 +53,15 @@ export async function POST(req: NextRequest) {
     const convex = await getAuthenticatedConvexClient();
     const typedConversationId = conversationId as Id<'conversations'> | undefined;
 
+    // Resolve Convex user ID for ownership checks on conversation mutations
+    let convexUserId: string | undefined;
+    try {
+      const userRecord = await convex.query(api.users.getByClerkId, { clerkId: userId });
+      convexUserId = userRecord ? String(userRecord._id) : undefined;
+    } catch {
+      // Non-fatal — ownership checks will fail gracefully
+    }
+
     // Create Convex record
     const fileRecordId = await convex.mutation(api.uploadedFiles.create, {
       userId,
@@ -60,6 +69,7 @@ export async function POST(req: NextRequest) {
       filename: file.name,
       mimeType: file.type,
       status: 'processing',
+      callerUserId: userId,
     });
 
     try {
@@ -77,6 +87,7 @@ export async function POST(req: NextRequest) {
           await convex.mutation(api.conversations.setVectorStoreId, {
             conversationId: typedConversationId,
             vectorStoreId,
+            callerUserId: convexUserId ?? '',
           });
         }
       }
@@ -106,6 +117,7 @@ export async function POST(req: NextRequest) {
         status: 'ready',
         openaiFileId,
         vectorStoreId,
+        callerUserId: userId,
       });
 
       return Response.json({
@@ -120,6 +132,7 @@ export async function POST(req: NextRequest) {
       await convex.mutation(api.uploadedFiles.updateStatus, {
         fileId: fileRecordId,
         status: 'failed',
+        callerUserId: userId,
       });
       throw error;
     }

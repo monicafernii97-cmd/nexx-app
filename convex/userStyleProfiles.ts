@@ -1,15 +1,17 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { getAuthenticatedUser } from './lib/auth';
 
 /**
  * User Style Profiles — learned preferences that adapt NEXX's output.
  * These are safe-to-adapt dimensions: formatting, detail level, tone.
  * Never-adapt: legal substance, rigor, citations, safety, neutrality.
+ *
+ * Auth: resolves userId from ctx.auth identity, not from args.
  */
 
 export const upsert = mutation({
     args: {
-        userId: v.id('users'),
         prefersJudgeLens: v.optional(v.boolean()),
         prefersCourtReadyDefault: v.optional(v.boolean()),
         prefersDetailedResponses: v.optional(v.boolean()),
@@ -17,35 +19,37 @@ export const upsert = mutation({
         tonePreference: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        const userId = user._id;
+
         const existing = await ctx.db
             .query('userStyleProfiles')
-            .withIndex('by_userId', (q) => q.eq('userId', args.userId))
+            .withIndex('by_userId', (q) => q.eq('userId', userId))
             .first();
-
-        const { userId: _userId, ...profileFields } = args;
 
         if (existing) {
             await ctx.db.patch(existing._id, {
-                ...profileFields,
+                ...args,
                 updatedAt: Date.now(),
             });
             return existing._id;
         }
 
         return await ctx.db.insert('userStyleProfiles', {
-            userId: args.userId,
-            ...profileFields,
+            userId,
+            ...args,
             updatedAt: Date.now(),
         });
     },
 });
 
 export const getByUser = query({
-    args: { userId: v.id('users') },
-    handler: async (ctx, args) => {
+    args: {},
+    handler: async (ctx) => {
+        const user = await getAuthenticatedUser(ctx);
         return await ctx.db
             .query('userStyleProfiles')
-            .withIndex('by_userId', (q) => q.eq('userId', args.userId))
+            .withIndex('by_userId', (q) => q.eq('userId', user._id))
             .first();
     },
 });

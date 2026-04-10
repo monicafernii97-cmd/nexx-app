@@ -5,6 +5,8 @@ import { v } from "convex/values";
  * Tool Runs — audit trail for tool executions.
  * Records every function tool call made during a chat response,
  * including the input sent to the tool and the output received.
+ *
+ * Ownership: callerUserId must own the conversation.
  */
 
 export const create = mutation({
@@ -13,8 +15,16 @@ export const create = mutation({
         toolType: v.string(),
         inputJson: v.string(),
         outputJson: v.optional(v.string()),
+        callerUserId: v.string(),
     },
     handler: async (ctx, args) => {
+        // Verify conversation ownership
+        const conversation = await ctx.db.get(args.conversationId);
+        if (!conversation) throw new Error('Conversation not found');
+        if (String(conversation.userId) !== args.callerUserId) {
+            throw new Error('Unauthorized: caller does not own this conversation');
+        }
+
         // 30-day retention TTL
         const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
         const createdAt = Date.now();
@@ -39,8 +49,17 @@ export const create = mutation({
 });
 
 export const getByConversation = query({
-    args: { conversationId: v.id('conversations') },
+    args: {
+        conversationId: v.id('conversations'),
+        callerUserId: v.string(),
+    },
     handler: async (ctx, args) => {
+        // Verify conversation ownership
+        const conversation = await ctx.db.get(args.conversationId);
+        if (!conversation || String(conversation.userId) !== args.callerUserId) {
+            return [];
+        }
+
         return await ctx.db
             .query('toolRuns')
             .withIndex('by_conversationId', (q) => q.eq('conversationId', args.conversationId))

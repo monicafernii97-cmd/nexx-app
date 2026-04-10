@@ -177,14 +177,32 @@ export const get = query({
 
 // ── NEW: Responses API + Conversations API state management ──
 
+/**
+ * Verify the caller owns the conversation before patching.
+ * Used by all server-side-only state mutations below.
+ */
+async function verifyConversationOwnership(
+    ctx: { db: { get: (id: any) => Promise<any> } },
+    conversationId: any,
+    callerUserId: string
+) {
+    const conversation = await ctx.db.get(conversationId);
+    if (!conversation) throw new Error('Conversation not found');
+    if (String(conversation.userId) !== callerUserId) {
+        throw new Error('Unauthorized: caller does not own this conversation');
+    }
+}
+
 /** Set the OpenAI Conversations API state on a conversation (called from the chat API route). */
 export const setOpenAIConversationState = mutation({
     args: {
         conversationId: v.id('conversations'),
         openaiConversationId: v.string(),
         openaiLastResponseId: v.optional(v.string()),
+        callerUserId: v.string(),
     },
     handler: async (ctx, args) => {
+        await verifyConversationOwnership(ctx, args.conversationId, args.callerUserId);
         await ctx.db.patch(args.conversationId, {
             openaiConversationId: args.openaiConversationId,
             openaiLastResponseId: args.openaiLastResponseId,
@@ -198,8 +216,10 @@ export const setLastResponseId = mutation({
     args: {
         conversationId: v.id('conversations'),
         openaiLastResponseId: v.string(),
+        callerUserId: v.string(),
     },
     handler: async (ctx, args) => {
+        await verifyConversationOwnership(ctx, args.conversationId, args.callerUserId);
         await ctx.db.patch(args.conversationId, {
             openaiLastResponseId: args.openaiLastResponseId,
             lastMessageAt: Date.now(),
@@ -222,8 +242,10 @@ export const setRouteMode = mutation({
             v.literal('support_grounding'),
             v.literal('safety_escalation')
         ),
+        callerUserId: v.string(),
     },
     handler: async (ctx, args) => {
+        await verifyConversationOwnership(ctx, args.conversationId, args.callerUserId);
         await ctx.db.patch(args.conversationId, {
             routeMode: args.routeMode,
         });
@@ -235,8 +257,10 @@ export const setVectorStoreId = mutation({
     args: {
         conversationId: v.id('conversations'),
         vectorStoreId: v.string(),
+        callerUserId: v.string(),
     },
     handler: async (ctx, args) => {
+        await verifyConversationOwnership(ctx, args.conversationId, args.callerUserId);
         await ctx.db.patch(args.conversationId, {
             vectorStoreId: args.vectorStoreId,
         });

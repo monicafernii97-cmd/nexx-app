@@ -158,6 +158,7 @@ export async function POST(req: NextRequest) {
         await convex.mutation(api.conversations.setOpenAIConversationState, {
           conversationId: typedConversationId,
           openaiConversationId,
+          callerUserId: String(convexUserId ?? ''),
         });
       } catch (err) {
         console.warn('[Chat] Failed to save conversation state:', err);
@@ -338,6 +339,7 @@ export async function POST(req: NextRequest) {
             toolType: fc.name,
             inputJson: JSON.stringify(parsedArgs),
             outputJson: JSON.stringify(result),
+            callerUserId: String(convexUserId ?? ''),
           });
         } catch { /* non-fatal */ }
       }
@@ -410,6 +412,7 @@ export async function POST(req: NextRequest) {
         role: 'user',
         content: message,
         mode: routeMode,
+        callerUserId: String(convexUserId ?? ''),
       });
     } catch (err) {
       console.warn('[Chat] Failed to save user message:', err);
@@ -423,6 +426,7 @@ export async function POST(req: NextRequest) {
         content: parsedResponse.message,
         mode: routeMode,
         artifactsJson: JSON.stringify(parsedResponse.artifacts),
+        callerUserId: String(convexUserId ?? ''),
       });
     } catch (err) {
       console.warn('[Chat] Failed to save assistant message:', err);
@@ -435,6 +439,7 @@ export async function POST(req: NextRequest) {
         await convex.mutation(api.conversations.setLastResponseId, {
           conversationId: typedConversationId,
           openaiLastResponseId: responseId,
+          callerUserId: String(convexUserId ?? ''),
         });
       } catch { /* non-fatal */ }
     }
@@ -460,7 +465,7 @@ export async function POST(req: NextRequest) {
         traceId: finalTrace.traceId,
         route: '/api/chat',
         routeMode,
-        userId: clerkUserId,
+        callerUserId: clerkUserId,
         conversationId: typedConversationId,
         debugJson: serializeTrace(finalTrace),
       });

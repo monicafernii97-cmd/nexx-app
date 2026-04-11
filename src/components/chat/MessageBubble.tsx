@@ -533,7 +533,7 @@ export default function MessageBubble({
                         viewModel={structuredViewModel}
                         patterns={detectedPatterns}
                         procedureInfo={procedureInfo}
-                        onAction={(action) => onAction?.(action)}
+                        onAction={(action, content) => onAction?.(action, content)}
                     />
                 ) : (
                     <>

@@ -174,43 +174,59 @@ export default function ConversationPage() {
                 throw new Error(`Failed to get AI response: ${response.status} ${errorText}`);
             }
 
-            // Handle streaming response with FINAL_REWRITE markers
+            // Handle SSE-framed streaming response
             const reader = response.body?.getReader();
             if (!reader) throw new Error('No response body');
 
             const decoder = new TextDecoder();
-            let accumulated = '';
+            let draftText = '';
             let finalPayload: string | null = null;
+            let sseBuffer = '';
 
             while (true) {
                 const { done, value } = await reader.read();
-                if (done) break;
+                if (done) {
+                    // Flush any remaining bytes from the decoder
+                    const remaining = decoder.decode(undefined, { stream: false });
+                    if (remaining) sseBuffer += remaining;
+                    break;
+                }
 
                 const chunk = decoder.decode(value, { stream: true });
-                accumulated += chunk;
+                sseBuffer += chunk;
 
-                // Check for final rewrite markers
-                const startMarker = '[[NEXX_FINAL_REWRITE_START]]';
-                const endMarker = '[[NEXX_FINAL_REWRITE_END]]';
-                const startIdx = accumulated.indexOf(startMarker);
+                // Parse complete SSE events (double newline delimited)
+                const events = sseBuffer.split('\n\n');
+                // Keep the last (possibly incomplete) chunk in the buffer
+                sseBuffer = events.pop() ?? '';
 
-                if (startIdx !== -1) {
-                    const endIdx = accumulated.indexOf(endMarker, startIdx);
-                    if (endIdx !== -1) {
-                        // Extract final payload
-                        finalPayload = accumulated.slice(startIdx + startMarker.length, endIdx);
-                        // Update streaming content with text before markers
-                        const draftText = accumulated.slice(0, startIdx);
-                        if (draftText) setStreamingContent(draftText);
-                        break;
-                    } else {
-                        // Still accumulating — show draft text before marker
-                        const draftText = accumulated.slice(0, startIdx);
-                        if (draftText) setStreamingContent(draftText);
+                for (const eventBlock of events) {
+                    if (!eventBlock.trim()) continue;
+
+                    let eventType = '';
+                    let eventData = '';
+
+                    for (const line of eventBlock.split('\n')) {
+                        if (line.startsWith('event: ')) {
+                            eventType = line.slice(7).trim();
+                        } else if (line.startsWith('data: ')) {
+                            eventData = line.slice(6);
+                        }
                     }
-                } else {
-                    // No markers yet — show all text as draft
-                    setStreamingContent(accumulated);
+
+                    if (eventType === 'delta' && eventData) {
+                        try {
+                            const delta = JSON.parse(eventData) as string;
+                            draftText += delta;
+                            setStreamingContent(draftText);
+                        } catch {
+                            // Non-JSON delta — append raw
+                            draftText += eventData;
+                            setStreamingContent(draftText);
+                        }
+                    } else if (eventType === 'final' && eventData) {
+                        finalPayload = eventData;
+                    }
                 }
             }
 
@@ -225,10 +241,10 @@ export default function ConversationPage() {
             if (finalPayload) {
                 data = JSON.parse(finalPayload);
             } else {
-                // Fallback: try parsing entire accumulated text as JSON
-                // This handles the case where streaming wasn't available
+                // Fallback: try parsing entire draft text as JSON
+                // This handles the case where SSE framing wasn't used
                 try {
-                    data = JSON.parse(accumulated);
+                    data = JSON.parse(draftText);
                 } catch {
                     data = { ok: false, error: 'Failed to parse response' };
                 }

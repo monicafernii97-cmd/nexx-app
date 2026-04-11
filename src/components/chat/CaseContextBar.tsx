@@ -49,7 +49,7 @@ export function CaseContextBar({ chips, caseName }: CaseContextBarProps) {
       )}
 
       {/* Context chips */}
-      <div className="flex items-center gap-1.5 overflow-x-auto">
+      <div className="flex items-center gap-1.5">
         {chips.map((chip, i) => {
           const tone = chip.tone ?? 'neutral';
           return (

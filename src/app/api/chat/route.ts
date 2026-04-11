@@ -1,4 +1,4 @@
-import { NextRequest, after } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { openai, ensureOpenAIConversation } from '@/lib/openaiConversation';
 import { classifyMessage } from '@/lib/nexx/router';
@@ -368,7 +368,7 @@ export async function POST(req: NextRequest) {
               // Stream delta to client
               const delta = event.delta ?? '';
               accumulatedText += delta;
-              controller.enqueue(encoder.encode(delta));
+              controller.enqueue(encoder.encode(`event: delta\ndata: ${JSON.stringify(delta)}\n\n`));
             } else if (event.type === 'response.completed') {
               lastResponse = event.response;
               responseId = event.response?.id;
@@ -553,43 +553,9 @@ export async function POST(req: NextRequest) {
             });
           } catch { /* non-fatal */ }
 
-          // ── Step 17: persistAfterResponse (deferred) ──
-          // Note: We can't use after() inside a stream, so we fire this
-          // as a final async operation before closing the stream.
-          try {
-            const allMessages = await convex.query(api.messages.list, { conversationId: typedConversationId });
-            const messageArray = allMessages.map((m: { role: string; content: string }) => ({
-              role: m.role,
-              content: m.content,
-            }));
-
-            await persistAfterResponse({
-              conversationId,
-              messages: messageArray,
-              messageCount: messageArray.length,
-              existingSummary: contextPacket.conversationSummary,
-              existingCaseGraph,
-              saveSummary: async (summary, turnCount) => {
-                await convex.mutation(api.conversationSummaries.upsert, {
-                  conversationId: typedConversationId,
-                  summary: JSON.stringify(summary),
-                  turnCount,
-                });
-              },
-              saveCaseGraph: async (graphJson) => {
-                await convex.mutation(api.caseGraphs.upsert, {
-                  userId: convexUserId,
-                  graphJson,
-                });
-              },
-            });
-          } catch (err) {
-            console.warn('[Chat] persistAfterResponse error:', err);
-          }
-
-          // ── Step 18: Send final rewrite markers ──
-          // The client's streamRenderer.ts detects these markers and swaps
-          // the live draft text with the polished final response + artifacts.
+          // ── Step 17: Send final payload via SSE event ──
+          // Uses SSE framing (event: type + data: json) instead of in-band
+          // sentinel strings, preventing collision with model output.
           const finalPayload = JSON.stringify({
             ok: true,
             response: parsedResponse,
@@ -597,21 +563,51 @@ export async function POST(req: NextRequest) {
             routeMode,
           });
 
-          controller.enqueue(encoder.encode('[[NEXX_FINAL_REWRITE_START]]'));
-          controller.enqueue(encoder.encode(finalPayload));
-          controller.enqueue(encoder.encode('[[NEXX_FINAL_REWRITE_END]]'));
+          controller.enqueue(encoder.encode(`event: final\ndata: ${finalPayload}\n\n`));
           controller.close();
+
+          // ── Step 18: persistAfterResponse (fire-and-forget) ──
+          // Runs AFTER stream is closed so it doesn't block user-visible latency.
+          void (async () => {
+            try {
+              const allMessages = await convex.query(api.messages.list, { conversationId: typedConversationId });
+              const messageArray = allMessages.map((m: { role: string; content: string }) => ({
+                role: m.role,
+                content: m.content,
+              }));
+
+              await persistAfterResponse({
+                conversationId,
+                messages: messageArray,
+                messageCount: messageArray.length,
+                existingSummary: contextPacket.conversationSummary,
+                existingCaseGraph,
+                saveSummary: async (summary, turnCount) => {
+                  await convex.mutation(api.conversationSummaries.upsert, {
+                    conversationId: typedConversationId,
+                    summary: JSON.stringify(summary),
+                    turnCount,
+                  });
+                },
+                saveCaseGraph: async (graphJson) => {
+                  await convex.mutation(api.caseGraphs.upsert, {
+                    userId: convexUserId,
+                    graphJson,
+                  });
+                },
+              });
+            } catch (err) {
+              console.warn('[Chat] persistAfterResponse error:', err);
+            }
+          })();
 
         } catch (error) {
           console.error('[Chat] Streaming error:', error);
-          // Send error as final payload
           const errorPayload = JSON.stringify({
             ok: false,
             error: 'Failed to generate response',
           });
-          controller.enqueue(encoder.encode('[[NEXX_FINAL_REWRITE_START]]'));
-          controller.enqueue(encoder.encode(errorPayload));
-          controller.enqueue(encoder.encode('[[NEXX_FINAL_REWRITE_END]]'));
+          controller.enqueue(encoder.encode(`event: final\ndata: ${errorPayload}\n\n`));
           controller.close();
         }
       },

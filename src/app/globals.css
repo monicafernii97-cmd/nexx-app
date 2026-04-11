@@ -180,7 +180,7 @@ body {
 
 /* Typography Overrides */
 /* Restoring Playfair Display for elegant luxury headers */
-.font-serif, .text-headline, .text-editorial {
+.font-serif, .text-editorial {
   font-family: var(--font-playfair), Georgia, serif;
   font-weight: 700;
   letter-spacing: -0.01em;

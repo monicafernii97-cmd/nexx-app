@@ -5,7 +5,7 @@
  * so components can be developed and tested without a live backend.
  */
 
-import type { AssistantResponseViewModel, PanelData } from './types';
+import type { AssistantResponseViewModel, PanelData, ResponseIntent } from './types';
 import { buildPresentation } from './presentation-rules';
 import { getPanelTone } from './panel-library';
 
@@ -312,7 +312,7 @@ export const MOCK_MIXED: AssistantResponseViewModel = (() => {
 // All mocks indexed by intent
 // ---------------------------------------------------------------------------
 
-export const MOCK_RESPONSES: Record<string, AssistantResponseViewModel> = {
+export const MOCK_RESPONSES: Record<ResponseIntent, AssistantResponseViewModel> = {
   support: MOCK_SUPPORT,
   analysis: MOCK_ANALYSIS,
   strategy: MOCK_STRATEGY,

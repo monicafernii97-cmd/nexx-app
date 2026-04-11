@@ -8,6 +8,7 @@
  * Dispatches ActionType via callback prop.
  */
 
+import type { IconProps } from '@phosphor-icons/react';
 import {
   Copy,
   NotePencil,
@@ -29,7 +30,7 @@ import { getActionLabel, getActionTier } from '@/lib/ui-intelligence/action-rout
 // Icon map
 // ---------------------------------------------------------------------------
 
-const ICON_MAP: Record<ActionType, React.ComponentType<{ size?: number; weight?: string }>> = {
+const ICON_MAP: Record<ActionType, React.ComponentType<IconProps>> = {
   copy: Copy,
   save_note: NotePencil,
   pin: PushPin,
@@ -76,6 +77,7 @@ export function ContextualActionBar({
         return (
           <button
             key={action}
+            type="button"
             onClick={() => onAction(action)}
             className={`
               inline-flex items-center gap-1.5 px-3 py-1.5

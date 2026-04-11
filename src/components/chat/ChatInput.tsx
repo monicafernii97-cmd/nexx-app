@@ -49,6 +49,14 @@ const MODE_OPTIONS: { id: ComposerMode; label: string }[] = [
 export default function ChatInput({ onSend, disabled, placeholder, onQuickAction, activeMode, onModeChange }: ChatInputProps) {
     const [input, setInput] = useState('');
     const [currentMode, setCurrentMode] = useState<ComposerMode>(activeMode ?? 'general');
+
+    // Sync internal state when controlled prop changes
+    useEffect(() => {
+        if (activeMode !== undefined) {
+            setCurrentMode(activeMode);
+        }
+    }, [activeMode]);
+
     const [isListening, setIsListening] = useState(false);
     const [micError, setMicError] = useState<string | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -295,6 +303,17 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
         }
     }, [onQuickAction, updateInput]);
 
+    /** Shared chip button styling — extracted to avoid duplication across quick action and upload chips. */
+    const chipButtonClasses = `
+        inline-flex items-center gap-1.5 px-3 py-1.5
+        text-xs font-medium rounded-full whitespace-nowrap
+        bg-[var(--surface-elevated)] text-[var(--text-muted)]
+        border border-[var(--border-subtle)]
+        hover:text-[var(--accent-icy)] hover:border-[var(--accent-icy)]/30
+        transition-all duration-150
+        disabled:opacity-40 disabled:cursor-not-allowed
+    `;
+
     return (
         <div className="relative space-y-2">
             {/* Quick Action Chips */}
@@ -307,15 +326,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                             type="button"
                             onClick={() => handleQuickActionClick(action.id)}
                             disabled={disabled}
-                            className="
-                                inline-flex items-center gap-1.5 px-3 py-1.5
-                                text-xs font-medium rounded-full whitespace-nowrap
-                                bg-[var(--surface-elevated)] text-[var(--text-muted)]
-                                border border-[var(--border-subtle)]
-                                hover:text-[var(--accent-icy)] hover:border-[var(--accent-icy)]/30
-                                transition-all duration-150
-                                disabled:opacity-40 disabled:cursor-not-allowed
-                            "
+                            className={chipButtonClasses}
                         >
                             <Icon size={12} />
                             {action.label}
@@ -336,15 +347,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                         }
                     }}
                     disabled={disabled}
-                    className="
-                        inline-flex items-center gap-1.5 px-3 py-1.5
-                        text-xs font-medium rounded-full whitespace-nowrap
-                        bg-[var(--surface-elevated)] text-[var(--text-muted)]
-                        border border-[var(--border-subtle)]
-                        hover:text-[var(--accent-icy)] hover:border-[var(--accent-icy)]/30
-                        transition-all duration-150
-                        disabled:opacity-40 disabled:cursor-not-allowed
-                    "
+                    className={chipButtonClasses}
                 >
                     <FileText size={12} />
                     Upload Thread
@@ -358,15 +361,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                         }
                     }}
                     disabled={disabled}
-                    className="
-                        inline-flex items-center gap-1.5 px-3 py-1.5
-                        text-xs font-medium rounded-full whitespace-nowrap
-                        bg-[var(--surface-elevated)] text-[var(--text-muted)]
-                        border border-[var(--border-subtle)]
-                        hover:text-[var(--accent-icy)] hover:border-[var(--accent-icy)]/30
-                        transition-all duration-150
-                        disabled:opacity-40 disabled:cursor-not-allowed
-                    "
+                    className={chipButtonClasses}
                 >
                     <FileArrowUp size={12} />
                     Upload Order

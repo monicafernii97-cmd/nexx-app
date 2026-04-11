@@ -189,11 +189,18 @@ const HIGHER_ACTIONS: ActionType[] = [
 function buildAllowedActions(eligibility: EligibilityFlags): ActionType[] {
   const actions: ActionType[] = [...UNIVERSAL_ACTIONS, ...MEDIUM_ACTIONS];
 
-  if (eligibility.timelineEligible) actions.push('add_to_timeline');
-  if (eligibility.incidentEligible) actions.push('convert_to_incident');
-  if (eligibility.exhibitEligible) actions.push('convert_to_exhibit');
-  if (eligibility.templateEligible) actions.push('insert_into_template');
-  if (eligibility.draftEligible) actions.push('create_draft');
+  // Use HIGHER_ACTIONS as single source of truth for higher-tier actions
+  const eligibilityMap: Record<string, boolean | undefined> = {
+    add_to_timeline: eligibility.timelineEligible,
+    convert_to_incident: eligibility.incidentEligible,
+    convert_to_exhibit: eligibility.exhibitEligible,
+    insert_into_template: eligibility.templateEligible,
+    create_draft: eligibility.draftEligible,
+  };
+
+  for (const action of HIGHER_ACTIONS) {
+    if (eligibilityMap[action]) actions.push(action);
+  }
 
   return actions;
 }
@@ -228,6 +235,3 @@ export function buildPresentation(intent: ResponseIntent): ResponsePresentation 
 export function getPanelOrder(intent: ResponseIntent): PanelType[] {
   return INTENT_PANEL_ORDER[intent] ?? INTENT_PANEL_ORDER.mixed;
 }
-
-// Suppress unused import warnings — these are used for type checking
-void (HIGHER_ACTIONS as ActionType[]);

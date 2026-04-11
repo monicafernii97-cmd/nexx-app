@@ -62,6 +62,42 @@ html {
 
   /* ── Clerk Component Fonts ── */
   --clerk-input-font: Inter, system-ui, -apple-system, sans-serif;
+
+  /* ═══ Premium Intelligence Tokens — Light Theme Defaults ═══ */
+  --surface-elevated: #F1F5F9;
+  --surface-card: #FFFFFF;
+  --border-subtle: rgba(15, 23, 42, 0.1);
+  --accent-icy: #0EA5E9;
+  --accent-platinum: #334155;
+  --warning-muted: #D97706;
+  --success-soft: #34D399;
+  --critical-access: #DC2626;
+  --support-violet: #8B5CF6;
+
+  /* ── Intelligence Text ── */
+  --text-heading: #0F172A;
+  --text-body: #334155;
+  --text-muted: #64748B;
+  --text-on-dark: #FFFFFF;
+}
+
+/* ═══ Dark Theme (Galaxy) ═══ */
+:root.dark,
+.dark {
+  --surface-elevated: #0F172A;
+  --surface-card: #1E293B;
+  --border-subtle: rgba(148, 163, 184, 0.2);
+  --accent-icy: #38BDF8;
+  --accent-platinum: #E2E8F0;
+  --warning-muted: #D97706;
+  --success-soft: #34D399;
+  --critical-access: #F59E0B;
+  --support-violet: #A78BFA;
+
+  --text-heading: #F8FAFC;
+  --text-body: #CBD5E1;
+  --text-muted: #64748B;
+  --text-on-dark: #FFFFFF;
 }
 
 @theme inline {
@@ -84,6 +120,16 @@ html {
   --color-error: var(--error);
   --color-cloud: rgba(255, 255, 255, 0.05);
   --color-cloud-light: rgba(255, 255, 255, 0.1);
+
+  /* ── Premium Intelligence Colors ── */
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-card: var(--surface-card);
+  --color-accent-icy: var(--accent-icy);
+  --color-accent-platinum: var(--accent-platinum);
+  --color-warning-muted: var(--warning-muted);
+  --color-success-soft: var(--success-soft);
+  --color-critical-access: var(--critical-access);
+  --color-support-violet: var(--support-violet);
 }
 
 /* ═══ Base ═══ */
@@ -100,9 +146,41 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ═══ Intelligence Typography Hierarchy ═══ */
+.text-headline {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+}
+
+.text-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.text-body {
+  font-size: 0.875rem;
+  line-height: 1.625;
+  color: var(--text-body);
+}
+
+.text-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.text-work-product {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875rem;
+  line-height: 1.625;
+}
+
 /* Typography Overrides */
 /* Restoring Playfair Display for elegant luxury headers */
-.font-serif, .text-headline, .text-editorial {
+.font-serif, .text-editorial {
   font-family: var(--font-playfair), Georgia, serif;
   font-weight: 700;
   letter-spacing: -0.01em;

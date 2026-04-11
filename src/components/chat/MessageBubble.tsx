@@ -6,6 +6,8 @@ import { useEffect, useRef, useState, useCallback, useMemo, useId } from 'react'
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { NexxArtifacts, LegalConfidence, JudgeSimulationResult, OppositionSimulationResult } from '@/lib/types';
+import { AssistantMessageCard } from './AssistantMessageCard';
+import type { AssistantResponseViewModel, ActionType, DetectedPattern, LocalProcedureInfo } from '@/lib/ui-intelligence/types';
 
 export type ChatTheme = 'dark' | 'light';
 
@@ -20,6 +22,14 @@ interface MessageBubbleProps {
     onRetry?: () => void;
     /** Called when user saves an edited message — passes new content. */
     onEdit?: (newContent: string) => void;
+    /** Structured response view model for adaptive panel rendering. */
+    structuredViewModel?: AssistantResponseViewModel;
+    /** Detected patterns for intelligence chips. */
+    detectedPatterns?: DetectedPattern[];
+    /** Local procedure badge info. */
+    procedureInfo?: LocalProcedureInfo;
+    /** Handler for contextual actions from AssistantMessageCard. */
+    onAction?: (action: ActionType, content?: string) => void;
 }
 
 // ── Shared action button (declared OUTSIDE render to satisfy react-hooks/static-components) ──
@@ -328,6 +338,10 @@ export default function MessageBubble({
     artifactsJson,
     onRetry,
     onEdit,
+    structuredViewModel,
+    detectedPatterns,
+    procedureInfo,
+    onAction,
 }: MessageBubbleProps) {
     const [copied, setCopied] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -513,6 +527,16 @@ export default function MessageBubble({
             </div>
 
             <div className="flex-1 max-w-4xl min-w-0 pr-4">
+                {/* Structured response rendering (AssistantMessageCard) */}
+                {structuredViewModel && !isStreaming ? (
+                    <AssistantMessageCard
+                        viewModel={structuredViewModel}
+                        patterns={detectedPatterns}
+                        procedureInfo={procedureInfo}
+                        onAction={(action, content) => onAction?.(action, content)}
+                    />
+                ) : (
+                    <>
                 {/* Confidence badge — rendered above the message */}
                 {artifacts?.confidence && (
                     <div className="mb-2">
@@ -604,6 +628,8 @@ export default function MessageBubble({
                             </ActionButton>
                         )}
                     </div>
+                )}
+                </>
                 )}
             </div>
         </motion.div>

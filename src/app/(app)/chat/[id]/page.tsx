@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
@@ -9,7 +9,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Archive, Lock, Sun, Moon } from '@phosphor-icons/react';
 import MessageBubble, { type ChatTheme } from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
+import { CaseContextBar, buildCaseContextChips } from '@/components/chat/CaseContextBar';
+import { AnalysisStatusStrip, DEFAULT_ANALYSIS_STEPS, getStepsByElapsed } from '@/components/chat/AnalysisStatusStrip';
 import type { NexxAssistantResponse, RouteMode } from '@/lib/types';
+import type { AnalysisStep } from '@/lib/ui-intelligence/types';
 
 const VALID_ROUTE_MODES: readonly RouteMode[] = [
     'adaptive_chat', 'direct_legal_answer', 'local_procedure',
@@ -49,6 +52,8 @@ export default function ConversationPage() {
         artifactsJson?: string;
         mode?: RouteMode;
     } | null>(null);
+    const [analysisSteps, setAnalysisSteps] = useState<AnalysisStep[]>(DEFAULT_ANALYSIS_STEPS);
+    const streamStartRef = useRef<number>(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // ── Theme state (persisted to localStorage) ──
@@ -67,6 +72,41 @@ export default function ConversationPage() {
         });
     }, []);
     const isLight = theme === 'light';
+
+    // Toggle dark class on html element for CSS variable switching
+    useEffect(() => {
+        const html = document.documentElement;
+        if (theme === 'dark') {
+            html.classList.add('dark');
+        } else {
+            html.classList.remove('dark');
+        }
+    }, [theme]);
+
+    // Build case context chips from user profile
+    const caseContextChips = useMemo(() => {
+        if (!userProfile) return [];
+        return buildCaseContextChips({
+            state: userProfile.state ?? undefined,
+            county: userProfile.county ?? undefined,
+            caseType: userProfile.custodyType ?? undefined,
+            proSe: !userProfile.hasAttorney,
+            childrenInvolved: !!(userProfile.children?.length || userProfile.childrenNames?.length),
+        });
+    }, [userProfile]);
+
+    // Analysis step progression during streaming
+    useEffect(() => {
+        if (!isStreaming) {
+            setAnalysisSteps(DEFAULT_ANALYSIS_STEPS);
+            return;
+        }
+        const interval = setInterval(() => {
+            const elapsed = (Date.now() - streamStartRef.current) / 1000;
+            setAnalysisSteps(getStepsByElapsed(elapsed));
+        }, 500);
+        return () => clearInterval(interval);
+    }, [isStreaming]);
 
     // Auto-scroll to bottom on new messages
     useEffect(() => {
@@ -105,15 +145,17 @@ export default function ConversationPage() {
     }), [userProfile, nexProfile]);
 
     /**
-     * Call the NEXX chat API and persist the response.
-     * Uses the Responses API (non-streaming structured JSON) — the API
-     * returns `{ ok, response: NexxAssistantResponse, routeMode }`.
-     * A stable requestId guarantees idempotent persistence.
+     * Call the NEXX chat API and handle the SSE streaming response.
+     *
+     * The server is the single persistence owner for both user and assistant
+     * messages (Steps 13 + 14 in route.ts). The client only needs to send
+     * the current user message + requestId for idempotent de-duplication.
      */
-    const callChatAPI = useCallback(async (history: { role: 'user' | 'assistant'; content: string }[]) => {
+    const callChatAPI = useCallback(async (message: string) => {
         setIsStreaming(true);
         setStreamingContent('');
         setUnsavedReply(null);
+        streamStartRef.current = Date.now();
 
         const requestId = `${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -122,7 +164,8 @@ export default function ConversationPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    messages: history,
+                    message,
+                    requestId,
                     userContext: buildUserContext(),
                     conversationId,
                 }),
@@ -133,79 +176,108 @@ export default function ConversationPage() {
                 throw new Error(`Failed to get AI response: ${response.status} ${errorText}`);
             }
 
-            const data = await response.json() as {
+            // Handle SSE-framed streaming response
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error('No response body');
+
+            const decoder = new TextDecoder();
+            let draftText = '';
+            let finalPayload: string | null = null;
+            let sseBuffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    // Flush any remaining bytes from the decoder
+                    const remaining = decoder.decode(undefined, { stream: false });
+                    if (remaining) sseBuffer += remaining;
+                    break;
+                }
+
+                const chunk = decoder.decode(value, { stream: true });
+                sseBuffer += chunk;
+
+                // Parse complete SSE events (double newline delimited)
+                const events = sseBuffer.split('\n\n');
+                // Keep the last (possibly incomplete) chunk in the buffer
+                sseBuffer = events.pop() ?? '';
+
+                for (const eventBlock of events) {
+                    if (!eventBlock.trim()) continue;
+
+                    let eventType = '';
+                    let eventData = '';
+
+                    for (const line of eventBlock.split('\n')) {
+                        if (line.startsWith('event: ')) {
+                            eventType = line.slice(7).trim();
+                        } else if (line.startsWith('data: ')) {
+                            eventData = line.slice(6);
+                        }
+                    }
+
+                    if (eventType === 'delta' && eventData) {
+                        try {
+                            const delta = JSON.parse(eventData) as string;
+                            draftText += delta;
+                            setStreamingContent(draftText);
+                        } catch {
+                            // Non-JSON delta — append raw
+                            draftText += eventData;
+                            setStreamingContent(draftText);
+                        }
+                    } else if (eventType === 'final' && eventData) {
+                        finalPayload = eventData;
+                    }
+                }
+            }
+
+            // Parse the final payload
+            let data: {
                 ok: boolean;
                 response?: NexxAssistantResponse;
                 routeMode?: string;
                 error?: string;
             };
 
+            if (finalPayload) {
+                data = JSON.parse(finalPayload);
+            } else {
+                // Fallback: try parsing entire draft text as JSON
+                // This handles the case where SSE framing wasn't used
+                try {
+                    data = JSON.parse(draftText);
+                } catch {
+                    data = { ok: false, error: 'Failed to parse response' };
+                }
+            }
+
             if (!data.ok || !data.response) {
                 throw new Error(data.error || 'Unknown error from chat API');
             }
 
+            // Show the final polished content — server already persisted both messages
             const fullContent = data.response.message;
-            const artifactsJson = JSON.stringify(data.response.artifacts);
-            const mode = isValidRouteMode(data.routeMode) ? data.routeMode : undefined;
             setStreamingContent(fullContent);
 
-            // Persist the assistant response with artifacts
-            try {
-                await sendMessage({
-                    conversationId,
-                    role: 'assistant',
-                    content: fullContent,
-                    requestId,
-                    artifactsJson,
-                    mode,
-                });
+            // Clear streaming content after a brief delay so the Convex query
+            // has time to pick up the server-persisted messages
+            setTimeout(() => {
                 setStreamingContent('');
                 setUnsavedReply(null);
                 setUnsavedResponseData(null);
-            } catch (persistError) {
-                console.error('Failed to persist AI response:', persistError);
-                try {
-                    // Retry with same requestId — idempotent, no duplicates
-                    await sendMessage({
-                        conversationId,
-                        role: 'assistant',
-                        content: fullContent,
-                        requestId,
-                        artifactsJson,
-                        mode,
-                    });
-                    setStreamingContent('');
-                    setUnsavedReply(null);
-                    setUnsavedResponseData(null);
-                } catch {
-                    // Mark as unsaved — blocks new sends until resolved
-                    setUnsavedReply(fullContent);
-                    setUnsavedResponseData({ requestId, artifactsJson, mode });
-                    console.error('Retry persistence also failed — response preserved in UI for manual copy');
-                }
-            }
+            }, 500);
+
         } catch (error) {
             console.error('Chat API error:', error);
             const fallbackContent = "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.";
-            try {
-                await sendMessage({
-                    conversationId,
-                    role: 'assistant',
-                    content: fallbackContent,
-                });
-                setStreamingContent('');
-                setUnsavedReply(null);
-                setUnsavedResponseData(null);
-            } catch {
-                // Fallback persistence failed — preserve for retry
-                setUnsavedReply(fallbackContent);
-                setUnsavedResponseData({ requestId });
-                setStreamingContent(fallbackContent);
-            }
+            setUnsavedReply(fallbackContent);
+            setUnsavedResponseData({ requestId });
+            setStreamingContent(fallbackContent);
         } finally {
             setIsStreaming(false);
         }
-    }, [conversationId, sendMessage, buildUserContext]);
+    }, [conversationId, buildUserContext]);
 
     /** Send a new user message and stream the AI response. */
     const handleSend = useCallback(
@@ -215,26 +287,16 @@ export default function ConversationPage() {
             setIsPending(true);
 
             try {
-                await sendMessage({
-                    conversationId,
-                    role: 'user',
-                    content: input,
-                });
-
-                const history = (messages ?? []).map((m) => ({
-                    role: m.role as 'user' | 'assistant',
-                    content: m.content,
-                }));
-                history.push({ role: 'user', content: input });
-
-                await callChatAPI(history);
+                // Server handles user message persistence (Step 13 in route.ts).
+                // No client-side sendMessage needed — avoids duplicate writes.
+                await callChatAPI(input);
             } catch (error) {
                 console.error('Send error:', error);
             } finally {
                 setIsPending(false);
             }
         },
-        [conversationId, messages, sendMessage, isStreaming, isPending, isThreadReady, unsavedReply, callChatAPI]
+        [isStreaming, isPending, isThreadReady, unsavedReply, callChatAPI]
     );
 
     /**
@@ -252,7 +314,11 @@ export default function ConversationPage() {
                     targetMessageId: assistantMessageId,
                 });
 
-                await callChatAPI(history);
+                // Extract the last user message from history for the server
+                const lastUserMsg = [...history].reverse().find(m => m.role === 'user');
+                if (!lastUserMsg) throw new Error('No user message found for retry');
+
+                await callChatAPI(lastUserMsg.content);
             } catch (error) {
                 console.error('Retry error:', error);
             } finally {
@@ -272,13 +338,14 @@ export default function ConversationPage() {
             setIsPending(true);
 
             try {
-                const history = await prepareRegenerate({
+                await prepareRegenerate({
                     conversationId,
                     targetMessageId: messageId,
                     newContent,
                 });
 
-                await callChatAPI(history);
+                // For edits, the new content IS the message text
+                await callChatAPI(newContent);
             } catch (error) {
                 console.error('Edit error:', error);
             } finally {
@@ -397,6 +464,21 @@ export default function ConversationPage() {
                 </button>
             </motion.div>
 
+            {/* Case Context Bar */}
+            {caseContextChips.length > 0 && (
+                <div className="px-4 lg:px-8 pt-2">
+                    <CaseContextBar
+                        chips={caseContextChips}
+                        caseName={conversation?.title}
+                    />
+                </div>
+            )}
+
+            {/* Analysis Status Strip */}
+            <div className="px-4 lg:px-8">
+                <AnalysisStatusStrip steps={analysisSteps} visible={isStreaming} />
+            </div>
+
             {/* Messages Area */}
             <div className={`flex-1 overflow-y-auto w-full no-scrollbar pb-6 px-1 lg:px-6 relative scroll-smooth flex flex-col transition-colors duration-300 ${isLight ? 'bg-white' : ''}`}>
                 {messages?.length === 0 && !isStreaming && (
@@ -491,7 +573,7 @@ export default function ConversationPage() {
                     </div>
                 )}
 
-                {/* Loading indicator (Pre-stream) */}
+                {/* Loading indicator (Pre-stream) — now covered by AnalysisStatusStrip */}
                 {isStreaming && !streamingContent && (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}

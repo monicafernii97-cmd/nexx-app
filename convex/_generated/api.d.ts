@@ -12,6 +12,7 @@ import type * as caseGraphs from "../caseGraphs.js";
 import type * as conversationSummaries from "../conversationSummaries.js";
 import type * as conversations from "../conversations.js";
 import type * as courtSettings from "../courtSettings.js";
+import type * as crons from "../crons.js";
 import type * as debugTraces from "../debugTraces.js";
 import type * as documents from "../documents.js";
 import type * as generatedDocuments from "../generatedDocuments.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   conversationSummaries: typeof conversationSummaries;
   conversations: typeof conversations;
   courtSettings: typeof courtSettings;
+  crons: typeof crons;
   debugTraces: typeof debugTraces;
   documents: typeof documents;
   generatedDocuments: typeof generatedDocuments;

@@ -113,6 +113,7 @@ export function PanelRenderer({ panel, index = 0, onCopy }: PanelRendererProps) 
           {/* Copy button for work-product panels */}
           {isWP && onCopy && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 const text = Array.isArray(panel.content)

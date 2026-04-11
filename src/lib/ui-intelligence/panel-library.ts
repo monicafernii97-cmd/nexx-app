@@ -8,6 +8,7 @@ import type { PanelType, PanelTone } from './types';
 // Panel Titles — display names for all 47 panel types
 // ---------------------------------------------------------------------------
 
+/** Display names for all 47 panel types, used as card headings. */
 export const PANEL_TITLES: Record<PanelType, string> = {
   // Foundational (7)
   overview: 'Overview',
@@ -78,6 +79,7 @@ export const PANEL_TITLES: Record<PanelType, string> = {
 // Panel Tones — visual treatment per panel type
 // ---------------------------------------------------------------------------
 
+/** Visual tone classification for each panel type (neutral, info, success, warning, support). */
 export const PANEL_TONES: Record<PanelType, PanelTone> = {
   // Foundational
   overview: 'neutral',
@@ -148,10 +150,12 @@ export const PANEL_TONES: Record<PanelType, PanelTone> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Get the display title for a panel type, falling back to the raw type string. */
 export function getPanelTitle(type: PanelType): string {
   return PANEL_TITLES[type] ?? type;
 }
 
+/** Get the visual tone for a panel type, defaulting to 'neutral'. */
 export function getPanelTone(type: PanelType): PanelTone {
   return PANEL_TONES[type] ?? 'neutral';
 }

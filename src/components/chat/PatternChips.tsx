@@ -30,6 +30,7 @@ interface PatternChipsProps {
   patterns: DetectedPattern[];
 }
 
+/** Renders amber-toned pill indicators for detected behavioral or custody patterns. */
 export function PatternChips({ patterns }: PatternChipsProps) {
   if (patterns.length === 0) return null;
 

@@ -19,6 +19,7 @@ import type { AnalysisStep } from '@/lib/ui-intelligence/types';
 // Default steps
 // ---------------------------------------------------------------------------
 
+/** Default 4-step analysis progression shown during streaming. */
 export const DEFAULT_ANALYSIS_STEPS: AnalysisStep[] = [
   { id: 'context', label: 'Analyzing case context', status: 'upcoming' },
   { id: 'evidence', label: 'Reviewing evidence patterns', status: 'upcoming' },
@@ -45,6 +46,7 @@ interface AnalysisStatusStripProps {
   visible: boolean;
 }
 
+/** Animated "thinking" indicator strip showing analysis step progression with color-coded dots. */
 export function AnalysisStatusStrip({ steps, visible }: AnalysisStatusStripProps) {
   return (
     <AnimatePresence>

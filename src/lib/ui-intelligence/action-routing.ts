@@ -8,6 +8,7 @@ import type { ActionType, ActionTier } from './types';
 // Action Labels
 // ---------------------------------------------------------------------------
 
+/** Human-readable labels for all 12 action types. */
 export const ACTION_LABELS: Record<ActionType, string> = {
   copy: 'Copy',
   save_note: 'Save Note',
@@ -27,6 +28,7 @@ export const ACTION_LABELS: Record<ActionType, string> = {
 // Action Icons — Phosphor icon names (regular weight)
 // ---------------------------------------------------------------------------
 
+/** Phosphor icon names (regular weight) for rendering action buttons. */
 export const ACTION_ICONS: Record<ActionType, string> = {
   copy: 'Copy',
   save_note: 'NotePencil',

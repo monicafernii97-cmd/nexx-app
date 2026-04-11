@@ -18,6 +18,7 @@ interface LocalProcedureBadgeProps {
   info: LocalProcedureInfo;
 }
 
+/** Blue trust badge showing jurisdiction-specific court and filing details. */
 export function LocalProcedureBadge({ info }: LocalProcedureBadgeProps) {
   return (
     <span

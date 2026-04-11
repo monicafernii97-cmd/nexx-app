@@ -145,12 +145,13 @@ export default function ConversationPage() {
     }), [userProfile, nexProfile]);
 
     /**
-     * Call the NEXX chat API and persist the response.
-     * Uses the Responses API (non-streaming structured JSON) — the API
-     * returns `{ ok, response: NexxAssistantResponse, routeMode }`.
-     * A stable requestId guarantees idempotent persistence.
+     * Call the NEXX chat API and handle the SSE streaming response.
+     *
+     * The server is the single persistence owner for both user and assistant
+     * messages (Steps 13 + 14 in route.ts). The client only needs to send
+     * the current user message + requestId for idempotent de-duplication.
      */
-    const callChatAPI = useCallback(async (history: { role: 'user' | 'assistant'; content: string }[]) => {
+    const callChatAPI = useCallback(async (message: string) => {
         setIsStreaming(true);
         setStreamingContent('');
         setUnsavedReply(null);
@@ -163,7 +164,8 @@ export default function ConversationPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    messages: history,
+                    message,
+                    requestId,
                     userContext: buildUserContext(),
                     conversationId,
                 }),
@@ -254,65 +256,28 @@ export default function ConversationPage() {
                 throw new Error(data.error || 'Unknown error from chat API');
             }
 
+            // Show the final polished content — server already persisted both messages
             const fullContent = data.response.message;
-            const artifactsJson = JSON.stringify(data.response.artifacts);
-            const mode = isValidRouteMode(data.routeMode) ? data.routeMode : undefined;
             setStreamingContent(fullContent);
 
-            // Persist the assistant response with artifacts
-            try {
-                await sendMessage({
-                    conversationId,
-                    role: 'assistant',
-                    content: fullContent,
-                    requestId,
-                    artifactsJson,
-                    mode,
-                });
+            // Clear streaming content after a brief delay so the Convex query
+            // has time to pick up the server-persisted messages
+            setTimeout(() => {
                 setStreamingContent('');
                 setUnsavedReply(null);
                 setUnsavedResponseData(null);
-            } catch (persistError) {
-                console.error('Failed to persist AI response:', persistError);
-                try {
-                    await sendMessage({
-                        conversationId,
-                        role: 'assistant',
-                        content: fullContent,
-                        requestId,
-                        artifactsJson,
-                        mode,
-                    });
-                    setStreamingContent('');
-                    setUnsavedReply(null);
-                    setUnsavedResponseData(null);
-                } catch {
-                    setUnsavedReply(fullContent);
-                    setUnsavedResponseData({ requestId, artifactsJson, mode });
-                    console.error('Retry persistence also failed — response preserved in UI for manual copy');
-                }
-            }
+            }, 500);
+
         } catch (error) {
             console.error('Chat API error:', error);
             const fallbackContent = "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.";
-            try {
-                await sendMessage({
-                    conversationId,
-                    role: 'assistant',
-                    content: fallbackContent,
-                });
-                setStreamingContent('');
-                setUnsavedReply(null);
-                setUnsavedResponseData(null);
-            } catch {
-                setUnsavedReply(fallbackContent);
-                setUnsavedResponseData({ requestId });
-                setStreamingContent(fallbackContent);
-            }
+            setUnsavedReply(fallbackContent);
+            setUnsavedResponseData({ requestId });
+            setStreamingContent(fallbackContent);
         } finally {
             setIsStreaming(false);
         }
-    }, [conversationId, sendMessage, buildUserContext]);
+    }, [conversationId, buildUserContext]);
 
     /** Send a new user message and stream the AI response. */
     const handleSend = useCallback(
@@ -322,26 +287,16 @@ export default function ConversationPage() {
             setIsPending(true);
 
             try {
-                await sendMessage({
-                    conversationId,
-                    role: 'user',
-                    content: input,
-                });
-
-                const history = (messages ?? []).map((m) => ({
-                    role: m.role as 'user' | 'assistant',
-                    content: m.content,
-                }));
-                history.push({ role: 'user', content: input });
-
-                await callChatAPI(history);
+                // Server handles user message persistence (Step 13 in route.ts).
+                // No client-side sendMessage needed — avoids duplicate writes.
+                await callChatAPI(input);
             } catch (error) {
                 console.error('Send error:', error);
             } finally {
                 setIsPending(false);
             }
         },
-        [conversationId, messages, sendMessage, isStreaming, isPending, isThreadReady, unsavedReply, callChatAPI]
+        [isStreaming, isPending, isThreadReady, unsavedReply, callChatAPI]
     );
 
     /**
@@ -359,7 +314,11 @@ export default function ConversationPage() {
                     targetMessageId: assistantMessageId,
                 });
 
-                await callChatAPI(history);
+                // Extract the last user message from history for the server
+                const lastUserMsg = [...history].reverse().find(m => m.role === 'user');
+                if (!lastUserMsg) throw new Error('No user message found for retry');
+
+                await callChatAPI(lastUserMsg.content);
             } catch (error) {
                 console.error('Retry error:', error);
             } finally {
@@ -379,13 +338,14 @@ export default function ConversationPage() {
             setIsPending(true);
 
             try {
-                const history = await prepareRegenerate({
+                await prepareRegenerate({
                     conversationId,
                     targetMessageId: messageId,
                     newContent,
                 });
 
-                await callChatAPI(history);
+                // For edits, the new content IS the message text
+                await callChatAPI(newContent);
             } catch (error) {
                 console.error('Edit error:', error);
             } finally {

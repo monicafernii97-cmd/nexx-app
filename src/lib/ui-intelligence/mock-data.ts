@@ -312,6 +312,7 @@ export const MOCK_MIXED: AssistantResponseViewModel = (() => {
 // All mocks indexed by intent
 // ---------------------------------------------------------------------------
 
+/** All mock response view models indexed by ResponseIntent, for development and visual testing. */
 export const MOCK_RESPONSES: Record<ResponseIntent, AssistantResponseViewModel> = {
   support: MOCK_SUPPORT,
   analysis: MOCK_ANALYSIS,

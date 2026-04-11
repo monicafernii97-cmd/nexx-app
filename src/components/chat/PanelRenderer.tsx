@@ -66,6 +66,7 @@ interface PanelRendererProps {
   onCopy?: (content: string) => void;
 }
 
+/** Renders a single intelligence panel card with tone coloring, collapse toggle, copy, and stagger animation. */
 export function PanelRenderer({ panel, index = 0, onCopy }: PanelRendererProps) {
   const title = panel.title || getPanelTitle(panel.type);
   const tone = panel.tone ?? getPanelTone(panel.type);

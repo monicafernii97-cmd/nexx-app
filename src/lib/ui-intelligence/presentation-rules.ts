@@ -214,9 +214,9 @@ function buildAllowedActions(eligibility: EligibilityFlags): ActionType[] {
  * Determines which panels to show, in what order, and which actions are available.
  */
 export function buildPresentation(intent: ResponseIntent): ResponsePresentation {
-  const panelOrder = INTENT_PANEL_ORDER[intent] ?? INTENT_PANEL_ORDER.mixed;
-  const recommendedActions = INTENT_RECOMMENDED_ACTIONS[intent] ?? INTENT_RECOMMENDED_ACTIONS.mixed;
-  const eligibility = INTENT_ELIGIBILITY[intent] ?? INTENT_ELIGIBILITY.mixed;
+  const panelOrder = [...(INTENT_PANEL_ORDER[intent] ?? INTENT_PANEL_ORDER.mixed)];
+  const recommendedActions = [...(INTENT_RECOMMENDED_ACTIONS[intent] ?? INTENT_RECOMMENDED_ACTIONS.mixed)];
+  const eligibility = { ...(INTENT_ELIGIBILITY[intent] ?? INTENT_ELIGIBILITY.mixed) };
   const allowedActions = buildAllowedActions(eligibility);
 
   return {
@@ -233,5 +233,5 @@ export function buildPresentation(intent: ResponseIntent): ResponsePresentation 
  * Get the default panel order for an intent.
  */
 export function getPanelOrder(intent: ResponseIntent): PanelType[] {
-  return INTENT_PANEL_ORDER[intent] ?? INTENT_PANEL_ORDER.mixed;
+  return [...(INTENT_PANEL_ORDER[intent] ?? INTENT_PANEL_ORDER.mixed)];
 }

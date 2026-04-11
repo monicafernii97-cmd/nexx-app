@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
@@ -9,7 +9,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Archive, Lock, Sun, Moon } from '@phosphor-icons/react';
 import MessageBubble, { type ChatTheme } from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
+import { CaseContextBar, buildCaseContextChips } from '@/components/chat/CaseContextBar';
+import { AnalysisStatusStrip, DEFAULT_ANALYSIS_STEPS, getStepsByElapsed } from '@/components/chat/AnalysisStatusStrip';
 import type { NexxAssistantResponse, RouteMode } from '@/lib/types';
+import type { AnalysisStep } from '@/lib/ui-intelligence/types';
 
 const VALID_ROUTE_MODES: readonly RouteMode[] = [
     'adaptive_chat', 'direct_legal_answer', 'local_procedure',
@@ -49,6 +52,8 @@ export default function ConversationPage() {
         artifactsJson?: string;
         mode?: RouteMode;
     } | null>(null);
+    const [analysisSteps, setAnalysisSteps] = useState<AnalysisStep[]>(DEFAULT_ANALYSIS_STEPS);
+    const streamStartRef = useRef<number>(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // ── Theme state (persisted to localStorage) ──
@@ -67,6 +72,41 @@ export default function ConversationPage() {
         });
     }, []);
     const isLight = theme === 'light';
+
+    // Toggle dark class on html element for CSS variable switching
+    useEffect(() => {
+        const html = document.documentElement;
+        if (theme === 'dark') {
+            html.classList.add('dark');
+        } else {
+            html.classList.remove('dark');
+        }
+    }, [theme]);
+
+    // Build case context chips from user profile
+    const caseContextChips = useMemo(() => {
+        if (!userProfile) return [];
+        return buildCaseContextChips({
+            state: userProfile.state ?? undefined,
+            county: userProfile.county ?? undefined,
+            caseType: userProfile.custodyType ?? undefined,
+            proSe: !userProfile.hasAttorney,
+            childrenInvolved: !!(userProfile.children?.length || userProfile.childrenNames?.length),
+        });
+    }, [userProfile]);
+
+    // Analysis step progression during streaming
+    useEffect(() => {
+        if (!isStreaming) {
+            setAnalysisSteps(DEFAULT_ANALYSIS_STEPS);
+            return;
+        }
+        const interval = setInterval(() => {
+            const elapsed = (Date.now() - streamStartRef.current) / 1000;
+            setAnalysisSteps(getStepsByElapsed(elapsed));
+        }, 500);
+        return () => clearInterval(interval);
+    }, [isStreaming]);
 
     // Auto-scroll to bottom on new messages
     useEffect(() => {
@@ -114,6 +154,7 @@ export default function ConversationPage() {
         setIsStreaming(true);
         setStreamingContent('');
         setUnsavedReply(null);
+        streamStartRef.current = Date.now();
 
         const requestId = `${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -133,12 +174,65 @@ export default function ConversationPage() {
                 throw new Error(`Failed to get AI response: ${response.status} ${errorText}`);
             }
 
-            const data = await response.json() as {
+            // Handle streaming response with FINAL_REWRITE markers
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error('No response body');
+
+            const decoder = new TextDecoder();
+            let accumulated = '';
+            let finalPayload: string | null = null;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                accumulated += chunk;
+
+                // Check for final rewrite markers
+                const startMarker = '[[NEXX_FINAL_REWRITE_START]]';
+                const endMarker = '[[NEXX_FINAL_REWRITE_END]]';
+                const startIdx = accumulated.indexOf(startMarker);
+
+                if (startIdx !== -1) {
+                    const endIdx = accumulated.indexOf(endMarker, startIdx);
+                    if (endIdx !== -1) {
+                        // Extract final payload
+                        finalPayload = accumulated.slice(startIdx + startMarker.length, endIdx);
+                        // Update streaming content with text before markers
+                        const draftText = accumulated.slice(0, startIdx);
+                        if (draftText) setStreamingContent(draftText);
+                        break;
+                    } else {
+                        // Still accumulating — show draft text before marker
+                        const draftText = accumulated.slice(0, startIdx);
+                        if (draftText) setStreamingContent(draftText);
+                    }
+                } else {
+                    // No markers yet — show all text as draft
+                    setStreamingContent(accumulated);
+                }
+            }
+
+            // Parse the final payload
+            let data: {
                 ok: boolean;
                 response?: NexxAssistantResponse;
                 routeMode?: string;
                 error?: string;
             };
+
+            if (finalPayload) {
+                data = JSON.parse(finalPayload);
+            } else {
+                // Fallback: try parsing entire accumulated text as JSON
+                // This handles the case where streaming wasn't available
+                try {
+                    data = JSON.parse(accumulated);
+                } catch {
+                    data = { ok: false, error: 'Failed to parse response' };
+                }
+            }
 
             if (!data.ok || !data.response) {
                 throw new Error(data.error || 'Unknown error from chat API');
@@ -165,7 +259,6 @@ export default function ConversationPage() {
             } catch (persistError) {
                 console.error('Failed to persist AI response:', persistError);
                 try {
-                    // Retry with same requestId — idempotent, no duplicates
                     await sendMessage({
                         conversationId,
                         role: 'assistant',
@@ -178,7 +271,6 @@ export default function ConversationPage() {
                     setUnsavedReply(null);
                     setUnsavedResponseData(null);
                 } catch {
-                    // Mark as unsaved — blocks new sends until resolved
                     setUnsavedReply(fullContent);
                     setUnsavedResponseData({ requestId, artifactsJson, mode });
                     console.error('Retry persistence also failed — response preserved in UI for manual copy');
@@ -197,7 +289,6 @@ export default function ConversationPage() {
                 setUnsavedReply(null);
                 setUnsavedResponseData(null);
             } catch {
-                // Fallback persistence failed — preserve for retry
                 setUnsavedReply(fallbackContent);
                 setUnsavedResponseData({ requestId });
                 setStreamingContent(fallbackContent);
@@ -397,6 +488,21 @@ export default function ConversationPage() {
                 </button>
             </motion.div>
 
+            {/* Case Context Bar */}
+            {caseContextChips.length > 0 && (
+                <div className="px-4 lg:px-8 pt-2">
+                    <CaseContextBar
+                        chips={caseContextChips}
+                        caseName={conversation?.title}
+                    />
+                </div>
+            )}
+
+            {/* Analysis Status Strip */}
+            <div className="px-4 lg:px-8">
+                <AnalysisStatusStrip steps={analysisSteps} visible={isStreaming} />
+            </div>
+
             {/* Messages Area */}
             <div className={`flex-1 overflow-y-auto w-full no-scrollbar pb-6 px-1 lg:px-6 relative scroll-smooth flex flex-col transition-colors duration-300 ${isLight ? 'bg-white' : ''}`}>
                 {messages?.length === 0 && !isStreaming && (
@@ -491,7 +597,7 @@ export default function ConversationPage() {
                     </div>
                 )}
 
-                {/* Loading indicator (Pre-stream) */}
+                {/* Loading indicator (Pre-stream) — now covered by AnalysisStatusStrip */}
                 {isStreaming && !streamingContent && (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}

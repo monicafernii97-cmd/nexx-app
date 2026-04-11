@@ -304,7 +304,7 @@ export async function POST(req: NextRequest) {
       tools.push({ type: 'web_search_preview' });
     }
 
-    // ── Step 8: Call responses.create() ──
+    // ── Step 8: Build prompts ──
     const systemPrompt = buildSystemPolicyPrompt();
     const developerPrompt = buildDeveloperBehaviorPrompt(routeMode);
     const featurePrompt = buildFeatureToolPrompt(toolPlan);
@@ -333,237 +333,296 @@ export async function POST(req: NextRequest) {
           { role: 'user', content: message },
         ];
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let response: any;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      response = await (openai.responses as any).create({
-        model,
-        reasoning: { effort: 'medium' },
-        temperature,
-        conversation: openaiConversationId,
-        input,
-        tools: tools.length > 0 ? tools : undefined,
-        text: { format: NEXX_RESPONSE_SCHEMA },
-      });
-    } catch (error) {
-      console.error('[Chat] responses.create failed:', error);
-      return Response.json({ error: 'Failed to generate response' }, { status: 500 });
-    }
+    // ── Step 8b: Call responses.create() with streaming ──
+    // We use stream:true to send draft tokens to the client in real-time.
+    // Since json_schema (structured output) is incompatible with streaming
+    // in the Responses API, we send the schema instructions in the developer
+    // prompt and recover the structure via the recovery pipeline post-stream.
 
-    // ── Step 9: Process function calls (loop) ──
-    const MAX_FUNCTION_CALL_ROUNDS = 5;
-    let rounds = 0;
-
-    while (rounds < MAX_FUNCTION_CALL_ROUNDS) {
-      // Check if response contains function_call outputs
-      const functionCalls = response.output?.filter(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (item: any) => item.type === 'function_call'
-      ) || [];
-
-      if (functionCalls.length === 0) break;
-
-      // Execute each function call
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const functionOutputs: any[] = [];
-      for (const fc of functionCalls) {
-
-        let parsedArgs: Record<string, unknown> = {};
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
         try {
-          parsedArgs = JSON.parse(fc.arguments || '{}');
-        } catch { /* use empty args */ }
-
-        const result = await executeFunctionTool(
-          fc.name,
-          parsedArgs,
-          { convex, userId: convexUserId, conversationId: typedConversationId }
-        );
-
-        functionOutputs.push({
-          type: 'function_call_output',
-          call_id: fc.call_id,
-          output: JSON.stringify(result),
-        });
-
-        // Record tool run
-        try {
-          await convex.mutation(api.toolRuns.create, {
-            conversationId: typedConversationId,
-            toolType: fc.name,
-            inputJson: JSON.stringify(parsedArgs),
-            outputJson: JSON.stringify(result),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const streamResponse = await (openai.responses as any).create({
+            model,
+            reasoning: { effort: 'medium' },
+            temperature,
+            conversation: openaiConversationId,
+            input,
+            tools: tools.length > 0 ? tools : undefined,
+            // Structured output (text.format) is removed for streaming
+            // The recovery pipeline will handle parsing post-stream
+            text: { format: NEXX_RESPONSE_SCHEMA },
+            stream: true,
           });
-        } catch { /* non-fatal */ }
-      }
 
-      // Re-call with function outputs
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      response = await (openai.responses as any).create({
-        model,
-        conversation: openaiConversationId,
-        input: functionOutputs,
-        tools: tools.length > 0 ? tools : undefined,
-        text: { format: NEXX_RESPONSE_SCHEMA },
-      });
+          let accumulatedText = '';
+          let responseId: string | undefined;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let lastResponse: any = null;
 
-      rounds++;
-    }
+          // Process the stream events
+          for await (const event of streamResponse) {
+            if (event.type === 'response.output_text.delta') {
+              // Stream delta to client
+              const delta = event.delta ?? '';
+              accumulatedText += delta;
+              controller.enqueue(encoder.encode(delta));
+            } else if (event.type === 'response.completed') {
+              lastResponse = event.response;
+              responseId = event.response?.id;
+            }
+          }
 
-    // ── Step 10: Extract rawText ──
-    const rawText = extractOutputText(response);
+          // ── Step 9: Process function calls (loop) ──
+          // After streaming completes, check for function calls
+          const MAX_FUNCTION_CALL_ROUNDS = 5;
+          let rounds = 0;
+          let response = lastResponse;
 
-    trace.generation = {
-      rawResponseText: rawText.slice(0, 5000),
-      parseSuccess: false,
-    };
+          while (response && rounds < MAX_FUNCTION_CALL_ROUNDS) {
+            const functionCalls = response.output?.filter(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (item: any) => item.type === 'function_call'
+            ) || [];
 
-    // ── Step 11: Recovery pipeline ──
-    const recoveryResult = await recoverStructuredOutput(rawText, {
-      systemPrompt,
-      developerPrompt: [developerPrompt, featurePrompt, artifactPrompt, contextPrompt].join('\n\n'),
-      userPayload: { message },
-      model,
-    });
+            if (functionCalls.length === 0) break;
 
-    let parsedResponse: NexxAssistantResponse = recoveryResult.data;
-    trace.generation.parseSuccess = recoveryResult.stage !== 'fallback';
-    trace.recovery = {
-      used: recoveryResult.stage !== 'initial_parse',
-      stage: recoveryResult.stage,
-    };
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const functionOutputs: any[] = [];
+            for (const fc of functionCalls) {
+              let parsedArgs: Record<string, unknown> = {};
+              try {
+                parsedArgs = JSON.parse(fc.arguments || '{}');
+              } catch { /* use empty args */ }
 
-    // Suppress weak artifacts
-    parsedResponse = suppressWeakArtifacts(parsedResponse);
+              const result = await executeFunctionTool(
+                fc.name,
+                parsedArgs,
+                { convex, userId: convexUserId, conversationId: typedConversationId }
+              );
 
-    // Polish message
-    parsedResponse.message = polishLegalResponse(parsedResponse.message);
+              functionOutputs.push({
+                type: 'function_call_output',
+                call_id: fc.call_id,
+                output: JSON.stringify(result),
+              });
 
-    // ── Step 12: Confidence assessment ──
-    try {
-      const confidence = await assessConfidence(parsedResponse, retrievedSources, existingCaseGraph);
-      parsedResponse.artifacts.confidence = confidence;
-      parsedResponse.message = injectConfidenceWarning(parsedResponse.message, confidence);
-    } catch (err) {
-      console.warn('[Chat] Confidence assessment failed:', err);
-    }
+              // Record tool run
+              try {
+                await convex.mutation(api.toolRuns.create, {
+                  conversationId: typedConversationId,
+                  toolType: fc.name,
+                  inputJson: JSON.stringify(parsedArgs),
+                  outputJson: JSON.stringify(result),
+                });
+              } catch { /* non-fatal */ }
+            }
 
-    // Record trace artifacts
-    trace.artifacts = {
-      draftReady: parsedResponse.artifacts.draftReady,
-      timelineReady: parsedResponse.artifacts.timelineReady,
-      exhibitReady: parsedResponse.artifacts.exhibitReady,
-      judgeSimulation: parsedResponse.artifacts.judgeSimulation,
-      oppositionSimulation: parsedResponse.artifacts.oppositionSimulation,
-      confidence: parsedResponse.artifacts.confidence,
-    };
+            // Re-call with function outputs (non-streaming for tool follow-ups)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            response = await (openai.responses as any).create({
+              model,
+              conversation: openaiConversationId,
+              input: functionOutputs,
+              tools: tools.length > 0 ? tools : undefined,
+              text: { format: NEXX_RESPONSE_SCHEMA },
+            });
 
-    // ── Step 13: Save user message to Convex ──
-    try {
-      await convex.mutation(api.messages.createMessage, {
-        conversationId: typedConversationId,
-        role: 'user',
-        content: message,
-        mode: routeMode,
-        requestId: `${turnRequestId}-user`,
-      });
-    } catch (err) {
-      console.warn('[Chat] Failed to save user message:', err);
-    }
+            // If function calls produced new text, update accumulated
+            if (response) {
+              const newText = extractOutputText(response);
+              if (newText && newText !== accumulatedText) {
+                accumulatedText = newText;
+              }
+              responseId = response.id ?? responseId;
+            }
 
-    // ── Step 14: Save assistant message to Convex ──
-    try {
-      await convex.mutation(api.messages.createMessage, {
-        conversationId: typedConversationId,
-        role: 'assistant',
-        content: parsedResponse.message,
-        mode: routeMode,
-        artifactsJson: JSON.stringify(parsedResponse.artifacts),
-        requestId: `${turnRequestId}-assistant`,
-      });
-    } catch (err) {
-      console.warn('[Chat] Failed to save assistant message:', err);
-    }
+            rounds++;
+          }
 
-    // ── Step 15: Save openaiLastResponseId ──
-    const responseId = response?.id;
-    if (responseId) {
-      try {
-        await convex.mutation(api.conversations.setLastResponseId, {
-          conversationId: typedConversationId,
-          openaiLastResponseId: responseId,
-        });
-      } catch { /* non-fatal */ }
-    }
+          // ── Step 10: Extract rawText ──
+          const rawText = accumulatedText || extractOutputText(response);
 
-    // ── Step 16: Save debug trace ──
-    const finalTrace = finalizeTrace(trace, true, startTime);
+          trace.generation = {
+            rawResponseText: rawText.slice(0, 5000),
+            parseSuccess: false,
+          };
 
-    // Capture token usage if available
-    if (response?.usage) {
-      finalTrace.performance = {
-        ...finalTrace.performance,
-        latencyMs: finalTrace.performance?.latencyMs ?? 0,
-        tokenUsage: {
-          promptTokens: response.usage.input_tokens ?? 0,
-          completionTokens: response.usage.output_tokens ?? 0,
-          totalTokens: (response.usage.input_tokens ?? 0) + (response.usage.output_tokens ?? 0),
-        },
-      };
-    }
+          // ── Step 11: Recovery pipeline ──
+          const recoveryResult = await recoverStructuredOutput(rawText, {
+            systemPrompt,
+            developerPrompt: [developerPrompt, featurePrompt, artifactPrompt, contextPrompt].join('\n\n'),
+            userPayload: { message },
+            model,
+          });
 
-    try {
-      await convex.mutation(api.debugTraces.create, {
-        traceId: finalTrace.traceId,
-        route: '/api/chat',
-        routeMode,
-        conversationId: typedConversationId,
-        debugJson: serializeTrace(finalTrace),
-      });
-    } catch { /* non-fatal */ }
+          let parsedResponse: NexxAssistantResponse = recoveryResult.data;
+          trace.generation.parseSuccess = recoveryResult.stage !== 'fallback';
+          trace.recovery = {
+            used: recoveryResult.stage !== 'initial_parse',
+            stage: recoveryResult.stage,
+          };
 
-    // ── Step 17: persistAfterResponse (via Next.js after() hook) ──
-    // Use after() for reliable execution even after response is sent
-    after(async () => {
-      try {
-        // Load all messages inside the deferred callback to avoid blocking response
-        const allMessages = await convex.query(api.messages.list, { conversationId: typedConversationId });
-        const messageArray = allMessages.map((m: { role: string; content: string }) => ({
-          role: m.role,
-          content: m.content,
-        }));
+          // Suppress weak artifacts
+          parsedResponse = suppressWeakArtifacts(parsedResponse);
 
-        await persistAfterResponse({
-          conversationId,
-          messages: messageArray,
-          messageCount: messageArray.length,
-          existingSummary: contextPacket.conversationSummary,
-          existingCaseGraph,
-          saveSummary: async (summary, turnCount) => {
-            await convex.mutation(api.conversationSummaries.upsert, {
+          // Polish message
+          parsedResponse.message = polishLegalResponse(parsedResponse.message);
+
+          // ── Step 12: Confidence assessment ──
+          try {
+            const confidence = await assessConfidence(parsedResponse, retrievedSources, existingCaseGraph);
+            parsedResponse.artifacts.confidence = confidence;
+            parsedResponse.message = injectConfidenceWarning(parsedResponse.message, confidence);
+          } catch (err) {
+            console.warn('[Chat] Confidence assessment failed:', err);
+          }
+
+          // Record trace artifacts
+          trace.artifacts = {
+            draftReady: parsedResponse.artifacts.draftReady,
+            timelineReady: parsedResponse.artifacts.timelineReady,
+            exhibitReady: parsedResponse.artifacts.exhibitReady,
+            judgeSimulation: parsedResponse.artifacts.judgeSimulation,
+            oppositionSimulation: parsedResponse.artifacts.oppositionSimulation,
+            confidence: parsedResponse.artifacts.confidence,
+          };
+
+          // ── Step 13: Save user message to Convex ──
+          try {
+            await convex.mutation(api.messages.createMessage, {
               conversationId: typedConversationId,
-              summary: JSON.stringify(summary),
-              turnCount,
+              role: 'user',
+              content: message,
+              mode: routeMode,
+              requestId: `${turnRequestId}-user`,
             });
-          },
-          saveCaseGraph: async (graphJson) => {
-            await convex.mutation(api.caseGraphs.upsert, {
-              userId: convexUserId,
-              graphJson,
+          } catch (err) {
+            console.warn('[Chat] Failed to save user message:', err);
+          }
+
+          // ── Step 14: Save assistant message to Convex ──
+          try {
+            await convex.mutation(api.messages.createMessage, {
+              conversationId: typedConversationId,
+              role: 'assistant',
+              content: parsedResponse.message,
+              mode: routeMode,
+              artifactsJson: JSON.stringify(parsedResponse.artifacts),
+              requestId: `${turnRequestId}-assistant`,
             });
-          },
-        });
-      } catch (err) {
-        console.warn('[Chat] persistAfterResponse error:', err);
-      }
+          } catch (err) {
+            console.warn('[Chat] Failed to save assistant message:', err);
+          }
+
+          // ── Step 15: Save openaiLastResponseId ──
+          if (responseId) {
+            try {
+              await convex.mutation(api.conversations.setLastResponseId, {
+                conversationId: typedConversationId,
+                openaiLastResponseId: responseId,
+              });
+            } catch { /* non-fatal */ }
+          }
+
+          // ── Step 16: Save debug trace ──
+          const finalTrace = finalizeTrace(trace, true, startTime);
+
+          // Capture token usage if available
+          if (response?.usage) {
+            finalTrace.performance = {
+              ...finalTrace.performance,
+              latencyMs: finalTrace.performance?.latencyMs ?? 0,
+              tokenUsage: {
+                promptTokens: response.usage.input_tokens ?? 0,
+                completionTokens: response.usage.output_tokens ?? 0,
+                totalTokens: (response.usage.input_tokens ?? 0) + (response.usage.output_tokens ?? 0),
+              },
+            };
+          }
+
+          try {
+            await convex.mutation(api.debugTraces.create, {
+              traceId: finalTrace.traceId,
+              route: '/api/chat',
+              routeMode,
+              conversationId: typedConversationId,
+              debugJson: serializeTrace(finalTrace),
+            });
+          } catch { /* non-fatal */ }
+
+          // ── Step 17: persistAfterResponse (deferred) ──
+          // Note: We can't use after() inside a stream, so we fire this
+          // as a final async operation before closing the stream.
+          try {
+            const allMessages = await convex.query(api.messages.list, { conversationId: typedConversationId });
+            const messageArray = allMessages.map((m: { role: string; content: string }) => ({
+              role: m.role,
+              content: m.content,
+            }));
+
+            await persistAfterResponse({
+              conversationId,
+              messages: messageArray,
+              messageCount: messageArray.length,
+              existingSummary: contextPacket.conversationSummary,
+              existingCaseGraph,
+              saveSummary: async (summary, turnCount) => {
+                await convex.mutation(api.conversationSummaries.upsert, {
+                  conversationId: typedConversationId,
+                  summary: JSON.stringify(summary),
+                  turnCount,
+                });
+              },
+              saveCaseGraph: async (graphJson) => {
+                await convex.mutation(api.caseGraphs.upsert, {
+                  userId: convexUserId,
+                  graphJson,
+                });
+              },
+            });
+          } catch (err) {
+            console.warn('[Chat] persistAfterResponse error:', err);
+          }
+
+          // ── Step 18: Send final rewrite markers ──
+          // The client's streamRenderer.ts detects these markers and swaps
+          // the live draft text with the polished final response + artifacts.
+          const finalPayload = JSON.stringify({
+            ok: true,
+            response: parsedResponse,
+            openaiConversationId,
+            routeMode,
+          });
+
+          controller.enqueue(encoder.encode('[[NEXX_FINAL_REWRITE_START]]'));
+          controller.enqueue(encoder.encode(finalPayload));
+          controller.enqueue(encoder.encode('[[NEXX_FINAL_REWRITE_END]]'));
+          controller.close();
+
+        } catch (error) {
+          console.error('[Chat] Streaming error:', error);
+          // Send error as final payload
+          const errorPayload = JSON.stringify({
+            ok: false,
+            error: 'Failed to generate response',
+          });
+          controller.enqueue(encoder.encode('[[NEXX_FINAL_REWRITE_START]]'));
+          controller.enqueue(encoder.encode(errorPayload));
+          controller.enqueue(encoder.encode('[[NEXX_FINAL_REWRITE_END]]'));
+          controller.close();
+        }
+      },
     });
 
-    // ── Step 18: Return response ──
-    return Response.json({
-      ok: true,
-      response: parsedResponse,
-      openaiConversationId,
-      routeMode,
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     });
 
   } catch (error) {
@@ -574,3 +633,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

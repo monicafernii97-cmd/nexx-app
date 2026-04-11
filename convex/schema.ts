@@ -481,4 +481,93 @@ export default defineSchema({
         createdAt: v.number(),
         expiresAt: v.optional(v.number()),
     }).index('by_conversationId', ['conversationId']),
+
+    // ═══ NEW: Case Pins (workspace pinned items) ═══
+    casePins: defineTable({
+        userId: v.id('users'),
+        /** The pinnable classification */
+        type: v.union(
+            v.literal('key_fact'),
+            v.literal('strategy_point'),
+            v.literal('good_faith_point'),
+            v.literal('strength_highlight'),
+            v.literal('risk_concern'),
+            v.literal('hearing_prep_point'),
+            v.literal('draft_snippet'),
+            v.literal('question_to_verify'),
+            v.literal('timeline_anchor')
+        ),
+        title: v.string(),
+        content: v.string(),
+        /** Source message that generated this pin */
+        sourceMessageId: v.optional(v.id('messages')),
+        sourceConversationId: v.optional(v.id('conversations')),
+        /** Idempotency key to prevent duplicate pins */
+        requestId: v.optional(v.string()),
+        /** Sort order within user's pin rail */
+        sortOrder: v.optional(v.number()),
+        createdAt: v.number(),
+    })
+        .index('by_userId', ['userId'])
+        .index('by_userId_type', ['userId', 'type'])
+        .index('by_requestId', ['requestId']),
+
+    // ═══ NEW: Case Memory (saved strategy/analysis items) ═══
+    caseMemory: defineTable({
+        userId: v.id('users'),
+        /** Save classification */
+        type: v.union(
+            v.literal('case_note'),
+            v.literal('key_fact'),
+            v.literal('strategy_point'),
+            v.literal('risk_concern'),
+            v.literal('strength_highlight'),
+            v.literal('good_faith_point'),
+            v.literal('draft_snippet'),
+            v.literal('timeline_candidate'),
+            v.literal('incident_note'),
+            v.literal('exhibit_note'),
+            v.literal('procedure_note'),
+            v.literal('question_to_verify')
+        ),
+        title: v.string(),
+        content: v.string(),
+        /** Optional JSON metadata (artifacts, linked items, etc.) */
+        metadataJson: v.optional(v.string()),
+        /** Source message/conversation for traceability */
+        sourceMessageId: v.optional(v.id('messages')),
+        sourceConversationId: v.optional(v.id('conversations')),
+        /** Idempotency key */
+        requestId: v.optional(v.string()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_userId', ['userId'])
+        .index('by_userId_type', ['userId', 'type'])
+        .index('by_requestId', ['requestId']),
+
+    // ═══ NEW: Timeline Candidates (AI-suggested timeline entries) ═══
+    timelineCandidates: defineTable({
+        userId: v.id('users'),
+        /** Status: candidate (AI-suggested) or confirmed (user-approved) */
+        status: v.union(v.literal('candidate'), v.literal('confirmed')),
+        title: v.string(),
+        description: v.string(),
+        /** ISO date string for the event */
+        eventDate: v.optional(v.string()),
+        /** Tags: incident, communication, medical, school, court, etc. */
+        tags: v.optional(v.array(v.string())),
+        /** Source traceability */
+        sourceMessageId: v.optional(v.id('messages')),
+        sourceConversationId: v.optional(v.id('conversations')),
+        /** Linked incident if converted from incident flow */
+        linkedIncidentId: v.optional(v.id('incidents')),
+        /** Idempotency key */
+        requestId: v.optional(v.string()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_userId', ['userId'])
+        .index('by_userId_status', ['userId', 'status'])
+        .index('by_requestId', ['requestId']),
 });

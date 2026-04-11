@@ -99,7 +99,9 @@ export function PanelRenderer({ panel, index = 0, onCopy }: PanelRendererProps) 
         aria-controls={isCollapsible ? contentId : undefined}
         tabIndex={isCollapsible ? 0 : undefined}
         onKeyDown={(e) => {
-          if (isCollapsible && (e.key === 'Enter' || e.key === ' ')) {
+          if (!isCollapsible) return;
+          if (e.target !== e.currentTarget) return;
+          if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             setIsExpanded((prev) => !prev);
           }

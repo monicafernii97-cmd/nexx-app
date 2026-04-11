@@ -52,6 +52,9 @@ export function AnalysisStatusStrip({ steps, visible }: AnalysisStatusStripProps
     <AnimatePresence>
       {visible && (
         <motion.div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
@@ -59,7 +62,7 @@ export function AnalysisStatusStrip({ steps, visible }: AnalysisStatusStripProps
           className="
             flex items-center gap-4 px-4 py-2.5
             rounded-xl bg-[var(--surface-elevated)] border border-[var(--border-subtle)]
-            overflow-hidden
+            overflow-x-auto scrollbar-thin
           "
         >
           {steps.map((step, i) => (
@@ -129,7 +132,8 @@ export function AnalysisStatusStrip({ steps, visible }: AnalysisStatusStripProps
  */
 export function getStepsByElapsed(elapsedSeconds: number): AnalysisStep[] {
   return DEFAULT_ANALYSIS_STEPS.map((step, i) => {
-    const threshold = (i + 1) * 1.5; // Each step ~1.5s apart
+    // First step activates immediately; subsequent steps spaced 1.5s apart
+    const threshold = i === 0 ? 0 : i * 1.5;
     if (elapsedSeconds >= threshold + 1.5) {
       return { ...step, status: 'complete' as const };
     } else if (elapsedSeconds >= threshold) {

@@ -92,7 +92,7 @@ export function PanelRenderer({ panel, index = 0, onCopy }: PanelRendererProps) 
     >
       {/* Eyebrow + Collapse Toggle */}
       <div
-        className="flex items-center justify-between cursor-pointer select-none"
+        className={`flex items-center justify-between select-none ${isCollapsible ? 'cursor-pointer' : ''}`}
         onClick={() => isCollapsible && setIsExpanded((prev) => !prev)}
         role={isCollapsible ? 'button' : undefined}
         aria-expanded={isCollapsible ? isExpanded : undefined}

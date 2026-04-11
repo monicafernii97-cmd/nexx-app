@@ -29,7 +29,7 @@ export function LocalProcedureBadge({ info }: LocalProcedureBadgeProps) {
         bg-[var(--accent-icy)]/10 text-[var(--accent-icy)]
         border border-[var(--accent-icy)]/20
       "
-      title={info.detail ?? `${info.jurisdiction} procedure applied`}
+      title={info.detail?.trim() || `${info.jurisdiction} procedure applied`}
     >
       <Scales size={10} weight="bold" />
       {info.jurisdiction} procedure

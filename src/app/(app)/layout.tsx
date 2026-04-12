@@ -2,7 +2,9 @@
 
 import Sidebar from '@/components/Sidebar';
 import { UserProvider } from '@/lib/user-context';
+import { WorkspaceProvider } from '@/lib/workspace-context';
 import { ToastProvider } from '@/components/feedback/ToastProvider';
+import { GlobalWorkspaceRail } from '@/components/workspace/GlobalWorkspaceRail';
 import { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 
@@ -10,17 +12,25 @@ import { motion } from 'framer-motion';
 export default function AppShellLayout({ children }: { children: ReactNode }) {
     return (
         <UserProvider>
-            <ToastProvider>
-                <div className="silk-bg min-h-[100dvh] flex p-4 md:p-6 gap-6">
-                    <Sidebar />
-                    <motion.main
-                        layout
-                        className="flex-1 min-w-0 transition-all duration-300 rounded-[2.5rem]"
-                    >
-                        {children}
-                    </motion.main>
-                </div>
-            </ToastProvider>
+            <WorkspaceProvider>
+                <ToastProvider>
+                    <div className="silk-bg min-h-[100dvh] flex p-4 md:p-6 gap-6 overflow-hidden">
+                        <Sidebar />
+                        
+                        <motion.main
+                            layout
+                            className="flex-1 min-w-0 transition-all duration-300 relative z-10"
+                        >
+                            {children}
+                        </motion.main>
+
+                        {/* Persistent Right Rail — Context everywhere */}
+                        <div className="hidden xl:block">
+                            <GlobalWorkspaceRail />
+                        </div>
+                    </div>
+                </ToastProvider>
+            </WorkspaceProvider>
         </UserProvider>
     );
 }

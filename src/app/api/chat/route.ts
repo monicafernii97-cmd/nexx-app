@@ -346,9 +346,10 @@ export async function POST(req: NextRequest) {
 
     // ── Step 8b: Call responses.create() with streaming ──
     // We use stream:true to send draft tokens to the client in real-time.
-    // Since json_schema (structured output) is incompatible with streaming
-    // in the Responses API, we send the schema instructions in the developer
-    // prompt and recover the structure via the recovery pipeline post-stream.
+    // json_schema structured output IS compatible with streaming —
+    // the model sends partial JSON chunks that accumulate into a valid
+    // schema-conforming response. Recovery pipeline runs post-stream as a
+    // safety net for partial/malformed completions.
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -362,8 +363,7 @@ export async function POST(req: NextRequest) {
             conversation: openaiConversationId,
             input,
             tools: tools.length > 0 ? tools : undefined,
-            // Structured output (text.format) is removed for streaming
-            // The recovery pipeline will handle parsing post-stream
+            // Structured output schema — compatible with streaming
             text: { format: NEXX_RESPONSE_SCHEMA },
             stream: true,
           });

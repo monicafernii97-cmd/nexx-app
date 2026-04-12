@@ -1,14 +1,13 @@
 /**
- * Stream Renderer — client-side accumulator for streaming responses.
+ * Stream Renderer — client-side utilities for streaming responses.
+ *
+ * NOTE: The primary streaming pathway now uses SSE framing in the chat
+ * page (event: delta / event: final) — see chat/[id]/page.tsx.
  * 
- * Phase 1: Non-streaming (structured output requires full response).
- * Phase 2: Streaming hybrid with [[NEXX_FINAL_REWRITE_START]] markers.
- * 
- * The hybrid approach:
- * 1. Model streams natural prose as a "draft" (shown live to user)
- * 2. Server completes recovery/validation/suppression on the full response
- * 3. Server sends [[NEXX_FINAL_REWRITE_START]] + polished JSON + [[NEXX_FINAL_REWRITE_END]]
- * 4. Client swaps draft text with polished final + renders artifacts
+ * This module provides reusable helpers for advanced scenarios:
+ * - createStreamAccumulator / pushChunk: marker-based hybrid streaming
+ * - parseApiResponse: non-streaming fallback
+ * - hasArtifacts / getArtifactSummary: structured response inspection
  */
 
 import type { NexxAssistantResponse, NexxArtifacts } from '../types';

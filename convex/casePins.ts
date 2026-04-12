@@ -24,16 +24,21 @@ const pinnableTypeValidator = v.union(
 // Queries
 // ---------------------------------------------------------------------------
 
-/** List all pins for the authenticated user, newest first. */
+/** List all pins for the authenticated user, sorted by rail order (sortOrder ascending). */
 export const listByUser = query({
     args: {},
     handler: async (ctx) => {
         const user = await getAuthenticatedUser(ctx);
-        return ctx.db
+        const pins = await ctx.db
             .query('casePins')
             .withIndex('by_userId', (q) => q.eq('userId', user._id))
-            .order('desc')
             .collect();
+
+        return pins.sort(
+            (a, b) =>
+                (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) ||
+                b.createdAt - a.createdAt
+        );
     },
 });
 

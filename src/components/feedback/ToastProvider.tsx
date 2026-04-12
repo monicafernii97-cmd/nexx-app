@@ -101,6 +101,7 @@ function ToastItem({
 }) {
     const style = VARIANT_STYLES[toast.variant];
     const Icon = style.icon;
+    const isUrgent = toast.variant === 'error' || toast.variant === 'warning';
 
     return (
         <motion.div
@@ -115,8 +116,8 @@ function ToastItem({
                 min-w-[320px] max-w-[420px]
                 ${style.bg}
             `}
-            role="alert"
-            aria-live={toast.variant === 'error' || toast.variant === 'warning' ? 'assertive' : 'polite'}
+            role={isUrgent ? 'alert' : 'status'}
+            aria-live={isUrgent ? 'assertive' : 'polite'}
         >
             {/* Icon */}
             <div className={`mt-0.5 flex-shrink-0 ${style.accent}`}>
@@ -197,9 +198,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
     // Clean up orphaned timers on unmount
     useEffect(() => {
+        const timeoutIds = timeoutIdsRef.current;
         return () => {
-            timeoutIdsRef.current.forEach((id) => clearTimeout(id));
-            timeoutIdsRef.current.clear();
+            timeoutIds.forEach((id) => clearTimeout(id));
+            timeoutIds.clear();
         };
     }, []);
 

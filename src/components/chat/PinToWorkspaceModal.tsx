@@ -6,9 +6,14 @@
  * Flow: User clicks "Pin" → modal with editable title + content →
  * confirm → item instantly appears in right rail (optimistic) →
  * persists to casePins backend.
+ *
+ * State reset strategy: The inner `PinModalForm` is keyed on
+ * `initialContent + initialTitle`. When the modal closes, AnimatePresence
+ * unmounts it entirely, giving fresh state on reopen. If the seed props
+ * change while the modal stays open, the key forces a remount.
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, PushPin, Check } from '@phosphor-icons/react';
 import type { PinnableType } from '@/lib/integration/types';
@@ -36,6 +41,144 @@ const PIN_OPTIONS: PinOption[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Inner form (remounts via key when seed props change → fresh state)
+// ---------------------------------------------------------------------------
+
+/** Inner form component that owns all editing state. */
+function PinModalForm({
+    onPin,
+    initialContent,
+    initialTitle,
+    isPinning,
+    onClose,
+}: {
+    onPin: (type: PinnableType, title: string, content: string) => void;
+    initialContent: string;
+    initialTitle: string;
+    isPinning: boolean;
+    onClose: () => void;
+}) {
+    const [selectedType, setSelectedType] = useState<PinnableType>('key_fact');
+    const [title, setTitle] = useState(initialTitle);
+    const [content, setContent] = useState(initialContent);
+
+    const handlePin = () => {
+        const finalTitle = title.trim() || PIN_OPTIONS.find(o => o.type === selectedType)?.label || 'Pinned Item';
+        onPin(selectedType, finalTitle, content);
+    };
+
+    return (
+        <>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
+                <div className="flex items-center gap-2">
+                    <PushPin size={20} className="text-[var(--accent-icy)]" weight="bold" />
+                    <h2 className="text-headline text-lg text-[var(--text-heading)]">Pin to Workspace</h2>
+                </div>
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="text-[var(--text-muted)] hover:text-[var(--text-heading)] transition-colors p-1"
+                    aria-label="Close modal"
+                >
+                    <X size={18} />
+                </button>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-4 space-y-4 overflow-y-auto max-h-[60vh]">
+                {/* Pin type selector */}
+                <div>
+                    <label className="text-eyebrow block mb-2">Pin Type</label>
+                    <div className="flex flex-wrap gap-1.5">
+                        {PIN_OPTIONS.map((option) => (
+                            <button
+                                key={option.type}
+                                type="button"
+                                onClick={() => setSelectedType(option.type)}
+                                className={`
+                                    inline-flex items-center gap-1 px-2.5 py-1.5
+                                    text-xs font-medium rounded-full
+                                    border transition-all duration-150
+                                    ${selectedType === option.type
+                                        ? 'border-[var(--accent-icy)] bg-[var(--accent-icy)]/10 text-[var(--accent-icy)]'
+                                        : 'border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-[var(--accent-icy)]/30'
+                                    }
+                                `}
+                            >
+                                <span>{option.emoji}</span>
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Title input */}
+                <div>
+                    <label className="text-eyebrow block mb-1.5">Title</label>
+                    <input
+                        type="text"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="Enter a title..."
+                        className="
+                            w-full px-3 py-2 text-sm rounded-xl
+                            bg-[var(--surface-elevated)] text-[var(--text-body)]
+                            border border-[var(--border-subtle)]
+                            focus:outline-none focus:border-[var(--accent-icy)]/50
+                            placeholder:text-[var(--text-muted)]
+                        "
+                    />
+                </div>
+
+                {/* Content textarea */}
+                <div>
+                    <label className="text-eyebrow block mb-1.5">Content</label>
+                    <textarea
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        rows={4}
+                        className="
+                            w-full px-3 py-2 text-sm rounded-xl resize-none
+                            bg-[var(--surface-elevated)] text-[var(--text-body)]
+                            border border-[var(--border-subtle)]
+                            focus:outline-none focus:border-[var(--accent-icy)]/50
+                            placeholder:text-[var(--text-muted)]
+                        "
+                    />
+                </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-subtle)]">
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-heading)] transition-colors rounded-xl"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    onClick={handlePin}
+                    disabled={!content.trim() || isPinning}
+                    className="
+                        inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold
+                        rounded-xl transition-all duration-150
+                        bg-[var(--accent-icy)] text-white
+                        hover:bg-[var(--accent-icy)]/90
+                        disabled:opacity-40 disabled:cursor-not-allowed
+                    "
+                >
+                    <Check size={14} weight="bold" />
+                    {isPinning ? 'Pinning...' : 'Pin'}
+                </button>
+            </div>
+        </>
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -60,24 +203,6 @@ export function PinToWorkspaceModal({
     initialTitle = '',
     isPinning = false,
 }: PinToWorkspaceModalProps) {
-    const [selectedType, setSelectedType] = useState<PinnableType>('key_fact');
-    const [title, setTitle] = useState(initialTitle);
-    const [content, setContent] = useState(initialContent);
-
-    // Reset form state when modal opens or seed props change
-    useEffect(() => {
-        if (isOpen) {
-            setSelectedType('key_fact');
-            setTitle(initialTitle);
-            setContent(initialContent);
-        }
-    }, [isOpen, initialContent, initialTitle]);
-
-    const handlePin = () => {
-        const finalTitle = title.trim() || PIN_OPTIONS.find(o => o.type === selectedType)?.label || 'Pinned Item';
-        onPin(selectedType, finalTitle, content);
-    };
-
     return (
         <AnimatePresence>
             {isOpen && (
@@ -104,111 +229,14 @@ export function PinToWorkspaceModal({
                             bg-[var(--surface-card)] shadow-2xl
                         "
                     >
-                        {/* Header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
-                            <div className="flex items-center gap-2">
-                                <PushPin size={20} className="text-[var(--accent-icy)]" weight="bold" />
-                                <h2 className="text-headline text-lg text-[var(--text-heading)]">Pin to Workspace</h2>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="text-[var(--text-muted)] hover:text-[var(--text-heading)] transition-colors p-1"
-                                aria-label="Close modal"
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        {/* Content */}
-                        <div className="px-6 py-4 space-y-4 overflow-y-auto max-h-[60vh]">
-                            {/* Pin type selector */}
-                            <div>
-                                <label className="text-eyebrow block mb-2">Pin Type</label>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {PIN_OPTIONS.map((option) => (
-                                        <button
-                                            key={option.type}
-                                            type="button"
-                                            onClick={() => setSelectedType(option.type)}
-                                            className={`
-                                                inline-flex items-center gap-1 px-2.5 py-1.5
-                                                text-xs font-medium rounded-full
-                                                border transition-all duration-150
-                                                ${selectedType === option.type
-                                                    ? 'border-[var(--accent-icy)] bg-[var(--accent-icy)]/10 text-[var(--accent-icy)]'
-                                                    : 'border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-[var(--accent-icy)]/30'
-                                                }
-                                            `}
-                                        >
-                                            <span>{option.emoji}</span>
-                                            {option.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Title input */}
-                            <div>
-                                <label className="text-eyebrow block mb-1.5">Title</label>
-                                <input
-                                    type="text"
-                                    value={title}
-                                    onChange={(e) => setTitle(e.target.value)}
-                                    placeholder="Enter a title..."
-                                    className="
-                                        w-full px-3 py-2 text-sm rounded-xl
-                                        bg-[var(--surface-elevated)] text-[var(--text-body)]
-                                        border border-[var(--border-subtle)]
-                                        focus:outline-none focus:border-[var(--accent-icy)]/50
-                                        placeholder:text-[var(--text-muted)]
-                                    "
-                                />
-                            </div>
-
-                            {/* Content textarea */}
-                            <div>
-                                <label className="text-eyebrow block mb-1.5">Content</label>
-                                <textarea
-                                    value={content}
-                                    onChange={(e) => setContent(e.target.value)}
-                                    rows={4}
-                                    className="
-                                        w-full px-3 py-2 text-sm rounded-xl resize-none
-                                        bg-[var(--surface-elevated)] text-[var(--text-body)]
-                                        border border-[var(--border-subtle)]
-                                        focus:outline-none focus:border-[var(--accent-icy)]/50
-                                        placeholder:text-[var(--text-muted)]
-                                    "
-                                />
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-subtle)]">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="px-4 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-heading)] transition-colors rounded-xl"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handlePin}
-                                disabled={!content.trim() || isPinning}
-                                className="
-                                    inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold
-                                    rounded-xl transition-all duration-150
-                                    bg-[var(--accent-icy)] text-white
-                                    hover:bg-[var(--accent-icy)]/90
-                                    disabled:opacity-40 disabled:cursor-not-allowed
-                                "
-                            >
-                                <Check size={14} weight="bold" />
-                                {isPinning ? 'Pinning...' : 'Pin'}
-                            </button>
-                        </div>
+                        <PinModalForm
+                            key={`${initialContent}-${initialTitle}`}
+                            onPin={onPin}
+                            initialContent={initialContent}
+                            initialTitle={initialTitle}
+                            isPinning={isPinning}
+                            onClose={onClose}
+                        />
                     </motion.div>
                 </>
             )}

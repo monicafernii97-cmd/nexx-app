@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { ItemCard } from '@/components/workspace/ItemCard';
+import { EmptyState } from '@/components/workspace/EmptyState';
 
 /**
  * Workspace Overview — A bento-style dashboard summarizing the entire case context.
@@ -32,9 +33,9 @@ export default function WorkspaceOverview() {
         .slice(0, 2);
 
     const stats = [
-        { label: 'Key Points', value: counts.memory, icon: Notebook, color: 'var(--support-violet)', href: '/chat/key-points' },
-        { label: 'Pinned Focus', value: counts.pins, icon: PushPin, color: 'var(--accent-icy)', href: '/chat/pinned' },
-        { label: 'Timeline Entries', value: counts.timeline, icon: CalendarCheck, color: 'var(--emerald)', href: '/chat/timeline' },
+        { label: 'Key Points', value: counts.memory, loading: memory === undefined, icon: Notebook, color: 'var(--support-violet)', href: '/chat/key-points' },
+        { label: 'Pinned Focus', value: counts.pins, loading: pins === undefined, icon: PushPin, color: 'var(--accent-icy)', href: '/chat/pinned' },
+        { label: 'Timeline Entries', value: counts.timeline, loading: timeline === undefined, icon: CalendarCheck, color: 'var(--emerald)', href: '/chat/timeline' },
     ];
 
     return (
@@ -61,7 +62,9 @@ export default function WorkspaceOverview() {
                                 </div>
                                 <div>
                                     <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1">{stat.label}</p>
-                                    <p className="text-2xl font-serif text-white leading-none">{stat.value}</p>
+                                    <p className="text-2xl font-serif text-white leading-none">
+                                        {stat.loading ? <span className="inline-block w-6 h-6 rounded bg-white/10 animate-pulse" /> : stat.value}
+                                    </p>
                                 </div>
                             </div>
                             <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">
@@ -86,9 +89,12 @@ export default function WorkspaceOverview() {
                         {memory === undefined ? (
                             <div className="h-48 glass-ethereal rounded-3xl animate-pulse" />
                         ) : memory.length === 0 ? (
-                            <div className="p-12 text-center glass-ethereal rounded-3xl border border-white/5 opacity-40">
-                                <p className="text-xs font-semibold uppercase tracking-widest text-white">No key points saved yet</p>
-                            </div>
+                            <EmptyState
+                                icon={Notebook}
+                                title="No Key Points Yet"
+                                description="Strategic insights saved from your AI sessions will appear here."
+                                compact
+                            />
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {recentMemory.map(item => (
@@ -118,9 +124,12 @@ export default function WorkspaceOverview() {
                         {pins === undefined ? (
                             <div className="h-48 glass-ethereal rounded-3xl animate-pulse" />
                         ) : pins.length === 0 ? (
-                            <div className="p-12 text-center glass-ethereal rounded-3xl border border-white/5 opacity-40">
-                                <p className="text-xs font-semibold uppercase tracking-widest text-white">Focus list is empty</p>
-                            </div>
+                            <EmptyState
+                                icon={PushPin}
+                                title="Focus List Empty"
+                                description="Pin key facts from any conversation to keep them in focus."
+                                compact
+                            />
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {recentPins.map(pin => (
@@ -157,13 +166,12 @@ export default function WorkspaceOverview() {
                                     {[1, 2, 3].map(i => <div key={i} className="h-20 bg-white/5 rounded-2xl animate-pulse" />)}
                                 </div>
                             ) : timeline.length === 0 ? (
-                                <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40 py-12">
-                                    <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-                                        <CalendarCheck size={32} />
-                                    </div>
-                                    <p className="text-xs font-semibold uppercase tracking-widest">Timeline Pristine</p>
-                                    <p className="text-[10px] mt-2 max-w-[160px]">Extract chronological events from chat to build your story.</p>
-                                </div>
+                                <EmptyState
+                                    icon={CalendarCheck}
+                                    title="Timeline Pristine"
+                                    description="Extract chronological events from chat to build your story."
+                                    compact
+                                />
                             ) : (
                                 <div className="space-y-4">
                                     {recentTimeline.map((event, i) => {

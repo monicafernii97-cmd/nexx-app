@@ -13,6 +13,8 @@ interface EmptyStateProps {
     actionHref?: string;
     /** Execute a callback (button-based CTA). Takes precedence over actionHref. */
     onAction?: () => void;
+    /** Compact mode for inline/card contexts (smaller padding + icon). */
+    compact?: boolean;
 }
 
 /** 
@@ -26,23 +28,24 @@ export function EmptyState({
     actionLabel,
     actionHref,
     onAction,
+    compact = false,
 }: EmptyStateProps) {
     return (
         <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-[rgba(10,17,40,0.5)] rounded-[2.5rem] border border-[rgba(255,255,255,0.08)] backdrop-blur-md"
+            className={`flex-1 flex flex-col items-center justify-center text-center ${compact ? 'p-6' : 'p-8'} bg-[rgba(10,17,40,0.5)] rounded-[2.5rem] border border-[rgba(255,255,255,0.08)] backdrop-blur-md`}
         >
-            <div className="w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_20px_rgba(18,61,126,0.4)] relative">
+            <div className={`${compact ? 'w-10 h-10 mb-4' : 'w-16 h-16 mb-6'} rounded-full mx-auto flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_20px_rgba(18,61,126,0.4)] relative`}>
                 <div className="absolute inset-0 rounded-full bg-white/10 blur-md" />
-                <Icon size={32} weight="fill" className="text-white relative z-10" />
+                <Icon size={compact ? 20 : 32} weight="fill" className="text-white relative z-10" />
             </div>
             
-            <h3 className="text-xl font-serif text-white mb-2 tracking-tight">
+            <h3 className={`${compact ? 'text-sm' : 'text-xl'} font-serif text-white mb-2 tracking-tight`}>
                 {title}
             </h3>
             
-            <p className="text-[14px] text-[rgba(255,255,255,0.6)] font-medium mb-8 max-w-[240px] leading-relaxed">
+            <p className={`${compact ? 'text-[11px] max-w-[200px]' : 'text-[14px] max-w-[240px]'} text-[rgba(255,255,255,0.6)] font-medium mb-8 leading-relaxed`}>
                 {description}
             </p>
             

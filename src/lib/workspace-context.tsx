@@ -52,29 +52,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const getOrCreateDefault = useMutation(api.cases.getOrCreateDefault);
     const cases = useQuery(api.cases.list);
 
-    // On first load, auto-provision a default case
+    // On first load, auto-provision a default case (provisioning only — no setState)
     useEffect(() => {
         if (cases !== undefined && cases.length === 0) {
-            // No cases yet — create the default "My Case"
             getOrCreateDefault().catch(console.error);
-        } else if (cases !== undefined && cases.length > 0 && !activeCaseId) {
-            // Cases exist but none selected — pick the first active one
-            const active = cases.find(c => c.status === 'active') ?? cases[0];
-            setActiveCaseId(active._id);
         }
-    }, [cases, activeCaseId, getOrCreateDefault]);
+    }, [cases, getOrCreateDefault]);
 
-    const activeCase = cases?.find(c => c._id === activeCaseId) ?? null;
+    // Derive active case at render time (avoids react-hooks/set-state-in-effect)
+    const resolvedActiveCaseId =
+        activeCaseId ??
+        cases?.find(c => c.status === 'active')?._id ??
+        cases?.[0]?._id ??
+        null;
+
+    const activeCase = cases?.find(c => c._id === resolvedActiveCaseId) ?? null;
+
+    // The default case gets legacy (no caseId) records
+    const defaultCaseId = cases?.[0]?._id ?? null;
+    const isDefaultCase = resolvedActiveCaseId === defaultCaseId;
 
     // Queries — still user-scoped (caseId filtering done client-side for backward compat)
     const allPins = useQuery(api.casePins.listByUser);
     const allMemory = useQuery(api.caseMemory.listByUser);
     const allTimeline = useQuery(api.timelineCandidates.listByUser);
 
-    // Filter to active case (gracefully handle items without caseId — pre-migration data)
-    const pins = allPins?.filter(p => !p.caseId || p.caseId === activeCaseId);
-    const memory = allMemory?.filter(m => !m.caseId || m.caseId === activeCaseId);
-    const timeline = allTimeline?.filter(t => !t.caseId || t.caseId === activeCaseId);
+    // Filter to active case — legacy items (no caseId) only appear in the default case
+    const pins = allPins?.filter(p => p.caseId ? p.caseId === resolvedActiveCaseId : isDefaultCase);
+    const memory = allMemory?.filter(m => m.caseId ? m.caseId === resolvedActiveCaseId : isDefaultCase);
+    const timeline = allTimeline?.filter(t => t.caseId ? t.caseId === resolvedActiveCaseId : isDefaultCase);
 
     // Mutations
     const removePinMutation = useMutation(api.casePins.remove);

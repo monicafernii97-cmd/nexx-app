@@ -149,7 +149,8 @@ export function NarrativeBlock({
                 {/* Narrative body with gradient fade */}
                 <div className="relative">
                     <motion.div
-                        animate={{ maxHeight: isExpanded ? 2000 : 320 }}
+                        initial={false}
+                        animate={{ height: isExpanded ? 'auto' : 320 }}
                         transition={{ duration: 0.4, ease: 'easeInOut' }}
                         className="overflow-hidden"
                     >
@@ -215,14 +216,22 @@ export function NarrativeBlock({
                 {/* Dual CTAs */}
                 <div className="flex items-center gap-3 mt-6 pt-4 border-t border-white/5">
                     <button
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] text-[12px] font-bold uppercase tracking-wider text-white/50 hover:text-white/70 transition-all cursor-pointer"
+                        aria-disabled="true"
+                        tabIndex={-1}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-white/10 bg-white/[0.02] text-[12px] font-bold uppercase tracking-wider text-white/25 cursor-not-allowed"
                     >
                         <FilePdf size={14} weight="bold" />
                         Download PDF
                     </button>
                     <button
                         onClick={onSendToDocuVault}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[var(--accent-emerald)]/20 to-[var(--accent-emerald)]/10 border border-[var(--accent-emerald)]/20 text-[12px] font-bold uppercase tracking-wider text-[var(--accent-emerald)] hover:from-[var(--accent-emerald)]/30 hover:to-[var(--accent-emerald)]/15 transition-all cursor-pointer"
+                        disabled={!onSendToDocuVault}
+                        aria-disabled={!onSendToDocuVault}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-all ${
+                            onSendToDocuVault
+                                ? 'bg-gradient-to-r from-[var(--accent-emerald)]/20 to-[var(--accent-emerald)]/10 border border-[var(--accent-emerald)]/20 text-[var(--accent-emerald)] hover:from-[var(--accent-emerald)]/30 hover:to-[var(--accent-emerald)]/15 cursor-pointer'
+                                : 'border border-white/10 bg-white/[0.02] text-white/25 cursor-not-allowed'
+                        }`}
                     >
                         <Scales size={14} weight="bold" />
                         Court Document

@@ -48,6 +48,23 @@ export const getOrCreateDefault = mutation({
             createdAt: now,
             updatedAt: now,
         });
+
+        // Idempotent guard: if a concurrent mutation already created a case,
+        // return the earliest one and remove the duplicate we just inserted.
+        const allCases = await ctx.db
+            .query('cases')
+            .withIndex('by_userId', (q) => q.eq('userId', user._id))
+            .collect();
+
+        if (allCases.length > 1) {
+            // Keep the oldest (lowest createdAt), remove the one we just made
+            const sorted = [...allCases].sort((a, b) => a.createdAt - b.createdAt);
+            for (const dup of sorted.slice(1)) {
+                await ctx.db.delete(dup._id);
+            }
+            return sorted[0];
+        }
+
         return (await ctx.db.get(id))!;
     },
 });

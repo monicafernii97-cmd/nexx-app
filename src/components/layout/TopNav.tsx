@@ -11,7 +11,6 @@ import {
     Check,
 } from '@phosphor-icons/react';
 import { useWorkspace } from '@/lib/workspace-context';
-import type { Id } from '@convex/_generated/dataModel';
 
 /**
  * TopNav — 72px glassmorphic bar spanning CENTER + RIGHT columns.
@@ -119,14 +118,13 @@ export function TopNav() {
 
                             <div className="mt-1 pt-1 border-t border-white/5">
                                 <button
-                                    onClick={() => {
-                                        // TODO: open "Add Case" modal
-                                        setIsSwitcherOpen(false);
-                                    }}
-                                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-all cursor-pointer text-white/40 hover:text-white/60"
+                                    aria-disabled="true"
+                                    tabIndex={-1}
+                                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/20 cursor-not-allowed"
                                 >
                                     <Plus size={16} weight="bold" />
                                     <span className="text-[13px] font-medium">Add New Case</span>
+                                    <span className="text-[10px] ml-auto opacity-50">Soon</span>
                                 </button>
                             </div>
                         </motion.div>
@@ -137,16 +135,20 @@ export function TopNav() {
             {/* ── Right: Actions ── */}
             <div className="flex items-center gap-2">
                 <button
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white/30 hover:text-white/60 hover:bg-white/5 transition-all border border-transparent hover:border-white/10"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white/20 border border-transparent cursor-not-allowed"
                     aria-label="Search"
-                    title="Search workspace"
+                    aria-disabled="true"
+                    tabIndex={-1}
+                    title="Search — coming soon"
                 >
                     <MagnifyingGlass size={18} weight="bold" />
                 </button>
                 <button
-                    className="relative w-10 h-10 rounded-xl flex items-center justify-center text-white/30 hover:text-white/60 hover:bg-white/5 transition-all border border-transparent hover:border-white/10"
+                    className="relative w-10 h-10 rounded-xl flex items-center justify-center text-white/20 border border-transparent cursor-not-allowed"
                     aria-label="Notifications"
-                    title="Notifications"
+                    aria-disabled="true"
+                    tabIndex={-1}
+                    title="Notifications — coming soon"
                 >
                     <Bell size={18} weight="bold" />
                 </button>

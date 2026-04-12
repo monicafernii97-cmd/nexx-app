@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X,
@@ -87,10 +87,29 @@ export function GenerateReportModal({
     const [outputType, setOutputType] = useState<OutputType>('summary');
     const [tone, setTone] = useState<ToneType>('neutral_concise');
     const [patternHandling, setPatternHandling] = useState<PatternHandling>('include_supported');
+    const modalRef = useRef<HTMLDivElement>(null);
+    const previousFocusRef = useRef<HTMLElement | null>(null);
 
-    const handleGenerate = () => {
+    // Escape to close + focus management
+    useEffect(() => {
+        if (!isOpen) return;
+        previousFocusRef.current = document.activeElement as HTMLElement;
+        const timer = setTimeout(() => modalRef.current?.focus(), 50);
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+            clearTimeout(timer);
+            previousFocusRef.current?.focus();
+        };
+    }, [isOpen, onClose]);
+
+    const handleGenerate = useCallback(() => {
         onGenerate({ outputType, tone, patternHandling });
-    };
+    }, [onGenerate, outputType, tone, patternHandling]);
 
     return (
         <AnimatePresence>
@@ -114,7 +133,12 @@ export function GenerateReportModal({
                         className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none"
                     >
                         <div
-                            className="w-full max-w-[720px] pointer-events-auto rounded-[24px] border border-white/10 shadow-2xl overflow-hidden"
+                            ref={modalRef}
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="generate-report-title"
+                            tabIndex={-1}
+                            className="w-full max-w-[720px] pointer-events-auto rounded-[24px] border border-white/10 shadow-2xl overflow-hidden outline-none"
                             style={{
                                 background: 'linear-gradient(135deg, rgba(10, 17, 40, 0.98), rgba(10, 17, 40, 0.95))',
                                 backdropFilter: 'blur(40px)',
@@ -124,7 +148,7 @@ export function GenerateReportModal({
                             {/* Header */}
                             <div className="flex items-start justify-between mb-6">
                                 <div>
-                                    <h2 className="text-[22px] font-bold text-white">Generate Report</h2>
+                                    <h2 id="generate-report-title" className="text-[22px] font-bold text-white">Generate Report</h2>
                                     <p className="text-[13px] text-white/40 mt-1">
                                         Create a structured summary from your saved facts, timeline, and source-backed events.
                                     </p>

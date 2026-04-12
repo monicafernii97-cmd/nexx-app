@@ -4,14 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import {
     SquaresFour, Notebook, PushPin, CalendarCheck,
-    ArrowRight, Clock, Plus, FileText,
+    ArrowRight, Plus,
 } from '@phosphor-icons/react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { parseEventDate, safeEventDate } from '@/lib/workspace-constants';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ItemCard } from '@/components/workspace/ItemCard';
 import { EmptyState } from '@/components/workspace/EmptyState';
 import { PatternsBlock } from '@/components/workspace/PatternsBlock';
@@ -28,10 +28,13 @@ import { GenerateReportModal } from '@/components/workspace/GenerateReportModal'
  * "What happened → When → Is there a pattern → What does it all mean?"
  */
 export default function WorkspaceOverview() {
-    const { pins, memory, timeline, counts, removePin, removeMemory, activeCase } = useWorkspace();
+    const { pins, memory, timeline, counts, removeMemory } = useWorkspace();
 
     // ── Generate Report Modal state ──
-    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const searchParams = useSearchParams();
+    const [isReportModalOpen, setIsReportModalOpen] = useState(
+        () => searchParams.get('openReportModal') === 'true'
+    );
 
     // Listen for sidebar "Generate Report" button
     useEffect(() => {
@@ -43,13 +46,11 @@ export default function WorkspaceOverview() {
     // Narrative state (will be populated by AI in future)
     const [narrative] = useState<CaseNarrative | null>(null);
 
-    // Recent items
-    const recentMemory = [...(memory ?? [])]
+    // Recent key facts only (filtered from all memory)
+    const recentKeyFacts = [...(memory ?? [])]
+        .filter(item => item.type === 'key_fact')
         .sort((a, b) => b.createdAt - a.createdAt)
         .slice(0, 4);
-    const recentPins = [...(pins ?? [])]
-        .sort((a, b) => b.createdAt - a.createdAt)
-        .slice(0, 2);
     const recentTimeline = [...(timeline || [])]
         .sort((a, b) => {
             const dateA = parseEventDate(a.eventDate, a.createdAt);
@@ -65,10 +66,14 @@ export default function WorkspaceOverview() {
         tone: 'neutral_concise' | 'detailed_organized' | 'attorney_ready';
         patternHandling: 'include_supported' | 'exclude';
     }) => {
-        // In a real scenario, we'd trigger the AI generation here.
-        // For now, we redirect to show the 'Magic Moment' bridge.
         setIsReportModalOpen(false);
-        router.push('/docuvault?prefilled=true');
+        const params = new URLSearchParams({
+            prefilled: 'true',
+            outputType: options.outputType,
+            tone: options.tone,
+            patternHandling: options.patternHandling,
+        });
+        router.push(`/docuvault?${params.toString()}`);
     }, [router]);
 
     const stats = [
@@ -147,7 +152,7 @@ export default function WorkspaceOverview() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {[1, 2].map(i => <div key={i} className="h-24 rounded-[18px] bg-white/5 animate-pulse" />)}
                     </div>
-                ) : memory.length === 0 ? (
+                ) : recentKeyFacts.length === 0 ? (
                     <EmptyState
                         icon={Notebook}
                         title="No Key Facts Yet"
@@ -156,7 +161,7 @@ export default function WorkspaceOverview() {
                     />
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {recentMemory.map(item => (
+                        {recentKeyFacts.map(item => (
                             <ItemCard
                                 key={item._id}
                                 id={item._id}

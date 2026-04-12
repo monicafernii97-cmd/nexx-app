@@ -277,8 +277,13 @@ export default function Sidebar() {
                 {/* Generate Report CTA — the primary action trigger */}
                 <button
                     onClick={() => {
-                        // Dispatch custom event for the GenerateReportModal
-                        window.dispatchEvent(new CustomEvent('nexx:open-report-modal'));
+                        // Navigate to overview first, then open the modal
+                        const pathname = window.location.pathname;
+                        if (pathname.includes('/chat/overview')) {
+                            window.dispatchEvent(new CustomEvent('nexx:open-report-modal'));
+                        } else {
+                            window.location.href = '/chat/overview?openReportModal=true';
+                        }
                     }}
                     title="Generate a structured report from your workspace data"
                     aria-label="Generate report"

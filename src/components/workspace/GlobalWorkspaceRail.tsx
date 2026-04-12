@@ -103,9 +103,9 @@ export function GlobalWorkspaceRail() {
 
     // ── Source Health ──
     const totalSources = useMemo(() => {
-        const pinSources = pins?.filter(p => p.sourceMessageId).length ?? 0;
-        const memorySources = memory?.filter(m => m.sourceMessageId).length ?? 0;
-        const timelineSources = timeline?.filter(t => t.sourceMessageId).length ?? 0;
+        const pinSources = pins?.filter(p => p.sourceMessageId || p.sourceConversationId).length ?? 0;
+        const memorySources = memory?.filter(m => m.sourceMessageId || m.sourceConversationId).length ?? 0;
+        const timelineSources = timeline?.filter(t => t.sourceMessageId || t.sourceConversationId).length ?? 0;
         return pinSources + memorySources + timelineSources;
     }, [pins, memory, timeline]);
 

@@ -34,13 +34,13 @@ export interface DetectedPattern {
     supportingEvents: PatternEvent[];
     confidence: Confidence;
     score: number;
-    category: string;
+    category: BehaviorCategory;
 }
 
 export interface SuppressedCandidate {
     reason: string;
     eventCount: number;
-    category: string;
+    category: BehaviorCategory;
 }
 
 export interface PatternAnalysisResult {

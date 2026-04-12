@@ -322,6 +322,11 @@ function DocuVaultPageInner() {
             {/* ═══════════════════════════════════════════════════
                 VIEW: COMPOSE (Main Generator)
                ═══════════════════════════════════════════════════ */}
+            {view === 'compose' && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                     className="space-y-8"
                 >
                     {/* ── Magic Moment Banner ── */}

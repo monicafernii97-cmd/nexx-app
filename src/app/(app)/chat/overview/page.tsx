@@ -3,7 +3,8 @@
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import { SquaresFour, Notebook, PushPin, CalendarCheck, ArrowRight, Clock, Plus } from '@phosphor-icons/react';
 import { useWorkspace } from '@/lib/workspace-context';
-import { parseEventDate } from '@/lib/workspace-constants';
+import { parseEventDate, safeEventDate } from '@/lib/workspace-constants';
+import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { ItemCard } from '@/components/workspace/ItemCard';
@@ -165,17 +166,22 @@ export default function WorkspaceOverview() {
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    {recentTimeline.map((event, i) => (
+                                    {recentTimeline.map((event, i) => {
+                                        const displayDate = safeEventDate(event.eventDate);
+                                        return (
                                         <div key={event._id} className="relative pl-6 pb-6 last:pb-0">
                                             {i !== recentTimeline.length - 1 && (
                                                 <div className="absolute left-[3px] top-6 bottom-0 w-px bg-white/10" />
                                             )}
                                             <div className="absolute left-0 top-1.5 w-[7px] h-[7px] rounded-full bg-[var(--emerald)] shadow-[0_0_8px_var(--emerald)]" />
-                                            <p className="text-[10px] font-bold text-white/40 uppercase mb-1">{event.eventDate || 'Date Pending'}</p>
+                                            <p className="text-[10px] font-bold text-white/40 uppercase mb-1">
+                                                {displayDate ? format(displayDate, 'MMM d, yyyy') : 'Date Pending'}
+                                            </p>
                                             <p className="text-sm font-semibold text-white truncate">{event.title}</p>
                                             <p className="text-[11px] text-white/60 line-clamp-1 mt-1">{event.description}</p>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                     <Link 
                                         href="/chat/timeline"
                                         className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors pt-2"

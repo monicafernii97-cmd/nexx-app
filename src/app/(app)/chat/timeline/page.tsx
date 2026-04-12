@@ -47,7 +47,7 @@ export default function TimelineExplorer() {
     const tabConfigs = useMemo(() => {
         return TABS.map(tab => ({
             ...tab,
-            count: tab.id === 'all' ? timeline?.length : timeline?.filter(t => t.status === tab.id).length
+            count: tab.id === 'all' ? (timeline?.length ?? 0) : (timeline?.filter(t => t.status === tab.id).length ?? 0)
         }));
     }, [timeline]);
 

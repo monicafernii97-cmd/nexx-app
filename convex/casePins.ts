@@ -1,7 +1,13 @@
 import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
+import { getAuthenticatedUser } from './lib/auth';
 
-/** Pinnable type validator (matches schema). */
+/**
+ * Pinnable type validator (must match `PinnableClass` in `src/lib/ui-intelligence/types.ts`).
+ *
+ * Intentionally duplicated: Convex validators run on the server and cannot import
+ * TypeScript types from the Next.js app. Keep both lists in sync manually.
+ */
 const pinnableTypeValidator = v.union(
     v.literal('key_fact'),
     v.literal('strategy_point'),
@@ -20,11 +26,12 @@ const pinnableTypeValidator = v.union(
 
 /** List all pins for the authenticated user, newest first. */
 export const listByUser = query({
-    args: { userId: v.id('users') },
-    handler: async (ctx, args) => {
+    args: {},
+    handler: async (ctx) => {
+        const user = await getAuthenticatedUser(ctx);
         return ctx.db
             .query('casePins')
-            .withIndex('by_userId', (q) => q.eq('userId', args.userId))
+            .withIndex('by_userId', (q) => q.eq('userId', user._id))
             .order('desc')
             .collect();
     },
@@ -37,7 +44,6 @@ export const listByUser = query({
 /** Create a new pin. Returns existing ID if requestId already exists (idempotent). */
 export const create = mutation({
     args: {
-        userId: v.id('users'),
         type: pinnableTypeValidator,
         title: v.string(),
         content: v.string(),
@@ -46,11 +52,15 @@ export const create = mutation({
         requestId: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        // Idempotency check
+        const user = await getAuthenticatedUser(ctx);
+
+        // Idempotency check — scoped to this user
         if (args.requestId) {
             const existing = await ctx.db
                 .query('casePins')
-                .withIndex('by_requestId', (q) => q.eq('requestId', args.requestId))
+                .withIndex('by_userId_requestId', (q) =>
+                    q.eq('userId', user._id).eq('requestId', args.requestId)
+                )
                 .first();
             if (existing) return existing._id;
         }
@@ -58,12 +68,12 @@ export const create = mutation({
         // Get current max sort order
         const pins = await ctx.db
             .query('casePins')
-            .withIndex('by_userId', (q) => q.eq('userId', args.userId))
+            .withIndex('by_userId', (q) => q.eq('userId', user._id))
             .collect();
         const maxOrder = pins.reduce((max, p) => Math.max(max, p.sortOrder ?? 0), 0);
 
         return ctx.db.insert('casePins', {
-            userId: args.userId,
+            userId: user._id,
             type: args.type,
             title: args.title,
             content: args.content,
@@ -76,21 +86,31 @@ export const create = mutation({
     },
 });
 
-/** Remove a pin by ID. */
+/** Remove a pin by ID (with ownership verification). */
 export const remove = mutation({
     args: { pinId: v.id('casePins') },
     handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        const pin = await ctx.db.get(args.pinId);
+        if (!pin || pin.userId !== user._id) {
+            throw new Error('Not authorized to delete this pin');
+        }
         await ctx.db.delete(args.pinId);
     },
 });
 
-/** Update sort order for a pin (for drag-and-drop reordering). */
+/** Update sort order for a pin (with ownership verification). */
 export const updateSortOrder = mutation({
     args: {
         pinId: v.id('casePins'),
         sortOrder: v.number(),
     },
     handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        const pin = await ctx.db.get(args.pinId);
+        if (!pin || pin.userId !== user._id) {
+            throw new Error('Not authorized to modify this pin');
+        }
         await ctx.db.patch(args.pinId, { sortOrder: args.sortOrder });
     },
 });

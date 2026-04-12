@@ -69,8 +69,12 @@ export function AccessIndicator({ level, expiresInMinutes }: AccessIndicatorProp
     const config = LEVEL_CONFIG[level];
     const Icon = config.icon;
 
-    const label = level === 'expiring' && expiresInMinutes !== undefined
-        ? `Access expires in ${expiresInMinutes}m`
+    const safeMinutes = typeof expiresInMinutes === 'number' && Number.isFinite(expiresInMinutes) && expiresInMinutes > 0
+        ? Math.round(expiresInMinutes)
+        : undefined;
+
+    const label = level === 'expiring' && safeMinutes !== undefined
+        ? `Access expires in ${safeMinutes}m`
         : config.label;
 
     return (

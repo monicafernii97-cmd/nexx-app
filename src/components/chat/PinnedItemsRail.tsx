@@ -157,7 +157,7 @@ export function PinnedItemsRail({
                                             type="button"
                                             onClick={() => onUnpin(item._id)}
                                             className="
-                                                opacity-0 group-hover:opacity-100
+                                                opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100
                                                 text-[var(--text-muted)] hover:text-[var(--critical-access)]
                                                 transition-all duration-150 p-0.5
                                             "

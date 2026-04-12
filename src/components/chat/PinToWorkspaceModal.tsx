@@ -8,7 +8,7 @@
  * persists to casePins backend.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, PushPin, Check } from '@phosphor-icons/react';
 import type { PinnableType } from '@/lib/integration/types';
@@ -63,6 +63,15 @@ export function PinToWorkspaceModal({
     const [selectedType, setSelectedType] = useState<PinnableType>('key_fact');
     const [title, setTitle] = useState(initialTitle);
     const [content, setContent] = useState(initialContent);
+
+    // Reset form state when modal opens or seed props change
+    useEffect(() => {
+        if (isOpen) {
+            setSelectedType('key_fact');
+            setTitle(initialTitle);
+            setContent(initialContent);
+        }
+    }, [isOpen, initialContent, initialTitle]);
 
     const handlePin = () => {
         const finalTitle = title.trim() || PIN_OPTIONS.find(o => o.type === selectedType)?.label || 'Pinned Item';

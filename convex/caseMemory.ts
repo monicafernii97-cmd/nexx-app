@@ -1,7 +1,13 @@
 import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
+import { getAuthenticatedUser } from './lib/auth';
 
-/** Save-type validator (matches schema). */
+/**
+ * Save-type validator (must match `SaveType` in `src/lib/ui-intelligence/types.ts`).
+ *
+ * Intentionally duplicated: Convex validators run on the server and cannot import
+ * TypeScript types from the Next.js app. Keep both lists in sync manually.
+ */
 const saveTypeValidator = v.union(
     v.literal('case_note'),
     v.literal('key_fact'),
@@ -21,29 +27,28 @@ const saveTypeValidator = v.union(
 // Queries
 // ---------------------------------------------------------------------------
 
-/** List all case memory items for the user, newest first. */
+/** List all case memory items for the authenticated user, newest first. */
 export const listByUser = query({
-    args: { userId: v.id('users') },
-    handler: async (ctx, args) => {
+    args: {},
+    handler: async (ctx) => {
+        const user = await getAuthenticatedUser(ctx);
         return ctx.db
             .query('caseMemory')
-            .withIndex('by_userId', (q) => q.eq('userId', args.userId))
+            .withIndex('by_userId', (q) => q.eq('userId', user._id))
             .order('desc')
             .collect();
     },
 });
 
-/** List case memory items filtered by type. */
+/** List case memory items filtered by type for the authenticated user. */
 export const listByType = query({
-    args: {
-        userId: v.id('users'),
-        type: saveTypeValidator,
-    },
+    args: { type: saveTypeValidator },
     handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
         return ctx.db
             .query('caseMemory')
             .withIndex('by_userId_type', (q) =>
-                q.eq('userId', args.userId).eq('type', args.type)
+                q.eq('userId', user._id).eq('type', args.type)
             )
             .order('desc')
             .collect();
@@ -54,10 +59,9 @@ export const listByType = query({
 // Mutations
 // ---------------------------------------------------------------------------
 
-/** Save an item to case memory. Returns existing ID if requestId matches (idempotent). */
+/** Save an item to case memory. Returns existing ID if requestId matches (idempotent, scoped to user). */
 export const save = mutation({
     args: {
-        userId: v.id('users'),
         type: saveTypeValidator,
         title: v.string(),
         content: v.string(),
@@ -67,18 +71,22 @@ export const save = mutation({
         requestId: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        // Idempotency
+        const user = await getAuthenticatedUser(ctx);
+
+        // Idempotency — scoped to this user
         if (args.requestId) {
             const existing = await ctx.db
                 .query('caseMemory')
-                .withIndex('by_requestId', (q) => q.eq('requestId', args.requestId))
+                .withIndex('by_userId_requestId', (q) =>
+                    q.eq('userId', user._id).eq('requestId', args.requestId)
+                )
                 .first();
             if (existing) return existing._id;
         }
 
         const now = Date.now();
         return ctx.db.insert('caseMemory', {
-            userId: args.userId,
+            userId: user._id,
             type: args.type,
             title: args.title,
             content: args.content,
@@ -92,7 +100,7 @@ export const save = mutation({
     },
 });
 
-/** Update a case memory item's content. */
+/** Update a case memory item's content (with ownership verification). */
 export const update = mutation({
     args: {
         itemId: v.id('caseMemory'),
@@ -100,6 +108,11 @@ export const update = mutation({
         content: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        const item = await ctx.db.get(args.itemId);
+        if (!item || item.userId !== user._id) {
+            throw new Error('Not authorized to modify this item');
+        }
         const updates: Record<string, unknown> = { updatedAt: Date.now() };
         if (args.title !== undefined) updates.title = args.title;
         if (args.content !== undefined) updates.content = args.content;
@@ -107,10 +120,15 @@ export const update = mutation({
     },
 });
 
-/** Delete a case memory item. */
+/** Delete a case memory item (with ownership verification). */
 export const remove = mutation({
     args: { itemId: v.id('caseMemory') },
     handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        const item = await ctx.db.get(args.itemId);
+        if (!item || item.userId !== user._id) {
+            throw new Error('Not authorized to delete this item');
+        }
         await ctx.db.delete(args.itemId);
     },
 });

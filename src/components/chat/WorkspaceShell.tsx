@@ -55,15 +55,26 @@ export function WorkspaceShell({
                 {children}
             </div>
 
-            {/* Right rail — pinned items (desktop only) */}
+            {/* Right rail — pinned items */}
+            {/* Desktop: full expanded/collapsed toggle. Mobile: always collapsed icon bar */}
             {!hideRail && (
-                <div className="hidden lg:flex flex-shrink-0">
-                    <PinnedItemsRail
-                        items={pinnedItems}
-                        onUnpin={onUnpin}
-                        isExpanded={isRailExpanded}
-                        onToggle={() => setIsRailExpanded((prev) => !prev)}
-                    />
+                <div className="flex flex-shrink-0">
+                    <div className="hidden lg:flex">
+                        <PinnedItemsRail
+                            items={pinnedItems}
+                            onUnpin={onUnpin}
+                            isExpanded={isRailExpanded}
+                            onToggle={() => setIsRailExpanded((prev) => !prev)}
+                        />
+                    </div>
+                    <div className="flex lg:hidden">
+                        <PinnedItemsRail
+                            items={pinnedItems}
+                            onUnpin={onUnpin}
+                            isExpanded={false}
+                            onToggle={() => setIsRailExpanded((prev) => !prev)}
+                        />
+                    </div>
                 </div>
             )}
         </div>

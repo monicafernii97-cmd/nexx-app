@@ -510,7 +510,7 @@ export default defineSchema({
     })
         .index('by_userId', ['userId'])
         .index('by_userId_type', ['userId', 'type'])
-        .index('by_requestId', ['requestId']),
+        .index('by_userId_requestId', ['userId', 'requestId']),
 
     // ═══ NEW: Case Memory (saved strategy/analysis items) ═══
     caseMemory: defineTable({
@@ -544,7 +544,7 @@ export default defineSchema({
     })
         .index('by_userId', ['userId'])
         .index('by_userId_type', ['userId', 'type'])
-        .index('by_requestId', ['requestId']),
+        .index('by_userId_requestId', ['userId', 'requestId']),
 
     // ═══ NEW: Timeline Candidates (AI-suggested timeline entries) ═══
     timelineCandidates: defineTable({
@@ -569,5 +569,5 @@ export default defineSchema({
     })
         .index('by_userId', ['userId'])
         .index('by_userId_status', ['userId', 'status'])
-        .index('by_requestId', ['requestId']),
+        .index('by_userId_requestId', ['userId', 'requestId']),
 });

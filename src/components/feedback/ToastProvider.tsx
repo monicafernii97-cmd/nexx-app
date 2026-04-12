@@ -10,7 +10,7 @@
  * - Stacked display for multiple simultaneous toasts
  */
 
-import { createContext, useContext, useCallback, useState, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Warning, X, ArrowRight } from '@phosphor-icons/react';
 
@@ -116,7 +116,7 @@ function ToastItem({
                 ${style.bg}
             `}
             role="alert"
-            aria-live="assertive"
+            aria-live={toast.variant === 'error' || toast.variant === 'warning' ? 'assertive' : 'polite'}
         >
             {/* Icon */}
             <div className={`mt-0.5 flex-shrink-0 ${style.accent}`}>
@@ -168,6 +168,7 @@ function ToastItem({
 /** Wrap your app with ToastProvider to enable the toast system. */
 export function ToastProvider({ children }: { children: ReactNode }) {
     const [toasts, setToasts] = useState<ToastConfig[]>([]);
+    const timeoutIdsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
     const dismissToast = useCallback((id: string) => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -179,10 +180,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             const toast: ToastConfig = { ...config, id };
             setToasts((prev) => [...prev, toast]);
 
-            // Auto-dismiss
+            // Auto-dismiss with cleanup tracking
             const duration = config.duration ?? 4000;
             if (duration > 0) {
-                setTimeout(() => dismissToast(id), duration);
+                const timeoutId = setTimeout(() => {
+                    timeoutIdsRef.current.delete(timeoutId);
+                    dismissToast(id);
+                }, duration);
+                timeoutIdsRef.current.add(timeoutId);
             }
 
             return id;
@@ -190,13 +195,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         [dismissToast]
     );
 
+    // Clean up orphaned timers on unmount
+    useEffect(() => {
+        return () => {
+            timeoutIdsRef.current.forEach((id) => clearTimeout(id));
+            timeoutIdsRef.current.clear();
+        };
+    }, []);
+
     return (
         <ToastContext.Provider value={{ showToast, dismissToast }}>
             {children}
 
             {/* Toast container — bottom-right */}
             <div
-                className="fixed bottom-6 right-6 z-50 flex flex-col-reverse gap-2"
+                className="fixed bottom-6 right-6 z-40 flex flex-col-reverse gap-2"
                 aria-label="Notifications"
             >
                 <AnimatePresence mode="popLayout">

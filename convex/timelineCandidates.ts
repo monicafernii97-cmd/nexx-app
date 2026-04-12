@@ -1,33 +1,35 @@
 import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
+import { getAuthenticatedUser } from './lib/auth';
 
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
 
-/** List all timeline candidates for the user, newest first. */
+/** List all timeline candidates for the authenticated user, newest first. */
 export const listByUser = query({
-    args: { userId: v.id('users') },
-    handler: async (ctx, args) => {
+    args: {},
+    handler: async (ctx) => {
+        const user = await getAuthenticatedUser(ctx);
         return ctx.db
             .query('timelineCandidates')
-            .withIndex('by_userId', (q) => q.eq('userId', args.userId))
+            .withIndex('by_userId', (q) => q.eq('userId', user._id))
             .order('desc')
             .collect();
     },
 });
 
-/** List timeline candidates filtered by status (candidate or confirmed). */
+/** List timeline candidates filtered by status for the authenticated user. */
 export const listByStatus = query({
     args: {
-        userId: v.id('users'),
         status: v.union(v.literal('candidate'), v.literal('confirmed')),
     },
     handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
         return ctx.db
             .query('timelineCandidates')
             .withIndex('by_userId_status', (q) =>
-                q.eq('userId', args.userId).eq('status', args.status)
+                q.eq('userId', user._id).eq('status', args.status)
             )
             .order('desc')
             .collect();
@@ -38,10 +40,9 @@ export const listByStatus = query({
 // Mutations
 // ---------------------------------------------------------------------------
 
-/** Create a timeline candidate. Returns existing ID if requestId matches. */
+/** Create a timeline candidate. Returns existing ID if requestId matches (scoped to user). */
 export const create = mutation({
     args: {
-        userId: v.id('users'),
         title: v.string(),
         description: v.string(),
         eventDate: v.optional(v.string()),
@@ -52,18 +53,22 @@ export const create = mutation({
         requestId: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        // Idempotency
+        const user = await getAuthenticatedUser(ctx);
+
+        // Idempotency — scoped to this user
         if (args.requestId) {
             const existing = await ctx.db
                 .query('timelineCandidates')
-                .withIndex('by_requestId', (q) => q.eq('requestId', args.requestId))
+                .withIndex('by_userId_requestId', (q) =>
+                    q.eq('userId', user._id).eq('requestId', args.requestId)
+                )
                 .first();
             if (existing) return existing._id;
         }
 
         const now = Date.now();
         return ctx.db.insert('timelineCandidates', {
-            userId: args.userId,
+            userId: user._id,
             status: 'candidate',
             title: args.title,
             description: args.description,
@@ -79,10 +84,15 @@ export const create = mutation({
     },
 });
 
-/** Confirm a timeline candidate (user-approved). */
+/** Confirm a timeline candidate (with ownership verification). */
 export const confirm = mutation({
     args: { candidateId: v.id('timelineCandidates') },
     handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        const candidate = await ctx.db.get(args.candidateId);
+        if (!candidate || candidate.userId !== user._id) {
+            throw new Error('Not authorized to modify this timeline candidate');
+        }
         await ctx.db.patch(args.candidateId, {
             status: 'confirmed',
             updatedAt: Date.now(),
@@ -90,10 +100,15 @@ export const confirm = mutation({
     },
 });
 
-/** Delete a timeline candidate. */
+/** Delete a timeline candidate (with ownership verification). */
 export const remove = mutation({
     args: { candidateId: v.id('timelineCandidates') },
     handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        const candidate = await ctx.db.get(args.candidateId);
+        if (!candidate || candidate.userId !== user._id) {
+            throw new Error('Not authorized to delete this timeline candidate');
+        }
         await ctx.db.delete(args.candidateId);
     },
 });

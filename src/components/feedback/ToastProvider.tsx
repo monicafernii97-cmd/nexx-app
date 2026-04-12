@@ -113,7 +113,7 @@ function ToastItem({
             className={`
                 relative flex items-start gap-3 px-4 py-3 rounded-2xl
                 border backdrop-blur-lg shadow-lg
-                min-w-[320px] max-w-[420px]
+                w-[calc(100vw-3rem)] max-w-[420px] sm:min-w-[320px]
                 ${style.bg}
             `}
             role={isUrgent ? 'alert' : 'status'}
@@ -192,8 +192,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             const toast: ToastConfig = { ...config, id };
             setToasts((prev) => [...prev, toast]);
 
-            // Auto-dismiss with cleanup tracking
-            const duration = config.duration ?? 4000;
+            // Auto-dismiss — destination toasts stay until manually dismissed
+            const duration = config.duration ?? (config.destination ? 0 : 4000);
             if (duration > 0) {
                 const timeoutId = setTimeout(() => {
                     timeoutIdsRef.current.delete(id);

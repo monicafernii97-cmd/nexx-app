@@ -11,6 +11,7 @@ import { parseEventDate, safeEventDate } from '@/lib/workspace-constants';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ItemCard } from '@/components/workspace/ItemCard';
 import { EmptyState } from '@/components/workspace/EmptyState';
 import { PatternsBlock } from '@/components/workspace/PatternsBlock';
@@ -57,15 +58,18 @@ export default function WorkspaceOverview() {
         })
         .slice(0, 5);
 
+    const router = useRouter();
+
     const handleGenerateReport = useCallback((options: {
         outputType: 'summary' | 'court_document' | 'both';
         tone: 'neutral_concise' | 'detailed_organized' | 'attorney_ready';
         patternHandling: 'include_supported' | 'exclude';
     }) => {
-        // TODO: Wire to narrative generation API
-        console.log('Generate report:', options);
+        // In a real scenario, we'd trigger the AI generation here.
+        // For now, we redirect to show the 'Magic Moment' bridge.
         setIsReportModalOpen(false);
-    }, []);
+        router.push('/docuvault?prefilled=true');
+    }, [router]);
 
     const stats = [
         { label: 'Key Facts', value: counts.keyFacts, loading: memory === undefined, icon: Notebook, color: 'var(--support-violet)', href: '/chat/key-points' },

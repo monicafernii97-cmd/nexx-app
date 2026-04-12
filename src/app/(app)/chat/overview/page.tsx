@@ -16,7 +16,14 @@ export default function WorkspaceOverview() {
 
     const recentPins = pins?.slice(0, 2) || [];
     const recentMemory = memory?.slice(0, 2) || [];
-    const recentTimeline = timeline?.slice(0, 2) || [];
+    // CR #4 — Sort by eventDate/createdAt before slicing to match the Timeline Explorer
+    const recentTimeline = [...(timeline || [])]
+        .sort((a, b) => {
+            const dateA = a.eventDate ? new Date(a.eventDate).getTime() : a.createdAt;
+            const dateB = b.eventDate ? new Date(b.eventDate).getTime() : b.createdAt;
+            return dateB - dateA;
+        })
+        .slice(0, 2);
 
     const stats = [
         { label: 'Key Points', value: counts.memory, icon: Notebook, color: 'var(--support-violet)', href: '/chat/key-points' },
@@ -82,7 +89,7 @@ export default function WorkspaceOverview() {
                                     <ItemCard
                                         key={item._id}
                                         id={item._id}
-                                        type={item.type as any}
+                                        type={item.type}
                                         title={item.title}
                                         content={item.content}
                                         createdAt={item.createdAt}

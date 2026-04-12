@@ -1,10 +1,9 @@
 'use client';
 
-import { createContext, useContext, ReactNode, useMemo } from 'react';
+import { createContext, useContext, useCallback, type ReactNode } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Doc, Id } from '@convex/_generated/dataModel';
-import type { PinnableType } from '@/lib/integration/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -16,7 +15,7 @@ export interface WorkspaceContextType {
     memory: Doc<'caseMemory'>[] | undefined;
     timeline: Doc<'timelineCandidates'>[] | undefined;
     
-    // Derived Counts
+    // Derived Counts (tolerant of partial loads — CR #12)
     counts: {
         pins: number;
         memory: number;
@@ -49,36 +48,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const removeMemoryMutation = useMutation(api.caseMemory.remove);
     const confirmTimelineMutation = useMutation(api.timelineCandidates.confirm);
 
-    // Derived values
-    const counts = useMemo(() => {
-        if (!pins || !memory || !timeline) {
-            return { pins: 0, memory: 0, timeline: 0, keyFacts: 0, strategy: 0, risks: 0 };
-        }
-
-        return {
-            pins: pins.length,
-            memory: memory.length,
-            timeline: timeline.length,
-            keyFacts: memory.filter(m => m.type === 'key_fact').length,
-            strategy: memory.filter(m => m.type === 'strategy_point').length,
-            risks: memory.filter(m => m.type === 'risk_concern').length,
-        };
-    }, [pins, memory, timeline]);
-
-    // Helpers
-    const removePin = async (pinId: Id<'casePins'>) => {
-        await removePinMutation({ pinId });
+    // Derived values — tolerant of partial loads (CR #12)
+    // Each count is computed independently so a slow sibling query
+    // doesn't reset already-resolved counters to 0.
+    const counts = {
+        pins: pins?.length ?? 0,
+        memory: memory?.length ?? 0,
+        timeline: timeline?.length ?? 0,
+        keyFacts: memory?.filter(m => m.type === 'key_fact').length ?? 0,
+        strategy: memory?.filter(m => m.type === 'strategy_point').length ?? 0,
+        risks: memory?.filter(m => m.type === 'risk_concern').length ?? 0,
     };
 
-    const removeMemory = async (itemId: Id<'caseMemory'>) => {
-        await removeMemoryMutation({ itemId });
-    };
+    // Stable action callbacks (useCallback → fixes React Compiler memo error)
+    const removePin = useCallback(
+        async (pinId: Id<'casePins'>) => { await removePinMutation({ pinId }); },
+        [removePinMutation],
+    );
 
-    const confirmTimeline = async (candidateId: Id<'timelineCandidates'>) => {
-        await confirmTimelineMutation({ candidateId });
-    };
+    const removeMemory = useCallback(
+        async (itemId: Id<'caseMemory'>) => { await removeMemoryMutation({ itemId }); },
+        [removeMemoryMutation],
+    );
 
-    const value = useMemo(() => ({
+    const confirmTimeline = useCallback(
+        async (candidateId: Id<'timelineCandidates'>) => { await confirmTimelineMutation({ candidateId }); },
+        [confirmTimelineMutation],
+    );
+
+    const value: WorkspaceContextType = {
         pins,
         memory,
         timeline,
@@ -86,7 +84,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         removePin,
         removeMemory,
         confirmTimeline,
-    }), [pins, memory, timeline, counts, removePinMutation, removeMemoryMutation, confirmTimelineMutation]);
+    };
 
     return (
         <WorkspaceContext.Provider value={value}>

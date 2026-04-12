@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
-import { CalendarCheck, MagnifyingGlass, Check, Trash, WarningCircle, Clock, Plus, Tag } from '@phosphor-icons/react';
+import { CalendarCheck, MagnifyingGlass, Check, Clock, Tag } from '@phosphor-icons/react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { EmptyState } from '@/components/workspace/EmptyState';
 import { FilterTabs } from '@/components/workspace/FilterTabs';
@@ -24,6 +24,7 @@ export default function TimelineExplorer() {
     const { timeline, confirmTimeline } = useWorkspace();
     const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
     const filteredEvents = useMemo(() => {
         if (!timeline) return [];
@@ -33,9 +34,14 @@ export default function TimelineExplorer() {
                                  event.description.toLowerCase().includes(searchQuery.toLowerCase());
             return matchesTab && matchesSearch;
         }).sort((a, b) => {
-            // Sort by eventDate if possible, otherwise by createdAt
-            const dateA = a.eventDate ? new Date(a.eventDate).getTime() : a.createdAt;
-            const dateB = b.eventDate ? new Date(b.eventDate).getTime() : b.createdAt;
+            // CR #6 — Safe date parsing with NaN guard
+            const parseDate = (d?: string) => {
+                if (!d) return NaN;
+                const t = new Date(d).getTime();
+                return Number.isNaN(t) ? NaN : t;
+            };
+            const dateA = parseDate(a.eventDate) || a.createdAt;
+            const dateB = parseDate(b.eventDate) || b.createdAt;
             return dateB - dateA;
         });
     }, [timeline, activeTab, searchQuery]);
@@ -46,6 +52,20 @@ export default function TimelineExplorer() {
             count: tab.id === 'all' ? timeline?.length : timeline?.filter(t => t.status === tab.id).length
         }));
     }, [timeline]);
+
+    // CR #7 — Confirm with pending guard + error handling
+    const handleConfirm = useCallback(async (candidateId: string) => {
+        if (confirmingId) return; // prevent double-click
+        setConfirmingId(candidateId);
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await confirmTimeline(candidateId as any);
+        } catch (err) {
+            console.error('Failed to confirm timeline event:', err);
+        } finally {
+            setConfirmingId(null);
+        }
+    }, [confirmingId, confirmTimeline]);
 
     return (
         <PageContainer>
@@ -144,10 +164,11 @@ export default function TimelineExplorer() {
 
                                             {event.status === 'candidate' && (
                                                 <button
-                                                    onClick={() => confirmTimeline(event._id)}
-                                                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--emerald)]/20 text-[var(--emerald)] border border-[var(--emerald)]/30 text-xs font-bold uppercase tracking-widest hover:bg-[var(--emerald)] transition-all hover:text-white"
+                                                    onClick={() => handleConfirm(event._id)}
+                                                    disabled={confirmingId === event._id}
+                                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--emerald)]/20 text-[var(--emerald)] border border-[var(--emerald)]/30 text-xs font-bold uppercase tracking-widest hover:bg-[var(--emerald)] transition-all hover:text-white ${confirmingId === event._id ? 'opacity-50 cursor-wait' : ''}`}
                                                 >
-                                                    <Check size={14} weight="bold" /> Confirm
+                                                    <Check size={14} weight="bold" /> {confirmingId === event._id ? 'Confirming...' : 'Confirm'}
                                                 </button>
                                             )}
                                         </div>

@@ -1,8 +1,7 @@
 'use client';
 
-import { ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { WarningCircle, ArrowRight } from '@phosphor-icons/react';
+import { ArrowRight } from '@phosphor-icons/react';
 import Link from 'next/link';
 
 interface EmptyStateProps {
@@ -10,7 +9,10 @@ interface EmptyStateProps {
     title: string;
     description: string;
     actionLabel?: string;
+    /** Navigate to a route (link-based CTA). */
     actionHref?: string;
+    /** Execute a callback (button-based CTA). Takes precedence over actionHref. */
+    onAction?: () => void;
 }
 
 /** 
@@ -23,6 +25,7 @@ export function EmptyState({
     description,
     actionLabel,
     actionHref,
+    onAction,
 }: EmptyStateProps) {
     return (
         <motion.div 
@@ -43,7 +46,22 @@ export function EmptyState({
                 {description}
             </p>
             
-            {actionLabel && actionHref && (
+            {actionLabel && onAction ? (
+                <button
+                    onClick={onAction}
+                    className="
+                        btn-primary w-full max-w-[200px] 
+                        text-xs py-4 px-6 rounded-xl 
+                        uppercase font-bold tracking-[0.1em] 
+                        text-white shadow-lg
+                        flex items-center justify-center gap-2
+                        group
+                    "
+                >
+                    {actionLabel}
+                    <ArrowRight size={14} weight="bold" className="transition-transform group-hover:translate-x-1" />
+                </button>
+            ) : actionLabel && actionHref ? (
                 <Link 
                     href={actionHref}
                     className="
@@ -58,7 +76,7 @@ export function EmptyState({
                     {actionLabel}
                     <ArrowRight size={14} weight="bold" className="transition-transform group-hover:translate-x-1" />
                 </Link>
-            )}
+            ) : null}
         </motion.div>
     );
 }

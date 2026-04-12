@@ -5,12 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
     PushPin, 
     Notebook, 
-    X, 
     CaretRight, 
     CaretLeft,
     ListBullets,
-    ClockCounterClockwise
 } from '@phosphor-icons/react';
+import Link from 'next/link';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ItemCard } from './ItemCard';
 
@@ -47,6 +46,7 @@ export function GlobalWorkspaceRail() {
                 <button
                     onClick={() => setIsExpanded(true)}
                     className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all group"
+                    aria-label="Expand workspace rail"
                     title="Expand Workspace"
                 >
                     <CaretLeft size={20} weight="bold" className="group-hover:-translate-x-0.5 transition-transform" />
@@ -55,6 +55,7 @@ export function GlobalWorkspaceRail() {
                 <div className="flex flex-col gap-4">
                     <button 
                         onClick={() => { setIsExpanded(true); setActiveTab('pinned'); }}
+                        aria-label={`Pinned items (${counts.pins})`}
                         className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition-all ${activeTab === 'pinned' ? 'bg-[var(--accent-icy)]/20 text-[var(--accent-icy)] border border-[var(--accent-icy)]/30' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
                     >
                         <PushPin size={20} weight={activeTab === 'pinned' ? 'fill' : 'regular'} />
@@ -67,6 +68,7 @@ export function GlobalWorkspaceRail() {
 
                     <button 
                         onClick={() => { setIsExpanded(true); setActiveTab('memory'); }}
+                        aria-label={`Key points (${keyPoints.length})`}
                         className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition-all ${activeTab === 'memory' ? 'bg-[var(--support-violet)]/20 text-[var(--support-violet)] border border-[var(--support-violet)]/30' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
                     >
                         <Notebook size={20} weight={activeTab === 'memory' ? 'fill' : 'regular'} />
@@ -80,6 +82,11 @@ export function GlobalWorkspaceRail() {
             </motion.div>
         );
     }
+
+    // -------------------------------------------------------------------------
+    // Loading state check (CR #9)
+    // -------------------------------------------------------------------------
+    const isLoading = pins === undefined || memory === undefined;
 
     // -------------------------------------------------------------------------
     // Expanded State
@@ -99,6 +106,7 @@ export function GlobalWorkspaceRail() {
                 <button
                     onClick={() => setIsExpanded(false)}
                     className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-white transition-all"
+                    aria-label="Collapse workspace rail"
                 >
                     <CaretRight size={18} weight="bold" />
                 </button>
@@ -109,6 +117,7 @@ export function GlobalWorkspaceRail() {
                 <div className="flex items-center p-1 bg-black/20 rounded-xl border border-white/5 relative">
                     <button
                         onClick={() => setActiveTab('pinned')}
+                        aria-label="View pinned items"
                         className={`
                             flex-1 flex items-center justify-center gap-2 py-2 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all relative z-10
                             ${activeTab === 'pinned' ? 'text-white' : 'text-white/40 hover:text-white/60'}
@@ -119,6 +128,7 @@ export function GlobalWorkspaceRail() {
                     </button>
                     <button
                         onClick={() => setActiveTab('memory')}
+                        aria-label="View key points"
                         className={`
                             flex-1 flex items-center justify-center gap-2 py-2 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all relative z-10
                             ${activeTab === 'memory' ? 'text-white' : 'text-white/40 hover:text-white/60'}
@@ -139,63 +149,72 @@ export function GlobalWorkspaceRail() {
 
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-3 no-scrollbar">
-                <AnimatePresence mode="popLayout">
-                    {activeTab === 'pinned' ? (
-                        pins && pins.length > 0 ? (
-                            pins.map((pin) => (
-                                <ItemCard
-                                    key={pin._id}
-                                    id={pin._id}
-                                    type={pin.type}
-                                    title={pin.title}
-                                    content={pin.content}
-                                    createdAt={pin.createdAt}
-                                    onRemove={removePin}
-                                    isPinned
-                                    compact
-                                />
-                            ))
+                {isLoading ? (
+                    /* CR #9 — show loading skeleton, not empty state */
+                    <div className="flex flex-col gap-3 opacity-40 animate-pulse py-8">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="h-20 rounded-2xl bg-white/5 border border-white/5" />
+                        ))}
+                    </div>
+                ) : (
+                    <AnimatePresence mode="popLayout">
+                        {activeTab === 'pinned' ? (
+                            pins.length > 0 ? (
+                                pins.map((pin) => (
+                                    <ItemCard
+                                        key={pin._id}
+                                        id={pin._id}
+                                        type={pin.type}
+                                        title={pin.title}
+                                        content={pin.content}
+                                        createdAt={pin.createdAt}
+                                        onRemove={removePin}
+                                        isPinned
+                                        compact
+                                    />
+                                ))
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-20 px-8 text-center opacity-40">
+                                    <PushPin size={32} weight="duotone" className="mb-4" />
+                                    <p className="text-xs font-semibold uppercase tracking-widest">No Active Pins</p>
+                                    <p className="text-[10px] mt-2 leading-relaxed">Pin key facts from any chat to keep them in focus here.</p>
+                                </div>
+                            )
                         ) : (
-                            <div className="flex flex-col items-center justify-center py-20 px-8 text-center opacity-40">
-                                <PushPin size={32} weight="duotone" className="mb-4" />
-                                <p className="text-xs font-semibold uppercase tracking-widest">No Active Pins</p>
-                                <p className="text-[10px] mt-2 leading-relaxed">Pin key facts from any chat to keep them in focus here.</p>
-                            </div>
-                        )
-                    ) : (
-                        keyPoints.length > 0 ? (
-                            keyPoints.map((item) => (
-                                <ItemCard
-                                    key={item._id}
-                                    id={item._id}
-                                    type={item.type}
-                                    title={item.title}
-                                    content={item.content}
-                                    createdAt={item.createdAt}
-                                    onRemove={removeMemory}
-                                    compact
-                                />
-                            ))
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-20 px-8 text-center opacity-40">
-                                <Notebook size={32} weight="duotone" className="mb-4" />
-                                <p className="text-xs font-semibold uppercase tracking-widest">Workspace Empty</p>
-                                <p className="text-[10px] mt-2 leading-relaxed">Strategic insights saved to your case will appear here.</p>
-                            </div>
-                        )
-                    )}
-                </AnimatePresence>
+                            keyPoints.length > 0 ? (
+                                keyPoints.map((item) => (
+                                    <ItemCard
+                                        key={item._id}
+                                        id={item._id}
+                                        type={item.type}
+                                        title={item.title}
+                                        content={item.content}
+                                        createdAt={item.createdAt}
+                                        onRemove={removeMemory}
+                                        compact
+                                    />
+                                ))
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-20 px-8 text-center opacity-40">
+                                    <Notebook size={32} weight="duotone" className="mb-4" />
+                                    <p className="text-xs font-semibold uppercase tracking-widest">Workspace Empty</p>
+                                    <p className="text-[10px] mt-2 leading-relaxed">Strategic insights saved to your case will appear here.</p>
+                                </div>
+                            )
+                        )}
+                    </AnimatePresence>
+                )}
             </div>
 
-            {/* Footer / Quick Actions */}
+            {/* Footer — CR #10: Wire to real timeline route */}
             <div className="px-6 py-4 border-t border-white/5 bg-white/[0.02]">
-                <button
-                    onClick={() => {}} // TODO: Global search toggle
-                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/5 border border-white/5 text-[11px] font-bold uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all"
+                <Link
+                    href="/chat/timeline"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/5 border border-white/5 text-[11px] font-bold uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all no-underline"
                 >
                     <ListBullets size={16} />
                     View Timeline
-                </button>
+                </Link>
             </div>
         </motion.aside>
     );

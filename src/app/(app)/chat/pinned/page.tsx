@@ -1,7 +1,7 @@
 'use client';
 
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
-import { PushPin, Notebook } from '@phosphor-icons/react';
+import { PushPin } from '@phosphor-icons/react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ItemCard } from '@/components/workspace/ItemCard';
 import { EmptyState } from '@/components/workspace/EmptyState';

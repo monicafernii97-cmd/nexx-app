@@ -2,7 +2,6 @@
 
 import { motion } from 'framer-motion';
 import { 
-    X, 
     Calendar, 
     PushPin, 
     Notebook, 
@@ -61,6 +60,7 @@ interface ItemCardProps {
     title: string;
     content: string;
     createdAt: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Convex IDs are branded strings; callers pass Id<T> which extends string
     onRemove: (id: any) => Promise<void>;
     isPinned?: boolean;
     compact?: boolean;

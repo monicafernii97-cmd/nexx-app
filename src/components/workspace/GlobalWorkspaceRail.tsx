@@ -84,10 +84,11 @@ export function GlobalWorkspaceRail() {
         );
     }
 
-    // -------------------------------------------------------------------------
-    // Loading state check (CR #9)
-    // -------------------------------------------------------------------------
-    const isLoading = pins === undefined || memory === undefined;
+    // Per-pane loading — each tab can render as soon as its data resolves
+    const isLoading =
+        activeTab === 'pinned'
+            ? pins === undefined
+            : memory === undefined;
 
     // -------------------------------------------------------------------------
     // Expanded State
@@ -171,8 +172,14 @@ export function GlobalWorkspaceRail() {
                 </div>
             </div>
 
-            {/* Content Area */}
-            <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-3 no-scrollbar">
+            {/* Content Area — tabpanel for ARIA wiring */}
+            <div
+                id={activeTab === 'pinned' ? 'workspace-panel-pinned' : 'workspace-panel-memory'}
+                role="tabpanel"
+                aria-labelledby={activeTab === 'pinned' ? 'workspace-tab-pinned' : 'workspace-tab-memory'}
+                tabIndex={0}
+                className="flex-1 overflow-y-auto px-4 pb-6 space-y-3 no-scrollbar"
+            >
                 {isLoading ? (
                     /* CR #9 — show loading skeleton, not empty state */
                     <div className="flex flex-col gap-3 opacity-40 animate-pulse py-8">
@@ -183,7 +190,7 @@ export function GlobalWorkspaceRail() {
                 ) : (
                     <AnimatePresence mode="popLayout">
                         {activeTab === 'pinned' ? (
-                            pins.length > 0 ? (
+                            pins && pins.length > 0 ? (
                                 pins.map((pin) => (
                                     <ItemCard
                                         key={pin._id}

@@ -88,6 +88,7 @@ export default function TimelineExplorer() {
                     <input
                         type="text"
                         placeholder="Search events..."
+                        aria-label="Search timeline events"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-[14px] text-white placeholder:text-white/25 focus:outline-none focus:ring-2 focus:ring-[var(--emerald)]/50 focus:border-[var(--emerald)]/50 transition-all"
@@ -176,8 +177,8 @@ export default function TimelineExplorer() {
                                             {event.status === 'candidate' && (
                                                 <button
                                                     onClick={() => handleConfirm(event._id)}
-                                                    disabled={confirmingId === event._id}
-                                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--emerald)]/20 text-[var(--emerald)] border border-[var(--emerald)]/30 text-xs font-bold uppercase tracking-widest hover:bg-[var(--emerald)] transition-all hover:text-white ${confirmingId === event._id ? 'opacity-50 cursor-wait' : ''}`}
+                                                    disabled={confirmingId !== null}
+                                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--emerald)]/20 text-[var(--emerald)] border border-[var(--emerald)]/30 text-xs font-bold uppercase tracking-widest hover:bg-[var(--emerald)] transition-all hover:text-white ${confirmingId !== null ? 'opacity-50 cursor-wait' : ''}`}
                                                 >
                                                     <Check size={14} weight="bold" /> {confirmingId === event._id ? 'Confirming...' : 'Confirm'}
                                                 </button>

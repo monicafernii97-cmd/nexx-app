@@ -3,7 +3,7 @@ import { mutation, query } from './_generated/server';
 import { getAuthenticatedUser } from './lib/auth';
 
 /**
- * Pinnable type validator (must match `PinnableClass` in `src/lib/ui-intelligence/types.ts`).
+ * Pinnable type validator (must match `PinnableType` in `src/lib/integration/types.ts`).
  *
  * Intentionally duplicated: Convex validators run on the server and cannot import
  * TypeScript types from the Next.js app. Keep both lists in sync manually.

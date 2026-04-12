@@ -134,19 +134,25 @@ function ToastItem({
                         {toast.description}
                     </p>
                 )}
-                {toast.destination && (
-                    <a
-                        href={toast.destination.href}
-                        className={`
-                            inline-flex items-center gap-1 mt-1.5
-                            text-xs font-medium ${style.accent}
-                            hover:underline transition-colors
-                        `}
-                    >
-                        {toast.destination.label}
-                        <ArrowRight size={12} weight="bold" />
-                    </a>
-                )}
+                {(() => {
+                    const safeDestination =
+                        toast.destination && /^\/(?!\/)/.test(toast.destination.href)
+                            ? toast.destination
+                            : undefined;
+                    return safeDestination ? (
+                        <a
+                            href={safeDestination.href}
+                            className={`
+                                inline-flex items-center gap-1 mt-1.5
+                                text-xs font-medium ${style.accent}
+                                hover:underline transition-colors
+                            `}
+                        >
+                            {safeDestination.label}
+                            <ArrowRight size={12} weight="bold" />
+                        </a>
+                    ) : null;
+                })()}
             </div>
 
             {/* Dismiss */}
@@ -169,9 +175,14 @@ function ToastItem({
 /** Wrap your app with ToastProvider to enable the toast system. */
 export function ToastProvider({ children }: { children: ReactNode }) {
     const [toasts, setToasts] = useState<ToastConfig[]>([]);
-    const timeoutIdsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+    const timeoutIdsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
     const dismissToast = useCallback((id: string) => {
+        const timeoutId = timeoutIdsRef.current.get(id);
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutIdsRef.current.delete(id);
+        }
         setToasts((prev) => prev.filter((t) => t.id !== id));
     }, []);
 
@@ -185,10 +196,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             const duration = config.duration ?? 4000;
             if (duration > 0) {
                 const timeoutId = setTimeout(() => {
-                    timeoutIdsRef.current.delete(timeoutId);
+                    timeoutIdsRef.current.delete(id);
                     dismissToast(id);
                 }, duration);
-                timeoutIdsRef.current.add(timeoutId);
+                timeoutIdsRef.current.set(id, timeoutId);
             }
 
             return id;
@@ -200,7 +211,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const timeoutIds = timeoutIdsRef.current;
         return () => {
-            timeoutIds.forEach((id) => clearTimeout(id));
+            timeoutIds.forEach((timerId) => clearTimeout(timerId));
             timeoutIds.clear();
         };
     }, []);

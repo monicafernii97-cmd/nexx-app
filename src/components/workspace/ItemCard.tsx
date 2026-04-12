@@ -54,14 +54,13 @@ const TYPE_CONFIGS: Record<string, TypeConfig> = {
 // Props
 // ---------------------------------------------------------------------------
 
-interface ItemCardProps {
-    id: string;
+interface ItemCardProps<TId extends string = string> {
+    id: TId;
     type: ItemType;
     title: string;
     content: string;
     createdAt: number;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Convex IDs are branded strings; callers pass Id<T> which extends string
-    onRemove: (id: any) => Promise<void>;
+    onRemove: (id: TId) => Promise<void>;
     isPinned?: boolean;
     compact?: boolean;
 }
@@ -73,8 +72,9 @@ interface ItemCardProps {
 /**
  * Shared ItemCard for workspace items (Memory, Pins, Timeline).
  * Uses ethereal design patterns with type-aware accents.
+ * Generic over `TId` to preserve Convex branded ID types through `onRemove`.
  */
-export function ItemCard({
+export function ItemCard<TId extends string>({
     id,
     type,
     title,
@@ -83,7 +83,7 @@ export function ItemCard({
     onRemove,
     isPinned = false,
     compact = false,
-}: ItemCardProps) {
+}: ItemCardProps<TId>) {
     const config = TYPE_CONFIGS[type] || { label: type, color: 'accent-platinum', icon: Notebook };
     const Icon = config.icon;
     const accentColor = `var(--${config.color})`;

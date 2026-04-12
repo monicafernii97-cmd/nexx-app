@@ -295,13 +295,11 @@ export async function POST(req: NextRequest) {
 
     if (toolPlan.useFileSearch && existingVectorStoreId) {
       // Build metadata filters from case context (Backend Gap #4)
+      // Filter keys must match VectorStoreFilter fields stored during upload
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fileSearchFilters: Record<string, any> = {};
       if (contextPacket.userProfile?.state) {
         fileSearchFilters.jurisdiction = contextPacket.userProfile.state;
-      }
-      if (contextPacket.userProfile?.county) {
-        fileSearchFilters.county = contextPacket.userProfile.county;
       }
 
       tools.push({

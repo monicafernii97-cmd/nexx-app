@@ -54,9 +54,9 @@ const navItems: NavItem[] = [
         href: '/chat',
         icon: ChatCircleText,
         children: [
-            { label: 'Key Points', href: '/chat', icon: Notebook },
-            { label: 'Pinned Items', href: '/chat', icon: PushPin },
-            { label: 'Timeline', href: '/incident-report', icon: CalendarCheck },
+            { label: 'Key Points', href: '/chat/key-points', icon: Notebook },
+            { label: 'Pinned Items', href: '/chat/pinned', icon: PushPin },
+            { label: 'Timeline', href: '/chat/timeline', icon: CalendarCheck },
         ],
     },
     {

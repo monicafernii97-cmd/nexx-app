@@ -44,8 +44,6 @@ const ACTION_TO_SAVE_TYPE: Partial<Record<ActionType, string>> = {
 
 interface WorkspaceClientProps {
     children: (ctx: WorkspaceContext) => ReactNode;
-    /** Current conversation ID for source tracking. */
-    conversationId?: string;
 }
 
 /** Context provided to children for action dispatch. */
@@ -58,7 +56,7 @@ export interface WorkspaceContext {
 }
 
 /** Workspace client orchestrator — renders children with action context. */
-export function WorkspaceClient({ children, conversationId: _conversationId }: WorkspaceClientProps) {
+export function WorkspaceClient({ children }: WorkspaceClientProps) {
     const { showToast } = useToast();
 
     // ── Convex mutations ──

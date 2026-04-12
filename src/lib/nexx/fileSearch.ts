@@ -46,6 +46,13 @@ export async function uploadToVectorStore(
   chunkSize = 800,
   chunkOverlap = 200
 ): Promise<string> {
+  if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
+    throw new Error('chunkSize must be a positive integer');
+  }
+  if (!Number.isInteger(chunkOverlap) || chunkOverlap < 0 || chunkOverlap >= chunkSize) {
+    throw new Error('chunkOverlap must be a non-negative integer smaller than chunkSize');
+  }
+
   // Upload file to OpenAI
   const uploadedFile = await openai.files.create({
     file,

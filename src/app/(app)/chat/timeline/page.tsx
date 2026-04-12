@@ -4,10 +4,12 @@ import { useState, useMemo, useCallback } from 'react';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import { CalendarCheck, MagnifyingGlass, Check, Clock, Tag } from '@phosphor-icons/react';
 import { useWorkspace } from '@/lib/workspace-context';
+import { parseEventDate } from '@/lib/workspace-constants';
 import { EmptyState } from '@/components/workspace/EmptyState';
 import { FilterTabs } from '@/components/workspace/FilterTabs';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
+import type { Id } from '@convex/_generated/dataModel';
 
 const TABS = [
     { id: 'all', label: 'All Events' },
@@ -24,7 +26,7 @@ export default function TimelineExplorer() {
     const { timeline, confirmTimeline } = useWorkspace();
     const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
-    const [confirmingId, setConfirmingId] = useState<string | null>(null);
+    const [confirmingId, setConfirmingId] = useState<Id<'timelineCandidates'> | null>(null);
 
     const filteredEvents = useMemo(() => {
         if (!timeline) return [];
@@ -34,14 +36,8 @@ export default function TimelineExplorer() {
                                  event.description.toLowerCase().includes(searchQuery.toLowerCase());
             return matchesTab && matchesSearch;
         }).sort((a, b) => {
-            // CR #6 — Safe date parsing with NaN guard
-            const parseDate = (d?: string) => {
-                if (!d) return NaN;
-                const t = new Date(d).getTime();
-                return Number.isNaN(t) ? NaN : t;
-            };
-            const dateA = parseDate(a.eventDate) || a.createdAt;
-            const dateB = parseDate(b.eventDate) || b.createdAt;
+            const dateA = parseEventDate(a.eventDate, a.createdAt);
+            const dateB = parseEventDate(b.eventDate, b.createdAt);
             return dateB - dateA;
         });
     }, [timeline, activeTab, searchQuery]);
@@ -54,12 +50,11 @@ export default function TimelineExplorer() {
     }, [timeline]);
 
     // CR #7 — Confirm with pending guard + error handling
-    const handleConfirm = useCallback(async (candidateId: string) => {
+    const handleConfirm = useCallback(async (candidateId: Id<'timelineCandidates'>) => {
         if (confirmingId) return; // prevent double-click
         setConfirmingId(candidateId);
         try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await confirmTimeline(candidateId as any);
+            await confirmTimeline(candidateId);
         } catch (err) {
             console.error('Failed to confirm timeline event:', err);
         } finally {

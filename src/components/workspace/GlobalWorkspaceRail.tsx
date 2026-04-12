@@ -11,6 +11,7 @@ import {
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { useWorkspace } from '@/lib/workspace-context';
+import { RAIL_KEY_POINT_TYPES } from '@/lib/workspace-constants';
 import { ItemCard } from './ItemCard';
 
 /**
@@ -27,9 +28,9 @@ export function GlobalWorkspaceRail() {
     const [isExpanded, setIsExpanded] = useState(true);
     const [activeTab, setActiveTab] = useState<'pinned' | 'memory'>('pinned');
 
-    // Filter memory to "Key Points" (Facts, Strategy, Risks) for the rail rollup
+    // Filter memory to key-point types for the rail rollup — uses shared constant
     const keyPoints = memory?.filter(m => 
-        ['key_fact', 'strategy_point', 'risk_concern', 'strength_highlight'].includes(m.type)
+        RAIL_KEY_POINT_TYPES.includes(m.type as typeof RAIL_KEY_POINT_TYPES[number])
     ) || [];
 
     // -------------------------------------------------------------------------

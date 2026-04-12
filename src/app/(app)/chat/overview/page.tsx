@@ -3,6 +3,7 @@
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import { SquaresFour, Notebook, PushPin, CalendarCheck, ArrowRight, Clock, Plus } from '@phosphor-icons/react';
 import { useWorkspace } from '@/lib/workspace-context';
+import { parseEventDate } from '@/lib/workspace-constants';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { ItemCard } from '@/components/workspace/ItemCard';
@@ -16,11 +17,11 @@ export default function WorkspaceOverview() {
 
     const recentPins = pins?.slice(0, 2) || [];
     const recentMemory = memory?.slice(0, 2) || [];
-    // CR #4 — Sort by eventDate/createdAt before slicing to match the Timeline Explorer
+    // CR #4 — Sort by eventDate/createdAt (NaN-safe) before slicing
     const recentTimeline = [...(timeline || [])]
         .sort((a, b) => {
-            const dateA = a.eventDate ? new Date(a.eventDate).getTime() : a.createdAt;
-            const dateB = b.eventDate ? new Date(b.eventDate).getTime() : b.createdAt;
+            const dateA = parseEventDate(a.eventDate, a.createdAt);
+            const dateB = parseEventDate(b.eventDate, b.createdAt);
             return dateB - dateA;
         })
         .slice(0, 2);

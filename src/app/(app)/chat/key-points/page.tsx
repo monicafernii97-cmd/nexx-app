@@ -2,31 +2,16 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
-import { Notebook, MagnifyingGlass } from '@phosphor-icons/react';
+import { Notebook, MagnifyingGlass, Funnel } from '@phosphor-icons/react';
 import { useWorkspace } from '@/lib/workspace-context';
+import { ALL_SAVE_TYPE_TABS } from '@/lib/workspace-constants';
 import { ItemCard } from '@/components/workspace/ItemCard';
 import { EmptyState } from '@/components/workspace/EmptyState';
 import { FilterTabs } from '@/components/workspace/FilterTabs';
 
 /**
- * CR #1 — Only include tabs that map to real memory types.
- * The `caseMemory` table contains ALL 12 SaveType values, so all tabs
- * will find matching items provided the user has saved that type.
- */
-const TABS = [
-    { id: 'all', label: 'All Points' },
-    { id: 'key_fact', label: 'Facts' },
-    { id: 'strategy_point', label: 'Strategy' },
-    { id: 'risk_concern', label: 'Risks' },
-    { id: 'strength_highlight', label: 'Strengths' },
-    { id: 'good_faith_point', label: 'Good Faith' },
-    { id: 'draft_snippet', label: 'Drafts' },
-    { id: 'case_note', label: 'Notes' },
-];
-
-/**
  * Key Points Page — Centralized explorer for all saved case insights.
- * Features type filtering, search, and bulk management.
+ * Features full 12-type filtering, search, and bulk management.
  */
 export default function KeyPointsPage() {
     const { memory, removeMemory, pins } = useWorkspace();
@@ -45,7 +30,7 @@ export default function KeyPointsPage() {
     }, [memory, activeTab, searchQuery]);
 
     const tabConfigs = useMemo(() => {
-        return TABS.map(tab => ({
+        return ALL_SAVE_TYPE_TABS.map(tab => ({
             ...tab,
             count: tab.id === 'all' ? memory?.length : memory?.filter(m => m.type === tab.id).length
         }));
@@ -56,6 +41,10 @@ export default function KeyPointsPage() {
         setSearchQuery('');
         setActiveTab('all');
     }, []);
+
+    // CR #5 — Distinguish truly-empty workspace from empty tab/search filter
+    const hasAnyMemory = (memory?.length ?? 0) > 0;
+    const isFilterMiss = hasAnyMemory && filteredItems.length === 0;
 
     return (
         <PageContainer>
@@ -93,14 +82,23 @@ export default function KeyPointsPage() {
                         <div key={i} className="h-48 glass-ethereal rounded-2xl border border-white/10" />
                     ))}
                 </div>
-            ) : filteredItems.length === 0 ? (
+            ) : !hasAnyMemory ? (
+                /* Truly empty — no data at all */
                 <EmptyState
-                    icon={searchQuery ? MagnifyingGlass : Notebook}
-                    title={searchQuery ? "No Matches Found" : "Workspace Empty"}
-                    description={searchQuery ? "Try refining your search terms or clearing filters." : "You haven't saved any key points yet. Insights from AI sessions will appear here."}
-                    actionLabel={searchQuery ? "Clear Search" : "Start New Chat"}
-                    actionHref={searchQuery ? undefined : "/chat"}
-                    onAction={searchQuery ? handleClearSearch : undefined}
+                    icon={Notebook}
+                    title="Workspace Empty"
+                    description="You haven't saved any key points yet. Insights from AI sessions will appear here."
+                    actionLabel="Start New Chat"
+                    actionHref="/chat"
+                />
+            ) : isFilterMiss ? (
+                /* Has data but current filter/search yields nothing */
+                <EmptyState
+                    icon={searchQuery ? MagnifyingGlass : Funnel}
+                    title={searchQuery ? "No Matches Found" : "No Items in This Category"}
+                    description={searchQuery ? "Try refining your search terms or clearing filters." : "None of your saved points match this filter. Try another category or view all."}
+                    actionLabel="Clear Filters"
+                    onAction={handleClearSearch}
                 />
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">

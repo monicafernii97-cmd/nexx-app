@@ -9,6 +9,8 @@
  */
 
 import type * as caseGraphs from "../caseGraphs.js";
+import type * as caseMemory from "../caseMemory.js";
+import type * as casePins from "../casePins.js";
 import type * as conversationSummaries from "../conversationSummaries.js";
 import type * as conversations from "../conversations.js";
 import type * as courtSettings from "../courtSettings.js";
@@ -23,6 +25,7 @@ import type * as nexProfiles from "../nexProfiles.js";
 import type * as resourcesCache from "../resourcesCache.js";
 import type * as retrievedSources from "../retrievedSources.js";
 import type * as stripe from "../stripe.js";
+import type * as timelineCandidates from "../timelineCandidates.js";
 import type * as toolRuns from "../toolRuns.js";
 import type * as uploadedFiles from "../uploadedFiles.js";
 import type * as userStyleProfiles from "../userStyleProfiles.js";
@@ -36,6 +39,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   caseGraphs: typeof caseGraphs;
+  caseMemory: typeof caseMemory;
+  casePins: typeof casePins;
   conversationSummaries: typeof conversationSummaries;
   conversations: typeof conversations;
   courtSettings: typeof courtSettings;
@@ -50,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   resourcesCache: typeof resourcesCache;
   retrievedSources: typeof retrievedSources;
   stripe: typeof stripe;
+  timelineCandidates: typeof timelineCandidates;
   toolRuns: typeof toolRuns;
   uploadedFiles: typeof uploadedFiles;
   userStyleProfiles: typeof userStyleProfiles;

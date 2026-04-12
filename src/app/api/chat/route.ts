@@ -294,9 +294,22 @@ export async function POST(req: NextRequest) {
     const tools: any[] = [...NEXX_FUNCTION_TOOLS];
 
     if (toolPlan.useFileSearch && existingVectorStoreId) {
+      // Build metadata filters from case context (Backend Gap #4)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fileSearchFilters: Record<string, any> = {};
+      if (contextPacket.userProfile?.state) {
+        fileSearchFilters.jurisdiction = contextPacket.userProfile.state;
+      }
+      if (contextPacket.userProfile?.county) {
+        fileSearchFilters.county = contextPacket.userProfile.county;
+      }
+
       tools.push({
         type: 'file_search',
         vector_store_ids: [existingVectorStoreId],
+        ...(Object.keys(fileSearchFilters).length > 0
+          ? { filters: fileSearchFilters }
+          : {}),
       });
     }
 

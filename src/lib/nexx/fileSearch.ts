@@ -61,18 +61,28 @@ export async function uploadToVectorStore(
 
   // Attach to vector store with custom chunking + metadata
   // Legal documents benefit from smaller chunks (~800 tokens) vs default (4096)
-  await openai.vectorStores.files.createAndPoll(vectorStoreId, {
-    file_id: uploadedFile.id,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ...(metadata ? { metadata: metadata as any } : {}),
-    chunking_strategy: {
-      type: 'static',
-      static: {
-        max_chunk_size_tokens: chunkSize,
-        chunk_overlap_tokens: chunkOverlap,
+  try {
+    await openai.vectorStores.files.createAndPoll(vectorStoreId, {
+      file_id: uploadedFile.id,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ...(metadata ? { metadata: metadata as any } : {}),
+      chunking_strategy: {
+        type: 'static',
+        static: {
+          max_chunk_size_tokens: chunkSize,
+          chunk_overlap_tokens: chunkOverlap,
+        },
       },
-    },
-  });
+    });
+  } catch (attachError) {
+    // Clean up orphaned file to prevent storage leaks
+    try {
+      await openai.files.delete(uploadedFile.id);
+    } catch {
+      console.warn('[FileSearch] Failed to clean up orphaned file:', uploadedFile.id);
+    }
+    throw attachError;
+  }
 
   return uploadedFile.id;
 }

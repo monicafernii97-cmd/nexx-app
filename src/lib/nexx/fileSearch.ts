@@ -31,25 +31,58 @@ export async function deleteVectorStore(vectorStoreId: string): Promise<void> {
 
 /**
  * Upload a file to OpenAI and attach it to a vector store.
- * Returns the OpenAI file ID.
+ *
+ * @param vectorStoreId - Target vector store ID.
+ * @param file - File to upload.
+ * @param metadata - Optional metadata filters (caseId, docType, jurisdiction).
+ * @param chunkSize - Max chunk size in tokens (default: 800 for legal docs).
+ * @param chunkOverlap - Token overlap between chunks (default: 200).
+ * @returns The OpenAI file ID.
  */
 export async function uploadToVectorStore(
   vectorStoreId: string,
   file: File,
-  metadata?: VectorStoreFilter
+  metadata?: VectorStoreFilter,
+  chunkSize = 800,
+  chunkOverlap = 200
 ): Promise<string> {
+  if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
+    throw new Error('chunkSize must be a positive integer');
+  }
+  if (!Number.isInteger(chunkOverlap) || chunkOverlap < 0 || chunkOverlap >= chunkSize) {
+    throw new Error('chunkOverlap must be a non-negative integer smaller than chunkSize');
+  }
+
   // Upload file to OpenAI
   const uploadedFile = await openai.files.create({
     file,
     purpose: 'assistants',
   });
 
-  // Attach to vector store with metadata — wait until indexing is complete
-  await openai.vectorStores.files.createAndPoll(vectorStoreId, {
-    file_id: uploadedFile.id,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ...(metadata ? { metadata: metadata as any } : {}),
-  });
+  // Attach to vector store with custom chunking + metadata
+  // Legal documents benefit from smaller chunks (~800 tokens) vs default (4096)
+  try {
+    await openai.vectorStores.files.createAndPoll(vectorStoreId, {
+      file_id: uploadedFile.id,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ...(metadata ? { metadata: metadata as any } : {}),
+      chunking_strategy: {
+        type: 'static',
+        static: {
+          max_chunk_size_tokens: chunkSize,
+          chunk_overlap_tokens: chunkOverlap,
+        },
+      },
+    });
+  } catch (attachError) {
+    // Clean up orphaned file to prevent storage leaks
+    try {
+      await openai.files.delete(uploadedFile.id);
+    } catch {
+      console.warn('[FileSearch] Failed to clean up orphaned file:', uploadedFile.id);
+    }
+    throw attachError;
+  }
 
   return uploadedFile.id;
 }

@@ -21,6 +21,9 @@ import {
     FileArrowUp,
     Crown,
     Question,
+    PushPin,
+    Notebook,
+    CalendarCheck,
     IconWeight,
 } from '@phosphor-icons/react';
 import { useState, useMemo, useCallback, type ComponentType, type CSSProperties } from 'react';
@@ -43,10 +46,19 @@ interface NavItem {
     children?: NavChild[];
 }
 
-/** Ordered list of sidebar navigation items with DocuVault sub-routes. */
+/** Ordered list of sidebar navigation items with expandable sub-routes. */
 const navItems: NavItem[] = [
     { label: 'Dashboard', href: '/dashboard', icon: SquaresFour },
-    { label: 'Chat', href: '/chat', icon: ChatCircleText },
+    {
+        label: 'Chat',
+        href: '/chat',
+        icon: ChatCircleText,
+        children: [
+            { label: 'Key Points', href: '/chat/key-points', icon: Notebook },
+            { label: 'Pinned Items', href: '/chat/pinned', icon: PushPin },
+            { label: 'Timeline', href: '/chat/timeline', icon: CalendarCheck },
+        ],
+    },
     {
         label: 'DocuVault',
         href: '/docuvault',

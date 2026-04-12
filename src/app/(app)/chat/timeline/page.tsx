@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
-import { CalendarCheck, MagnifyingGlass, Check, Clock, Tag } from '@phosphor-icons/react';
+import { CalendarCheck, MagnifyingGlass, Check, Clock, Tag, Funnel } from '@phosphor-icons/react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { parseEventDate } from '@/lib/workspace-constants';
 import { EmptyState } from '@/components/workspace/EmptyState';
@@ -103,13 +103,23 @@ export default function TimelineExplorer() {
                         </div>
                     ))}
                 </div>
-            ) : filteredEvents.length === 0 ? (
+            ) : filteredEvents.length === 0 && (timeline?.length ?? 0) === 0 ? (
+                /* Truly empty — no timeline data at all */
                 <EmptyState
                     icon={CalendarCheck}
-                    title={searchQuery ? "No Events Found" : "Timeline Empty"}
-                    description={searchQuery ? "Try searching for a different date or keyword." : "You haven't extracted any timeline events yet. Ask NEXX during chat to 'Add this to my timeline'."}
+                    title="Timeline Empty"
+                    description="You haven't extracted any timeline events yet. Ask NEXX during chat to 'Add this to my timeline'."
                     actionLabel="Go to Chat"
                     actionHref="/chat"
+                />
+            ) : filteredEvents.length === 0 ? (
+                /* Has data but current filter/search yields nothing */
+                <EmptyState
+                    icon={searchQuery ? MagnifyingGlass : Funnel}
+                    title={searchQuery ? "No Events Found" : "No Events Match This Filter"}
+                    description={searchQuery ? "Try searching for a different date or keyword." : "None of your timeline events match the selected status. Try another tab or view all."}
+                    actionLabel="Clear Filters"
+                    onAction={() => { setSearchQuery(''); setActiveTab('all'); }}
                 />
             ) : (
                 <div className="max-w-4xl mx-auto relative px-4 sm:px-8">

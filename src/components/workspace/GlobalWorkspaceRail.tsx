@@ -115,10 +115,28 @@ export function GlobalWorkspaceRail() {
 
             {/* Tab Selection */}
             <div className="px-6 mb-4">
-                <div className="flex items-center p-1 bg-black/20 rounded-xl border border-white/5 relative">
+                <div
+                    role="tablist"
+                    aria-label="Workspace views"
+                    className="flex items-center p-1 bg-black/20 rounded-xl border border-white/5 relative"
+                    onKeyDown={(e) => {
+                        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                            e.preventDefault();
+                            setActiveTab(activeTab === 'pinned' ? 'memory' : 'pinned');
+                            // Move focus to the newly activated tab
+                            const next = e.currentTarget.querySelector<HTMLButtonElement>(`[aria-selected="false"]`);
+                            next?.focus();
+                        }
+                    }}
+                >
                     <button
+                        role="tab"
+                        aria-selected={activeTab === 'pinned'}
+                        tabIndex={activeTab === 'pinned' ? 0 : -1}
                         onClick={() => setActiveTab('pinned')}
                         aria-label="View pinned items"
+                        id="workspace-tab-pinned"
+                        aria-controls="workspace-panel-pinned"
                         className={`
                             flex-1 flex items-center justify-center gap-2 py-2 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all relative z-10
                             ${activeTab === 'pinned' ? 'text-white' : 'text-white/40 hover:text-white/60'}
@@ -128,8 +146,13 @@ export function GlobalWorkspaceRail() {
                         Pinned
                     </button>
                     <button
+                        role="tab"
+                        aria-selected={activeTab === 'memory'}
+                        tabIndex={activeTab === 'memory' ? 0 : -1}
                         onClick={() => setActiveTab('memory')}
                         aria-label="View key points"
+                        id="workspace-tab-memory"
+                        aria-controls="workspace-panel-memory"
                         className={`
                             flex-1 flex items-center justify-center gap-2 py-2 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all relative z-10
                             ${activeTab === 'memory' ? 'text-white' : 'text-white/40 hover:text-white/60'}

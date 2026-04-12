@@ -4,7 +4,8 @@ import { useState, useMemo, useCallback } from 'react';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import { CalendarCheck, MagnifyingGlass, Check, Clock, Tag, Funnel } from '@phosphor-icons/react';
 import { useWorkspace } from '@/lib/workspace-context';
-import { parseEventDate } from '@/lib/workspace-constants';
+import { parseEventDate, safeEventDate } from '@/lib/workspace-constants';
+import { useToast } from '@/components/feedback/ToastProvider';
 import { EmptyState } from '@/components/workspace/EmptyState';
 import { FilterTabs } from '@/components/workspace/FilterTabs';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -24,6 +25,7 @@ const TABS = [
  */
 export default function TimelineExplorer() {
     const { timeline, confirmTimeline } = useWorkspace();
+    const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [confirmingId, setConfirmingId] = useState<Id<'timelineCandidates'> | null>(null);
@@ -51,16 +53,17 @@ export default function TimelineExplorer() {
 
     // CR #7 — Confirm with pending guard + error handling
     const handleConfirm = useCallback(async (candidateId: Id<'timelineCandidates'>) => {
-        if (confirmingId) return; // prevent double-click
+        if (confirmingId) return;
         setConfirmingId(candidateId);
         try {
             await confirmTimeline(candidateId);
-        } catch (err) {
-            console.error('Failed to confirm timeline event:', err);
+            showToast({ title: 'Event Confirmed', description: 'Timeline entry has been verified.', variant: 'success' });
+        } catch {
+            showToast({ title: 'Confirmation Failed', description: 'Could not confirm this event. Please try again.', variant: 'error' });
         } finally {
             setConfirmingId(null);
         }
-    }, [confirmingId, confirmTimeline]);
+    }, [confirmingId, confirmTimeline, showToast]);
 
     return (
         <PageContainer>
@@ -128,7 +131,10 @@ export default function TimelineExplorer() {
 
                     <div className="space-y-12">
                         <AnimatePresence mode="popLayout">
-                            {filteredEvents.map((event, i) => (
+                            {filteredEvents.map((event, i) => {
+                                // Validate eventDate once for safe formatting
+                                const displayDate = safeEventDate(event.eventDate);
+                                return (
                                 <motion.div
                                     key={event._id}
                                     layout
@@ -147,7 +153,7 @@ export default function TimelineExplorer() {
                                         `} />
                                         <div className="mt-4 flex flex-col items-center">
                                             <span className="text-[10px] font-bold text-white/40 uppercase vertical-text">
-                                                {event.eventDate ? format(new Date(event.eventDate), 'yyyy') : 'Pending'}
+                                                {displayDate ? format(displayDate, 'yyyy') : 'Pending'}
                                             </span>
                                         </div>
                                     </div>
@@ -158,7 +164,7 @@ export default function TimelineExplorer() {
                                             <div>
                                                 <div className="flex items-center gap-3 mb-2">
                                                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--emerald)]">
-                                                        {event.eventDate ? format(new Date(event.eventDate), 'MMMM d, yyyy') : 'Date to be verified'}
+                                                        {displayDate ? format(displayDate, 'MMMM d, yyyy') : 'Date to be verified'}
                                                     </span>
                                                     {event.status === 'candidate' && (
                                                         <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 text-[9px] font-bold uppercase border border-amber-500/20">Candidate</span>
@@ -201,7 +207,8 @@ export default function TimelineExplorer() {
                                         </div>
                                     </div>
                                 </motion.div>
-                            ))}
+                                );
+                            })}
                         </AnimatePresence>
                     </div>
                 </div>

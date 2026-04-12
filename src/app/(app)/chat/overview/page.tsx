@@ -15,8 +15,12 @@ import { ItemCard } from '@/components/workspace/ItemCard';
 export default function WorkspaceOverview() {
     const { pins, memory, timeline, counts, removePin, removeMemory } = useWorkspace();
 
-    const recentPins = pins?.slice(0, 2) || [];
-    const recentMemory = memory?.slice(0, 2) || [];
+    const recentPins = [...(pins ?? [])]
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(0, 2);
+    const recentMemory = [...(memory ?? [])]
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(0, 2);
     // CR #4 — Sort by eventDate/createdAt (NaN-safe) before slicing
     const recentTimeline = [...(timeline || [])]
         .sort((a, b) => {

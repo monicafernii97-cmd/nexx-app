@@ -52,3 +52,10 @@ export function parseEventDate(dateStr?: string, fallback?: number): number {
     const t = new Date(dateStr).getTime();
     return Number.isNaN(t) ? (fallback ?? 0) : t;
 }
+
+/** Parse an optional date string into a validated Date for display, or null. */
+export function safeEventDate(dateStr?: string): Date | null {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    return Number.isNaN(d.getTime()) ? null : d;
+}

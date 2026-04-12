@@ -1,42 +1,140 @@
 'use client';
 
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-    PushPin, 
-    Notebook, 
-    CaretRight, 
+import { useMemo } from 'react';
+import { motion } from 'framer-motion';
+import {
+    CheckCircle,
+    WarningCircle,
+    Clock,
+    Lightning,
+    FileText,
+    CalendarCheck,
+    ChartBar,
+    ArrowRight,
+    CaretRight,
     CaretLeft,
-    ListBullets,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { useWorkspace } from '@/lib/workspace-context';
-import { RAIL_KEY_POINT_TYPES } from '@/lib/workspace-constants';
-import { ItemCard } from './ItemCard';
+import { useState } from 'react';
+
+// ---------------------------------------------------------------------------
+// Readiness scoring — how "court-ready" is the user's workspace?
+// ---------------------------------------------------------------------------
+
+type ReadinessLevel = 'strong' | 'partial' | 'missing';
+
+interface ReadinessItem {
+    label: string;
+    level: ReadinessLevel;
+    detail: string;
+    icon: typeof CheckCircle;
+}
+
+function getReadinessLevel(count: number, threshold: number): ReadinessLevel {
+    if (count >= threshold) return 'strong';
+    if (count > 0) return 'partial';
+    return 'missing';
+}
+
+const LEVEL_STYLES: Record<ReadinessLevel, { dot: string; text: string; bg: string }> = {
+    strong: {
+        dot: 'bg-[var(--accent-emerald)]',
+        text: 'text-[var(--accent-emerald)]',
+        bg: 'bg-[var(--accent-emerald)]/10 border-[var(--accent-emerald)]/20',
+    },
+    partial: {
+        dot: 'bg-amber-400',
+        text: 'text-amber-400',
+        bg: 'bg-amber-400/10 border-amber-400/20',
+    },
+    missing: {
+        dot: 'bg-white/20',
+        text: 'text-white/30',
+        bg: 'bg-white/5 border-white/10',
+    },
+};
+
+// ---------------------------------------------------------------------------
+// Suggested Actions — contextual CTAs based on workspace state
+// ---------------------------------------------------------------------------
+
+interface SuggestedAction {
+    label: string;
+    href: string;
+    priority: 'high' | 'medium' | 'low';
+}
 
 /**
- * GlobalWorkspaceRail — Persistent right-side workspace companion.
- * 
- * Features:
- * - Tabbed view for Pinned Items and Key Points.
- * - Collapsible to a 48px icon-bar.
- * - Integrated with WorkspaceContext for real-time updates.
- * - Glassmorphic ethereal design matching the app shell.
+ * GlobalWorkspaceRail — The "Insights Rail" (360px sticky right panel).
+ *
+ * Replaces the old Pinned/Points tab switcher with an outcome-oriented
+ * audit panel: Report Readiness, Source Health, and Suggested Actions.
+ *
+ * Visual philosophy: GUIDANCE — not noise. Just readiness, gaps, next steps.
  */
 export function GlobalWorkspaceRail() {
-    const { pins, memory, counts, removePin, removeMemory } = useWorkspace();
+    const { counts, pins, memory, timeline } = useWorkspace();
     const [isExpanded, setIsExpanded] = useState(true);
-    const [activeTab, setActiveTab] = useState<'pinned' | 'memory'>('pinned');
 
-    // Filter memory to key-point types for the rail rollup — uses shared constant
-    const keyPoints = memory?.filter(m => 
-        RAIL_KEY_POINT_TYPES.includes(m.type as typeof RAIL_KEY_POINT_TYPES[number])
-    ) || [];
+    // ── Readiness scoring ──
+    const readiness: ReadinessItem[] = useMemo(() => [
+        {
+            label: 'Key Facts',
+            level: getReadinessLevel(counts.keyFacts, 3),
+            detail: counts.keyFacts === 0 ? 'None captured yet' : `${counts.keyFacts} documented`,
+            icon: FileText,
+        },
+        {
+            label: 'Timeline',
+            level: getReadinessLevel(counts.confirmedTimeline, 3),
+            detail: counts.confirmedTimeline === 0
+                ? 'No confirmed events'
+                : `${counts.confirmedTimeline} confirmed`,
+            icon: CalendarCheck,
+        },
+        {
+            label: 'Patterns',
+            level: getReadinessLevel(0, 1), // Will be dynamic once pattern detection is built
+            detail: 'Requires 3+ repeated events',
+            icon: ChartBar,
+        },
+    ], [counts]);
 
-    // -------------------------------------------------------------------------
-    // Collapsed State
-    // -------------------------------------------------------------------------
+    // ── Source Health ──
+    const totalSources = useMemo(() => {
+        const pinSources = pins?.filter(p => p.sourceMessageId).length ?? 0;
+        const memorySources = memory?.filter(m => m.sourceMessageId).length ?? 0;
+        const timelineSources = timeline?.filter(t => t.sourceMessageId).length ?? 0;
+        return pinSources + memorySources + timelineSources;
+    }, [pins, memory, timeline]);
 
+    const totalItems = counts.pins + counts.memory + counts.timeline;
+    const unlinkedItems = totalItems - totalSources;
+
+    // ── Suggested Actions ──
+    const actions: SuggestedAction[] = useMemo(() => {
+        const result: SuggestedAction[] = [];
+
+        if (counts.keyFacts === 0) {
+            result.push({ label: 'Capture key facts from chat', href: '/chat', priority: 'high' });
+        }
+        if (counts.timeline === 0) {
+            result.push({ label: 'Add timeline events', href: '/chat/timeline', priority: 'high' });
+        } else if (counts.confirmedTimeline < counts.timeline) {
+            result.push({ label: 'Review unconfirmed events', href: '/chat/timeline', priority: 'medium' });
+        }
+        if (counts.risks === 0 && counts.keyFacts > 0) {
+            result.push({ label: 'Identify risk concerns', href: '/chat', priority: 'medium' });
+        }
+        if (result.length === 0) {
+            result.push({ label: 'Generate your case summary', href: '/chat/overview', priority: 'low' });
+        }
+
+        return result.slice(0, 3); // Max 3 actions
+    }, [counts]);
+
+    // ── Collapsed State ──
     if (!isExpanded) {
         return (
             <motion.div
@@ -46,205 +144,156 @@ export function GlobalWorkspaceRail() {
             >
                 <button
                     onClick={() => setIsExpanded(true)}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all group"
-                    aria-label="Expand workspace rail"
-                    title="Expand Workspace"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all group cursor-pointer"
+                    aria-label="Expand insights rail"
+                    title="Expand Insights"
                 >
                     <CaretLeft size={20} weight="bold" className="group-hover:-translate-x-0.5 transition-transform" />
                 </button>
 
-                <div className="flex flex-col gap-4">
-                    <button 
-                        onClick={() => { setIsExpanded(true); setActiveTab('pinned'); }}
-                        aria-label={`Pinned items (${counts.pins})`}
-                        className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition-all ${activeTab === 'pinned' ? 'bg-[var(--accent-icy)]/20 text-[var(--accent-icy)] border border-[var(--accent-icy)]/30' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
-                    >
-                        <PushPin size={20} weight={activeTab === 'pinned' ? 'fill' : 'regular'} />
-                        {counts.pins > 0 && (
-                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-[var(--accent-icy)] text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-[#0A1128]">
-                                {counts.pins}
-                            </span>
-                        )}
-                    </button>
-
-                    <button 
-                        onClick={() => { setIsExpanded(true); setActiveTab('memory'); }}
-                        aria-label={`Key points (${keyPoints.length})`}
-                        className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition-all ${activeTab === 'memory' ? 'bg-[var(--support-violet)]/20 text-[var(--support-violet)] border border-[var(--support-violet)]/30' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
-                    >
-                        <Notebook size={20} weight={activeTab === 'memory' ? 'fill' : 'regular'} />
-                        {keyPoints.length > 0 && (
-                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-[var(--support-violet)] text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-[#0A1128]">
-                                {keyPoints.length}
-                            </span>
-                        )}
-                    </button>
+                {/* Readiness summary icons */}
+                <div className="flex flex-col gap-3 mt-4">
+                    {readiness.map((item) => (
+                        <div
+                            key={item.label}
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center border ${LEVEL_STYLES[item.level].bg}`}
+                            title={`${item.label}: ${item.detail}`}
+                        >
+                            <item.icon size={18} weight="fill" className={LEVEL_STYLES[item.level].text} />
+                        </div>
+                    ))}
                 </div>
             </motion.div>
         );
     }
 
-    // Per-pane loading — each tab can render as soon as its data resolves
-    const isLoading =
-        activeTab === 'pinned'
-            ? pins === undefined
-            : memory === undefined;
-
-    // -------------------------------------------------------------------------
-    // Expanded State
-    // -------------------------------------------------------------------------
-
+    // ── Expanded State ──
     return (
         <motion.aside
             initial={false}
-            animate={{ width: 340 }}
+            animate={{ width: 360 }}
             className="h-[calc(100dvh-3rem)] sticky top-6 flex flex-col glass-ethereal rounded-[2rem] border border-white/10 overflow-hidden z-30 shadow-2xl"
         >
-            {/* Header / Tabs */}
+            {/* Header */}
             <div className="flex items-center justify-between px-6 pt-6 pb-4">
-                <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-bold tracking-[0.1em] uppercase text-white/50">Workspace</h2>
-                </div>
+                <h2 className="text-sm font-bold tracking-[0.1em] uppercase text-white/50">
+                    Insights
+                </h2>
                 <button
                     onClick={() => setIsExpanded(false)}
-                    className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-white transition-all"
-                    aria-label="Collapse workspace rail"
+                    className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-white transition-all cursor-pointer"
+                    aria-label="Collapse insights rail"
                 >
                     <CaretRight size={18} weight="bold" />
                 </button>
             </div>
 
-            {/* Tab Selection */}
-            <div className="px-6 mb-4">
-                <div
-                    role="tablist"
-                    aria-label="Workspace views"
-                    className="flex items-center p-1 bg-black/20 rounded-xl border border-white/5 relative"
-                    onKeyDown={(e) => {
-                        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                            e.preventDefault();
-                            setActiveTab(activeTab === 'pinned' ? 'memory' : 'pinned');
-                            // Move focus to the newly activated tab
-                            const next = e.currentTarget.querySelector<HTMLButtonElement>(`[aria-selected="false"]`);
-                            next?.focus();
-                        }
-                    }}
-                >
-                    <button
-                        role="tab"
-                        aria-selected={activeTab === 'pinned'}
-                        tabIndex={activeTab === 'pinned' ? 0 : -1}
-                        onClick={() => setActiveTab('pinned')}
-                        aria-label="View pinned items"
-                        id="workspace-tab-pinned"
-                        aria-controls="workspace-panel-pinned"
-                        className={`
-                            flex-1 flex items-center justify-center gap-2 py-2 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all relative z-10
-                            ${activeTab === 'pinned' ? 'text-white' : 'text-white/40 hover:text-white/60'}
-                        `}
-                    >
-                        <PushPin size={14} weight={activeTab === 'pinned' ? 'fill' : 'bold'} />
-                        Pinned
-                    </button>
-                    <button
-                        role="tab"
-                        aria-selected={activeTab === 'memory'}
-                        tabIndex={activeTab === 'memory' ? 0 : -1}
-                        onClick={() => setActiveTab('memory')}
-                        aria-label="View key points"
-                        id="workspace-tab-memory"
-                        aria-controls="workspace-panel-memory"
-                        className={`
-                            flex-1 flex items-center justify-center gap-2 py-2 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all relative z-10
-                            ${activeTab === 'memory' ? 'text-white' : 'text-white/40 hover:text-white/60'}
-                        `}
-                    >
-                        <Notebook size={14} weight={activeTab === 'memory' ? 'fill' : 'bold'} />
-                        Points
-                    </button>
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-6 no-scrollbar">
 
-                    {/* Active Background Indicator */}
-                    <motion.div
-                        className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gradient-to-br from-white/15 to-white/5 border border-white/10 rounded-lg shadow-inner shadow-white/5"
-                        animate={{ x: activeTab === 'pinned' ? 0 : '100%' }}
-                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                    />
-                </div>
-            </div>
+                {/* ── Section 1: Report Readiness ── */}
+                <section>
+                    <div className="flex items-center gap-2 mb-3">
+                        <ChartBar size={14} weight="fill" className="text-white/30" />
+                        <h3 className="text-[11px] font-bold tracking-[0.12em] uppercase text-white/40">
+                            Report Readiness
+                        </h3>
+                    </div>
 
-            {/* Content Area — tabpanel for ARIA wiring */}
-            <div
-                id={activeTab === 'pinned' ? 'workspace-panel-pinned' : 'workspace-panel-memory'}
-                role="tabpanel"
-                aria-labelledby={activeTab === 'pinned' ? 'workspace-tab-pinned' : 'workspace-tab-memory'}
-                tabIndex={0}
-                className="flex-1 overflow-y-auto px-4 pb-6 space-y-3 no-scrollbar"
-            >
-                {isLoading ? (
-                    /* CR #9 — show loading skeleton, not empty state */
-                    <div className="flex flex-col gap-3 opacity-40 animate-pulse py-8">
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="h-20 rounded-2xl bg-white/5 border border-white/5" />
+                    <div className="space-y-2">
+                        {readiness.map((item) => {
+                            const styles = LEVEL_STYLES[item.level];
+                            return (
+                                <div
+                                    key={item.label}
+                                    className={`flex items-center gap-3 px-3.5 py-3 rounded-[14px] border transition-all ${styles.bg}`}
+                                >
+                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${styles.dot}`} />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[13px] font-semibold text-white/80">{item.label}</p>
+                                        <p className={`text-[11px] font-medium mt-0.5 ${styles.text}`}>{item.detail}</p>
+                                    </div>
+                                    {item.level === 'strong' && (
+                                        <CheckCircle size={16} weight="fill" className="text-[var(--accent-emerald)] flex-shrink-0" />
+                                    )}
+                                    {item.level === 'partial' && (
+                                        <WarningCircle size={16} weight="fill" className="text-amber-400 flex-shrink-0" />
+                                    )}
+                                    {item.level === 'missing' && (
+                                        <Clock size={16} weight="regular" className="text-white/20 flex-shrink-0" />
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </section>
+
+                {/* ── Section 2: Source Health ── */}
+                <section>
+                    <div className="flex items-center gap-2 mb-3">
+                        <FileText size={14} weight="fill" className="text-white/30" />
+                        <h3 className="text-[11px] font-bold tracking-[0.12em] uppercase text-white/40">
+                            Source Health
+                        </h3>
+                    </div>
+
+                    <div className="px-3.5 py-3 rounded-[14px] border border-white/10 bg-white/[0.03]">
+                        <div className="flex items-baseline justify-between mb-2">
+                            <span className="text-[22px] font-bold text-white">{totalSources}</span>
+                            <span className="text-[11px] font-medium text-white/40">linked sources</span>
+                        </div>
+                        {unlinkedItems > 0 && (
+                            <p className="text-[11px] font-medium text-amber-400/70">
+                                {unlinkedItems} item{unlinkedItems !== 1 ? 's' : ''} without source link
+                            </p>
+                        )}
+                        {unlinkedItems === 0 && totalItems > 0 && (
+                            <p className="text-[11px] font-medium text-[var(--accent-emerald)]/70">
+                                All items fully source-backed ✓
+                            </p>
+                        )}
+                    </div>
+                </section>
+
+                {/* ── Section 3: Suggested Actions ── */}
+                <section>
+                    <div className="flex items-center gap-2 mb-3">
+                        <Lightning size={14} weight="fill" className="text-white/30" />
+                        <h3 className="text-[11px] font-bold tracking-[0.12em] uppercase text-white/40">
+                            Next Steps
+                        </h3>
+                    </div>
+
+                    <div className="space-y-2">
+                        {actions.map((action, i) => (
+                            <Link
+                                key={i}
+                                href={action.href}
+                                className="flex items-center gap-3 px-3.5 py-3 rounded-[14px] border border-white/5 bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/10 transition-all group no-underline"
+                            >
+                                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                    action.priority === 'high' ? 'bg-amber-400' :
+                                    action.priority === 'medium' ? 'bg-[var(--accent-icy)]' :
+                                    'bg-white/20'
+                                }`} />
+                                <span className="text-[12px] font-medium text-white/60 group-hover:text-white/80 transition-colors flex-1">
+                                    {action.label}
+                                </span>
+                                <ArrowRight size={12} className="text-white/20 group-hover:text-white/40 transition-colors" />
+                            </Link>
                         ))}
                     </div>
-                ) : (
-                    <AnimatePresence mode="popLayout">
-                        {activeTab === 'pinned' ? (
-                            pins && pins.length > 0 ? (
-                                pins.map((pin) => (
-                                    <ItemCard
-                                        key={pin._id}
-                                        id={pin._id}
-                                        type={pin.type}
-                                        title={pin.title}
-                                        content={pin.content}
-                                        createdAt={pin.createdAt}
-                                        onRemove={removePin}
-                                        isPinned
-                                        compact
-                                    />
-                                ))
-                            ) : (
-                                <div className="flex flex-col items-center justify-center py-20 px-8 text-center opacity-40">
-                                    <PushPin size={32} weight="duotone" className="mb-4" />
-                                    <p className="text-xs font-semibold uppercase tracking-widest">No Active Pins</p>
-                                    <p className="text-[10px] mt-2 leading-relaxed">Pin key facts from any chat to keep them in focus here.</p>
-                                </div>
-                            )
-                        ) : (
-                            keyPoints.length > 0 ? (
-                                keyPoints.map((item) => (
-                                    <ItemCard
-                                        key={item._id}
-                                        id={item._id}
-                                        type={item.type}
-                                        title={item.title}
-                                        content={item.content}
-                                        createdAt={item.createdAt}
-                                        onRemove={removeMemory}
-                                        compact
-                                    />
-                                ))
-                            ) : (
-                                <div className="flex flex-col items-center justify-center py-20 px-8 text-center opacity-40">
-                                    <Notebook size={32} weight="duotone" className="mb-4" />
-                                    <p className="text-xs font-semibold uppercase tracking-widest">Workspace Empty</p>
-                                    <p className="text-[10px] mt-2 leading-relaxed">Strategic insights saved to your case will appear here.</p>
-                                </div>
-                            )
-                        )}
-                    </AnimatePresence>
-                )}
+                </section>
             </div>
 
-            {/* Footer — CR #10: Wire to real timeline route */}
-            <div className="px-6 py-4 border-t border-white/5 bg-white/[0.02]">
+            {/* Footer CTA */}
+            <div className="px-5 py-4 border-t border-white/5 bg-white/[0.02]">
                 <Link
-                    href="/chat/timeline"
-                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/5 border border-white/5 text-[11px] font-bold uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/10 transition-all no-underline"
+                    href="/chat/overview"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[var(--accent-emerald)]/20 to-[var(--accent-emerald)]/10 border border-[var(--accent-emerald)]/20 text-[12px] font-bold uppercase tracking-widest text-[var(--accent-emerald)] hover:from-[var(--accent-emerald)]/30 hover:to-[var(--accent-emerald)]/15 transition-all no-underline"
                 >
-                    <ListBullets size={16} />
-                    View Timeline
+                    <FileText size={14} weight="bold" />
+                    Case Overview
                 </Link>
             </div>
         </motion.aside>

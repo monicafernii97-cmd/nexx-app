@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, useState, useEffect, type ReactNode } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Doc, Id } from '@convex/_generated/dataModel';
@@ -10,7 +10,13 @@ import type { Doc, Id } from '@convex/_generated/dataModel';
 // ---------------------------------------------------------------------------
 
 export interface WorkspaceContextType {
-    // Data
+    // Active Case
+    activeCase: Doc<'cases'> | null | undefined;
+    activeCaseId: Id<'cases'> | null;
+    cases: Doc<'cases'>[] | undefined;
+    setActiveCaseId: (id: Id<'cases'>) => void;
+
+    // Data (scoped to active case)
     pins: Doc<'casePins'>[] | undefined;
     memory: Doc<'caseMemory'>[] | undefined;
     timeline: Doc<'timelineCandidates'>[] | undefined;
@@ -20,9 +26,11 @@ export interface WorkspaceContextType {
         pins: number;
         memory: number;
         timeline: number;
+        confirmedTimeline: number;
         keyFacts: number;
         strategy: number;
         risks: number;
+        strengths: number;
     };
 
     // Actions
@@ -38,10 +46,35 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefin
 // ---------------------------------------------------------------------------
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-    // Queries
-    const pins = useQuery(api.casePins.listByUser);
-    const memory = useQuery(api.caseMemory.listByUser);
-    const timeline = useQuery(api.timelineCandidates.listByUser);
+    const [activeCaseId, setActiveCaseId] = useState<Id<'cases'> | null>(null);
+
+    // Ensure a default case exists for the user
+    const getOrCreateDefault = useMutation(api.cases.getOrCreateDefault);
+    const cases = useQuery(api.cases.list);
+
+    // On first load, auto-provision a default case
+    useEffect(() => {
+        if (cases !== undefined && cases.length === 0) {
+            // No cases yet — create the default "My Case"
+            getOrCreateDefault().catch(console.error);
+        } else if (cases !== undefined && cases.length > 0 && !activeCaseId) {
+            // Cases exist but none selected — pick the first active one
+            const active = cases.find(c => c.status === 'active') ?? cases[0];
+            setActiveCaseId(active._id);
+        }
+    }, [cases, activeCaseId, getOrCreateDefault]);
+
+    const activeCase = cases?.find(c => c._id === activeCaseId) ?? null;
+
+    // Queries — still user-scoped (caseId filtering done client-side for backward compat)
+    const allPins = useQuery(api.casePins.listByUser);
+    const allMemory = useQuery(api.caseMemory.listByUser);
+    const allTimeline = useQuery(api.timelineCandidates.listByUser);
+
+    // Filter to active case (gracefully handle items without caseId — pre-migration data)
+    const pins = allPins?.filter(p => !p.caseId || p.caseId === activeCaseId);
+    const memory = allMemory?.filter(m => !m.caseId || m.caseId === activeCaseId);
+    const timeline = allTimeline?.filter(t => !t.caseId || t.caseId === activeCaseId);
 
     // Mutations
     const removePinMutation = useMutation(api.casePins.remove);
@@ -55,9 +88,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         pins: pins?.length ?? 0,
         memory: memory?.length ?? 0,
         timeline: timeline?.length ?? 0,
+        confirmedTimeline: timeline?.filter(t => t.status === 'confirmed').length ?? 0,
         keyFacts: memory?.filter(m => m.type === 'key_fact').length ?? 0,
         strategy: memory?.filter(m => m.type === 'strategy_point').length ?? 0,
         risks: memory?.filter(m => m.type === 'risk_concern').length ?? 0,
+        strengths: memory?.filter(m => m.type === 'strength_highlight').length ?? 0,
     };
 
     // Stable action callbacks (useCallback → fixes React Compiler memo error)
@@ -77,6 +112,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     );
 
     const value: WorkspaceContextType = {
+        activeCase,
+        activeCaseId,
+        cases,
+        setActiveCaseId,
         pins,
         memory,
         timeline,

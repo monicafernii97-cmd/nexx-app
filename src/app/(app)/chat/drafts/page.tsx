@@ -129,7 +129,7 @@ export default function DraftsPage() {
                             content={item.content}
                             createdAt={item.createdAt}
                             onRemove={removeMemory}
-                            sourceConversationId={(item as any).sourceConversationId}
+                            sourceConversationId={item.sourceConversationId}
                         />
                     ))}
                 </div>

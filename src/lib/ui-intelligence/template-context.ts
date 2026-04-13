@@ -86,11 +86,35 @@ export function buildTemplateContext(caseGraph: CaseGraph): TemplateContext {
             : 'unknown',
         represented: parties?.userHasAttorney ?? false,
         causeNumber: jurisdiction?.caseNumber,
-        partyNames: {
-            petitioner: parties?.userRole === 'petitioner' ? parties?.userName : parties?.opposingPartyName,
-            respondent: parties?.userRole === 'respondent' ? parties?.userName : parties?.opposingPartyName,
-            childrenInitials: children.map(c => c.initials).filter(Boolean),
-        },
+        partyNames: buildPartyNames(parties, children),
+    };
+}
+
+/** Derive caption party names only when the user's role is known. */
+function buildPartyNames(
+    parties: CaseGraph['parties'],
+    children: CaseGraph['children'],
+): TemplateContext['partyNames'] {
+    const role = parties?.userRole;
+    if (role === 'petitioner') {
+        return {
+            petitioner: parties?.userName,
+            respondent: parties?.opposingPartyName,
+            childrenInitials: (children ?? []).map(c => c.initials).filter(Boolean),
+        };
+    }
+    if (role === 'respondent') {
+        return {
+            petitioner: parties?.opposingPartyName,
+            respondent: parties?.userName,
+            childrenInitials: (children ?? []).map(c => c.initials).filter(Boolean),
+        };
+    }
+    // Unknown or intervenor — don't guess caption placement
+    return {
+        petitioner: undefined,
+        respondent: undefined,
+        childrenInitials: (children ?? []).map(c => c.initials).filter(Boolean),
     };
 }
 

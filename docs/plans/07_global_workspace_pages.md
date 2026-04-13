@@ -72,7 +72,7 @@ Even with the global rail, full-page views are needed for bulk management, searc
 > [!IMPORTANT]
 > **Persistent Real Estate**: Making the rail "always visible" reduces the center content width by 320px on desktop. We will ensure the center column is responsive and uses `max-w-5xl` for optimal reading.
 > [!TIP]
-> **Visibility Toggle**: We will include a "Collapse" button on the rail (to a 40px icon bar) so users can reclaim full screen width when needed.
+> **Visibility Toggle**: We will include a "Collapse" button on the rail (to a 40px icon bar) so users can reclaim full-screen width when needed.
 
 ---
 
@@ -86,3 +86,4 @@ Even with the global rail, full-page views are needed for bulk management, searc
 1. **Global Persistence**: Verify the rail stays populated while navigating from Dashboard -> Chat -> Incident Report.
 2. **Interaction**: Pin an item in Chat and verify it appears in the rail *and* the Dashboard view immediately.
 3. **Responsive**: Check collapse/expand behavior on small vs large screens.
+4. **Accessibility**: Verify keyboard navigation (Tab/Shift+Tab, Enter/Space to toggle collapse), visible focus ring on collapse/expand controls, `aria-expanded` state updates, and that pinned items are reachable via keyboard and announced by screen readers.

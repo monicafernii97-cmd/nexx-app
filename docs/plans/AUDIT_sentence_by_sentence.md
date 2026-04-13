@@ -49,7 +49,7 @@
 | # | Sentence | Status | Plan Ref |
 |---|---------|--------|----------|
 | 1.8 | "inside one response, visually differentiate between plain-language guidance and court-usable output" | ✅ | §2.12 Dual-Output |
-| 1.9 | "guidance: plain-language explanation in a normal looking paragraph" | ✅ | §2.12 Guidance zone |
+| 1.9 | "guidance: plain-language explanation in a normal-looking paragraph" | ✅ | §2.12 Guidance zone |
 | 1.10 | "work product: draft language, a timeline entry, an exhibit summary, affidavit wording → formatted in copy-ready styled block" | ✅ | §2.12 Work Product zone |
 | 1.11 | "copy-ready block with copy/export controls" | ✅ | §2.12 "copy/export controls" |
 | 1.12 | "this is explicitly the second most important upgrade" | ✅ | §2.12 "second most important upgrade" |
@@ -205,7 +205,7 @@
 | 5.8 | "evidence/record panels (6): timeline_candidate, incident_summary, documentation_gap, exhibit_note, proof_strength, fact_vs_feeling" | ✅ | §1.3 |
 | 5.9 | "process/procedure panels (5): procedure_notes, local_context, what_to_verify, deadline_watch, filing_considerations" | ✅ | §1.3 |
 | 5.10 | "reflective/support panels (5): emotional_insight, validation_support, gentle_reframe, pattern_detected, relationship_dynamic" | ✅ | §1.3 |
-| 5.11 | "memory/organization panels (3): pinworthy_points, save_to_case_suggestions, related_case_context, linked_history" | ✅ | §1.3 (4 listed, including linked_history) |
+| 5.11 | "memory/organization panels (4): pinworthy_points, save_to_case_suggestions, related_case_context, linked_history" | ✅ | §1.3 (4 listed, including linked_history) |
 
 ### 5C — Intent → Panel Mapping
 
@@ -355,7 +355,7 @@
 
 | # | Sentence | Status | Plan Ref |
 |---|---------|--------|----------|
-| 7.1 | "export ResponseIntent = 'support' | 'analysis' | 'strategy' | 'drafting' | 'incident' | 'procedure' | 'evidence' | 'mixed'" | ✅ | §1.2 |
+| 7.1 | `export ResponseIntent = 'support' \| 'analysis' \| 'strategy' \| 'drafting' \| 'incident' \| 'procedure' \| 'evidence' \| 'mixed'` | ✅ | §1.2 |
 | 7.2 | "export PanelType = 34+ panel types" | ✅ | §1.2 (47 in v2) |
 | 7.3 | "export SaveType = 12 save classifications" | ✅ | §1.2 |
 | 7.4 | "export ActionType = 12 action types" | ✅ | §1.2 |

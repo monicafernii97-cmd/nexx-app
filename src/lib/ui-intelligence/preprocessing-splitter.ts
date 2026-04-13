@@ -84,7 +84,13 @@ const HEADING_MAP: Record<string, PanelType> = {
  * Falls back to a single 'overview' panel if no headings found.
  */
 export function splitIntoPanels(markdownText: string): PanelData[] {
-    if (!markdownText?.trim()) return [];
+    if (!markdownText?.trim()) {
+        return [{
+            type: 'overview',
+            title: 'Response',
+            content: '',
+        }];
+    }
 
     // Match markdown headings (## or ###)
     const headingRegex = /^#{2,3}\s+(.+)$/gm;

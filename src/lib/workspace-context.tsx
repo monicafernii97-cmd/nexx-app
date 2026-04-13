@@ -127,7 +127,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     const value: WorkspaceContextType = {
         activeCase,
-        activeCaseId,
+        activeCaseId: resolvedActiveCaseId,
         cases,
         setActiveCaseId,
         pins,

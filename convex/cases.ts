@@ -26,8 +26,11 @@ export const list = query({
  * a "My Case" the first time the workspace loads. No onboarding modal,
  * no extra steps. Multi-case support simply reveals the switcher later.
  *
- * Convex mutations are serialized per-document, so query→insert within
- * a single handler is atomic and race-free.
+ * Convex uses optimistic concurrency control (OCC): mutations run against
+ * a consistent snapshot. If two concurrent calls both read "no case exists"
+ * and attempt to insert, Convex detects the read/write conflict and retries
+ * the losing mutation — which will then see the first insert and return it.
+ * A client-side `provisioningRef` guard further prevents double-fire.
  */
 export const getOrCreateDefault = mutation({
     args: {},

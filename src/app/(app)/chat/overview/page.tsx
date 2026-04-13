@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import {
     SquaresFour, Notebook, PushPin, CalendarCheck,
@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/workspace/EmptyState';
 import { PatternsBlock } from '@/components/workspace/PatternsBlock';
 import { NarrativeBlock, type CaseNarrative } from '@/components/workspace/NarrativeBlock';
 import { GenerateReportModal } from '@/components/workspace/GenerateReportModal';
+import type { DetectedPattern } from '@/lib/nexx/premiumAnalytics';
 
 /**
  * Workspace Overview — The "Case Thinking Environment".
@@ -61,20 +62,34 @@ export default function WorkspaceOverview() {
 
     const router = useRouter();
 
+    // Detected patterns — will be populated by AI analysis in Part 5.
+    // The architecture is ready; pass real DetectedPattern[] once the
+    // narrative API route computes them from timeline + memory data.
+    const detectedPatterns = useMemo<DetectedPattern[]>(() => [], []);
+
     const handleGenerateReport = useCallback((options: {
         outputType: 'summary' | 'court_document' | 'both';
         tone: 'neutral_concise' | 'detailed_organized' | 'attorney_ready';
         patternHandling: 'include_supported' | 'exclude';
     }) => {
         setIsReportModalOpen(false);
+        // Navigate to DocuVault with report options only.
+        // Does NOT set prefilled=true — that belongs to the AI hydration flow
+        // once the narrative API route generates real body content.
         const params = new URLSearchParams({
-            prefilled: 'true',
             outputType: options.outputType,
             tone: options.tone,
             patternHandling: options.patternHandling,
         });
         router.push(`/docuvault?${params.toString()}`);
     }, [router]);
+
+    const handleSendToDocuVault = useCallback(() => {
+        if (!narrative) return;
+        // Store the narrative in sessionStorage so DocuVault can hydrate it
+        sessionStorage.setItem('nexx:narrative', JSON.stringify(narrative));
+        router.push('/docuvault?source=narrative');
+    }, [narrative, router]);
 
     const stats = [
         { label: 'Key Facts', value: counts.keyFacts, loading: memory === undefined, icon: Notebook, color: 'var(--support-violet)', href: '/chat/key-points' },
@@ -242,14 +257,16 @@ export default function WorkspaceOverview() {
             </motion.section>
 
             {/* ── Section 3: Observed Patterns (only if earned) ── */}
-            <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.45 }}
-                className="mb-8"
-            >
-                <PatternsBlock patterns={[]} />
-            </motion.div>
+            {detectedPatterns.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.45 }}
+                    className="mb-8"
+                >
+                    <PatternsBlock patterns={detectedPatterns} />
+                </motion.div>
+            )}
 
             {/* ── Section 4: Case Summary Narrative (highest value) ── */}
             <motion.div
@@ -261,9 +278,7 @@ export default function WorkspaceOverview() {
                 <NarrativeBlock
                     narrative={narrative}
                     onGenerate={() => setIsReportModalOpen(true)}
-                    onSendToDocuVault={() => {
-                        // TODO: Navigate to DocuVault in prefilled mode
-                    }}
+                    onSendToDocuVault={handleSendToDocuVault}
                 />
             </motion.div>
 
@@ -297,7 +312,7 @@ export default function WorkspaceOverview() {
                 itemCounts={{
                     facts: counts.keyFacts,
                     timeline: counts.timeline,
-                    patterns: 0,
+                    patterns: detectedPatterns.length,
                     pins: counts.pins,
                 }}
             />

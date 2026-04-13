@@ -77,6 +77,10 @@ export function GlobalWorkspaceRail() {
     const { counts, pins, memory, timeline } = useWorkspace();
     const [isExpanded, setIsExpanded] = useState(true);
 
+    // True when at least one data query is still loading.
+    // Prevents showing "missing" readiness for data that simply hasn't arrived yet.
+    const isLoading = pins === undefined || memory === undefined || timeline === undefined;
+
     // ── Readiness scoring ──
     const readiness: ReadinessItem[] = useMemo(() => [
         {
@@ -191,6 +195,16 @@ export function GlobalWorkspaceRail() {
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-6 no-scrollbar">
 
+                {isLoading ? (
+                    /* Skeleton placeholders while workspace queries resolve */
+                    <div className="space-y-4 pt-2">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="h-14 rounded-[14px] bg-white/5 animate-pulse" />
+                        ))}
+                        <div className="h-20 rounded-[14px] bg-white/5 animate-pulse mt-6" />
+                    </div>
+                ) : (
+                <>
                 {/* ── Section 1: Report Readiness ── */}
                 <section>
                     <div className="flex items-center gap-2 mb-3">
@@ -284,6 +298,8 @@ export function GlobalWorkspaceRail() {
                         ))}
                     </div>
                 </section>
+                </>
+                )}
             </div>
 
             {/* Footer CTA */}

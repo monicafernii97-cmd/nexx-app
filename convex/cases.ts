@@ -58,7 +58,12 @@ export const getOrCreateDefault = mutation({
     },
 });
 
-/** Create a new case (for the "+ Add Case" flow). */
+/** Create a new case (for the "+ Add Case" flow).
+ *
+ * Enforces single-active semantics: archives all previously active cases
+ * for this user before inserting the new one as 'active'. This ensures
+ * `resolvedActiveCaseId` falls back to the correct case on page reload.
+ */
 export const create = mutation({
     args: {
         title: v.string(),
@@ -66,6 +71,18 @@ export const create = mutation({
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
+
+        // Archive all currently active cases for this user
+        const activeCases = await ctx.db
+            .query('cases')
+            .withIndex('by_userId', (q) => q.eq('userId', user._id))
+            .collect();
+        for (const c of activeCases) {
+            if (c.status === 'active') {
+                await ctx.db.patch(c._id, { status: 'archived', updatedAt: Date.now() });
+            }
+        }
+
         const now = Date.now();
         return ctx.db.insert('cases', {
             userId: user._id,

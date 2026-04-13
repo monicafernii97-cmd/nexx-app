@@ -48,20 +48,25 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefin
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const [activeCaseId, setActiveCaseId] = useState<Id<'cases'> | null>(null);
     const provisioningRef = useRef(false);
+    const [provisionRetry, setProvisionRetry] = useState(0);
 
     // Ensure a default case exists for the user
     const getOrCreateDefault = useMutation(api.cases.getOrCreateDefault);
     const cases = useQuery(api.cases.list);
 
-    // On first load, auto-provision a default case (provisioning only — no setState)
+    // On first load, auto-provision a default case.
+    // On transient failure, increment provisionRetry to re-trigger (max 3 attempts).
     useEffect(() => {
-        if (cases !== undefined && cases.length === 0 && !provisioningRef.current) {
+        if (cases !== undefined && cases.length === 0 && !provisioningRef.current && provisionRetry < 3) {
             provisioningRef.current = true;
             getOrCreateDefault()
-                .catch(console.error)
+                .catch(() => {
+                    // Schedule a retry after a short delay
+                    setTimeout(() => setProvisionRetry(r => r + 1), 1500);
+                })
                 .finally(() => { provisioningRef.current = false; });
         }
-    }, [cases, getOrCreateDefault]);
+    }, [cases, getOrCreateDefault, provisionRetry]);
 
     // Derive active case at render time (avoids react-hooks/set-state-in-effect)
     const resolvedActiveCaseId =

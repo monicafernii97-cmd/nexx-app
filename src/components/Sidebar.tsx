@@ -24,6 +24,7 @@ import {
     PushPin,
     Notebook,
     CalendarCheck,
+    FileText,
     IconWeight,
 } from '@phosphor-icons/react';
 import { useState, useMemo, useCallback, type ComponentType, type CSSProperties } from 'react';
@@ -273,7 +274,35 @@ export default function Sidebar() {
             <div className="px-5 pb-6 pt-4 mt-auto">
                 <div className="primary-divider mb-4 opacity-50" />
 
-                {/* Tour replay button */}
+                {/* Generate Report CTA — the primary action trigger */}
+                <button
+                    onClick={() => {
+                        // Navigate to overview first, then open the modal
+                        const pathname = window.location.pathname;
+                        if (pathname.includes('/chat/overview')) {
+                            window.dispatchEvent(new CustomEvent('nexx:open-report-modal'));
+                        } else {
+                            window.location.href = '/chat/overview?openReportModal=true';
+                        }
+                    }}
+                    title="Generate a structured report from your workspace data"
+                    aria-label="Generate report"
+                    className={`flex items-center gap-3 w-full px-3.5 py-3 mb-3 rounded-2xl transition-all duration-300 cursor-pointer bg-gradient-to-r from-[var(--accent-emerald)]/20 to-[var(--accent-emerald)]/10 border border-[var(--accent-emerald)]/20 hover:from-[var(--accent-emerald)]/30 hover:to-[var(--accent-emerald)]/15 hover:border-[var(--accent-emerald)]/30 ${collapsed ? 'justify-center' : ''}`}
+                >
+                    <FileText size={18} weight="bold" className="text-[var(--accent-emerald)] flex-shrink-0" />
+                    <AnimatePresence mode="popLayout">
+                        {!collapsed && (
+                            <motion.span
+                                initial={{ opacity: 0, width: 0 }}
+                                animate={{ opacity: 1, width: 'auto' }}
+                                exit={{ opacity: 0, width: 0 }}
+                                className="text-[13px] font-bold whitespace-nowrap overflow-hidden text-[var(--accent-emerald)]"
+                            >
+                                Generate Report
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
+                </button>
                 <button
                     onClick={restartTour}
                     title="Replay onboarding tour"

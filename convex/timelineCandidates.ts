@@ -45,6 +45,7 @@ export const create = mutation({
     args: {
         title: v.string(),
         description: v.string(),
+        caseId: v.optional(v.id('cases')),
         eventDate: v.optional(v.string()),
         tags: v.optional(v.array(v.string())),
         sourceMessageId: v.optional(v.id('messages')),
@@ -69,6 +70,7 @@ export const create = mutation({
         const now = Date.now();
         return ctx.db.insert('timelineCandidates', {
             userId: user._id,
+            caseId: args.caseId,
             status: 'candidate',
             title: args.title,
             description: args.description,

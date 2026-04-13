@@ -52,6 +52,7 @@ export const create = mutation({
         type: pinnableTypeValidator,
         title: v.string(),
         content: v.string(),
+        caseId: v.optional(v.id('cases')),
         sourceMessageId: v.optional(v.id('messages')),
         sourceConversationId: v.optional(v.id('conversations')),
         requestId: v.optional(v.string()),
@@ -79,6 +80,7 @@ export const create = mutation({
 
         return ctx.db.insert('casePins', {
             userId: user._id,
+            caseId: args.caseId,
             type: args.type,
             title: args.title,
             content: args.content,

@@ -482,9 +482,22 @@ export default defineSchema({
         expiresAt: v.optional(v.number()),
     }).index('by_conversationId', ['conversationId']),
 
+    // ═══ NEW: Cases (multi-case support) ═══
+    cases: defineTable({
+        userId: v.id('users'),
+        title: v.string(),
+        description: v.string(),
+        status: v.union(v.literal('active'), v.literal('archived')),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_userId', ['userId']),
+
     // ═══ NEW: Case Pins (workspace pinned items) ═══
     casePins: defineTable({
         userId: v.id('users'),
+        /** Optional case scoping — backwards-compatible with pre-case data */
+        caseId: v.optional(v.id('cases')),
         /** The pinnable classification */
         type: v.union(
             v.literal('key_fact'),
@@ -510,11 +523,14 @@ export default defineSchema({
     })
         .index('by_userId', ['userId'])
         .index('by_userId_type', ['userId', 'type'])
-        .index('by_userId_requestId', ['userId', 'requestId']),
+        .index('by_userId_requestId', ['userId', 'requestId'])
+        .index('by_caseId', ['caseId']),
 
     // ═══ NEW: Case Memory (saved strategy/analysis items) ═══
     caseMemory: defineTable({
         userId: v.id('users'),
+        /** Optional case scoping — backwards-compatible with pre-case data */
+        caseId: v.optional(v.id('cases')),
         /** Save classification */
         type: v.union(
             v.literal('case_note'),
@@ -544,11 +560,14 @@ export default defineSchema({
     })
         .index('by_userId', ['userId'])
         .index('by_userId_type', ['userId', 'type'])
-        .index('by_userId_requestId', ['userId', 'requestId']),
+        .index('by_userId_requestId', ['userId', 'requestId'])
+        .index('by_caseId', ['caseId']),
 
     // ═══ NEW: Timeline Candidates (AI-suggested timeline entries) ═══
     timelineCandidates: defineTable({
         userId: v.id('users'),
+        /** Optional case scoping — backwards-compatible with pre-case data */
+        caseId: v.optional(v.id('cases')),
         /** Status: candidate (AI-suggested) or confirmed (user-approved) */
         status: v.union(v.literal('candidate'), v.literal('confirmed')),
         title: v.string(),
@@ -569,5 +588,6 @@ export default defineSchema({
     })
         .index('by_userId', ['userId'])
         .index('by_userId_status', ['userId', 'status'])
-        .index('by_userId_requestId', ['userId', 'requestId']),
+        .index('by_userId_requestId', ['userId', 'requestId'])
+        .index('by_caseId', ['caseId']),
 });

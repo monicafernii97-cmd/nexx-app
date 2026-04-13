@@ -15,6 +15,7 @@ import {
     CheckCircle,
     DownloadSimple,
     ArrowsClockwise,
+    MagicWand,
 } from '@phosphor-icons/react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from 'convex/react';
@@ -328,6 +329,27 @@ function DocuVaultPageInner() {
                     exit={{ opacity: 0 }}
                     className="space-y-8"
                 >
+                    {/* ── Magic Moment Banner ── */}
+                    {searchParams.get('prefilled') === 'true' && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            className="p-5 rounded-[22px] border border-[var(--accent-emerald)]/30 bg-[var(--accent-emerald)]/10 backdrop-blur-3xl shadow-[0_8px_32px_rgba(16,185,129,0.15)] flex items-center gap-4 relative overflow-hidden group"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                            <div className="w-12 h-12 rounded-2xl bg-[var(--accent-emerald)] flex items-center justify-center shadow-lg shadow-[var(--accent-emerald)]/20">
+                                <MagicWand size={24} weight="fill" className="text-white drop-shadow-sm" />
+                            </div>
+                            <div>
+                                <h3 className="text-[17px] font-bold text-white drop-shadow-sm">Magic Moment: Pre-filled</h3>
+                                <p className="text-[14px] font-medium text-[var(--accent-emerald)] brightness-150">
+                                    Your case data has been organized and pre-filled. Review and edit before exporting.
+                                </p>
+                            </div>
+                            <CheckCircle size={32} weight="fill" className="ml-auto text-[var(--accent-emerald)]/20" />
+                        </motion.div>
+                    )}
+
                     {/* Header */}
                     <PageHeader
                         icon={Bank}

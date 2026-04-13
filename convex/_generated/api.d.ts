@@ -11,6 +11,7 @@
 import type * as caseGraphs from "../caseGraphs.js";
 import type * as caseMemory from "../caseMemory.js";
 import type * as casePins from "../casePins.js";
+import type * as cases from "../cases.js";
 import type * as conversationSummaries from "../conversationSummaries.js";
 import type * as conversations from "../conversations.js";
 import type * as courtSettings from "../courtSettings.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   caseGraphs: typeof caseGraphs;
   caseMemory: typeof caseMemory;
   casePins: typeof casePins;
+  cases: typeof cases;
   conversationSummaries: typeof conversationSummaries;
   conversations: typeof conversations;
   courtSettings: typeof courtSettings;

@@ -65,6 +65,7 @@ export const save = mutation({
         type: saveTypeValidator,
         title: v.string(),
         content: v.string(),
+        caseId: v.optional(v.id('cases')),
         metadataJson: v.optional(v.string()),
         sourceMessageId: v.optional(v.id('messages')),
         sourceConversationId: v.optional(v.id('conversations')),
@@ -87,6 +88,7 @@ export const save = mutation({
         const now = Date.now();
         return ctx.db.insert('caseMemory', {
             userId: user._id,
+            caseId: args.caseId,
             type: args.type,
             title: args.title,
             content: args.content,

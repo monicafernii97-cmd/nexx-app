@@ -21,6 +21,10 @@ import { useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 
+/**
+ * CaseSwitcher — Sidebar dropdown to switch between active cases.
+ * Shows the active case name and provides actions to create or archive cases.
+ */
 export function CaseSwitcher() {
     const { activeCase, cases, activeCaseId, setActiveCaseId } = useWorkspace();
     const [isOpen, setIsOpen] = useState(false);

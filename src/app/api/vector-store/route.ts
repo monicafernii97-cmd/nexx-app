@@ -17,9 +17,10 @@ import { api } from '@convex/_generated/api';
 
 export const maxDuration = 30;
 
-// ---------------------------------------------------------------------------
-// GET — List vector stores for user
-// ---------------------------------------------------------------------------
+/**
+ * GET /api/vector-store — List all vector stores owned by the authenticated user.
+ * Returns file records grouped by vectorStoreId.
+ */
 
 export async function GET() {
     const { userId } = await auth();
@@ -74,9 +75,11 @@ export async function GET() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// POST — Create a standalone vector store
-// ---------------------------------------------------------------------------
+/**
+ * POST /api/vector-store — Create a standalone OpenAI vector store with ownership tracking.
+ * Validates the request body, creates the remote store, persists a local ownership record,
+ * and rolls back the remote store if local persistence fails.
+ */
 
 export async function POST(req: NextRequest) {
     const { userId } = await auth();
@@ -86,6 +89,15 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json();
+
+        // Validate body is an object before accessing properties
+        if (typeof body !== 'object' || body === null) {
+            return NextResponse.json(
+                { error: 'Request body must be a JSON object' },
+                { status: 400 },
+            );
+        }
+
         const name = body.name || `nexx_store_${userId}_${Date.now()}`;
 
         // vectorStores API is in the beta namespace; cast needed until SDK exports stable types
@@ -100,13 +112,31 @@ export async function POST(req: NextRequest) {
             },
         });
 
-        // Persist store ownership — create a placeholder uploadedFiles record
-        // so GET/DELETE can find the store via getByUser even before real files are added
+        // Persist store ownership — create a placeholder record, then attach the vectorStoreId
+        // so GET/DELETE (keyed off file.vectorStoreId) can discover this store
         const convex = await getAuthenticatedConvexClient();
-        await convex.mutation(api.uploadedFiles.create, {
-            filename: `_vectorstore_${name}`,
-            mimeType: 'application/x-vectorstore',
-        });
+        try {
+            const fileId = await convex.mutation(api.uploadedFiles.create, {
+                filename: `_vectorstore_${name}`,
+                mimeType: 'application/x-vectorstore',
+            });
+            // Attach the provider's store ID via the action (supports vectorStoreId)
+            await convex.action(api.uploadedFiles.updateStatus, {
+                fileId,
+                status: 'ready' as const,
+                vectorStoreId: vectorStore.id,
+            });
+        } catch (convexErr) {
+            // Convex failed — delete the orphaned remote store
+            console.error('[vector-store/POST] Convex persist failed, rolling back remote store:', convexErr);
+            try {
+                await (openai.vectorStores as unknown as { del: (id: string) => Promise<void> }).del(vectorStore.id);
+            } catch { /* best-effort rollback */ }
+            return NextResponse.json(
+                { error: 'Failed to persist vector store ownership' },
+                { status: 500 },
+            );
+        }
 
         return NextResponse.json({
             ok: true,
@@ -122,9 +152,10 @@ export async function POST(req: NextRequest) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// DELETE — Delete a vector store + cleanup
-// ---------------------------------------------------------------------------
+/**
+ * DELETE /api/vector-store — Delete a vector store and mark local file records as defunct.
+ * Validates ownership before deletion. Aborts local cleanup if the remote delete fails.
+ */
 
 export async function DELETE(req: NextRequest) {
     const { userId } = await auth();

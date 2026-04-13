@@ -26,6 +26,11 @@ const DRAFT_TABS = [
 // M3: Module-scoped stable Set — prevents stale closure in useMemo
 const DRAFT_TYPES = new Set(['draft_snippet', 'hearing_prep_point', 'exhibit_note', 'procedure_note']);
 
+/**
+ * DraftsPage \u2014 Manages all saved draft snippets from chat.
+ * Shows court-ready versions, affidavit language, motion paragraphs,
+ * hearing prep, and other work product created from AI sessions.
+ */
 export default function DraftsPage() {
     const { memory, removeMemory } = useWorkspace();
     const [activeTab, setActiveTab] = useState('all');
@@ -86,6 +91,7 @@ export default function DraftsPage() {
                     <input
                         type="text"
                         placeholder="Search drafts..."
+                        aria-label="Search drafts"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-[14px] text-white placeholder:text-white/25 focus:outline-none focus:ring-2 focus:ring-[var(--accent-platinum)]/50 focus:border-[var(--accent-platinum)]/50 transition-all"

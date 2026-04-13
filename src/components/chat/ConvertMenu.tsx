@@ -49,6 +49,11 @@ interface ConvertMenuProps {
 // Component
 // ---------------------------------------------------------------------------
 
+/**
+ * ConvertMenu \u2014 "Convert This Into\u2026" dropdown button for intelligence panels.
+ * Lets users transform AI-generated content into structured work products
+ * (exhibits, incidents, affidavits, motions, hearing outlines, timeline events).
+ */
 export function ConvertMenu({ content, panelTitle, onConvert, compact = false }: ConvertMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);

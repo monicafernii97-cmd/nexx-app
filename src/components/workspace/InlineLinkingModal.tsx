@@ -42,6 +42,10 @@ interface InlineLinkingModalProps {
 // Component
 // ---------------------------------------------------------------------------
 
+/**
+ * InlineLinkingModal \u2014 Modal picker for linking workspace items to timeline events.
+ * Provides search and select UI for connecting items to existing timeline entries.
+ */
 export function InlineLinkingModal({
     isOpen,
     onClose,

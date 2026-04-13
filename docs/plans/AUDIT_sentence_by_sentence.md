@@ -440,7 +440,7 @@
 | # | Sentence | Status | Plan Ref |
 |---|---------|--------|----------|
 | 10.3 | "create-docuvault-item.ts creation helper with integration metadata" | ✅ | §3.12 |
-| 10.4 | "create-incident-report.ts with status: candidate | confirmed" | ✅ | §3.13 |
+| 10.4 | "create-incident-report.ts with status: `candidate \| confirmed`" | ✅ | §3.13 |
 | 10.5 | "create-linked-timeline-item.ts with candidate status + optional eventDate" | ✅ | §3.14 |
 
 ### 10C — Server Actions (6 files)

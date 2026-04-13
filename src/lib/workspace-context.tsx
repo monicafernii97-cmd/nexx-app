@@ -59,16 +59,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     // On transient failure, increment provisionRetry to re-trigger (max 3 attempts).
     useEffect(() => {
         let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+        let cancelled = false;
         if (cases !== undefined && cases.length === 0 && !provisioningRef.current && provisionRetry < 3) {
             provisioningRef.current = true;
             getOrCreateDefault()
                 .catch(() => {
+                    if (cancelled) return;
                     // Schedule a retry after a short delay
-                    retryTimeout = setTimeout(() => setProvisionRetry(r => r + 1), 1500);
+                    retryTimeout = setTimeout(() => {
+                        if (!cancelled) setProvisionRetry(r => r + 1);
+                    }, 1500);
                 })
                 .finally(() => { provisioningRef.current = false; });
         }
         return () => {
+            cancelled = true;
             if (retryTimeout) clearTimeout(retryTimeout);
         };
     }, [cases, getOrCreateDefault, provisionRetry]);
@@ -138,19 +143,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     // Persist case switch to DB so it survives page reloads (CR #49)
     const setActiveCaseId = useCallback(
         (id: Id<'cases'>) => {
-            let previousId: Id<'cases'> | null = null;
-            setActiveCaseIdLocal(prev => {
-                previousId = prev;
-                return id;
-            });
+            const previousId = resolvedActiveCaseId;
+            setActiveCaseIdLocal(id);
             setActiveMutation({ caseId: id }).catch((err) => {
                 console.error(err);
-                if (previousId !== null) {
-                    setActiveCaseIdLocal(previousId);
-                }
+                setActiveCaseIdLocal(current => (current === id ? previousId : current));
             });
         },
-        [setActiveMutation],
+        [resolvedActiveCaseId, setActiveMutation],
     );
 
     const value: WorkspaceContextType = {

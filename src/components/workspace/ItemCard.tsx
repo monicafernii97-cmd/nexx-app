@@ -15,6 +15,7 @@ import {
     MagnifyingGlass
 } from '@phosphor-icons/react';
 import { format } from 'date-fns';
+import { SourceBadge } from '@/components/workspace/SourceBadge';
 import type { PinnableType } from '@/lib/integration/types';
 import type { SaveType } from '@/lib/ui-intelligence/types';
 
@@ -63,6 +64,8 @@ interface ItemCardProps<TId extends string = string> {
     onRemove: (id: TId) => Promise<void>;
     isPinned?: boolean;
     compact?: boolean;
+    /** If present, shows a SourceBadge linking to the origin conversation */
+    sourceConversationId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +86,7 @@ export function ItemCard<TId extends string>({
     onRemove,
     isPinned = false,
     compact = false,
+    sourceConversationId,
 }: ItemCardProps<TId>) {
     const config = TYPE_CONFIGS[type] || { label: type, color: 'accent-platinum', icon: Notebook };
     const Icon = config.icon;
@@ -166,6 +170,9 @@ export function ItemCard<TId extends string>({
                             {format(createdAt, 'MMM d, h:mm a')}
                         </span>
                     </div>
+                    {sourceConversationId && (
+                        <SourceBadge source="chat" conversationId={sourceConversationId} compact />
+                    )}
                 </div>
             )}
         </motion.div>

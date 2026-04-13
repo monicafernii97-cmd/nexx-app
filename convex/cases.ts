@@ -148,3 +148,18 @@ export const update = mutation({
         await ctx.db.patch(args.caseId, updates);
     },
 });
+
+export const archive = mutation({
+    args: { caseId: v.id('cases') },
+    handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        const existing = await ctx.db.get(args.caseId);
+        if (!existing || existing.userId !== user._id) {
+            throw new Error('Not authorized to archive this case');
+        }
+        await ctx.db.patch(args.caseId, {
+            status: 'archived' as const,
+            updatedAt: Date.now(),
+        });
+    },
+});

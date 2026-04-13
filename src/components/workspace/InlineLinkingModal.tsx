@@ -146,6 +146,7 @@ export function InlineLinkingModal({
                             <button
                                 onClick={handleClose}
                                 className="p-2 rounded-xl hover:bg-white/10 text-white/40 hover:text-white/70 transition-all"
+                                aria-label="Close"
                             >
                                 <X size={16} />
                             </button>
@@ -158,6 +159,7 @@ export function InlineLinkingModal({
                                 <input
                                     type="text"
                                     placeholder={`Search ${label.toLowerCase()}s...`}
+                                    aria-label={`Search ${label.toLowerCase()}s`}
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-[13px] text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[var(--accent-icy)]/30 transition-all"

@@ -17,6 +17,7 @@ import {
     Check,
 } from '@phosphor-icons/react';
 import { useWorkspace } from '@/lib/workspace-context';
+import { useToast } from '@/components/feedback/ToastProvider';
 import { useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
@@ -27,10 +28,12 @@ import type { Id } from '@convex/_generated/dataModel';
  */
 export function CaseSwitcher() {
     const { activeCase, cases, activeCaseId, setActiveCaseId } = useWorkspace();
+    const { showToast } = useToast();
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const createCase = useMutation(api.cases.create);
     const archiveCase = useMutation(api.cases.archive);
+    const unarchiveCase = useMutation(api.cases.unarchive);
 
     // Close on outside click
     useEffect(() => {
@@ -70,6 +73,11 @@ export function CaseSwitcher() {
             setIsOpen(false);
         } catch (err) {
             console.error('Failed to create case:', err);
+            showToast({
+                title: 'Failed to create case',
+                description: err instanceof Error ? err.message : 'Please try again.',
+                variant: 'error',
+            });
         }
     };
 
@@ -79,6 +87,26 @@ export function CaseSwitcher() {
             setIsOpen(false);
         } catch (err) {
             console.error('Failed to archive case:', err);
+            showToast({
+                title: 'Failed to archive case',
+                description: err instanceof Error ? err.message : 'Please try again.',
+                variant: 'error',
+            });
+        }
+    };
+
+    const handleUnarchive = async (caseId: Id<'cases'>) => {
+        try {
+            await unarchiveCase({ caseId });
+            setActiveCaseId(caseId);
+            setIsOpen(false);
+        } catch (err) {
+            console.error('Failed to restore case:', err);
+            showToast({
+                title: 'Failed to restore case',
+                description: err instanceof Error ? err.message : 'Please try again.',
+                variant: 'error',
+            });
         }
     };
 
@@ -221,11 +249,9 @@ export function CaseSwitcher() {
                                 {archivedCases.slice(0, 3).map(c => (
                                     <button
                                         key={c._id}
-                                        onClick={() => {
-                                            setActiveCaseId(c._id);
-                                            setIsOpen(false);
-                                        }}
+                                        onClick={() => handleUnarchive(c._id)}
                                         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/50 transition-all"
+                                        title={`Restore "${c.title}" to active`}
                                     >
                                         <Archive size={14} />
                                         <span className="text-[12px] font-medium truncate">{c.title}</span>

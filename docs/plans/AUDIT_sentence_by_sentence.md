@@ -628,7 +628,7 @@ These are full code blocks provided in the message. Each needs verification that
 
 | Status | Count |
 |--------|-------|
-| ✅ Fully Covered | **347** |
+| ✅ Fully Covered | **328** |
 | ⚠️ Partially Covered | **0** |
 | ❌ Missing from Plan | **0** |
 

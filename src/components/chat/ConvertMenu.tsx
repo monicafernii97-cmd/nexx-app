@@ -100,7 +100,7 @@ export function ConvertMenu({ content, panelTitle, onConvert, compact = false }:
                 `}
                 aria-label="Convert this into..."
                 aria-expanded={isOpen}
-                aria-haspopup="menu"
+                aria-haspopup="true"
                 title="Convert this into..."
             >
                 <ArrowsClockwise size={compact ? 14 : 12} />
@@ -129,13 +129,13 @@ export function ConvertMenu({ content, panelTitle, onConvert, compact = false }:
                             </p>
                         </div>
 
-                        <div className="p-1.5" role="menu" aria-label="Convert options">
+                        <div className="p-1.5" aria-label="Convert options">
                             {CONVERT_OPTIONS.map(option => {
                                 const Icon = ICON_MAP[option.icon] ?? FileText;
                                 return (
                                     <button
                                         key={option.target}
-                                        role="menuitem"
+                                        type="button"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             handleSelect(option.target);

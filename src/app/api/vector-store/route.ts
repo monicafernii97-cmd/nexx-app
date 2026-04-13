@@ -121,11 +121,23 @@ export async function POST(req: NextRequest) {
                 mimeType: 'application/x-vectorstore',
             });
             // Attach the provider's store ID via the action (supports vectorStoreId)
-            await convex.action(api.uploadedFiles.updateStatus, {
-                fileId,
-                status: 'ready' as const,
-                vectorStoreId: vectorStore.id,
-            });
+            try {
+                await convex.action(api.uploadedFiles.updateStatus, {
+                    fileId,
+                    status: 'ready' as const,
+                    vectorStoreId: vectorStore.id,
+                });
+            } catch (updateErr) {
+                // updateStatus failed — clean up the orphaned placeholder record
+                console.error('[vector-store/POST] updateStatus failed, cleaning up:', updateErr);
+                try {
+                    await convex.action(api.uploadedFiles.updateStatus, {
+                        fileId,
+                        status: 'failed' as const,
+                    });
+                } catch { /* best-effort cleanup */ }
+                throw updateErr; // re-throw so outer catch rolls back remote store
+            }
         } catch (convexErr) {
             // Convex failed — delete the orphaned remote store
             console.error('[vector-store/POST] Convex persist failed, rolling back remote store:', convexErr);
@@ -205,11 +217,17 @@ export async function DELETE(req: NextRequest) {
         }
 
         // OpenAI delete succeeded (or was already gone) — mark local files as defunct
-        for (const file of affectedFiles) {
-            await convex.action(api.uploadedFiles.updateStatus, {
-                fileId: file._id,
-                status: 'failed',
-            });
+        const results = await Promise.allSettled(
+            affectedFiles.map(file =>
+                convex.action(api.uploadedFiles.updateStatus, {
+                    fileId: file._id,
+                    status: 'failed' as const,
+                })
+            )
+        );
+        const failures = results.filter(r => r.status === 'rejected');
+        if (failures.length > 0) {
+            console.warn(`[vector-store/DELETE] ${failures.length}/${results.length} file status updates failed`);
         }
 
         return NextResponse.json({

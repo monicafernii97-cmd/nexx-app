@@ -100,10 +100,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const allMemory = useQuery(api.caseMemory.listByUser);
     const allTimeline = useQuery(api.timelineCandidates.listByUser);
 
-    // Filter to active case — legacy items (no caseId) only appear in the default case
-    const pins = allPins?.filter(p => p.caseId ? p.caseId === resolvedActiveCaseId : isDefaultCase);
-    const memory = allMemory?.filter(m => m.caseId ? m.caseId === resolvedActiveCaseId : isDefaultCase);
-    const timeline = allTimeline?.filter(t => t.caseId ? t.caseId === resolvedActiveCaseId : isDefaultCase);
+    // Filter to active case — legacy items (no caseId) only appear in the default case.
+    // Return undefined until cases is loaded so consumers see loading state, not empty arrays.
+    const pins =
+        cases === undefined
+            ? undefined
+            : allPins?.filter(p => (p.caseId ? p.caseId === resolvedActiveCaseId : isDefaultCase));
+    const memory =
+        cases === undefined
+            ? undefined
+            : allMemory?.filter(m => (m.caseId ? m.caseId === resolvedActiveCaseId : isDefaultCase));
+    const timeline =
+        cases === undefined
+            ? undefined
+            : allTimeline?.filter(t => (t.caseId ? t.caseId === resolvedActiveCaseId : isDefaultCase));
 
     // Mutations
     const removePinMutation = useMutation(api.casePins.remove);

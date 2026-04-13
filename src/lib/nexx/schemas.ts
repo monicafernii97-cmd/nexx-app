@@ -489,7 +489,6 @@ export const CASE_REPORT_SCHEMA = {
     additionalProperties: false,
     properties: {
       title: { type: 'string' },
-      generatedAt: { type: 'string' },
       sections: {
         type: 'array',
         items: {
@@ -505,6 +504,6 @@ export const CASE_REPORT_SCHEMA = {
       summary: { type: 'string' },
       recommendations: { type: 'array', items: { type: 'string' } },
     },
-    required: ['title', 'generatedAt', 'sections', 'summary', 'recommendations'],
+    required: ['title', 'sections', 'summary', 'recommendations'],
   },
 };

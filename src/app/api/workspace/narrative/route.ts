@@ -71,17 +71,21 @@ export async function POST(req: NextRequest) {
         ]);
 
         // ── Case-scoped filtering ──
-        // caseMemory + timelineCandidates have optional caseId → filter by it.
-        // incidents + pins lack caseId (Sprint 5) but are already user-scoped via auth.
+        // caseMemory, timelineCandidates, and casePins have optional caseId → filter by it.
+        // incidents schema lacks caseId today; filter applied for forward-compatibility
+        // so it activates automatically once Sprint 5 adds the field.
         const caseScopedMemory = (caseMemory ?? []).filter(
             (m: { caseId?: Id<'cases'> }) => !m.caseId || m.caseId === caseId,
         );
         const caseScopedTimeline = (timeline ?? []).filter(
             (t: { caseId?: Id<'cases'> }) => !t.caseId || t.caseId === caseId,
         );
-        // TODO (Sprint 5): Add caseId to incidents/pins schema and filter here.
-        const caseScopedIncidents = incidents ?? [];
-        const caseScopedPins = pins ?? [];
+        const caseScopedIncidents = (incidents ?? []).filter(
+            (i) => !(i as Record<string, unknown>).caseId || (i as Record<string, unknown>).caseId === caseId,
+        );
+        const caseScopedPins = (pins ?? []).filter(
+            (p: { caseId?: Id<'cases'> }) => !p.caseId || p.caseId === caseId,
+        );
 
         // Find existing pattern analysis (most recent)
         const patternAnalysis = caseScopedMemory
@@ -101,9 +105,16 @@ export async function POST(req: NextRequest) {
                 'case memory items',
             ),
             pins: serializeForPrompt(caseScopedPins, 'pinned items'),
-            patterns: patternAnalysis
-                ? (patternAnalysis as { content?: string }).content ?? 'No patterns analyzed yet.'
-                : 'No patterns analyzed yet.',
+            patterns: (() => {
+                const raw = (patternAnalysis as { content?: string } | undefined)?.content;
+                if (!raw) return 'No patterns analyzed yet.';
+                try {
+                    const parsed = JSON.parse(raw) as { patterns?: unknown[] };
+                    return serializeForPrompt(parsed.patterns ?? [], 'supported patterns');
+                } catch {
+                    return 'No patterns analyzed yet.';
+                }
+            })(),
         };
 
         // Call GPT for narrative synthesis

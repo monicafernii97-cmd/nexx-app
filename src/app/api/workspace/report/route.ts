@@ -124,11 +124,19 @@ export async function POST(req: NextRequest) {
         );
 
         // Build pattern context — differentiate 'excluded' from 'not available'
+        // and extract only the .patterns array (excluding suppressedCandidates).
         let patternsContext: string;
         if (config.patternHandling !== 'include_supported') {
             patternsContext = 'Pattern analysis excluded per user configuration.';
         } else if (patternItem) {
-            patternsContext = (patternItem as { content?: string }).content ?? 'No patterns analyzed.';
+            try {
+                const parsed = JSON.parse((patternItem as { content?: string }).content ?? '{}') as {
+                    patterns?: unknown[];
+                };
+                patternsContext = serializeForPrompt(parsed.patterns ?? [], 'supported patterns');
+            } catch {
+                patternsContext = 'No pattern analysis available. Run pattern detection first for best results.';
+            }
         } else {
             patternsContext = 'No pattern analysis available. Run pattern detection first for best results.';
         }

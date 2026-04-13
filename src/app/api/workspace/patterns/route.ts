@@ -72,16 +72,18 @@ export async function POST(req: NextRequest) {
         ]);
 
         // ── Case-scoped filtering ──
-        // caseMemory + timelineCandidates have optional caseId → filter by it.
-        // incidents lack caseId (Sprint 5) but are already user-scoped via auth.
+        // caseMemory, timelineCandidates, and casePins have optional caseId → filter by it.
+        // incidents schema lacks caseId today; filter applied for forward-compatibility
+        // so it activates automatically once Sprint 5 adds the field.
         const caseScopedMemory = (caseMemory ?? []).filter(
             (m: { caseId?: Id<'cases'> }) => !m.caseId || m.caseId === caseId,
         );
         const caseScopedTimeline = (timeline ?? []).filter(
             (t: { caseId?: Id<'cases'> }) => !t.caseId || t.caseId === caseId,
         );
-        // TODO (Sprint 5): Add caseId to incidents schema and filter here.
-        const caseScopedIncidents = incidents ?? [];
+        const caseScopedIncidents = (incidents ?? []).filter(
+            (i) => !(i as Record<string, unknown>).caseId || (i as Record<string, unknown>).caseId === caseId,
+        );
 
         // Exclude prior AI-generated artifacts so synthetic output
         // doesn't become evidence for subsequent runs.
@@ -128,6 +130,14 @@ export async function POST(req: NextRequest) {
         const outputText = response.output_text;
         const rawResult = JSON.parse(outputText);
 
+        // Build a lookup of all known source IDs from loaded records
+        // so we can validate GPT's source references against real data.
+        const knownSourceIds = new Set<string>([
+            ...caseScopedIncidents.map((i: { _id: string }) => i._id),
+            ...caseScopedTimeline.map((t: { _id: string }) => t._id),
+            ...primaryCaseMemory.map((m: { _id: string }) => m._id),
+        ]);
+
         // Score each pattern locally using our scoring system
         const scoredPatterns: DetectedPattern[] = rawResult.patterns
             .map((p: {
@@ -139,10 +149,17 @@ export async function POST(req: NextRequest) {
                 observability: 'interpretive' | 'mostly_observable' | 'clearly_observable';
             }) => {
                 const distinctDates = countDistinctDates(p.supportingEvents);
+
+                // Validate source-backing by cross-referencing against
+                // actual loaded records (not just schema presence).
+                const allSourceBacked = p.supportingEvents.every(
+                    (e: PatternEvent) => e.sourceId != null && knownSourceIds.has(e.sourceId),
+                );
+
                 const scoring = scorePattern({
                     eventCount: p.supportingEvents.length,
                     distinctDates,
-                    allSourceBacked: p.supportingEvents.every(e => e.sourceType !== undefined),
+                    allSourceBacked,
                     behavioralSimilarity: p.behavioralSimilarity,
                     observability: p.observability,
                 });

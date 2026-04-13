@@ -15,7 +15,7 @@ import type { Id } from '@convex/_generated/dataModel';
 import { CASE_REPORT_SCHEMA } from '@/lib/nexx/schemas';
 import { buildReportPrompt } from '@/lib/nexx/prompts/reportPrompt';
 import { PRIMARY_MODEL } from '@/lib/tiers';
-import type { OutputType, ToneType, PatternHandling } from '@/components/workspace/GenerateReportModal';
+import type { OutputType, ToneType, PatternHandling } from '@/lib/workspace-types';
 
 export const maxDuration = 60;
 
@@ -92,16 +92,18 @@ export async function POST(req: NextRequest) {
         const convex = await getAuthenticatedConvexClient();
 
         // Load case data in parallel
-        // Note: queries currently return all user data; case-scoped filtering is Sprint 5.
+        // TODO (Sprint 5): Replace with case-scoped queries once caseId is on timeline.
         const [timeline, caseMemory] = await Promise.all([
             convex.query(api.timelineCandidates.listByUser, {}),
             convex.query(api.caseMemory.listByUser, {}),
         ]);
 
-        // Filter caseMemory to target case
+        // Best-effort case filtering
         const caseScopedMemory = (caseMemory ?? []).filter(
             (m: { caseId?: Id<'cases'> }) => !m.caseId || m.caseId === config.caseId,
         );
+        // TODO (Sprint 5): Filter timeline by caseId once schema supports it.
+        const caseScopedTimeline = timeline ?? [];
 
         // Find most recent narrative and pattern analysis
         const narrativeItem = caseScopedMemory
@@ -121,15 +123,23 @@ export async function POST(req: NextRequest) {
             (m: { type: string }) => !['pattern_analysis', 'narrative_synthesis'].includes(m.type),
         );
 
+        // Build pattern context — differentiate 'excluded' from 'not available'
+        let patternsContext: string;
+        if (config.patternHandling !== 'include_supported') {
+            patternsContext = 'Pattern analysis excluded per user configuration.';
+        } else if (patternItem) {
+            patternsContext = (patternItem as { content?: string }).content ?? 'No patterns analyzed.';
+        } else {
+            patternsContext = 'No pattern analysis available. Run pattern detection first for best results.';
+        }
+
         const caseContext = {
             caseGraphSummary: 'Derive case context from the narrative and key points below.',
             narrative: narrativeItem
                 ? (narrativeItem as { content?: string }).content ?? 'No narrative generated yet.'
                 : 'No narrative generated yet. Generate a case narrative first for best results.',
-            patterns: config.patternHandling === 'include_supported' && patternItem
-                ? (patternItem as { content?: string }).content ?? 'No patterns analyzed.'
-                : 'Pattern analysis excluded per user configuration.',
-            timeline: serializeForPrompt(timeline, 'timeline events'),
+            patterns: patternsContext,
+            timeline: serializeForPrompt(caseScopedTimeline, 'timeline events'),
             keyPoints: serializeForPrompt(keyPoints, 'key points'),
         };
 
@@ -146,6 +156,9 @@ export async function POST(req: NextRequest) {
         });
 
         const report = JSON.parse(response.output_text);
+
+        // Server-stamp generatedAt (don't rely on model for timestamps)
+        report.generatedAt = new Date().toISOString();
 
         return NextResponse.json(report);
     } catch (err) {

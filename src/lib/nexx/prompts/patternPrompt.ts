@@ -55,7 +55,7 @@ Your task: Analyze the case data below and identify behavioral patterns that are
    - communication_timing_conflicts
    - transportation_logistics
    
-   You may also use a custom category if none of the above fit.
+   You MUST use one of the above categories. Do not invent custom categories.
 
 6. **Suppressed candidates** — If you detect a potential pattern that does NOT meet the threshold (fewer than 3 events, or events on the same date), include it in suppressedCandidates with the reason it was suppressed.
 

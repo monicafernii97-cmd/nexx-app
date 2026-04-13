@@ -10,7 +10,7 @@
  * Pattern handling: include_supported | exclude
  */
 
-import type { OutputType, ToneType, PatternHandling } from '@/components/workspace/GenerateReportModal';
+import type { OutputType, ToneType, PatternHandling } from '@/lib/workspace-types';
 
 /**
  * Build the report generation developer prompt.
@@ -95,10 +95,10 @@ ${caseContext.caseGraphSummary}
 
 ### Narrative Summary
 ${caseContext.narrative}
-
+${config.patternHandling === 'include_supported' ? `
 ### Patterns
 ${caseContext.patterns}
-
+` : ''}
 ### Timeline
 ${caseContext.timeline}
 
@@ -109,8 +109,9 @@ ${caseContext.keyPoints}
 
 Return a JSON object matching the case_report schema with:
 - title: Report title
-- generatedAt: ISO timestamp of generation
 - sections: Array of { heading, body } sections
 - summary: One-paragraph executive summary
-- recommendations: Array of actionable next steps`;
+- recommendations: Array of actionable next steps
+
+Note: Do NOT include a generatedAt field — the server will stamp it automatically.`;
 }

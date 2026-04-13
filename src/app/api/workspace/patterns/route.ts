@@ -16,8 +16,9 @@ import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { PATTERN_DETECTION_SCHEMA } from '@/lib/nexx/schemas';
 import { buildPatternPrompt } from '@/lib/nexx/prompts/patternPrompt';
-import { scorePattern, countDistinctDates } from '@/lib/nexx/premiumAnalytics';
+import { scorePattern, countDistinctDates, BEHAVIOR_CATEGORIES } from '@/lib/nexx/premiumAnalytics';
 import type { DetectedPattern, PatternEvent, BehaviorCategory } from '@/lib/nexx/premiumAnalytics';
+import { randomUUID } from 'crypto';
 import { PRIMARY_MODEL } from '@/lib/tiers';
 
 export const maxDuration = 60;
@@ -55,28 +56,31 @@ export async function POST(req: NextRequest) {
         const convex = await getAuthenticatedConvexClient();
 
         // Load all case data in parallel
-        // Note: queries currently return all user data; case-scoped filtering is Sprint 5.
+        // TODO (Sprint 5): Replace with case-scoped queries once caseId is on incidents/timeline.
         const [incidents, timeline, caseMemory] = await Promise.all([
             convex.query(api.incidents.list, {}),
             convex.query(api.timelineCandidates.listByUser, {}),
             convex.query(api.caseMemory.listByUser, {}),
         ]);
 
-        // Filter caseMemory to the target case where possible
+        // Best-effort case filtering where caseId field is available
         const caseScopedMemory = (caseMemory ?? []).filter(
             (m: { caseId?: Id<'cases'> }) => !m.caseId || m.caseId === caseId,
         );
+        // TODO (Sprint 5): Filter incidents/timeline by caseId once schema supports it.
+        const caseScopedIncidents = incidents ?? [];
+        const caseScopedTimeline = timeline ?? [];
 
         // Build serialized context for the prompt
         const caseContext = {
-            incidents: serializeForPrompt(incidents, 'incidents'),
-            timeline: serializeForPrompt(timeline, 'timeline events'),
+            incidents: serializeForPrompt(caseScopedIncidents, 'incidents'),
+            timeline: serializeForPrompt(caseScopedTimeline, 'timeline events'),
             caseMemory: serializeForPrompt(caseScopedMemory, 'case memory items'),
             caseGraphSummary: 'Case graph not yet loaded — provide context from incidents and timeline.',
         };
 
         // Check minimum data threshold
-        const totalEvents = (incidents?.length ?? 0) + (timeline?.length ?? 0);
+        const totalEvents = caseScopedIncidents.length + caseScopedTimeline.length + caseScopedMemory.length;
         if (totalEvents < 3) {
             return NextResponse.json({
                 patterns: [],
@@ -127,14 +131,24 @@ export async function POST(req: NextRequest) {
                     supportingEvents: p.supportingEvents,
                     confidence: scoring.confidence,
                     score: scoring.score,
-                    category: p.category as BehaviorCategory,
+                    category: (BEHAVIOR_CATEGORIES as readonly string[]).includes(p.category)
+                        ? (p.category as BehaviorCategory)
+                        : ('missed_or_delayed_calls' as BehaviorCategory),
                     _eligible: scoring.eligibleToShow,
                 };
             })
             .filter((p: DetectedPattern & { _eligible: boolean }) => p._eligible)
-            .map(({ _eligible: _, ...p }: DetectedPattern & { _eligible: boolean }) => p);
+            .map((p: DetectedPattern & { _eligible: boolean }): DetectedPattern => ({
+                title: p.title,
+                summary: p.summary,
+                supportingEvents: p.supportingEvents,
+                confidence: p.confidence,
+                score: p.score,
+                category: p.category,
+            }));
 
-        // Store results in caseMemory
+        // Store results in caseMemory (with requestId for idempotency)
+        const requestId = randomUUID();
         await convex.mutation(api.caseMemory.save, {
             caseId,
             type: 'pattern_analysis',
@@ -144,6 +158,7 @@ export async function POST(req: NextRequest) {
                 generatedAt: new Date().toISOString(),
             }),
             title: `Pattern Analysis — ${new Date().toLocaleDateString()}`,
+            requestId,
         });
 
         return NextResponse.json({

@@ -16,7 +16,8 @@ import type { Id } from '@convex/_generated/dataModel';
 import { CASE_NARRATIVE_SCHEMA } from '@/lib/nexx/schemas';
 import { buildNarrativePrompt } from '@/lib/nexx/prompts/narrativePrompt';
 import { PRIMARY_MODEL } from '@/lib/tiers';
-import type { CaseNarrative } from '@/components/workspace/NarrativeBlock';
+import type { CaseNarrative } from '@/lib/workspace-types';
+import { randomUUID } from 'crypto';
 
 export const maxDuration = 60;
 
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
         const convex = await getAuthenticatedConvexClient();
 
         // Load all case data in parallel
-        // Note: queries currently return all user data; case-scoped filtering is Sprint 5.
+        // TODO (Sprint 5): Replace with case-scoped queries once caseId is on incidents/timeline.
         const [incidents, timeline, caseMemory, pins] = await Promise.all([
             convex.query(api.incidents.list, {}),
             convex.query(api.timelineCandidates.listByUser, {}),
@@ -61,10 +62,14 @@ export async function POST(req: NextRequest) {
             convex.query(api.casePins.listByUser, {}),
         ]);
 
-        // Filter caseMemory to the target case where possible
+        // Best-effort case filtering where caseId field is available
         const caseScopedMemory = (caseMemory ?? []).filter(
             (m: { caseId?: Id<'cases'> }) => !m.caseId || m.caseId === caseId,
         );
+        // TODO (Sprint 5): Filter incidents/timeline/pins by caseId once schema supports it.
+        const caseScopedIncidents = incidents ?? [];
+        const caseScopedTimeline = timeline ?? [];
+        const caseScopedPins = pins ?? [];
 
         // Find existing pattern analysis (most recent)
         const patternAnalysis = caseScopedMemory
@@ -75,15 +80,15 @@ export async function POST(req: NextRequest) {
 
         const caseContext = {
             caseGraphSummary: 'Derive case context from the incidents, timeline, and case memory below.',
-            incidents: serializeForPrompt(incidents, 'incidents'),
-            timeline: serializeForPrompt(timeline, 'timeline events'),
+            incidents: serializeForPrompt(caseScopedIncidents, 'incidents'),
+            timeline: serializeForPrompt(caseScopedTimeline, 'timeline events'),
             caseMemory: serializeForPrompt(
                 caseScopedMemory.filter((m: { type: string }) =>
                     m.type !== 'pattern_analysis' && m.type !== 'narrative_synthesis',
                 ),
                 'case memory items',
             ),
-            pins: serializeForPrompt(pins, 'pinned items'),
+            pins: serializeForPrompt(caseScopedPins, 'pinned items'),
             patterns: patternAnalysis
                 ? (patternAnalysis as { content?: string }).content ?? 'No patterns analyzed yet.'
                 : 'No patterns analyzed yet.',
@@ -100,12 +105,14 @@ export async function POST(req: NextRequest) {
 
         const narrative: CaseNarrative = JSON.parse(response.output_text);
 
-        // Store in caseMemory
+        // Store in caseMemory (with requestId for idempotency)
+        const requestId = randomUUID();
         await convex.mutation(api.caseMemory.save, {
             caseId,
             type: 'narrative_synthesis',
             content: JSON.stringify(narrative),
             title: narrative.title || `Case Narrative — ${new Date().toLocaleDateString()}`,
+            requestId,
         });
 
         return NextResponse.json(narrative);

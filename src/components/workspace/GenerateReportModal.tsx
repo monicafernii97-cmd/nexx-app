@@ -17,12 +17,11 @@ import {
 } from '@phosphor-icons/react';
 
 // ---------------------------------------------------------------------------
-// Types
+// Types — imported from shared module & re-exported for consumers
 // ---------------------------------------------------------------------------
 
-export type OutputType = 'summary' | 'court_document' | 'both';
-export type ToneType = 'neutral_concise' | 'detailed_organized' | 'attorney_ready';
-export type PatternHandling = 'include_supported' | 'exclude';
+import type { OutputType, ToneType, PatternHandling } from '@/lib/workspace-types';
+export type { OutputType, ToneType, PatternHandling } from '@/lib/workspace-types';
 
 interface GenerateReportModalProps {
     isOpen: boolean;

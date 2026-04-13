@@ -58,15 +58,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     // On first load, auto-provision a default case.
     // On transient failure, increment provisionRetry to re-trigger (max 3 attempts).
     useEffect(() => {
+        let retryTimeout: ReturnType<typeof setTimeout> | null = null;
         if (cases !== undefined && cases.length === 0 && !provisioningRef.current && provisionRetry < 3) {
             provisioningRef.current = true;
             getOrCreateDefault()
                 .catch(() => {
                     // Schedule a retry after a short delay
-                    setTimeout(() => setProvisionRetry(r => r + 1), 1500);
+                    retryTimeout = setTimeout(() => setProvisionRetry(r => r + 1), 1500);
                 })
                 .finally(() => { provisioningRef.current = false; });
         }
+        return () => {
+            if (retryTimeout) clearTimeout(retryTimeout);
+        };
     }, [cases, getOrCreateDefault, provisionRetry]);
 
     // Derive active case at render time (avoids react-hooks/set-state-in-effect)
@@ -134,10 +138,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     // Persist case switch to DB so it survives page reloads (CR #49)
     const setActiveCaseId = useCallback(
         (id: Id<'cases'>) => {
+            const previousId = activeCaseId;
             setActiveCaseIdLocal(id);
-            setActiveMutation({ caseId: id }).catch(console.error);
+            setActiveMutation({ caseId: id }).catch((err) => {
+                console.error(err);
+                setActiveCaseIdLocal(previousId);
+            });
         },
-        [setActiveMutation],
+        [setActiveMutation, activeCaseId],
     );
 
     const value: WorkspaceContextType = {

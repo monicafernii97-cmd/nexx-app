@@ -74,9 +74,12 @@ export function buildTemplateContext(caseGraph: CaseGraph): TemplateContext {
         courtName: jurisdiction?.courtType
             ? `${jurisdiction.county ?? ''} ${jurisdiction.courtType} Court`.trim()
             : undefined,
-        caseType: caseGraph.openIssues?.[0]?.issue ?? 'general',
-        caseOpen: true, // Default — case graph doesn't track closed state
-        married: !!parties?.userName && !!parties?.opposingPartyName,
+        // A10: Don't derive caseType from openIssues — it misclassifies templates.
+        // Should come from a dedicated field when available.
+        caseType: 'general',
+        caseOpen: true,
+        // A11: Don't assume married — default to false unless explicitly known
+        married: false,
         childrenInvolved: children.length > 0,
         partyRole: (parties?.userRole === 'petitioner' || parties?.userRole === 'respondent')
             ? parties.userRole
@@ -119,6 +122,9 @@ const TEMPLATE_REQUIREMENTS: Record<string, { required: string[]; optional: stri
     },
 };
 
+// A12: Boolean facts that must be `true` to count as "available"
+const REQUIRED_TRUE_FACTS = new Set(['childrenInvolved', 'married']);
+
 /**
  * Check whether a template is compatible with the current case context.
  */
@@ -134,7 +140,10 @@ export function checkTemplateCompatibility(
 
     for (const fact of requirements.required) {
         const value = context[fact as keyof TemplateContext];
-        if (value !== undefined && value !== '' && value !== 'unknown') {
+        const isTruthyEnough = REQUIRED_TRUE_FACTS.has(fact)
+            ? value === true
+            : value !== undefined && value !== '' && value !== 'unknown';
+        if (isTruthyEnough) {
             available.push(fact);
         } else {
             missing.push(fact);

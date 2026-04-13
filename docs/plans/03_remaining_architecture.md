@@ -138,7 +138,7 @@ The `documentDrafter.ts` module already exists and is complete. This just wires 
 
 ## WS-5: Infrastructure Gaps
 
-### [NEW] `convex/crons.ts`
+### [MODIFY] `convex/crons.ts` (already exists — add toolRuns cron)
 
 Register the `toolRuns.deleteExpired` cron:
 

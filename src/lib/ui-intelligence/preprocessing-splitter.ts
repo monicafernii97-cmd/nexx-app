@@ -145,6 +145,15 @@ export function splitIntoPanels(markdownText: string): PanelData[] {
         });
     }
 
+    // M2: Fallback — if all sections had empty content, don't drop the markdown
+    if (panels.length === 0) {
+        return [{
+            type: 'overview',
+            title: 'Response',
+            content: markdownText.trim(),
+        }];
+    }
+
     return panels;
 }
 

@@ -64,7 +64,9 @@ export function InlineLinkingModal({
                 status: t.status,
             }));
         }
-        // Future: incidents from workspace context
+        // A9: Incident linking — not yet wired to workspace context.
+        // Returns empty list; consumers should check linkTarget === 'incident'
+        // and show a disabled state or hide the option until incidents are available.
         return [];
     }, [linkTarget, timeline]);
 
@@ -77,14 +79,19 @@ export function InlineLinkingModal({
         );
     }, [items, searchQuery]);
 
+    // N2: Reset state on every close — not just confirm
+    const handleClose = () => {
+        setSelectedId(null);
+        setSearchQuery('');
+        onClose();
+    };
+
     const handleConfirm = () => {
         if (!selectedId) return;
         const item = items.find(i => i.id === selectedId);
         if (item) {
             onLink(selectedId, item.title);
-            setSelectedId(null);
-            setSearchQuery('');
-            onClose();
+            handleClose();
         }
     };
 
@@ -101,7 +108,7 @@ export function InlineLinkingModal({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-                        onClick={onClose}
+                        onClick={handleClose}
                     />
 
                     {/* Modal */}
@@ -110,6 +117,9 @@ export function InlineLinkingModal({
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="inline-linking-title"
                         className="fixed inset-x-4 top-[20%] md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:w-[480px] z-50 rounded-2xl border border-white/12 bg-[#0E1729]/98 backdrop-blur-xl shadow-2xl overflow-hidden"
                     >
                         {/* Header */}
@@ -119,7 +129,7 @@ export function InlineLinkingModal({
                                     <LinkIcon size={16} weight="duotone" className="text-[var(--accent-icy)]" />
                                 </div>
                                 <div>
-                                    <h3 className="text-[15px] font-semibold text-white">
+                                    <h3 id="inline-linking-title" className="text-[15px] font-semibold text-white">
                                         Link to {label}
                                     </h3>
                                     {sourceTitle && (
@@ -130,7 +140,7 @@ export function InlineLinkingModal({
                                 </div>
                             </div>
                             <button
-                                onClick={onClose}
+                                onClick={handleClose}
                                 className="p-2 rounded-xl hover:bg-white/10 text-white/40 hover:text-white/70 transition-all"
                             >
                                 <X size={16} />
@@ -220,7 +230,7 @@ export function InlineLinkingModal({
                         {/* Footer */}
                         <div className="px-6 py-4 border-t border-white/8 flex items-center justify-end gap-3">
                             <button
-                                onClick={onClose}
+                                onClick={handleClose}
                                 className="px-4 py-2 rounded-xl text-[12px] font-semibold text-white/50 hover:text-white/70 hover:bg-white/5 transition-all"
                             >
                                 Cancel

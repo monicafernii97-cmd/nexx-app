@@ -78,10 +78,10 @@ export function getConvertRoute(target: ConvertTarget): RouteConfig {
 
 /**
  * Build an ActionResult for a successful conversion.
+ * M4: source param removed — was unused.
  */
 export function buildConvertResult(
     target: ConvertTarget,
-    source: ItemSource,
 ): ActionResult {
     const route = CONVERT_ROUTES[target];
     return {
@@ -97,12 +97,13 @@ export function buildConvertResult(
 
 /**
  * All available convert targets with their labels for the ConvertMenu.
+ * N7: Derived from CONVERT_ROUTES to prevent config drift.
  */
-export const CONVERT_OPTIONS: Array<{ target: ConvertTarget; label: string; icon: string }> = [
-    { target: 'exhibit_summary', label: 'Exhibit Summary', icon: 'FileText' },
-    { target: 'incident_narrative', label: 'Incident Narrative', icon: 'SealWarning' },
-    { target: 'affidavit_language', label: 'Affidavit Language', icon: 'FileText' },
-    { target: 'motion_paragraph', label: 'Motion Paragraph', icon: 'FileText' },
-    { target: 'hearing_outline', label: 'Hearing Outline', icon: 'Strategy' },
-    { target: 'timeline_item', label: 'Timeline Event', icon: 'CalendarCheck' },
-];
+export const CONVERT_OPTIONS: Array<{ target: ConvertTarget; label: string; icon: string }> =
+    (Object.entries(CONVERT_ROUTES) as Array<[ConvertTarget, RouteConfig]>).map(
+        ([target, config]) => ({
+            target,
+            label: config.label,
+            icon: config.icon,
+        })
+    );

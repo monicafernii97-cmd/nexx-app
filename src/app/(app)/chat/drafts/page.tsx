@@ -23,17 +23,17 @@ const DRAFT_TABS = [
     { id: 'procedure_note', label: 'Procedures' },
 ];
 
+// M3: Module-scoped stable Set — prevents stale closure in useMemo
+const DRAFT_TYPES = new Set(['draft_snippet', 'hearing_prep_point', 'exhibit_note', 'procedure_note']);
+
 export default function DraftsPage() {
     const { memory, removeMemory } = useWorkspace();
     const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Only show draft-related types
-    const draftTypes = new Set(['draft_snippet', 'hearing_prep_point', 'exhibit_note', 'procedure_note']);
-
     const allDrafts = useMemo(() => {
         if (!memory) return [];
-        return memory.filter(item => draftTypes.has(item.type));
+        return memory.filter(item => DRAFT_TYPES.has(item.type));
     }, [memory]);
 
     const filteredItems = useMemo(() => {
@@ -129,6 +129,7 @@ export default function DraftsPage() {
                             content={item.content}
                             createdAt={item.createdAt}
                             onRemove={removeMemory}
+                            sourceConversationId={(item as any).sourceConversationId}
                         />
                     ))}
                 </div>

@@ -141,7 +141,7 @@ gpt-5.4 ✅ | gpt-5.4-mini ✅ | gpt-5.4-pro (judge sim/opposition sim/deep draf
 
 ## Response Schema Artifact Slots — Confirmed Complete
 
-```
+```typescript
 artifacts: {
   draftReady          ← Court-ready document draft
   timelineReady       ← Timeline exhibit  

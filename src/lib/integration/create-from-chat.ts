@@ -5,7 +5,6 @@
  * panelType) so every created item is traceable to its origin.
  */
 
-import type { ConvexReactClient } from 'convex/react';
 import type { ItemSource, ActionResult } from './types';
 import type { ConvertTarget } from './route-created-item';
 import { getConvertRoute, buildConvertResult } from './route-created-item';
@@ -47,15 +46,17 @@ export function extractTitle(content: string, fallback = 'Untitled'): string {
     return content.slice(0, 60).trim() + (content.length > 60 ? '…' : '');
 }
 
-// ---------------------------------------------------------------------------
-// Create item (pure function — actual Convex call happens in WorkspaceClient)
-// ---------------------------------------------------------------------------
+// N6: Explicit return type for buildCreateArgs
+interface CreateArgsResult {
+    mutation: 'timelineCandidates' | 'caseMemory';
+    args: Record<string, unknown>;
+}
 
 /**
  * Build the mutation arguments for creating an item from chat.
  * Returns the save type and formatted args ready for Convex.
  */
-export function buildCreateArgs(args: CreateFromChatArgs) {
+export function buildCreateArgs(args: CreateFromChatArgs): CreateArgsResult {
     const route = getConvertRoute(args.target);
     const title = args.title || extractTitle(args.content);
 
@@ -92,5 +93,5 @@ export function buildCreateArgs(args: CreateFromChatArgs) {
  * Build the success result for a create-from-chat action.
  */
 export function buildCreateResult(args: CreateFromChatArgs): ActionResult {
-    return buildConvertResult(args.target, args.source);
+    return buildConvertResult(args.target);
 }

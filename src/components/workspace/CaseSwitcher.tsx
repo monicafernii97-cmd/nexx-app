@@ -78,10 +78,24 @@ export function CaseSwitcher() {
         }
     };
 
-    if (!cases || cases.length === 0) {
+    if (!cases) {
         return (
             <div className="px-3 py-2">
                 <div className="h-9 rounded-xl bg-white/5 animate-pulse" />
+            </div>
+        );
+    }
+
+    if (cases.length === 0) {
+        return (
+            <div className="px-3">
+                <button
+                    onClick={handleNewCase}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-dashed border-white/15 hover:bg-[var(--accent-icy)]/10 text-[var(--accent-icy)]/70 hover:text-[var(--accent-icy)] transition-all"
+                >
+                    <Plus size={14} weight="bold" />
+                    <span className="text-[12px] font-bold">Create First Case</span>
+                </button>
             </div>
         );
     }
@@ -169,16 +183,25 @@ export function CaseSwitcher() {
                                             <Check size={14} weight="bold" className="text-[var(--accent-icy)]" />
                                         )}
                                         {c._id !== activeCaseId && activeCases.length > 1 && (
-                                            <button
+                                            <div
+                                                role="button"
+                                                tabIndex={0}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleArchive(c._id);
                                                 }}
-                                                className="p-1 rounded-lg opacity-0 group-hover/item:opacity-100 hover:bg-white/10 text-white/30 hover:text-white/60 transition-all"
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        handleArchive(c._id);
+                                                    }
+                                                }}
+                                                className="p-1 rounded-lg opacity-0 group-hover/item:opacity-100 hover:bg-white/10 text-white/30 hover:text-white/60 transition-all cursor-pointer"
                                                 aria-label={`Archive ${c.title}`}
                                             >
                                                 <Archive size={12} />
-                                            </button>
+                                            </div>
                                         )}
                                     </div>
                                 </button>

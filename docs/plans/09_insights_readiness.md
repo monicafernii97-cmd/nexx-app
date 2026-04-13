@@ -31,7 +31,7 @@ We will introduce a "Case" as a first-class citizen. Even for users with one cas
 
 #### [NEW] `convex/cases.ts`
 - Table `cases`: `userId`, `title`, `description`, `status`.
-- Mutation `getOrCreateDefault`: Ensures every user has at least one "My Case" default.
+- Mutation `getOrCreateDefault`: Ensures every user has at least one "My Case" default. **Race-safe**: Uses a uniqueness constraint on `(userId, isDefault)` and wraps create in a conflict-safe upsert pattern to prevent duplicate defaults under concurrent requests.
 - Mutation `create`: For adding new cases.
 
 #### [MODIFY] `convex/schema.ts`
@@ -42,6 +42,9 @@ We will introduce a "Case" as a first-class citizen. Even for users with one cas
   - `incidents`
   - `documents`
 - Add index `by_caseId` to all the above.
+
+> [!WARNING]
+> **Migration**: Existing rows lack `caseId`. A backfill migration step must run *before* any query filters by `caseId`. The sequence is: (1) deploy schema with optional `caseId`, (2) run backfill mutation assigning existing rows to the user's default case, (3) deploy queries that filter by `caseId`.
 
 #### [MODIFY] `src/lib/workspace-context.tsx`
 - Add `activeCaseId` and `setActiveCaseId` to context.
@@ -106,7 +109,7 @@ Connecting the workspace intelligence to legal output.
 
 #### [MODIFY] `src/app/(app)/docuvault/page.tsx`
 - **Magic Moment Banner**: Show at top — *"Your case data has been organized and pre-filled. Review and edit before exporting."*
-- Accept `caseId` and `prepopulatedData` from workspace.
+- Accept `caseId` from workspace. Pre-populated data is stored server-side in a short-lived session record (Convex `reportSessions` table with 15-min TTL) and referenced by a session token — *not* passed via URL params or client-visible transport, to avoid exposing sensitive case data.
 
 ---
 

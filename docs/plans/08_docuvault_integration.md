@@ -65,13 +65,11 @@ The core feature: let users send their accumulated workspace intelligence (pins,
 
 > [!IMPORTANT]
 > **Q1: Is this a single-case-per-user platform?** The current schema has no `caseId` on pins/memory/timeline. If you plan to support multiple cases per user in the future, we should add `caseId` now. Otherwise the current userId scoping is fine.
-
 > [!IMPORTANT]  
 > **Q2: What document should workspace export produce?** Options:
 > - **(a)** A **strategic briefing** (non-court document, internal summary)
 > - **(b)** Feed workspace data into **existing court filing templates** (petition, motion, etc.)
 > - **(c)** Both — briefing + pre-populate filings
-
 > [!WARNING]
 > **Q3: DocuVault page complexity.** The existing `/docuvault` page is a full document builder. Should the "Generate Report" flow:
 > - **(a)** Navigate to the existing DocuVault page with data pre-filled?

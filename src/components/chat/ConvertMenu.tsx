@@ -60,9 +60,17 @@ export function ConvertMenu({ content, panelTitle, onConvert, compact = false }:
                 setIsOpen(false);
             }
         }
+        // N5: Close on Escape key
+        function handleKeyDown(event: KeyboardEvent) {
+            if (event.key === 'Escape') setIsOpen(false);
+        }
         if (isOpen) {
             document.addEventListener('mousedown', handleClickOutside);
-            return () => document.removeEventListener('mousedown', handleClickOutside);
+            document.addEventListener('keydown', handleKeyDown);
+            return () => {
+                document.removeEventListener('mousedown', handleClickOutside);
+                document.removeEventListener('keydown', handleKeyDown);
+            };
         }
     }, [isOpen]);
 
@@ -87,6 +95,7 @@ export function ConvertMenu({ content, panelTitle, onConvert, compact = false }:
                 `}
                 aria-label="Convert this into..."
                 aria-expanded={isOpen}
+                aria-haspopup="menu"
                 title="Convert this into..."
             >
                 <ArrowsClockwise size={compact ? 14 : 12} />
@@ -115,13 +124,17 @@ export function ConvertMenu({ content, panelTitle, onConvert, compact = false }:
                             </p>
                         </div>
 
-                        <div className="p-1.5">
+                        <div className="p-1.5" role="menu" aria-label="Convert options">
                             {CONVERT_OPTIONS.map(option => {
                                 const Icon = ICON_MAP[option.icon] ?? FileText;
                                 return (
                                     <button
                                         key={option.target}
-                                        onClick={() => handleSelect(option.target)}
+                                        role="menuitem"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSelect(option.target);
+                                        }}
                                         className="
                                             w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg
                                             text-white/60 hover:text-white/90 hover:bg-white/5

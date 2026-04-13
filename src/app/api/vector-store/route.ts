@@ -88,7 +88,10 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const name = body.name || `nexx_store_${userId}_${Date.now()}`;
 
-        const vectorStore = await (openai.vectorStores as any).create({
+        // A5: vectorStores API is in the beta namespace; cast needed until SDK exports stable types
+        const vectorStore = await (openai.vectorStores as unknown as {
+            create: (params: { name: string; metadata: Record<string, unknown> }) => Promise<{ id: string; name: string }>;
+        }).create({
             name,
             metadata: {
                 userId,
@@ -132,25 +135,37 @@ export async function DELETE(req: NextRequest) {
             );
         }
 
-        // Delete from OpenAI
-        try {
-            await (openai.vectorStores as any).del(vectorStoreId);
-        } catch (err: any) {
-            // Store may already be deleted — log but don't fail
-            if (err?.status !== 404) {
-                console.warn('[vector-store/DELETE] OpenAI deletion warning:', err.message);
-            }
-        }
-
-        // Update Convex records — mark files as deleted
+        // A6: Validate ownership BEFORE deleting from OpenAI
         const convex = await getAuthenticatedConvexClient();
         const files = await convex.query(api.uploadedFiles.getByUser, {});
         const affectedFiles = files.filter(f => f.vectorStoreId === vectorStoreId);
 
+        // If the user has no files in this store, they don't own it
+        if (affectedFiles.length === 0) {
+            return NextResponse.json(
+                { error: 'Vector store not found or not owned by user' },
+                { status: 403 },
+            );
+        }
+
+        // Now safe to delete from OpenAI — ownership verified
+        // A5: vectorStores API is typed in the beta namespace; cast is necessary
+        // until the SDK exports stable types for vector store operations
+        try {
+            await (openai.vectorStores as unknown as { del: (id: string) => Promise<void> }).del(vectorStoreId);
+        } catch (err: unknown) {
+            // Store may already be deleted — log but don't fail
+            const status = (err as { status?: number })?.status;
+            if (status !== 404) {
+                console.warn('[vector-store/DELETE] OpenAI deletion warning:', err);
+            }
+        }
+
+        // Update Convex records — mark files as defunct
         for (const file of affectedFiles) {
             await convex.action(api.uploadedFiles.updateStatus, {
                 fileId: file._id,
-                status: 'failed', // Mark as defunct
+                status: 'failed',
             });
         }
 

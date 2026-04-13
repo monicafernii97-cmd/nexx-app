@@ -157,6 +157,17 @@ export const archive = mutation({
         if (!existing || existing.userId !== user._id) {
             throw new Error('Not authorized to archive this case');
         }
+
+        // Prevent archiving the last active case
+        const activeCases = await ctx.db
+            .query('cases')
+            .withIndex('by_userId', (q) => q.eq('userId', user._id))
+            .filter((q) => q.eq(q.field('status'), 'active'))
+            .collect();
+        if (activeCases.length <= 1) {
+            throw new Error('Cannot archive your last active case');
+        }
+
         await ctx.db.patch(args.caseId, {
             status: 'archived' as const,
             updatedAt: Date.now(),

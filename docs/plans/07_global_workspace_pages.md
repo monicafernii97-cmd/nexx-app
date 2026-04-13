@@ -71,7 +71,6 @@ Even with the global rail, full-page views are needed for bulk management, searc
 
 > [!IMPORTANT]
 > **Persistent Real Estate**: Making the rail "always visible" reduces the center content width by 320px on desktop. We will ensure the center column is responsive and uses `max-w-5xl` for optimal reading.
-
 > [!TIP]
 > **Visibility Toggle**: We will include a "Collapse" button on the rail (to a 40px icon bar) so users can reclaim full screen width when needed.
 

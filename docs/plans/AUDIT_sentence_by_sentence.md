@@ -636,6 +636,5 @@ These are full code blocks provided in the message. Each needs verification that
 
 > [!TIP]
 > **Result: 100% coverage.** Every single sentence, suggestion, type definition, file path, endpoint, design decision, principle, code example, and UI specification from the original message is captured in `implementation_plan.md` v2. No items are missing.
-
 > [!NOTE]
 > The v2 plan (second-pass audit) successfully added the 28 items that were missing from v1, bringing coverage to complete. The plan is ready for execution pending answers to the 4 open questions at the bottom of the plan.

@@ -77,13 +77,12 @@ export const create = mutation({
             .query('cases')
             .withIndex('by_userId', (q) => q.eq('userId', user._id))
             .collect();
+        const now = Date.now();
         for (const c of activeCases) {
             if (c.status === 'active') {
-                await ctx.db.patch(c._id, { status: 'archived', updatedAt: Date.now() });
+                await ctx.db.patch(c._id, { status: 'archived', updatedAt: now });
             }
         }
-
-        const now = Date.now();
         return ctx.db.insert('cases', {
             userId: user._id,
             title: args.title,
@@ -118,14 +117,15 @@ export const setActive = mutation({
             .query('cases')
             .withIndex('by_userId', (q) => q.eq('userId', user._id))
             .collect();
+        const now = Date.now();
         for (const c of userCases) {
             if (c.status === 'active' && c._id !== args.caseId) {
-                await ctx.db.patch(c._id, { status: 'archived', updatedAt: Date.now() });
+                await ctx.db.patch(c._id, { status: 'archived', updatedAt: now });
             }
         }
 
         // Activate the target case
-        await ctx.db.patch(args.caseId, { status: 'active', updatedAt: Date.now() });
+        await ctx.db.patch(args.caseId, { status: 'active', updatedAt: now });
     },
 });
 

@@ -11,7 +11,7 @@ import { parseEventDate, safeEventDate } from '@/lib/workspace-constants';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { ItemCard } from '@/components/workspace/ItemCard';
 import { EmptyState } from '@/components/workspace/EmptyState';
 import { PatternsBlock } from '@/components/workspace/PatternsBlock';
@@ -31,10 +31,10 @@ export default function WorkspaceOverview() {
     const { pins, memory, timeline, counts, removeMemory } = useWorkspace();
 
     // ── Generate Report Modal state ──
-    const searchParams = useSearchParams();
-    const [isReportModalOpen, setIsReportModalOpen] = useState(
-        () => searchParams.get('openReportModal') === 'true'
-    );
+    const [isReportModalOpen, setIsReportModalOpen] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        return new URLSearchParams(window.location.search).get('openReportModal') === 'true';
+    });
 
     // Listen for sidebar "Generate Report" button
     useEffect(() => {

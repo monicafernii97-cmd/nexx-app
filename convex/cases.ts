@@ -25,13 +25,16 @@ export const list = query({
  * This is the "zero-friction" entry point — every user automatically gets
  * a "My Case" the first time the workspace loads. No onboarding modal,
  * no extra steps. Multi-case support simply reveals the switcher later.
+ *
+ * Convex mutations are serialized per-document, so query→insert within
+ * a single handler is atomic and race-free.
  */
 export const getOrCreateDefault = mutation({
     args: {},
     handler: async (ctx) => {
         const user = await getAuthenticatedUser(ctx);
 
-        // Check for an existing case
+        // Check for any existing case — if found, return it immediately
         const existing = await ctx.db
             .query('cases')
             .withIndex('by_userId', (q) => q.eq('userId', user._id))
@@ -48,23 +51,6 @@ export const getOrCreateDefault = mutation({
             createdAt: now,
             updatedAt: now,
         });
-
-        // Idempotent guard: if a concurrent mutation already created a case,
-        // return the earliest one and remove the duplicate we just inserted.
-        const allCases = await ctx.db
-            .query('cases')
-            .withIndex('by_userId', (q) => q.eq('userId', user._id))
-            .collect();
-
-        if (allCases.length > 1) {
-            // Keep the oldest (lowest createdAt), remove the one we just made
-            const sorted = [...allCases].sort((a, b) => a.createdAt - b.createdAt);
-            for (const dup of sorted.slice(1)) {
-                await ctx.db.delete(dup._id);
-            }
-            return sorted[0];
-        }
-
         return (await ctx.db.get(id))!;
     },
 });

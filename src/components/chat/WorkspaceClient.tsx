@@ -18,6 +18,7 @@ import type { ActionType, PanelData } from '@/lib/ui-intelligence/types';
 import type { PinnableType } from '@/lib/integration/types';
 import { ACTION_DESTINATIONS } from '@/lib/integration/types';
 import { useToast } from '@/components/feedback/ToastProvider';
+import { useWorkspace } from '@/lib/workspace-context';
 import { SaveToCaseModal } from '@/components/chat/SaveToCaseModal';
 import { PinToWorkspaceModal } from '@/components/chat/PinToWorkspaceModal';
 
@@ -58,6 +59,7 @@ export interface WorkspaceContext {
 /** Workspace client orchestrator — renders children with action context. */
 export function WorkspaceClient({ children }: WorkspaceClientProps) {
     const { showToast } = useToast();
+    const { activeCaseId } = useWorkspace();
 
     // ── Convex mutations ──
     const saveToCaseMemory = useMutation(api.caseMemory.save);
@@ -105,6 +107,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                     type: type as Parameters<typeof saveToCaseMemory>[0]['type'],
                     title,
                     content: modalSeedContent,
+                    caseId: activeCaseId ?? undefined,
                     requestId,
                 });
 
@@ -128,7 +131,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                 setIsSaving(false);
             }
         },
-        [saveToCaseMemory, showToast, modalSeedContent]
+        [saveToCaseMemory, showToast, modalSeedContent, activeCaseId]
     );
 
     // ── Pin to workspace ──
@@ -141,6 +144,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                     type,
                     title,
                     content,
+                    caseId: activeCaseId ?? undefined,
                     requestId,
                 });
 
@@ -160,7 +164,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                 setIsPinning(false);
             }
         },
-        [createPin, showToast]
+        [createPin, showToast, activeCaseId]
     );
 
     // ── Add to timeline ──
@@ -171,6 +175,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                 await createTimelineCandidate({
                     title,
                     description,
+                    caseId: activeCaseId ?? undefined,
                     requestId,
                 });
 
@@ -191,7 +196,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                 });
             }
         },
-        [createTimelineCandidate, showToast]
+        [createTimelineCandidate, showToast, activeCaseId]
     );
 
     // ── Quick save (no modal — direct mutation for simple actions) ──
@@ -206,6 +211,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                     type: saveType as Parameters<typeof saveToCaseMemory>[0]['type'],
                     title,
                     content,
+                    caseId: activeCaseId ?? undefined,
                     requestId,
                 });
 
@@ -225,7 +231,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                 });
             }
         },
-        [saveToCaseMemory, showToast]
+        [saveToCaseMemory, showToast, activeCaseId]
     );
 
     // ── Central action dispatcher ──

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useCallback, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, useState, useEffect, useRef, type ReactNode } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Doc, Id } from '@convex/_generated/dataModel';
@@ -47,6 +47,7 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefin
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const [activeCaseId, setActiveCaseId] = useState<Id<'cases'> | null>(null);
+    const provisioningRef = useRef(false);
 
     // Ensure a default case exists for the user
     const getOrCreateDefault = useMutation(api.cases.getOrCreateDefault);
@@ -54,8 +55,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     // On first load, auto-provision a default case (provisioning only — no setState)
     useEffect(() => {
-        if (cases !== undefined && cases.length === 0) {
-            getOrCreateDefault().catch(console.error);
+        if (cases !== undefined && cases.length === 0 && !provisioningRef.current) {
+            provisioningRef.current = true;
+            getOrCreateDefault()
+                .catch(console.error)
+                .finally(() => { provisioningRef.current = false; });
         }
     }, [cases, getOrCreateDefault]);
 
@@ -68,8 +72,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     const activeCase = cases?.find(c => c._id === resolvedActiveCaseId) ?? null;
 
-    // The default case gets legacy (no caseId) records
-    const defaultCaseId = cases?.[0]?._id ?? null;
+    // The default (original) case gets legacy (no caseId) records.
+    // cases.list returns newest-first, so we need the oldest case — not [0].
+    const defaultCaseId =
+        cases && cases.length > 0
+            ? cases.reduce((oldest, c) => (c.createdAt < oldest.createdAt ? c : oldest))._id
+            : null;
     const isDefaultCase = resolvedActiveCaseId === defaultCaseId;
 
     // Queries — still user-scoped (caseId filtering done client-side for backward compat)

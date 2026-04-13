@@ -7,7 +7,7 @@
  * Includes "New Case" and "Archive" actions.
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     CaretUpDown,
@@ -31,7 +31,9 @@ export function CaseSwitcher() {
     const { showToast } = useToast();
     const [isOpen, setIsOpen] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
+    const [pendingActions, setPendingActions] = useState<Set<string>>(new Set());
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
     const createCase = useMutation(api.cases.create);
     const archiveCase = useMutation(api.cases.archive);
     const unarchiveCase = useMutation(api.cases.unarchive);
@@ -87,6 +89,8 @@ export function CaseSwitcher() {
     };
 
     const handleArchive = async (caseId: Id<'cases'>) => {
+        if (pendingActions.has(caseId)) return;
+        setPendingActions(prev => new Set(prev).add(caseId));
         try {
             await archiveCase({ caseId });
             setIsOpen(false);
@@ -97,10 +101,18 @@ export function CaseSwitcher() {
                 description: err instanceof Error ? err.message : 'Please try again.',
                 variant: 'error',
             });
+        } finally {
+            setPendingActions(prev => {
+                const next = new Set(prev);
+                next.delete(caseId);
+                return next;
+            });
         }
     };
 
     const handleUnarchive = async (caseId: Id<'cases'>) => {
+        if (pendingActions.has(caseId)) return;
+        setPendingActions(prev => new Set(prev).add(caseId));
         try {
             await unarchiveCase({ caseId });
             setActiveCaseId(caseId);
@@ -112,8 +124,43 @@ export function CaseSwitcher() {
                 description: err instanceof Error ? err.message : 'Please try again.',
                 variant: 'error',
             });
+        } finally {
+            setPendingActions(prev => {
+                const next = new Set(prev);
+                next.delete(caseId);
+                return next;
+            });
         }
     };
+
+    /** Menu keyboard navigation — ArrowUp/Down, Home/End, Escape. */
+    const handleMenuKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+        const menu = menuRef.current;
+        if (!menu) return;
+        const items = Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+        const idx = items.indexOf(e.target as HTMLElement);
+
+        let next: HTMLElement | undefined;
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                next = items[(idx + 1) % items.length];
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                next = items[(idx - 1 + items.length) % items.length];
+                break;
+            case 'Home':
+                e.preventDefault();
+                next = items[0];
+                break;
+            case 'End':
+                e.preventDefault();
+                next = items[items.length - 1];
+                break;
+        }
+        next?.focus();
+    }, []);
 
     if (!cases) {
         return (
@@ -150,7 +197,7 @@ export function CaseSwitcher() {
                     transition-all duration-200 group
                 "
                 aria-expanded={isOpen}
-                aria-haspopup="listbox"
+                aria-haspopup="menu"
             >
                 <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-7 h-7 rounded-lg bg-[var(--accent-icy)]/10 border border-[var(--accent-icy)]/20 flex items-center justify-center flex-shrink-0">
@@ -184,8 +231,10 @@ export function CaseSwitcher() {
                             rounded-2xl border border-white/12 bg-[#0E1729]/95 backdrop-blur-xl
                             shadow-2xl shadow-black/40 overflow-hidden
                         "
-                        role="listbox"
-                        aria-label="Select case"
+                        role="menu"
+                        aria-label="Case actions"
+                        ref={menuRef}
+                        onKeyDown={handleMenuKeyDown}
                     >
                         {/* Active Cases */}
                         <div className="p-2">
@@ -195,14 +244,15 @@ export function CaseSwitcher() {
                             {activeCases.map(c => (
                                 <div
                                     key={c._id}
-                                    role="option"
-                                    aria-selected={c._id === activeCaseId}
+                                    role="menuitem"
                                     tabIndex={0}
                                     onClick={() => {
                                         setActiveCaseId(c._id);
                                         setIsOpen(false);
                                     }}
                                     onKeyDown={(e) => {
+                                        // Only act when the event originates from this row, not nested buttons
+                                        if (e.target !== e.currentTarget) return;
                                         if (e.key === 'Enter' || e.key === ' ') {
                                             e.preventDefault();
                                             setActiveCaseId(c._id);
@@ -217,6 +267,7 @@ export function CaseSwitcher() {
                                             : 'hover:bg-white/5 text-white/60 hover:text-white/80'
                                         }
                                     `}
+                                    aria-current={c._id === activeCaseId ? 'true' : undefined}
                                 >
                                     <div className="flex items-center gap-2.5 min-w-0">
                                         <FolderOpen size={14} weight={c._id === activeCaseId ? 'fill' : 'regular'} />
@@ -235,7 +286,8 @@ export function CaseSwitcher() {
                                                     e.stopPropagation();
                                                     handleArchive(c._id);
                                                 }}
-                                                className="p-1 rounded-lg opacity-0 group-hover/item:opacity-100 hover:bg-white/10 text-white/30 hover:text-white/60 transition-all cursor-pointer"
+                                                disabled={pendingActions.has(c._id)}
+                                                className="p-1 rounded-lg opacity-0 group-hover/item:opacity-100 hover:bg-white/10 text-white/30 hover:text-white/60 transition-all cursor-pointer disabled:opacity-50"
                                                 aria-label={`Archive ${c.title}`}
                                             >
                                                 <Archive size={12} />
@@ -255,8 +307,10 @@ export function CaseSwitcher() {
                                 {archivedCases.slice(0, 3).map(c => (
                                     <button
                                         key={c._id}
+                                        role="menuitem"
                                         onClick={() => handleUnarchive(c._id)}
-                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/50 transition-all"
+                                        disabled={pendingActions.has(c._id)}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                         title={`Restore "${c.title}" to active`}
                                     >
                                         <Archive size={14} />
@@ -269,6 +323,7 @@ export function CaseSwitcher() {
                         {/* New Case */}
                         <div className="p-2 border-t border-white/8">
                             <button
+                                role="menuitem"
                                 onClick={handleNewCase}
                                 disabled={isCreating}
                                 className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[var(--accent-icy)]/10 text-[var(--accent-icy)]/70 hover:text-[var(--accent-icy)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"

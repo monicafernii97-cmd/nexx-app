@@ -24,7 +24,7 @@ export const RAIL_KEY_POINT_TYPES: SaveType[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// All 12 SaveType filter tabs for the Key Points Explorer
+// SaveType filter tabs for the Key Points Explorer (+ "All Points")
 // ---------------------------------------------------------------------------
 
 export const ALL_SAVE_TYPE_TABS: { id: string; label: string }[] = [

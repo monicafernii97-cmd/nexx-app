@@ -138,14 +138,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     // Persist case switch to DB so it survives page reloads (CR #49)
     const setActiveCaseId = useCallback(
         (id: Id<'cases'>) => {
-            const previousId = activeCaseId;
-            setActiveCaseIdLocal(id);
+            let previousId: Id<'cases'> | null = null;
+            setActiveCaseIdLocal(prev => {
+                previousId = prev;
+                return id;
+            });
             setActiveMutation({ caseId: id }).catch((err) => {
                 console.error(err);
-                setActiveCaseIdLocal(previousId);
+                if (previousId !== null) {
+                    setActiveCaseIdLocal(previousId);
+                }
             });
         },
-        [setActiveMutation, activeCaseId],
+        [setActiveMutation],
     );
 
     const value: WorkspaceContextType = {

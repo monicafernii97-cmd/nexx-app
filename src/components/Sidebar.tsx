@@ -31,6 +31,7 @@ import { useState, useMemo, useCallback, type ComponentType, type CSSProperties 
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 import { restartTour, navIdSelector } from '@/lib/tourUtils';
+import { CaseSwitcher } from '@/components/workspace/CaseSwitcher';
 
 /** Child navigation item definition for sidebar sub-menus. */
 interface NavChild {
@@ -59,6 +60,7 @@ const navItems: NavItem[] = [
             { label: 'Key Points', href: '/chat/key-points', icon: Notebook },
             { label: 'Pinned Items', href: '/chat/pinned', icon: PushPin },
             { label: 'Timeline', href: '/chat/timeline', icon: CalendarCheck },
+            { label: 'Drafts', href: '/chat/drafts', icon: FileText },
         ],
     },
     {
@@ -158,6 +160,13 @@ export default function Sidebar() {
 
             {/* Divider */}
             <div className="mx-6 primary-divider opacity-50" />
+
+            {/* Case Switcher */}
+            {!collapsed && (
+                <div className="py-3">
+                    <CaseSwitcher />
+                </div>
+            )}
 
             {/* Navigation — CSS override for overflow when driver.js tour is active (see globals.css) */}
             <nav className="flex-1 py-6 px-4 space-y-1.5 overflow-y-auto overflow-x-hidden no-scrollbar sidebar-nav">

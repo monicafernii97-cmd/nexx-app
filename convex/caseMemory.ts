@@ -16,6 +16,7 @@ const saveTypeValidator = v.union(
     v.literal('strength_highlight'),
     v.literal('good_faith_point'),
     v.literal('draft_snippet'),
+    v.literal('hearing_prep_point'),
     v.literal('timeline_candidate'),
     v.literal('incident_note'),
     v.literal('exhibit_note'),

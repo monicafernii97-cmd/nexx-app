@@ -148,3 +148,46 @@ export const update = mutation({
         await ctx.db.patch(args.caseId, updates);
     },
 });
+
+export const archive = mutation({
+    args: { caseId: v.id('cases') },
+    handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        const existing = await ctx.db.get(args.caseId);
+        if (!existing || existing.userId !== user._id) {
+            throw new Error('Not authorized to archive this case');
+        }
+
+        // Prevent archiving the last active case
+        const activeCases = await ctx.db
+            .query('cases')
+            .withIndex('by_userId', (q) => q.eq('userId', user._id))
+            .filter((q) => q.eq(q.field('status'), 'active'))
+            .collect();
+        if (activeCases.length <= 1) {
+            throw new Error('Cannot archive your last active case');
+        }
+
+        await ctx.db.patch(args.caseId, {
+            status: 'archived' as const,
+            updatedAt: Date.now(),
+        });
+    },
+});
+
+/** Restore an archived case to active status. */
+export const unarchive = mutation({
+    args: { caseId: v.id('cases') },
+    handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        const existing = await ctx.db.get(args.caseId);
+        if (!existing || existing.userId !== user._id) {
+            throw new Error('Not authorized to modify this case');
+        }
+        if (existing.status === 'active') return; // already active, no-op
+        await ctx.db.patch(args.caseId, {
+            status: 'active' as const,
+            updatedAt: Date.now(),
+        });
+    },
+});

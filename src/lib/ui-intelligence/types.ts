@@ -136,6 +136,7 @@ export type SaveType =
   | 'strength_highlight'
   | 'good_faith_point'
   | 'draft_snippet'
+  | 'hearing_prep_point'
   | 'timeline_candidate'
   | 'incident_note'
   | 'exhibit_note'

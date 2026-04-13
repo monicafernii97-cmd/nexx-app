@@ -15,7 +15,9 @@ import { motion } from 'framer-motion';
 import { CaretDown, CaretUp } from '@phosphor-icons/react';
 import { getPanelTitle, getPanelTone } from '@/lib/ui-intelligence/panel-library';
 import { isWorkProduct } from '@/lib/ui-intelligence/dual-output';
+import { ConvertMenu } from '@/components/chat/ConvertMenu';
 import type { PanelData, PanelTone } from '@/lib/ui-intelligence/types';
+import type { ConvertTarget } from '@/lib/integration/route-created-item';
 
 // ---------------------------------------------------------------------------
 // Tone → CSS classes
@@ -64,10 +66,11 @@ interface PanelRendererProps {
   panel: PanelData;
   index?: number;
   onCopy?: (content: string) => void;
+  onConvert?: (target: ConvertTarget, content: string, title: string) => void;
 }
 
 /** Renders a single intelligence panel card with tone coloring, collapse toggle, copy, and stagger animation. */
-export function PanelRenderer({ panel, index = 0, onCopy }: PanelRendererProps) {
+export function PanelRenderer({ panel, index = 0, onCopy, onConvert }: PanelRendererProps) {
   const title = panel.title || getPanelTitle(panel.type);
   const tone = panel.tone ?? getPanelTone(panel.type);
   const styles = TONE_STYLES[tone];
@@ -126,6 +129,16 @@ export function PanelRenderer({ panel, index = 0, onCopy }: PanelRendererProps) 
             >
               Copy
             </button>
+          )}
+
+          {/* Convert menu for actionable content */}
+          {onConvert && (
+            <ConvertMenu
+              content={Array.isArray(panel.content) ? panel.content.join('\n') : panel.content}
+              panelTitle={title}
+              onConvert={onConvert}
+              compact
+            />
           )}
 
           {isCollapsible && (

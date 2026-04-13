@@ -545,7 +545,9 @@ export default defineSchema({
             v.literal('incident_note'),
             v.literal('exhibit_note'),
             v.literal('procedure_note'),
-            v.literal('question_to_verify')
+            v.literal('question_to_verify'),
+            v.literal('pattern_analysis'),
+            v.literal('narrative_synthesis')
         ),
         title: v.string(),
         content: v.string(),

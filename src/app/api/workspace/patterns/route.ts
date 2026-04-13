@@ -1,0 +1,160 @@
+/**
+ * Pattern Detection API — POST /api/workspace/patterns
+ *
+ * Analyzes case data (incidents, timeline, caseMemory) to detect
+ * evidence-based behavioral patterns using GPT structured output.
+ *
+ * Results are scored locally using premiumAnalytics.scorePattern()
+ * and stored in caseMemory as type: 'pattern_analysis'.
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { getOpenAIClient } from '@/lib/openaiConversation';
+import { getAuthenticatedConvexClient } from '@/lib/convexServer';
+import { api } from '@convex/_generated/api';
+import type { Id } from '@convex/_generated/dataModel';
+import { PATTERN_DETECTION_SCHEMA } from '@/lib/nexx/schemas';
+import { buildPatternPrompt } from '@/lib/nexx/prompts/patternPrompt';
+import { scorePattern, countDistinctDates } from '@/lib/nexx/premiumAnalytics';
+import type { DetectedPattern, PatternEvent, BehaviorCategory } from '@/lib/nexx/premiumAnalytics';
+import { PRIMARY_MODEL } from '@/lib/tiers';
+
+export const maxDuration = 60;
+
+/** Serialize an array of Convex documents into a readable string for the prompt. */
+function serializeForPrompt(items: unknown[], label: string): string {
+    if (!items || items.length === 0) return `No ${label} documented.`;
+    return JSON.stringify(items, null, 2);
+}
+
+/**
+ * POST /api/workspace/patterns — Run pattern detection on a case.
+ *
+ * Request body: { caseId: string }
+ * Returns: { patterns: DetectedPattern[], suppressedCandidates: SuppressedCandidate[] }
+ */
+export async function POST(req: NextRequest) {
+    const { userId } = await auth();
+    if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let caseId: Id<'cases'>;
+    try {
+        const body = await req.json();
+        if (!body.caseId || typeof body.caseId !== 'string') {
+            return NextResponse.json({ error: 'caseId is required' }, { status: 400 });
+        }
+        caseId = body.caseId as Id<'cases'>;
+    } catch {
+        return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    try {
+        const convex = await getAuthenticatedConvexClient();
+
+        // Load all case data in parallel
+        // Note: queries currently return all user data; case-scoped filtering is Sprint 5.
+        const [incidents, timeline, caseMemory] = await Promise.all([
+            convex.query(api.incidents.list, {}),
+            convex.query(api.timelineCandidates.listByUser, {}),
+            convex.query(api.caseMemory.listByUser, {}),
+        ]);
+
+        // Filter caseMemory to the target case where possible
+        const caseScopedMemory = (caseMemory ?? []).filter(
+            (m: { caseId?: Id<'cases'> }) => !m.caseId || m.caseId === caseId,
+        );
+
+        // Build serialized context for the prompt
+        const caseContext = {
+            incidents: serializeForPrompt(incidents, 'incidents'),
+            timeline: serializeForPrompt(timeline, 'timeline events'),
+            caseMemory: serializeForPrompt(caseScopedMemory, 'case memory items'),
+            caseGraphSummary: 'Case graph not yet loaded — provide context from incidents and timeline.',
+        };
+
+        // Check minimum data threshold
+        const totalEvents = (incidents?.length ?? 0) + (timeline?.length ?? 0);
+        if (totalEvents < 3) {
+            return NextResponse.json({
+                patterns: [],
+                suppressedCandidates: [{
+                    reason: `Only ${totalEvents} events documented. Pattern detection requires at least 3 events across multiple dates.`,
+                    eventCount: totalEvents,
+                    category: 'insufficient_data',
+                }],
+                message: 'Insufficient data for pattern detection. Add more incidents or timeline events.',
+            });
+        }
+
+        // Call GPT for pattern detection
+        const client = getOpenAIClient();
+        const response = await client.responses.create({
+            model: PRIMARY_MODEL,
+            instructions: buildPatternPrompt(caseContext),
+            input: 'Analyze the case data provided in the instructions and detect behavioral patterns.',
+            text: { format: PATTERN_DETECTION_SCHEMA },
+        });
+
+        // Parse structured output
+        const outputText = response.output_text;
+        const rawResult = JSON.parse(outputText);
+
+        // Score each pattern locally using our scoring system
+        const scoredPatterns: DetectedPattern[] = rawResult.patterns
+            .map((p: {
+                title: string;
+                summary: string;
+                category: string;
+                supportingEvents: PatternEvent[];
+                behavioralSimilarity: 'weak' | 'moderate' | 'strong';
+                observability: 'interpretive' | 'mostly_observable' | 'clearly_observable';
+            }) => {
+                const distinctDates = countDistinctDates(p.supportingEvents);
+                const scoring = scorePattern({
+                    eventCount: p.supportingEvents.length,
+                    distinctDates,
+                    allSourceBacked: p.supportingEvents.every(e => e.sourceType !== undefined),
+                    behavioralSimilarity: p.behavioralSimilarity,
+                    observability: p.observability,
+                });
+
+                return {
+                    title: p.title,
+                    summary: p.summary,
+                    supportingEvents: p.supportingEvents,
+                    confidence: scoring.confidence,
+                    score: scoring.score,
+                    category: p.category as BehaviorCategory,
+                    _eligible: scoring.eligibleToShow,
+                };
+            })
+            .filter((p: DetectedPattern & { _eligible: boolean }) => p._eligible)
+            .map(({ _eligible: _, ...p }: DetectedPattern & { _eligible: boolean }) => p);
+
+        // Store results in caseMemory
+        await convex.mutation(api.caseMemory.save, {
+            caseId,
+            type: 'pattern_analysis',
+            content: JSON.stringify({
+                patterns: scoredPatterns,
+                suppressedCandidates: rawResult.suppressedCandidates,
+                generatedAt: new Date().toISOString(),
+            }),
+            title: `Pattern Analysis — ${new Date().toLocaleDateString()}`,
+        });
+
+        return NextResponse.json({
+            patterns: scoredPatterns,
+            suppressedCandidates: rawResult.suppressedCandidates,
+        });
+    } catch (err) {
+        console.error('[patterns] Error:', err);
+        return NextResponse.json(
+            { error: 'Pattern detection failed', detail: err instanceof Error ? err.message : 'Unknown error' },
+            { status: 500 },
+        );
+    }
+}

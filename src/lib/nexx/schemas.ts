@@ -2,8 +2,9 @@
  * All structured output JSON schemas in one place.
  * These are passed via `text.format` in `responses.create`.
  * 
- * 15 schemas total — covering chat, incidents, court rules, resources,
- * compliance, memory, drafting, simulations, retrieval, and confidence.
+ * 18 schemas total — covering chat, incidents, court rules, resources,
+ * compliance, memory, drafting, simulations, retrieval, confidence,
+ * patterns, narrative, and reports.
  */
 
 // ---------------------------------------------------------------------------
@@ -391,5 +392,119 @@ export const TEMPLATE_DRAFT_PLAN_SCHEMA = {
       missingFacts: { type: 'array', items: { type: 'string' } },
     },
     required: ['templateId', 'requiredFacts', 'optionalFacts', 'missingFacts'],
+  },
+};
+
+// ---------------------------------------------------------------------------
+// 16. Pattern Detection Schema (workspace patterns API)
+// ---------------------------------------------------------------------------
+
+export const PATTERN_DETECTION_SCHEMA = {
+  type: 'json_schema' as const,
+  name: 'pattern_detection',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      patterns: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            title: { type: 'string' },
+            summary: { type: 'string' },
+            category: { type: 'string' },
+            supportingEvents: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  date: { type: 'string' },
+                  description: { type: 'string' },
+                  sourceType: { type: 'string', enum: ['message', 'timeline', 'pin', 'incident'] },
+                  sourceId: { type: ['string', 'null'] },
+                },
+                required: ['date', 'description', 'sourceType'],
+              },
+            },
+            behavioralSimilarity: { type: 'string', enum: ['weak', 'moderate', 'strong'] },
+            observability: { type: 'string', enum: ['interpretive', 'mostly_observable', 'clearly_observable'] },
+          },
+          required: ['title', 'summary', 'category', 'supportingEvents', 'behavioralSimilarity', 'observability'],
+        },
+      },
+      suppressedCandidates: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            reason: { type: 'string' },
+            eventCount: { type: 'number' },
+            category: { type: 'string' },
+          },
+          required: ['reason', 'eventCount', 'category'],
+        },
+      },
+    },
+    required: ['patterns', 'suppressedCandidates'],
+  },
+};
+
+// ---------------------------------------------------------------------------
+// 17. Case Narrative Schema (workspace narrative API)
+// ---------------------------------------------------------------------------
+
+export const CASE_NARRATIVE_SCHEMA = {
+  type: 'json_schema' as const,
+  name: 'case_narrative',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      title: { type: 'string' },
+      overview: { type: 'string' },
+      keyFactsSummary: { type: 'array', items: { type: 'string' } },
+      timelineSummary: { type: 'array', items: { type: 'string' } },
+      supportedPatternsSummary: { type: 'array', items: { type: 'string' } },
+      openQuestions: { type: 'array', items: { type: 'string' } },
+      narrative: { type: 'string' },
+    },
+    required: ['title', 'overview', 'keyFactsSummary', 'timelineSummary',
+               'supportedPatternsSummary', 'openQuestions', 'narrative'],
+  },
+};
+
+// ---------------------------------------------------------------------------
+// 18. Case Report Schema (workspace report API)
+// ---------------------------------------------------------------------------
+
+export const CASE_REPORT_SCHEMA = {
+  type: 'json_schema' as const,
+  name: 'case_report',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      title: { type: 'string' },
+      generatedAt: { type: 'string' },
+      sections: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            heading: { type: 'string' },
+            body: { type: 'string' },
+          },
+          required: ['heading', 'body'],
+        },
+      },
+      summary: { type: 'string' },
+      recommendations: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['title', 'generatedAt', 'sections', 'summary', 'recommendations'],
   },
 };

@@ -17,24 +17,9 @@ import { CASE_NARRATIVE_SCHEMA } from '@/lib/nexx/schemas';
 import { buildNarrativePrompt } from '@/lib/nexx/prompts/narrativePrompt';
 import { PRIMARY_MODEL } from '@/lib/tiers';
 import type { CaseNarrative } from '@/lib/workspace-types';
-import { createHash } from 'crypto';
-
-/**
- * Derive a stable idempotency key from case context.
- * Same caseId + type + calendar day → same key, so retries within a day dedupe.
- */
-function stableRequestId(caseId: string, type: string): string {
-    const dayKey = new Date().toISOString().slice(0, 10);
-    return createHash('sha256').update(`${caseId}:${type}:${dayKey}`).digest('hex').slice(0, 32);
-}
+import { stableRequestId, serializeForPrompt } from '@/lib/workspace-utils';
 
 export const maxDuration = 60;
-
-/** Serialize an array of Convex documents into a readable string. */
-function serializeForPrompt(items: unknown[], label: string): string {
-    if (!items || items.length === 0) return `No ${label} documented.`;
-    return JSON.stringify(items, null, 2);
-}
 
 /**
  * POST /api/workspace/narrative — Generate a case narrative.

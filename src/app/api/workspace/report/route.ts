@@ -16,14 +16,9 @@ import { CASE_REPORT_SCHEMA } from '@/lib/nexx/schemas';
 import { buildReportPrompt } from '@/lib/nexx/prompts/reportPrompt';
 import { PRIMARY_MODEL } from '@/lib/tiers';
 import type { OutputType, ToneType, PatternHandling } from '@/lib/workspace-types';
+import { serializeForPrompt } from '@/lib/workspace-utils';
 
 export const maxDuration = 60;
-
-/** Serialize an array of Convex documents into a readable string. */
-function serializeForPrompt(items: unknown[], label: string): string {
-    if (!items || items.length === 0) return `No ${label} documented.`;
-    return JSON.stringify(items, null, 2);
-}
 
 /** Validate report configuration from request body. */
 function validateConfig(body: Record<string, unknown>): {
@@ -163,7 +158,16 @@ export async function POST(req: NextRequest) {
             text: { format: CASE_REPORT_SCHEMA },
         });
 
-        const report = JSON.parse(response.output_text);
+        let report: Record<string, unknown>;
+        try {
+            report = JSON.parse(response.output_text);
+        } catch {
+            console.error('[report] Failed to parse model output:', response.output_text.slice(0, 200));
+            return NextResponse.json(
+                { error: 'Report generation failed', detail: 'Model returned invalid JSON' },
+                { status: 500 },
+            );
+        }
 
         // Server-stamp generatedAt (don't rely on model for timestamps)
         report.generatedAt = new Date().toISOString();

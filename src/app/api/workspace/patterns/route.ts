@@ -18,25 +18,10 @@ import { PATTERN_DETECTION_SCHEMA } from '@/lib/nexx/schemas';
 import { buildPatternPrompt } from '@/lib/nexx/prompts/patternPrompt';
 import { scorePattern, countDistinctDates, BEHAVIOR_CATEGORIES } from '@/lib/nexx/premiumAnalytics';
 import type { DetectedPattern, PatternEvent, BehaviorCategory } from '@/lib/nexx/premiumAnalytics';
-import { createHash } from 'crypto';
 import { PRIMARY_MODEL } from '@/lib/tiers';
-
-/**
- * Derive a stable idempotency key from case context.
- * Same caseId + type + calendar day → same key, so retries within a day dedupe.
- */
-function stableRequestId(caseId: string, type: string): string {
-    const dayKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    return createHash('sha256').update(`${caseId}:${type}:${dayKey}`).digest('hex').slice(0, 32);
-}
+import { stableRequestId, serializeForPrompt } from '@/lib/workspace-utils';
 
 export const maxDuration = 60;
-
-/** Serialize an array of Convex documents into a readable string for the prompt. */
-function serializeForPrompt(items: unknown[], label: string): string {
-    if (!items || items.length === 0) return `No ${label} documented.`;
-    return JSON.stringify(items, null, 2);
-}
 
 /**
  * POST /api/workspace/patterns — Run pattern detection on a case.
@@ -170,9 +155,13 @@ export async function POST(req: NextRequest) {
                     supportingEvents: p.supportingEvents,
                     confidence: scoring.confidence,
                     score: scoring.score,
-                    category: (BEHAVIOR_CATEGORIES as readonly string[]).includes(p.category)
-                        ? (p.category as BehaviorCategory)
-                        : ('missed_or_delayed_calls' as BehaviorCategory),
+                    category: (() => {
+                        if ((BEHAVIOR_CATEGORIES as readonly string[]).includes(p.category)) {
+                            return p.category as BehaviorCategory;
+                        }
+                        console.warn(`[patterns] Unrecognized category "${p.category}", defaulting to missed_or_delayed_calls`);
+                        return 'missed_or_delayed_calls' as BehaviorCategory;
+                    })(),
                     _eligible: scoring.eligibleToShow,
                 };
             })

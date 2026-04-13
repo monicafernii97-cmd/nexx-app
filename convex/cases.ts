@@ -95,6 +95,40 @@ export const create = mutation({
     },
 });
 
+/**
+ * Persist the user's active-case selection.
+ *
+ * Enforces single-active semantics: archives every other active case for
+ * this user, then patches the target case to 'active'. This ensures
+ * `resolvedActiveCaseId` falls back to the correct case on page reload.
+ */
+export const setActive = mutation({
+    args: {
+        caseId: v.id('cases'),
+    },
+    handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        const target = await ctx.db.get(args.caseId);
+        if (!target || target.userId !== user._id) {
+            throw new Error('Not authorized to activate this case');
+        }
+
+        // Archive all currently active cases for this user
+        const userCases = await ctx.db
+            .query('cases')
+            .withIndex('by_userId', (q) => q.eq('userId', user._id))
+            .collect();
+        for (const c of userCases) {
+            if (c.status === 'active' && c._id !== args.caseId) {
+                await ctx.db.patch(c._id, { status: 'archived', updatedAt: Date.now() });
+            }
+        }
+
+        // Activate the target case
+        await ctx.db.patch(args.caseId, { status: 'active', updatedAt: Date.now() });
+    },
+});
+
 /** Update a case's title or description (with ownership check). */
 export const update = mutation({
     args: {

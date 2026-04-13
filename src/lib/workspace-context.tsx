@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useCallback, useState, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Doc, Id } from '@convex/_generated/dataModel';
@@ -46,12 +46,13 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefin
 // ---------------------------------------------------------------------------
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-    const [activeCaseId, setActiveCaseId] = useState<Id<'cases'> | null>(null);
+    const [activeCaseId, setActiveCaseIdLocal] = useState<Id<'cases'> | null>(null);
     const provisioningRef = useRef(false);
     const [provisionRetry, setProvisionRetry] = useState(0);
 
     // Ensure a default case exists for the user
     const getOrCreateDefault = useMutation(api.cases.getOrCreateDefault);
+    const setActiveMutation = useMutation(api.cases.setActive);
     const cases = useQuery(api.cases.list);
 
     // On first load, auto-provision a default case.
@@ -128,6 +129,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const confirmTimeline = useCallback(
         async (candidateId: Id<'timelineCandidates'>) => { await confirmTimelineMutation({ candidateId }); },
         [confirmTimelineMutation],
+    );
+
+    // Persist case switch to DB so it survives page reloads (CR #49)
+    const setActiveCaseId = useCallback(
+        (id: Id<'cases'>) => {
+            setActiveCaseIdLocal(id);
+            setActiveMutation({ caseId: id }).catch(console.error);
+        },
+        [setActiveMutation],
     );
 
     const value: WorkspaceContextType = {

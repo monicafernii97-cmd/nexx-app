@@ -18,8 +18,17 @@ import { PATTERN_DETECTION_SCHEMA } from '@/lib/nexx/schemas';
 import { buildPatternPrompt } from '@/lib/nexx/prompts/patternPrompt';
 import { scorePattern, countDistinctDates, BEHAVIOR_CATEGORIES } from '@/lib/nexx/premiumAnalytics';
 import type { DetectedPattern, PatternEvent, BehaviorCategory } from '@/lib/nexx/premiumAnalytics';
-import { randomUUID } from 'crypto';
+import { createHash } from 'crypto';
 import { PRIMARY_MODEL } from '@/lib/tiers';
+
+/**
+ * Derive a stable idempotency key from case context.
+ * Same caseId + type + calendar day → same key, so retries within a day dedupe.
+ */
+function stableRequestId(caseId: string, type: string): string {
+    const dayKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    return createHash('sha256').update(`${caseId}:${type}:${dayKey}`).digest('hex').slice(0, 32);
+}
 
 export const maxDuration = 60;
 
@@ -55,32 +64,45 @@ export async function POST(req: NextRequest) {
     try {
         const convex = await getAuthenticatedConvexClient();
 
-        // Load all case data in parallel
-        // TODO (Sprint 5): Replace with case-scoped queries once caseId is on incidents/timeline.
+        // Load case data in parallel
         const [incidents, timeline, caseMemory] = await Promise.all([
             convex.query(api.incidents.list, {}),
             convex.query(api.timelineCandidates.listByUser, {}),
             convex.query(api.caseMemory.listByUser, {}),
         ]);
 
-        // Best-effort case filtering where caseId field is available
+        // ── Case-scoped filtering ──
+        // caseMemory + timelineCandidates have optional caseId → filter by it.
+        // incidents lack caseId (Sprint 5) but are already user-scoped via auth.
         const caseScopedMemory = (caseMemory ?? []).filter(
             (m: { caseId?: Id<'cases'> }) => !m.caseId || m.caseId === caseId,
         );
-        // TODO (Sprint 5): Filter incidents/timeline by caseId once schema supports it.
+        const caseScopedTimeline = (timeline ?? []).filter(
+            (t: { caseId?: Id<'cases'> }) => !t.caseId || t.caseId === caseId,
+        );
+        // TODO (Sprint 5): Add caseId to incidents schema and filter here.
         const caseScopedIncidents = incidents ?? [];
-        const caseScopedTimeline = timeline ?? [];
+
+        // Exclude prior AI-generated artifacts so synthetic output
+        // doesn't become evidence for subsequent runs.
+        const primaryCaseMemory = caseScopedMemory.filter(
+            (m: { type?: string }) =>
+                m.type !== 'pattern_analysis' && m.type !== 'narrative_synthesis',
+        );
 
         // Build serialized context for the prompt
         const caseContext = {
             incidents: serializeForPrompt(caseScopedIncidents, 'incidents'),
             timeline: serializeForPrompt(caseScopedTimeline, 'timeline events'),
-            caseMemory: serializeForPrompt(caseScopedMemory, 'case memory items'),
+            caseMemory: serializeForPrompt(primaryCaseMemory, 'case memory items'),
             caseGraphSummary: 'Case graph not yet loaded — provide context from incidents and timeline.',
         };
 
-        // Check minimum data threshold
-        const totalEvents = caseScopedIncidents.length + caseScopedTimeline.length + caseScopedMemory.length;
+        // Check minimum data threshold (primary evidence only)
+        const totalEvents =
+            caseScopedIncidents.length +
+            caseScopedTimeline.length +
+            primaryCaseMemory.length;
         if (totalEvents < 3) {
             return NextResponse.json({
                 patterns: [],
@@ -147,8 +169,9 @@ export async function POST(req: NextRequest) {
                 category: p.category,
             }));
 
-        // Store results in caseMemory (with requestId for idempotency)
-        const requestId = randomUUID();
+        // Store results in caseMemory with a stable requestId so client
+        // retries on the same day don't create duplicate rows.
+        const requestId = stableRequestId(caseId, 'pattern_analysis');
         await convex.mutation(api.caseMemory.save, {
             caseId,
             type: 'pattern_analysis',

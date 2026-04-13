@@ -92,18 +92,18 @@ export async function POST(req: NextRequest) {
         const convex = await getAuthenticatedConvexClient();
 
         // Load case data in parallel
-        // TODO (Sprint 5): Replace with case-scoped queries once caseId is on timeline.
         const [timeline, caseMemory] = await Promise.all([
             convex.query(api.timelineCandidates.listByUser, {}),
             convex.query(api.caseMemory.listByUser, {}),
         ]);
 
-        // Best-effort case filtering
+        // ── Case-scoped filtering ──
         const caseScopedMemory = (caseMemory ?? []).filter(
             (m: { caseId?: Id<'cases'> }) => !m.caseId || m.caseId === config.caseId,
         );
-        // TODO (Sprint 5): Filter timeline by caseId once schema supports it.
-        const caseScopedTimeline = timeline ?? [];
+        const caseScopedTimeline = (timeline ?? []).filter(
+            (t: { caseId?: Id<'cases'> }) => !t.caseId || t.caseId === config.caseId,
+        );
 
         // Find most recent narrative and pattern analysis
         const narrativeItem = caseScopedMemory

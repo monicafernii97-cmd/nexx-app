@@ -17,7 +17,16 @@ import { CASE_NARRATIVE_SCHEMA } from '@/lib/nexx/schemas';
 import { buildNarrativePrompt } from '@/lib/nexx/prompts/narrativePrompt';
 import { PRIMARY_MODEL } from '@/lib/tiers';
 import type { CaseNarrative } from '@/lib/workspace-types';
-import { randomUUID } from 'crypto';
+import { createHash } from 'crypto';
+
+/**
+ * Derive a stable idempotency key from case context.
+ * Same caseId + type + calendar day → same key, so retries within a day dedupe.
+ */
+function stableRequestId(caseId: string, type: string): string {
+    const dayKey = new Date().toISOString().slice(0, 10);
+    return createHash('sha256').update(`${caseId}:${type}:${dayKey}`).digest('hex').slice(0, 32);
+}
 
 export const maxDuration = 60;
 
@@ -53,8 +62,7 @@ export async function POST(req: NextRequest) {
     try {
         const convex = await getAuthenticatedConvexClient();
 
-        // Load all case data in parallel
-        // TODO (Sprint 5): Replace with case-scoped queries once caseId is on incidents/timeline.
+        // Load case data in parallel
         const [incidents, timeline, caseMemory, pins] = await Promise.all([
             convex.query(api.incidents.list, {}),
             convex.query(api.timelineCandidates.listByUser, {}),
@@ -62,13 +70,17 @@ export async function POST(req: NextRequest) {
             convex.query(api.casePins.listByUser, {}),
         ]);
 
-        // Best-effort case filtering where caseId field is available
+        // ── Case-scoped filtering ──
+        // caseMemory + timelineCandidates have optional caseId → filter by it.
+        // incidents + pins lack caseId (Sprint 5) but are already user-scoped via auth.
         const caseScopedMemory = (caseMemory ?? []).filter(
             (m: { caseId?: Id<'cases'> }) => !m.caseId || m.caseId === caseId,
         );
-        // TODO (Sprint 5): Filter incidents/timeline/pins by caseId once schema supports it.
+        const caseScopedTimeline = (timeline ?? []).filter(
+            (t: { caseId?: Id<'cases'> }) => !t.caseId || t.caseId === caseId,
+        );
+        // TODO (Sprint 5): Add caseId to incidents/pins schema and filter here.
         const caseScopedIncidents = incidents ?? [];
-        const caseScopedTimeline = timeline ?? [];
         const caseScopedPins = pins ?? [];
 
         // Find existing pattern analysis (most recent)
@@ -105,8 +117,9 @@ export async function POST(req: NextRequest) {
 
         const narrative: CaseNarrative = JSON.parse(response.output_text);
 
-        // Store in caseMemory (with requestId for idempotency)
-        const requestId = randomUUID();
+        // Store in caseMemory with a stable requestId so client
+        // retries on the same day don't create duplicate rows.
+        const requestId = stableRequestId(caseId, 'narrative_synthesis');
         await convex.mutation(api.caseMemory.save, {
             caseId,
             type: 'narrative_synthesis',

@@ -13,18 +13,11 @@ import {
 } from '@phosphor-icons/react';
 
 // ---------------------------------------------------------------------------
-// Types
+// Types — imported from shared module & re-exported for consumers
 // ---------------------------------------------------------------------------
 
-export interface CaseNarrative {
-    title: string;
-    overview: string;
-    keyFactsSummary: string[];
-    timelineSummary: string[];
-    supportedPatternsSummary: string[];
-    openQuestions: string[];
-    narrative: string;
-}
+import type { CaseNarrative } from '@/lib/workspace-types';
+export type { CaseNarrative } from '@/lib/workspace-types';
 
 interface NarrativeBlockProps {
     /** The AI-generated narrative, or null if not yet generated */

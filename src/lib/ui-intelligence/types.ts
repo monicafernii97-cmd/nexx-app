@@ -141,7 +141,9 @@ export type SaveType =
   | 'incident_note'
   | 'exhibit_note'
   | 'procedure_note'
-  | 'question_to_verify';
+  | 'question_to_verify'
+  | 'pattern_analysis'
+  | 'narrative_synthesis';
 
 // ---------------------------------------------------------------------------
 // Action Types — 12 actions

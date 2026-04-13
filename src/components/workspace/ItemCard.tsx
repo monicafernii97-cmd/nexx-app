@@ -12,7 +12,9 @@ import {
     Lightning,
     FileText,
     Checks,
-    MagnifyingGlass
+    MagnifyingGlass,
+    ChartBar,
+    BookOpen,
 } from '@phosphor-icons/react';
 import { format } from 'date-fns';
 import { SourceBadge } from '@/components/workspace/SourceBadge';
@@ -49,6 +51,10 @@ const TYPE_CONFIGS: Record<string, TypeConfig> = {
     exhibit_note: { label: 'Exhibit', color: 'info', icon: FileText },
     procedure_note: { label: 'Procedure', color: 'support-violet', icon: Strategy },
     timeline_candidate: { label: 'Candidate', color: 'accent-icy', icon: Calendar },
+
+    // AI-generated analysis types
+    pattern_analysis: { label: 'Pattern Analysis', color: 'accent-emerald', icon: ChartBar },
+    narrative_synthesis: { label: 'Case Narrative', color: 'support-violet', icon: BookOpen },
 };
 
 // ---------------------------------------------------------------------------

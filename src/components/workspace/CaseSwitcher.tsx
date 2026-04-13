@@ -244,37 +244,31 @@ export function CaseSwitcher() {
                             {activeCases.map(c => (
                                 <div
                                     key={c._id}
-                                    role="menuitem"
-                                    tabIndex={0}
-                                    onClick={() => {
-                                        setActiveCaseId(c._id);
-                                        setIsOpen(false);
-                                    }}
-                                    onKeyDown={(e) => {
-                                        // Only act when the event originates from this row, not nested buttons
-                                        if (e.target !== e.currentTarget) return;
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            setActiveCaseId(c._id);
-                                            setIsOpen(false);
-                                        }
-                                    }}
+                                    role="none"
                                     className={`
                                         w-full flex items-center justify-between px-3 py-2.5 rounded-xl
-                                        transition-all duration-150 group/item cursor-pointer
+                                        transition-all duration-150 group/item
                                         ${c._id === activeCaseId
                                             ? 'bg-[var(--accent-icy)]/10 text-white'
                                             : 'hover:bg-white/5 text-white/60 hover:text-white/80'
                                         }
                                     `}
-                                    aria-current={c._id === activeCaseId ? 'true' : undefined}
                                 >
-                                    <div className="flex items-center gap-2.5 min-w-0">
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        onClick={() => {
+                                            setActiveCaseId(c._id);
+                                            setIsOpen(false);
+                                        }}
+                                        className="flex items-center gap-2.5 min-w-0 flex-1 bg-transparent border-none p-0 text-inherit cursor-pointer text-left"
+                                        aria-current={c._id === activeCaseId ? 'true' : undefined}
+                                    >
                                         <FolderOpen size={14} weight={c._id === activeCaseId ? 'fill' : 'regular'} />
                                         <span className="text-[13px] font-medium truncate">
                                             {c.title}
                                         </span>
-                                    </div>
+                                    </button>
                                     <div className="flex items-center gap-1">
                                         {c._id === activeCaseId && (
                                             <Check size={14} weight="bold" className="text-[var(--accent-icy)]" />
@@ -282,6 +276,7 @@ export function CaseSwitcher() {
                                         {c._id !== activeCaseId && activeCases.length > 1 && (
                                             <button
                                                 type="button"
+                                                role="menuitem"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleArchive(c._id);

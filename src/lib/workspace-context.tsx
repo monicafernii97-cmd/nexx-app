@@ -49,6 +49,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const [activeCaseId, setActiveCaseIdLocal] = useState<Id<'cases'> | null>(null);
     const provisioningRef = useRef(false);
     const [provisionRetry, setProvisionRetry] = useState(0);
+    const pendingSetActiveRef = useRef<Promise<void>>(Promise.resolve());
 
     // Ensure a default case exists for the user
     const getOrCreateDefault = useMutation(api.cases.getOrCreateDefault);
@@ -93,7 +94,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         cases && cases.length > 0
             ? cases.reduce((oldest, c) => (c.createdAt < oldest.createdAt ? c : oldest))._id
             : null;
-    const isDefaultCase = resolvedActiveCaseId === defaultCaseId;
+    const isDefaultCase =
+        defaultCaseId !== null && resolvedActiveCaseId === defaultCaseId;
 
     // Queries — still user-scoped (caseId filtering done client-side for backward compat)
     const allPins = useQuery(api.casePins.listByUser);
@@ -101,17 +103,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const allTimeline = useQuery(api.timelineCandidates.listByUser);
 
     // Filter to active case — legacy items (no caseId) only appear in the default case.
-    // Return undefined until cases is loaded so consumers see loading state, not empty arrays.
+    // Return undefined until cases is loaded (or empty) so consumers see loading state.
     const pins =
-        cases === undefined
+        cases === undefined || cases.length === 0
             ? undefined
             : allPins?.filter(p => (p.caseId ? p.caseId === resolvedActiveCaseId : isDefaultCase));
     const memory =
-        cases === undefined
+        cases === undefined || cases.length === 0
             ? undefined
             : allMemory?.filter(m => (m.caseId ? m.caseId === resolvedActiveCaseId : isDefaultCase));
     const timeline =
-        cases === undefined
+        cases === undefined || cases.length === 0
             ? undefined
             : allTimeline?.filter(t => (t.caseId ? t.caseId === resolvedActiveCaseId : isDefaultCase));
 
@@ -155,10 +157,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         (id: Id<'cases'>) => {
             const previousId = resolvedActiveCaseId;
             setActiveCaseIdLocal(id);
-            setActiveMutation({ caseId: id }).catch((err) => {
-                console.error(err);
-                setActiveCaseIdLocal(current => (current === id ? previousId : current));
-            });
+            // Serialize writes so rapid switches can't persist a stale selection
+            pendingSetActiveRef.current = pendingSetActiveRef.current
+                .then(() => setActiveMutation({ caseId: id }))
+                .catch((err) => {
+                    console.error(err);
+                    setActiveCaseIdLocal(current => (current === id ? previousId : current));
+                });
         },
         [resolvedActiveCaseId, setActiveMutation],
     );

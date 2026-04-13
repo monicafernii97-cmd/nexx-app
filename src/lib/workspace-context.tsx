@@ -159,7 +159,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             setActiveCaseIdLocal(id);
             // Serialize writes so rapid switches can't persist a stale selection
             pendingSetActiveRef.current = pendingSetActiveRef.current
-                .then(() => setActiveMutation({ caseId: id }))
+                .then(async () => { await setActiveMutation({ caseId: id }); })
                 .catch((err) => {
                     console.error(err);
                     setActiveCaseIdLocal(current => (current === id ? previousId : current));

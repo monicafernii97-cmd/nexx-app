@@ -93,10 +93,10 @@ export function computePanelEngagement(events: PanelUsageEvent[]): PanelEngageme
             0,
         );
 
-        const impressions = counts.shown || 1; // Avoid division by zero
+        const impressions = counts.shown;
         const activeInteractions =
             counts.expanded + counts.copied + counts.saved + counts.pinned + counts.converted;
-        const engagementRate = activeInteractions / impressions;
+        const engagementRate = impressions > 0 ? activeInteractions / impressions : 0;
 
         engagements.push({ panelType, counts, score, impressions, engagementRate });
     }
@@ -154,6 +154,23 @@ export function buildPanelRecommendations(events: PanelUsageEvent[]): PanelRecom
                 reason: `Low engagement rate (${(eng.engagementRate * 100).toFixed(1)}%) with ${eng.impressions} impressions — try different framing.`,
             });
         }
+    }
+
+    // Detect merge candidates: pairs of low-engagement panels that serve
+    // similar purposes and could be consolidated into one.
+    const lowEngagement = engagements.filter(
+        (e) => e.score >= DEMOTE_THRESHOLD && e.score < PROMOTE_THRESHOLD &&
+            e.impressions >= MERGE_IMPRESSION_MIN && e.engagementRate < LOW_ENGAGEMENT_RATE * 2,
+    );
+    if (lowEngagement.length >= 2) {
+        // The two weakest panels are merge candidates
+        const sorted = [...lowEngagement].sort((a, b) => a.score - b.score);
+        recommendations.push({
+            panelType: sorted[0].panelType,
+            action: 'merge',
+            score: sorted[0].score,
+            reason: `Low engagement alongside ${sorted[1].panelType} — consider merging into a combined panel.`,
+        });
     }
 
     // Sort: retire/demote first (urgent), then promote, then test_variant

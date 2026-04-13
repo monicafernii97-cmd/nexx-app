@@ -191,7 +191,7 @@ const detectFollowUpPattern: SignalExtractor = (events) => {
     ).length;
     const totalShown = events.filter((e) => e.interaction === 'shown').length;
 
-    if (totalShown < 20) return null;
+    if (totalShown < 20 || totalShown === 0) return null;
     const ratio = followUp / totalShown;
 
     if (ratio > 0.15) {

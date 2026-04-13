@@ -13,16 +13,16 @@ import type { EvalScore } from './router-eval';
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Filler phrases that undermine court-ready quality. */
+/** Filler phrases that undermine court-ready quality. Uses ^\s* to handle leading whitespace. */
 const FILLER_PATTERNS: RegExp[] = [
-    /^Great question/i,
-    /^I'd be happy to/i,
-    /^Absolutely/i,
-    /^That's a great/i,
-    /^Sure thing/i,
-    /^Let me help/i,
-    /^Of course/i,
-    /^No problem/i,
+    /^\s*Great question/i,
+    /^\s*I'd be happy to/i,
+    /^\s*Absolutely/i,
+    /^\s*That's a great/i,
+    /^\s*Sure thing/i,
+    /^\s*Let me help/i,
+    /^\s*Of course/i,
+    /^\s*No problem/i,
     /\bbasically\b/i,
     /\bjust wanted to\b/i,
 ];

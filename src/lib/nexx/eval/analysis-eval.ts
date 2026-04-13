@@ -40,7 +40,7 @@ export function evaluateAnalysis(response: NexxAssistantResponse): EvalScore[] {
     });
 
     // 3. Judge lens — does it consider how a judge might view the situation?
-    const hasJudgeLens = /\b(judge|court.*view|bench|credibility|perception|appear.*to)\b/i.test(text);
+    const hasJudgeLens = /\b(judge|court.*view|bench|credibility|perception|appears?\s+to)\b/i.test(text);
     scores.push({
         dimension: 'analysis_judge_lens',
         score: hasJudgeLens ? 1 : 0.3,

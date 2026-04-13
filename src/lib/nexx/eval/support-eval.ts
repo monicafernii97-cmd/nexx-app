@@ -75,11 +75,21 @@ export function evaluateSupport(response: NexxAssistantResponse): EvalScore[] {
         notes: `${structureCount} list/header items — ${structureRatio < 0.5 ? 'appropriate density' : 'over-structured for support'}`,
     });
 
-    // 4. Appropriate length — not too brief, not overly long
+    // 4. Appropriate length — too brief loses warmth, too long overwhelms
+    const lengthScore = wordCount >= 50 && wordCount <= 400
+        ? 1                          // Sweet spot for empathetic support
+        : wordCount > 400
+            ? 0.5                    // Too long — may overwhelm the reader
+            : wordCount >= 30
+                ? 0.6                // Borderline brief
+                : 0.2;              // Critically brief — not enough space for empathy
+    const lengthNote = wordCount >= 50 && wordCount <= 400
+        ? 'appropriate'
+        : wordCount > 400 ? 'may be too long — risk of overwhelming' : 'too brief for meaningful support';
     scores.push({
         dimension: 'support_appropriate_length',
-        score: wordCount >= 50 && wordCount <= 400 ? 1 : wordCount >= 30 ? 0.6 : 0.2,
-        notes: `${wordCount} words — ${wordCount >= 50 && wordCount <= 400 ? 'appropriate' : wordCount > 400 ? 'may be too long' : 'too brief'}`,
+        score: lengthScore,
+        notes: `${wordCount} words — ${lengthNote}`,
     });
 
     // 5. No advice overload — support should validate before advising

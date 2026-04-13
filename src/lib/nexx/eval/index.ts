@@ -42,7 +42,7 @@ export interface SubsystemResult {
 
 /** Complete evaluation result from all subsystems. */
 export interface EvalResult {
-    /** Overall quality score (0–1, average of all subsystem averages) */
+    /** Overall quality score (0–1, average of all individual dimension scores) */
     overall: number;
     /** Per-subsystem results */
     bySubsystem: SubsystemResult[];

@@ -64,8 +64,10 @@ export function evaluateProcedure(
     });
 
     // 2. Correct jurisdiction — if expected, does it match?
+    //    Use case-insensitive string check instead of dynamic RegExp
+    //    to avoid ReDoS from special characters in user input.
     if (expectedJurisdiction) {
-        const mentionsExpected = new RegExp(`\\b${expectedJurisdiction}\\b`, 'i').test(text);
+        const mentionsExpected = text.toLowerCase().includes(expectedJurisdiction.toLowerCase());
         scores.push({
             dimension: 'procedure_correct_jurisdiction',
             score: mentionsExpected ? 1 : 0,

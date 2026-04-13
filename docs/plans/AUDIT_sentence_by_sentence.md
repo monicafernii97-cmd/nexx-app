@@ -289,7 +289,7 @@
 | 5.52 | "user pinned this" | ✅ | §1.11 |
 | 5.53 | "user ignored all actions" | ✅ | §1.11 |
 | 5.54 | "user asked a follow-up because response missed something" | ✅ | §1.11 |
-| 5.55 | "user rewrote / requested 'make this softer'" | ✅ | §1.11 |
+| 5.55 | "user requested a softer rewrite" | ✅ | §1.11 |
 | 5.56 | "user repeatedly asks for judge-friendly wording" | ✅ | §1.11 |
 | 5.57 | "user never uses timeline conversion" | ✅ | §1.11 |
 | 5.58 | "user frequently uses good-faith and reasonableness panels" | ✅ | §1.11 |

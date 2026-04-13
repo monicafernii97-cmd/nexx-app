@@ -30,6 +30,7 @@ export function CaseSwitcher() {
     const { activeCase, cases, activeCaseId, setActiveCaseId } = useWorkspace();
     const { showToast } = useToast();
     const [isOpen, setIsOpen] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const createCase = useMutation(api.cases.create);
     const archiveCase = useMutation(api.cases.archive);
@@ -63,6 +64,8 @@ export function CaseSwitcher() {
     const archivedCases = cases?.filter(c => c.status === 'archived') ?? [];
 
     const handleNewCase = async () => {
+        if (isCreating) return;
+        setIsCreating(true);
         try {
             const newCaseId = await createCase({
                 title: `Case ${(cases?.length ?? 0) + 1}`,
@@ -78,6 +81,8 @@ export function CaseSwitcher() {
                 description: err instanceof Error ? err.message : 'Please try again.',
                 variant: 'error',
             });
+        } finally {
+            setIsCreating(false);
         }
     };
 
@@ -123,10 +128,11 @@ export function CaseSwitcher() {
             <div className="px-3">
                 <button
                     onClick={handleNewCase}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-dashed border-white/15 hover:bg-[var(--accent-icy)]/10 text-[var(--accent-icy)]/70 hover:text-[var(--accent-icy)] transition-all"
+                    disabled={isCreating}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-dashed border-white/15 hover:bg-[var(--accent-icy)]/10 text-[var(--accent-icy)]/70 hover:text-[var(--accent-icy)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Plus size={14} weight="bold" />
-                    <span className="text-[12px] font-bold">Create First Case</span>
+                    <span className="text-[12px] font-bold">{isCreating ? 'Creating...' : 'Create First Case'}</span>
                 </button>
             </div>
         );
@@ -187,17 +193,25 @@ export function CaseSwitcher() {
                                 Active Cases
                             </p>
                             {activeCases.map(c => (
-                                <button
+                                <div
                                     key={c._id}
                                     role="option"
                                     aria-selected={c._id === activeCaseId}
+                                    tabIndex={0}
                                     onClick={() => {
                                         setActiveCaseId(c._id);
                                         setIsOpen(false);
                                     }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            setActiveCaseId(c._id);
+                                            setIsOpen(false);
+                                        }
+                                    }}
                                     className={`
                                         w-full flex items-center justify-between px-3 py-2.5 rounded-xl
-                                        transition-all duration-150 group/item
+                                        transition-all duration-150 group/item cursor-pointer
                                         ${c._id === activeCaseId
                                             ? 'bg-[var(--accent-icy)]/10 text-white'
                                             : 'hover:bg-white/5 text-white/60 hover:text-white/80'
@@ -215,28 +229,20 @@ export function CaseSwitcher() {
                                             <Check size={14} weight="bold" className="text-[var(--accent-icy)]" />
                                         )}
                                         {c._id !== activeCaseId && activeCases.length > 1 && (
-                                            <div
-                                                role="button"
-                                                tabIndex={0}
+                                            <button
+                                                type="button"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleArchive(c._id);
-                                                }}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter' || e.key === ' ') {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        handleArchive(c._id);
-                                                    }
                                                 }}
                                                 className="p-1 rounded-lg opacity-0 group-hover/item:opacity-100 hover:bg-white/10 text-white/30 hover:text-white/60 transition-all cursor-pointer"
                                                 aria-label={`Archive ${c.title}`}
                                             >
                                                 <Archive size={12} />
-                                            </div>
+                                            </button>
                                         )}
                                     </div>
-                                </button>
+                                </div>
                             ))}
                         </div>
 
@@ -264,10 +270,11 @@ export function CaseSwitcher() {
                         <div className="p-2 border-t border-white/8">
                             <button
                                 onClick={handleNewCase}
-                                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[var(--accent-icy)]/10 text-[var(--accent-icy)]/70 hover:text-[var(--accent-icy)] transition-all"
+                                disabled={isCreating}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[var(--accent-icy)]/10 text-[var(--accent-icy)]/70 hover:text-[var(--accent-icy)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Plus size={14} weight="bold" />
-                                <span className="text-[12px] font-bold">New Case</span>
+                                <span className="text-[12px] font-bold">{isCreating ? 'Creating...' : 'New Case'}</span>
                             </button>
                         </div>
                     </motion.div>

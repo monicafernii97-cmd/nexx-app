@@ -18,6 +18,7 @@ export const RAIL_KEY_POINT_TYPES: SaveType[] = [
     'risk_concern',
     'strength_highlight',
     'good_faith_point',
+    'hearing_prep_point',
     'draft_snippet',
     'question_to_verify',
 ];
@@ -33,6 +34,7 @@ export const ALL_SAVE_TYPE_TABS: { id: string; label: string }[] = [
     { id: 'risk_concern', label: 'Risks' },
     { id: 'strength_highlight', label: 'Strengths' },
     { id: 'good_faith_point', label: 'Good Faith' },
+    { id: 'hearing_prep_point', label: 'Hearing Prep' },
     { id: 'draft_snippet', label: 'Drafts' },
     { id: 'case_note', label: 'Notes' },
     { id: 'timeline_candidate', label: 'Timeline' },

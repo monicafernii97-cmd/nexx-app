@@ -219,9 +219,11 @@ export function clusterTimelineEvents(
             continue;
         }
 
-        // Post-trigger phases: only assign escalation/current_dispute
-        // for events that appear AFTER the trigger.
-        if (triggerIndex >= 0 && i > triggerIndex) {
+        // Post-trigger phases:
+        // - If trigger exists, only route events AFTER it.
+        // - If trigger does not exist yet, still route conflict/recent events
+        //   so fallback promotion has candidates to scan.
+        if (triggerIndex < 0 || i > triggerIndex) {
             if (i >= recentBound && hasConflict) {
                 result.get('current_dispute')!.push(event);
                 continue;
@@ -232,7 +234,10 @@ export function clusterTimelineEvents(
                 continue;
             }
 
-            if (i >= recentBound) {
+            // Only route unmarked recent events to current_dispute when a
+            // trigger is known — without a trigger, unmarked events should
+            // stay in background to avoid inflating the dispute phase.
+            if (triggerIndex >= 0 && i >= recentBound) {
                 result.get('current_dispute')!.push(event);
                 continue;
             }

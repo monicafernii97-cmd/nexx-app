@@ -87,6 +87,48 @@ function hasMarkers(text: string, patterns: RegExp[]): boolean {
 }
 
 
+// Only structural/legal event types are routed to relief_connection.
+// Excluded TimelineEventType values: 'medical', 'school', 'travel',
+// 'exchange', 'payment' — these are factual/contextual events that
+// belong in chronology phases, not relief routing.
+// TODO: Revisit this allowlist if new event types warrant relief routing.
+const RELIEF_EVENT_TYPES: Set<string> = new Set([
+    'filing', 'incident', 'agreement', 'communication', 'other',
+]);
+
+/**
+ * Pre-scan sorted events to find the trigger index — the first event
+ * with change markers that isn't a relief event and appears at or after
+ * the early boundary. Returns -1 if no trigger is found (fallback scan
+ * will promote from escalation/current_dispute later).
+ */
+function findTriggerIndex(
+    sorted: TimelineEventNode[],
+    earlyBound: number,
+    reliefTypes: Set<string>,
+): number {
+    for (let i = 0; i < sorted.length; i++) {
+        const event = sorted[i];
+        const combined = `${event.title} ${event.description}`;
+
+        // Skip relief events — they're routed separately
+        if (hasMarkers(combined, RELIEF_MARKER_RX) && reliefTypes.has(event.type)) {
+            continue;
+        }
+
+        // Skip pure-early events with no change markers
+        if (i < earlyBound && !hasMarkers(combined, CHANGE_MARKER_RX)) {
+            continue;
+        }
+
+        // First event with change markers = trigger
+        if (hasMarkers(combined, CHANGE_MARKER_RX)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 // ---------------------------------------------------------------------------
 // Phase Assignment
 // ---------------------------------------------------------------------------
@@ -136,25 +178,20 @@ export function clusterTimelineEvents(
         Math.max(earlyBound + 1, totalEvents - Math.floor(totalEvents * 0.2)),
     );
 
-    let triggerFound = false;
-
-    // Only structural/legal event types are routed to relief_connection.
-    // Excluded TimelineEventType values: 'medical', 'school', 'travel',
-    // 'exchange', 'payment' — these are factual/contextual events that
-    // belong in chronology phases, not relief routing.
-    // TODO: Revisit this allowlist if new event types warrant relief routing.
-    const RELIEF_EVENT_TYPES: Set<string> = new Set([
-        'filing', 'incident', 'agreement', 'communication', 'other',
-    ]);
+    // Pre-scan: find the trigger event index before assigning phases.
+    // This prevents conflict/recent events from being placed into
+    // post-trigger phases (escalation, current_dispute) when they
+    // chronologically precede the actual trigger.
+    const triggerIndex = findTriggerIndex(sorted, earlyBound, RELIEF_EVENT_TYPES);
 
     for (let i = 0; i < sorted.length; i++) {
         const event = sorted[i];
         const combined = `${event.title} ${event.description}`;
 
         // Precompute marker flags once per event using precompiled regexes
+        // (hasChange not needed here — trigger is pre-determined by findTriggerIndex)
         const hasRelief = hasMarkers(combined, RELIEF_MARKER_RX);
         const hasStability = hasMarkers(combined, STABILITY_MARKER_RX);
-        const hasChange = hasMarkers(combined, CHANGE_MARKER_RX);
         const hasConflict = hasMarkers(combined, CONFLICT_MARKER_RX);
 
         // Relief events go to relief_connection regardless of timeline position.
@@ -163,10 +200,17 @@ export function clusterTimelineEvents(
             continue;
         }
 
+        // Trigger event: the pre-scanned index
+        if (i === triggerIndex) {
+            result.get('trigger_event')!.push(event);
+            continue;
+        }
+
         // Early events: route to background/baseline only if they don't
-        // carry change or conflict markers. Events with change/conflict
-        // signals fall through to the trigger/escalation handlers below.
-        if (i < earlyBound && !hasChange && !hasConflict) {
+        // carry change or conflict markers AND appear before the trigger.
+        // Events with change/conflict before the trigger still go to
+        // background — they precede the narrative pivot.
+        if (i < earlyBound && (triggerIndex < 0 || i < triggerIndex)) {
             if (hasStability) {
                 result.get('baseline_practice')!.push(event);
             } else {
@@ -175,35 +219,28 @@ export function clusterTimelineEvents(
             continue;
         }
 
-        // Look for trigger event: first event with change markers after baseline
-        if (!triggerFound && hasChange) {
-            result.get('trigger_event')!.push(event);
-            triggerFound = true;
-            continue;
+        // Post-trigger phases: only assign escalation/current_dispute
+        // for events that appear AFTER the trigger.
+        if (triggerIndex >= 0 && i > triggerIndex) {
+            if (i >= recentBound && hasConflict) {
+                result.get('current_dispute')!.push(event);
+                continue;
+            }
+
+            if (hasConflict) {
+                result.get('escalation')!.push(event);
+                continue;
+            }
+
+            if (i >= recentBound) {
+                result.get('current_dispute')!.push(event);
+                continue;
+            }
         }
 
-        // Recent events with conflict → current_dispute
-        if (i >= recentBound && hasConflict) {
-            result.get('current_dispute')!.push(event);
-            continue;
-        }
-
-        // Middle events with conflict → escalation (even before trigger found,
-        // so the fallback trigger scan can inspect them)
-        if (hasConflict) {
-            result.get('escalation')!.push(event);
-            continue;
-        }
-
-        // Middle events with stability → still baseline_practice
+        // Pre-trigger events with stability → baseline_practice
         if (hasStability) {
             result.get('baseline_practice')!.push(event);
-            continue;
-        }
-
-        // Recent events without specific markers → current_dispute if recent
-        if (i >= recentBound) {
-            result.get('current_dispute')!.push(event);
             continue;
         }
 
@@ -211,10 +248,9 @@ export function clusterTimelineEvents(
         result.get('background')!.push(event);
     }
 
-    // If no trigger was found, promote the first conflict/change event
-    // from escalation or current_dispute — validate markers to avoid
-    // promoting unmarked events.
-    if (!triggerFound) {
+    // If no trigger was found via change markers, promote the first
+    // conflict/change event from escalation or current_dispute.
+    if (triggerIndex < 0) {
         const fallbackMarkers = [...CHANGE_MARKER_RX, ...CONFLICT_MARKER_RX];
         for (const phase of ['escalation', 'current_dispute'] as const) {
             const phaseEvents = result.get(phase);

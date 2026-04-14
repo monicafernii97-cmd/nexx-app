@@ -43,26 +43,41 @@ interface SplitSentence {
 export function splitIntoSentences(text: string): SplitSentence[] {
     if (!text?.trim()) return [];
 
-    // First, split on newlines that look like distinct items (bullets, numbered lists)
-    const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
+    // Split on paragraph breaks (2+ newlines); single newlines within
+    // paragraphs may be soft wraps or list items.
+    const paragraphs = text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
 
     const sentences: SplitSentence[] = [];
 
-    for (const line of lines) {
-        // Skip empty lines or pure whitespace
-        if (!line) continue;
+    /** Returns true if the line looks like a bullet or numbered list item. */
+    const isList = (l: string) => /^[-•*]\s/.test(l) || /^\d+[.)\]]\s/.test(l);
 
-        // If the line is a short bullet/list item, treat it as one sentence
-        // Preserve the original line for accurate index tracking
-        if (/^[\-•*]\s/.test(line) || /^\d+[\.\)]\s/.test(line)) {
-            const cleaned = line.replace(/^[\-•*]\s+/, '').replace(/^\d+[\.\)]\s+/, '');
-            sentences.push({ text: cleaned, originalText: line });
+    for (const para of paragraphs) {
+        const lines = para.split(/\n/).map(l => l.trim()).filter(Boolean);
+
+        // If any line in the paragraph is a list item, treat every line
+        // individually (preserves bullets and numbered items).
+        const hasList = lines.some(isList);
+
+        if (hasList) {
+            for (const line of lines) {
+                if (isList(line)) {
+                    const cleaned = line.replace(/^[-•*]\s+/, '').replace(/^\d+[.)\]]\s+/, '');
+                    sentences.push({ text: cleaned, originalText: line });
+                } else {
+                    sentences.push({ text: line, originalText: line });
+                }
+            }
             continue;
         }
 
-        // Split on sentence boundaries, preserving abbreviations
+        // Non-list paragraph: collapse internal single newlines into spaces
+        // so soft-wrapped prose becomes a single block, then split on
+        // sentence-ending punctuation.
+        const collapsed = lines.join(' ');
+
         // Replace common abbreviations with placeholders
-        const processed = line
+        const processed = collapsed
             .replace(/\b(Mr|Mrs|Ms|Dr|Jr|Sr|Prof|Hon|Rev|St|Ave|Blvd|Dept|Inc|Corp|Ltd|etc|vs|Tex|Fam|Civ|Crim)\./gi, '$1_DOT_')
             .replace(/\b([A-Z])\./g, '$1_DOT_')    // initials
             .replace(/(\d+)\.(\d+)/g, '$1_DECIMAL_$2'); // decimals/statutes
@@ -96,9 +111,9 @@ export function splitIntoSentences(text: string): SplitSentence[] {
  */
 const TIE_BREAK_PRIORITY: SentenceType[] = [
     'request',
-    'procedure',
-    'argument',
     'fact',
+    'argument',
+    'procedure',
     'timeline_event',
     'evidence_reference',
     'issue',

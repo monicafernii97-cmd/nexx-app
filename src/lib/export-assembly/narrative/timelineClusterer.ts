@@ -132,15 +132,21 @@ export function clusterTimelineEvents(
         const event = sorted[i];
         const combined = `${event.title} ${event.description}`;
 
+        // Precompute marker flags once per event to avoid repeated scanning
+        const hasRelief = hasMarkers(combined, RELIEF_MARKERS);
+        const hasStability = hasMarkers(combined, STABILITY_MARKERS);
+        const hasChange = hasMarkers(combined, CHANGE_MARKERS);
+        const hasConflict = hasMarkers(combined, CONFLICT_MARKERS);
+
         // Relief events go to relief_connection regardless of timeline position.
-        if (hasMarkers(combined, RELIEF_MARKERS) && RELIEF_EVENT_TYPES.has(event.type)) {
+        if (hasRelief && RELIEF_EVENT_TYPES.has(event.type)) {
             result.get('relief_connection')!.push(event);
             continue;
         }
 
         // Early events with no conflict → background or baseline
         if (i < earlyBound) {
-            if (hasMarkers(combined, STABILITY_MARKERS)) {
+            if (hasStability) {
                 result.get('baseline_practice')!.push(event);
             } else {
                 result.get('background')!.push(event);
@@ -149,26 +155,26 @@ export function clusterTimelineEvents(
         }
 
         // Look for trigger event: first event with change markers after baseline
-        if (!triggerFound && hasMarkers(combined, CHANGE_MARKERS)) {
+        if (!triggerFound && hasChange) {
             result.get('trigger_event')!.push(event);
             triggerFound = true;
             continue;
         }
 
         // Recent events with conflict → current_dispute
-        if (i >= recentBound && hasMarkers(combined, CONFLICT_MARKERS)) {
+        if (i >= recentBound && hasConflict) {
             result.get('current_dispute')!.push(event);
             continue;
         }
 
         // Middle events with conflict after trigger → escalation
-        if (triggerFound && hasMarkers(combined, CONFLICT_MARKERS)) {
+        if (triggerFound && hasConflict) {
             result.get('escalation')!.push(event);
             continue;
         }
 
         // Middle events with stability → still baseline_practice
-        if (hasMarkers(combined, STABILITY_MARKERS)) {
+        if (hasStability) {
             result.get('baseline_practice')!.push(event);
             continue;
         }
@@ -187,14 +193,22 @@ export function clusterTimelineEvents(
         }
     }
 
-    // If no trigger was found, promote the first conflict event
+    // If no trigger was found, promote the first conflict/change event
+    // from escalation or current_dispute — validate markers to avoid
+    // promoting unmarked events.
     if (!triggerFound) {
+        const fallbackMarkers = [...CHANGE_MARKERS, ...CONFLICT_MARKERS];
         for (const phase of ['escalation', 'current_dispute'] as const) {
             const phaseEvents = result.get(phase);
             if (phaseEvents && phaseEvents.length > 0) {
-                const trigger = phaseEvents.shift()!;
-                result.get('trigger_event')!.push(trigger);
-                break;
+                const idx = phaseEvents.findIndex(e =>
+                    hasMarkers(`${e.title} ${e.description}`, fallbackMarkers),
+                );
+                if (idx >= 0) {
+                    const [trigger] = phaseEvents.splice(idx, 1);
+                    result.get('trigger_event')!.push(trigger);
+                    break;
+                }
             }
         }
     }

@@ -170,7 +170,10 @@ export function mapIssuesToRelief(
     const connections: ReliefConnection[] = [];
     let connectionId = 0;
 
-    for (const issue of issues) {
+    // Deduplicate incoming issues so duplicate tags produce only one mapping
+    const uniqueIssues = [...new Set(issues)];
+
+    for (const issue of uniqueIssues) {
         const rule = RELIEF_RULES.find(r => r.issueTag === issue);
         if (!rule) continue;
 
@@ -178,13 +181,31 @@ export function mapIssuesToRelief(
         const supportingNodes = nodes.filter(n => n.issueTags.includes(issue));
         if (supportingNodes.length < rule.minNodeSupport) continue;
 
-        // Find supporting events
+        // Build a set of evidence IDs linked to supporting nodes
+        // so event matching can be scoped to related evidence.
+        const nodeEvidenceSet = new Set<string>();
+        for (const node of supportingNodes) {
+            for (const eid of node.provenance.linkedEvidenceIds) {
+                nodeEvidenceSet.add(eid);
+            }
+        }
+
+        // Find supporting events — use word-boundary matching and prefer
+        // events linked to the same evidence as supporting nodes.
         const supportingEventIds: string[] = [];
         const supportingEvidenceIds: string[] = [];
 
+        // Build word-boundary patterns once per rule
+        const keywordPatterns = rule.eventKeywords.map(
+            kw => new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'),
+        );
+
         for (const event of events) {
-            const combined = `${event.title} ${event.description}`.toLowerCase();
-            if (rule.eventKeywords.some(kw => combined.includes(kw))) {
+            const combined = `${event.title} ${event.description}`;
+            const matchesKeyword = keywordPatterns.some(re => re.test(combined));
+            const isLinked = event.linkedEvidenceIds?.some(eid => nodeEvidenceSet.has(eid)) ?? false;
+
+            if (matchesKeyword || isLinked) {
                 supportingEventIds.push(event.id);
                 if (event.linkedEvidenceIds) {
                     supportingEvidenceIds.push(...event.linkedEvidenceIds);
@@ -193,9 +214,7 @@ export function mapIssuesToRelief(
         }
 
         // Collect evidence from nodes
-        for (const node of supportingNodes) {
-            supportingEvidenceIds.push(...node.provenance.linkedEvidenceIds);
-        }
+        supportingEvidenceIds.push(...nodeEvidenceSet);
 
         // Generate reasoning from template with dynamic values
         const supportCount = supportingNodes.length + supportingEventIds.length;
@@ -249,9 +268,10 @@ function inferYearsFromDates(nodes: ClassifiedNode[]): string {
 
     const earliest = Math.min(...allDates);
     const latest = Math.max(...allDates);
-    const years = Math.round((latest - earliest) / (365.25 * 24 * 60 * 60 * 1000));
+    const yearsFloat = (latest - earliest) / (365.25 * 24 * 60 * 60 * 1000);
 
-    if (years < 1) return 'approximately one year';
+    if (yearsFloat < 1) return 'less than one year';
+    const years = Math.round(yearsFloat);
     return `approximately ${years} year${years === 1 ? '' : 's'}`;
 }
 

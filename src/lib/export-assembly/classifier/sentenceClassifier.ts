@@ -82,6 +82,7 @@ export function splitIntoSentences(text: string): SplitSentence[] {
         const processed = collapsed
             .replace(/\b(Mr|Mrs|Ms|Dr|Jr|Sr|Prof|Hon|Rev|St|Ave|Blvd|Dept|Inc|Corp|Ltd|etc|vs|Tex|Fam|Civ|Crim)\./gi, '$1_DOT_')
             .replace(/(?:[A-Z]\.){2,}/g, match => match.replace(/\./g, '_DOT_'))  // multi-initial sequences
+            .replace(/\b([A-Z])\.(?=\s+[A-Z][a-z])/g, '$1_DOT_')  // single initial before capitalized name
             .replace(/(\d+)\.(\d+)/g, '$1_DECIMAL_$2'); // decimals/statutes
 
         // Split on sentence-ending punctuation
@@ -245,13 +246,17 @@ export function classifyText(
     const splitSentences = splitIntoSentences(text);
     const results: SentenceClassification[] = [];
 
+    // Normalize text by collapsing single newlines into spaces (matching
+    // the collapsed form used in splitIntoSentences) so indexOf lookups
+    // align with the originalText stored during splitting.
+    const normalized = text.replace(/\n(?!\n)/g, ' ');
     let searchFrom = 0;
 
     for (const { text: sentenceText, originalText } of splitSentences) {
         const classification = classifySentence(sentenceText, sourceType, userTags);
 
         // Use originalText (with bullet markers intact) for accurate position finding
-        const idx = text.indexOf(originalText, searchFrom);
+        const idx = normalized.indexOf(originalText, searchFrom);
         const startIdx = idx >= 0 ? idx : searchFrom;
 
         // startIndex/endIndex refer to where the original text lives in the source

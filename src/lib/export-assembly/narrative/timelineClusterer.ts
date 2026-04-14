@@ -174,8 +174,9 @@ export function clusterTimelineEvents(
             continue;
         }
 
-        // Middle events with conflict after trigger → escalation
-        if (triggerFound && hasConflict) {
+        // Middle events with conflict → escalation (even before trigger found,
+        // so the fallback trigger scan can inspect them)
+        if (hasConflict) {
             result.get('escalation')!.push(event);
             continue;
         }
@@ -192,12 +193,8 @@ export function clusterTimelineEvents(
             continue;
         }
 
-        // Default: background for early, escalation for middle post-trigger
-        if (triggerFound) {
-            result.get('escalation')!.push(event);
-        } else {
-            result.get('background')!.push(event);
-        }
+        // Default: background
+        result.get('background')!.push(event);
     }
 
     // If no trigger was found, promote the first conflict/change event

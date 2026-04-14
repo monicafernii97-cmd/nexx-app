@@ -210,15 +210,18 @@ export function mapIssuesToRelief(
             // for generic terms like 'call' or 'notice'.
             if (matchesKeyword && isLinked) {
                 supportingEventIds.push(event.id);
+                // Only include evidence IDs that intersect with node evidence
                 if (event.linkedEvidenceIds) {
-                    supportingEvidenceIds.push(...event.linkedEvidenceIds);
+                    const relevant = event.linkedEvidenceIds.filter(eid => nodeEvidenceSet.has(eid));
+                    supportingEvidenceIds.push(...relevant);
                 }
             } else if (isLinked) {
                 // Events linked to supporting evidence count even without
                 // keyword matches — the evidence linkage is sufficient.
                 supportingEventIds.push(event.id);
                 if (event.linkedEvidenceIds) {
-                    supportingEvidenceIds.push(...event.linkedEvidenceIds);
+                    const relevant = event.linkedEvidenceIds.filter(eid => nodeEvidenceSet.has(eid));
+                    supportingEvidenceIds.push(...relevant);
                 }
             }
         }

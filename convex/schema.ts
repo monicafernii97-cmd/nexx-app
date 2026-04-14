@@ -602,4 +602,43 @@ export default defineSchema({
         .index('by_userId_status', ['userId', 'status'])
         .index('by_userId_requestId', ['userId', 'requestId'])
         .index('by_caseId', ['caseId']),
+
+    // ═══ NEW: Detected Patterns (evidence-based behavioral patterns) ═══
+    // Strict rules enforced before insert:
+    //   • 3+ supporting events required
+    //   • 2+ distinct dates required
+    //   • All events source-backed against real Convex records
+    //   • No emotional labeling — neutral observable categories only
+    //   • Score < 5 (low confidence) → never stored
+    detectedPatterns: defineTable({
+        userId: v.id('users'),
+        caseId: v.id('cases'),
+        /** Pattern title (neutral, observable behavior label) */
+        title: v.string(),
+        /** AI-generated summary of the pattern */
+        summary: v.string(),
+        /** Neutral behavior category from BEHAVIOR_CATEGORIES */
+        category: v.string(),
+        /** Supporting events with source traceability — JSON: PatternEvent[] */
+        eventsJson: v.string(),
+        /** Number of supporting events (denormalized for queries) */
+        eventCount: v.number(),
+        /** Number of distinct dates (denormalized for queries) */
+        distinctDates: v.number(),
+        /** Confidence score (0-10, only 5+ stored) */
+        score: v.number(),
+        /** Confidence band — only medium/high are persisted */
+        confidence: v.union(
+            v.literal('medium'),
+            v.literal('high')
+        ),
+        /** Idempotency key (prevents duplicate runs) */
+        requestId: v.string(),
+        generatedAt: v.number(),
+        createdAt: v.number(),
+    })
+        .index('by_caseId', ['caseId'])
+        .index('by_userId', ['userId'])
+        .index('by_caseId_category', ['caseId', 'category'])
+        .index('by_requestId', ['requestId']),
 });

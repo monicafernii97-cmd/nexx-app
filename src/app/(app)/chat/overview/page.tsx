@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import {
     SquaresFour, Notebook, PushPin, CalendarCheck,
@@ -16,8 +16,10 @@ import { ItemCard } from '@/components/workspace/ItemCard';
 import { EmptyState } from '@/components/workspace/EmptyState';
 import { PatternsBlock } from '@/components/workspace/PatternsBlock';
 import { NarrativeBlock, type CaseNarrative } from '@/components/workspace/NarrativeBlock';
+import { useQuery } from 'convex/react';
+import { api } from '@convex/_generated/api';
 import { GenerateReportModal } from '@/components/workspace/GenerateReportModal';
-import type { DetectedPattern } from '@/lib/nexx/premiumAnalytics';
+
 
 /**
  * Workspace Overview — The "Case Thinking Environment".
@@ -29,7 +31,7 @@ import type { DetectedPattern } from '@/lib/nexx/premiumAnalytics';
  * "What happened → When → Is there a pattern → What does it all mean?"
  */
 export default function WorkspaceOverview() {
-    const { pins, memory, timeline, counts, removeMemory } = useWorkspace();
+    const { pins, memory, timeline, counts, removeMemory, activeCaseId } = useWorkspace();
 
     // ── Generate Report Modal state ──
     const [isReportModalOpen, setIsReportModalOpen] = useState(() => {
@@ -44,8 +46,64 @@ export default function WorkspaceOverview() {
         return () => window.removeEventListener('nexx:open-report-modal', handler);
     }, []);
 
-    // Narrative state (will be populated by AI in future)
-    const [narrative] = useState<CaseNarrative | null>(null);
+    // ── Detected Patterns from Convex ──
+    const detectedPatterns = useQuery(
+        api.detectedPatterns.listByCase,
+        activeCaseId ? { caseId: activeCaseId } : 'skip'
+    );
+
+    // ── Pattern Detection API trigger ──
+    const [isDetectingPatterns, setIsDetectingPatterns] = useState(false);
+    const [patternError, setPatternError] = useState<string | null>(null);
+
+    const handleDetectPatterns = useCallback(async () => {
+        if (!activeCaseId || isDetectingPatterns) return;
+        setIsDetectingPatterns(true);
+        setPatternError(null);
+        try {
+            const res = await fetch('/api/workspace/patterns', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ caseId: activeCaseId }),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Pattern detection failed');
+            }
+        } catch (err) {
+            setPatternError(err instanceof Error ? err.message : 'Pattern detection failed');
+        } finally {
+            setIsDetectingPatterns(false);
+        }
+    }, [activeCaseId, isDetectingPatterns]);
+
+    // ── Narrative Generation API trigger ──
+    const [narrative, setNarrative] = useState<CaseNarrative | null>(null);
+    const [isGeneratingNarrative, setIsGeneratingNarrative] = useState(false);
+    const [narrativeError, setNarrativeError] = useState<string | null>(null);
+
+    const handleGenerateNarrative = useCallback(async () => {
+        if (!activeCaseId || isGeneratingNarrative) return;
+        setIsGeneratingNarrative(true);
+        setNarrativeError(null);
+        try {
+            const res = await fetch('/api/workspace/narrative', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ caseId: activeCaseId }),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Narrative generation failed');
+            }
+            const data = await res.json();
+            setNarrative(data);
+        } catch (err) {
+            setNarrativeError(err instanceof Error ? err.message : 'Narrative generation failed');
+        } finally {
+            setIsGeneratingNarrative(false);
+        }
+    }, [activeCaseId, isGeneratingNarrative]);
 
     // Recent key facts only (filtered from all memory)
     const recentKeyFacts = [...(memory ?? [])]
@@ -61,11 +119,6 @@ export default function WorkspaceOverview() {
         .slice(0, 5);
 
     const router = useRouter();
-
-    // Detected patterns — will be populated by AI analysis in Part 5.
-    // The architecture is ready; pass real DetectedPattern[] once the
-    // narrative API route computes them from timeline + memory data.
-    const detectedPatterns = useMemo<DetectedPattern[]>(() => [], []);
 
     const handleGenerateReport = useCallback((options: {
         outputType: 'summary' | 'court_document' | 'both';
@@ -256,17 +309,40 @@ export default function WorkspaceOverview() {
                 )}
             </motion.section>
 
-            {/* ── Section 3: Observed Patterns (only if earned) ── */}
-            {detectedPatterns.length > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.45 }}
-                    className="mb-8"
-                >
-                    <PatternsBlock patterns={detectedPatterns} />
-                </motion.div>
-            )}
+            {/* ── Section 3: Observed Patterns (always show — PatternsBlock handles empty state) ── */}
+            <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45 }}
+                className="mb-8"
+            >
+                <PatternsBlock patterns={(detectedPatterns ?? []).map(p => ({
+                    title: p.title,
+                    summary: p.summary,
+                    category: p.category as import('@/lib/nexx/premiumAnalytics').BehaviorCategory,
+                    confidence: p.confidence,
+                    score: p.score,
+                    supportingEvents: (() => {
+                        try { return JSON.parse(p.eventsJson); }
+                        catch { return []; }
+                    })(),
+                }))} />
+
+                {/* Detect Patterns trigger */}
+                <div className="mt-4 flex items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={handleDetectPatterns}
+                        disabled={isDetectingPatterns || !activeCaseId}
+                        className="text-[11px] font-bold uppercase tracking-wider px-4 py-2 rounded-full border border-white/10 hover:border-white/25 bg-white/[0.03] hover:bg-white/[0.06] text-white/50 hover:text-white/80 transition-all disabled:opacity-40 cursor-pointer"
+                    >
+                        {isDetectingPatterns ? 'Analyzing...' : 'Detect Patterns'}
+                    </button>
+                    {patternError && (
+                        <p className="text-[11px] text-red-400/70">{patternError}</p>
+                    )}
+                </div>
+            </motion.div>
 
             {/* ── Section 4: Case Summary Narrative (highest value) ── */}
             <motion.div
@@ -277,9 +353,13 @@ export default function WorkspaceOverview() {
             >
                 <NarrativeBlock
                     narrative={narrative}
-                    onGenerate={() => setIsReportModalOpen(true)}
+                    isGenerating={isGeneratingNarrative}
+                    onGenerate={handleGenerateNarrative}
                     onSendToDocuVault={handleSendToDocuVault}
                 />
+                {narrativeError && (
+                    <p className="text-[11px] text-red-400/70 mt-2">{narrativeError}</p>
+                )}
             </motion.div>
 
             {/* ── "New Strategic Session" card ── */}
@@ -312,7 +392,7 @@ export default function WorkspaceOverview() {
                 itemCounts={{
                     facts: counts.keyFacts,
                     timeline: counts.timeline,
-                    patterns: detectedPatterns.length,
+                    patterns: detectedPatterns?.length ?? 0,
                     pins: counts.pins,
                 }}
             />

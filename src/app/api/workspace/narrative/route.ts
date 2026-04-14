@@ -47,37 +47,28 @@ export async function POST(req: NextRequest) {
     try {
         const convex = await getAuthenticatedConvexClient();
 
-        // Load case data in parallel
-        const [incidents, timeline, caseMemory, pins] = await Promise.all([
-            convex.query(api.incidents.list, {}),
+        // Load case data in parallel — pass caseId for scoped queries
+        const [incidents, timeline, caseMemory, pins, detectedPatterns] = await Promise.all([
+            convex.query(api.incidents.list, { caseId }),
             convex.query(api.timelineCandidates.listByUser, {}),
             convex.query(api.caseMemory.listByUser, {}),
             convex.query(api.casePins.listByUser, {}),
+            convex.query(api.detectedPatterns.listByCase, { caseId }),
         ]);
 
         // ── Case-scoped filtering ──
-        // caseMemory, timelineCandidates, and casePins have optional caseId → filter by it.
-        // incidents schema lacks caseId today; filter applied for forward-compatibility
-        // so it activates automatically once Sprint 5 adds the field.
+        // incidents and detectedPatterns are already scoped via query args.
+        // caseMemory, timelineCandidates, and casePins use optional caseId → filter client-side.
         const caseScopedMemory = (caseMemory ?? []).filter(
             (m: { caseId?: Id<'cases'> }) => !m.caseId || m.caseId === caseId,
         );
         const caseScopedTimeline = (timeline ?? []).filter(
             (t: { caseId?: Id<'cases'> }) => !t.caseId || t.caseId === caseId,
         );
-        const caseScopedIncidents = (incidents ?? []).filter(
-            (i) => !(i as Record<string, unknown>).caseId || (i as Record<string, unknown>).caseId === caseId,
-        );
+        const caseScopedIncidents = incidents ?? [];
         const caseScopedPins = (pins ?? []).filter(
             (p: { caseId?: Id<'cases'> }) => !p.caseId || p.caseId === caseId,
         );
-
-        // Find existing pattern analysis (most recent)
-        const patternAnalysis = caseScopedMemory
-            .filter((m: { type: string }) => m.type === 'pattern_analysis')
-            .sort((a: { _creationTime: number }, b: { _creationTime: number }) =>
-                b._creationTime - a._creationTime,
-            )[0];
 
         const caseContext = {
             caseGraphSummary: 'Derive case context from the incidents, timeline, and case memory below.',
@@ -90,16 +81,18 @@ export async function POST(req: NextRequest) {
                 'case memory items',
             ),
             pins: serializeForPrompt(caseScopedPins, 'pinned items'),
-            patterns: (() => {
-                const raw = (patternAnalysis as { content?: string } | undefined)?.content;
-                if (!raw) return 'No patterns analyzed yet.';
-                try {
-                    const parsed = JSON.parse(raw) as { patterns?: unknown[] };
-                    return serializeForPrompt(parsed.patterns ?? [], 'supported patterns');
-                } catch {
-                    return 'No patterns analyzed yet.';
-                }
-            })(),
+            patterns: detectedPatterns && detectedPatterns.length > 0
+                ? serializeForPrompt(
+                    detectedPatterns.map((p: { title: string; summary: string; category: string; eventCount: number; confidence: string }) => ({
+                        title: p.title,
+                        summary: p.summary,
+                        category: p.category,
+                        eventCount: p.eventCount,
+                        confidence: p.confidence,
+                    })),
+                    'supported patterns'
+                )
+                : 'No patterns analyzed yet.',
         };
 
         // Call GPT for narrative synthesis

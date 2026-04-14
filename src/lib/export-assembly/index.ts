@@ -115,6 +115,11 @@ export function assembleExportInput(
         case 'exhibit_document':
             mappedSections = mapToExhibitSections(classifiedNodes, narrative, request);
             break;
+        default: {
+            // Exhaustiveness check — TypeScript will error if a new ExportPath is added
+            const _exhaustive: never = request.path;
+            throw new Error(`Unknown export path: ${_exhaustive}`);
+        }
     }
 
     const assemblyTimeMs = performance.now() - startTime;

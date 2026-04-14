@@ -64,18 +64,7 @@ export function compressEmotion(sentence: string): string {
  * Less aggressive than court-safe — summaries can include perspective.
  */
 export function compressOpinion(sentence: string): string {
-    // Remove only the harshest character attacks
-    const harshJudgments = [
-        'selfish', 'narcissist', 'narcissistic', 'toxic', 'crazy',
-        'psycho', 'disgusting', 'pathetic', 'worthless', 'incompetent',
-        'delusional', 'abusive',
-    ];
-
-    let result = sentence;
-    for (const judgment of harshJudgments) {
-        const regex = new RegExp(`\\b${judgment}\\b`, 'gi');
-        result = result.replace(regex, '');
-    }
+    let result = sentence.replace(HARSH_JUDGMENT_RE, '');
 
     // Clean up artifacts from removed words
     result = result.replace(/\s{2,}/g, ' ').trim();
@@ -86,6 +75,14 @@ export function compressOpinion(sentence: string): string {
 
     return result;
 }
+
+/** Pre-compiled regex for harsh character judgments — built once at module load. */
+const HARSH_JUDGMENTS = [
+    'selfish', 'narcissist', 'narcissistic', 'toxic', 'crazy',
+    'psycho', 'disgusting', 'pathetic', 'worthless', 'incompetent',
+    'delusional', 'abusive',
+];
+const HARSH_JUDGMENT_RE = new RegExp(`\\b(?:${HARSH_JUDGMENTS.join('|')})\\b`, 'gi');
 
 // ---------------------------------------------------------------------------
 // Full Summary-Safe Text Builder

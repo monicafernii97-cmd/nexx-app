@@ -32,21 +32,31 @@ import { extractEntities } from './entityExtractor';
  * - Decimal numbers (§ 153.002)
  * - Newline-delimited bullet points
  */
-export function splitIntoSentences(text: string): string[] {
+/** A sentence with both its cleaned text and original text for index tracking. */
+interface SplitSentence {
+    /** The cleaned sentence text (bullet markers stripped) */
+    text: string;
+    /** The original text as it appeared in the input (for indexOf) */
+    originalText: string;
+}
+
+export function splitIntoSentences(text: string): SplitSentence[] {
     if (!text?.trim()) return [];
 
     // First, split on newlines that look like distinct items (bullets, numbered lists)
     const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
 
-    const sentences: string[] = [];
+    const sentences: SplitSentence[] = [];
 
     for (const line of lines) {
         // Skip empty lines or pure whitespace
         if (!line) continue;
 
         // If the line is a short bullet/list item, treat it as one sentence
+        // Preserve the original line for accurate index tracking
         if (/^[\-•*]\s/.test(line) || /^\d+[\.\)]\s/.test(line)) {
-            sentences.push(line.replace(/^[\-•*]\s+/, '').replace(/^\d+[\.\)]\s+/, ''));
+            const cleaned = line.replace(/^[\-•*]\s+/, '').replace(/^\d+[\.\)]\s+/, '');
+            sentences.push({ text: cleaned, originalText: line });
             continue;
         }
 
@@ -66,7 +76,7 @@ export function splitIntoSentences(text: string): string[] {
                 .replace(/_DOT_/g, '.')
                 .replace(/_DECIMAL_/g, '.')
                 .trim();
-            if (restored) sentences.push(restored);
+            if (restored) sentences.push({ text: restored, originalText: restored });
         }
     }
 
@@ -196,18 +206,21 @@ export function classifyText(
     sourceType: WorkspaceNodeType,
     userTags?: string[],
 ): SentenceClassification[] {
-    const sentences = splitIntoSentences(text);
+    const splitSentences = splitIntoSentences(text);
     const results: SentenceClassification[] = [];
 
     let searchFrom = 0;
 
-    for (const sentence of sentences) {
-        const classification = classifySentence(sentence, sourceType, userTags);
+    for (const { text: sentenceText, originalText } of splitSentences) {
+        const classification = classifySentence(sentenceText, sourceType, userTags);
 
-        // Find the sentence position in original text
-        const idx = text.indexOf(sentence, searchFrom);
-        classification.startIndex = idx >= 0 ? idx : searchFrom;
-        classification.endIndex = classification.startIndex + sentence.length;
+        // Use originalText (with bullet markers intact) for accurate position finding
+        const idx = text.indexOf(originalText, searchFrom);
+        const startIdx = idx >= 0 ? idx : searchFrom;
+
+        // startIndex/endIndex refer to where the original text lives in the source
+        classification.startIndex = startIdx;
+        classification.endIndex = startIdx + originalText.length;
         searchFrom = classification.endIndex;
 
         results.push(classification);

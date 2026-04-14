@@ -28,6 +28,14 @@ import type {
     ExhibitConfig,
 } from '../types/exports';
 
+/**
+ * Parse a date string to epoch ms. Returns Infinity for unparseable dates.
+ */
+function parseDateMs(dateStr: string): number {
+    const ms = Date.parse(dateStr);
+    return Number.isNaN(ms) ? Infinity : ms;
+}
+
 // ---------------------------------------------------------------------------
 // Label Generators
 // ---------------------------------------------------------------------------
@@ -94,9 +102,12 @@ export function mapToExhibitSections(
             // Sort by the chosen organization method
             switch (config.organization) {
                 case 'chronological': {
-                    const dateA = a.extractedEntities.dates[0] ?? '';
-                    const dateB = b.extractedEntities.dates[0] ?? '';
-                    return dateA.localeCompare(dateB);
+                    const dateA = a.extractedEntities.dates[0];
+                    const dateB = b.extractedEntities.dates[0];
+                    if (dateA && dateB) return parseDateMs(dateA) - parseDateMs(dateB);
+                    if (dateA) return -1;
+                    if (dateB) return 1;
+                    return 0;
                 }
                 case 'issue_based':
                     return (b.issueTags[0] ?? '').localeCompare(a.issueTags[0] ?? '');
@@ -112,8 +123,9 @@ export function mapToExhibitSections(
         });
 
     // ── Determine party role for labels ──
-    // Try to get from request config or infer from nodes
-    const partyRole = ('partyRole' in config) ? undefined : undefined;
+    const partyRole = ('partyRole' in config && typeof (config as Record<string, unknown>).partyRole === 'string')
+        ? (config as Record<string, unknown>).partyRole as string
+        : undefined;
 
     // ── Build Index Entries ──
     const indexEntries: ExhibitMappedItem[] = evidenceNodes.map((node, index) => {

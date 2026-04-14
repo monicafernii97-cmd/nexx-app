@@ -95,7 +95,8 @@ function hasMarkers(text: string, markers: string[]): boolean {
  */
 export function clusterTimelineEvents(
     events: TimelineEventNode[],
-    classifiedNodes: ClassifiedNode[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _classifiedNodes: ClassifiedNode[],
 ): Map<NarrativePhase, TimelineEventNode[]> {
     const result = new Map<NarrativePhase, TimelineEventNode[]>([
         ['background', []],
@@ -117,11 +118,6 @@ export function clusterTimelineEvents(
 
     let triggerFound = false;
 
-    // Build a set of node issues for context enrichment
-    const nodeIssueMap = new Map<string, string[]>();
-    for (const node of classifiedNodes) {
-        nodeIssueMap.set(node.nodeId, node.issueTags);
-    }
 
     for (let i = 0; i < sorted.length; i++) {
         const event = sorted[i];
@@ -185,9 +181,9 @@ export function clusterTimelineEvents(
     // If no trigger was found, promote the first conflict event
     if (!triggerFound) {
         for (const phase of ['escalation', 'current_dispute'] as const) {
-            const events = result.get(phase);
-            if (events && events.length > 0) {
-                const trigger = events.shift()!;
+            const phaseEvents = result.get(phase);
+            if (phaseEvents && phaseEvents.length > 0) {
+                const trigger = phaseEvents.shift()!;
                 result.get('trigger_event')!.push(trigger);
                 break;
             }
@@ -228,8 +224,8 @@ export function clusterByIssue(
     }
 
     // Sort each cluster by date
-    for (const [key, events] of clusters) {
-        clusters.set(key, sortByDate(events));
+    for (const [key, clusterEvents] of clusters) {
+        clusters.set(key, sortByDate(clusterEvents));
     }
 
     return clusters;

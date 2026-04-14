@@ -270,7 +270,7 @@ export function suggestSections(
 
     // ── Court Document ──
     if (scores.fact > 0.6) courtDocument.push('factualBackground');
-    if (scores.fact > 0.4 && scores.timeline_event > 0.3) {
+    else if (scores.fact > 0.4 && scores.timeline_event > 0.3) {
         courtDocument.push('factualBackground');
     }
     if (scores.argument > 0.55) courtDocument.push('argumentSections');

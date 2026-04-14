@@ -196,13 +196,17 @@ export function mapIssuesToRelief(
             supportingEvidenceIds.push(...node.provenance.linkedEvidenceIds);
         }
 
-        // Generate reasoning from template
+        // Generate reasoning from template with dynamic values
         const supportCount = supportingNodes.length + supportingEventIds.length;
+        const yearsEstimate = inferYearsFromDates(supportingNodes);
+        const practiceType = inferPracticeType(supportingNodes);
+        const expenseType = inferExpenseType(supportingNodes);
+
         const reasoning = rule.reasoningTemplate
             .replace('{supportCount}', `${supportCount}`)
-            .replace('{years}', 'several years')
-            .replace('{practice_type}', 'flexible co-parenting')
-            .replace('{expense_type}', 'shared expenses');
+            .replace('{years}', yearsEstimate)
+            .replace('{practice_type}', practiceType)
+            .replace('{expense_type}', expenseType);
 
         // Confidence: based on support volume and evidence linkage
         const hasEvidence = supportingEvidenceIds.length > 0;
@@ -225,4 +229,54 @@ export function mapIssuesToRelief(
     }
 
     return connections;
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic Template Value Inference
+// ---------------------------------------------------------------------------
+
+/** Estimate duration from earliest to latest date found in supporting nodes. */
+function inferYearsFromDates(nodes: ClassifiedNode[]): string {
+    const allDates: number[] = [];
+    for (const node of nodes) {
+        for (const dateStr of node.extractedEntities.dates) {
+            const ms = Date.parse(dateStr);
+            if (!Number.isNaN(ms)) allDates.push(ms);
+        }
+    }
+    if (allDates.length < 2) return 'several years';
+
+    const earliest = Math.min(...allDates);
+    const latest = Math.max(...allDates);
+    const years = Math.round((latest - earliest) / (365.25 * 24 * 60 * 60 * 1000));
+
+    if (years < 1) return 'approximately one year';
+    return `approximately ${years} year${years === 1 ? '' : 's'}`;
+}
+
+/** Infer practice type from node text. */
+function inferPracticeType(nodes: ClassifiedNode[]): string {
+    const combined = nodes.map(n => n.rawText.toLowerCase()).join(' ');
+
+    if (combined.includes('informal') || combined.includes('mutual understanding')) {
+        return 'informal mutual understanding';
+    }
+    if (combined.includes('flexible') || combined.includes('worked well')) {
+        return 'flexible co-parenting arrangement';
+    }
+    if (combined.includes('strict') || combined.includes('by the order')) {
+        return 'strict order-based possession schedule';
+    }
+    return 'established co-parenting practice';
+}
+
+/** Infer expense type from node text. */
+function inferExpenseType(nodes: ClassifiedNode[]): string {
+    const combined = nodes.map(n => n.rawText.toLowerCase()).join(' ');
+
+    if (combined.includes('medical') || combined.includes('health')) return 'medical expenses';
+    if (combined.includes('tuition') || combined.includes('school')) return 'educational expenses';
+    if (combined.includes('extracurricular') || combined.includes('activity')) return 'extracurricular expenses';
+    if (combined.includes('insurance')) return 'insurance costs';
+    return 'shared child-related expenses';
 }

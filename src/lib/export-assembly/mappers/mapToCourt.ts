@@ -26,6 +26,15 @@ import type { ClassifiedNode } from '../types/classification';
 import type { LegalNarrative } from '../types/narrative';
 import type { CourtMappedSections, ExportRequest, CourtConfig } from '../types/exports';
 
+/**
+ * Parse a date string to epoch ms. Returns Infinity for unparseable dates
+ * so they sort to the end.
+ */
+function parseDateMs(dateStr: string): number {
+    const ms = Date.parse(dateStr);
+    return Number.isNaN(ms) ? Infinity : ms;
+}
+
 // ---------------------------------------------------------------------------
 // Title Generation
 // ---------------------------------------------------------------------------
@@ -108,10 +117,13 @@ export function mapToCourtSections(
             n.nodeType === 'incident_report',
         )
         .sort((a, b) => {
-            // Sort by date if available, then by relevance
-            const dateA = a.extractedEntities.dates[0] ?? '';
-            const dateB = b.extractedEntities.dates[0] ?? '';
-            if (dateA && dateB) return dateA.localeCompare(dateB);
+            // Sort chronologically using Date.parse, then by relevance
+            const dateA = a.extractedEntities.dates[0];
+            const dateB = b.extractedEntities.dates[0];
+            if (dateA && dateB) {
+                const diff = parseDateMs(dateA) - parseDateMs(dateB);
+                if (diff !== 0) return diff;
+            }
             return b.exportRelevance.court_document - a.exportRelevance.court_document;
         });
 

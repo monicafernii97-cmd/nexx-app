@@ -129,45 +129,37 @@ const LOCATION_REGEXES: RegExp[] = [
 export function extractEntities(text: string): ExtractedEntities {
     const entities = emptyEntities();
 
-    // ── Dates ──
-    for (const regex of DATE_REGEXES) {
-        const matches = text.matchAll(new RegExp(regex.source, regex.flags));
-        for (const m of matches) {
-            if (m[1]) entities.dates.push(m[1].trim());
+    /**
+     * matchAll with a fresh regex copy — avoids shared lastIndex state
+     * when module-level /g regexes are reused across calls.
+     */
+    function matchAllFresh(input: string, regex: RegExp): IterableIterator<RegExpMatchArray> {
+        return input.matchAll(new RegExp(regex.source, regex.flags));
+    }
+
+    /** Push all capture-group-1 matches from a regex array. */
+    function pushMatches(regexes: RegExp[], target: string[]) {
+        for (const regex of regexes) {
+            for (const m of matchAllFresh(text, regex)) {
+                if (m[1]) target.push(m[1].trim());
+            }
         }
     }
+
+    // ── Dates ──
+    pushMatches(DATE_REGEXES, entities.dates);
 
     // ── Courts ──
-    for (const regex of COURT_REGEXES) {
-        const matches = text.matchAll(new RegExp(regex.source, regex.flags));
-        for (const m of matches) {
-            if (m[1]) entities.courts.push(m[1].trim());
-        }
-    }
+    pushMatches(COURT_REGEXES, entities.courts);
 
     // ── Filings ──
-    for (const regex of FILING_REGEXES) {
-        const matches = text.matchAll(new RegExp(regex.source, regex.flags));
-        for (const m of matches) {
-            if (m[1]) entities.filings.push(m[1].trim());
-        }
-    }
+    pushMatches(FILING_REGEXES, entities.filings);
 
     // ── Exhibits ──
-    for (const regex of EXHIBIT_REGEXES) {
-        const matches = text.matchAll(new RegExp(regex.source, regex.flags));
-        for (const m of matches) {
-            if (m[1]) entities.exhibits.push(m[1].trim());
-        }
-    }
+    pushMatches(EXHIBIT_REGEXES, entities.exhibits);
 
     // ── Statutes/Rules ──
-    for (const regex of STATUTE_REGEXES) {
-        const matches = text.matchAll(new RegExp(regex.source, regex.flags));
-        for (const m of matches) {
-            if (m[1]) entities.statutesOrRules.push(m[1].trim());
-        }
-    }
+    pushMatches(STATUTE_REGEXES, entities.statutesOrRules);
 
     // ── People (proper names: 2+ capitalized words) ──
     const nameMatches = text.matchAll(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g);
@@ -179,12 +171,7 @@ export function extractEntities(text: string): ExtractedEntities {
     }
 
     // ── Locations ──
-    for (const regex of LOCATION_REGEXES) {
-        const matches = text.matchAll(new RegExp(regex.source, regex.flags));
-        for (const m of matches) {
-            if (m[1]) entities.locations.push(m[1].trim());
-        }
-    }
+    pushMatches(LOCATION_REGEXES, entities.locations);
 
     // ── Deduplicate all arrays ──
     entities.people = [...new Set(entities.people)];

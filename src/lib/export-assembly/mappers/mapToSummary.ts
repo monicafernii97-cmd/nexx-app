@@ -68,7 +68,12 @@ export function mapToSummarySections(
             allIssueTags.add(tag);
         }
     }
-    const keyIssues = narrative.issueSummaries.map(s => s.heading);
+    // Prefer narrative issue summaries; fall back to raw issue tags
+    const keyIssues = narrative.issueSummaries.length > 0
+        ? narrative.issueSummaries.map(s => s.heading)
+        : [...allIssueTags].map(tag =>
+            tag.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+        );
 
     // ── Timeline Summary ──
     const timelineSummary = config.includeTimeline

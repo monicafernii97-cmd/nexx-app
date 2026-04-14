@@ -36,6 +36,7 @@ export const create = mutation({
         fileSize: v.optional(v.number()),
         incidentId: v.optional(v.id('incidents')),
         status: v.optional(v.union(v.literal('draft'), v.literal('final'))),
+        caseId: v.optional(v.id('cases')),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
@@ -61,6 +62,7 @@ export const create = mutation({
             status: args.status ?? 'draft',
             createdAt: Date.now(),
             updatedAt: Date.now(),
+            caseId: args.caseId,
         });
     },
 });
@@ -69,6 +71,7 @@ export const create = mutation({
 export const list = query({
     args: {
         type: v.optional(documentTypeValidator),
+        caseId: v.optional(v.id('cases')),
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
@@ -79,6 +82,22 @@ export const list = query({
             .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
             .first();
         if (!user) return [];
+
+        // Case-scoped query when caseId is provided
+        if (args.caseId) {
+            const results = await ctx.db
+                .query('documents')
+                .withIndex('by_user_case', (q) =>
+                    q.eq('userId', user._id).eq('caseId', args.caseId!)
+                )
+                .order('desc')
+                .collect();
+            // Filter by type client-side when using case index
+            if (args.type) {
+                return results.filter((d) => d.type === args.type);
+            }
+            return results;
+        }
 
         if (args.type) {
             return await ctx.db

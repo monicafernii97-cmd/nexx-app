@@ -24,7 +24,15 @@ export const metadata: Metadata = {
 /** Root HTML layout with Outfit and Playfair Display fonts and Convex/Clerk providers. */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${outfit.variable} ${playfair.variable}`}>
+    <html lang="en" className={`${outfit.variable} ${playfair.variable} dark`} suppressHydrationWarning>
+      <head>
+        {/* Prevent flash of wrong theme — runs before paint */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('nexx-theme');var d=document.documentElement;if(t==='light'){d.classList.remove('dark');d.classList.add('light')}else{d.classList.add('dark');d.classList.remove('light')}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="antialiased">
         <ConvexClientProvider>
           {children}

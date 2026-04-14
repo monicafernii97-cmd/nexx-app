@@ -32,6 +32,7 @@ import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 import { restartTour, navIdSelector } from '@/lib/tourUtils';
 import { CaseSwitcher } from '@/components/workspace/CaseSwitcher';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 /** Child navigation item definition for sidebar sub-menus. */
 interface NavChild {
@@ -332,6 +333,23 @@ export default function Sidebar() {
                         )}
                     </AnimatePresence>
                 </button>
+
+                {/* Theme Toggle */}
+                <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-2 px-2'} mb-2`}>
+                    <ThemeToggle collapsed={collapsed} />
+                    <AnimatePresence>
+                        {!collapsed && (
+                            <motion.span
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="text-[12px] font-medium text-sapphire-muted"
+                            >
+                                Theme
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
+                </div>
 
                 {isLoaded && user ? (
                     <div className="relative group w-full">

@@ -20,11 +20,13 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { MODE_LABELS } from '@/lib/constants';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
+import { useWorkspace } from '@/lib/workspace-context';
 
 /** Conversation list page with mode picker and new-chat creation. Ethereal theme. */
 export default function ChatListPage() {
     const router = useRouter();
-    const conversations = useQuery(api.conversations.list, {});
+    const { activeCaseId } = useWorkspace();
+    const conversations = useQuery(api.conversations.list, activeCaseId ? { caseId: activeCaseId } : {});
     const createConversation = useMutation(api.conversations.create);
     const removeConversation = useMutation(api.conversations.remove);
     const [isCreating, setIsCreating] = useState(false);
@@ -53,6 +55,7 @@ export default function ChatListPage() {
             const id = await createConversation({
                 title: 'New Conversation',
                 mode: 'general',
+                ...(activeCaseId ? { caseId: activeCaseId } : {}),
             });
             router.push(`/chat/${id}`);
         } catch (error) {

@@ -19,10 +19,12 @@ import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 import { parseLocalDate } from '@/lib/dateUtils';
+import { useWorkspace } from '@/lib/workspace-context';
 
 /** Incident Report listing page with search, category filters, and delete functionality. */
 export default function IncidentReportPage() {
-    const incidents = useQuery(api.incidents.list);
+    const { activeCaseId } = useWorkspace();
+    const incidents = useQuery(api.incidents.list, activeCaseId ? { caseId: activeCaseId } : {});
     const removeIncident = useMutation(api.incidents.remove);
     const [activeFilter, setActiveFilter] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');

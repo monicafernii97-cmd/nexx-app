@@ -82,7 +82,7 @@ export function splitIntoSentences(text: string): SplitSentence[] {
         const processed = collapsed
             .replace(/\b(Mr|Mrs|Ms|Dr|Jr|Sr|Prof|Hon|Rev|St|Ave|Blvd|Dept|Inc|Corp|Ltd|etc|vs|Tex|Fam|Civ|Crim)\./gi, '$1_DOT_')
             .replace(/(?:[A-Z]\.){2,}/g, match => match.replace(/\./g, '_DOT_'))  // multi-initial sequences
-            .replace(/\b([A-Z])\.(?=\s+[A-Z][a-z])/g, '$1_DOT_')  // single initial before capitalized name
+            .replace(/(?<!\b(?:Exhibit|Annex|Figure|Table|Schedule)\s)\b([A-Z])\.(?=\s+[A-Z][a-z])/g, '$1_DOT_')  // single initial before name (not labels)
             .replace(/(\d+)\.(\d+)/g, '$1_DECIMAL_$2'); // decimals/statutes
 
         // Split on sentence-ending punctuation

@@ -12,10 +12,13 @@
  * wiring layer provides node ↔ event linkage.
  */
 
-import type { TimelineEventNode } from '../types/narrative';
-import type { NarrativePhase } from '../types/narrative';
+import {
+    NARRATIVE_PHASE_ORDER,
+    type NarrativePhase,
+    type PatternSection,
+    type TimelineEventNode,
+} from '../types/narrative';
 import type { ClassifiedNode } from '../types/classification';
-import type { PatternSection } from '../types/narrative';
 
 import { parseDateMs } from '../utils/dateUtils';
 
@@ -105,14 +108,11 @@ export function clusterTimelineEvents(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _classifiedNodes: ClassifiedNode[],
 ): Map<NarrativePhase, TimelineEventNode[]> {
-    const result = new Map<NarrativePhase, TimelineEventNode[]>([
-        ['background', []],
-        ['baseline_practice', []],
-        ['trigger_event', []],
-        ['escalation', []],
-        ['current_dispute', []],
-        ['relief_connection', []],
-    ]);
+    const result = new Map<NarrativePhase, TimelineEventNode[]>(
+        NARRATIVE_PHASE_ORDER.map(
+            (phase): [NarrativePhase, TimelineEventNode[]] => [phase, []],
+        ),
+    );
 
     if (events.length === 0) return result;
 
@@ -151,8 +151,10 @@ export function clusterTimelineEvents(
             continue;
         }
 
-        // Early events with no conflict → background or baseline
-        if (i < earlyBound) {
+        // Early events: route to background/baseline only if they don't
+        // carry change or conflict markers. Events with change/conflict
+        // signals fall through to the trigger/escalation handlers below.
+        if (i < earlyBound && !hasChange && !hasConflict) {
             if (hasStability) {
                 result.get('baseline_practice')!.push(event);
             } else {

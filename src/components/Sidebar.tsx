@@ -336,7 +336,7 @@ export default function Sidebar() {
 
                 {/* Theme Toggle */}
                 <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-2 px-2'} mb-2`}>
-                    <ThemeToggle collapsed={collapsed} />
+                    <ThemeToggle />
                     <AnimatePresence>
                         {!collapsed && (
                             <motion.span

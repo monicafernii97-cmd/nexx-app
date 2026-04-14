@@ -26,7 +26,10 @@ import { useWorkspace } from '@/lib/workspace-context';
 export default function ChatListPage() {
     const router = useRouter();
     const { activeCaseId } = useWorkspace();
-    const conversations = useQuery(api.conversations.list, activeCaseId ? { caseId: activeCaseId } : {});
+    const conversations = useQuery(
+        api.conversations.list,
+        activeCaseId ? { caseId: activeCaseId } : 'skip'
+    );
     const createConversation = useMutation(api.conversations.create);
     const removeConversation = useMutation(api.conversations.remove);
     const [isCreating, setIsCreating] = useState(false);
@@ -65,6 +68,8 @@ export default function ChatListPage() {
         }
     };
 
+    const isWorkspaceReady = activeCaseId !== null;
+
     const isLoadingConversations = conversations === undefined;
     const activeConversations = isLoadingConversations ? [] : conversations.filter((c) => c.status === 'active');
     const archivedConversations = isLoadingConversations ? [] : conversations.filter((c) => c.status === 'archived');
@@ -95,7 +100,7 @@ export default function ChatListPage() {
                     
                     <button
                         onClick={handleNewChat}
-                        disabled={isCreating}
+                        disabled={isCreating || !isWorkspaceReady}
                         className="btn-primary shrink-0 py-4 px-8 text-[13px] uppercase tracking-widest flex items-center gap-2 disabled:scale-100 disabled:opacity-50 shadow-md transition-all self-start md:self-end"
                     >
                         <Plus size={16} weight="bold" />

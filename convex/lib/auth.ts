@@ -48,3 +48,21 @@ export async function getAuthenticatedUserAndConversation(
 
     return { user, conversation };
 }
+
+/**
+ * Validate that a caseId belongs to the given user.
+ * Returns the case doc if valid, throws if the case doesn't exist or is owned by another user.
+ * Accepts undefined/null caseId and returns null (no-op for legacy records).
+ */
+export async function validateCaseOwnership(
+    ctx: MutationCtx | QueryCtx,
+    caseId: Id<'cases'> | undefined,
+    userId: Id<'users'>
+) {
+    if (!caseId) return null;
+    const caseDoc = await ctx.db.get(caseId);
+    if (!caseDoc || caseDoc.userId !== userId) {
+        throw new Error('Not authorized to use this case');
+    }
+    return caseDoc;
+}

@@ -10,7 +10,7 @@ import { INCIDENT_CATEGORIES } from '@/lib/constants';
 
 export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
         const { userId } = await auth();
         if (!userId) {
@@ -28,7 +28,12 @@ export async function GET() {
             }
             throw authErr;
         }
-        const incidentsList = await convex.query(api.incidents.list, {});
+
+        // Accept optional caseId for case-scoped exports
+        const { searchParams } = new URL(request.url);
+        const caseIdRaw = searchParams.get('caseId');
+        const listArgs = caseIdRaw ? { caseId: caseIdRaw as any } : {};
+        const incidentsList = await convex.query(api.incidents.list, listArgs);
 
         if (!incidentsList || incidentsList.length === 0) {
             return new NextResponse('No incidents found', { status: 404 });

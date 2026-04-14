@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore, useCallback } from 'react';
 import { motion } from 'framer-motion';
 
 // ---------------------------------------------------------------------------
 // ThemeToggle — Persisted sun/moon toggle for dark ↔ light theme switching.
 //
-// On mount, reads from localStorage. Defaults to 'dark' (galaxy theme).
+// Uses useSyncExternalStore to read from localStorage without triggering the
+// react-hooks/set-state-in-effect lint rule. Defaults to 'dark' (galaxy theme).
 // Applies/removes the .dark class on <html> to match globals.css tokens.
 // ---------------------------------------------------------------------------
 
@@ -14,10 +15,24 @@ type Theme = 'dark' | 'light';
 
 const STORAGE_KEY = 'nexx-theme';
 
+/** All active subscribers — notified when the theme changes. */
+const listeners = new Set<() => void>();
+
 /** Read the stored theme, falling back to 'dark'. */
-function getStoredTheme(): Theme {
+function getSnapshot(): Theme {
     if (typeof window === 'undefined') return 'dark';
     return (localStorage.getItem(STORAGE_KEY) as Theme) || 'dark';
+}
+
+/** Server snapshot — always 'dark' to match the initial HTML class. */
+function getServerSnapshot(): Theme {
+    return 'dark';
+}
+
+/** Subscribe to theme changes. */
+function subscribe(callback: () => void) {
+    listeners.add(callback);
+    return () => { listeners.delete(callback); };
 }
 
 /** Apply the theme class to <html> */
@@ -32,32 +47,16 @@ function applyTheme(theme: Theme) {
     }
 }
 
-interface ThemeToggleProps {
-    /** Collapsed sidebar mode — show icon only */
-    collapsed?: boolean;
-}
+export function ThemeToggle() {
+    const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-export function ThemeToggle({ collapsed = false }: ThemeToggleProps) {
-    const [theme, setTheme] = useState<Theme>('dark');
-    const [mounted, setMounted] = useState(false);
-
-    // Hydrate from localStorage on mount
-    useEffect(() => {
-        const stored = getStoredTheme();
-        setTheme(stored);
-        applyTheme(stored);
-        setMounted(true);
-    }, []);
-
-    const toggle = () => {
+    const toggle = useCallback(() => {
         const next: Theme = theme === 'dark' ? 'light' : 'dark';
-        setTheme(next);
-        applyTheme(next);
         localStorage.setItem(STORAGE_KEY, next);
-    };
-
-    // Prevent hydration mismatch — render nothing server-side
-    if (!mounted) return <div className="w-9 h-9" />;
+        applyTheme(next);
+        // Notify all subscribers so useSyncExternalStore re-reads the snapshot
+        listeners.forEach((cb) => cb());
+    }, [theme]);
 
     const isDark = theme === 'dark';
 
@@ -67,7 +66,7 @@ export function ThemeToggle({ collapsed = false }: ThemeToggleProps) {
             aria-label={`Switch to ${isDark ? 'light' : 'dark'} theme`}
             title={`Switch to ${isDark ? 'light' : 'dark'} theme`}
             className="relative flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-300 cursor-pointer
-                       hover:bg-white/10 dark:hover:bg-white/10 light:hover:bg-black/5
+                       hover:bg-white/10
                        border border-transparent hover:border-white/20"
         >
             {/* Sun icon (visible in dark mode → click to go light) */}

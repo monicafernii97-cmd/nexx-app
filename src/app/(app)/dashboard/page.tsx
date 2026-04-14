@@ -53,8 +53,14 @@ function DashboardContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { activeCaseId } = useWorkspace();
-    const incidents = useQuery(api.incidents.list, activeCaseId ? { caseId: activeCaseId } : {});
-    const conversations = useQuery(api.conversations.list, activeCaseId ? { caseId: activeCaseId } : {});
+    const incidents = useQuery(
+        api.incidents.list,
+        activeCaseId ? { caseId: activeCaseId } : 'skip'
+    );
+    const conversations = useQuery(
+        api.conversations.list,
+        activeCaseId ? { caseId: activeCaseId } : 'skip'
+    );
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
 
     // ── Checkout success toast ──

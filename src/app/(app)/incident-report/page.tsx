@@ -24,7 +24,10 @@ import { useWorkspace } from '@/lib/workspace-context';
 /** Incident Report listing page with search, category filters, and delete functionality. */
 export default function IncidentReportPage() {
     const { activeCaseId } = useWorkspace();
-    const incidents = useQuery(api.incidents.list, activeCaseId ? { caseId: activeCaseId } : {});
+    const incidents = useQuery(
+        api.incidents.list,
+        activeCaseId ? { caseId: activeCaseId } : 'skip'
+    );
     const removeIncident = useMutation(api.incidents.remove);
     const [activeFilter, setActiveFilter] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -82,7 +85,7 @@ export default function IncidentReportPage() {
                     <div className="flex items-center gap-3">
                         {incidents && incidents.length > 0 && (
                             <a 
-                                href="/api/incidents/export"
+                                href={`/api/incidents/export${activeCaseId ? `?caseId=${activeCaseId}` : ''}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-[12px] font-bold uppercase tracking-wider bg-[rgba(255,255,255,0.05)] text-white hover:bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.3)] transition-all no-underline shrink-0"

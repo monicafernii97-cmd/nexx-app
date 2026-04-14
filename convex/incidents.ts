@@ -1,6 +1,6 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
-import { getAuthenticatedUser } from './lib/auth';
+import { getAuthenticatedUser, validateCaseOwnership } from './lib/auth';
 
 /** Incident category enum — shared across args */
 const categoryValidator = v.union(
@@ -36,6 +36,7 @@ export const create = mutation({
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
+        await validateCaseOwnership(ctx, args.caseId, user._id);
 
         return await ctx.db.insert('incidents', {
             userId: user._id,

@@ -24,9 +24,16 @@ interface ReliefRule {
     minNodeSupport: number;
     /** Keywords in events that strengthen this relief */
     eventKeywords: string[];
+    /** Pre-compiled word-boundary patterns for eventKeywords (static, not user input) */
+    keywordPatterns: RegExp[];
 }
 
-const RELIEF_RULES: ReliefRule[] = [
+/** Escape special regex characters for word-boundary matching. */
+function escapeKeyword(kw: string): RegExp {
+    return new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+}
+
+const RELIEF_RULES: ReliefRule[] = ([
     {
         issueTag: 'electronic_communication',
         suggestedRelief:
@@ -147,7 +154,10 @@ const RELIEF_RULES: ReliefRule[] = [
             'deadline',
         ],
     },
-];
+] as Omit<ReliefRule, 'keywordPatterns'>[]).map(rule => ({
+    ...rule,
+    keywordPatterns: rule.eventKeywords.map(escapeKeyword),
+}));
 
 // ---------------------------------------------------------------------------
 // Relief Mapping
@@ -195,10 +205,8 @@ export function mapIssuesToRelief(
         const supportingEventIds: string[] = [];
         const supportingEvidenceIds: string[] = [];
 
-        // Build word-boundary patterns once per rule
-        const keywordPatterns = rule.eventKeywords.map(
-            kw => new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'),
-        );
+        // Use pre-compiled keyword patterns from the rule
+        const { keywordPatterns } = rule;
 
         for (const event of events) {
             const combined = `${event.title} ${event.description}`;

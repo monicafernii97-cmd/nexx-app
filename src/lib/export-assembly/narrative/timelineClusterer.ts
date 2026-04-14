@@ -256,7 +256,7 @@ export function clusterByIssue(
             existing.push(event);
             clusters.set('untagged', existing);
         } else {
-            for (const tag of tags) {
+            for (const tag of new Set(tags)) {
                 const existing = clusters.get(tag) ?? [];
                 existing.push(event);
                 clusters.set(tag, existing);

@@ -172,7 +172,7 @@ export default function NewIncidentPage() {
 
     /** Save the incident as a draft (no confirmation). */
     const handleSaveDraft = async () => {
-        if (!userId || isSaving) return;
+        if (!userId || !activeCaseId || isSaving) return;
         setIsSaving(true);
         setAnalyzeError(null);
 
@@ -223,7 +223,7 @@ export default function NewIncidentPage() {
 
     /** Publish the incident to the timeline (create + confirm). */
     const handlePublish = async () => {
-        if (!userId || isSaving) return;
+        if (!userId || !activeCaseId || isSaving) return;
         setIsSaving(true);
         setAnalyzeError(null);
 
@@ -529,7 +529,7 @@ export default function NewIncidentPage() {
                         <div className="pt-4 space-y-3">
                             <button
                                 onClick={handleAnalyze}
-                                disabled={!narrative.trim() || isAnalyzing}
+                                disabled={!narrative.trim() || isAnalyzing || !activeCaseId}
                                 className="w-full flex items-center justify-center gap-2.5 rounded-[2rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,255,255,0.02))] border border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.5)] hover:-translate-y-1 transition-all disabled:scale-100 disabled:opacity-50 py-5 text-[15px] text-white font-bold tracking-wide backdrop-blur-md cursor-pointer group"
                             >
                                 {isAnalyzing ? (
@@ -545,7 +545,7 @@ export default function NewIncidentPage() {
                             </button>
                             <button
                                 onClick={handleSaveDraft}
-                                disabled={!narrative.trim() || isAnalyzing || isSaving}
+                                disabled={!narrative.trim() || isAnalyzing || isSaving || !activeCaseId}
                                 className="w-full flex items-center justify-center gap-2.5 rounded-[2rem] bg-transparent border border-[rgba(255,255,255,0.12)] hover:border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.04)] transition-all disabled:opacity-40 py-4 text-[13px] text-white/70 hover:text-white font-bold tracking-widest uppercase backdrop-blur-md cursor-pointer"
                             >
                                 <FloppyDisk size={16} weight="duotone" /> {isSaving ? 'Saving...' : 'Save as Draft'}

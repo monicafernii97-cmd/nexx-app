@@ -18,10 +18,19 @@ const STORAGE_KEY = 'nexx-theme';
 /** All active subscribers — notified when the theme changes. */
 const listeners = new Set<() => void>();
 
+/** Validate that a stored value is a valid Theme. */
+function coerceTheme(value: string | null): Theme {
+    return value === 'light' || value === 'dark' ? value : 'dark';
+}
+
 /** Read the stored theme, falling back to 'dark'. */
 function getSnapshot(): Theme {
     if (typeof window === 'undefined') return 'dark';
-    return (localStorage.getItem(STORAGE_KEY) as Theme) || 'dark';
+    try {
+        return coerceTheme(localStorage.getItem(STORAGE_KEY));
+    } catch {
+        return 'dark';
+    }
 }
 
 /** Server snapshot — always 'dark' to match the initial HTML class. */
@@ -62,7 +71,11 @@ export function ThemeToggle() {
 
     const toggle = useCallback(() => {
         const next: Theme = theme === 'dark' ? 'light' : 'dark';
-        localStorage.setItem(STORAGE_KEY, next);
+        try {
+            localStorage.setItem(STORAGE_KEY, next);
+        } catch {
+            // Best effort persistence; continue applying in-memory/UI theme.
+        }
         applyTheme(next);
         // Notify all subscribers so useSyncExternalStore re-reads the snapshot
         listeners.forEach((cb) => cb());
@@ -72,6 +85,7 @@ export function ThemeToggle() {
 
     return (
         <button
+            type="button"
             onClick={toggle}
             aria-label={`Switch to ${isDark ? 'light' : 'dark'} theme`}
             title={`Switch to ${isDark ? 'light' : 'dark'} theme`}

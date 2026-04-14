@@ -80,21 +80,26 @@ export default function WorkspaceOverview() {
     // ── Narrative Generation API trigger ──
     const [narrative, setNarrative] = useState<CaseNarrative | null>(null);
     const [isGeneratingNarrative, setIsGeneratingNarrative] = useState(false);
+    const [narrativeError, setNarrativeError] = useState<string | null>(null);
 
     const handleGenerateNarrative = useCallback(async () => {
         if (!activeCaseId || isGeneratingNarrative) return;
         setIsGeneratingNarrative(true);
+        setNarrativeError(null);
         try {
             const res = await fetch('/api/workspace/narrative', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ caseId: activeCaseId }),
             });
-            if (!res.ok) throw new Error('Narrative generation failed');
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Narrative generation failed');
+            }
             const data = await res.json();
             setNarrative(data);
-        } catch {
-            // Error handled by NarrativeBlock's empty state
+        } catch (err) {
+            setNarrativeError(err instanceof Error ? err.message : 'Narrative generation failed');
         } finally {
             setIsGeneratingNarrative(false);
         }
@@ -352,6 +357,9 @@ export default function WorkspaceOverview() {
                     onGenerate={handleGenerateNarrative}
                     onSendToDocuVault={handleSendToDocuVault}
                 />
+                {narrativeError && (
+                    <p className="text-[11px] text-red-400/70 mt-2">{narrativeError}</p>
+                )}
             </motion.div>
 
             {/* ── "New Strategic Session" card ── */}

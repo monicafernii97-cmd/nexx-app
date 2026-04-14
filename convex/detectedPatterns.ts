@@ -122,13 +122,16 @@ export const replaceForCase = mutation({
         const user = await getAuthenticatedUser(ctx);
         await validateCaseOwnership(ctx, args.caseId, user._id);
 
-        // Delete existing patterns with this requestId
+        // Delete existing patterns with this requestId, validating ownership
         const existing = await ctx.db
             .query('detectedPatterns')
             .withIndex('by_requestId', (q) => q.eq('requestId', args.requestId))
             .collect();
 
         for (const pattern of existing) {
+            if (pattern.userId !== user._id || pattern.caseId !== args.caseId) {
+                throw new Error('Not authorized to replace these patterns');
+            }
             await ctx.db.delete(pattern._id);
         }
 

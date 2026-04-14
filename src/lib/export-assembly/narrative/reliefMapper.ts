@@ -253,6 +253,10 @@ export function mapIssuesToRelief(
         });
     }
 
+    // Sort by confidence descending so highest-confidence connections appear
+    // first — downstream consumers like mapToSummary take only the first N.
+    connections.sort((a, b) => b.confidence - a.confidence);
+
     return connections;
 }
 

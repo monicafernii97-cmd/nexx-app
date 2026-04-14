@@ -118,11 +118,17 @@ export function splitIntoSentences(text: string): SplitSentence[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Tie-break priority (when top scores are within threshold):
- * 1. request > argument
- * 2. argument > opinion
- * 3. fact > emotion
- * 4. procedure > fact (when court-rule language is explicit)
+ * Tie-break priority order (when top scores are within threshold):
+ * 1. request — most specific legal ask
+ * 2. fact — verifiable factual statement
+ * 3. argument — legal reasoning / persuasion
+ * 4. procedure — court-rule language (promoted over fact when hasCourtTerms)
+ * 5. timeline_event — chronological events
+ * 6. evidence_reference — citations to exhibits/documents
+ * 7. issue — legal issue identification
+ * 8. risk — risk statements
+ * 9. opinion — subjective views
+ * 10. emotion — emotional language
  */
 const TIE_BREAK_PRIORITY: SentenceType[] = [
     'request',
@@ -204,17 +210,16 @@ export function classifySentence(
     const dominantType = resolveDominantType(scores, signals.hasCourtTerm);
 
     // Confidence = (dominant – runner-up) + 50% boost of dominant score, capped at 1.
-    // The gap rewards clear separation between types; the 50% boost rewards
-    // high absolute scores so a dominant 0.8 with runner-up 0.7 still gets
-    // a meaningful confidence. Result can exceed 1.0 before capping (e.g.,
-    // dominant=1.0, runner-up=0.0 → 1.5), which Math.min clamps to 1.
-    const sorted = SENTENCE_TYPES
-        .filter(t => t !== 'unknown')
-        .map(t => scores[t])
-        .sort((a, b) => b - a);
-    const confidence = sorted.length >= 2
-        ? Math.min(1, sorted[0] - sorted[1] + sorted[0] * 0.5)
-        : sorted[0] ?? 0;
+    // Uses the resolved dominantType score (not raw top score) so confidence
+    // reflects the tie-broken result. Runner-up is the best score among all
+    // types excluding dominantType.
+    const dominantScore = scores[dominantType];
+    const runnerUp = SENTENCE_TYPES
+        .filter(t => t !== 'unknown' && t !== dominantType)
+        .reduce((max, t) => Math.max(max, scores[t]), 0);
+    const confidence = dominantScore > 0
+        ? Math.min(1, dominantScore - runnerUp + dominantScore * 0.5)
+        : 0;
 
     return {
         sentence,

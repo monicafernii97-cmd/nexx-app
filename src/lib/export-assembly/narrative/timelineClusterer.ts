@@ -130,7 +130,11 @@ export function clusterTimelineEvents(
 
     let triggerFound = false;
 
-    // Event types eligible for relief_connection routing
+    // Only structural/legal event types are routed to relief_connection.
+    // Excluded TimelineEventType values: 'medical', 'school', 'travel',
+    // 'exchange', 'payment' — these are factual/contextual events that
+    // belong in chronology phases, not relief routing.
+    // TODO: Revisit this allowlist if new event types warrant relief routing.
     const RELIEF_EVENT_TYPES: Set<string> = new Set([
         'filing', 'incident', 'agreement', 'communication', 'other',
     ]);

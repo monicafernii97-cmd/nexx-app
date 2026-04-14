@@ -82,7 +82,7 @@ const checkBestNextStepsOveruse: AuditRule = (events) => {
             id: 'best_next_steps_overuse',
             severity: 'warning',
             area: 'panel_frequency',
-            summary: `best_next_steps shown in ${(ratio * 100).toFixed(0)}% of responses (threshold: 40%).`,
+            summary: `best_next_steps accounts for ${(ratio * 100).toFixed(0)}% of shown panels (threshold: 40%).`,
             recommendation: 'Diversify panel selection. Consider boosting options_paths, decision_guide, or do_now_vs_later as alternatives.',
             affectedPanels: ['best_next_steps', 'options_paths', 'decision_guide', 'do_now_vs_later'],
         };

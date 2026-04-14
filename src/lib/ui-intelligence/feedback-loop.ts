@@ -164,7 +164,7 @@ const detectTonePreference: SignalExtractor = (events) => {
     const neutral = engagements.find((e) => e.panelType === 'more_neutral_version');
 
     if (!courtReady || !neutral) return null;
-    if (courtReady.impressions < 5) return null;
+    if (courtReady.impressions < 5 || neutral.impressions < 5) return null;
 
     // If neutral version is copied/saved more than court-ready
     const neutralValue = neutral.counts.copied + neutral.counts.saved;

@@ -53,6 +53,18 @@ export interface UiLibraryAudit {
 
 type AuditRule = (events: PanelUsageEvent[]) => UiAuditFinding | null;
 
+/** Strategic panels checked by the good-faith underuse rule. */
+const STRATEGIC_PANELS = new Set<PanelType>([
+    'judge_lens', 'risk_concern', 'strength_highlight',
+    'good_faith_positioning', 'cooperation_signal',
+]);
+
+/** Reflective/support panels checked by the over-structuring rule. */
+const SUPPORT_PANELS = new Set<PanelType>([
+    'emotional_insight', 'validation_support', 'gentle_reframe',
+    'pattern_detected', 'relationship_dynamic',
+]);
+
 /**
  * Rule 1: Overuse of best_next_steps.
  * If >40% of all shown panels are best_next_steps, the system is
@@ -85,10 +97,7 @@ const checkBestNextStepsOveruse: AuditRule = (events) => {
  */
 const checkGoodFaithUnderuse: AuditRule = (events) => {
     const strategicShown = events.filter(
-        (e) => e.interaction === 'shown' && [
-            'judge_lens', 'risk_concern', 'strength_highlight',
-            'good_faith_positioning', 'cooperation_signal',
-        ].includes(e.panelType),
+        (e) => e.interaction === 'shown' && STRATEGIC_PANELS.has(e.panelType),
     );
     if (strategicShown.length < 10) return null;
 
@@ -196,11 +205,7 @@ const checkToneCalibration: AuditRule = (events) => {
  * emotional support into workflow clutter.
  */
 const checkSupportOverstructured: AuditRule = (events) => {
-    const supportPanels: PanelType[] = [
-        'emotional_insight', 'validation_support', 'gentle_reframe',
-        'pattern_detected', 'relationship_dynamic',
-    ];
-    const supportEvents = events.filter((e) => supportPanels.includes(e.panelType));
+    const supportEvents = events.filter((e) => SUPPORT_PANELS.has(e.panelType));
     const shown = supportEvents.filter((e) => e.interaction === 'shown').length;
     const dismissed = supportEvents.filter((e) => e.interaction === 'dismissed').length;
 
@@ -214,7 +219,7 @@ const checkSupportOverstructured: AuditRule = (events) => {
             area: 'intent_alignment',
             summary: `Support panels dismissed ${(dismissRate * 100).toFixed(0)}% of the time (${dismissed}/${shown}).`,
             recommendation: 'Reduce panel density in support-mode responses. Let empathy breathe — fewer panels, more prose.',
-            affectedPanels: supportPanels,
+            affectedPanels: [...SUPPORT_PANELS],
         };
     }
     return null;

@@ -28,7 +28,6 @@ import type { WorkspaceNode } from './types/workspace';
 import type { ClassifiedNode } from './types/classification';
 import type { TimelineEventNode, LegalNarrative } from './types/narrative';
 import type {
-    ExportPath,
     ExportRequest,
     SummaryMappedSections,
     CourtMappedSections,
@@ -44,26 +43,30 @@ import { mapToExhibitSections } from './mappers/mapToExhibits';
 // Result Types
 // ---------------------------------------------------------------------------
 
-export interface AssemblyResult {
-    /** The export path this was assembled for */
-    path: ExportPath;
-    /** All classified nodes with scores, tags, and transformed text */
-    classifiedNodes: ClassifiedNode[];
-    /** The legal narrative built from timeline + classified content */
-    narrative: LegalNarrative;
-    /** The mapped sections ready for prompt generation */
-    mappedSections: SummaryMappedSections | CourtMappedSections | ExhibitMappedSections;
-    /** Assembly metadata */
-    meta: {
-        totalNodes: number;
-        selectedNodes: number;
-        classifiedNodes: number;
-        narrativeSections: number;
-        detectedPatterns: number;
-        reliefConnections: number;
-        assemblyTimeMs: number;
-    };
+/** Shared metadata across all export paths. */
+export interface AssemblyMeta {
+    totalNodes: number;
+    selectedNodes: number;
+    classifiedNodes: number;
+    /** Total narrative sections (chronology + patterns + turning points + issues) */
+    narrativeSections: number;
+    detectedPatterns: number;
+    reliefConnections: number;
+    assemblyTimeMs: number;
 }
+
+/** Base fields shared by all assembly results. */
+interface AssemblyResultBase {
+    classifiedNodes: ClassifiedNode[];
+    narrative: LegalNarrative;
+    meta: AssemblyMeta;
+}
+
+/** Discriminated union — callers can narrow mappedSections from path. */
+export type AssemblyResult =
+    | (AssemblyResultBase & { path: 'case_summary'; mappedSections: SummaryMappedSections })
+    | (AssemblyResultBase & { path: 'court_document'; mappedSections: CourtMappedSections })
+    | (AssemblyResultBase & { path: 'exhibit_document'; mappedSections: ExhibitMappedSections });
 
 // ---------------------------------------------------------------------------
 // Main Entry Point
@@ -87,13 +90,16 @@ export function assembleExportInput(
 ): AssemblyResult {
     const startTime = performance.now();
 
-    // ── Step 1: Filter selected nodes ──
-    const selectedNodes = request.selectedNodeIds.length > 0
-        ? allNodes.filter(n => request.selectedNodeIds.includes(n.id))
+    // ── Step 1: Filter selected nodes (use Set for O(1) lookups) ──
+    const selectedNodeIdSet = new Set(request.selectedNodeIds);
+    const selectedTimelineIdSet = new Set(request.selectedTimelineIds);
+
+    const selectedNodes = selectedNodeIdSet.size > 0
+        ? allNodes.filter(n => selectedNodeIdSet.has(n.id))
         : allNodes; // If no specific selection, use all
 
-    const selectedEvents = request.selectedTimelineIds.length > 0
-        ? allEvents.filter(e => request.selectedTimelineIds.includes(e.id))
+    const selectedEvents = selectedTimelineIdSet.size > 0
+        ? allEvents.filter(e => selectedTimelineIdSet.has(e.id))
         : allEvents;
 
     // ── Step 2: Classify all selected nodes ──
@@ -124,21 +130,27 @@ export function assembleExportInput(
 
     const assemblyTimeMs = performance.now() - startTime;
 
+    const meta: AssemblyMeta = {
+        totalNodes: allNodes.length,
+        selectedNodes: selectedNodes.length,
+        classifiedNodes: classifiedNodes.length,
+        narrativeSections:
+            narrative.chronology.length +
+            narrative.patternSections.length +
+            narrative.turningPoints.length +
+            narrative.issueSummaries.length,
+        detectedPatterns: narrative.patternSections.length,
+        reliefConnections: narrative.reliefConnections.length,
+        assemblyTimeMs,
+    };
+
     return {
         path: request.path,
         classifiedNodes,
         narrative,
         mappedSections,
-        meta: {
-            totalNodes: allNodes.length,
-            selectedNodes: selectedNodes.length,
-            classifiedNodes: classifiedNodes.length,
-            narrativeSections: narrative.chronology.length,
-            detectedPatterns: narrative.patternSections.length,
-            reliefConnections: narrative.reliefConnections.length,
-            assemblyTimeMs,
-        },
-    };
+        meta,
+    } as AssemblyResult;
 }
 
 // ---------------------------------------------------------------------------

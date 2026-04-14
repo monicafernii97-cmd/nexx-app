@@ -19,15 +19,21 @@ import type { PatternSection } from '../types/narrative';
 // ---------------------------------------------------------------------------
 
 /**
- * Sort events by date ascending. Events without dates go to the end.
+ * Parse a date string to epoch ms. Returns Infinity for missing/malformed dates
+ * so they consistently sort to the end.
+ */
+function parseDateMs(dateStr: string | undefined): number {
+    if (!dateStr) return Infinity;
+    const ms = Date.parse(dateStr);
+    return Number.isNaN(ms) ? Infinity : ms;
+}
+
+/**
+ * Sort events by date ascending. Events without dates or with
+ * unparseable dates go to the end.
  */
 function sortByDate(events: TimelineEventNode[]): TimelineEventNode[] {
-    return [...events].sort((a, b) => {
-        if (!a.date && !b.date) return 0;
-        if (!a.date) return 1;
-        if (!b.date) return -1;
-        return new Date(a.date).getTime() - new Date(b.date).getTime();
-    });
+    return [...events].sort((a, b) => parseDateMs(a.date) - parseDateMs(b.date));
 }
 
 

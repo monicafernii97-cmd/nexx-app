@@ -28,7 +28,7 @@ export type TimelineEventType =
  */
 export interface TimelineEventNode {
     id: string;
-    date: string;
+    date?: string;
     title: string;
     description: string;
     type: TimelineEventType;

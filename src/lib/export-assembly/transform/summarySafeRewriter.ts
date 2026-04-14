@@ -63,6 +63,14 @@ export function compressEmotion(sentence: string): string {
  * Removes the harshest character judgments but keeps analytical opinions.
  * Less aggressive than court-safe — summaries can include perspective.
  */
+/** Pre-compiled regex for harsh character judgments — built once at module load. */
+const HARSH_JUDGMENTS = [
+    'selfish', 'narcissist', 'narcissistic', 'toxic', 'crazy',
+    'psycho', 'disgusting', 'pathetic', 'worthless', 'incompetent',
+    'delusional', 'abusive',
+];
+const HARSH_JUDGMENT_RE = new RegExp(`\\b(?:${HARSH_JUDGMENTS.join('|')})\\b`, 'gi');
+
 export function compressOpinion(sentence: string): string {
     let result = sentence.replace(HARSH_JUDGMENT_RE, '');
 
@@ -75,14 +83,6 @@ export function compressOpinion(sentence: string): string {
 
     return result;
 }
-
-/** Pre-compiled regex for harsh character judgments — built once at module load. */
-const HARSH_JUDGMENTS = [
-    'selfish', 'narcissist', 'narcissistic', 'toxic', 'crazy',
-    'psycho', 'disgusting', 'pathetic', 'worthless', 'incompetent',
-    'delusional', 'abusive',
-];
-const HARSH_JUDGMENT_RE = new RegExp(`\\b(?:${HARSH_JUDGMENTS.join('|')})\\b`, 'gi');
 
 // ---------------------------------------------------------------------------
 // Full Summary-Safe Text Builder
@@ -109,8 +109,9 @@ export function buildSummarySafeText(sentences: SentenceClassification[]): strin
                     if (s.scores.argument > 0.2) {
                         return compressOpinion(s.sentence);
                     }
-                    // Strip pure opinion with no analytical value
+                    // Low-argument, high-confidence opinion = pure opinion → drop
                     if (s.confidence > 0.7) return '';
+                    // Low-argument, low-confidence → may have some value → keep compressed
                     return compressOpinion(s.sentence);
 
                 default:

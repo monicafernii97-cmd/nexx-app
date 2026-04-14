@@ -123,7 +123,10 @@ export function classifyNode(node: WorkspaceNode): ClassifiedNode {
     // 5. Export relevance
     const exportRelevance = calculateExportRelevance(scores);
 
-    // Build a partial ClassifiedNode for tag assignment
+    // Build a partial ClassifiedNode for tag assignment.
+    // CONSTRAINT: assignIssueTags/assignPatternTags only read rawText and
+    // extractedEntities from this object. They must NOT depend on pre-existing
+    // issueTags or patternTags (which are empty at this point).
     const partialNode = {
         nodeId: node.id,
         nodeType: node.type,

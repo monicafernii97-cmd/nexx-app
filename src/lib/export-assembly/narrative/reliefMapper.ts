@@ -235,12 +235,33 @@ export function mapIssuesToRelief(
 // Dynamic Template Value Inference
 // ---------------------------------------------------------------------------
 
+/**
+ * Normalize common date formats to ISO-friendly strings before parsing.
+ * Handles MM/DD/YY and MM/DD/YYYY which Date.parse handles inconsistently.
+ */
+function normalizeDateStr(dateStr: string): number {
+    // Try MM/DD/YY or MM/DD/YYYY
+    const usShort = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+    if (usShort) {
+        const year = parseInt(usShort[3], 10);
+        const fullYear = year < 50 ? 2000 + year : 1900 + year;
+        return new Date(fullYear, parseInt(usShort[1], 10) - 1, parseInt(usShort[2], 10)).getTime();
+    }
+    const usFull = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (usFull) {
+        return new Date(parseInt(usFull[3], 10), parseInt(usFull[1], 10) - 1, parseInt(usFull[2], 10)).getTime();
+    }
+    // Fallback to Date.parse for ISO and natural language dates
+    const ms = Date.parse(dateStr);
+    return Number.isNaN(ms) ? NaN : ms;
+}
+
 /** Estimate duration from earliest to latest date found in supporting nodes. */
 function inferYearsFromDates(nodes: ClassifiedNode[]): string {
     const allDates: number[] = [];
     for (const node of nodes) {
         for (const dateStr of node.extractedEntities.dates) {
-            const ms = Date.parse(dateStr);
+            const ms = normalizeDateStr(dateStr);
             if (!Number.isNaN(ms)) allDates.push(ms);
         }
     }

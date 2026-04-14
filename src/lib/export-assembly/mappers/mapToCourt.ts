@@ -290,7 +290,7 @@ function buildExhibitReferences(
             refs.push({
                 label,
                 description: node.cleanedText.substring(0, 150),
-                linkedEvidenceId: node.provenance.linkedEvidenceIds[0] ?? '',
+                linkedEvidenceId: node.provenance.linkedEvidenceIds[i] ?? node.provenance.linkedEvidenceIds[0] ?? '',
             });
         }
     }

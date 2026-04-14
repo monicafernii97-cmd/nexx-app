@@ -29,7 +29,10 @@ export function mapToSummarySections(
     narrative: LegalNarrative,
     request: ExportRequest,
 ): SummaryMappedSections {
-    const config = request.config as SummaryConfig;
+    const rawConfig = (request.config ?? {}) as Partial<SummaryConfig>;
+    const includeTimeline = rawConfig.includeTimeline ?? false;
+    const includeEvidenceAppendix = rawConfig.includeEvidenceAppendix ?? false;
+    const includeRecommendations = rawConfig.includeRecommendations ?? false;
     const generatedAt = new Date().toISOString();
 
     // ── Overview ──
@@ -76,7 +79,7 @@ export function mapToSummarySections(
         );
 
     // ── Timeline Summary ──
-    const timelineSummary = config.includeTimeline
+    const timelineSummary = includeTimeline
         ? narrative.chronology
         : [];
 
@@ -106,7 +109,7 @@ export function mapToSummarySections(
         n.dominantType === 'evidence_reference' ||
         n.tags.includes('has_exhibit_reference'),
     );
-    const evidenceOverview = config.includeEvidenceAppendix
+    const evidenceOverview = includeEvidenceAppendix
         ? evidenceNodes.map(n => {
             const exhibits = n.extractedEntities.exhibits.join(', ');
             return exhibits
@@ -130,7 +133,7 @@ export function mapToSummarySections(
 
     // ── Recommended Next Steps ──
     const recommendedNextSteps: string[] = [];
-    if (config.includeRecommendations) {
+    if (includeRecommendations) {
         // Generate recommendations based on detected issues and patterns
         if (narrative.reliefConnections.length > 0) {
             for (const rc of narrative.reliefConnections.slice(0, 5)) {

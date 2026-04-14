@@ -112,8 +112,8 @@ const LOCATION_REGEXES: RegExp[] = [
     /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*[A-Z]{2})\b/g,
     // City, State (full)
     /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*(?:Texas|California|New York|Florida|Illinois|Ohio|Georgia|Pennsylvania))\b/g,
-    // County references
-    /\b([\w\s]+\s+County)\b/gi,
+    // County references — limited to 1-3 capitalized words before "County"
+    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\s+County)\b/g,
 ];
 
 // ---------------------------------------------------------------------------
@@ -165,7 +165,10 @@ export function extractEntities(text: string): ExtractedEntities {
     const nameMatches = text.matchAll(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g);
     for (const m of nameMatches) {
         const name = m[1].trim();
-        if (!NAME_FALSE_POSITIVES.has(name) && !entities.courts.includes(name)) {
+        // Skip false positives and names that overlap with court references
+        // (e.g., "Family Court" when courts has "Family Court of Harris")
+        const isCourtFragment = entities.courts.some(c => c.includes(name) || name.includes(c));
+        if (!NAME_FALSE_POSITIVES.has(name) && !isCourtFragment) {
             entities.people.push(name);
         }
     }

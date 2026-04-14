@@ -15,6 +15,9 @@ type Theme = 'dark' | 'light';
 
 const STORAGE_KEY = 'nexx-theme';
 
+/** In-memory fallback — keeps React state consistent when localStorage is unavailable. */
+let inMemoryTheme: Theme = 'dark';
+
 /** All active subscribers — notified when the theme changes. */
 const listeners = new Set<() => void>();
 
@@ -23,13 +26,15 @@ function coerceTheme(value: string | null): Theme {
     return value === 'light' || value === 'dark' ? value : 'dark';
 }
 
-/** Read the stored theme, falling back to 'dark'. */
+/** Read the stored theme, falling back to in-memory value. */
 function getSnapshot(): Theme {
-    if (typeof window === 'undefined') return 'dark';
+    if (typeof window === 'undefined') return inMemoryTheme;
     try {
-        return coerceTheme(localStorage.getItem(STORAGE_KEY));
+        const stored = coerceTheme(localStorage.getItem(STORAGE_KEY));
+        inMemoryTheme = stored;
+        return stored;
     } catch {
-        return 'dark';
+        return inMemoryTheme;
     }
 }
 
@@ -42,7 +47,7 @@ function getServerSnapshot(): Theme {
 function subscribe(callback: () => void) {
     listeners.add(callback);
     const handleStorage = (e: StorageEvent) => {
-        if (e.key === STORAGE_KEY) {
+        if (e.storageArea === localStorage && (e.key === STORAGE_KEY || e.key === null)) {
             applyTheme(getSnapshot());
             callback();
         }
@@ -71,10 +76,11 @@ export function ThemeToggle() {
 
     const toggle = useCallback(() => {
         const next: Theme = theme === 'dark' ? 'light' : 'dark';
+        inMemoryTheme = next;
         try {
             localStorage.setItem(STORAGE_KEY, next);
         } catch {
-            // Best effort persistence; continue applying in-memory/UI theme.
+            // Best effort persistence; in-memory fallback keeps UI consistent.
         }
         applyTheme(next);
         // Notify all subscribers so useSyncExternalStore re-reads the snapshot

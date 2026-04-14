@@ -1,7 +1,7 @@
 import { mutation, query, internalMutation } from './_generated/server';
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
-import { getAuthenticatedUser } from './lib/auth';
+import { getAuthenticatedUser, validateCaseOwnership } from './lib/auth';
 
 /** Create a new conversation — auth-guarded */
 export const create = mutation({
@@ -13,9 +13,11 @@ export const create = mutation({
             v.literal('strategic'),
             v.literal('general')
         ),
+        caseId: v.id('cases'),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
+        await validateCaseOwnership(ctx, args.caseId, user._id);
 
         return await ctx.db.insert('conversations', {
             userId: user._id,
@@ -25,6 +27,7 @@ export const create = mutation({
             messageCount: 0,
             lastMessageAt: Date.now(),
             createdAt: Date.now(),
+            caseId: args.caseId,
         });
     },
 });
@@ -125,6 +128,7 @@ export const list = query({
         status: v.optional(
             v.union(v.literal('active'), v.literal('archived'))
         ),
+        caseId: v.optional(v.id('cases')),
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
@@ -135,6 +139,22 @@ export const list = query({
             .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
             .first();
         if (!user) return [];
+
+        // Case-scoped query when caseId is provided
+        if (args.caseId) {
+            const results = await ctx.db
+                .query('conversations')
+                .withIndex('by_user_case', (q) =>
+                    q.eq('userId', user._id).eq('caseId', args.caseId!)
+                )
+                .order('desc')
+                .collect();
+            // Filter by status client-side when using case index
+            if (args.status) {
+                return results.filter((c) => c.status === args.status);
+            }
+            return results;
+        }
 
         if (args.status) {
             return await ctx.db

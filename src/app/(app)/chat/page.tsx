@@ -20,11 +20,16 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { MODE_LABELS } from '@/lib/constants';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
+import { useWorkspace } from '@/lib/workspace-context';
 
 /** Conversation list page with mode picker and new-chat creation. Ethereal theme. */
 export default function ChatListPage() {
     const router = useRouter();
-    const conversations = useQuery(api.conversations.list, {});
+    const { activeCaseId } = useWorkspace();
+    const conversations = useQuery(
+        api.conversations.list,
+        activeCaseId ? { caseId: activeCaseId } : 'skip'
+    );
     const createConversation = useMutation(api.conversations.create);
     const removeConversation = useMutation(api.conversations.remove);
     const [isCreating, setIsCreating] = useState(false);
@@ -53,6 +58,7 @@ export default function ChatListPage() {
             const id = await createConversation({
                 title: 'New Conversation',
                 mode: 'general',
+                caseId: activeCaseId!,
             });
             router.push(`/chat/${id}`);
         } catch (error) {
@@ -61,6 +67,8 @@ export default function ChatListPage() {
             setIsCreating(false);
         }
     };
+
+    const isWorkspaceReady = activeCaseId !== null;
 
     const isLoadingConversations = conversations === undefined;
     const activeConversations = isLoadingConversations ? [] : conversations.filter((c) => c.status === 'active');
@@ -92,7 +100,7 @@ export default function ChatListPage() {
                     
                     <button
                         onClick={handleNewChat}
-                        disabled={isCreating}
+                        disabled={isCreating || !isWorkspaceReady}
                         className="btn-primary shrink-0 py-4 px-8 text-[13px] uppercase tracking-widest flex items-center gap-2 disabled:scale-100 disabled:opacity-50 shadow-md transition-all self-start md:self-end"
                     >
                         <Plus size={16} weight="bold" />

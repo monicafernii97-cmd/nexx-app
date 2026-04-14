@@ -23,6 +23,7 @@ import OnboardingTour from '@/components/OnboardingTour';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { parseLocalDate } from '@/lib/dateUtils';
+import { useWorkspace } from '@/lib/workspace-context';
 
 /** Quick-action cards linking to primary user flows (new chat, log incident, draft document). */
 const quickActions = [
@@ -51,8 +52,15 @@ function DashboardContent() {
     const { userId } = useUser();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const incidents = useQuery(api.incidents.list);
-    const conversations = useQuery(api.conversations.list, {});
+    const { activeCaseId } = useWorkspace();
+    const incidents = useQuery(
+        api.incidents.list,
+        activeCaseId ? { caseId: activeCaseId } : 'skip'
+    );
+    const conversations = useQuery(
+        api.conversations.list,
+        activeCaseId ? { caseId: activeCaseId } : 'skip'
+    );
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
 
     // ── Checkout success toast ──

@@ -1,6 +1,6 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
-import { getAuthenticatedUser } from './lib/auth';
+import { getAuthenticatedUser, validateCaseOwnership } from './lib/auth';
 
 /** Document type enum — shared across args */
 const documentTypeValidator = v.union(
@@ -36,15 +36,28 @@ export const create = mutation({
         fileSize: v.optional(v.number()),
         incidentId: v.optional(v.id('incidents')),
         status: v.optional(v.union(v.literal('draft'), v.literal('final'))),
+        caseId: v.optional(v.id('cases')),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
 
-        // Verify incidentId belongs to this user
+        // Validate caseId ownership
+        await validateCaseOwnership(ctx, args.caseId, user._id);
+
+        // Verify incidentId belongs to this user + reconcile caseId
+        let resolvedCaseId = args.caseId;
         if (args.incidentId) {
             const incident = await ctx.db.get(args.incidentId);
             if (!incident || incident.userId !== user._id) {
                 throw new Error('Not authorized to link to this incident');
+            }
+            // Derive caseId from incident when not explicitly provided,
+            // or reject mismatches to prevent cross-case document links.
+            if (incident.caseId) {
+                if (resolvedCaseId && resolvedCaseId !== incident.caseId) {
+                    throw new Error('Document caseId does not match the linked incident case');
+                }
+                resolvedCaseId = incident.caseId;
             }
         }
 
@@ -61,6 +74,7 @@ export const create = mutation({
             status: args.status ?? 'draft',
             createdAt: Date.now(),
             updatedAt: Date.now(),
+            caseId: resolvedCaseId,
         });
     },
 });
@@ -69,6 +83,7 @@ export const create = mutation({
 export const list = query({
     args: {
         type: v.optional(documentTypeValidator),
+        caseId: v.optional(v.id('cases')),
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
@@ -79,6 +94,22 @@ export const list = query({
             .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
             .first();
         if (!user) return [];
+
+        // Case-scoped query when caseId is provided
+        if (args.caseId) {
+            const results = await ctx.db
+                .query('documents')
+                .withIndex('by_user_case', (q) =>
+                    q.eq('userId', user._id).eq('caseId', args.caseId!)
+                )
+                .order('desc')
+                .collect();
+            // Filter by type client-side when using case index
+            if (args.type) {
+                return results.filter((d) => d.type === args.type);
+            }
+            return results;
+        }
 
         if (args.type) {
             return await ctx.db

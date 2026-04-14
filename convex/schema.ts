@@ -144,9 +144,12 @@ export default defineSchema({
             v.literal('support_grounding'),
             v.literal('safety_escalation')
         )),
+        // ── Case Scoping (Sprint 5) ──
+        caseId: v.optional(v.id('cases')),
     })
         .index('by_user', ['userId'])
-        .index('by_user_status', ['userId', 'status']),
+        .index('by_user_status', ['userId', 'status'])
+        .index('by_user_case', ['userId', 'caseId']),
 
     // ═══ Messages ═══
     messages: defineTable({
@@ -204,9 +207,12 @@ export default defineSchema({
         aiAnalysis: v.optional(v.string()),
         createdAt: v.number(),
         updatedAt: v.number(),
+        // ── Case Scoping (Sprint 5) ──
+        caseId: v.optional(v.id('cases')),
     })
         .index('by_user', ['userId'])
-        .index('by_user_date', ['userId', 'date']),
+        .index('by_user_date', ['userId', 'date'])
+        .index('by_user_case', ['userId', 'caseId']),
 
     // ═══ Documents ═══
     documents: defineTable({
@@ -230,9 +236,12 @@ export default defineSchema({
         status: v.union(v.literal('draft'), v.literal('final')),
         createdAt: v.number(),
         updatedAt: v.number(),
+        // ── Case Scoping (Sprint 5) ──
+        caseId: v.optional(v.id('cases')),
     })
         .index('by_user', ['userId'])
-        .index('by_user_type', ['userId', 'type']),
+        .index('by_user_type', ['userId', 'type'])
+        .index('by_user_case', ['userId', 'caseId']),
 
     // ═══ User Court Settings (Legal Document System) ═══
     userCourtSettings: defineTable({

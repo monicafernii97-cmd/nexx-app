@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '@convex/_generated/api';
+import type { Id } from '@convex/_generated/dataModel';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
 import { getMergedRules } from '@/lib/legal/courtRules';
 import { escapeHtml } from '@/lib/utils/htmlUtils';
@@ -10,7 +11,7 @@ import { INCIDENT_CATEGORIES } from '@/lib/constants';
 
 export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
         const { userId } = await auth();
         if (!userId) {
@@ -28,7 +29,22 @@ export async function GET() {
             }
             throw authErr;
         }
-        const incidentsList = await convex.query(api.incidents.list, {});
+
+        // Accept optional caseId for case-scoped exports
+        const { searchParams } = new URL(request.url);
+        const caseIdRaw = searchParams.get('caseId');
+        const listArgs = caseIdRaw ? { caseId: caseIdRaw as Id<'cases'> } : {};
+
+        let incidentsList;
+        try {
+            incidentsList = await convex.query(api.incidents.list, listArgs);
+        } catch (queryErr) {
+            // Return 400 for invalid caseId format (Convex validator rejects it)
+            if (queryErr instanceof Error && (queryErr.message.includes('validation') || queryErr.message.includes('Invalid'))) {
+                return new NextResponse('Invalid caseId format', { status: 400 });
+            }
+            throw queryErr;
+        }
 
         if (!incidentsList || incidentsList.length === 0) {
             return new NextResponse('No incidents found', { status: 404 });

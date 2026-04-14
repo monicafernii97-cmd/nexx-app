@@ -1,6 +1,6 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
-import { getAuthenticatedUser } from './lib/auth';
+import { getAuthenticatedUser, validateCaseOwnership } from './lib/auth';
 
 /** Incident category enum — shared across args */
 const categoryValidator = v.union(
@@ -32,9 +32,11 @@ export const create = mutation({
         location: v.optional(v.string()),
         childrenInvolved: v.optional(v.boolean()),
         aiAnalysis: v.optional(v.string()),
+        caseId: v.id('cases'),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
+        await validateCaseOwnership(ctx, args.caseId, user._id);
 
         return await ctx.db.insert('incidents', {
             userId: user._id,
@@ -53,14 +55,17 @@ export const create = mutation({
             status: 'draft',
             createdAt: Date.now(),
             updatedAt: Date.now(),
+            caseId: args.caseId,
         });
     },
 });
 
 /** List incidents for the authenticated user */
 export const list = query({
-    args: {},
-    handler: async (ctx) => {
+    args: {
+        caseId: v.optional(v.id('cases')),
+    },
+    handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) return [];
 
@@ -69,6 +74,17 @@ export const list = query({
             .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
             .first();
         if (!user) return [];
+
+        // Case-scoped query when caseId is provided
+        if (args.caseId) {
+            return await ctx.db
+                .query('incidents')
+                .withIndex('by_user_case', (q) =>
+                    q.eq('userId', user._id).eq('caseId', args.caseId!)
+                )
+                .order('desc')
+                .collect();
+        }
 
         return await ctx.db
             .query('incidents')

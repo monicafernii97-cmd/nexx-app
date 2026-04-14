@@ -118,7 +118,7 @@ const detectKeyFactPinHabit: SignalExtractor = (events) => {
             type: 'boost_panel',
             pattern: `User pins key_takeaway/overview panels ${(ratio * 100).toFixed(0)}% of the time.`,
             recommendation: 'Elevate key_takeaway to first position. User values concise facts.',
-            confidence: pinned.length >= 10 ? 'high' : 'low',
+            confidence: pinned.length >= 10 ? 'high' : 'medium',
             relatedPanels: ['key_takeaway', 'overview'],
         };
     }
@@ -130,8 +130,10 @@ const detectKeyFactPinHabit: SignalExtractor = (events) => {
  * "User dismisses support panels frequently" → lighter support responses.
  */
 const detectSupportDismissPattern: SignalExtractor = (events) => {
+    // All 5 reflective/support panels — aligned with ui-audit.ts
     const supportPanels: PanelType[] = [
         'emotional_insight', 'validation_support', 'gentle_reframe',
+        'pattern_detected', 'relationship_dynamic',
     ];
     const supportEvents = events.filter((e) => supportPanels.includes(e.panelType));
     const dismissed = supportEvents.filter((e) => e.interaction === 'dismissed').length;
@@ -193,7 +195,7 @@ const detectFollowUpPattern: SignalExtractor = (events) => {
         (e) => e.panelType === 'follow_up_questions' && e.interaction === 'shown',
     ).length;
 
-    if (followUpShown < 20 || followUpShown === 0) return null;
+    if (followUpShown < 20) return null;
     const ratio = followUp / followUpShown;
 
     if (ratio > 0.15) {

@@ -38,6 +38,18 @@ const STATUTE_MARKERS: RegExp[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalize a jurisdiction string for safe comparison.
+ * Strips punctuation, collapses whitespace, and lowercases.
+ */
+function normalizeJurisdiction(value: string): string {
+    return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -64,10 +76,14 @@ export function evaluateProcedure(
     });
 
     // 2. Correct jurisdiction — if expected, does it match?
-    //    Use case-insensitive string check instead of dynamic RegExp
-    //    to avoid ReDoS from special characters in user input.
+    //    Normalize both strings to prevent false positives (e.g. "tx" inside "text")
+    //    and false negatives from punctuation/spacing differences.
     if (expectedJurisdiction) {
-        const mentionsExpected = text.toLowerCase().includes(expectedJurisdiction.toLowerCase());
+        const normalizedText = ` ${normalizeJurisdiction(text)} `;
+        const normalizedExpected = normalizeJurisdiction(expectedJurisdiction);
+        const mentionsExpected =
+            normalizedExpected.length > 0 &&
+            normalizedText.includes(` ${normalizedExpected} `);
         scores.push({
             dimension: 'procedure_correct_jurisdiction',
             score: mentionsExpected ? 1 : 0,
@@ -101,13 +117,18 @@ export function evaluateProcedure(
         notes: hasSteps ? 'Contains actionable procedure steps' : 'Missing concrete filing/process steps',
     });
 
-    // 6. No fabricated statutes — check for suspicious citation patterns
-    const suspiciousCitations = /\d{2,}\s+U\.S\.C\.\s+§\s+\d+|v\.\s+\w+,\s+\d+\s+\w+\.\s+\d+/i.test(text);
+    // 6. No fabricated statutes — only flag federal U.S.C. citations when
+    //    they appear without any legitimate procedure/statute markers.
+    //    Legitimate responses that cite real statutes will have STATUTE_MARKERS
+    //    hits, so we only penalize when citations appear in isolation.
+    const hasFederalStatuteCitation = /\b\d+\s+U\.S\.C\.\s+§\s*\d+\b/i.test(text);
+    const hasProcedureCitation = STATUTE_MARKERS.some((p) => p.test(text));
+    const suspiciousCitations = hasFederalStatuteCitation && !hasProcedureCitation;
     scores.push({
         dimension: 'procedure_no_fabrication',
         score: suspiciousCitations ? 0 : 1,
         notes: suspiciousCitations
-            ? 'WARNING: Possible fabricated citation detected'
+            ? 'WARNING: Federal citation without supporting statute markers — possible fabrication'
             : 'No suspicious citations',
     });
 

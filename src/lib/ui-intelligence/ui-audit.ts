@@ -90,7 +90,7 @@ const checkGoodFaithUnderuse: AuditRule = (events) => {
             'good_faith_positioning', 'cooperation_signal',
         ].includes(e.panelType),
     );
-    if (strategicShown.length < 10 || strategicShown.length === 0) return null;
+    if (strategicShown.length < 10) return null;
 
     const goodFaithCount = strategicShown.filter(
         (e) => e.panelType === 'good_faith_positioning',

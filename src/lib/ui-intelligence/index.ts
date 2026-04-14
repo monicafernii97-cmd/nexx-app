@@ -48,3 +48,15 @@ export {
 
 // Dual Output
 export { isWorkProduct, splitGuidanceAndWorkProduct } from './dual-output';
+
+// Panel Audit
+export type { PanelEngagement, PanelAction, PanelRecommendation } from './panel-audit';
+export { computePanelEngagement, buildPanelRecommendations } from './panel-audit';
+
+// UI Self-Audit
+export type { AuditSeverity, AuditArea, UiAuditFinding, UiLibraryAudit } from './ui-audit';
+export { buildUiLibraryAudit } from './ui-audit';
+
+// Feedback Loop
+export type { SignalType, SignalConfidence, FeedbackSignal } from './feedback-loop';
+export { buildFeedbackSignals } from './feedback-loop';

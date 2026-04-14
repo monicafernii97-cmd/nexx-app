@@ -141,7 +141,7 @@ function resolveDominantType(
 
     // Find highest-priority candidate
     for (const priority of TIE_BREAK_PRIORITY) {
-        if ((candidates as readonly SentenceType[]).includes(priority)) {
+        if (candidates.some(c => c === priority)) {
             return priority;
         }
     }

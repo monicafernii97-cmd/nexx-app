@@ -1,12 +1,15 @@
 /**
  * Timeline Clusterer — Groups timeline events into narrative phases.
  *
- * Takes chronologically sorted events and classified nodes, then assigns
- * each event to one of 6 narrative phases:
+ * Takes chronologically sorted events and assigns each event to one of
+ * 6 narrative phases:
  *   background → baseline_practice → trigger_event → escalation →
  *   current_dispute → relief_connection
  *
  * Also supports issue-based and pattern-based clustering.
+ *
+ * TODO: Enrich phase assignment with classified node context once the
+ * wiring layer provides node ↔ event linkage.
  */
 
 import type { TimelineEventNode } from '../types/narrative';
@@ -77,7 +80,10 @@ function hasMarkers(text: string, markers: string[]): boolean {
  * 1. Sort all events by date
  * 2. Divide into time segments (early, middle, recent)
  * 3. Use keyword heuristics to assign phases
- * 4. Enrich with classified node context
+ *
+ * TODO: Step 4 — Enrich with classified node context (_classifiedNodes
+ * is accepted in the signature but not yet used; it is reserved for
+ * future node ↔ event cross-referencing).
  *
  * Phase rules:
  * - background:         Earliest 20% OR events with stability markers and no conflict
@@ -106,9 +112,14 @@ export function clusterTimelineEvents(
     const sorted = sortByDate(events);
     const totalEvents = sorted.length;
 
-    // Time boundaries (approximate)
+    // Time boundaries (approximate).
+    // Clamp recentBound to totalEvents - 1 so the recent-phase condition
+    // (i >= recentBound) is reachable even for very small event lists.
     const earlyBound = Math.max(1, Math.floor(totalEvents * 0.2));
-    const recentBound = Math.max(earlyBound + 1, totalEvents - Math.floor(totalEvents * 0.2));
+    const recentBound = Math.min(
+        totalEvents - 1,
+        Math.max(earlyBound + 1, totalEvents - Math.floor(totalEvents * 0.2)),
+    );
 
     let triggerFound = false;
 

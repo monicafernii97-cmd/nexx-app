@@ -162,8 +162,8 @@ export function extractEntities(text: string): ExtractedEntities {
     pushMatches(STATUTE_REGEXES, entities.statutesOrRules);
 
     // ── People (proper names: 2+ capitalized words) ──
-    const nameMatches = text.matchAll(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g);
-    for (const m of nameMatches) {
+    const NAME_REGEX = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g;
+    for (const m of matchAllFresh(text, NAME_REGEX)) {
         const name = m[1].trim();
         // Skip false positives and names that overlap with court references
         // (e.g., "Family Court" when courts has "Family Court of Harris")

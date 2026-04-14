@@ -170,7 +170,11 @@ export function classifySentence(
 
     const dominantType = resolveDominantType(scores, signals.hasCourtTerm);
 
-    // Confidence = score gap (dominant - runner-up) + 50% boost of dominant score, capped at 1
+    // Confidence = (dominant – runner-up) + 50% boost of dominant score, capped at 1.
+    // The gap rewards clear separation between types; the 50% boost rewards
+    // high absolute scores so a dominant 0.8 with runner-up 0.7 still gets
+    // a meaningful confidence. Result can exceed 1.0 before capping (e.g.,
+    // dominant=1.0, runner-up=0.0 → 1.5), which Math.min clamps to 1.
     const sorted = SENTENCE_TYPES
         .filter(t => t !== 'unknown')
         .map(t => scores[t])

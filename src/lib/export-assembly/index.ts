@@ -108,26 +108,7 @@ export function assembleExportInput(
     // ── Step 3: Build legal narrative ──
     const narrative = buildLegalNarrative(selectedEvents, classifiedNodes);
 
-    // ── Step 4: Route to path-specific mapper ──
-    let mappedSections: SummaryMappedSections | CourtMappedSections | ExhibitMappedSections;
-
-    switch (request.path) {
-        case 'case_summary':
-            mappedSections = mapToSummarySections(classifiedNodes, narrative, request);
-            break;
-        case 'court_document':
-            mappedSections = mapToCourtSections(classifiedNodes, narrative, request);
-            break;
-        case 'exhibit_document':
-            mappedSections = mapToExhibitSections(classifiedNodes, narrative, request);
-            break;
-        default: {
-            // Exhaustiveness check — TypeScript will error if a new ExportPath is added
-            const _exhaustive: never = request.path;
-            throw new Error(`Unknown export path: ${_exhaustive}`);
-        }
-    }
-
+    // ── Step 4: Compute assembly metadata ──
     const assemblyTimeMs = performance.now() - startTime;
 
     const meta: AssemblyMeta = {
@@ -144,13 +125,40 @@ export function assembleExportInput(
         assemblyTimeMs,
     };
 
-    return {
-        path: request.path,
-        classifiedNodes,
-        narrative,
-        mappedSections,
-        meta,
-    } as AssemblyResult;
+    // ── Step 5: Route to path-specific mapper and return ──
+    // Return directly from each branch so TypeScript can infer the
+    // discriminated union without a cast.
+    switch (request.path) {
+        case 'case_summary':
+            return {
+                path: 'case_summary',
+                classifiedNodes,
+                narrative,
+                mappedSections: mapToSummarySections(classifiedNodes, narrative, request),
+                meta,
+            };
+        case 'court_document':
+            return {
+                path: 'court_document',
+                classifiedNodes,
+                narrative,
+                mappedSections: mapToCourtSections(classifiedNodes, narrative, request),
+                meta,
+            };
+        case 'exhibit_document':
+            return {
+                path: 'exhibit_document',
+                classifiedNodes,
+                narrative,
+                mappedSections: mapToExhibitSections(classifiedNodes, narrative, request),
+                meta,
+            };
+        default: {
+            // Exhaustiveness check — TypeScript will error if a new ExportPath is added
+            const _exhaustive: never = request.path;
+            throw new Error(`Unknown export path: ${_exhaustive}`);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

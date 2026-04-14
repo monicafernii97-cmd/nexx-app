@@ -25,15 +25,7 @@
 import type { ClassifiedNode } from '../types/classification';
 import type { LegalNarrative } from '../types/narrative';
 import type { CourtMappedSections, ExportRequest, CourtConfig } from '../types/exports';
-
-/**
- * Parse a date string to epoch ms. Returns Infinity for unparseable dates
- * so they sort to the end.
- */
-function parseDateMs(dateStr: string): number {
-    const ms = Date.parse(dateStr);
-    return Number.isNaN(ms) ? Infinity : ms;
-}
+import { parseDateMs } from '../utils/dateUtils';
 
 // ---------------------------------------------------------------------------
 // Title Generation

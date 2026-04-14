@@ -14,19 +14,7 @@ import type { NarrativePhase } from '../types/narrative';
 import type { ClassifiedNode } from '../types/classification';
 import type { PatternSection } from '../types/narrative';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Parse a date string to epoch ms. Returns Infinity for missing/malformed dates
- * so they consistently sort to the end.
- */
-function parseDateMs(dateStr: string | undefined): number {
-    if (!dateStr) return Infinity;
-    const ms = Date.parse(dateStr);
-    return Number.isNaN(ms) ? Infinity : ms;
-}
+import { parseDateMs } from '../utils/dateUtils';
 
 /**
  * Sort events by date ascending. Events without dates or with
@@ -124,13 +112,17 @@ export function clusterTimelineEvents(
 
     let triggerFound = false;
 
+    // Event types eligible for relief_connection routing
+    const RELIEF_EVENT_TYPES: Set<string> = new Set([
+        'filing', 'incident', 'agreement', 'communication', 'other',
+    ]);
 
     for (let i = 0; i < sorted.length; i++) {
         const event = sorted[i];
         const combined = `${event.title} ${event.description}`;
 
-        // Relief events always go to relief_connection regardless of position
-        if (hasMarkers(combined, RELIEF_MARKERS) && event.type === 'filing') {
+        // Relief events go to relief_connection regardless of timeline position.
+        if (hasMarkers(combined, RELIEF_MARKERS) && RELIEF_EVENT_TYPES.has(event.type)) {
             result.get('relief_connection')!.push(event);
             continue;
         }

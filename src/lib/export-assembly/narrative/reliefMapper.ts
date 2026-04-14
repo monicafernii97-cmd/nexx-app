@@ -31,7 +31,7 @@ const RELIEF_RULES: ReliefRule[] = [
         suggestedRelief:
             'Temporary clarification limiting calls to one scheduled weekly call during non-possession weeks',
         reasoningTemplate:
-            'The prior reduced arrangement functioned for {years} and better aligns with the child\'s current school-week routine. {supportCount} documenting the ongoing dispute support this request.',
+            'The prior reduced arrangement functioned for {years} and better aligns with the child\'s current school-week routine. Supported by {supportCount} data points documenting the ongoing dispute.',
         minNodeSupport: 2,
         eventKeywords: [
             'facetime', 'video call', 'phone call', 'communication',
@@ -79,7 +79,7 @@ const RELIEF_RULES: ReliefRule[] = [
         suggestedRelief:
             'Order requiring both parties to share medical information and decisions within 24 hours',
         reasoningTemplate:
-            'Medical communication breakdowns have been documented {supportCount} times. A clear communication protocol would serve the child\'s health interests.',
+            'Medical communication breakdowns have been documented across {supportCount} data points. A clear communication protocol would serve the child\'s health interests.',
         minNodeSupport: 2,
         eventKeywords: [
             'medical', 'doctor', 'therapy', 'medication', 'health',

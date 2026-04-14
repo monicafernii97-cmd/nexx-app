@@ -6,6 +6,7 @@ import { useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
 import { useUser } from '@/lib/user-context';
+import { useWorkspace } from '@/lib/workspace-context';
 import {
     Microphone,
     MicrophoneSlash,
@@ -36,6 +37,7 @@ type Step = 'describe' | 'review' | 'confirmed';
 /** Premium multi-step incident creation form with AI-powered narrative analysis. */
 export default function NewIncidentPage() {
     const { userId } = useUser();
+    const { activeCaseId } = useWorkspace();
     const router = useRouter();
     const [step, setStep] = useState<Step>('describe');
     const [narrative, setNarrative] = useState('');
@@ -206,6 +208,7 @@ export default function NewIncidentPage() {
                     witnesses: witnessArr,
                     childrenInvolved: childrenInvolved || undefined,
                     aiAnalysis: behavioralAnalysis || undefined,
+                    caseId: activeCaseId!,
                 });
                 setCreatedId(incidentId);
             }
@@ -242,6 +245,7 @@ export default function NewIncidentPage() {
                     witnesses: witnessArr,
                     childrenInvolved: childrenInvolved || undefined,
                     aiAnalysis: behavioralAnalysis || undefined,
+                    caseId: activeCaseId!,
                 });
                 setCreatedId(incidentId);
             } else {

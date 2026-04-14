@@ -29,10 +29,20 @@ function getServerSnapshot(): Theme {
     return 'dark';
 }
 
-/** Subscribe to theme changes. */
+/** Subscribe to theme changes (includes cross-tab sync via storage event). */
 function subscribe(callback: () => void) {
     listeners.add(callback);
-    return () => { listeners.delete(callback); };
+    const handleStorage = (e: StorageEvent) => {
+        if (e.key === STORAGE_KEY) {
+            applyTheme(getSnapshot());
+            callback();
+        }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => {
+        listeners.delete(callback);
+        window.removeEventListener('storage', handleStorage);
+    };
 }
 
 /** Apply the theme class to <html> */
@@ -66,8 +76,8 @@ export function ThemeToggle() {
             aria-label={`Switch to ${isDark ? 'light' : 'dark'} theme`}
             title={`Switch to ${isDark ? 'light' : 'dark'} theme`}
             className="relative flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-300 cursor-pointer
-                       hover:bg-white/10
-                       border border-transparent hover:border-white/20"
+                       hover:bg-black/5 dark:hover:bg-white/10
+                       border border-transparent hover:border-black/10 dark:hover:border-white/20"
         >
             {/* Sun icon (visible in dark mode → click to go light) */}
             <motion.svg

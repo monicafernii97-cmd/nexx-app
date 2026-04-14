@@ -13,7 +13,7 @@ export const create = mutation({
             v.literal('strategic'),
             v.literal('general')
         ),
-        caseId: v.optional(v.id('cases')),
+        caseId: v.id('cases'),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);

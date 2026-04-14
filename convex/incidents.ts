@@ -32,7 +32,7 @@ export const create = mutation({
         location: v.optional(v.string()),
         childrenInvolved: v.optional(v.boolean()),
         aiAnalysis: v.optional(v.string()),
-        caseId: v.optional(v.id('cases')),
+        caseId: v.id('cases'),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);

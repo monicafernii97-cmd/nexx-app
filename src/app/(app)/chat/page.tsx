@@ -58,7 +58,7 @@ export default function ChatListPage() {
             const id = await createConversation({
                 title: 'New Conversation',
                 mode: 'general',
-                ...(activeCaseId ? { caseId: activeCaseId } : {}),
+                caseId: activeCaseId!,
             });
             router.push(`/chat/${id}`);
         } catch (error) {

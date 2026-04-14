@@ -121,7 +121,7 @@ const checkStrengthRiskImbalance: AuditRule = (events) => {
     const risk = engagements.find((e) => e.panelType === 'risk_concern');
 
     if (!strength || !risk) return null;
-    if (strength.counts.saved < 3 || risk.counts.saved < 1) return null;
+    if (strength.counts.saved < 3) return null;
 
     if (strength.counts.saved > risk.counts.saved * 2) {
         return {

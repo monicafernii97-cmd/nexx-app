@@ -189,17 +189,19 @@ const detectFollowUpPattern: SignalExtractor = (events) => {
     const followUp = events.filter(
         (e) => e.panelType === 'follow_up_questions' && e.interaction === 'expanded',
     ).length;
-    const totalShown = events.filter((e) => e.interaction === 'shown').length;
+    const followUpShown = events.filter(
+        (e) => e.panelType === 'follow_up_questions' && e.interaction === 'shown',
+    ).length;
 
-    if (totalShown < 20 || totalShown === 0) return null;
-    const ratio = followUp / totalShown;
+    if (followUpShown < 20 || followUpShown === 0) return null;
+    const ratio = followUp / followUpShown;
 
     if (ratio > 0.15) {
         return {
             type: 'boost_panel',
-            pattern: `follow_up_questions expanded in ${(ratio * 100).toFixed(0)}% of responses.`,
+            pattern: `follow_up_questions expanded ${(ratio * 100).toFixed(0)}% of the times it is shown.`,
             recommendation: 'Responses may lack specificity. Consider boosting gather_this_next or adding detail to initial analysis.',
-            confidence: totalShown >= 50 ? 'high' : 'medium',
+            confidence: followUpShown >= 50 ? 'high' : 'medium',
             relatedPanels: ['follow_up_questions', 'gather_this_next'],
         };
     }

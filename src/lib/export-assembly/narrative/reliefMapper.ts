@@ -202,14 +202,13 @@ export function mapIssuesToRelief(
 
         for (const event of events) {
             const combined = `${event.title} ${event.description}`;
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const _matchesKeyword = keywordPatterns.some(re => re.test(combined));
+            const matchesKeyword = keywordPatterns.some(re => re.test(combined));
             const isLinked = event.linkedEvidenceIds?.some(eid => nodeEvidenceSet.has(eid)) ?? false;
 
-            // Evidence linkage is the gating criterion for event support.
-            // `_matchesKeyword` is reserved for future confidence weighting
-            // but does not gate inclusion.
-            if (isLinked) {
+            // Both keyword match AND evidence linkage are required to count
+            // an event as supporting — keyword-only or link-only hits are
+            // too permissive for generic terms and can inflate supportCount.
+            if (isLinked && matchesKeyword) {
                 supportingEventIds.push(event.id);
                 if (event.linkedEvidenceIds) {
                     const relevant = event.linkedEvidenceIds.filter(eid => nodeEvidenceSet.has(eid));

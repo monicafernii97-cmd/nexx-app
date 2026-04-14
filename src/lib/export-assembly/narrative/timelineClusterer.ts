@@ -71,11 +71,19 @@ function escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function hasMarkers(text: string, markers: string[]): boolean {
-    return markers.some(m => {
-        const pattern = new RegExp(`\\b${escapeRegex(m)}\\b`, 'i');
-        return pattern.test(text);
-    });
+/** Convert a marker string to a word-boundary regex. */
+function toMarkerRegex(marker: string): RegExp {
+    return new RegExp(`\\b${escapeRegex(marker)}\\b`, 'i');
+}
+
+// Precompile marker regexes at module level to avoid hot-path allocation.
+const CHANGE_MARKER_RX = CHANGE_MARKERS.map(toMarkerRegex);
+const CONFLICT_MARKER_RX = CONFLICT_MARKERS.map(toMarkerRegex);
+const STABILITY_MARKER_RX = STABILITY_MARKERS.map(toMarkerRegex);
+const RELIEF_MARKER_RX = RELIEF_MARKERS.map(toMarkerRegex);
+
+function hasMarkers(text: string, patterns: RegExp[]): boolean {
+    return patterns.some(re => re.test(text));
 }
 
 
@@ -143,11 +151,11 @@ export function clusterTimelineEvents(
         const event = sorted[i];
         const combined = `${event.title} ${event.description}`;
 
-        // Precompute marker flags once per event to avoid repeated scanning
-        const hasRelief = hasMarkers(combined, RELIEF_MARKERS);
-        const hasStability = hasMarkers(combined, STABILITY_MARKERS);
-        const hasChange = hasMarkers(combined, CHANGE_MARKERS);
-        const hasConflict = hasMarkers(combined, CONFLICT_MARKERS);
+        // Precompute marker flags once per event using precompiled regexes
+        const hasRelief = hasMarkers(combined, RELIEF_MARKER_RX);
+        const hasStability = hasMarkers(combined, STABILITY_MARKER_RX);
+        const hasChange = hasMarkers(combined, CHANGE_MARKER_RX);
+        const hasConflict = hasMarkers(combined, CONFLICT_MARKER_RX);
 
         // Relief events go to relief_connection regardless of timeline position.
         if (hasRelief && RELIEF_EVENT_TYPES.has(event.type)) {
@@ -207,7 +215,7 @@ export function clusterTimelineEvents(
     // from escalation or current_dispute — validate markers to avoid
     // promoting unmarked events.
     if (!triggerFound) {
-        const fallbackMarkers = [...CHANGE_MARKERS, ...CONFLICT_MARKERS];
+        const fallbackMarkers = [...CHANGE_MARKER_RX, ...CONFLICT_MARKER_RX];
         for (const phase of ['escalation', 'current_dispute'] as const) {
             const phaseEvents = result.get(phase);
             if (phaseEvents && phaseEvents.length > 0) {

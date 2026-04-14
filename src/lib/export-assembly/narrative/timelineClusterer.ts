@@ -17,6 +17,7 @@ import {
     type NarrativePhase,
     type PatternSection,
     type TimelineEventNode,
+    type TimelineEventType,
 } from '../types/narrative';
 import type { ClassifiedNode } from '../types/classification';
 
@@ -92,20 +93,22 @@ function hasMarkers(text: string, patterns: RegExp[]): boolean {
 // 'exchange', 'payment' — these are factual/contextual events that
 // belong in chronology phases, not relief routing.
 // TODO: Revisit this allowlist if new event types warrant relief routing.
-const RELIEF_EVENT_TYPES: Set<string> = new Set([
+const RELIEF_EVENT_TYPES: ReadonlySet<TimelineEventType> = new Set<TimelineEventType>([
     'filing', 'incident', 'agreement', 'communication', 'other',
 ]);
 
 /**
  * Pre-scan sorted events to find the trigger index — the first event
- * with change markers that isn't a relief event and appears at or after
- * the early boundary. Returns -1 if no trigger is found (fallback scan
- * will promote from escalation/current_dispute later).
+ * with change markers that isn't a relief event. Early events (before
+ * earlyBound) are skipped unless they carry change markers, so the
+ * trigger may appear before the early boundary when warranted.
+ * Returns -1 if no trigger is found (fallback scan will promote from
+ * escalation/current_dispute later).
  */
 function findTriggerIndex(
     sorted: TimelineEventNode[],
     earlyBound: number,
-    reliefTypes: Set<string>,
+    reliefTypes: ReadonlySet<TimelineEventType>,
 ): number {
     for (let i = 0; i < sorted.length; i++) {
         const event = sorted[i];

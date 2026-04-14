@@ -205,7 +205,17 @@ export function mapIssuesToRelief(
             const matchesKeyword = keywordPatterns.some(re => re.test(combined));
             const isLinked = event.linkedEvidenceIds?.some(eid => nodeEvidenceSet.has(eid)) ?? false;
 
-            if (matchesKeyword || isLinked) {
+            // Require both keyword match AND evidence linkage to count
+            // an event as supporting — keyword-only hits are too permissive
+            // for generic terms like 'call' or 'notice'.
+            if (matchesKeyword && isLinked) {
+                supportingEventIds.push(event.id);
+                if (event.linkedEvidenceIds) {
+                    supportingEvidenceIds.push(...event.linkedEvidenceIds);
+                }
+            } else if (isLinked) {
+                // Events linked to supporting evidence count even without
+                // keyword matches — the evidence linkage is sufficient.
                 supportingEventIds.push(event.id);
                 if (event.linkedEvidenceIds) {
                     supportingEvidenceIds.push(...event.linkedEvidenceIds);
@@ -264,7 +274,7 @@ function inferYearsFromDates(nodes: ClassifiedNode[]): string {
             if (!Number.isNaN(ms)) allDates.push(ms);
         }
     }
-    if (allDates.length < 2) return 'several years';
+    if (allDates.length < 2) return 'an unspecified duration';
 
     const earliest = Math.min(...allDates);
     const latest = Math.max(...allDates);

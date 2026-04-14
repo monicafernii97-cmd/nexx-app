@@ -76,22 +76,36 @@ export function splitIntoSentences(text: string): SplitSentence[] {
         // sentence-ending punctuation.
         const collapsed = lines.join(' ');
 
-        // Replace common abbreviations with placeholders
+        // Replace common abbreviations with placeholders.
+        // Only mask true initials/acronyms (sequences like 'J. K.' or 'U.S.')
+        // so labels like 'Exhibit A.' are not masked.
         const processed = collapsed
             .replace(/\b(Mr|Mrs|Ms|Dr|Jr|Sr|Prof|Hon|Rev|St|Ave|Blvd|Dept|Inc|Corp|Ltd|etc|vs|Tex|Fam|Civ|Crim)\./gi, '$1_DOT_')
-            .replace(/\b([A-Z])\./g, '$1_DOT_')    // initials
+            .replace(/(?:[A-Z]\.){2,}/g, match => match.replace(/\./g, '_DOT_'))  // multi-initial sequences
             .replace(/(\d+)\.(\d+)/g, '$1_DECIMAL_$2'); // decimals/statutes
 
         // Split on sentence-ending punctuation
         const parts = processed.split(/(?<=[.!?])\s+/);
 
+        // Track position in collapsed string to preserve raw originalText
+        let searchFrom = 0;
         for (const part of parts) {
             // Restore placeholders
             const restored = part
                 .replace(/_DOT_/g, '.')
                 .replace(/_DECIMAL_/g, '.')
                 .trim();
-            if (restored) sentences.push({ text: restored, originalText: restored });
+            if (!restored) continue;
+
+            // Find the raw span in the collapsed source for originalText
+            const idx = collapsed.indexOf(restored, searchFrom);
+            if (idx >= 0) {
+                sentences.push({ text: restored, originalText: collapsed.slice(idx, idx + restored.length) });
+                searchFrom = idx + restored.length;
+            } else {
+                // Fallback — use restored if exact span not found
+                sentences.push({ text: restored, originalText: restored });
+            }
         }
     }
 
@@ -148,15 +162,18 @@ function resolveDominantType(
 
     if (candidates.length === 1) return candidates[0];
 
-    // Apply tie-break priority
-    // Special rule: procedure > fact only when court-rule language is explicit
-    if (hasCourtTerms && candidates.includes('procedure') && candidates.includes('fact')) {
-        return 'procedure';
-    }
-
-    // Find highest-priority candidate
+    // Find highest-priority candidate.
+    // When 'fact' is the current pick but 'procedure' is also a candidate
+    // and court-rule language is present, promote 'procedure' over 'fact'.
     for (const priority of TIE_BREAK_PRIORITY) {
         if (candidates.some(c => c === priority)) {
+            if (
+                priority === 'fact' &&
+                hasCourtTerms &&
+                candidates.some(c => c === 'procedure')
+            ) {
+                return 'procedure';
+            }
             return priority;
         }
     }

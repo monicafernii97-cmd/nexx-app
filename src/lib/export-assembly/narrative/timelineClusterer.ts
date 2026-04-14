@@ -63,9 +63,16 @@ const RELIEF_MARKERS = [
     'proposed', 'hearing', 'filed',
 ];
 
+/** Escape special regex characters in a string. */
+function escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function hasMarkers(text: string, markers: string[]): boolean {
-    const lower = text.toLowerCase();
-    return markers.some(m => lower.includes(m));
+    return markers.some(m => {
+        const pattern = new RegExp(`\\b${escapeRegex(m)}\\b`, 'i');
+        return pattern.test(text);
+    });
 }
 
 

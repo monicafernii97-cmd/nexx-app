@@ -5,7 +5,7 @@
  * evidence-based behavioral patterns using GPT structured output.
  *
  * Results are scored locally using premiumAnalytics.scorePattern()
- * and stored in caseMemory as type: 'pattern_analysis'.
+ * and stored in the dedicated detectedPatterns table.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,7 +19,7 @@ import { buildPatternPrompt } from '@/lib/nexx/prompts/patternPrompt';
 import { scorePattern, countDistinctDates, BEHAVIOR_CATEGORIES } from '@/lib/nexx/premiumAnalytics';
 import type { DetectedPattern, PatternEvent, BehaviorCategory } from '@/lib/nexx/premiumAnalytics';
 import { PRIMARY_MODEL } from '@/lib/tiers';
-import { stableRequestId, serializeForPrompt } from '@/lib/workspace-utils';
+import { serializeForPrompt } from '@/lib/workspace-utils';
 
 export const maxDuration = 60;
 
@@ -49,26 +49,23 @@ export async function POST(req: NextRequest) {
     try {
         const convex = await getAuthenticatedConvexClient();
 
-        // Load case data in parallel
+        // Load case data in parallel — pass caseId for scoped queries
         const [incidents, timeline, caseMemory] = await Promise.all([
-            convex.query(api.incidents.list, {}),
+            convex.query(api.incidents.list, { caseId }),
             convex.query(api.timelineCandidates.listByUser, {}),
             convex.query(api.caseMemory.listByUser, {}),
         ]);
 
         // ── Case-scoped filtering ──
-        // caseMemory, timelineCandidates, and casePins have optional caseId → filter by it.
-        // incidents schema lacks caseId today; filter applied for forward-compatibility
-        // so it activates automatically once Sprint 5 adds the field.
+        // incidents are already scoped via the query arg.
+        // caseMemory and timelineCandidates use optional caseId → filter client-side.
         const caseScopedMemory = (caseMemory ?? []).filter(
             (m: { caseId?: Id<'cases'> }) => !m.caseId || m.caseId === caseId,
         );
         const caseScopedTimeline = (timeline ?? []).filter(
             (t: { caseId?: Id<'cases'> }) => !t.caseId || t.caseId === caseId,
         );
-        const caseScopedIncidents = (incidents ?? []).filter(
-            (i) => !(i as Record<string, unknown>).caseId || (i as Record<string, unknown>).caseId === caseId,
-        );
+        const caseScopedIncidents = incidents ?? [];
 
         // Exclude prior AI-generated artifacts so synthetic output
         // doesn't become evidence for subsequent runs.
@@ -175,19 +172,25 @@ export async function POST(req: NextRequest) {
                 category: p.category,
             }));
 
-        // Store results in caseMemory with a stable requestId so client
-        // retries on the same day don't create duplicate rows.
-        const requestId = stableRequestId(caseId, 'pattern_analysis');
-        await convex.mutation(api.caseMemory.save, {
+        // Persist to dedicated detectedPatterns table with idempotent batch replace.
+        // Uses a stable requestId so same-day retries replace rather than duplicate.
+        const requestId = `patterns_${caseId}_${new Date().toISOString().slice(0, 10)}`;
+        const generatedAt = Date.now();
+
+        await convex.mutation(api.detectedPatterns.replaceForCase, {
             caseId,
-            type: 'pattern_analysis',
-            content: JSON.stringify({
-                patterns: scoredPatterns,
-                suppressedCandidates: rawResult.suppressedCandidates,
-                generatedAt: new Date().toISOString(),
-            }),
-            title: `Pattern Analysis — ${new Date().toLocaleDateString()}`,
             requestId,
+            patterns: scoredPatterns.map((p) => ({
+                title: p.title,
+                summary: p.summary,
+                category: p.category,
+                eventsJson: JSON.stringify(p.supportingEvents),
+                eventCount: p.supportingEvents.length,
+                distinctDates: countDistinctDates(p.supportingEvents),
+                score: p.score,
+                confidence: p.confidence as 'medium' | 'high',
+                generatedAt,
+            })),
         });
 
         return NextResponse.json({

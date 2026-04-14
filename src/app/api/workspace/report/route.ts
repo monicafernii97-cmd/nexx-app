@@ -86,10 +86,11 @@ export async function POST(req: NextRequest) {
     try {
         const convex = await getAuthenticatedConvexClient();
 
-        // Load case data in parallel
-        const [timeline, caseMemory] = await Promise.all([
+        // Load case data in parallel — pass caseId for scoped queries
+        const [timeline, caseMemory, detectedPatterns] = await Promise.all([
             convex.query(api.timelineCandidates.listByUser, {}),
             convex.query(api.caseMemory.listByUser, {}),
+            convex.query(api.detectedPatterns.listByCase, { caseId: config.caseId }),
         ]);
 
         // ── Case-scoped filtering ──
@@ -100,15 +101,9 @@ export async function POST(req: NextRequest) {
             (t: { caseId?: Id<'cases'> }) => !t.caseId || t.caseId === config.caseId,
         );
 
-        // Find most recent narrative and pattern analysis
+        // Find most recent narrative
         const narrativeItem = caseScopedMemory
             .filter((m: { type: string }) => m.type === 'narrative_synthesis')
-            .sort((a: { _creationTime: number }, b: { _creationTime: number }) =>
-                b._creationTime - a._creationTime,
-            )[0];
-
-        const patternItem = caseScopedMemory
-            .filter((m: { type: string }) => m.type === 'pattern_analysis')
             .sort((a: { _creationTime: number }, b: { _creationTime: number }) =>
                 b._creationTime - a._creationTime,
             )[0];
@@ -118,20 +113,21 @@ export async function POST(req: NextRequest) {
             (m: { type: string }) => !['pattern_analysis', 'narrative_synthesis'].includes(m.type),
         );
 
-        // Build pattern context — differentiate 'excluded' from 'not available'
-        // and extract only the .patterns array (excluding suppressedCandidates).
+        // Build pattern context from dedicated detectedPatterns table
         let patternsContext: string;
         if (config.patternHandling !== 'include_supported') {
             patternsContext = 'Pattern analysis excluded per user configuration.';
-        } else if (patternItem) {
-            try {
-                const parsed = JSON.parse((patternItem as { content?: string }).content ?? '{}') as {
-                    patterns?: unknown[];
-                };
-                patternsContext = serializeForPrompt(parsed.patterns ?? [], 'supported patterns');
-            } catch {
-                patternsContext = 'No pattern analysis available. Run pattern detection first for best results.';
-            }
+        } else if (detectedPatterns && detectedPatterns.length > 0) {
+            patternsContext = serializeForPrompt(
+                detectedPatterns.map((p: { title: string; summary: string; category: string; eventCount: number; confidence: string }) => ({
+                    title: p.title,
+                    summary: p.summary,
+                    category: p.category,
+                    eventCount: p.eventCount,
+                    confidence: p.confidence,
+                })),
+                'supported patterns',
+            );
         } else {
             patternsContext = 'No pattern analysis available. Run pattern detection first for best results.';
         }

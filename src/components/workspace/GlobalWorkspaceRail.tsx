@@ -17,6 +17,8 @@ import {
 import Link from 'next/link';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useState } from 'react';
+import { useQuery } from 'convex/react';
+import { api } from '@convex/_generated/api';
 
 // ---------------------------------------------------------------------------
 // Readiness scoring — how "court-ready" is the user's workspace?
@@ -74,8 +76,15 @@ interface SuggestedAction {
  * Visual philosophy: GUIDANCE — not noise. Just readiness, gaps, next steps.
  */
 export function GlobalWorkspaceRail() {
-    const { counts, pins, memory, timeline } = useWorkspace();
+    const { counts, pins, memory, timeline, activeCaseId } = useWorkspace();
     const [isExpanded, setIsExpanded] = useState(true);
+
+    // ── Detected patterns from Convex ──
+    const detectedPatterns = useQuery(
+        api.detectedPatterns.listByCase,
+        activeCaseId ? { caseId: activeCaseId } : 'skip'
+    );
+    const patternCount = detectedPatterns?.length ?? 0;
 
     // True when at least one data query is still loading.
     // Prevents showing "missing" readiness for data that simply hasn't arrived yet.
@@ -99,11 +108,13 @@ export function GlobalWorkspaceRail() {
         },
         {
             label: 'Patterns',
-            level: getReadinessLevel(0, 1), // Will be dynamic once pattern detection is built
-            detail: 'Requires 3+ repeated events',
+            level: getReadinessLevel(patternCount, 1),
+            detail: patternCount === 0
+                ? 'Requires 3+ repeated events'
+                : `${patternCount} detected`,
             icon: ChartBar,
         },
-    ], [counts]);
+    ], [counts, patternCount]);
 
     // ── Source Health ──
     const totalSources = useMemo(() => {

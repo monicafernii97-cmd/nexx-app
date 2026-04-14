@@ -17,6 +17,7 @@ import type * as conversations from "../conversations.js";
 import type * as courtSettings from "../courtSettings.js";
 import type * as crons from "../crons.js";
 import type * as debugTraces from "../debugTraces.js";
+import type * as detectedPatterns from "../detectedPatterns.js";
 import type * as documents from "../documents.js";
 import type * as generatedDocuments from "../generatedDocuments.js";
 import type * as incidents from "../incidents.js";
@@ -48,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   courtSettings: typeof courtSettings;
   crons: typeof crons;
   debugTraces: typeof debugTraces;
+  detectedPatterns: typeof detectedPatterns;
   documents: typeof documents;
   generatedDocuments: typeof generatedDocuments;
   incidents: typeof incidents;

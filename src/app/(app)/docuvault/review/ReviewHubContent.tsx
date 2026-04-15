@@ -65,6 +65,8 @@ export default function ReviewHubContent() {
 
     // Track sidebar edit state to auto-save on selection change
     const pendingEditRef = useRef<{ nodeId: string; text: string } | null>(null);
+    // Synchronous guard — prevents double-submission before React re-renders
+    const draftingGuardRef = useRef(false);
 
     // Merge item overrides into review items so grouping/stats reflect edits
     const effectiveItems = useMemo(() => {
@@ -125,16 +127,23 @@ export default function ReviewHubContent() {
         [effectiveItems, selectedItemId],
     );
 
-    /** Flush any pending sidebar edit + start GPT drafting (with double-click guard). */
+    /** Flush any pending sidebar edit + start GPT drafting (synchronous guard). */
     const handleApproveAndDraft = useCallback(() => {
-        if (isDrafting) return; // Prevent double-submission
+        if (draftingGuardRef.current) return;
+        draftingGuardRef.current = true;
         if (pendingEditRef.current) {
             editItem(pendingEditRef.current.nodeId, pendingEditRef.current.text);
             pendingEditRef.current = null;
         }
-        setIsDrafting(true);
-        startDrafting();
-    }, [editItem, startDrafting, isDrafting]);
+        try {
+            setIsDrafting(true);
+            startDrafting();
+        } catch (err) {
+            draftingGuardRef.current = false;
+            setIsDrafting(false);
+            throw err;
+        }
+    }, [editItem, startDrafting]);
 
     /** Confirm before discarding all review work. */
     const handleReset = useCallback(() => {

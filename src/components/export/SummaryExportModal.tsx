@@ -76,11 +76,11 @@ export default function SummaryExportModal({
         onSubmit(request);
     };
 
-    if (!isOpen) return null;
-
     return (
         <AnimatePresence>
+            {isOpen && (
             <motion.div
+                key="summary-export-modal"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -284,6 +284,7 @@ export default function SummaryExportModal({
                     </button>
                 </motion.div>
             </motion.div>
+            )}
         </AnimatePresence>
     );
 }

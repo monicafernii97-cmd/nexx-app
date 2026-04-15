@@ -69,21 +69,26 @@ export const saveOverrides = mutation({
         const userId = user._id;
         const now = Date.now();
 
-        // Check for existing record
-        const existing = await ctx.db
+        // Collect ALL matching records to guard against race-created duplicates
+        const allMatching = await ctx.db
             .query('exportOverrides')
             .withIndex('by_userId_case_path', (q) =>
                 q.eq('userId', userId).eq('caseId', caseId).eq('exportPath', exportPath),
             )
-            .first();
+            .collect();
 
-        if (existing) {
-            await ctx.db.patch(existing._id, {
+        if (allMatching.length > 0) {
+            // Keep the first record, delete any race-created duplicates
+            const [primary, ...duplicates] = allMatching;
+            for (const dup of duplicates) {
+                await ctx.db.delete(dup._id);
+            }
+            await ctx.db.patch(primary._id, {
                 sectionOverrides,
                 itemOverrides,
                 updatedAt: now,
             });
-            return existing._id;
+            return primary._id;
         }
 
         return await ctx.db.insert('exportOverrides', {
@@ -168,24 +173,33 @@ export const saveSession = mutation({
         const userId = user._id;
         const now = Date.now();
 
-        // Find existing session for this case
-        const existing = await ctx.db
+        // Collect ALL matching sessions to guard against race-created duplicates
+        const allSessions = await ctx.db
             .query('exportSessions')
             .withIndex('by_userId_case', (q) =>
                 q.eq('userId', userId).eq('caseId', args.caseId),
             )
             .order('desc')
-            .first();
+            .collect();
 
-        if (existing && existing.phase !== 'completed') {
-            await ctx.db.patch(existing._id, {
+        // Find first non-completed session to update
+        const active = allSessions.find(s => s.phase !== 'completed');
+
+        if (active) {
+            // Delete any other non-completed sessions (race duplicates)
+            for (const s of allSessions) {
+                if (s._id !== active._id && s.phase !== 'completed') {
+                    await ctx.db.delete(s._id);
+                }
+            }
+            await ctx.db.patch(active._id, {
                 phase: args.phase,
                 exportRequestJson: args.exportRequestJson,
                 assemblyResultJson: args.assemblyResultJson,
                 draftOutputJson: args.draftOutputJson,
                 updatedAt: now,
             });
-            return existing._id;
+            return active._id;
         }
 
         return await ctx.db.insert('exportSessions', {
@@ -207,7 +221,11 @@ export const clearSession = mutation({
         sessionId: v.id('exportSessions'),
     },
     handler: async (ctx, { sessionId }) => {
-        await getAuthenticatedUser(ctx);
+        const user = await getAuthenticatedUser(ctx);
+        const session = await ctx.db.get(sessionId);
+        if (!session || session.userId !== user._id) {
+            throw new Error('Not authorized to delete this session');
+        }
         await ctx.db.delete(sessionId);
     },
 });

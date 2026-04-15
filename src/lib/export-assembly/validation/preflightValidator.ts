@@ -116,22 +116,25 @@ export function preflightCourt(
         });
     }
 
-    // Party names
+    // Party names — determine filing vs opposing based on petitionerRole
+    const filingPartyRole = courtSettings.petitionerRole ?? 'petitioner';
     const hasPetitioner = Boolean(courtSettings.petitionerLegalName?.trim());
+    const hasRespondent = Boolean(courtSettings.respondentLegalName?.trim());
+    const hasFilingParty = filingPartyRole === 'petitioner' ? hasPetitioner : hasRespondent;
     checks.push({
-        id: 'party_petitioner',
+        id: 'party_filing',
         label: 'Filing Party Name',
-        severity: hasPetitioner ? 'pass' : 'error',
-        detail: hasPetitioner ? undefined : 'Filing party legal name is required for court documents.',
+        severity: hasFilingParty ? 'pass' : 'error',
+        detail: hasFilingParty ? undefined : 'Filing party legal name is required for court documents.',
         category: 'required_content',
     });
 
-    const hasRespondent = Boolean(courtSettings.respondentLegalName?.trim());
+    const hasOpposingParty = filingPartyRole === 'petitioner' ? hasRespondent : hasPetitioner;
     checks.push({
-        id: 'party_respondent',
+        id: 'party_opposing',
         label: 'Opposing Party Name',
-        severity: hasRespondent ? 'pass' : 'warning',
-        detail: hasRespondent ? undefined : 'Opposing party name not set. Document may be incomplete.',
+        severity: hasOpposingParty ? 'pass' : 'warning',
+        detail: hasOpposingParty ? undefined : 'Opposing party name not set. Document may be incomplete.',
         category: 'required_content',
     });
 
@@ -243,7 +246,7 @@ export function preflightCourt(
  * Run preflight checks for a case summary export.
  */
 export function preflightSummary(
-    _config: SummaryConfig,
+    config: SummaryConfig,
     mappedSections: SummaryMappedSections,
     reviewItems: MappingReviewItem[],
 ): PreflightResult {
@@ -259,14 +262,17 @@ export function preflightSummary(
         category: 'required_content',
     });
 
-    const hasTimeline = mappedSections.timelineSummary.length > 0;
-    checks.push({
-        id: 'timeline',
-        label: 'Timeline Events',
-        severity: hasTimeline ? 'pass' : 'warning',
-        detail: hasTimeline ? undefined : 'No timeline events mapped.',
-        category: 'required_content',
-    });
+    // Only check timeline if config includes it
+    if (config.includeTimeline !== false) {
+        const hasTimeline = mappedSections.timelineSummary.length > 0;
+        checks.push({
+            id: 'timeline',
+            label: 'Timeline Events',
+            severity: hasTimeline ? 'pass' : 'warning',
+            detail: hasTimeline ? undefined : 'No timeline events mapped.',
+            category: 'required_content',
+        });
+    }
 
     // Quality checks
     const lowConfidence = reviewItems.filter(

@@ -82,11 +82,11 @@ export default function ExhibitExportModal({
         onSubmit(request);
     };
 
-    if (!isOpen) return null;
-
     return (
         <AnimatePresence>
+            {isOpen && (
             <motion.div
+                key="exhibit-export-modal"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -237,12 +237,21 @@ export default function ExhibitExportModal({
                             ]).map(toggle => (
                                 <label
                                     key={toggle.key}
+                                    htmlFor={`exhibit-toggle-${toggle.key}`}
                                     className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 cursor-pointer hover:bg-white/8 transition-colors"
                                 >
                                     <span className="text-[13px] font-semibold text-white/80">{toggle.label}</span>
+                                    <input
+                                        type="checkbox"
+                                        id={`exhibit-toggle-${toggle.key}`}
+                                        checked={form[toggle.key]}
+                                        onChange={() => setForm(prev => ({ ...prev, [toggle.key]: !prev[toggle.key] }))}
+                                        className="sr-only"
+                                    />
                                     <div
+                                        role="switch"
+                                        aria-checked={form[toggle.key]}
                                         className={`w-10 h-6 rounded-full relative transition-colors ${form[toggle.key] ? 'bg-violet-500' : 'bg-white/20'}`}
-                                        onClick={() => setForm(prev => ({ ...prev, [toggle.key]: !prev[toggle.key] }))}
                                     >
                                         <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform ${form[toggle.key] ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
                                     </div>
@@ -308,6 +317,7 @@ export default function ExhibitExportModal({
                     </button>
                 </motion.div>
             </motion.div>
+            )}
         </AnimatePresence>
     );
 }

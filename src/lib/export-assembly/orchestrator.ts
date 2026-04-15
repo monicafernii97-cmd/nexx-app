@@ -156,7 +156,17 @@ export function runAssembly(
         detail: 'Classifying content and detecting signals',
     });
 
-    const assembly = assembleExportInput(allNodes, allEvents, request);
+    let assembly: AssemblyResult;
+    try {
+        assembly = assembleExportInput(allNodes, allEvents, request);
+    } catch (error) {
+        onStatus?.({
+            phase: 'error',
+            progress: 15,
+            detail: `Assembly failed: ${error instanceof Error ? error.message : String(error)}`,
+        });
+        throw error;
+    }
 
     onStatus?.({
         phase: 'mapping',

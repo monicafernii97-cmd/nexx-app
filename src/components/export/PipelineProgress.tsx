@@ -3,8 +3,8 @@
 /**
  * Pipeline Progress — Visual step-by-step assembly progress view.
  *
- * Replaces the generic spinner with an 8-step pipeline trace:
- * Collecting → Classifying → Mapping → Review → Overrides → Drafting → Compliance → Rendering
+ * Replaces the generic spinner with a 9-step pipeline trace:
+ * Collecting → Classifying → Mapping → Review → Overrides → Drafting → Compliance → Rendering → Saving
  *
  * Shows current step, completed steps, and live progress detail.
  */
@@ -19,9 +19,11 @@ import {
     PencilSimple,
     ShieldCheck,
     FilePdf,
+    CloudArrowUp,
     CheckCircle,
     CircleNotch,
     Circle,
+    WarningOctagon,
 } from '@phosphor-icons/react';
 import type { PipelinePhase } from '@/lib/export-assembly/orchestrator';
 
@@ -36,6 +38,8 @@ interface PipelineProgressProps {
     progress: number;
     /** Detailed status message */
     detail: string;
+    /** Phase where error occurred (for error state display) */
+    errorPhase?: PipelinePhase;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,6 +63,7 @@ const PIPELINE_STEPS: PipelineStep[] = [
     { phase: 'drafting', label: 'Drafting Document', description: 'AI generating prose from your approved mapping', icon: PencilSimple, color: '#A78BFA' },
     { phase: 'compliance', label: 'Checking Compliance', description: 'Validating against court formatting rules', icon: ShieldCheck, color: '#34D399' },
     { phase: 'rendering', label: 'Rendering PDF', description: 'Generating court-ready PDF', icon: FilePdf, color: '#F59E0B' },
+    { phase: 'saving', label: 'Saving Document', description: 'Uploading and finalizing document', icon: CloudArrowUp, color: '#60A5FA' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -70,11 +75,28 @@ function getStepIndex(phase: PipelinePhase): number {
     return idx >= 0 ? idx : -1;
 }
 
-function getStepStatus(step: PipelineStep, currentPhase: PipelinePhase): 'completed' | 'active' | 'pending' {
-    const currentIdx = getStepIndex(currentPhase);
+function getStepStatus(
+    step: PipelineStep,
+    currentPhase: PipelinePhase,
+    errorPhase?: PipelinePhase,
+): 'completed' | 'active' | 'pending' | 'error' {
     const stepIdx = getStepIndex(step.phase);
 
-    if (currentPhase === 'completed' || currentPhase === 'saving') return 'completed';
+    // When in error state, show which step failed
+    if (currentPhase === 'error') {
+        const failedIdx = errorPhase ? getStepIndex(errorPhase) : -1;
+        if (failedIdx >= 0) {
+            if (stepIdx < failedIdx) return 'completed';
+            if (stepIdx === failedIdx) return 'error';
+            return 'pending';
+        }
+        // No errorPhase provided — mark everything as completed up to where we got
+        return 'pending';
+    }
+
+    if (currentPhase === 'completed') return 'completed';
+
+    const currentIdx = getStepIndex(currentPhase);
     if (stepIdx < currentIdx) return 'completed';
     if (stepIdx === currentIdx) return 'active';
     return 'pending';
@@ -84,7 +106,7 @@ function getStepStatus(step: PipelineStep, currentPhase: PipelinePhase): 'comple
 // Component
 // ---------------------------------------------------------------------------
 
-export default function PipelineProgress({ currentPhase, progress, detail }: PipelineProgressProps) {
+export default function PipelineProgress({ currentPhase, progress, detail, errorPhase }: PipelineProgressProps) {
     const isError = currentPhase === 'error';
     const isComplete = currentPhase === 'completed';
 
@@ -111,7 +133,7 @@ export default function PipelineProgress({ currentPhase, progress, detail }: Pip
             {/* Step List */}
             <div className="space-y-1">
                 {PIPELINE_STEPS.map((step, i) => {
-                    const status = getStepStatus(step, currentPhase);
+                    const status = getStepStatus(step, currentPhase, errorPhase);
                     const Icon = step.icon;
 
                     return (
@@ -121,16 +143,24 @@ export default function PipelineProgress({ currentPhase, progress, detail }: Pip
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: i * 0.05 }}
                             className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-                                status === 'active'
-                                    ? 'bg-white/10 border border-white/20'
-                                    : status === 'completed'
-                                        ? 'bg-white/5 border border-transparent'
-                                        : 'opacity-40 border border-transparent'
+                                status === 'error'
+                                    ? 'bg-rose-500/10 border border-rose-500/30'
+                                    : status === 'active'
+                                        ? 'bg-white/10 border border-white/20'
+                                        : status === 'completed'
+                                            ? 'bg-white/5 border border-transparent'
+                                            : 'opacity-40 border border-transparent'
                             }`}
                         >
                             {/* Status Icon */}
                             <div className="shrink-0">
-                                {status === 'completed' ? (
+                                {status === 'error' ? (
+                                    <WarningOctagon
+                                        size={22}
+                                        weight="fill"
+                                        className="text-rose-400"
+                                    />
+                                ) : status === 'completed' ? (
                                     <CheckCircle
                                         size={22}
                                         weight="fill"

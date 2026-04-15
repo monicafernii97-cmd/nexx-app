@@ -23,6 +23,7 @@ import {
     useContext,
     useMemo,
     useReducer,
+    useState,
     useEffect,
     useRef,
     type ReactNode,
@@ -170,9 +171,13 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
         case 'UPDATE_ITEM_OVERRIDE': {
             const existing = state.overrides.itemOverrides;
             const idx = existing.findIndex(i => i.nodeId === action.override.nodeId);
+            // Merge with existing override to preserve fields from prior edits
+            const merged = idx >= 0
+                ? { ...existing[idx], ...action.override }
+                : action.override;
             const updated = idx >= 0
-                ? existing.map((item, i) => i === idx ? action.override : item)
-                : [...existing, action.override];
+                ? existing.map((item, i) => i === idx ? merged : item)
+                : [...existing, merged];
             return {
                 ...state,
                 overrides: { ...state.overrides, itemOverrides: updated },
@@ -223,6 +228,10 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
 interface ExportContextValue {
     state: ExportState;
     dispatch: React.Dispatch<ExportAction>;
+    /** True when overrides/reviewItems have changed since last save */
+    isDirty: boolean;
+    /** Call after persisting to Convex to reset dirty flag */
+    markSaved: () => void;
 
     // Convenience actions
     startConfigure: (path: ExportPath, caseId?: Id<'cases'>) => void;
@@ -251,26 +260,28 @@ const AUTO_SAVE_INTERVAL_MS = 30_000;
 
 export function ExportProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(exportReducer, initialState);
+    const [isDirty, setIsDirty] = useState(false);
     const lastSavedRef = useRef<string>('');
 
-    // ── Auto-save during review phase ──
+    /** Call after persisting to Convex to reset dirty flag */
+    const markSaved = useCallback(() => {
+        setIsDirty(false);
+    }, []);
+
+    // ── Auto-save dirty detection during review phase ──
     useEffect(() => {
         if (state.phase !== 'reviewing') return;
 
         const interval = setInterval(() => {
-            // Serialize current state for comparison
+            // Compare full overrides + reviewItems content (not just length)
             const snapshot = JSON.stringify({
                 overrides: state.overrides,
-                reviewItems: state.reviewItems.length,
+                reviewItems: state.reviewItems,
             });
 
-            // Only save if state changed since last save
             if (snapshot !== lastSavedRef.current) {
                 lastSavedRef.current = snapshot;
-                // Convex save will be triggered by the consuming component
-                // via useMutation(api.exportOverrides.saveSession)
-                // This context just tracks the dirty state
-                console.debug('[ExportContext] Auto-save triggered (state changed)');
+                setIsDirty(true);
             }
         }, AUTO_SAVE_INTERVAL_MS);
 
@@ -345,6 +356,8 @@ export function ExportProvider({ children }: { children: ReactNode }) {
     const value = useMemo<ExportContextValue>(() => ({
         state,
         dispatch,
+        isDirty,
+        markSaved,
         startConfigure,
         setRequest,
         startAssembly,
@@ -360,6 +373,8 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         reset,
     }), [
         state,
+        isDirty,
+        markSaved,
         startConfigure,
         setRequest,
         startAssembly,

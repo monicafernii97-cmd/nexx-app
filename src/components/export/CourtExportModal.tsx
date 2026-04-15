@@ -101,11 +101,11 @@ export default function CourtExportModal({
     const hasJurisdiction = Boolean(courtSettings?.state && courtSettings?.county);
     const hasParties = Boolean(courtSettings?.petitionerLegalName);
 
-    if (!isOpen) return null;
-
     return (
         <AnimatePresence>
+            {isOpen && (
             <motion.div
+                key="court-export-modal"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -305,6 +305,7 @@ export default function CourtExportModal({
                     </button>
                 </motion.div>
             </motion.div>
+            )}
         </AnimatePresence>
     );
 }

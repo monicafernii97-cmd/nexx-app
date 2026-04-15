@@ -170,7 +170,7 @@ export default function PipelineProgress({ currentPhase, progress, detail, error
                                     <CircleNotch
                                         size={22}
                                         weight="bold"
-                                        className="animate-spin"
+                                        className="animate-spin motion-reduce:animate-none"
                                         style={{ color: step.color }}
                                     />
                                 ) : (

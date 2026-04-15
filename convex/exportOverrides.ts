@@ -69,7 +69,7 @@ export const saveOverrides = mutation({
         const userId = user._id;
         const now = Date.now();
 
-        // Collect ALL matching records to guard against race-created duplicates
+        // Query for existing records
         const allMatching = await ctx.db
             .query('exportOverrides')
             .withIndex('by_userId_case_path', (q) =>
@@ -78,7 +78,7 @@ export const saveOverrides = mutation({
             .collect();
 
         if (allMatching.length > 0) {
-            // Keep the first record, delete any race-created duplicates
+            // Update the first record, delete any duplicates
             const [primary, ...duplicates] = allMatching;
             for (const dup of duplicates) {
                 await ctx.db.delete(dup._id);
@@ -91,7 +91,13 @@ export const saveOverrides = mutation({
             return primary._id;
         }
 
-        return await ctx.db.insert('exportOverrides', {
+        // No existing record — insert then immediately verify.
+        // Convex mutations are serializable (OCC with automatic retry on
+        // conflict), so a true concurrent-insert race cannot occur. The
+        // post-insert verification is defense-in-depth: if a duplicate is
+        // somehow present, it is cleaned up within this same transaction
+        // so getOverrides never observes nondeterministic rows.
+        const newId = await ctx.db.insert('exportOverrides', {
             userId,
             caseId,
             exportPath,
@@ -100,6 +106,31 @@ export const saveOverrides = mutation({
             createdAt: now,
             updatedAt: now,
         });
+
+        // Post-insert dedup verification
+        const postInsert = await ctx.db
+            .query('exportOverrides')
+            .withIndex('by_userId_case_path', (q) =>
+                q.eq('userId', userId).eq('caseId', caseId).eq('exportPath', exportPath),
+            )
+            .collect();
+
+        if (postInsert.length > 1) {
+            // Keep earliest record, remove duplicates
+            const sorted = postInsert.sort((a, b) => a._creationTime - b._creationTime);
+            const [primary, ...duplicates] = sorted;
+            for (const dup of duplicates) {
+                await ctx.db.delete(dup._id);
+            }
+            await ctx.db.patch(primary._id, {
+                sectionOverrides,
+                itemOverrides,
+                updatedAt: now,
+            });
+            return primary._id;
+        }
+
+        return newId;
     },
 });
 
@@ -174,7 +205,7 @@ export const saveSession = mutation({
         const userId = user._id;
         const now = Date.now();
 
-        // Collect ALL matching sessions to guard against race-created duplicates
+        // Query all sessions for this user+case
         const allSessions = await ctx.db
             .query('exportSessions')
             .withIndex('by_userId_case', (q) =>
@@ -187,7 +218,7 @@ export const saveSession = mutation({
         const active = allSessions.find(s => s.phase !== 'completed');
 
         if (active) {
-            // Delete any other non-completed sessions (race duplicates)
+            // Delete any other non-completed sessions (duplicates)
             for (const s of allSessions) {
                 if (s._id !== active._id && s.phase !== 'completed') {
                     await ctx.db.delete(s._id);
@@ -203,7 +234,11 @@ export const saveSession = mutation({
             return active._id;
         }
 
-        return await ctx.db.insert('exportSessions', {
+        // No active session — insert then verify.
+        // Convex mutations are serializable (OCC with automatic retry on
+        // conflict), preventing true concurrent-insert races. The post-insert
+        // verification is defense-in-depth so getSession never sees duplicates.
+        const newId = await ctx.db.insert('exportSessions', {
             userId,
             caseId: args.caseId,
             phase: args.phase,
@@ -213,6 +248,35 @@ export const saveSession = mutation({
             createdAt: now,
             updatedAt: now,
         });
+
+        // Post-insert dedup verification
+        const postInsert = await ctx.db
+            .query('exportSessions')
+            .withIndex('by_userId_case', (q) =>
+                q.eq('userId', userId).eq('caseId', args.caseId),
+            )
+            .order('desc')
+            .collect();
+
+        const activePostInsert = postInsert.filter(s => s.phase !== 'completed');
+        if (activePostInsert.length > 1) {
+            // Keep earliest active session, remove duplicates
+            const sorted = activePostInsert.sort((a, b) => a._creationTime - b._creationTime);
+            const [primary, ...duplicates] = sorted;
+            for (const dup of duplicates) {
+                await ctx.db.delete(dup._id);
+            }
+            await ctx.db.patch(primary._id, {
+                phase: args.phase,
+                exportRequestJson: args.exportRequestJson,
+                assemblyResultJson: args.assemblyResultJson,
+                draftOutputJson: args.draftOutputJson,
+                updatedAt: now,
+            });
+            return primary._id;
+        }
+
+        return newId;
     },
 });
 

@@ -299,7 +299,7 @@ export default function MappingCanvas({
                     onLockSection={onLockSection}
                     onExcludeItem={onExcludeItem}
                     onEditItem={onEditItem}
-                    onMoveItem={onMoveItem}
+                    onMoveItem={_onMoveItem}
                 />
             ))}
 

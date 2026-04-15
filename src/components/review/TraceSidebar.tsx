@@ -124,7 +124,14 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude, onT
                         <div className="flex items-center gap-1">
                             <button
                                 type="button"
-                                onClick={() => setIsEditing(!isEditing)}
+                                onClick={() => {
+                                    if (isEditing) {
+                                        // Closing edit without Save — reset text + clear pending draft
+                                        setEditText(item.userOverride?.editedText ?? item.originalText);
+                                        onTextChange?.(null);
+                                    }
+                                    setIsEditing(prev => !prev);
+                                }}
                                 className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors"
                                 aria-label="Edit source text"
                             >

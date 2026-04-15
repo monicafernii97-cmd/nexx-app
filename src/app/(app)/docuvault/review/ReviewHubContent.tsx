@@ -65,10 +65,30 @@ export default function ReviewHubContent() {
     // Track sidebar edit state to auto-save on selection change
     const pendingEditRef = useRef<{ nodeId: string; text: string } | null>(null);
 
+    // Merge item overrides into review items so grouping/stats reflect edits
+    const effectiveItems = useMemo(() => {
+        const overridesByNodeId = new Map(
+            state.overrides.itemOverrides.map(ov => [ov.nodeId, ov]),
+        );
+        return state.reviewItems.map(item => {
+            const ov = overridesByNodeId.get(item.nodeId);
+            if (!ov) return item;
+            return {
+                ...item,
+                userOverride: {
+                    ...item.userOverride,
+                    editedText: ov.editedText ?? item.userOverride?.editedText,
+                    exclude: ov.excluded ?? item.userOverride?.exclude,
+                    forceSection: ov.forcedSection ?? item.userOverride?.forceSection,
+                },
+            };
+        });
+    }, [state.reviewItems, state.overrides.itemOverrides]);
+
     // Group review items by their suggested section (first suggestion)
     const sectionGroups = useMemo(() => {
         const groups = new Map<string, MappingReviewItem[]>();
-        for (const item of state.reviewItems) {
+        for (const item of effectiveItems) {
             const section = item.userOverride?.forceSection
                 ?? item.suggestedSections[0]
                 ?? 'Unclassified';
@@ -77,13 +97,13 @@ export default function ReviewHubContent() {
             groups.set(section, list);
         }
         return groups;
-    }, [state.reviewItems]);
+    }, [effectiveItems]);
 
     // Compute stats (memoized to avoid redundant filtering)
     const { totalItems, includedItems, lowConfidenceCount, lockedSections, sectionCount } = useMemo(() => {
-        const total = state.reviewItems.length;
-        const included = state.reviewItems.filter(i => i.includedInExport && !i.userOverride?.exclude).length;
-        const lowConf = state.reviewItems.filter(i => i.confidence < 0.5 && i.includedInExport && !i.userOverride?.exclude).length;
+        const total = effectiveItems.length;
+        const included = effectiveItems.filter(i => i.includedInExport && !i.userOverride?.exclude).length;
+        const lowConf = effectiveItems.filter(i => i.confidence < 0.5 && i.includedInExport && !i.userOverride?.exclude).length;
         const locked = state.overrides.sectionOverrides.filter(s => s.isLocked).length;
         return {
             totalItems: total,
@@ -92,17 +112,22 @@ export default function ReviewHubContent() {
             lockedSections: locked,
             sectionCount: sectionGroups.size,
         };
-    }, [state.reviewItems, state.overrides.sectionOverrides, sectionGroups.size]);
+    }, [effectiveItems, state.overrides.sectionOverrides, sectionGroups.size]);
 
     // Find selected item
     const selectedItem = useMemo(
-        () => state.reviewItems.find(i => i.nodeId === selectedItemId) ?? null,
-        [state.reviewItems, selectedItemId],
+        () => effectiveItems.find(i => i.nodeId === selectedItemId) ?? null,
+        [effectiveItems, selectedItemId],
     );
 
+    /** Flush any pending sidebar edit + start GPT drafting. */
     const handleApproveAndDraft = useCallback(() => {
+        if (pendingEditRef.current) {
+            editItem(pendingEditRef.current.nodeId, pendingEditRef.current.text);
+            pendingEditRef.current = null;
+        }
         startDrafting();
-    }, [startDrafting]);
+    }, [editItem, startDrafting]);
 
     /** Auto-save any pending sidebar edit before switching selection. */
     const handleSelectItem = useCallback((nodeId: string | null) => {

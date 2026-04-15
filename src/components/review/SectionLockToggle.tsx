@@ -15,6 +15,7 @@ interface SectionLockToggleProps {
     onToggle: (sectionId: string, locked: boolean) => void;
 }
 
+/** Toggle button for locking/unlocking a section from GPT regeneration. */
 export default function SectionLockToggle({ sectionId, isLocked, onToggle }: SectionLockToggleProps) {
     return (
         <button

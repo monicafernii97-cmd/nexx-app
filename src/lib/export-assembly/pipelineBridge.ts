@@ -91,7 +91,7 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
         if (lockedSectionIds.has(sectionId)) {
             // Locked — collect items for this section and preserve verbatim
             const sectionItems = reviewItems.filter(item => {
-                if (excludedNodeIds.has(item.nodeId)) return false;
+                if (excludedNodeIds.has(item.nodeId) || !item.includedInExport) return false;
                 const assignedSection = item.userOverride?.forceSection
                     ?? item.suggestedSections[0]
                     ?? 'Unclassified';
@@ -153,6 +153,15 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
                 courtRules: Object.keys(courtRules).length > 0 ? courtRules : undefined,
             });
 
+            // Guard: treat empty or partial AI output as failure
+            const draftedIds = new Set(drafted.map(s => s.sectionId));
+            if (
+                drafted.length === 0 ||
+                sectionsToGenerate.some(id => !draftedIds.has(id))
+            ) {
+                throw new Error('AI drafter returned an empty or incomplete section set');
+            }
+
             aiDraftedSections = drafted.map(d => ({
                 sectionId: d.sectionId,
                 heading: d.heading,
@@ -165,7 +174,7 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
             // Fallback: use raw review item text for failed sections
             aiDraftedSections = sectionsToGenerate.map(sectionId => {
                 const sectionItems = reviewItems.filter(item => {
-                    if (excludedNodeIds.has(item.nodeId)) return false;
+                    if (excludedNodeIds.has(item.nodeId) || !item.includedInExport) return false;
                     const assignedSection = item.userOverride?.forceSection
                         ?? item.suggestedSections[0]
                         ?? 'Unclassified';

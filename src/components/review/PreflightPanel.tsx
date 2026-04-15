@@ -30,6 +30,12 @@ interface PreflightPanelProps {
 // Component
 // ---------------------------------------------------------------------------
 
+/**
+ * PreflightPanel — Filing readiness checks with SVG score ring.
+ *
+ * Shows categorized pass/warning/error checks with severity indicators
+ * and an overall numeric readiness score.
+ */
 export default function PreflightPanel({ result, onClose }: PreflightPanelProps) {
     const { checks, canProceed, errorCount, warningCount, readinessScore } = result;
 

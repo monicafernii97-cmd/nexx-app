@@ -42,6 +42,7 @@ interface TraceSidebarProps {
 // Score bar component
 // ---------------------------------------------------------------------------
 
+/** Animated horizontal bar showing a classification score (0-1) with label. */
 function ScoreBar({ label, score, color, isTop }: { label: string; score: number; color: string; isTop: boolean }) {
     const pct = Math.round(score * 100);
     return (
@@ -69,6 +70,12 @@ function ScoreBar({ label, score, color, isTop }: { label: string; score: number
 // Component
 // ---------------------------------------------------------------------------
 
+/**
+ * TraceSidebar — Source traceability panel for a selected review item.
+ *
+ * Shows original text, "Why this section?" explanation, classification
+ * scores, confidence analysis, and court-safe preview with inline editing.
+ */
 export default function TraceSidebar({ item, onClose, onEditText, onExclude }: TraceSidebarProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(item.userOverride?.editedText ?? item.originalText);
@@ -139,6 +146,7 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude }: T
                             />
                             <div className="flex items-center gap-2">
                                 <button
+                                    type="button"
                                     onClick={() => {
                                         onEditText(editText);
                                         setIsEditing(false);
@@ -148,6 +156,7 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude }: T
                                     Save
                                 </button>
                                 <button
+                                    type="button"
                                     onClick={() => {
                                         setEditText(item.userOverride?.editedText ?? item.originalText);
                                         setIsEditing(false);

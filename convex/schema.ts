@@ -327,6 +327,12 @@ export default defineSchema({
             v.literal('unchecked')
         )),
         complianceCheckedAt: v.optional(v.number()),
+        /** Pipeline draft output (JSON blob) */
+        draftOutputJson: v.optional(v.string()),
+        /** Snapshot of the assembly result at generation time (JSON blob) */
+        assemblySnapshotJson: v.optional(v.string()),
+        /** Snapshot of the export request config at generation time (JSON blob) */
+        exportConfigJson: v.optional(v.string()),
         createdAt: v.number(),
         updatedAt: v.number(),
     })

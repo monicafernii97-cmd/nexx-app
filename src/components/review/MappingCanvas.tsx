@@ -73,6 +73,7 @@ function SectionTile({
     onLockSection,
     onExcludeItem,
     onEditItem,
+    // Reserved for future drag-to-reorder functionality (Sprint 9B)
     onMoveItem: _onMoveItem,
 }: {
     sectionId: string;
@@ -203,16 +204,20 @@ function SectionTile({
                                             {/* Action Buttons */}
                                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                                                 <button
+                                                    type="button"
                                                     onClick={() => setEditingItemId(isEditing ? null : item.nodeId)}
                                                     className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors"
                                                     title="Edit text"
+                                                    aria-label="Edit text"
                                                 >
                                                     <PencilSimple size={13} weight="bold" />
                                                 </button>
                                                 <button
+                                                    type="button"
                                                     onClick={() => onExcludeItem(item.nodeId, !isExcluded)}
                                                     className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors"
                                                     title={isExcluded ? 'Include' : 'Exclude'}
+                                                    aria-label={isExcluded ? 'Include in export' : 'Exclude from export'}
                                                 >
                                                     {isExcluded ? <Eye size={13} weight="bold" /> : <EyeSlash size={13} weight="bold" />}
                                                 </button>
@@ -289,6 +294,13 @@ function getTypeBadgeClass(type: string): string {
 // Main Component
 // ---------------------------------------------------------------------------
 
+/**
+ * MappingCanvas — Renders section tiles with review items for the Review Hub.
+ *
+ * Each section tile is collapsible and shows the items mapped to that section
+ * with confidence scores, type badges, and inline editing. Accepts override
+ * callbacks for locking, excluding, editing, and moving items.
+ */
 export default function MappingCanvas({
     sectionGroups,
     overrides,

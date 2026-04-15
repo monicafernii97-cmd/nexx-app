@@ -15,6 +15,9 @@ import type { PipelineStatus } from '@/lib/export-assembly/orchestrator';
 // Fixtures
 // ---------------------------------------------------------------------------
 
+/** Fixed timestamp for deterministic test fixtures. */
+const FIXED_TS = Date.UTC(2025, 0, 15, 12, 0, 0);
+
 /** Minimal workspace nodes covering multiple content types. */
 const FIXTURE_NODES: WorkspaceNode[] = [
     {
@@ -22,32 +25,32 @@ const FIXTURE_NODES: WorkspaceNode[] = [
         type: 'key_fact',
         title: 'Custody Facts',
         text: 'On January 15, 2025, the respondent failed to pick up the children from school at the agreed time of 3:30 PM.',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: FIXED_TS,
+        updatedAt: FIXED_TS,
     },
     {
         id: 'node-emotion-1',
         type: 'case_note',
         title: 'Personal Feelings',
         text: 'I am devastated and terrified that my children are not safe. I feel completely helpless and angry about the situation.',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: FIXED_TS,
+        updatedAt: FIXED_TS,
     },
     {
         id: 'node-evidence-1',
         type: 'evidence_item',
         title: 'Text Messages',
         text: 'See attached text messages from January 15-17, 2025 documenting the respondent\'s failure to communicate regarding the children\'s schedule.',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: FIXED_TS,
+        updatedAt: FIXED_TS,
     },
     {
         id: 'node-request-1',
         type: 'strategy_point',
         title: 'Relief Sought',
         text: 'The Court should grant petitioner sole managing conservatorship and order respondent to pay child support.',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: FIXED_TS,
+        updatedAt: FIXED_TS,
     },
 ];
 
@@ -106,8 +109,12 @@ describe('Export Assembly Pipeline', () => {
             expect(typeof item.includedInExport).toBe('boolean');
         }
 
-        // Pipeline should have emitted progress events
-        expect(phases.length).toBeGreaterThanOrEqual(1);
+        // Pipeline should emit expected status phases and finish ready for review
+        const emittedPhases = phases.map(p => p.phase);
+        expect(emittedPhases).toEqual(
+            expect.arrayContaining(['collecting', 'classifying', 'mapping', 'ready_for_review']),
+        );
+        expect(emittedPhases.at(-1)).toBe('ready_for_review');
     });
 
     it('classifies emotional content correctly', () => {
@@ -120,8 +127,8 @@ describe('Export Assembly Pipeline', () => {
         // The emotion-heavy node should be classified
         const emotionItem = result.reviewItems.find(i => i.nodeId === 'node-emotion-1');
         expect(emotionItem).toBeDefined();
-        // It should be classified as emotion or have emotion-adjacent type
-        expect(['emotion', 'opinion', 'fact']).toContain(emotionItem!.dominantType);
+        // It should be classified as emotion or have emotion-adjacent type (not fact)
+        expect(['emotion', 'opinion']).toContain(emotionItem!.dominantType);
     });
 
     it('includes evidence reference nodes', () => {

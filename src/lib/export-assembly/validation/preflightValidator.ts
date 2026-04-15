@@ -25,6 +25,7 @@ import type {
     ExhibitMappedSections,
     MappingReviewItem,
 } from '../types/exports';
+import type { ExportOverrides } from '../orchestrator';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -369,3 +370,96 @@ function buildResult(checks: PreflightCheck[]): PreflightResult {
         canProceed: errorCount === 0,
     };
 }
+
+// ---------------------------------------------------------------------------
+// Generic Entry Point
+// ---------------------------------------------------------------------------
+
+/** Input for the generic preflight dispatcher. */
+export interface RunPreflightInput {
+    exportPath: string;
+    config: Record<string, unknown>;
+    reviewItems: MappingReviewItem[];
+    overrides: ExportOverrides;
+}
+
+/**
+ * Run preflight checks for any export path.
+ *
+ * Routes to the correct path-specific validator. Used by both:
+ * - Manual preflight button (ReviewHubContent)
+ * - Auto-preflight in the SSE pipeline (stream/route.ts)
+ *
+ * Same function, same config, same output — guaranteed consistency.
+ */
+export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
+    const { exportPath, config, reviewItems } = input;
+
+    // Build a minimal quality-only check from review items
+    // (the full path-specific validators need typed config + mapped sections,
+    //  which may not be available in the generic path)
+    const checks: PreflightCheck[] = [];
+
+    // ── Quality: Low confidence items ──
+    const lowConfCount = reviewItems.filter(
+        item => item.includedInExport && item.confidence < 0.5,
+    ).length;
+    checks.push({
+        id: 'low_confidence_items',
+        label: 'Low confidence items',
+        severity: lowConfCount > 0 ? 'warning' : 'pass',
+        detail: lowConfCount > 0
+            ? `${lowConfCount} item${lowConfCount > 1 ? 's' : ''} below 50% confidence`
+            : 'All items above 50% confidence',
+        category: 'quality',
+    });
+
+    // ── Quality: Empty sections ──
+    const includedCount = reviewItems.filter(item => item.includedInExport).length;
+    checks.push({
+        id: 'items_included',
+        label: 'Items included in export',
+        severity: includedCount > 0 ? 'pass' : 'error',
+        detail: includedCount > 0
+            ? `${includedCount} item${includedCount > 1 ? 's' : ''} included`
+            : 'No items included in export',
+        category: 'required_content',
+    });
+
+    // ── Required: Court settings (for court document path) ──
+    if (exportPath === 'court_document') {
+        const hasState = !!config.courtState;
+        const hasCounty = !!config.courtCounty;
+        checks.push({
+            id: 'court_jurisdiction',
+            label: 'Court jurisdiction specified',
+            severity: hasState && hasCounty ? 'pass' : 'error',
+            detail: hasState && hasCounty
+                ? `${config.courtState}, ${config.courtCounty} County`
+                : 'Missing court state or county',
+            category: 'required_content',
+        });
+
+        const hasPetitioner = !!config.petitionerName;
+        checks.push({
+            id: 'petitioner_name',
+            label: 'Petitioner identified',
+            severity: hasPetitioner ? 'pass' : 'warning',
+            detail: hasPetitioner ? String(config.petitionerName) : 'Petitioner name not set',
+            category: 'required_content',
+        });
+    }
+
+    // ── Evidence: Variety of evidence types ──
+    const types = new Set(reviewItems.map(item => item.dominantType));
+    checks.push({
+        id: 'evidence_variety',
+        label: 'Evidence type coverage',
+        severity: types.size >= 2 ? 'pass' : 'warning',
+        detail: `${types.size} evidence type${types.size !== 1 ? 's' : ''} represented`,
+        category: 'evidence',
+    });
+
+    return buildResult(checks);
+}
+

@@ -3,16 +3,16 @@
 /**
  * Review Hub Content — The product center of the export pipeline.
  *
- * This client component is shown during the 'reviewing' phase. It renders:
- * - MappingCanvas: Section tiles with review items
- * - TraceSidebar: Source provenance + "why this section?" explanation
- * - PreflightPanel: Filing readiness score
- * - Inline editing, locking, and drag-to-reorder
+ * Multi-phase client component:
+ * - reviewing: Canvas + sidebar + preflight inspection
+ * - drafting:  Step checklist showing pipeline progress
+ * - completed: Success card with Download + View in DocuVault + stats
+ * - error:     Error message with retry
  *
  * The user approves the assembly output here before GPT drafting begins.
  */
 
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowLeft,
@@ -20,8 +20,16 @@ import {
     Export,
     CheckCircle,
     WarningCircle,
+    Download,
+    ArrowSquareOut,
+    ArrowClockwise,
+    SpinnerGap,
+    Circle,
+    XCircle,
 } from '@phosphor-icons/react';
-import { useExport } from '../context/ExportContext';
+import { useExport, type DraftingStage } from '../context/ExportContext';
+import { useDraftingStream, type DraftStreamInput } from '@/hooks/useDraftingStream';
+import { runPreflightChecks } from '@/lib/export-assembly/validation/preflightValidator';
 import MappingCanvas from '@/components/review/MappingCanvas';
 import TraceSidebar from '@/components/review/TraceSidebar';
 import PreflightPanel from '@/components/review/PreflightPanel';
@@ -42,6 +50,28 @@ function getExportLabel(exportPath: string | null | undefined): string {
     }
 }
 
+/** Drafting checklist stages in order. */
+const DRAFTING_STAGES: { key: DraftingStage; label: string }[] = [
+    { key: 'drafting', label: 'Drafting AI sections' },
+    { key: 'preflight', label: 'Running preflight checks' },
+    { key: 'rendering_html', label: 'Rendering document' },
+    { key: 'rendering_pdf', label: 'Generating PDF' },
+    { key: 'saving', label: 'Saving to DocuVault' },
+];
+
+/** Map error codes to user-friendly messages. */
+function getErrorDescription(code: string | null): string {
+    switch (code) {
+        case 'draft_failed': return 'AI drafting failed. The AI model may be unavailable.';
+        case 'preflight_failed': return 'Preflight validation encountered an error.';
+        case 'render_html_failed': return 'Document HTML rendering failed.';
+        case 'render_pdf_failed': return 'PDF generation failed. Chrome may be unavailable.';
+        case 'upload_failed': return 'Failed to upload PDF to storage.';
+        case 'save_failed': return 'Failed to save export record.';
+        default: return 'An unexpected error occurred during export.';
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -50,23 +80,33 @@ function getExportLabel(exportPath: string | null | undefined): string {
 export default function ReviewHubContent() {
     const {
         state,
+        dispatch,
         lockSection,
         editItem,
         moveItem,
         excludeItem,
+        setPreflight,
         startDrafting,
         reset,
     } = useExport();
 
+    const { startStream, abort } = useDraftingStream({ dispatch, state });
+
+    // Local UI state
     const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-    const [textMode, setTextMode] = useState<'original' | 'court_safe'>('original');
-    const [showPreflight, setShowPreflight] = useState(false);
     const [isDrafting, setIsDrafting] = useState(false);
+    const [showPreflight, setShowPreflight] = useState(false);
+    const [textMode, setTextMode] = useState<'original' | 'court_safe'>('original');
 
     // Track sidebar edit state to auto-save on selection change
     const pendingEditRef = useRef<{ nodeId: string; text: string } | null>(null);
     // Synchronous guard — prevents double-submission before React re-renders
     const draftingGuardRef = useRef(false);
+
+    // Cleanup: abort stream on unmount
+    useEffect(() => {
+        return () => { abort(); };
+    }, [abort]);
 
     // Merge item overrides into review items so grouping/stats reflect edits
     const effectiveItems = useMemo(() => {
@@ -127,6 +167,22 @@ export default function ReviewHubContent() {
         [effectiveItems, selectedItemId],
     );
 
+    /** Run manual preflight checks. */
+    const handleRunPreflight = useCallback(() => {
+        try {
+            const result = runPreflightChecks({
+                exportPath: state.exportPath ?? 'court_document',
+                config: (state.exportRequest?.config ?? {}) as Record<string, unknown>,
+                reviewItems: effectiveItems,
+                overrides: state.overrides,
+            });
+            setPreflight(result);
+            setShowPreflight(true);
+        } catch (err) {
+            console.error('[ReviewHub] Preflight failed:', err);
+        }
+    }, [state.exportPath, state.exportRequest, effectiveItems, state.overrides, setPreflight]);
+
     /** Flush any pending sidebar edit + start GPT drafting (synchronous guard). */
     const handleApproveAndDraft = useCallback(() => {
         if (draftingGuardRef.current) return;
@@ -138,23 +194,43 @@ export default function ReviewHubContent() {
         try {
             setIsDrafting(true);
             startDrafting();
+
+            // Build stream input and fire
+            const input: DraftStreamInput = {
+                assemblyResult: state.assemblyResult!,
+                overrides: state.overrides,
+                exportRequest: state.exportRequest!,
+                reviewItems: effectiveItems,
+                caseId: state.caseId as string,
+            };
+            startStream(input);
         } catch (err) {
             draftingGuardRef.current = false;
             setIsDrafting(false);
             throw err;
         }
-    }, [editItem, startDrafting]);
+    }, [editItem, startDrafting, startStream, state, effectiveItems]);
 
     /** Confirm before discarding all review work. */
     const handleReset = useCallback(() => {
         if (window.confirm('Exit review? Unsaved changes will be lost.')) {
+            abort();
+            draftingGuardRef.current = false;
+            setIsDrafting(false);
             reset();
         }
-    }, [reset]);
+    }, [reset, abort]);
+
+    /** Retry: reset and start fresh. */
+    const handleRetry = useCallback(() => {
+        draftingGuardRef.current = false;
+        setIsDrafting(false);
+        // Go back to reviewing phase so user can re-approve
+        dispatch({ type: 'RESET' });
+    }, [dispatch]);
 
     /** Auto-save any pending sidebar edit before switching selection. */
     const handleSelectItem = useCallback((nodeId: string | null) => {
-        // If there's a pending edit from the sidebar, auto-save it
         if (pendingEditRef.current) {
             editItem(pendingEditRef.current.nodeId, pendingEditRef.current.text);
             pendingEditRef.current = null;
@@ -162,7 +238,26 @@ export default function ReviewHubContent() {
         setSelectedItemId(nodeId);
     }, [editItem]);
 
-    // Guard: only render during reviewing phase
+    // =========================================================================
+    // Phase Routing
+    // =========================================================================
+
+    // Drafting phase — step checklist
+    if (state.phase === 'drafting') {
+        return <DraftingPhaseUI state={state} onCancel={handleReset} />;
+    }
+
+    // Completed phase — success card
+    if (state.phase === 'completed') {
+        return <CompletedPhaseUI state={state} onNewExport={handleReset} />;
+    }
+
+    // Error phase — error card
+    if (state.phase === 'error') {
+        return <ErrorPhaseUI state={state} onRetry={handleRetry} onReset={handleReset} />;
+    }
+
+    // Guard: only render canvas during reviewing phase
     if (state.phase !== 'reviewing') {
         return (
             <div className="flex items-center justify-center h-full text-white/40">
@@ -171,7 +266,9 @@ export default function ReviewHubContent() {
         );
     }
 
-    const preflightAvailable = !!state.preflight;
+    // =========================================================================
+    // Reviewing Phase (main canvas)
+    // =========================================================================
 
     return (
         <div className="flex h-full overflow-hidden">
@@ -222,17 +319,14 @@ export default function ReviewHubContent() {
                                 onChange={setTextMode}
                             />
 
-                            {/* Preflight Button — disabled when data unavailable */}
+                            {/* Preflight Button */}
                             <button
                                 type="button"
-                                onClick={() => preflightAvailable && setShowPreflight(!showPreflight)}
-                                disabled={!preflightAvailable}
+                                onClick={handleRunPreflight}
                                 className={`px-4 py-2 rounded-xl text-[12px] font-bold tracking-wide transition-all flex items-center gap-2 ${
-                                    !preflightAvailable
-                                        ? 'bg-white/5 border border-white/10 text-white/30 cursor-not-allowed'
-                                        : showPreflight
-                                            ? 'bg-[#60A5FA]/15 border border-[#60A5FA]/40 text-[#60A5FA]'
-                                            : 'bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                                    showPreflight && state.preflight
+                                        ? 'bg-[#60A5FA]/15 border border-[#60A5FA]/40 text-[#60A5FA]'
+                                        : 'bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10'
                                 }`}
                             >
                                 <Lightning size={14} weight="fill" />
@@ -324,6 +418,241 @@ export default function ReviewHubContent() {
                     </motion.div>
                 )}
             </AnimatePresence>
+        </div>
+    );
+}
+
+// =========================================================================
+// Drafting Phase — Step Checklist
+// =========================================================================
+
+function DraftingPhaseUI({
+    state,
+    onCancel,
+}: {
+    state: ReturnType<typeof useExport>['state'];
+    onCancel: () => void;
+}) {
+    const currentStageIndex = DRAFTING_STAGES.findIndex(s => s.key === state.draftingStage);
+
+    return (
+        <div className="flex items-center justify-center h-full">
+            <div className="w-full max-w-md p-8 rounded-2xl bg-[rgba(10,17,40,0.8)] border border-white/10 backdrop-blur-xl">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-[#1A4B9B]/20 border border-[#1A4B9B]/40 flex items-center justify-center">
+                        <SpinnerGap size={20} className="text-[#60A5FA] animate-spin" />
+                    </div>
+                    <div>
+                        <h2 className="text-[16px] font-bold text-white">Generating Export</h2>
+                        <p className="text-[12px] text-white/50">{state.statusDetail}</p>
+                    </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full h-1.5 bg-white/5 rounded-full mb-6 overflow-hidden">
+                    <motion.div
+                        className="h-full bg-gradient-to-r from-[#1A4B9B] to-[#60A5FA] rounded-full"
+                        initial={{ width: '50%' }}
+                        animate={{ width: `${state.progress}%` }}
+                        transition={{ ease: 'easeOut', duration: 0.5 }}
+                    />
+                </div>
+
+                {/* Step checklist */}
+                <div className="space-y-3">
+                    {DRAFTING_STAGES.map((stage, i) => {
+                        const isCompleted = i < currentStageIndex;
+                        const isActive = i === currentStageIndex;
+                        const isPending = i > currentStageIndex;
+
+                        return (
+                            <div key={stage.key} className="flex items-center gap-3">
+                                {isCompleted && (
+                                    <CheckCircle size={18} weight="fill" className="text-emerald-400 shrink-0" />
+                                )}
+                                {isActive && (
+                                    <SpinnerGap size={18} className="text-[#60A5FA] animate-spin shrink-0" />
+                                )}
+                                {isPending && (
+                                    <Circle size={18} className="text-white/20 shrink-0" />
+                                )}
+                                <span className={`text-[13px] ${
+                                    isCompleted ? 'text-white/60' :
+                                    isActive ? 'text-white font-semibold' :
+                                    'text-white/30'
+                                }`}>
+                                    {stage.label}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Cancel button */}
+                <button
+                    type="button"
+                    onClick={onCancel}
+                    className="mt-6 w-full py-2.5 rounded-xl text-[12px] font-bold text-white/50 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white/70 transition-colors"
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// =========================================================================
+// Completed Phase — Success Card
+// =========================================================================
+
+function CompletedPhaseUI({
+    state,
+    onNewExport,
+}: {
+    state: ReturnType<typeof useExport>['state'];
+    onNewExport: () => void;
+}) {
+    const preflightPassCount = state.preflight?.checks.filter(c => c.severity === 'pass').length ?? 0;
+    const preflightWarnCount = state.preflight?.warningCount ?? 0;
+    const downloadUrl = state.exportId
+        ? `/api/documents/export/${state.exportId}/download`
+        : null;
+
+    return (
+        <div className="flex items-center justify-center h-full">
+            <div className="w-full max-w-lg p-8 rounded-2xl bg-[rgba(10,17,40,0.8)] border border-white/10 backdrop-blur-xl">
+                {/* Success header */}
+                <div className="flex items-center gap-4 mb-6">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+                        <CheckCircle size={28} weight="fill" className="text-emerald-400" />
+                    </div>
+                    <div>
+                        <h2 className="text-[18px] font-bold text-white">Export Complete</h2>
+                        <p className="text-[13px] text-white/50">
+                            {state.filename ?? 'Document generated successfully'}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-3 mb-6">
+                    <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                        <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Sections</p>
+                        <p className="text-[18px] font-bold text-white">
+                            {state.reviewItems.length}
+                        </p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                        <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Preflight</p>
+                        <p className="text-[14px] font-bold text-white">
+                            <span className="text-emerald-400">{preflightPassCount} ✓</span>
+                            {preflightWarnCount > 0 && (
+                                <span className="text-amber-400 ml-1">{preflightWarnCount} ⚠</span>
+                            )}
+                        </p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                        <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Export</p>
+                        <p className="text-[13px] font-semibold text-white/70">
+                            {getExportLabel(state.exportPath)}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-3 mb-4">
+                    {/* Download PDF */}
+                    {downloadUrl && (
+                        <a
+                            href={downloadUrl}
+                            download={state.filename ?? 'export.pdf'}
+                            className="flex-1 py-3 rounded-xl text-[13px] font-bold text-white text-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-white/20 shadow-[0_4px_16px_rgba(26,75,155,0.3)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                        >
+                            <Download size={16} weight="bold" />
+                            Download PDF
+                        </a>
+                    )}
+
+                    {/* View in DocuVault */}
+                    <a
+                        href="/docuvault"
+                        className="flex-1 py-3 rounded-xl text-[13px] font-bold text-white/70 text-center bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white transition-all flex items-center justify-center gap-2"
+                    >
+                        <ArrowSquareOut size={16} />
+                        View in DocuVault
+                    </a>
+                </div>
+
+                {/* Start new export */}
+                <button
+                    type="button"
+                    onClick={onNewExport}
+                    className="w-full py-2.5 rounded-xl text-[12px] font-bold text-white/50 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white/70 transition-colors"
+                >
+                    Start New Export
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// =========================================================================
+// Error Phase
+// =========================================================================
+
+function ErrorPhaseUI({
+    state,
+    onRetry,
+    onReset,
+}: {
+    state: ReturnType<typeof useExport>['state'];
+    onRetry: () => void;
+    onReset: () => void;
+}) {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <div className="w-full max-w-md p-8 rounded-2xl bg-[rgba(10,17,40,0.8)] border border-red-500/20 backdrop-blur-xl">
+                <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center">
+                        <XCircle size={28} weight="fill" className="text-red-400" />
+                    </div>
+                    <div>
+                        <h2 className="text-[16px] font-bold text-white">Export Failed</h2>
+                        {state.errorCode && (
+                            <p className="text-[11px] text-red-400/70 font-mono">{state.errorCode}</p>
+                        )}
+                    </div>
+                </div>
+
+                <p className="text-[13px] text-white/60 mb-2">
+                    {getErrorDescription(state.errorCode)}
+                </p>
+                {state.errorMessage && (
+                    <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/10 mb-6">
+                        <p className="text-[12px] text-red-300/80 font-mono break-all">
+                            {state.errorMessage}
+                        </p>
+                    </div>
+                )}
+
+                <div className="flex gap-3">
+                    <button
+                        type="button"
+                        onClick={onRetry}
+                        className="flex-1 py-3 rounded-xl text-[13px] font-bold text-white bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-white/20 shadow-[0_4px_16px_rgba(26,75,155,0.3)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] transition-all flex items-center justify-center gap-2"
+                    >
+                        <ArrowClockwise size={16} weight="bold" />
+                        Retry Export
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onReset}
+                        className="flex-1 py-3 rounded-xl text-[13px] font-bold text-white/60 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white transition-colors"
+                    >
+                        Back to DocuVault
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }

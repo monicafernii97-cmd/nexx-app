@@ -79,12 +79,20 @@ export default function ReviewHubContent() {
         return groups;
     }, [state.reviewItems]);
 
-    // Compute stats
-    const totalItems = state.reviewItems.length;
-    const includedItems = state.reviewItems.filter(i => i.includedInExport && !i.userOverride?.exclude).length;
-    const lowConfidenceCount = state.reviewItems.filter(i => i.confidence < 0.5 && i.includedInExport && !i.userOverride?.exclude).length;
-    const lockedSections = state.overrides.sectionOverrides.filter(s => s.isLocked).length;
-    const sectionCount = sectionGroups.size;
+    // Compute stats (memoized to avoid redundant filtering)
+    const { totalItems, includedItems, lowConfidenceCount, lockedSections, sectionCount } = useMemo(() => {
+        const total = state.reviewItems.length;
+        const included = state.reviewItems.filter(i => i.includedInExport && !i.userOverride?.exclude).length;
+        const lowConf = state.reviewItems.filter(i => i.confidence < 0.5 && i.includedInExport && !i.userOverride?.exclude).length;
+        const locked = state.overrides.sectionOverrides.filter(s => s.isLocked).length;
+        return {
+            totalItems: total,
+            includedItems: included,
+            lowConfidenceCount: lowConf,
+            lockedSections: locked,
+            sectionCount: sectionGroups.size,
+        };
+    }, [state.reviewItems, state.overrides.sectionOverrides, sectionGroups.size]);
 
     // Find selected item
     const selectedItem = useMemo(

@@ -88,7 +88,23 @@ export const getRecentExports = query({
             .order('desc')
             .take(maxResults);
 
-        return docs;
+        // Strip heavy JSON blobs — return only metadata for the list UI
+        return docs.map((doc) => ({
+            _id: doc._id,
+            _creationTime: doc._creationTime,
+            caseId: doc.caseId,
+            templateId: doc.templateId,
+            templateTitle: doc.templateTitle,
+            caseType: doc.caseType,
+            status: doc.status,
+            courtState: doc.courtState,
+            courtCounty: doc.courtCounty,
+            petitionerName: doc.petitionerName,
+            respondentName: doc.respondentName,
+            storageId: doc.storageId,
+            createdAt: doc.createdAt,
+            updatedAt: doc.updatedAt,
+        }));
     },
 });
 
@@ -121,6 +137,11 @@ export const updateDocumentStatus = mutation({
         // Prevent downgrading a filed document
         if (doc.status === 'filed' && status !== 'filed') {
             throw new Error('Filed documents cannot be downgraded');
+        }
+
+        // Enforce documented progression: draft → final → filed
+        if (doc.status === 'draft' && status === 'filed') {
+            throw new Error('Draft documents must be finalized before filing');
         }
 
         await ctx.db.patch(documentId, {

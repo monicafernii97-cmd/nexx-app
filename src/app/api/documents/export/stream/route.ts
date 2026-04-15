@@ -262,6 +262,7 @@ export async function POST(request: NextRequest) {
                 await convex.mutation(api.generatedDocumentsExport.updateExportRun, {
                     exportId: exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
                     status: 'preflight',
+                    currentStage: 'draft',
                     draftOutputJson: JSON.stringify({
                         schemaVersion: 1,
                         sections: draftedSections,
@@ -317,6 +318,7 @@ export async function POST(request: NextRequest) {
                 await convex.mutation(api.generatedDocumentsExport.updateExportRun, {
                     exportId: exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
                     status: 'rendering',
+                    currentStage: 'preflight',
                     preflightJson: JSON.stringify({
                         schemaVersion: 1,
                         result: preflightResult,
@@ -376,6 +378,13 @@ export async function POST(request: NextRequest) {
                 });
 
                 const pdfBuffer = await renderHTMLToPDF(html, rules, causeNumber);
+
+                // Checkpoint: rendering complete
+                await convex.mutation(api.generatedDocumentsExport.updateExportRun, {
+                    exportId: exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                    status: 'saving',
+                    currentStage: 'render',
+                });
 
                 checkAborted();
 

@@ -725,6 +725,17 @@ function ErrorPhaseUI({
     onRetry: () => void;
     onReset: () => void;
 }) {
+    // Scoped retry label based on last completed stage
+    const retryLabel = (() => {
+        switch (state.lastCompletedStage) {
+            case 'draft': return 'Retry from Preflight';
+            case 'preflight': return 'Retry from Render';
+            case 'render': return 'Retry from Upload';
+            case 'upload': return 'Retry from Save';
+            default: return 'Full Rerun';
+        }
+    })();
+
     return (
         <div className="flex items-center justify-center h-full">
             <div className="w-full max-w-md p-8 rounded-2xl bg-[rgba(10,17,40,0.8)] border border-red-500/20 backdrop-blur-xl">
@@ -756,6 +767,17 @@ function ErrorPhaseUI({
                     </details>
                 )}
 
+                {/* Stage-aware retry info */}
+                {state.lastCompletedStage && (
+                    <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-white/5 border border-white/10">
+                        <CheckCircle size={14} weight="fill" className="text-emerald-400 shrink-0" />
+                        <p className="text-[11px] text-white/50">
+                            Last checkpoint: <span className="font-bold text-white/70">{state.lastCompletedStage}</span>
+                            {' '}— draft artifacts preserved
+                        </p>
+                    </div>
+                )}
+
                 <div className="flex gap-3">
                     <button
                         type="button"
@@ -763,7 +785,7 @@ function ErrorPhaseUI({
                         className="flex-1 py-3 rounded-xl text-[13px] font-bold text-white bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-white/20 shadow-[0_4px_16px_rgba(26,75,155,0.3)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] transition-all flex items-center justify-center gap-2"
                     >
                         <ArrowClockwise size={16} weight="bold" />
-                        Retry Export
+                        {retryLabel}
                     </button>
                     <button
                         type="button"

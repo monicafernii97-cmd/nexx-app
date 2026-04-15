@@ -297,6 +297,8 @@ export default defineSchema({
     // ═══ Generated Documents (Legal Document System) ═══
     generatedDocuments: defineTable({
         userId: v.id('users'),
+        /** Reference to the case this document belongs to */
+        caseId: v.optional(v.id('cases')),
         templateId: v.string(),
         templateTitle: v.string(),
         caseType: v.string(),
@@ -325,11 +327,18 @@ export default defineSchema({
             v.literal('unchecked')
         )),
         complianceCheckedAt: v.optional(v.number()),
+        /** Pipeline draft output (JSON blob) */
+        draftOutputJson: v.optional(v.string()),
+        /** Snapshot of the assembly result at generation time (JSON blob) */
+        assemblySnapshotJson: v.optional(v.string()),
+        /** Snapshot of the export request config at generation time (JSON blob) */
+        exportConfigJson: v.optional(v.string()),
         createdAt: v.number(),
         updatedAt: v.number(),
     })
         .index('by_user', ['userId'])
-        .index('by_user_status', ['userId', 'status']),
+        .index('by_user_status', ['userId', 'status'])
+        .index('by_case', ['caseId']),
 
     // ═══ Court Rules Cache (Legal Document System) ═══
     courtRulesCache: defineTable({

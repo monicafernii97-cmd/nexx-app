@@ -37,7 +37,7 @@ interface TraceSidebarProps {
     onEditText: (text: string) => void;
     onExclude: (excluded: boolean) => void;
     /** Called on each keystroke so the parent can track unsaved edits. */
-    onTextChange?: (text: string) => void;
+    onTextChange?: (text: string | null) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,8 +84,10 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude, onT
     const isExcluded = item.userOverride?.exclude ?? !item.includedInExport;
 
     // Section assignment explanation
+    const isForced = Boolean(item.userOverride?.forceSection);
     const topSection = item.userOverride?.forceSection ?? item.suggestedSections[0] ?? 'Unclassified';
-    const altSections = item.suggestedSections.slice(1, 4);
+    const classifierTop = item.suggestedSections[0] ?? 'Unclassified';
+    const altSections = item.suggestedSections.slice(isForced ? 0 : 1, isForced ? 3 : 4);
 
     // Only show the dominant type score — do NOT fabricate synthetic scores
     // for other types. Real per-type scores will come from ClassifiedNode.scores
@@ -165,6 +167,8 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude, onT
                                     onClick={() => {
                                         setEditText(item.userOverride?.editedText ?? item.originalText);
                                         setIsEditing(false);
+                                        // Signal parent to discard pending draft
+                                        onTextChange?.(null);
                                     }}
                                     className="px-3 py-1.5 rounded-lg bg-white/5 text-white/40 text-[11px] font-bold hover:bg-white/10 transition-colors"
                                 >
@@ -176,13 +180,18 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude, onT
                         <p className={`text-[13px] leading-relaxed p-3 rounded-xl bg-white/[0.04] border border-white/10 ${
                             isExcluded ? 'text-white/30 line-through' : 'text-white/70'
                         }`}>
-                            {item.userOverride?.editedText ?? item.originalText}
+                            {item.originalText}
                         </p>
                     )}
                     {item.userOverride?.editedText && (
-                        <p className="mt-2 text-[10px] text-violet-400 font-bold uppercase tracking-widest">
-                            ✎ User-edited version
-                        </p>
+                        <div className="mt-2">
+                            <p className="text-[10px] text-violet-400 font-bold uppercase tracking-widest mb-1">
+                                ✎ User-edited version
+                            </p>
+                            <p className="text-[13px] leading-relaxed p-3 rounded-xl bg-violet-500/5 border border-violet-500/15 text-white/70">
+                                {item.userOverride.editedText}
+                            </p>
+                        </div>
                     )}
                 </section>
 
@@ -198,17 +207,24 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude, onT
                                 {formatSectionName(topSection)}
                             </span>
                         </div>
-                        <p className="text-[11px] text-white/50 leading-relaxed">
-                            Dominant type <span className="text-white/70 font-semibold">{item.dominantType}</span> with{' '}
-                            <span className="text-white/70 font-semibold">{Math.round(item.confidence * 100)}%</span> confidence
-                            matched this section&apos;s classification rules.
-                        </p>
+                        {isForced ? (
+                            <p className="text-[11px] text-violet-400/80 leading-relaxed">
+                                Manually assigned by reviewer. Original classifier suggestion:{' '}
+                                <span className="text-white/70 font-semibold">{formatSectionName(classifierTop)}</span>.
+                            </p>
+                        ) : (
+                            <p className="text-[11px] text-white/50 leading-relaxed">
+                                Dominant type <span className="text-white/70 font-semibold">{item.dominantType}</span> with{' '}
+                                <span className="text-white/70 font-semibold">{Math.round(item.confidence * 100)}%</span> confidence
+                                matched this section&apos;s classification rules.
+                            </p>
+                        )}
                     </div>
 
                     {altSections.length > 0 && (
                         <div className="mt-2 space-y-1">
                             <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-1">
-                                Runner-Up Sections
+                                {isForced ? 'Classifier Suggestions' : 'Runner-Up Sections'}
                             </p>
                             {altSections.map(section => (
                                 <div key={section} className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02] border border-white/5">

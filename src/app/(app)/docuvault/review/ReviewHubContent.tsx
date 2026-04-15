@@ -257,7 +257,10 @@ export default function ReviewHubContent() {
                             item={selectedItem}
                             onClose={() => handleSelectItem(null)}
                             onTextChange={(text) => {
-                                pendingEditRef.current = { nodeId: selectedItem.nodeId, text };
+                                // null = user canceled edit, clear pending draft
+                                pendingEditRef.current = text != null
+                                    ? { nodeId: selectedItem.nodeId, text }
+                                    : null;
                             }}
                             onEditText={(text) => {
                                 editItem(selectedItem.nodeId, text);

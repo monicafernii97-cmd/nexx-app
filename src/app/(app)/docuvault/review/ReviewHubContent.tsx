@@ -192,6 +192,7 @@ export default function ReviewHubContent() {
                     detail: err instanceof Error ? err.message : 'An unexpected error occurred during preflight validation.',
                     category: 'compliance',
                 }],
+                criticalCount: 0,
                 errorCount: 1,
                 warningCount: 0,
                 readinessScore: 0,

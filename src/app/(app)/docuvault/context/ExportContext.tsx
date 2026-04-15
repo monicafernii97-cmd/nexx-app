@@ -42,6 +42,7 @@ import type {
 import { runAssembly } from '@/lib/export-assembly/orchestrator';
 import type { PreflightResult } from '@/lib/export-assembly/validation/preflightValidator';
 import { getAssemblyInputs } from '@/lib/export-assembly/services/getAssemblyInputs';
+import { validateAssemblyOutput } from '@/lib/export-assembly/validation/assemblyIntegrityValidator';
 
 // ---------------------------------------------------------------------------
 // State
@@ -533,9 +534,8 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                 (status) => dispatch({ type: 'ASSEMBLY_PROGRESS', status }),
             );
 
-            // 5. Validate assembly (placeholder — Step 5 builds real validator)
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-            const validation: AssemblyValidation = { warnings: [], errors: [], critical: [] };
+            // 5. Validate assembly
+            const validation = validateAssemblyOutput(result, config);
 
             // 6. Atomic completion
             dispatch({ type: 'ASSEMBLY_COMPLETE', result, validation });

@@ -32,7 +32,7 @@ import type { ExportOverrides } from '../orchestrator';
 // ---------------------------------------------------------------------------
 
 /** Severity levels for preflight checks. */
-export type PreflightSeverity = 'pass' | 'warning' | 'error';
+export type PreflightSeverity = 'pass' | 'warning' | 'error' | 'critical';
 
 /** A single preflight check result. */
 export interface PreflightCheck {
@@ -51,6 +51,8 @@ export interface PreflightCheck {
 /** Aggregate preflight result. */
 export interface PreflightResult {
     checks: PreflightCheck[];
+    /** Number of critical issues (blocks generation with highest severity) */
+    criticalCount: number;
     /** Number of errors (blocks generation) */
     errorCount: number;
     /** Number of warnings (advisory only) */
@@ -351,12 +353,13 @@ export function preflightExhibit(
 
 /** Compute aggregate result from individual checks. */
 function buildResult(checks: PreflightCheck[]): PreflightResult {
+    const criticalCount = checks.filter(c => c.severity === 'critical').length;
     const errorCount = checks.filter(c => c.severity === 'error').length;
     const warningCount = checks.filter(c => c.severity === 'warning').length;
     const passCount = checks.filter(c => c.severity === 'pass').length;
     const total = checks.length;
 
-    // Score: each pass = full points, each warning = half points, each error = 0
+    // Score: each pass = full points, each warning = half points, error/critical = 0
     const rawScore = total > 0
         ? ((passCount + warningCount * 0.5) / total) * 100
         : 100;
@@ -364,10 +367,11 @@ function buildResult(checks: PreflightCheck[]): PreflightResult {
 
     return {
         checks,
+        criticalCount,
         errorCount,
         warningCount,
         readinessScore,
-        canProceed: errorCount === 0,
+        canProceed: criticalCount === 0 && errorCount === 0,
     };
 }
 
@@ -414,17 +418,50 @@ export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
         category: 'quality',
     });
 
-    // ── Quality: Empty sections ──
+    // ── Critical: Zero included items ──
     const includedCount = reviewItems.filter(item => item.includedInExport).length;
-    checks.push({
-        id: 'items_included',
-        label: 'Items included in export',
-        severity: includedCount > 0 ? 'pass' : 'error',
-        detail: includedCount > 0
-            ? `${includedCount} item${includedCount > 1 ? 's' : ''} included`
-            : 'No items included in export',
-        category: 'required_content',
-    });
+    if (includedCount === 0) {
+        checks.push({
+            id: 'no_included_items',
+            label: 'No items included',
+            severity: 'critical',
+            detail: 'No items are included in the export. Cannot generate an empty document.',
+            category: 'required_content',
+        });
+    } else {
+        checks.push({
+            id: 'items_included',
+            label: 'Items included in export',
+            severity: 'pass',
+            detail: `${includedCount} item${includedCount > 1 ? 's' : ''} included`,
+            category: 'required_content',
+        });
+    }
+
+    // ── Critical: Court doc without caption data ──
+    if (exportPath === 'court_document') {
+        const hasCaption = !!config.courtState || !!config.petitionerName;
+        if (!hasCaption) {
+            checks.push({
+                id: 'missing_caption',
+                label: 'Missing caption data',
+                severity: 'critical',
+                detail: 'Court document requires caption data (court, parties). Set court profile first.',
+                category: 'required_content',
+            });
+        }
+    }
+
+    // ── Critical: Exhibit packet with zero exhibits ──
+    if (exportPath === 'exhibit_document' && includedCount === 0) {
+        checks.push({
+            id: 'no_exhibits',
+            label: 'No exhibits',
+            severity: 'critical',
+            detail: 'Exhibit packet requires at least one exhibit entry.',
+            category: 'required_content',
+        });
+    }
 
     // ── Required: Court settings (for court document path) ──
     if (exportPath === 'court_document') {

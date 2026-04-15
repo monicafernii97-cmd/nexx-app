@@ -295,6 +295,7 @@ export async function POST(request: NextRequest) {
                     console.warn('[ExportStream] Preflight check failed:', pfErr);
                     preflightResult = {
                         checks: [],
+                        criticalCount: 0,
                         errorCount: 0,
                         warningCount: 0,
                         readinessScore: 0,

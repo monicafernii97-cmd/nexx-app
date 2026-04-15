@@ -61,6 +61,7 @@ export default function ReviewHubContent() {
     const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
     const [textMode, setTextMode] = useState<'original' | 'court_safe'>('original');
     const [showPreflight, setShowPreflight] = useState(false);
+    const [isDrafting, setIsDrafting] = useState(false);
 
     // Track sidebar edit state to auto-save on selection change
     const pendingEditRef = useRef<{ nodeId: string; text: string } | null>(null);
@@ -124,14 +125,23 @@ export default function ReviewHubContent() {
         [effectiveItems, selectedItemId],
     );
 
-    /** Flush any pending sidebar edit + start GPT drafting. */
+    /** Flush any pending sidebar edit + start GPT drafting (with double-click guard). */
     const handleApproveAndDraft = useCallback(() => {
+        if (isDrafting) return; // Prevent double-submission
         if (pendingEditRef.current) {
             editItem(pendingEditRef.current.nodeId, pendingEditRef.current.text);
             pendingEditRef.current = null;
         }
+        setIsDrafting(true);
         startDrafting();
-    }, [editItem, startDrafting]);
+    }, [editItem, startDrafting, isDrafting]);
+
+    /** Confirm before discarding all review work. */
+    const handleReset = useCallback(() => {
+        if (window.confirm('Exit review? Unsaved changes will be lost.')) {
+            reset();
+        }
+    }, [reset]);
 
     /** Auto-save any pending sidebar edit before switching selection. */
     const handleSelectItem = useCallback((nodeId: string | null) => {
@@ -164,7 +174,7 @@ export default function ReviewHubContent() {
                         <div className="flex items-center gap-4">
                             <button
                                 type="button"
-                                onClick={reset}
+                                onClick={handleReset}
                                 className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-white/60 hover:text-white"
                                 aria-label="Exit review and reset"
                             >
@@ -224,10 +234,15 @@ export default function ReviewHubContent() {
                             <button
                                 type="button"
                                 onClick={handleApproveAndDraft}
-                                className="px-5 py-2.5 rounded-xl text-[13px] font-bold tracking-wide text-white bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-white/25 shadow-[0_4px_16px_rgba(26,75,155,0.3),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:-translate-y-0.5 transition-all flex items-center gap-2"
+                                disabled={isDrafting}
+                                className={`px-5 py-2.5 rounded-xl text-[13px] font-bold tracking-wide text-white border border-white/25 transition-all flex items-center gap-2 ${
+                                    isDrafting
+                                        ? 'bg-white/10 cursor-not-allowed opacity-60'
+                                        : 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_16px_rgba(26,75,155,0.3),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:-translate-y-0.5'
+                                }`}
                             >
                                 <Export size={16} weight="bold" />
-                                Approve & Draft
+                                {isDrafting ? 'Drafting…' : 'Approve & Draft'}
                             </button>
                         </div>
                     </div>

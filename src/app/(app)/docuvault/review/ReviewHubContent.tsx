@@ -183,6 +183,21 @@ export default function ReviewHubContent() {
             setShowPreflight(true);
         } catch (err) {
             console.error('[ReviewHub] Preflight failed:', err);
+            // Surface the error to the user via a synthetic preflight result
+            setPreflight({
+                checks: [{
+                    id: 'preflight_error',
+                    label: 'Preflight check failed',
+                    severity: 'error' as const,
+                    detail: err instanceof Error ? err.message : 'An unexpected error occurred during preflight validation.',
+                    category: 'compliance',
+                }],
+                errorCount: 1,
+                warningCount: 0,
+                readinessScore: 0,
+                canProceed: false,
+            });
+            setShowPreflight(true);
         }
     }, [state.exportPath, state.exportRequest, effectiveItems, state.overrides, setPreflight]);
 

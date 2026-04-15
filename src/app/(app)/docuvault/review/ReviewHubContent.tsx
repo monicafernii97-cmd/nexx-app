@@ -201,27 +201,29 @@ export default function ReviewHubContent() {
             editItem(pendingEditRef.current.nodeId, pendingEditRef.current.text);
             pendingEditRef.current = null;
         }
-        try {
-            setIsDrafting(true);
-            startDrafting();
 
-            // Build stream input and fire
-            const input: DraftStreamInput = {
-                assemblyResult: state.assemblyResult,
-                overrides: state.overrides,
-                exportRequest: state.exportRequest,
-                reviewItems: effectiveItems,
-                caseId: state.caseId,
-                retryOfExportId: retryExportIdRef.current ?? undefined,
-            };
-            retryExportIdRef.current = null; // Clear after use
-            startStream(input);
-        } catch (err) {
+        setIsDrafting(true);
+        startDrafting();
+
+        // Build stream input and fire
+        const input: DraftStreamInput = {
+            assemblyResult: state.assemblyResult,
+            overrides: state.overrides,
+            exportRequest: state.exportRequest,
+            reviewItems: effectiveItems,
+            caseId: state.caseId,
+            retryOfExportId: retryExportIdRef.current ?? undefined,
+        };
+        retryExportIdRef.current = null; // Clear after use
+
+        // startStream is async — handle rejection to reset guards
+        startStream(input).catch((err) => {
             draftingGuardRef.current = false;
             setIsDrafting(false);
-            throw err;
-        }
-    }, [editItem, startDrafting, startStream, state, effectiveItems]);
+            console.error('[ReviewHub] Stream start failed:', err);
+            dispatch({ type: 'ERROR', message: String(err), errorCode: 'draft_failed' });
+        });
+    }, [editItem, startDrafting, startStream, state, effectiveItems, dispatch]);
 
     /** Confirm before discarding all review work. */
     const handleReset = useCallback(() => {

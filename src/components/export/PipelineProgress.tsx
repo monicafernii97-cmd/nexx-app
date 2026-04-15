@@ -84,13 +84,10 @@ function getStepStatus(
 
     // When in error state, show which step failed
     if (currentPhase === 'error') {
-        const failedIdx = errorPhase ? getStepIndex(errorPhase) : -1;
-        if (failedIdx >= 0) {
-            if (stepIdx < failedIdx) return 'completed';
-            if (stepIdx === failedIdx) return 'error';
-            return 'pending';
-        }
-        // No errorPhase provided — mark everything as completed up to where we got
+        // If no errorPhase provided, default to last step so prior steps show completed
+        const failedIdx = errorPhase ? getStepIndex(errorPhase) : PIPELINE_STEPS.length - 1;
+        if (stepIdx < failedIdx) return 'completed';
+        if (stepIdx === failedIdx) return 'error';
         return 'pending';
     }
 
@@ -109,6 +106,7 @@ function getStepStatus(
 export default function PipelineProgress({ currentPhase, progress, detail, errorPhase }: PipelineProgressProps) {
     const isError = currentPhase === 'error';
     const isComplete = currentPhase === 'completed';
+    const safeProgress = Math.max(0, Math.min(100, progress));
 
     return (
         <div className="w-full max-w-md mx-auto">
@@ -118,13 +116,13 @@ export default function PipelineProgress({ currentPhase, progress, detail, error
                     <span className="text-[11px] font-bold tracking-[0.15em] uppercase text-white/40">
                         {isComplete ? 'Complete' : isError ? 'Error' : 'Assembly Pipeline'}
                     </span>
-                    <span className="text-[13px] font-bold text-white/70">{progress}%</span>
+                    <span className="text-[13px] font-bold text-white/70">{safeProgress}%</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
                     <motion.div
                         className={`h-full rounded-full ${isError ? 'bg-rose-500' : isComplete ? 'bg-emerald-500' : 'bg-[#60A5FA]'}`}
                         initial={{ width: 0 }}
-                        animate={{ width: `${progress}%` }}
+                        animate={{ width: `${safeProgress}%` }}
                         transition={{ duration: 0.5, ease: 'easeOut' }}
                     />
                 </div>
@@ -202,11 +200,13 @@ export default function PipelineProgress({ currentPhase, progress, detail, error
                                 }`}>
                                     {step.label}
                                 </p>
-                                {status === 'active' && (
+                                {(status === 'active' || status === 'error') && (
                                     <motion.p
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
-                                        className="text-[11px] text-white/50 truncate"
+                                        className={`text-[11px] truncate ${
+                                            status === 'error' ? 'text-rose-300' : 'text-white/50'
+                                        }`}
                                     >
                                         {detail || step.description}
                                     </motion.p>

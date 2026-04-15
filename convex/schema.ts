@@ -306,12 +306,26 @@ export default defineSchema({
         courtSettingsId: v.optional(v.id('userCourtSettings')),
         /** Convex storage ID for the generated PDF */
         storageId: v.optional(v.id('_storage')),
-        /** Document status lifecycle */
+
+        // ── Status lifecycle (expanded for pipeline) ──
         status: v.union(
             v.literal('draft'),
+            v.literal('drafting'),
+            v.literal('preflight'),
+            v.literal('rendering'),
+            v.literal('saving'),
+            v.literal('completed'),
+            v.literal('failed'),
             v.literal('final'),
             v.literal('filed')
         ),
+
+        // ── Run identity ──
+        /** Client-generated run ID for deduplication + traceability */
+        runId: v.optional(v.string()),
+        /** If this export is a retry, reference to the original */
+        retryOfExportId: v.optional(v.id('generatedDocuments')),
+
         /** Snapshot of the court settings used for this document */
         courtState: v.string(),
         courtCounty: v.string(),
@@ -319,26 +333,70 @@ export default defineSchema({
         causeNumber: v.optional(v.string()),
         petitionerName: v.string(),
         respondentName: v.optional(v.string()),
+
+        // ── File metadata ──
+        /** Generated PDF filename */
+        filename: v.optional(v.string()),
+        /** PDF MIME type */
+        mimeType: v.optional(v.string()),
+        /** PDF file size in bytes */
+        byteSize: v.optional(v.number()),
+        /** Export path (court_document, case_summary, exhibit_document) */
+        exportPath: v.optional(v.string()),
+
+        // ── Counts ──
+        sectionCount: v.optional(v.number()),
+        aiDraftedCount: v.optional(v.number()),
+        lockedCount: v.optional(v.number()),
+
+        // ── Validation ──
         /** Compliance check results (if run) */
         complianceStatus: v.optional(v.union(
             v.literal('pass'),
             v.literal('warning'),
             v.literal('fail'),
+            v.literal('error'),
             v.literal('unchecked')
         )),
         complianceCheckedAt: v.optional(v.number()),
+        /** Preflight result JSON (versioned) */
+        preflightJson: v.optional(v.string()),
+
+        // ── Snapshots (versioned) ──
         /** Pipeline draft output (JSON blob) */
         draftOutputJson: v.optional(v.string()),
         /** Snapshot of the assembly result at generation time (JSON blob) */
         assemblySnapshotJson: v.optional(v.string()),
         /** Snapshot of the export request config at generation time (JSON blob) */
         exportConfigJson: v.optional(v.string()),
+        /** Schema version for draft output JSON */
+        draftSchemaVersion: v.optional(v.number()),
+        /** Schema version for preflight JSON */
+        preflightSchemaVersion: v.optional(v.number()),
+
+        // ── Observability ──
+        /** GPT model used for drafting */
+        model: v.optional(v.string()),
+        /** Pipeline version identifier */
+        pipelineVersion: v.optional(v.string()),
+        /** When pipeline execution started */
+        startedAt: v.optional(v.number()),
+        /** When pipeline execution completed */
+        completedAt: v.optional(v.number()),
+        /** Pipeline duration in milliseconds */
+        durationMs: v.optional(v.number()),
+
+        // ── Error tracking ──
+        errorCode: v.optional(v.string()),
+        errorMessage: v.optional(v.string()),
+
         createdAt: v.number(),
         updatedAt: v.number(),
     })
         .index('by_user', ['userId'])
         .index('by_user_status', ['userId', 'status'])
-        .index('by_case', ['caseId']),
+        .index('by_case', ['caseId'])
+        .index('by_run', ['runId']),
 
     // ═══ Court Rules Cache (Legal Document System) ═══
     courtRulesCache: defineTable({

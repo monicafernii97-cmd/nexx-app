@@ -53,6 +53,15 @@ export type ExportPhase =
     | 'completed'
     | 'error';
 
+/** Drafting sub-stages for the checklist UI. */
+export type DraftingStage =
+    | 'drafting'
+    | 'preflight'
+    | 'rendering_html'
+    | 'rendering_pdf'
+    | 'saving'
+    | null;
+
 /** The export context state. */
 export interface ExportState {
     /** Current phase of the pipeline */
@@ -75,10 +84,16 @@ export interface ExportState {
     statusDetail: string;
     /** Error message if phase === 'error' */
     errorMessage: string | null;
+    /** Error code for typed error UI */
+    errorCode: string | null;
     /** Case ID for scoping overrides */
     caseId: Id<'cases'> | undefined;
-    /** Generated PDF URL (after COMPLETED phase) */
-    pdfUrl: string | null;
+    /** Convex export document ID (only source of truth for download) */
+    exportId: string | null;
+    /** Generated PDF filename */
+    filename: string | null;
+    /** Current sub-stage during drafting (for checklist UI) */
+    draftingStage: DraftingStage;
 }
 
 const initialState: ExportState = {
@@ -92,8 +107,11 @@ const initialState: ExportState = {
     progress: 0,
     statusDetail: '',
     errorMessage: null,
+    errorCode: null,
     caseId: undefined,
-    pdfUrl: null,
+    exportId: null,
+    filename: null,
+    draftingStage: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -112,9 +130,9 @@ type ExportAction =
     | { type: 'UPDATE_ITEM_OVERRIDE'; override: ItemOverride }
     | { type: 'SET_PREFLIGHT'; result: PreflightResult }
     | { type: 'START_DRAFTING' }
-    | { type: 'DRAFT_PROGRESS'; status: PipelineStatus }
-    | { type: 'COMPLETE'; pdfUrl: string }
-    | { type: 'ERROR'; message: string }
+    | { type: 'DRAFT_PROGRESS'; status: PipelineStatus; stage?: DraftingStage }
+    | { type: 'COMPLETE'; exportId: string; filename: string }
+    | { type: 'ERROR'; message: string; errorCode?: string }
     | { type: 'RESET' };
 
 function exportReducer(state: ExportState, action: ExportAction): ExportState {
@@ -192,13 +210,20 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
             return { ...state, preflight: action.result };
 
         case 'START_DRAFTING':
-            return { ...state, phase: 'drafting', progress: 60, statusDetail: 'Drafting document...' };
+            return {
+                ...state,
+                phase: 'drafting',
+                progress: 55,
+                statusDetail: 'Drafting document...',
+                draftingStage: 'drafting',
+            };
 
         case 'DRAFT_PROGRESS':
             return {
                 ...state,
                 progress: action.status.progress,
                 statusDetail: action.status.detail,
+                draftingStage: action.stage ?? state.draftingStage,
             };
 
         case 'COMPLETE':
@@ -207,7 +232,9 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
                 phase: 'completed',
                 progress: 100,
                 statusDetail: 'Document ready',
-                pdfUrl: action.pdfUrl,
+                exportId: action.exportId,
+                filename: action.filename,
+                draftingStage: null,
             };
 
         case 'ERROR':
@@ -215,6 +242,8 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
                 ...state,
                 phase: 'error',
                 errorMessage: action.message,
+                errorCode: action.errorCode ?? null,
+                draftingStage: null,
             };
 
         case 'RESET':
@@ -248,7 +277,7 @@ interface ExportContextValue {
     excludeItem: (nodeId: string, excluded: boolean) => void;
     setPreflight: (result: PreflightResult) => void;
     startDrafting: () => void;
-    complete: (pdfUrl: string) => void;
+    complete: (exportId: string, filename: string) => void;
     setError: (message: string) => void;
     reset: () => void;
 }
@@ -345,8 +374,8 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'START_DRAFTING' });
     }, []);
 
-    const complete = useCallback((pdfUrl: string) => {
-        dispatch({ type: 'COMPLETE', pdfUrl });
+    const complete = useCallback((exportId: string, filename: string) => {
+        dispatch({ type: 'COMPLETE', exportId, filename });
     }, []);
 
     const setError = useCallback((message: string) => {

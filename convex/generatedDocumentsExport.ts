@@ -1,9 +1,15 @@
 /**
- * Generated Documents Export — Convex mutations for saving pipeline output
- * and retrieving download URLs.
+ * Generated Documents Export — Convex lifecycle mutations for the export pipeline.
  *
- * Saves the draft output, assembly snapshot, and export config to the
- * generatedDocuments table for version history and recovery. Case-scoped.
+ * Four lifecycle mutations model the full export pipeline:
+ *   createExportRun  → record created at pipeline start (status: 'drafting')
+ *   updateExportRun  → incremental updates during pipeline stages
+ *   finalizeExportRun → mark completed with storageId/filename/counts
+ *   failExportRun    → mark failed with typed error code + message
+ *
+ * Plus: getRecentExports, getExportById, updateDocumentStatus, deleteExport.
+ *
+ * All mutations are case-ownership guarded.
  */
 
 import { v } from 'convex/values';
@@ -13,14 +19,18 @@ import { getAuthenticatedUser } from './lib/auth';
 /** Hard ceiling for query pagination to prevent unbounded reads. */
 const MAX_QUERY_LIMIT = 100;
 
+/** Current pipeline version for observability. */
+const PIPELINE_VERSION = '8d.1';
+
 // ---------------------------------------------------------------------------
-// Save a generated document from the export pipeline
+// 1. Create Export Run (pipeline start)
 // ---------------------------------------------------------------------------
 
-/** Save the pipeline output to generatedDocuments with case-ownership check. */
-export const saveExportResult = mutation({
+/** Create a new export record when the pipeline begins. */
+export const createExportRun = mutation({
     args: {
         caseId: v.id('cases'),
+        runId: v.string(),
         templateId: v.string(),
         templateTitle: v.string(),
         caseType: v.string(),
@@ -29,26 +39,31 @@ export const saveExportResult = mutation({
         petitionerName: v.string(),
         respondentName: v.optional(v.string()),
         causeNumber: v.optional(v.string()),
-        /** The draft output JSON from the pipeline */
-        draftOutputJson: v.string(),
-        /** The assembly result JSON snapshot */
-        assemblySnapshotJson: v.optional(v.string()),
-        /** The export request JSON snapshot */
+        exportPath: v.string(),
+        /** If this is a retry, reference to the original export */
+        retryOfExportId: v.optional(v.id('generatedDocuments')),
+        /** The export request config (JSON snapshot) */
         exportConfigJson: v.optional(v.string()),
+        /** The assembly result snapshot (JSON) */
+        assemblySnapshotJson: v.optional(v.string()),
+        /** GPT model used for drafting */
+        model: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
 
-        // Verify the caller owns this case (prevents cross-tenant references)
+        // Verify case ownership
         const caseRecord = await ctx.db.get(args.caseId);
         if (!caseRecord || caseRecord.userId !== user._id) {
             throw new Error('Case not found or access denied');
         }
 
         const now = Date.now();
-        const docId = await ctx.db.insert('generatedDocuments', {
+        return await ctx.db.insert('generatedDocuments', {
             userId: user._id,
             caseId: args.caseId,
+            runId: args.runId,
+            retryOfExportId: args.retryOfExportId,
             templateId: args.templateId,
             templateTitle: args.templateTitle,
             caseType: args.caseType,
@@ -57,20 +72,171 @@ export const saveExportResult = mutation({
             petitionerName: args.petitionerName,
             respondentName: args.respondentName,
             causeNumber: args.causeNumber,
-            draftOutputJson: args.draftOutputJson,
-            assemblySnapshotJson: args.assemblySnapshotJson,
+            exportPath: args.exportPath,
             exportConfigJson: args.exportConfigJson,
-            status: 'draft',
+            assemblySnapshotJson: args.assemblySnapshotJson,
+            model: args.model ?? 'gpt-5.4',
+            pipelineVersion: PIPELINE_VERSION,
+            status: 'drafting',
+            startedAt: now,
             createdAt: now,
             updatedAt: now,
         });
-
-        return docId;
     },
 });
 
 // ---------------------------------------------------------------------------
-// Get recent exports for a user (for Export History panel)
+// 2. Update Export Run (incremental stage updates)
+// ---------------------------------------------------------------------------
+
+/** Update an in-progress export during pipeline execution. */
+export const updateExportRun = mutation({
+    args: {
+        exportId: v.id('generatedDocuments'),
+        status: v.optional(v.union(
+            v.literal('drafting'),
+            v.literal('preflight'),
+            v.literal('rendering'),
+            v.literal('saving'),
+        )),
+        /** Draft output JSON (after GPT drafting completes) */
+        draftOutputJson: v.optional(v.string()),
+        draftSchemaVersion: v.optional(v.number()),
+        /** Preflight result JSON (after preflight completes) */
+        preflightJson: v.optional(v.string()),
+        preflightSchemaVersion: v.optional(v.number()),
+        complianceStatus: v.optional(v.union(
+            v.literal('pass'),
+            v.literal('warning'),
+            v.literal('error'),
+        )),
+        /** Section counts (after drafting completes) */
+        sectionCount: v.optional(v.number()),
+        aiDraftedCount: v.optional(v.number()),
+        lockedCount: v.optional(v.number()),
+    },
+    handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        const doc = await ctx.db.get(args.exportId);
+
+        if (!doc || doc.userId !== user._id) {
+            throw new Error('Export not found or access denied');
+        }
+
+        // Only allow updates on in-progress exports
+        const inProgressStatuses = ['drafting', 'preflight', 'rendering', 'saving'];
+        if (!inProgressStatuses.includes(doc.status)) {
+            throw new Error(`Cannot update export in '${doc.status}' status`);
+        }
+
+        const { exportId, ...updates } = args;
+        const filtered = Object.fromEntries(
+            Object.entries(updates).filter(([, val]) => val !== undefined),
+        );
+
+        await ctx.db.patch(exportId, {
+            ...filtered,
+            updatedAt: Date.now(),
+        });
+    },
+});
+
+// ---------------------------------------------------------------------------
+// 3. Finalize Export Run (pipeline success)
+// ---------------------------------------------------------------------------
+
+/** Mark an export as successfully completed with PDF reference. */
+export const finalizeExportRun = mutation({
+    args: {
+        exportId: v.id('generatedDocuments'),
+        storageId: v.id('_storage'),
+        filename: v.string(),
+        byteSize: v.number(),
+        mimeType: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        const doc = await ctx.db.get(args.exportId);
+
+        if (!doc || doc.userId !== user._id) {
+            throw new Error('Export not found or access denied');
+        }
+
+        // Guard: only in-progress exports can be finalized
+        const finalizableStatuses = ['drafting', 'preflight', 'rendering', 'saving'];
+        if (!finalizableStatuses.includes(doc.status)) {
+            throw new Error(`Cannot finalize export in '${doc.status}' status`);
+        }
+
+        const now = Date.now();
+        await ctx.db.patch(args.exportId, {
+            status: 'completed',
+            storageId: args.storageId,
+            filename: args.filename,
+            byteSize: args.byteSize,
+            mimeType: args.mimeType ?? 'application/pdf',
+            completedAt: now,
+            durationMs: doc.startedAt ? now - doc.startedAt : undefined,
+            updatedAt: now,
+        });
+    },
+});
+
+// ---------------------------------------------------------------------------
+// 4. Fail Export Run (pipeline error)
+// ---------------------------------------------------------------------------
+
+/** Mark an export as failed with typed error code. */
+export const failExportRun = mutation({
+    args: {
+        exportId: v.id('generatedDocuments'),
+        errorCode: v.string(),
+        errorMessage: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        const doc = await ctx.db.get(args.exportId);
+
+        if (!doc || doc.userId !== user._id) {
+            throw new Error('Export not found or access denied');
+        }
+
+        const now = Date.now();
+        await ctx.db.patch(args.exportId, {
+            status: 'failed',
+            errorCode: args.errorCode,
+            errorMessage: args.errorMessage,
+            completedAt: now,
+            durationMs: doc.startedAt ? now - doc.startedAt : undefined,
+            updatedAt: now,
+        });
+    },
+});
+
+// ---------------------------------------------------------------------------
+// Get a single export by ID (for download route)
+// ---------------------------------------------------------------------------
+
+/** Fetch a single export by ID — ownership-guarded. */
+export const getExportById = query({
+    args: {
+        exportId: v.id('generatedDocuments'),
+    },
+    handler: async (ctx, { exportId }) => {
+        const user = await getAuthenticatedUser(ctx);
+        const doc = await ctx.db.get(exportId);
+
+        if (!doc || doc.userId !== user._id) {
+            throw new Error('Export not found or access denied');
+        }
+
+        // Return full record for download + detail views
+        return doc;
+    },
+});
+
+// ---------------------------------------------------------------------------
+// Get recent exports for Export History panel
 // ---------------------------------------------------------------------------
 
 /** Fetch recent exported documents for the current user (clamped to 100). */
@@ -103,6 +269,9 @@ export const getRecentExports = query({
             petitionerName: doc.petitionerName,
             respondentName: doc.respondentName,
             storageId: doc.storageId,
+            filename: doc.filename,
+            exportPath: doc.exportPath,
+            sectionCount: doc.sectionCount,
             createdAt: doc.createdAt,
             updatedAt: doc.updatedAt,
         }));
@@ -110,14 +279,14 @@ export const getRecentExports = query({
 });
 
 // ---------------------------------------------------------------------------
-// Update document status
+// Update document status (post-completion lifecycle)
 // ---------------------------------------------------------------------------
 
 /**
- * Advance a document's status lifecycle.
+ * Advance a completed document's status lifecycle.
  *
- * Valid transitions: draft → final → filed. Downgrading a filed document
- * is not permitted to protect audit integrity.
+ * Valid transitions: completed → final → filed.
+ * Downgrading a filed document is not permitted to protect audit integrity.
  */
 export const updateDocumentStatus = mutation({
     args: {
@@ -140,9 +309,13 @@ export const updateDocumentStatus = mutation({
             throw new Error('Filed documents cannot be downgraded');
         }
 
-        // Enforce documented progression: draft → final → filed
-        if (doc.status === 'draft' && status === 'filed') {
-            throw new Error('Draft documents must be finalized before filing');
+        // Enforce progression: completed → final → filed
+        const validPredecessors: Record<string, string[]> = {
+            final: ['completed', 'draft'],
+            filed: ['final'],
+        };
+        if (!validPredecessors[status]?.includes(doc.status)) {
+            throw new Error(`Cannot transition from '${doc.status}' to '${status}'`);
         }
 
         await ctx.db.patch(documentId, {
@@ -153,11 +326,11 @@ export const updateDocumentStatus = mutation({
 });
 
 // ---------------------------------------------------------------------------
-// Delete a draft document
+// Delete a draft/failed document
 // ---------------------------------------------------------------------------
 
 /**
- * Delete a draft document (only drafts can be deleted).
+ * Delete a draft or failed document.
  *
  * Storage cleanup is best-effort — an orphan blob is preferable to
  * leaving documents undeletable.
@@ -174,11 +347,12 @@ export const deleteExport = mutation({
             throw new Error('Document not found or access denied');
         }
 
-        if (doc.status !== 'draft') {
-            throw new Error('Only draft documents can be deleted');
+        const deletableStatuses = ['draft', 'drafting', 'failed'];
+        if (!deletableStatuses.includes(doc.status)) {
+            throw new Error('Only draft or failed documents can be deleted');
         }
 
-        // Best-effort storage cleanup — orphan blob is preferable to blocking deletion
+        // Best-effort storage cleanup
         if (doc.storageId) {
             try {
                 await ctx.storage.delete(doc.storageId);
@@ -190,3 +364,32 @@ export const deleteExport = mutation({
         await ctx.db.delete(documentId);
     },
 });
+
+// ---------------------------------------------------------------------------
+// Generate upload URL (for API route to upload PDF)
+// ---------------------------------------------------------------------------
+
+/** Generate a signed upload URL for the API route to upload PDF to storage. */
+export const generateExportUploadUrl = mutation({
+    args: {},
+    handler: async (ctx) => {
+        await getAuthenticatedUser(ctx);
+        return await ctx.storage.generateUploadUrl();
+    },
+});
+
+// ---------------------------------------------------------------------------
+// Get storage URL (for download route)
+// ---------------------------------------------------------------------------
+
+/** Resolve a storage ID to a signed download URL. */
+export const getStorageUrl = query({
+    args: {
+        storageId: v.id('_storage'),
+    },
+    handler: async (ctx, { storageId }) => {
+        await getAuthenticatedUser(ctx);
+        return await ctx.storage.getUrl(storageId);
+    },
+});
+

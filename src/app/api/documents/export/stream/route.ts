@@ -170,7 +170,14 @@ export async function POST(request: NextRequest) {
                 try {
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
                 } catch {
-                    // Controller may be closed
+                    // Controller may be closed (client disconnected)
+                }
+            };
+
+            /** Check if client disconnected; throw to exit pipeline early. */
+            const checkAborted = () => {
+                if (request.signal.aborted) {
+                    throw Object.assign(new Error('Client disconnected'), { code: 'client_aborted' });
                 }
             };
 
@@ -244,6 +251,8 @@ export async function POST(request: NextRequest) {
                         });
                     },
                 });
+
+                checkAborted();
 
                 const { draftedSections } = pipelineResult;
                 const aiDraftedCount = draftedSections.filter(s => s.source === 'ai_drafted').length;
@@ -325,6 +334,8 @@ export async function POST(request: NextRequest) {
                     message: 'Rendering document HTML...',
                 });
 
+                checkAborted();
+
                 const rules = getExportRules(body.exportRequest);
                 const generatedSections = adaptDraftedToGenerated(draftedSections);
 
@@ -339,7 +350,7 @@ export async function POST(request: NextRequest) {
                         caption: {
                             causeNumber: causeNumber ?? '_______________',
                             leftLines: [petitionerName.toUpperCase()],
-                            rightLines: [`${courtState.toUpperCase()} COUNTY`],
+                            rightLines: [`${(courtCounty || courtState).toUpperCase()} COUNTY`],
                             style: courtState === 'Texas' ? 'section-symbol' : 'versus',
                         },
                         titleText: getTemplateName(body.exportRequest?.path ?? 'general').toUpperCase(),
@@ -365,6 +376,8 @@ export async function POST(request: NextRequest) {
 
                 const pdfBuffer = await renderHTMLToPDF(html, rules, causeNumber);
 
+                checkAborted();
+
                 // ────────────────────────────────────────────────
                 // 6. UPLOAD PDF TO CONVEX STORAGE
                 // ────────────────────────────────────────────────
@@ -385,6 +398,7 @@ export async function POST(request: NextRequest) {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/pdf' },
                     body: new Uint8Array(pdfBuffer),
+                    signal: request.signal,
                 });
 
                 if (!uploadResponse.ok) {
@@ -480,10 +494,11 @@ export async function POST(request: NextRequest) {
 /** Classify error into typed error code based on message/stack. */
 function classifyError(error: Error): string {
     const msg = error.message?.toLowerCase() ?? '';
+    if (msg.includes('client_aborted') || msg.includes('client disconnected')) return 'client_aborted';
     if (msg.includes('draft') || msg.includes('openai') || msg.includes('gpt')) return 'draft_failed';
     if (msg.includes('preflight')) return 'preflight_failed';
-    if (msg.includes('html') || msg.includes('template') || msg.includes('render')) return 'render_html_failed';
     if (msg.includes('pdf') || msg.includes('puppeteer') || msg.includes('chromium')) return 'render_pdf_failed';
+    if (msg.includes('html') || msg.includes('template')) return 'render_html_failed';
     if (msg.includes('upload') || msg.includes('storage')) return 'upload_failed';
     if (msg.includes('save') || msg.includes('mutation') || msg.includes('convex')) return 'save_failed';
     return 'unknown_failed';

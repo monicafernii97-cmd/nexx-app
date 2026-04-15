@@ -102,6 +102,8 @@ export default function ReviewHubContent() {
     const pendingEditRef = useRef<{ nodeId: string; text: string } | null>(null);
     // Synchronous guard — prevents double-submission before React re-renders
     const draftingGuardRef = useRef(false);
+    // Preserve failed exportId for retry linkage
+    const retryExportIdRef = useRef<string | null>(null);
 
     // Cleanup: abort stream on unmount
     useEffect(() => {
@@ -209,7 +211,9 @@ export default function ReviewHubContent() {
                 exportRequest: state.exportRequest,
                 reviewItems: effectiveItems,
                 caseId: state.caseId,
+                retryOfExportId: retryExportIdRef.current ?? undefined,
             };
+            retryExportIdRef.current = null; // Clear after use
             startStream(input);
         } catch (err) {
             draftingGuardRef.current = false;
@@ -228,13 +232,14 @@ export default function ReviewHubContent() {
         }
     }, [reset, abort]);
 
-    /** Retry: reset and start fresh. */
+    /** Retry: preserve failed exportId for linkage, then reset to reviewing. */
     const handleRetry = useCallback(() => {
+        // Capture failed exportId before RESET clears it
+        retryExportIdRef.current = state.exportId;
         draftingGuardRef.current = false;
         setIsDrafting(false);
-        // Go back to reviewing phase so user can re-approve
         dispatch({ type: 'RESET' });
-    }, [dispatch]);
+    }, [dispatch, state.exportId]);
 
     /** Auto-save any pending sidebar edit before switching selection. */
     const handleSelectItem = useCallback((nodeId: string | null) => {
@@ -521,6 +526,7 @@ function CompletedPhaseUI({
 }) {
     const preflightPassCount = state.preflight?.checks.filter(c => c.severity === 'pass').length ?? 0;
     const preflightWarnCount = state.preflight?.warningCount ?? 0;
+    const preflightErrorCount = state.preflight?.errorCount ?? 0;
     const downloadUrl = state.exportId
         ? `/api/documents/export/${state.exportId}/download`
         : null;
@@ -555,6 +561,9 @@ function CompletedPhaseUI({
                             <span className="text-emerald-400">{preflightPassCount} ✓</span>
                             {preflightWarnCount > 0 && (
                                 <span className="text-amber-400 ml-1">{preflightWarnCount} ⚠</span>
+                            )}
+                            {preflightErrorCount > 0 && (
+                                <span className="text-red-400 ml-1">{preflightErrorCount} ✕</span>
                             )}
                         </p>
                     </div>

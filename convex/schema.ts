@@ -390,13 +390,32 @@ export default defineSchema({
         errorCode: v.optional(v.string()),
         errorMessage: v.optional(v.string()),
 
+        // ── Versioning + Lineage ──
+        /** Sequential version number within a lineage chain (1, 2, 3…) */
+        version: v.optional(v.number()),
+        /** Root export ID — the first export in a version lineage chain */
+        rootExportId: v.optional(v.id('generatedDocuments')),
+        /** Parent export ID — the direct predecessor in a version chain */
+        parentExportId: v.optional(v.id('generatedDocuments')),
+
+        // ── Stage Tracking (for retry scoping) ──
+        /** The last pipeline stage that completed successfully */
+        currentStage: v.optional(v.union(
+            v.literal('draft'),
+            v.literal('preflight'),
+            v.literal('render'),
+            v.literal('upload'),
+            v.literal('finalize')
+        )),
+
         createdAt: v.number(),
         updatedAt: v.number(),
     })
         .index('by_user', ['userId'])
         .index('by_user_status', ['userId', 'status'])
         .index('by_case', ['caseId'])
-        .index('by_run', ['runId']),
+        .index('by_run', ['runId'])
+        .index('by_root_export', ['rootExportId']),
 
     // ═══ Court Rules Cache (Legal Document System) ═══
     courtRulesCache: defineTable({

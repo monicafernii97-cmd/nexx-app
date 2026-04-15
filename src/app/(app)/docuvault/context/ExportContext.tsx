@@ -159,9 +159,13 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
         case 'UPDATE_SECTION_OVERRIDE': {
             const existing = state.overrides.sectionOverrides;
             const idx = existing.findIndex(s => s.sectionId === action.override.sectionId);
+            // Merge with existing override to preserve fields from prior edits
+            const merged = idx >= 0
+                ? { ...existing[idx], ...action.override }
+                : action.override;
             const updated = idx >= 0
-                ? existing.map((s, i) => i === idx ? action.override : s)
-                : [...existing, action.override];
+                ? existing.map((s, i) => i === idx ? merged : s)
+                : [...existing, merged];
             return {
                 ...state,
                 overrides: { ...state.overrides, sectionOverrides: updated },
@@ -261,7 +265,7 @@ const AUTO_SAVE_INTERVAL_MS = 30_000;
 export function ExportProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(exportReducer, initialState);
     const [isDirty, setIsDirty] = useState(false);
-    const lastSavedRef = useRef<string>('');
+    const lastCheckedSnapshotRef = useRef<string>('');
 
     /** Call after persisting to Convex to reset dirty flag */
     const markSaved = useCallback(() => {
@@ -279,8 +283,8 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                 reviewItems: state.reviewItems,
             });
 
-            if (snapshot !== lastSavedRef.current) {
-                lastSavedRef.current = snapshot;
+            if (snapshot !== lastCheckedSnapshotRef.current) {
+                lastCheckedSnapshotRef.current = snapshot;
                 setIsDirty(true);
             }
         }, AUTO_SAVE_INTERVAL_MS);

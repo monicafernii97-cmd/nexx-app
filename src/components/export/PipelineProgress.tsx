@@ -185,11 +185,7 @@ export default function PipelineProgress({ currentPhase, progress, detail, error
                             {/* Step Icon */}
                             <div
                                 className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                                    status === 'active'
-                                        ? 'bg-white/15'
-                                        : status === 'completed'
-                                            ? 'bg-white/5'
-                                            : 'bg-white/5'
+                                    status === 'active' ? 'bg-white/15' : 'bg-white/5'
                                 }`}
                             >
                                 <Icon

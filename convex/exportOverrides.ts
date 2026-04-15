@@ -117,15 +117,16 @@ export const clearOverrides = mutation({
         const user = await getAuthenticatedUser(ctx);
         const userId = user._id;
 
-        const existing = await ctx.db
+        // Collect all matches to clean up any race-created duplicates
+        const allMatching = await ctx.db
             .query('exportOverrides')
             .withIndex('by_userId_case_path', (q) =>
                 q.eq('userId', userId).eq('caseId', caseId).eq('exportPath', exportPath),
             )
-            .first();
+            .collect();
 
-        if (existing) {
-            await ctx.db.delete(existing._id);
+        for (const record of allMatching) {
+            await ctx.db.delete(record._id);
         }
     },
 });

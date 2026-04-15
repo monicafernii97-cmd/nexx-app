@@ -26,6 +26,9 @@ import {
     SpinnerGap,
     Circle,
     XCircle,
+    ShieldWarning,
+    CaretDown,
+    CaretUp,
 } from '@phosphor-icons/react';
 import { useExport, type DraftingStage } from '../context/ExportContext';
 import { useDraftingStream, type DraftStreamInput } from '@/hooks/useDraftingStream';
@@ -98,6 +101,7 @@ export default function ReviewHubContent() {
     const [isDrafting, setIsDrafting] = useState(false);
     const [showPreflight, setShowPreflight] = useState(false);
     const [textMode, setTextMode] = useState<'original' | 'court_safe'>('original');
+    const [validationExpanded, setValidationExpanded] = useState(true);
 
     // Track sidebar edit state to auto-save on selection change
     const pendingEditRef = useRef<{ nodeId: string; text: string } | null>(null);
@@ -364,13 +368,14 @@ export default function ReviewHubContent() {
                                 Preflight
                             </button>
 
-                            {/* Approve & Draft */}
+                            {/* Approve & Draft — gated by critical validation */}
                             <button
                                 type="button"
                                 onClick={handleApproveAndDraft}
-                                disabled={isDrafting}
+                                disabled={isDrafting || (state.assemblyValidation?.critical?.length ?? 0) > 0}
+                                title={(state.assemblyValidation?.critical?.length ?? 0) > 0 ? 'Resolve critical validation issues first' : undefined}
                                 className={`px-5 py-2.5 rounded-xl text-[13px] font-bold tracking-wide text-white border border-white/25 transition-all flex items-center gap-2 ${
-                                    isDrafting
+                                    isDrafting || (state.assemblyValidation?.critical?.length ?? 0) > 0
                                         ? 'bg-white/10 cursor-not-allowed opacity-60'
                                         : 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_16px_rgba(26,75,155,0.3),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:-translate-y-0.5'
                                 }`}
@@ -381,6 +386,82 @@ export default function ReviewHubContent() {
                         </div>
                     </div>
                 </div>
+
+                {/* ── Assembly Validation Banner ── */}
+                {state.assemblyValidation && (
+                    (() => {
+                        const { critical, errors, warnings } = state.assemblyValidation;
+                        const totalIssues = critical.length + errors.length + warnings.length;
+                        if (totalIssues === 0) return null;
+                        const highestSeverity = critical.length > 0 ? 'critical' : errors.length > 0 ? 'error' : 'warning';
+                        const bannerColors = {
+                            critical: 'bg-red-500/10 border-red-500/30 text-red-400',
+                            error: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
+                            warning: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
+                        };
+                        return (
+                            <div className={`shrink-0 mx-6 mt-4 rounded-xl border ${bannerColors[highestSeverity]} overflow-hidden`}>
+                                <button
+                                    onClick={() => setValidationExpanded(!validationExpanded)}
+                                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
+                                >
+                                    <ShieldWarning size={18} weight="fill" />
+                                    <span className="text-[13px] font-bold">
+                                        {critical.length > 0 && `${critical.length} critical`}
+                                        {critical.length > 0 && errors.length > 0 && ' · '}
+                                        {errors.length > 0 && `${errors.length} error${errors.length > 1 ? 's' : ''}`}
+                                        {(critical.length > 0 || errors.length > 0) && warnings.length > 0 && ' · '}
+                                        {warnings.length > 0 && `${warnings.length} warning${warnings.length > 1 ? 's' : ''}`}
+                                    </span>
+                                    {critical.length > 0 && (
+                                        <span className="text-[11px] font-medium ml-auto mr-2 text-red-300">
+                                            Blocks drafting
+                                        </span>
+                                    )}
+                                    {validationExpanded ? <CaretUp size={14} /> : <CaretDown size={14} />}
+                                </button>
+                                <AnimatePresence>{validationExpanded && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="px-4 pb-3 space-y-1.5">
+                                            {critical.map(item => (
+                                                <div key={item.id} className="flex items-start gap-2.5 text-[12px]">
+                                                    <XCircle size={14} weight="fill" className="text-red-400 mt-0.5 shrink-0" />
+                                                    <div>
+                                                        <span className="font-bold text-red-300">{item.label}</span>
+                                                        <span className="text-red-400/80 ml-1">{item.detail}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {errors.map(item => (
+                                                <div key={item.id} className="flex items-start gap-2.5 text-[12px]">
+                                                    <WarningCircle size={14} weight="fill" className="text-amber-400 mt-0.5 shrink-0" />
+                                                    <div>
+                                                        <span className="font-bold text-amber-300">{item.label}</span>
+                                                        <span className="text-amber-400/80 ml-1">{item.detail}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {warnings.map(item => (
+                                                <div key={item.id} className="flex items-start gap-2.5 text-[12px]">
+                                                    <WarningCircle size={14} weight="regular" className="text-yellow-400 mt-0.5 shrink-0" />
+                                                    <div>
+                                                        <span className="font-bold text-yellow-300">{item.label}</span>
+                                                        <span className="text-yellow-400/80 ml-1">{item.detail}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                )}</AnimatePresence>
+                            </div>
+                        );
+                    })()
+                )}
 
                 {/* Canvas + Preflight */}
                 <div className="flex-1 flex overflow-hidden">

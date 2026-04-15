@@ -101,9 +101,13 @@ export default function ReviewHubContent() {
 
     // Compute stats (memoized to avoid redundant filtering)
     const { totalItems, includedItems, lowConfidenceCount, lockedSections, sectionCount } = useMemo(() => {
+        // Respect explicit reviewer overrides (re-include or exclude)
+        const isExcluded = (i: MappingReviewItem) =>
+            i.userOverride?.exclude ?? !i.includedInExport;
+
         const total = effectiveItems.length;
-        const included = effectiveItems.filter(i => i.includedInExport && !i.userOverride?.exclude).length;
-        const lowConf = effectiveItems.filter(i => i.confidence < 0.5 && i.includedInExport && !i.userOverride?.exclude).length;
+        const included = effectiveItems.filter(i => !isExcluded(i)).length;
+        const lowConf = effectiveItems.filter(i => i.confidence < 0.5 && !isExcluded(i)).length;
         const locked = state.overrides.sectionOverrides.filter(s => s.isLocked).length;
         return {
             totalItems: total,

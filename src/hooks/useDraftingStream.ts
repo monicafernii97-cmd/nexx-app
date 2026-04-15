@@ -13,7 +13,7 @@
 'use client';
 
 import { useCallback, useRef } from 'react';
-import type { ExportState, DraftingStage } from '@/app/(app)/docuvault/context/ExportContext';
+import type { DraftingStage } from '@/app/(app)/docuvault/context/ExportContext';
 import type { OrchestratorAssemblyResult, ExportOverrides, PipelineStatus } from '@/lib/export-assembly/orchestrator';
 import type { ExportRequest, MappingReviewItem } from '@/lib/export-assembly/types/exports';
 import type { PreflightResult } from '@/lib/export-assembly/validation/preflightValidator';
@@ -67,7 +67,6 @@ type SSEEvent = SSEMilestoneEvent | SSECompleteEvent | SSEErrorEvent;
 interface ContextDispatchers {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dispatch: React.Dispatch<any>;
-    state: ExportState;
 }
 
 // ---------------------------------------------------------------------------

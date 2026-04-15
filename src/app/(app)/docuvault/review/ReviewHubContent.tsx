@@ -91,7 +91,7 @@ export default function ReviewHubContent() {
         reset,
     } = useExport();
 
-    const { startStream, abort } = useDraftingStream({ dispatch, state });
+    const { startStream, abort } = useDraftingStream({ dispatch });
 
     // Local UI state
     const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -465,7 +465,7 @@ function DraftingPhaseUI({
                 <div className="w-full h-1.5 bg-white/5 rounded-full mb-6 overflow-hidden">
                     <motion.div
                         className="h-full bg-gradient-to-r from-[#1A4B9B] to-[#60A5FA] rounded-full"
-                        initial={{ width: '50%' }}
+                        initial={{ width: `${state.progress}%` }}
                         animate={{ width: `${state.progress}%` }}
                         transition={{ ease: 'easeOut', duration: 0.5 }}
                     />

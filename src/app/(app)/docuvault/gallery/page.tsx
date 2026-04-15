@@ -1,7 +1,7 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useMemo } from 'react';
 import {
     FileText,
     Search,
@@ -12,27 +12,24 @@ import {
     Plus,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@convex/_generated/api';
+import type { Id } from '@convex/_generated/dataModel';
+import { EXPORT_PATH_LABELS } from '@/lib/export-assembly/exportPathLabels';
+import type { ExportPath } from '@/lib/export-assembly/types/exports';
 import { UI_TABS } from '@/lib/legal/templateCategories';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 
-/** Mock document data (will connect to Convex backend) */
-interface SavedDocument {
-    id: string;
-    title: string;
-    category: string;
-    createdAt: Date;
-    status: 'complete' | 'draft';
-    fileSize: string;
-}
-
-/** Gallery page displaying saved and draft legal documents with search and filters. */
+/** Gallery page displaying saved and generated legal documents. */
 export default function DocuVaultGalleryPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<string>('all');
     const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name'>('newest');
+    const [deletingId, setDeletingId] = useState<Id<'generatedDocuments'> | null>(null);
 
-    // Placeholder — will be populated from Convex
-    const documents: SavedDocument[] = [];
+    // ── Fetch real data from Convex ──
+    const exports = useQuery(api.generatedDocumentsExport.getRecentExports, { limit: 100 });
+    const deleteExport = useMutation(api.generatedDocumentsExport.deleteExport);
 
     const filterTabs = [
         { id: 'all', label: 'All' },
@@ -41,6 +38,25 @@ export default function DocuVaultGalleryPage() {
             label: t.label === 'LEAD' ? 'LEAD' : t.label,
         })),
     ];
+
+    // Map exports to display items
+    const documents = useMemo(() => {
+        if (!exports) return [];
+        return exports.map(doc => ({
+            id: doc._id,
+            title: doc.filename ?? doc.templateTitle,
+            category: doc.exportPath ?? doc.templateId,
+            createdAt: new Date(doc.createdAt),
+            status: (['completed', 'final', 'filed'].includes(doc.status) ? 'complete' : 'draft') as 'complete' | 'draft',
+            fileSize: '-',
+            exportPath: doc.exportPath as ExportPath | undefined,
+            version: doc.version,
+            rootExportId: doc.rootExportId,
+            currentStage: doc.currentStage,
+            dbStatus: doc.status,
+            storageId: doc.storageId,
+        }));
+    }, [exports]);
 
     const filteredDocs = documents
         .filter(doc => {
@@ -56,6 +72,25 @@ export default function DocuVaultGalleryPage() {
 
     const completeDocs = filteredDocs.filter(d => d.status === 'complete');
     const draftDocs = filteredDocs.filter(d => d.status === 'draft');
+
+    /** Handle delete with confirmation */
+    const handleDelete = async (docId: Id<'generatedDocuments'>) => {
+        if (!window.confirm('Delete this document? This cannot be undone.')) return;
+        setDeletingId(docId);
+        try {
+            await deleteExport({ documentId: docId });
+        } catch (err) {
+            console.error('[Gallery] Delete failed:', err);
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    /** Get display label for export path */
+    const getPathLabel = (path?: ExportPath) => {
+        if (!path) return 'Document';
+        return EXPORT_PATH_LABELS[path] ?? path;
+    };
 
     return (
         <PageContainer>
@@ -119,7 +154,7 @@ export default function DocuVaultGalleryPage() {
                 </div>
             </motion.div>
 
-            {/* Document Gallery Wrapper & Header */}
+            {/* Document Gallery */}
             <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -128,6 +163,9 @@ export default function DocuVaultGalleryPage() {
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-[14px] font-bold tracking-[0.2em] uppercase text-white drop-shadow-sm m-0">
                         Document Gallery
+                        {exports !== undefined && (
+                            <span className="text-white/40 ml-2 font-medium">({documents.length})</span>
+                        )}
                     </h2>
 
                     <div className="relative shrink-0">
@@ -141,7 +179,6 @@ export default function DocuVaultGalleryPage() {
                             <option value="oldest" className="bg-[#0A1128] text-white">Oldest</option>
                             <option value="name" className="bg-[#0A1128] text-white">Name</option>
                         </select>
-                        {/* Add visual dropdown arrow since appearance-none hides it */}
                         <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
                             <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M1 1L5 5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -150,8 +187,16 @@ export default function DocuVaultGalleryPage() {
                     </div>
                 </div>
 
-                {/* Empty State — no documents at all */}
-                {documents.length === 0 && (
+                {/* Loading state */}
+                {exports === undefined && (
+                    <div className="p-16 rounded-[2rem] text-center border border-white/10 bg-white/5 backdrop-blur-2xl">
+                        <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white/70 animate-spin mx-auto mb-4" />
+                        <p className="text-[14px] text-white/50 font-medium">Loading documents…</p>
+                    </div>
+                )}
+
+                {/* Empty State */}
+                {exports !== undefined && documents.length === 0 && (
                     <div className="p-16 rounded-[2rem] text-center border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_12px_40px_rgba(0,0,0,0.4)]">
                         <div
                             className="w-24 h-24 rounded-[2rem] mx-auto mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-white/20 shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
@@ -170,8 +215,8 @@ export default function DocuVaultGalleryPage() {
                     </div>
                 )}
 
-                {/* No matching results — documents exist but filters yield nothing */}
-                {documents.length > 0 && filteredDocs.length === 0 && (
+                {/* No matching results */}
+                {exports !== undefined && documents.length > 0 && filteredDocs.length === 0 && (
                     <div className="p-12 rounded-[2rem] text-center border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_12px_40px_rgba(0,0,0,0.4)]">
                         <Search size={40} className="mx-auto mb-4 text-white/40" />
                         <p className="text-[18px] font-bold mb-2 text-white drop-shadow-sm">
@@ -184,62 +229,72 @@ export default function DocuVaultGalleryPage() {
                 )}
 
                 {/* Completed Documents Grid */}
-                {completeDocs.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-                        {completeDocs.map((doc, i) => (
-                            <motion.div
-                                key={doc.id}
-                                initial={{ opacity: 0, y: 12 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.05 * i }}
-                                className="p-6 rounded-[2rem] group transition-all border border-white/10 bg-white/5 backdrop-blur-2xl hover:bg-white/10 hover:border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-1"
-                            >
-                                <div className="flex items-start gap-5">
-                                    {/* Preview thumbnail */}
-                                    <div
-                                        className="w-20 h-24 rounded-xl flex items-center justify-center flex-shrink-0 bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-white/20 shadow-[0_4px_16px_rgba(0,0,0,0.5)]"
-                                    >
-                                        <FileText size={28} className="text-white drop-shadow-sm" />
-                                    </div>
-                                    <div className="flex-1 min-w-0 py-1">
-                                        <p className="text-[17px] font-bold truncate mb-2 text-white drop-shadow-sm">
-                                            {doc.title}
-                                        </p>
-                                        <div className="flex items-center gap-3 mb-3">
-                                            <span className="text-[11px] font-bold tracking-widest uppercase bg-white/10 text-white border border-white/20 px-3 py-1.5 rounded-full">{doc.category}</span>
-                                            <span className="text-[13px] font-bold text-white">{doc.fileSize}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-[13px] font-bold text-white">
-                                            <Clock size={14} className="text-[#60A5FA]" />
-                                            Updated {doc.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </div>
-                                    </div>
-                                    {/* Actions — disabled until backend wiring */}
-                                    <div className="flex gap-3">
-                                        <button
-                                            disabled
-                                            aria-disabled="true"
-                                            title="Download not available yet"
-                                            className="w-10 h-10 rounded-full flex items-center justify-center cursor-not-allowed bg-white/5 border border-white/10 text-white shadow-sm"
+                <AnimatePresence>
+                    {completeDocs.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                            {completeDocs.map((doc, i) => (
+                                <motion.div
+                                    key={doc.id}
+                                    initial={{ opacity: 0, y: 12 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    transition={{ delay: 0.05 * i }}
+                                    className="p-6 rounded-[2rem] group transition-all border border-white/10 bg-white/5 backdrop-blur-2xl hover:bg-white/10 hover:border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-1"
+                                >
+                                    <div className="flex items-start gap-5">
+                                        {/* Preview thumbnail */}
+                                        <div
+                                            className="w-20 h-24 rounded-xl flex items-center justify-center flex-shrink-0 bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-white/20 shadow-[0_4px_16px_rgba(0,0,0,0.5)]"
                                         >
-                                            <Download size={16} strokeWidth={2.5} />
-                                        </button>
-                                        <button
-                                            disabled
-                                            aria-disabled="true"
-                                            title="Delete not available yet"
-                                            className="w-10 h-10 rounded-full flex items-center justify-center cursor-not-allowed bg-white/5 border border-white/10 text-[#F87171] shadow-sm"
-                                        >
-                                            <Trash2 size={16} strokeWidth={2.5} />
-                                        </button>
+                                            <FileText size={28} className="text-white drop-shadow-sm" />
+                                        </div>
+                                        <div className="flex-1 min-w-0 py-1">
+                                            <p className="text-[17px] font-bold truncate mb-2 text-white drop-shadow-sm">
+                                                {doc.title}
+                                            </p>
+                                            <div className="flex items-center gap-3 mb-3 flex-wrap">
+                                                <span className="text-[11px] font-bold tracking-widest uppercase bg-white/10 text-white border border-white/20 px-3 py-1.5 rounded-full">
+                                                    {getPathLabel(doc.exportPath)}
+                                                </span>
+                                                {doc.version && doc.version > 1 && (
+                                                    <span className="text-[10px] font-bold text-white/40 bg-white/5 px-2 py-1 rounded-full">
+                                                        v{doc.version}
+                                                    </span>
+                                                )}
+                                                <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                                                    doc.dbStatus === 'filed' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                                    : doc.dbStatus === 'final' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                                                    : 'bg-white/5 text-white/40'
+                                                }`}>
+                                                    {doc.dbStatus.toUpperCase()}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[13px] font-bold text-white">
+                                                <Clock size={14} className="text-[#60A5FA]" />
+                                                {doc.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                            </div>
+                                        </div>
+                                        {/* Actions */}
+                                        <div className="flex gap-3">
+                                            {doc.storageId && (
+                                                <a
+                                                    href={`/api/documents/export/${doc.id}/download`}
+                                                    download={doc.title}
+                                                    className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors shadow-sm"
+                                                    aria-label="Download document"
+                                                >
+                                                    <Download size={16} strokeWidth={2.5} />
+                                                </a>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            </motion.div>
-                        ))}
-                    </div>
-                )}
+                                </motion.div>
+                            ))}
+                        </div>
+                    )}
+                </AnimatePresence>
 
-                {/* Drafts Section */}
+                {/* Draft/Failed Documents */}
                 {draftDocs.length > 0 && (
                     <>
                         <h2
@@ -257,17 +312,38 @@ export default function DocuVaultGalleryPage() {
                                     className="p-5 rounded-[1.5rem] flex items-center gap-5 bg-white/5 border border-white/10 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_16px_rgba(0,0,0,0.3)]"
                                 >
                                     <div
-                                        className="w-12 h-14 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#0A1128] border-2 border-dashed border-[#E5A84A] shadow-inner"
+                                        className={`w-12 h-14 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#0A1128] border-2 border-dashed ${
+                                            doc.dbStatus === 'failed' ? 'border-red-500/50' : 'border-[#E5A84A]'
+                                        } shadow-inner`}
                                     >
-                                        <FileText size={20} className="text-[#E5A84A] drop-shadow-sm" />
+                                        <FileText size={20} className={doc.dbStatus === 'failed' ? 'text-red-400' : 'text-[#E5A84A]'} />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-[16px] font-bold truncate text-white drop-shadow-sm">
                                             {doc.title}
                                         </p>
-                                        <p className="text-[13px] font-bold text-[#E5A84A] uppercase tracking-widest mt-1">Draft</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <p className={`text-[13px] font-bold uppercase tracking-widest ${
+                                                doc.dbStatus === 'failed' ? 'text-red-400' : 'text-[#E5A84A]'
+                                            }`}>
+                                                {doc.dbStatus === 'failed' ? 'Failed' : 'Draft'}
+                                            </p>
+                                            {doc.currentStage && (
+                                                <span className="text-[10px] text-white/30">
+                                                    Stage: {doc.currentStage}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-
+                                    {/* Delete draft/failed */}
+                                    <button
+                                        onClick={() => handleDelete(doc.id)}
+                                        disabled={deletingId === doc.id}
+                                        className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-[#F87171] hover:bg-red-500/10 hover:border-red-500/30 transition-colors shadow-sm disabled:opacity-40"
+                                        aria-label="Delete document"
+                                    >
+                                        <Trash2 size={16} strokeWidth={2.5} />
+                                    </button>
                                 </motion.div>
                             ))}
                         </div>

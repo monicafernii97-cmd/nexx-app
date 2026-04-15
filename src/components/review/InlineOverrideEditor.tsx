@@ -4,21 +4,32 @@
  * Inline Override Editor — Edit review item text directly within the canvas.
  *
  * Auto-sizes textarea, shows character count, and provides
- * Save/Cancel actions.
+ * Save/Cancel actions with keyboard shortcuts (⌘↵ save, Esc cancel).
  */
 
 import { useState, useRef, useEffect } from 'react';
 import { Check, X } from '@phosphor-icons/react';
 
+/** Props for the InlineOverrideEditor component. */
 interface InlineOverrideEditorProps {
-    nodeId: string;
+    /** The current text to display in the editor. */
     currentText: string;
+    /** Callback when the user saves edited text. */
     onSave: (text: string) => void;
+    /** Callback when the user cancels editing. */
     onCancel: () => void;
 }
 
+/**
+ * A self-sizing textarea editor for inline text overrides.
+ *
+ * Features:
+ * - Auto-focuses and places cursor at end on mount
+ * - Auto-resizes as user types
+ * - ⌘↵ / Ctrl+Enter saves, Escape cancels
+ * - Shows character count and disabled state when unchanged
+ */
 export default function InlineOverrideEditor({
-    nodeId: _nodeId,
     currentText,
     onSave,
     onCancel,
@@ -72,13 +83,15 @@ export default function InlineOverrideEditor({
                 </span>
                 <div className="flex items-center gap-1.5">
                     <button
+                        type="button"
                         onClick={onCancel}
                         className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors"
-                        title="Cancel (Esc)"
+                        aria-label="Cancel editing"
                     >
                         <X size={13} weight="bold" />
                     </button>
                     <button
+                        type="button"
                         onClick={() => hasChanges && onSave(text)}
                         disabled={!hasChanges}
                         className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
@@ -86,7 +99,7 @@ export default function InlineOverrideEditor({
                                 ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
                                 : 'bg-white/5 text-white/20 cursor-not-allowed'
                         }`}
-                        title="Save (⌘↵)"
+                        aria-label="Save changes"
                     >
                         <Check size={13} weight="bold" />
                     </button>

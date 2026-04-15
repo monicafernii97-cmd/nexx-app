@@ -38,6 +38,7 @@ export const saveExportResult = mutation({
 
         const docId = await ctx.db.insert('generatedDocuments', {
             userId: user._id,
+            caseId: args.caseId,
             templateId: args.templateId,
             templateTitle: args.templateTitle,
             caseType: args.caseType,

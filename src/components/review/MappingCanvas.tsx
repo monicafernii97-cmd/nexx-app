@@ -44,12 +44,14 @@ interface MappingCanvasProps {
 // Confidence Colors
 // ---------------------------------------------------------------------------
 
+/** Map a confidence value (0-1) to its display color. */
 function getConfidenceColor(confidence: number): string {
     if (confidence >= 0.8) return '#34D399'; // emerald
     if (confidence >= 0.5) return '#F59E0B'; // amber
     return '#F87171'; // rose
 }
 
+/** Map a confidence value (0-1) to a human-readable label. */
 function getConfidenceLabel(confidence: number): string {
     if (confidence >= 0.8) return 'High';
     if (confidence >= 0.5) return 'Medium';
@@ -60,6 +62,7 @@ function getConfidenceLabel(confidence: number): string {
 // Section Tile
 // ---------------------------------------------------------------------------
 
+/** A collapsible section tile displaying review items grouped by section. */
 function SectionTile({
     sectionId,
     items,
@@ -101,9 +104,12 @@ function SectionTile({
             }`}
         >
             {/* Section Header */}
-            <div
-                className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-white/5 transition-colors"
+            <button
+                type="button"
+                className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-white/5 transition-colors text-left"
                 onClick={() => setIsCollapsed(!isCollapsed)}
+                aria-expanded={!isCollapsed}
+                aria-label={`${formatSectionName(sectionId)}: ${includedCount} of ${items.length} items`}
             >
                 <div className="flex items-center gap-3">
                     <CaretDown
@@ -134,7 +140,7 @@ function SectionTile({
                         onToggle={onLockSection}
                     />
                 </div>
-            </div>
+            </button>
 
             {/* Items */}
             <AnimatePresence>
@@ -151,14 +157,16 @@ function SectionTile({
                                 const isExcluded = item.userOverride?.exclude ?? !item.includedInExport;
                                 const isSelected = item.nodeId === selectedItemId;
                                 const isEditing = item.nodeId === editingItemId;
-                                const displayText = textMode === 'court_safe' && item.transformedCourtSafeText
-                                    ? item.transformedCourtSafeText
-                                    : item.userOverride?.editedText ?? item.originalText;
+                                const displayText = textMode === 'court_safe'
+                                    ? (item.userOverride?.editedText ?? item.transformedCourtSafeText ?? item.originalText)
+                                    : (item.userOverride?.editedText ?? item.originalText);
 
                                 return (
                                     <motion.div
                                         key={item.nodeId}
                                         layout
+                                        role="button"
+                                        tabIndex={0}
                                         className={`group relative rounded-xl p-3.5 transition-all cursor-pointer ${
                                             isExcluded
                                                 ? 'opacity-40 bg-white/[0.02] border border-white/5'
@@ -167,6 +175,14 @@ function SectionTile({
                                                     : 'bg-white/[0.04] border border-white/10 hover:bg-white/[0.07] hover:border-white/15'
                                         }`}
                                         onClick={() => onSelectItem(isSelected ? null : item.nodeId)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                onSelectItem(isSelected ? null : item.nodeId);
+                                            }
+                                        }}
+                                        aria-pressed={isSelected}
+                                        aria-label={`${item.dominantType} item: ${displayText.slice(0, 60)}`}
                                     >
                                         {/* Item Header */}
                                         <div className="flex items-center justify-between mb-2">
@@ -207,7 +223,6 @@ function SectionTile({
                                         {isEditing ? (
                                             <div onClick={e => e.stopPropagation()}>
                                                 <InlineOverrideEditor
-                                                    nodeId={item.nodeId}
                                                     currentText={displayText}
                                                     onSave={(text) => {
                                                         onEditItem(item.nodeId, text);
@@ -245,12 +260,14 @@ function SectionTile({
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Format a section ID (snake_case) into a human-readable heading. */
 function formatSectionName(sectionId: string): string {
     return sectionId
         .replace(/_/g, ' ')
         .replace(/\b\w/g, c => c.toUpperCase());
 }
 
+/** Map a sentence type to its Tailwind badge class string. */
 function getTypeBadgeClass(type: string): string {
     switch (type) {
         case 'fact': return 'bg-blue-500/15 text-blue-400 border border-blue-500/20';
@@ -261,6 +278,9 @@ function getTypeBadgeClass(type: string): string {
         case 'request': return 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/20';
         case 'issue': return 'bg-orange-500/15 text-orange-400 border border-orange-500/20';
         case 'risk': return 'bg-red-500/15 text-red-400 border border-red-500/20';
+        case 'procedure': return 'bg-slate-500/15 text-slate-400 border border-slate-500/20';
+        case 'opinion': return 'bg-fuchsia-500/15 text-fuchsia-400 border border-fuchsia-500/20';
+        case 'unknown': return 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20';
         default: return 'bg-white/10 text-white/50 border border-white/10';
     }
 }

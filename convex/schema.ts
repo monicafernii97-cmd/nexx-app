@@ -297,6 +297,8 @@ export default defineSchema({
     // ═══ Generated Documents (Legal Document System) ═══
     generatedDocuments: defineTable({
         userId: v.id('users'),
+        /** Reference to the case this document belongs to */
+        caseId: v.optional(v.id('cases')),
         templateId: v.string(),
         templateTitle: v.string(),
         caseType: v.string(),
@@ -329,7 +331,8 @@ export default defineSchema({
         updatedAt: v.number(),
     })
         .index('by_user', ['userId'])
-        .index('by_user_status', ['userId', 'status']),
+        .index('by_user_status', ['userId', 'status'])
+        .index('by_case', ['caseId']),
 
     // ═══ Court Rules Cache (Legal Document System) ═══
     courtRulesCache: defineTable({

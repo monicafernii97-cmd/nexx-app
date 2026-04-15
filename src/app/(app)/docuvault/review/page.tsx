@@ -64,7 +64,7 @@ export default function ReviewHubPage() {
     // Compute stats
     const totalItems = state.reviewItems.length;
     const includedItems = state.reviewItems.filter(i => i.includedInExport && !i.userOverride?.exclude).length;
-    const lowConfidenceCount = state.reviewItems.filter(i => i.confidence < 0.5 && i.includedInExport).length;
+    const lowConfidenceCount = state.reviewItems.filter(i => i.confidence < 0.5 && i.includedInExport && !i.userOverride?.exclude).length;
     const lockedSections = state.overrides.sectionOverrides.filter(s => s.isLocked).length;
     const sectionCount = sectionGroups.size;
 
@@ -203,7 +203,7 @@ export default function ReviewHubPage() {
             <AnimatePresence>
                 {selectedItem && (
                     <motion.div
-                        key="trace-sidebar"
+                        key={`trace-sidebar-${selectedItem.nodeId}`}
                         initial={{ width: 0, opacity: 0 }}
                         animate={{ width: 380, opacity: 1 }}
                         exit={{ width: 0, opacity: 0 }}

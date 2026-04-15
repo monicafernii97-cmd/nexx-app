@@ -14,11 +14,14 @@ interface DraftStyleToggleProps {
     onChange: (mode: 'original' | 'court_safe') => void;
 }
 
+/** Segmented toggle for switching between original and court-safe text. */
 export default function DraftStyleToggle({ mode, onChange }: DraftStyleToggleProps) {
     return (
-        <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5">
+        <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5" role="group" aria-label="Text display mode">
             <button
+                type="button"
                 onClick={() => onChange('original')}
+                aria-pressed={mode === 'original'}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
                     mode === 'original'
                         ? 'bg-white/10 text-white shadow-sm'
@@ -30,7 +33,9 @@ export default function DraftStyleToggle({ mode, onChange }: DraftStyleTogglePro
                 Original
             </button>
             <button
+                type="button"
                 onClick={() => onChange('court_safe')}
+                aria-pressed={mode === 'court_safe'}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
                     mode === 'court_safe'
                         ? 'bg-emerald-500/15 text-emerald-400 shadow-sm'

@@ -93,7 +93,7 @@ describe('Export Assembly Pipeline', () => {
         expect(result.meta).toBeDefined();
 
         // Should have review items (one per input node)
-        expect(result.reviewItems.length).toBeGreaterThanOrEqual(1);
+        expect(result.reviewItems.length).toBe(FIXTURE_NODES.length);
 
         // Each review item should have required fields
         for (const item of result.reviewItems) {
@@ -117,12 +117,11 @@ describe('Export Assembly Pipeline', () => {
             [],
         );
 
-        // The emotion-heavy node should be classified as emotion
+        // The emotion-heavy node should be classified
         const emotionItem = result.reviewItems.find(i => i.nodeId === 'node-emotion-1');
-        if (emotionItem) {
-            // It should either be classified as emotion or have emotion signals
-            expect(['emotion', 'opinion', 'fact']).toContain(emotionItem.dominantType);
-        }
+        expect(emotionItem).toBeDefined();
+        // It should be classified as emotion or have emotion-adjacent type
+        expect(['emotion', 'opinion', 'fact']).toContain(emotionItem!.dominantType);
     });
 
     it('includes evidence reference nodes', () => {

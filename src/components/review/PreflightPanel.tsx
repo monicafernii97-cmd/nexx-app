@@ -56,8 +56,10 @@ export default function PreflightPanel({ result, onClose }: PreflightPanelProps)
                     </h2>
                 </div>
                 <button
+                    type="button"
                     onClick={onClose}
                     className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors text-white/40 hover:text-white"
+                    aria-label="Close preflight panel"
                 >
                     <X size={14} weight="bold" />
                 </button>
@@ -158,6 +160,7 @@ export default function PreflightPanel({ result, onClose }: PreflightPanelProps)
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Format a check category ID into a human-readable display string. */
 function formatCategory(category: string): string {
     return category.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }

@@ -141,7 +141,7 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
             // CourtConfig has known fields — extract safely
             const config = request.config;
             if ('documentType' in config) courtRules['documentType'] = config.documentType;
-            if ('draftStyle' in config) courtRules['draftStyle'] = config.draftStyle;
+            if ('tone' in config) courtRules['tone'] = config.tone;
         }
 
         try {

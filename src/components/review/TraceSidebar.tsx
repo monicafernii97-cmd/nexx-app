@@ -78,12 +78,9 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude }: T
     const topSection = item.userOverride?.forceSection ?? item.suggestedSections[0] ?? 'Unclassified';
     const altSections = item.suggestedSections.slice(1, 4);
 
-    // Simulated type scores based on dominant type and confidence
-    // In production, these would come from ClassifiedNode.scores
-    const typeScores: { type: SentenceType; score: number }[] = [
-        { type: item.dominantType, score: item.confidence },
-        ...generateFallbackScores(item.dominantType, item.confidence),
-    ].sort((a, b) => b.score - a.score);
+    // Only show the dominant type score — do NOT fabricate synthetic scores
+    // for other types. Real per-type scores will come from ClassifiedNode.scores
+    // when available on the MappingReviewItem in a future sprint.
 
     return (
         <div className="flex flex-col h-full bg-[rgba(10,17,40,0.95)] backdrop-blur-xl">
@@ -96,8 +93,10 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude }: T
                     </h2>
                 </div>
                 <button
+                    type="button"
                     onClick={onClose}
                     className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors text-white/40 hover:text-white"
+                    aria-label="Close trace sidebar"
                 >
                     <X size={14} weight="bold" />
                 </button>
@@ -113,16 +112,18 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude }: T
                         </h3>
                         <div className="flex items-center gap-1">
                             <button
+                                type="button"
                                 onClick={() => setIsEditing(!isEditing)}
                                 className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors"
-                                title="Edit text"
+                                aria-label="Edit source text"
                             >
                                 <PencilSimple size={12} weight="bold" />
                             </button>
                             <button
+                                type="button"
                                 onClick={() => onExclude(!isExcluded)}
                                 className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors"
-                                title={isExcluded ? 'Include in export' : 'Exclude from export'}
+                                aria-label={isExcluded ? 'Include in export' : 'Exclude from export'}
                             >
                                 {isExcluded ? <Eye size={12} weight="bold" /> : <EyeSlash size={12} weight="bold" />}
                             </button>
@@ -204,22 +205,22 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude }: T
                     )}
                 </section>
 
-                {/* ── Classification Scores ── */}
+                {/* ── Classification — Dominant Type Only ── */}
                 <section>
                     <h3 className="text-[11px] font-bold tracking-[0.15em] uppercase text-white/40 mb-3">
-                        Classification Scores
+                        Classification
                     </h3>
                     <div className="space-y-0.5">
-                        {typeScores.slice(0, 6).map((ts, i) => (
-                            <ScoreBar
-                                key={ts.type}
-                                label={ts.type}
-                                score={ts.score}
-                                color={getTypeColor(ts.type)}
-                                isTop={i === 0}
-                            />
-                        ))}
+                        <ScoreBar
+                            label={item.dominantType}
+                            score={item.confidence}
+                            color={getTypeColor(item.dominantType)}
+                            isTop={true}
+                        />
                     </div>
+                    <p className="text-[10px] text-white/30 mt-2">
+                        Per-type score breakdown will be available when real classification scores are wired.
+                    </p>
                 </section>
 
                 {/* ── Confidence Detail ── */}
@@ -277,18 +278,21 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude }: T
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Format a section ID (snake_case) into a human-readable heading. */
 function formatSectionName(sectionId: string): string {
     return sectionId
         .replace(/_/g, ' ')
         .replace(/\b\w/g, c => c.toUpperCase());
 }
 
+/** Map a confidence value (0-1) to a human-readable label. */
 function getConfidenceExplanation(confidence: number): string {
     if (confidence >= 0.8) return 'High Confidence';
     if (confidence >= 0.5) return 'Medium Confidence';
     return 'Low Confidence';
 }
 
+/** Map a SentenceType to its display color for score bars and badges. */
 function getTypeColor(type: SentenceType): string {
     const colors: Record<string, string> = {
         fact: '#60A5FA',
@@ -304,15 +308,4 @@ function getTypeColor(type: SentenceType): string {
         unknown: '#64748B',
     };
     return colors[type] ?? '#64748B';
-}
-
-/** Generate fallback type scores when real scores aren't available. */
-function generateFallbackScores(dominant: SentenceType, confidence: number): { type: SentenceType; score: number }[] {
-    const types: SentenceType[] = ['fact', 'argument', 'evidence_reference', 'timeline_event', 'emotion', 'request', 'issue', 'risk', 'procedure', 'opinion', 'unknown'];
-    const others = types.filter(t => t !== dominant);
-    const remaining = 1 - confidence;
-    return others.map((type, i) => ({
-        type,
-        score: Math.max(0.01, remaining * (1 / (i + 2))),
-    }));
 }

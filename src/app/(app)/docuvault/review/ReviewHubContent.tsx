@@ -256,6 +256,9 @@ export default function ReviewHubContent() {
                         <TraceSidebar
                             item={selectedItem}
                             onClose={() => handleSelectItem(null)}
+                            onTextChange={(text) => {
+                                pendingEditRef.current = { nodeId: selectedItem.nodeId, text };
+                            }}
                             onEditText={(text) => {
                                 editItem(selectedItem.nodeId, text);
                                 pendingEditRef.current = null; // Clear after explicit save

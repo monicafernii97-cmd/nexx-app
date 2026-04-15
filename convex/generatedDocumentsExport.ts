@@ -45,6 +45,7 @@ export const saveExportResult = mutation({
             throw new Error('Case not found or access denied');
         }
 
+        const now = Date.now();
         const docId = await ctx.db.insert('generatedDocuments', {
             userId: user._id,
             caseId: args.caseId,
@@ -60,8 +61,8 @@ export const saveExportResult = mutation({
             assemblySnapshotJson: args.assemblySnapshotJson,
             exportConfigJson: args.exportConfigJson,
             status: 'draft',
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
+            createdAt: now,
+            updatedAt: now,
         });
 
         return docId;

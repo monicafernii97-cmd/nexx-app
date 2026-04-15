@@ -36,6 +36,8 @@ interface TraceSidebarProps {
     onClose: () => void;
     onEditText: (text: string) => void;
     onExclude: (excluded: boolean) => void;
+    /** Called on each keystroke so the parent can track unsaved edits. */
+    onTextChange?: (text: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,7 +78,7 @@ function ScoreBar({ label, score, color, isTop }: { label: string; score: number
  * Shows original text, "Why this section?" explanation, classification
  * scores, confidence analysis, and court-safe preview with inline editing.
  */
-export default function TraceSidebar({ item, onClose, onEditText, onExclude }: TraceSidebarProps) {
+export default function TraceSidebar({ item, onClose, onEditText, onExclude, onTextChange }: TraceSidebarProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(item.userOverride?.editedText ?? item.originalText);
     const isExcluded = item.userOverride?.exclude ?? !item.includedInExport;
@@ -141,7 +143,10 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude }: T
                         <div className="space-y-2">
                             <textarea
                                 value={editText}
-                                onChange={e => setEditText(e.target.value)}
+                                onChange={e => {
+                                    setEditText(e.target.value);
+                                    onTextChange?.(e.target.value);
+                                }}
                                 className="w-full min-h-[100px] rounded-xl bg-white/5 border border-white/15 px-3 py-2.5 text-[13px] text-white/80 placeholder:text-white/30 focus:outline-none focus:border-[#60A5FA]/50 resize-y"
                             />
                             <div className="flex items-center gap-2">

@@ -10,11 +10,14 @@ import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import { getAuthenticatedUser } from './lib/auth';
 
+/** Hard ceiling for query pagination to prevent unbounded reads. */
+const MAX_QUERY_LIMIT = 100;
+
 // ---------------------------------------------------------------------------
 // Save a generated document from the export pipeline
 // ---------------------------------------------------------------------------
 
-/** Save the pipeline output to generatedDocuments. */
+/** Save the pipeline output to generatedDocuments with case-ownership check. */
 export const saveExportResult = mutation({
     args: {
         caseId: v.id('cases'),
@@ -35,6 +38,12 @@ export const saveExportResult = mutation({
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
+
+        // Verify the caller owns this case (prevents cross-tenant references)
+        const caseRecord = await ctx.db.get(args.caseId);
+        if (!caseRecord || caseRecord.userId !== user._id) {
+            throw new Error('Case not found or access denied');
+        }
 
         const docId = await ctx.db.insert('generatedDocuments', {
             userId: user._id,
@@ -63,14 +72,15 @@ export const saveExportResult = mutation({
 // Get recent exports for a user (for Export History panel)
 // ---------------------------------------------------------------------------
 
-/** Fetch recent exported documents for the current user. */
+/** Fetch recent exported documents for the current user (clamped to 100). */
 export const getRecentExports = query({
     args: {
         limit: v.optional(v.number()),
     },
     handler: async (ctx, { limit }) => {
         const user = await getAuthenticatedUser(ctx);
-        const maxResults = limit ?? 20;
+        const requested = limit ?? 20;
+        const maxResults = Math.min(MAX_QUERY_LIMIT, Math.max(1, Math.trunc(requested)));
 
         const docs = await ctx.db
             .query('generatedDocuments')
@@ -86,12 +96,16 @@ export const getRecentExports = query({
 // Update document status
 // ---------------------------------------------------------------------------
 
-/** Mark a document as final or filed. */
+/**
+ * Advance a document's status lifecycle.
+ *
+ * Valid transitions: draft → final → filed. Downgrading a filed document
+ * is not permitted to protect audit integrity.
+ */
 export const updateDocumentStatus = mutation({
     args: {
         documentId: v.id('generatedDocuments'),
         status: v.union(
-            v.literal('draft'),
             v.literal('final'),
             v.literal('filed'),
         ),
@@ -102,6 +116,11 @@ export const updateDocumentStatus = mutation({
 
         if (!doc || doc.userId !== user._id) {
             throw new Error('Document not found or access denied');
+        }
+
+        // Prevent downgrading a filed document
+        if (doc.status === 'filed' && status !== 'filed') {
+            throw new Error('Filed documents cannot be downgraded');
         }
 
         await ctx.db.patch(documentId, {
@@ -115,7 +134,12 @@ export const updateDocumentStatus = mutation({
 // Delete a draft document
 // ---------------------------------------------------------------------------
 
-/** Delete a draft document (only drafts can be deleted). */
+/**
+ * Delete a draft document (only drafts can be deleted).
+ *
+ * Storage cleanup is best-effort — an orphan blob is preferable to
+ * leaving documents undeletable.
+ */
 export const deleteExport = mutation({
     args: {
         documentId: v.id('generatedDocuments'),
@@ -132,9 +156,13 @@ export const deleteExport = mutation({
             throw new Error('Only draft documents can be deleted');
         }
 
-        // Delete associated storage if present
+        // Best-effort storage cleanup — orphan blob is preferable to blocking deletion
         if (doc.storageId) {
-            await ctx.storage.delete(doc.storageId);
+            try {
+                await ctx.storage.delete(doc.storageId);
+            } catch (err) {
+                console.warn('[deleteExport] Failed to delete blob:', doc.storageId, err);
+            }
         }
 
         await ctx.db.delete(documentId);

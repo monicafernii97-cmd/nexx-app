@@ -12,7 +12,7 @@
  * The user approves the assembly output here before GPT drafting begins.
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowLeft,
@@ -27,6 +27,20 @@ import TraceSidebar from '@/components/review/TraceSidebar';
 import PreflightPanel from '@/components/review/PreflightPanel';
 import DraftStyleToggle from '@/components/review/DraftStyleToggle';
 import type { MappingReviewItem } from '@/lib/export-assembly/types/exports';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Map an export path value to its human-readable display label. */
+function getExportLabel(exportPath: string | null | undefined): string {
+    switch (exportPath) {
+        case 'court_document': return 'Court Document';
+        case 'case_summary': return 'Case Summary';
+        case 'exhibit_packet': return 'Exhibit Packet';
+        default: return 'Export';
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -47,6 +61,9 @@ export default function ReviewHubContent() {
     const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
     const [textMode, setTextMode] = useState<'original' | 'court_safe'>('original');
     const [showPreflight, setShowPreflight] = useState(false);
+
+    // Track sidebar edit state to auto-save on selection change
+    const pendingEditRef = useRef<{ nodeId: string; text: string } | null>(null);
 
     // Group review items by their suggested section (first suggestion)
     const sectionGroups = useMemo(() => {
@@ -79,6 +96,16 @@ export default function ReviewHubContent() {
         startDrafting();
     }, [startDrafting]);
 
+    /** Auto-save any pending sidebar edit before switching selection. */
+    const handleSelectItem = useCallback((nodeId: string | null) => {
+        // If there's a pending edit from the sidebar, auto-save it
+        if (pendingEditRef.current) {
+            editItem(pendingEditRef.current.nodeId, pendingEditRef.current.text);
+            pendingEditRef.current = null;
+        }
+        setSelectedItemId(nodeId);
+    }, [editItem]);
+
     // Guard: only render during reviewing phase
     if (state.phase !== 'reviewing') {
         return (
@@ -87,6 +114,8 @@ export default function ReviewHubContent() {
             </div>
         );
     }
+
+    const preflightAvailable = !!state.preflight;
 
     return (
         <div className="flex h-full overflow-hidden">
@@ -109,9 +138,7 @@ export default function ReviewHubContent() {
                                     Review Hub
                                 </h1>
                                 <p className="text-[12px] text-white/50">
-                                    {state.exportPath === 'court_document' ? 'Court Document' :
-                                     state.exportPath === 'case_summary' ? 'Case Summary' :
-                                     'Exhibit Packet'}
+                                    {getExportLabel(state.exportPath)}
                                     {' · '}
                                     {sectionCount} sections · {includedItems}/{totalItems} items
                                 </p>
@@ -139,14 +166,17 @@ export default function ReviewHubContent() {
                                 onChange={setTextMode}
                             />
 
-                            {/* Preflight Button */}
+                            {/* Preflight Button — disabled when data unavailable */}
                             <button
                                 type="button"
-                                onClick={() => setShowPreflight(!showPreflight)}
+                                onClick={() => preflightAvailable && setShowPreflight(!showPreflight)}
+                                disabled={!preflightAvailable}
                                 className={`px-4 py-2 rounded-xl text-[12px] font-bold tracking-wide transition-all flex items-center gap-2 ${
-                                    showPreflight
-                                        ? 'bg-[#60A5FA]/15 border border-[#60A5FA]/40 text-[#60A5FA]'
-                                        : 'bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                                    !preflightAvailable
+                                        ? 'bg-white/5 border border-white/10 text-white/30 cursor-not-allowed'
+                                        : showPreflight
+                                            ? 'bg-[#60A5FA]/15 border border-[#60A5FA]/40 text-[#60A5FA]'
+                                            : 'bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10'
                                 }`}
                             >
                                 <Lightning size={14} weight="fill" />
@@ -175,7 +205,7 @@ export default function ReviewHubContent() {
                             overrides={state.overrides}
                             textMode={textMode}
                             selectedItemId={selectedItemId}
-                            onSelectItem={setSelectedItemId}
+                            onSelectItem={handleSelectItem}
                             onLockSection={lockSection}
                             onExcludeItem={excludeItem}
                             onEditItem={editItem}
@@ -217,8 +247,11 @@ export default function ReviewHubContent() {
                     >
                         <TraceSidebar
                             item={selectedItem}
-                            onClose={() => setSelectedItemId(null)}
-                            onEditText={(text) => editItem(selectedItem.nodeId, text)}
+                            onClose={() => handleSelectItem(null)}
+                            onEditText={(text) => {
+                                editItem(selectedItem.nodeId, text);
+                                pendingEditRef.current = null; // Clear after explicit save
+                            }}
                             onExclude={(excluded) => excludeItem(selectedItem.nodeId, excluded)}
                         />
                     </motion.div>

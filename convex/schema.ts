@@ -641,4 +641,67 @@ export default defineSchema({
         .index('by_userId', ['userId'])
         .index('by_caseId_category', ['caseId', 'category'])
         .index('by_requestId', ['requestId']),
+
+    // ═══ Export Overrides (Review-Centered Assembly) ═══
+    // Persists human edits, section locks, and item overrides per case/export path.
+    // Scoped per-case so users retain their review decisions across sessions.
+    exportOverrides: defineTable({
+        userId: v.id('users'),
+        caseId: v.optional(v.id('cases')),
+        /** Which export path these overrides apply to */
+        exportPath: v.union(
+            v.literal('case_summary'),
+            v.literal('court_document'),
+            v.literal('exhibit_document'),
+        ),
+        /** Section-level overrides (lock state, item ordering) */
+        sectionOverrides: v.array(v.object({
+            sectionId: v.string(),
+            /** When true, this section is frozen — regeneration skips it */
+            isLocked: v.boolean(),
+            /** User-defined item order within this section (node IDs) */
+            itemOrder: v.optional(v.array(v.string())),
+        })),
+        /** Item-level overrides (text edits, section reassignment, exclusion) */
+        itemOverrides: v.array(v.object({
+            nodeId: v.string(),
+            /** User-edited replacement text */
+            editedText: v.optional(v.string()),
+            /** Force this item into a different section */
+            forcedSection: v.optional(v.string()),
+            /** Exclude this item from the export entirely */
+            excluded: v.optional(v.boolean()),
+        })),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_userId', ['userId'])
+        .index('by_userId_case', ['userId', 'caseId'])
+        .index('by_userId_case_path', ['userId', 'caseId', 'exportPath']),
+
+    // ═══ Export Sessions (Crash Recovery + Auto-Save) ═══
+    // Stores in-progress assembly state so users never lose work.
+    // Auto-saved every 30 seconds during the review phase.
+    exportSessions: defineTable({
+        userId: v.id('users'),
+        caseId: v.optional(v.id('cases')),
+        /** Current pipeline phase */
+        phase: v.union(
+            v.literal('configuring'),
+            v.literal('assembling'),
+            v.literal('reviewing'),
+            v.literal('drafting'),
+            v.literal('completed'),
+        ),
+        /** Serialized ExportRequest */
+        exportRequestJson: v.string(),
+        /** Serialized AssemblyResult (after assembly completes) */
+        assemblyResultJson: v.optional(v.string()),
+        /** Serialized draft output (after GPT drafting completes) */
+        draftOutputJson: v.optional(v.string()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_userId', ['userId'])
+        .index('by_userId_case', ['userId', 'caseId']),
 });

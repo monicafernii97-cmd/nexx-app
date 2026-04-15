@@ -451,11 +451,12 @@ export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
     }
 
     // ── Evidence: Variety of evidence types ──
-    const types = new Set(reviewItems.map(item => item.dominantType));
+    const includedForVariety = reviewItems.filter(item => item.includedInExport);
+    const types = new Set(includedForVariety.map(item => item.dominantType));
     checks.push({
         id: 'evidence_variety',
         label: 'Evidence type coverage',
-        severity: types.size >= 2 ? 'pass' : 'warning',
+        severity: includedForVariety.length === 0 ? 'error' : types.size >= 2 ? 'pass' : 'warning',
         detail: `${types.size} evidence type${types.size !== 1 ? 's' : ''} represented`,
         category: 'evidence',
     });

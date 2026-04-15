@@ -23,6 +23,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@convex/_generated/api';
+import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { runDraftingPhase } from '@/lib/export-assembly/pipelineBridge';
 import { runPreflightChecks } from '@/lib/export-assembly/validation/preflightValidator';
@@ -150,12 +151,15 @@ export async function POST(request: NextRequest) {
         });
     }
 
-    // ── Convex client ──
-    const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-    // Forward the Clerk token for authenticated mutations
-    const authToken = request.headers.get('authorization')?.replace('Bearer ', '');
-    if (authToken) {
-        convex.setAuth(authToken);
+    // ── Convex client (established auth pattern) ──
+    let convex: ConvexHttpClient;
+    try {
+        convex = await getAuthenticatedConvexClient();
+    } catch {
+        return new Response(JSON.stringify({ error: 'Failed to authenticate with Convex' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
 
     // ── Create SSE stream ──
@@ -387,7 +391,15 @@ export async function POST(request: NextRequest) {
                     throw Object.assign(new Error('PDF upload to storage failed'), { code: 'upload_failed' });
                 }
 
-                const { storageId } = await uploadResponse.json();
+                const uploadResult = await uploadResponse.json();
+                const storageId = uploadResult?.storageId;
+
+                if (!storageId) {
+                    throw Object.assign(
+                        new Error('Storage upload returned no storageId'),
+                        { code: 'upload_failed' },
+                    );
+                }
 
                 // ────────────────────────────────────────────────
                 // 7. FINALIZE EXPORT RECORD
@@ -500,6 +512,11 @@ function buildFallbackHTML(sections: DraftedSection[], rules: CourtFormattingRul
     const sectionHTML = sections.map(s => `
         <div class="section-heading">${escapeHtml(s.heading)}</div>
         <div class="body-paragraph">${escapeHtml(s.body)}</div>
+        ${s.numberedItems?.length ? `
+        <ol class="numbered-list">
+            ${s.numberedItems.map(item => `<li>${escapeHtml(item)}</li>`).join('\n')}
+        </ol>
+        ` : ''}
     `).join('\n');
 
     return `<!DOCTYPE html>
@@ -529,6 +546,14 @@ function buildFallbackHTML(sections: DraftedSection[], rules: CourtFormattingRul
       text-align: ${rules.bodyAlignment};
       text-indent: ${rules.paragraphIndent}in;
       margin-bottom: 12pt;
+    }
+    .numbered-list {
+      margin: 6pt 0 12pt 24pt;
+      padding-left: 0;
+      text-align: ${rules.bodyAlignment};
+    }
+    .numbered-list li {
+      margin-bottom: 6pt;
     }
   </style>
 </head>

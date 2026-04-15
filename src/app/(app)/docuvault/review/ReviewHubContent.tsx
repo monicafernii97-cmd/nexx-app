@@ -186,6 +186,13 @@ export default function ReviewHubContent() {
     /** Flush any pending sidebar edit + start GPT drafting (synchronous guard). */
     const handleApproveAndDraft = useCallback(() => {
         if (draftingGuardRef.current) return;
+
+        // Validate required state before starting
+        if (!state.assemblyResult || !state.exportRequest || !state.caseId) {
+            console.error('[ReviewHub] Missing required state for drafting');
+            return;
+        }
+
         draftingGuardRef.current = true;
         if (pendingEditRef.current) {
             editItem(pendingEditRef.current.nodeId, pendingEditRef.current.text);
@@ -197,11 +204,11 @@ export default function ReviewHubContent() {
 
             // Build stream input and fire
             const input: DraftStreamInput = {
-                assemblyResult: state.assemblyResult!,
+                assemblyResult: state.assemblyResult,
                 overrides: state.overrides,
-                exportRequest: state.exportRequest!,
+                exportRequest: state.exportRequest,
                 reviewItems: effectiveItems,
-                caseId: state.caseId as string,
+                caseId: state.caseId,
             };
             startStream(input);
         } catch (err) {
@@ -537,7 +544,7 @@ function CompletedPhaseUI({
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-3 mb-6">
                     <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-                        <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Sections</p>
+                        <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Items</p>
                         <p className="text-[18px] font-bold text-white">
                             {state.reviewItems.length}
                         </p>

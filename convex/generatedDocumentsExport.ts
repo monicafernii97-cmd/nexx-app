@@ -162,6 +162,12 @@ export const finalizeExportRun = mutation({
             throw new Error('Export not found or access denied');
         }
 
+        // Guard: only in-progress exports can be finalized
+        const finalizableStatuses = ['drafting', 'preflight', 'rendering', 'saving'];
+        if (!finalizableStatuses.includes(doc.status)) {
+            throw new Error(`Cannot finalize export in '${doc.status}' status`);
+        }
+
         const now = Date.now();
         await ctx.db.patch(args.exportId, {
             status: 'completed',

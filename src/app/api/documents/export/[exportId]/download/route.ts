@@ -4,14 +4,14 @@
  * GET /api/documents/export/[exportId]/download
  *
  * Resolves exportId → Convex export record → storageId → signed URL.
- * Returns a redirect to the signed storage URL with proper Content-Disposition.
+ * Streams the PDF with proper Content-Disposition headers.
  *
- * Auth-guarded: only the export owner can download.
+ * Auth-guarded via Clerk + Convex ownership check.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { ConvexHttpClient } from 'convex/browser';
+import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '@convex/_generated/api';
 
 export async function GET(
@@ -31,11 +31,7 @@ export async function GET(
 
     try {
         // ── Fetch export record from Convex ──
-        const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-        const authToken = request.headers.get('authorization')?.replace('Bearer ', '');
-        if (authToken) {
-            convex.setAuth(authToken);
-        }
+        const convex = await getAuthenticatedConvexClient();
 
         const doc = await convex.query(api.generatedDocumentsExport.getExportById, {
             exportId: exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -58,14 +54,24 @@ export async function GET(
             return NextResponse.json({ error: 'Storage URL unavailable' }, { status: 500 });
         }
 
-        // ── Redirect with Content-Disposition ──
+        // ── Fetch and stream the PDF (headers survive unlike redirect) ──
+        const pdfResponse = await fetch(storageUrl);
+        if (!pdfResponse.ok || !pdfResponse.body) {
+            return NextResponse.json(
+                { error: 'Failed to fetch PDF from storage' },
+                { status: 502 },
+            );
+        }
+
         const filename = doc.filename ?? 'export.pdf';
-        const response = NextResponse.redirect(storageUrl);
-        response.headers.set(
-            'Content-Disposition',
-            `attachment; filename="${filename}"`,
-        );
-        return response;
+        return new NextResponse(pdfResponse.body, {
+            status: 200,
+            headers: {
+                'Content-Type': doc.mimeType ?? 'application/pdf',
+                'Content-Disposition': `attachment; filename="${filename}"`,
+                'Cache-Control': 'private, no-cache',
+            },
+        });
     } catch (error) {
         console.error('[ExportDownload] Error:', error);
         return NextResponse.json(

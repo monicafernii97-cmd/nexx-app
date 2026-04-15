@@ -62,6 +62,7 @@ const DRAFTING_STAGES: { key: DraftingStage; label: string }[] = [
 /** Map error codes to user-friendly messages. */
 function getErrorDescription(code: string | null): string {
     switch (code) {
+        case 'client_aborted': return 'Export was canceled before completion.';
         case 'draft_failed': return 'AI drafting failed. The AI model may be unavailable.';
         case 'preflight_failed': return 'Preflight validation encountered an error.';
         case 'render_html_failed': return 'Document HTML rendering failed.';
@@ -644,11 +645,16 @@ function ErrorPhaseUI({
                     {getErrorDescription(state.errorCode)}
                 </p>
                 {state.errorMessage && (
-                    <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/10 mb-6">
-                        <p className="text-[12px] text-red-300/80 font-mono break-all">
-                            {state.errorMessage}
-                        </p>
-                    </div>
+                    <details className="mb-6">
+                        <summary className="text-[11px] text-white/30 cursor-pointer hover:text-white/50 transition-colors">
+                            Show technical details
+                        </summary>
+                        <div className="mt-2 p-3 rounded-lg bg-red-500/5 border border-red-500/10">
+                            <p className="text-[12px] text-red-300/80 font-mono break-all">
+                                {state.errorMessage}
+                            </p>
+                        </div>
+                    </details>
                 )}
 
                 <div className="flex gap-3">

@@ -28,6 +28,8 @@ import {
     useRef,
     type ReactNode,
 } from 'react';
+import { useRouter } from 'next/navigation';
+import { useConvex } from 'convex/react';
 import type { Id } from '@convex/_generated/dataModel';
 import type { ExportRequest, ExportPath, MappingReviewItem } from '@/lib/export-assembly/types/exports';
 import type {
@@ -37,7 +39,9 @@ import type {
     ItemOverride,
     PipelineStatus,
 } from '@/lib/export-assembly/orchestrator';
+import { runAssembly } from '@/lib/export-assembly/orchestrator';
 import type { PreflightResult } from '@/lib/export-assembly/validation/preflightValidator';
+import { getAssemblyInputs } from '@/lib/export-assembly/services/getAssemblyInputs';
 
 // ---------------------------------------------------------------------------
 // State
@@ -52,6 +56,35 @@ export type ExportPhase =
     | 'drafting'
     | 'completed'
     | 'error';
+
+// ---------------------------------------------------------------------------
+// Config + Validation Types
+// ---------------------------------------------------------------------------
+
+/** Configuration collected from CreateExportModal. */
+export interface ExportConfig {
+    path: ExportPath;
+    caseId: Id<'cases'>;
+    templateId?: string;
+    includeTimeline?: boolean;
+    includeExhibits?: boolean;
+    narrativeDepth?: 'light' | 'standard' | 'full';
+    jurisdictionProfileId?: string;
+}
+
+/** A single validation item from assembly integrity or preflight checks. */
+export interface ValidationItem {
+    id: string;
+    label: string;
+    detail: string;
+}
+
+/** Assembly validation result with 3-severity model. */
+export interface AssemblyValidation {
+    warnings: ValidationItem[];
+    errors: ValidationItem[];
+    critical: ValidationItem[];
+}
 
 /** Drafting sub-stages for the checklist UI. */
 export type DraftingStage =
@@ -70,8 +103,12 @@ export interface ExportState {
     exportPath: ExportPath | null;
     /** The export request from the modal */
     exportRequest: ExportRequest | null;
+    /** User-selected export config */
+    config: ExportConfig | null;
     /** Assembly result (populated after ASSEMBLING phase) */
     assemblyResult: OrchestratorAssemblyResult | null;
+    /** Assembly integrity validation (3-severity model) */
+    assemblyValidation: AssemblyValidation | null;
     /** Review items for the Review Hub canvas */
     reviewItems: MappingReviewItem[];
     /** User overrides (locks, edits, reorders) */
@@ -94,13 +131,23 @@ export interface ExportState {
     filename: string | null;
     /** Current sub-stage during drafting (for checklist UI) */
     draftingStage: DraftingStage;
+    /** Export version number */
+    version: number | null;
+    /** Root export ID for version lineage */
+    rootExportId: string | null;
+    /** Parent export ID for version lineage */
+    parentExportId: string | null;
+    /** Last successfully completed pipeline stage */
+    lastCompletedStage: 'draft' | 'preflight' | 'render' | 'upload' | 'finalize' | null;
 }
 
 const initialState: ExportState = {
     phase: 'idle',
     exportPath: null,
     exportRequest: null,
+    config: null,
     assemblyResult: null,
+    assemblyValidation: null,
     reviewItems: [],
     overrides: { sectionOverrides: [], itemOverrides: [] },
     preflight: null,
@@ -112,6 +159,10 @@ const initialState: ExportState = {
     exportId: null,
     filename: null,
     draftingStage: null,
+    version: null,
+    rootExportId: null,
+    parentExportId: null,
+    lastCompletedStage: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -121,14 +172,18 @@ const initialState: ExportState = {
 type ExportAction =
     | { type: 'START_CONFIGURE'; exportPath: ExportPath; caseId?: Id<'cases'> }
     | { type: 'SET_REQUEST'; request: ExportRequest }
+    | { type: 'SET_CONFIG'; config: ExportConfig }
     | { type: 'START_ASSEMBLY' }
     | { type: 'ASSEMBLY_PROGRESS'; status: PipelineStatus }
-    | { type: 'ASSEMBLY_COMPLETE'; result: OrchestratorAssemblyResult }
+    | { type: 'ASSEMBLY_COMPLETE'; result: OrchestratorAssemblyResult; validation?: AssemblyValidation }
     | { type: 'SET_REVIEW_ITEMS'; items: MappingReviewItem[] }
     | { type: 'SET_OVERRIDES'; overrides: ExportOverrides }
     | { type: 'UPDATE_SECTION_OVERRIDE'; override: SectionOverride }
     | { type: 'UPDATE_ITEM_OVERRIDE'; override: ItemOverride }
     | { type: 'SET_PREFLIGHT'; result: PreflightResult }
+    | { type: 'SET_ASSEMBLY_VALIDATION'; validation: AssemblyValidation }
+    | { type: 'SET_VERSION_LINEAGE'; version: number; rootExportId: string | null; parentExportId: string | null }
+    | { type: 'SET_LAST_COMPLETED_STAGE'; stage: ExportState['lastCompletedStage'] }
     | { type: 'START_DRAFTING' }
     | { type: 'DRAFT_PROGRESS'; status: PipelineStatus; stage?: DraftingStage }
     | { type: 'COMPLETE'; exportId: string; filename: string }
@@ -148,6 +203,9 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
         case 'SET_REQUEST':
             return { ...state, exportRequest: action.request };
 
+        case 'SET_CONFIG':
+            return { ...state, config: action.config };
+
         case 'START_ASSEMBLY':
             return { ...state, phase: 'assembling', progress: 0, statusDetail: 'Starting assembly...' };
 
@@ -163,6 +221,7 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
                 ...state,
                 phase: 'reviewing',
                 assemblyResult: action.result,
+                assemblyValidation: action.validation ?? null,
                 reviewItems: action.result.reviewItems,
                 progress: 50,
                 statusDetail: 'Ready for review',
@@ -208,6 +267,20 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
 
         case 'SET_PREFLIGHT':
             return { ...state, preflight: action.result };
+
+        case 'SET_ASSEMBLY_VALIDATION':
+            return { ...state, assemblyValidation: action.validation };
+
+        case 'SET_VERSION_LINEAGE':
+            return {
+                ...state,
+                version: action.version,
+                rootExportId: action.rootExportId,
+                parentExportId: action.parentExportId,
+            };
+
+        case 'SET_LAST_COMPLETED_STAGE':
+            return { ...state, lastCompletedStage: action.stage };
 
         case 'START_DRAFTING':
             return {
@@ -270,7 +343,7 @@ interface ExportContextValue {
     startConfigure: (path: ExportPath, caseId?: Id<'cases'>) => void;
     setRequest: (request: ExportRequest) => void;
     startAssembly: () => void;
-    completeAssembly: (result: OrchestratorAssemblyResult) => void;
+    completeAssembly: (result: OrchestratorAssemblyResult, validation?: AssemblyValidation) => void;
     lockSection: (sectionId: string, locked: boolean) => void;
     editItem: (nodeId: string, editedText: string) => void;
     moveItem: (nodeId: string, toSection: string) => void;
@@ -278,8 +351,10 @@ interface ExportContextValue {
     setPreflight: (result: PreflightResult) => void;
     startDrafting: () => void;
     complete: (exportId: string, filename: string) => void;
-    setError: (message: string) => void;
+    setError: (message: string, errorCode?: string) => void;
     reset: () => void;
+    /** Single orchestration entry for structured export. */
+    startStructuredExport: (config: ExportConfig) => Promise<void>;
 }
 
 const ExportContext = createContext<ExportContextValue | null>(null);
@@ -334,8 +409,8 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'START_ASSEMBLY' });
     }, []);
 
-    const completeAssembly = useCallback((result: OrchestratorAssemblyResult) => {
-        dispatch({ type: 'ASSEMBLY_COMPLETE', result });
+    const completeAssembly = useCallback((result: OrchestratorAssemblyResult, validation?: AssemblyValidation) => {
+        dispatch({ type: 'ASSEMBLY_COMPLETE', result, validation });
     }, []);
 
     const lockSection = useCallback((sectionId: string, locked: boolean) => {
@@ -378,13 +453,100 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'COMPLETE', exportId, filename });
     }, []);
 
-    const setError = useCallback((message: string) => {
-        dispatch({ type: 'ERROR', message });
+    const setError = useCallback((message: string, errorCode?: string) => {
+        dispatch({ type: 'ERROR', message, errorCode });
     }, []);
 
     const reset = useCallback(() => {
         dispatch({ type: 'RESET' });
     }, []);
+
+    // ── Structured export orchestration ──
+    const convex = useConvex();
+    const router = useRouter();
+
+    const startStructuredExport = useCallback(async (config: ExportConfig) => {
+        try {
+            // 1. Initialize
+            dispatch({ type: 'START_CONFIGURE', exportPath: config.path, caseId: config.caseId });
+            dispatch({ type: 'SET_CONFIG', config });
+            dispatch({ type: 'START_ASSEMBLY' });
+
+            // 2. Fetch canonical assembly inputs
+            const inputs = await getAssemblyInputs(convex, config.caseId);
+
+            // 3. Build ExportRequest from config
+            const exportRequest: ExportRequest = {
+                path: config.path,
+                structureSource: config.path === 'court_document'
+                    ? 'court_prompt_profile'
+                    : config.path === 'exhibit_document'
+                        ? 'exhibit_prompt_profile'
+                        : 'summary_default',
+                templateId: config.templateId,
+                selectedNodeIds: [],   // use all — assembly filters internally
+                selectedEvidenceIds: [],
+                selectedTimelineIds: [],
+                config: config.path === 'court_document'
+                    ? {
+                        documentType: 'motion' as const,
+                        tone: 'neutral' as const,
+                        includeCaption: true,
+                        includeLegalStandard: true,
+                        includePrayer: true,
+                        includeCertificateOfService: true,
+                        includeProposedOrder: false,
+                        outputFormat: 'pdf' as const,
+                    }
+                    : config.path === 'exhibit_document'
+                        ? {
+                            exhibitMode: 'court_structured' as const,
+                            packetType: 'packet_with_index' as const,
+                            organization: 'chronological' as const,
+                            labelStyle: 'alpha' as const,
+                            includeCoverSheets: true,
+                            includeSummaries: true,
+                            includeBatesNumbers: false,
+                            includeSourceMetadata: true,
+                            includeDividerPages: false,
+                            includeConfidentialNotes: false,
+                            mergedOutput: true,
+                            outputFormat: 'pdf' as const,
+                        }
+                        : {
+                            audience: 'internal' as const,
+                            detailLevel: config.narrativeDepth === 'full' ? 'detailed' as const : config.narrativeDepth === 'light' ? 'concise' as const : 'standard' as const,
+                            organization: 'chronological' as const,
+                            includeTimeline: config.includeTimeline ?? true,
+                            includeEvidenceAppendix: config.includeExhibits ?? false,
+                            includeRecommendations: true,
+                            outputFormat: 'pdf' as const,
+                        },
+            };
+            dispatch({ type: 'SET_REQUEST', request: exportRequest });
+
+            // 4. Run assembly (synchronous — deterministic engine)
+            const result = runAssembly(
+                exportRequest,
+                inputs.workspaceNodes,
+                inputs.timelineEvents,
+                (status) => dispatch({ type: 'ASSEMBLY_PROGRESS', status }),
+            );
+
+            // 5. Validate assembly (placeholder — Step 5 builds real validator)
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+            const validation: AssemblyValidation = { warnings: [], errors: [], critical: [] };
+
+            // 6. Atomic completion
+            dispatch({ type: 'ASSEMBLY_COMPLETE', result, validation });
+
+            // 7. Navigate to review
+            router.push('/docuvault/review');
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Assembly failed. Please try again.';
+            dispatch({ type: 'ERROR', message });
+        }
+    }, [convex, router]);
 
     const value = useMemo<ExportContextValue>(() => ({
         state,
@@ -404,6 +566,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         complete,
         setError,
         reset,
+        startStructuredExport,
     }), [
         state,
         isDirty,
@@ -421,6 +584,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         complete,
         setError,
         reset,
+        startStructuredExport,
     ]);
 
     return (

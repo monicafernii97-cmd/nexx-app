@@ -63,8 +63,13 @@ function DocuVaultPageInner() {
     const { userId } = useUser();
     const { activeCaseId } = useWorkspace();
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
+    const courtSettings = useQuery(api.courtSettings.get);
     /** True while user profile query is in-flight (prevents generation with wrong defaults). */
-    const isUserProfileLoading = Boolean(userId) && user === undefined;
+    const isUserProfileLoading = Boolean(userId) && (user === undefined || courtSettings === undefined);
+
+    // Resolved court settings — courtSettings table is canonical, user profile is fallback
+    const resolvedState = courtSettings?.state || user?.state || '';
+    const resolvedCounty = courtSettings?.county || user?.county || '';
 
     // Tab & template state
     const [activeTab, setActiveTab] = useState<UITabCategory>('lead');
@@ -156,8 +161,8 @@ function DocuVaultPageInner() {
         }
 
         // Fail fast if required profile data is missing
-        if (!user?.state || !user?.county) {
-            setGenerationError('Please set your state and county in Court Settings before generating documents.');
+        if (!resolvedState || !resolvedCounty) {
+            setGenerationError('Please set your state and county in Court Settings (Legal Suite → Court Settings) before generating documents.');
             return;
         }
 
@@ -194,10 +199,10 @@ function DocuVaultPageInner() {
                 body: JSON.stringify({
                     templateId: selectedTemplate?.id ?? 'general',
                     courtSettings: {
-                        state: user.state,
-                        county: user.county,
+                        state: resolvedState,
+                        county: resolvedCounty,
                     },
-                    petitioner: { name: user.name || 'Petitioner' },
+                    petitioner: { name: courtSettings?.petitionerLegalName || user?.name || 'Petitioner' },
                     caseType: selectedTemplate?.caseTypes?.[0] ?? undefined,
                     bodyContent: documentContent ? [{ heading: 'Content', paragraphs: [documentContent] }] : [],
                 }),
@@ -672,10 +677,13 @@ function DocuVaultPageInner() {
                         onSubmit={async (config) => {
                             setShowCreateExport(false);
                             try {
-                                await startStructuredExport(config);
+                                await startStructuredExport({
+                                    ...config,
+                                    pastedContent: documentContent || undefined,
+                                });
                             } catch (err) {
                                 console.error('[DocuVault] Export start failed:', err);
-                                setShowCreateExport(true); // Re-open so user sees the failure
+                                setShowCreateExport(true);
                             }
                         }}
                         defaultCaseId={activeCaseId ?? undefined}

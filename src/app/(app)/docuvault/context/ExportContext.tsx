@@ -71,6 +71,8 @@ export interface ExportConfig {
     includeExhibits?: boolean;
     narrativeDepth?: 'light' | 'standard' | 'full';
     jurisdictionProfileId?: string;
+    /** User-pasted document text from the DocuVault compose area. */
+    pastedContent?: string;
 }
 
 /** A single validation item from assembly integrity or preflight checks. */
@@ -481,6 +483,17 @@ export function ExportProvider({ children }: { children: ReactNode }) {
 
             // 2. Fetch canonical assembly inputs
             const inputs = await getAssemblyInputs(convex, config.caseId);
+
+            // 2b. Inject pasted content as a synthetic workspace node if provided
+            if (config.pastedContent?.trim()) {
+                inputs.workspaceNodes.unshift({
+                    id: `pasted_${Date.now()}` as any,
+                    type: 'user_pasted_content',
+                    text: config.pastedContent.trim(),
+                    title: 'User-Provided Document Content',
+                    createdAt: Date.now(),
+                });
+            }
 
             // 3. Build ExportRequest from config
             const exportRequest: ExportRequest = {

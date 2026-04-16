@@ -32,6 +32,7 @@ export type WorkspaceNodeType =
     | 'good_faith_point'   // caseMemory → good_faith_point
     | 'question_to_verify' // caseMemory → question_to_verify
     | 'pattern_analysis'   // caseMemory → pattern_analysis
+    | 'user_pasted_content' // user-pasted text from DocuVault text area
 
 // ---------------------------------------------------------------------------
 // Normalized Workspace Node

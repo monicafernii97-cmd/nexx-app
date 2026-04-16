@@ -37,9 +37,10 @@ function validateCourtDocument(
 
     const { assembly, reviewItems, meta } = result;
     const includedItems = reviewItems.filter(i => i.includedInExport);
+    const hasAnyDiscoveredContent = reviewItems.length > 0;
 
     // ── Critical — ONLY when zero data (nothing to build a document from) ──
-    if (includedItems.length === 0) {
+    if (!hasAnyDiscoveredContent) {
         critical.push({
             id: nextId('court_crit'),
             label: 'No content available',
@@ -122,9 +123,10 @@ function validateSummaryReport(
 
     const { assembly, reviewItems, meta } = result;
     const includedItems = reviewItems.filter(i => i.includedInExport);
+    const hasAnyDiscoveredContent = reviewItems.length > 0;
 
     // ── Critical — ONLY when zero data ──
-    if (includedItems.length === 0) {
+    if (!hasAnyDiscoveredContent) {
         critical.push({
             id: nextId('summary_crit'),
             label: 'No content available',
@@ -187,9 +189,10 @@ function validateExhibitPacket(
 
     const { assembly, reviewItems } = result;
     const includedItems = reviewItems.filter(i => i.includedInExport);
+    const hasAnyDiscoveredContent = reviewItems.length > 0;
 
     // ── Critical — ONLY when zero data ──
-    if (includedItems.length === 0) {
+    if (!hasAnyDiscoveredContent) {
         critical.push({
             id: nextId('exhibit_crit'),
             label: 'No content available',

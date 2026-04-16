@@ -652,10 +652,11 @@ function DocuVaultPageInner() {
                             <button
                                 id="create-export-btn"
                                 onClick={() => setShowCreateExport(true)}
-                                className="flex items-center justify-center gap-3 py-5 rounded-[2rem] text-[14px] font-bold tracking-[0.15em] uppercase text-white transition-all bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_28px_rgba(0,0,0,0.5)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_12px_36px_rgba(0,0,0,0.6)] group hover:-translate-y-1"
+                                disabled={isParsing}
+                                className={`flex items-center justify-center gap-3 py-5 rounded-[2rem] text-[14px] font-bold tracking-[0.15em] uppercase text-white transition-all bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_28px_rgba(0,0,0,0.5)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_12px_36px_rgba(0,0,0,0.6)] group hover:-translate-y-1 ${isParsing ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 <Export size={22} weight="bold" className="text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)] group-hover:scale-110 transition-transform duration-300" />
-                                <span className="drop-shadow-sm">Create Export</span>
+                                <span className="drop-shadow-sm">{isParsing ? 'Extracting…' : 'Create Export'}</span>
                             </button>
                         </div>
 

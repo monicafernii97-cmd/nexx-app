@@ -385,6 +385,8 @@ export interface RunPreflightInput {
     config: Record<string, unknown>;
     reviewItems: MappingReviewItem[];
     overrides: ExportOverrides;
+    /** Explicit flag from upstream — true when pasted content with no workspace data. */
+    isFastPath?: boolean;
 }
 
 /**
@@ -395,9 +397,19 @@ export interface RunPreflightInput {
  * - Auto-preflight in the SSE pipeline (stream/route.ts)
  *
  * Same function, same config, same output — guaranteed consistency.
+ *
+ * @param input - Preflight input with export path, config, items, overrides, and optional fast-path flag
+ * @returns     - Preflight result with checklist, scores, and canProceed flag
  */
 export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
-    const { exportPath, config, reviewItems } = input;
+    const { exportPath, config, reviewItems, overrides, isFastPath = false } = input;
+
+    // Build excluded set from overrides for accurate inclusion counting
+    const excludedNodeIds = new Set(
+        (overrides.itemOverrides ?? [])
+            .filter(override => override.excluded)
+            .map(override => override.nodeId),
+    );
 
     // Build a minimal quality-only check from review items
     // (the full path-specific validators need typed config + mapped sections,
@@ -418,15 +430,17 @@ export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
         category: 'quality',
     });
 
-    // ── Critical: Zero included items ──
-    const includedCount = reviewItems.filter(item => item.includedInExport).length;
+    // ── Content: Items included (respects both reviewItem flags and override exclusions) ──
+    const includedCount = reviewItems.filter(
+        item => item.includedInExport && !excludedNodeIds.has(item.nodeId),
+    ).length;
     if (includedCount === 0) {
         checks.push({
             id: 'no_included_items',
             label: 'No items included',
-            severity: 'critical',
-            detail: exportPath === 'exhibit_document'
-                ? 'Exhibit packet requires at least one exhibit entry.'
+            severity: isFastPath ? 'warning' : 'critical',
+            detail: isFastPath
+                ? 'Pre-drafted content was excluded — nothing to export'
                 : 'No items are included in the export. Cannot generate an empty document.',
             category: 'required_content',
         });
@@ -435,59 +449,58 @@ export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
             id: 'items_included',
             label: 'Items included in export',
             severity: 'pass',
-            detail: `${includedCount} item${includedCount > 1 ? 's' : ''} included`,
+            detail: isFastPath
+                ? 'Pre-drafted document content detected'
+                : `${includedCount} item${includedCount > 1 ? 's' : ''} included`,
             category: 'required_content',
         });
     }
 
-    // ── Critical: Court doc without caption data (both fields required) ──
+    // ── Court-specific checks (always emit — downgraded to warning on fast path) ──
     if (exportPath === 'court_document') {
-        const hasCaption = !!config.courtState && !!config.petitionerName;
-        if (!hasCaption) {
-            checks.push({
-                id: 'missing_caption',
-                label: 'Missing caption data',
-                severity: 'critical',
-                detail: 'Court document requires caption data (court, parties). Set court profile first.',
-                category: 'required_content',
-            });
-        }
-    }
+        const hasCourtState = Boolean(config.courtState);
+        const hasCourtCounty = Boolean(config.courtCounty);
+        const hasPetitioner = Boolean(config.petitionerName);
 
-    // ── Required: Court settings (for court document path) ──
-    if (exportPath === 'court_document') {
-        const hasState = !!config.courtState;
-        const hasCounty = !!config.courtCounty;
         checks.push({
             id: 'court_jurisdiction',
             label: 'Court jurisdiction specified',
-            severity: hasState && hasCounty ? 'pass' : 'error',
-            detail: hasState && hasCounty
+            severity: hasCourtState && hasCourtCounty
+                ? 'pass'
+                : isFastPath ? 'warning' : 'error',
+            detail: hasCourtState && hasCourtCounty
                 ? `${config.courtState}, ${config.courtCounty} County`
-                : 'Missing court state or county',
+                : isFastPath
+                    ? 'Court jurisdiction could not be parsed from document — defaults will be used'
+                    : 'No jurisdiction specified. Set court settings in Legal Suite for formatted output.',
             category: 'required_content',
         });
 
-        const hasPetitioner = !!config.petitionerName;
         checks.push({
             id: 'petitioner_name',
             label: 'Petitioner identified',
-            severity: hasPetitioner ? 'pass' : 'warning',
-            detail: hasPetitioner ? String(config.petitionerName) : 'Petitioner name not set',
+            severity: hasPetitioner ? 'pass' : isFastPath ? 'warning' : 'error',
+            detail: hasPetitioner
+                ? String(config.petitionerName)
+                : isFastPath
+                    ? 'Petitioner name could not be parsed from document'
+                    : 'Petitioner name not set in court settings',
             category: 'required_content',
         });
     }
 
-    // ── Evidence: Variety of evidence types ──
+    // ── Evidence: Variety (advisory only) ──
     const includedForVariety = reviewItems.filter(item => item.includedInExport);
     const types = new Set(includedForVariety.map(item => item.dominantType));
-    checks.push({
-        id: 'evidence_variety',
-        label: 'Evidence type coverage',
-        severity: includedForVariety.length === 0 ? 'error' : types.size >= 2 ? 'pass' : 'warning',
-        detail: `${types.size} evidence type${types.size !== 1 ? 's' : ''} represented`,
-        category: 'evidence',
-    });
+    if (!isFastPath) {
+        checks.push({
+            id: 'evidence_variety',
+            label: 'Evidence type coverage',
+            severity: includedForVariety.length === 0 ? 'warning' : types.size >= 2 ? 'pass' : 'warning',
+            detail: `${types.size} evidence type${types.size !== 1 ? 's' : ''} represented`,
+            category: 'evidence',
+        });
+    }
 
     return buildResult(checks);
 }

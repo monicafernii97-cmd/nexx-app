@@ -113,6 +113,14 @@ function getExportRules(request: ExportRequest): CourtFormattingRules {
 // Route Handler
 // ---------------------------------------------------------------------------
 
+/**
+ * POST /api/documents/export/stream
+ *
+ * Full export pipeline with real-time SSE milestone events.
+ * Supports two modes:
+ * - **Fast path**: Pre-drafted pasted content → skip GPT → format + render PDF
+ * - **Full path**: Workspace data assembly → GPT drafting → format + render PDF
+ */
 export async function POST(request: NextRequest) {
     // ── Auth guard ──
     const { userId } = await auth();
@@ -228,33 +236,83 @@ export async function POST(request: NextRequest) {
                 });
 
                 // ────────────────────────────────────────────────
-                // 2. DRAFT SECTIONS VIA GPT
+                // 2. DRAFT SECTIONS VIA GPT (or skip for pasted content)
                 // ────────────────────────────────────────────────
-                send({
-                    type: 'milestone',
-                    stage: 'drafting',
-                    percent: 55,
-                    message: 'Drafting sections with AI...',
-                });
 
-                const pipelineResult = await runDraftingPhase({
-                    assemblyResult: body.assemblyResult,
-                    overrides: body.overrides,
-                    request: body.exportRequest,
-                    reviewItems: body.reviewItems,
-                    onStatus: (status) => {
-                        send({
-                            type: 'milestone',
-                            stage: 'drafting',
-                            percent: Math.min(status.progress, 70),
-                            message: status.detail ?? 'Drafting...',
-                        });
-                    },
-                });
+                // Detect fast path: court_document + synthetic pre_drafted node from ExportContext
+                const classifiedNodes = body.assemblyResult?.assembly?.classifiedNodes ?? [];
+                const isFastPath = body.exportRequest?.path === 'court_document'
+                    && classifiedNodes.length === 1
+                    && classifiedNodes[0].tags?.includes('pre_drafted');
+
+                let draftedSections: DraftedSection[];
+
+                if (isFastPath) {
+                    // ── FAST PATH: Content is already drafted — skip GPT ──
+                    send({
+                        type: 'milestone',
+                        stage: 'drafting',
+                        percent: 65,
+                        message: 'Using pre-drafted document content...',
+                    });
+
+                    // Respect Review Hub edits and exclusions
+                    const nodeId = classifiedNodes[0].nodeId;
+                    const itemOverride = body.overrides?.itemOverrides?.find(
+                        (o: { nodeId: string }) => o.nodeId === nodeId,
+                    );
+                    const reviewedItem = body.reviewItems?.find(
+                        (item: { nodeId: string }) => item.nodeId === nodeId,
+                    );
+
+                    if (itemOverride?.excluded || reviewedItem?.includedInExport === false) {
+                        throw Object.assign(
+                            new Error('Pasted content was excluded in review. Nothing to export.'),
+                            { code: 'draft_failed' },
+                        );
+                    }
+
+                    const rawText =
+                        itemOverride?.editedText
+                        ?? reviewedItem?.transformedCourtSafeText
+                        ?? reviewedItem?.originalText
+                        ?? classifiedNodes[0].rawText;
+
+                    draftedSections = [{
+                        sectionId: 'document_body',
+                        heading: '',
+                        body: rawText,
+                        source: 'user_locked' as const,
+                    }];
+                } else {
+                    // ── FULL PATH: Draft via GPT ──
+                    send({
+                        type: 'milestone',
+                        stage: 'drafting',
+                        percent: 55,
+                        message: 'Drafting sections with AI...',
+                    });
+
+                    const pipelineResult = await runDraftingPhase({
+                        assemblyResult: body.assemblyResult,
+                        overrides: body.overrides,
+                        request: body.exportRequest,
+                        reviewItems: body.reviewItems,
+                        onStatus: (status) => {
+                            send({
+                                type: 'milestone',
+                                stage: 'drafting',
+                                percent: Math.min(status.progress, 70),
+                                message: status.detail ?? 'Drafting...',
+                            });
+                        },
+                    });
+
+                    draftedSections = pipelineResult.draftedSections;
+                }
 
                 checkAborted();
 
-                const { draftedSections } = pipelineResult;
                 const aiDraftedCount = draftedSections.filter(s => s.source === 'ai_drafted').length;
                 const lockedCount = draftedSections.filter(s => s.source === 'user_locked').length;
 
@@ -290,6 +348,7 @@ export async function POST(request: NextRequest) {
                         config: (body.exportRequest?.config ?? {}) as unknown as Record<string, unknown>,
                         reviewItems: body.reviewItems,
                         overrides: body.overrides,
+                        isFastPath,
                     });
                 } catch (pfErr) {
                     // Preflight failure is non-blocking (advisory)

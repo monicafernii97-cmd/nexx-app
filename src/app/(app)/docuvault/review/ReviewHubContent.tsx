@@ -13,6 +13,7 @@
  */
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowLeft,
@@ -94,6 +95,7 @@ export default function ReviewHubContent() {
         reset,
     } = useExport();
 
+    const router = useRouter();
     const { startStream, abort } = useDraftingStream({ dispatch });
 
     // Local UI state
@@ -174,6 +176,12 @@ export default function ReviewHubContent() {
         [effectiveItems, selectedItemId],
     );
 
+    /** Whether the current assembly is a fast-path (pre-drafted pasted content). */
+    const isFastPath = useMemo(() => {
+        const nodes = state.assemblyResult?.assembly?.classifiedNodes ?? [];
+        return nodes.length === 1 && nodes[0].tags?.includes('pre_drafted');
+    }, [state.assemblyResult]);
+
     /** Run manual preflight checks. */
     const handleRunPreflight = useCallback(() => {
         try {
@@ -182,6 +190,7 @@ export default function ReviewHubContent() {
                 config: (state.exportRequest?.config ?? {}) as Record<string, unknown>,
                 reviewItems: effectiveItems,
                 overrides: state.overrides,
+                isFastPath,
             });
             setPreflight(result);
             setShowPreflight(true);
@@ -204,7 +213,7 @@ export default function ReviewHubContent() {
             });
             setShowPreflight(true);
         }
-    }, [state.exportPath, state.exportRequest, effectiveItems, state.overrides, setPreflight]);
+    }, [state.exportPath, state.exportRequest, effectiveItems, state.overrides, setPreflight, isFastPath]);
 
     /** Flush any pending sidebar edit + start GPT drafting (synchronous guard). */
     const handleApproveAndDraft = useCallback(() => {
@@ -252,8 +261,9 @@ export default function ReviewHubContent() {
             draftingGuardRef.current = false;
             setIsDrafting(false);
             reset();
+            router.push('/docuvault');
         }
-    }, [reset, abort]);
+    }, [reset, abort, router]);
 
     /** Retry: preserve failed exportId for linkage, then reset to reviewing. */
     const handleRetry = useCallback(() => {
@@ -559,6 +569,7 @@ function AssemblyValidationBanner({
 // Drafting Phase — Step Checklist
 // =========================================================================
 
+/** Step-by-step drafting progress checklist with animated indicators. */
 function DraftingPhaseUI({
     state,
     onCancel,
@@ -638,6 +649,7 @@ function DraftingPhaseUI({
 // Completed Phase — Success Card
 // =========================================================================
 
+/** Success card shown after export completes — download link, stats, and new export button. */
 function CompletedPhaseUI({
     state,
     onNewExport,
@@ -737,6 +749,7 @@ function CompletedPhaseUI({
 // Error Phase
 // =========================================================================
 
+/** Error recovery UI with stage-aware retry and back-to-DocuVault navigation. */
 function ErrorPhaseUI({
     state,
     onRetry,

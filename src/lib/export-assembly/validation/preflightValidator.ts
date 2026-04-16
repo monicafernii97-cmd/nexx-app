@@ -425,12 +425,14 @@ export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
 
     // ── Content: Items included ──
     const includedCount = reviewItems.filter(item => item.includedInExport).length;
-    if (includedCount === 0 && !isFastPath) {
+    if (includedCount === 0) {
         checks.push({
             id: 'no_included_items',
             label: 'No items included',
             severity: 'warning',
-            detail: 'No items are currently included in the export.',
+            detail: isFastPath
+                ? 'Pre-drafted content was excluded — nothing to export'
+                : 'No items are currently included in the export.',
             category: 'required_content',
         });
     } else {

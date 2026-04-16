@@ -273,6 +273,7 @@ export async function POST(request: NextRequest) {
 
                     const rawText =
                         itemOverride?.editedText
+                        ?? reviewedItem?.transformedCourtSafeText
                         ?? reviewedItem?.originalText
                         ?? classifiedNodes[0].rawText;
 

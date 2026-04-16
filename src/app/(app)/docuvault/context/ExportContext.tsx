@@ -191,6 +191,7 @@ type ExportAction =
     | { type: 'ERROR'; message: string; errorCode?: string }
     | { type: 'RESET' };
 
+/** Reducer managing the full export lifecycle state machine. */
 function exportReducer(state: ExportState, action: ExportAction): ExportState {
     switch (action.type) {
         case 'START_CONFIGURE':
@@ -398,6 +399,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
     }, [state.phase, state.overrides, state.reviewItems]);
 
     // ── Convenience actions ──
+    /** Start the configuration phase for a given export path. */
     const startConfigure = useCallback((path: ExportPath, caseId?: Id<'cases'>) => {
         dispatch({ type: 'START_CONFIGURE', exportPath: path, caseId });
     }, []);
@@ -466,6 +468,10 @@ export function ExportProvider({ children }: { children: ReactNode }) {
     const convex = useConvex();
     const router = useRouter();
 
+    /**
+     * End-to-end structured export orchestrator.
+     * Flow: Configure → Fetch Inputs → Build Request → Run Assembly → Validate → Navigate to Review.
+     */
     const startStructuredExport = useCallback(async (config: ExportConfig) => {
         try {
             // 1. Initialize
@@ -488,6 +494,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                 selectedNodeIds: [],   // use all — assembly filters internally
                 selectedEvidenceIds: [],
                 selectedTimelineIds: [],
+                // TODO: Pull tone, detailLevel, etc. from config or user jurisdiction profile when available
                 config: config.path === 'court_document'
                     ? {
                         documentType: 'motion' as const,
@@ -544,7 +551,8 @@ export function ExportProvider({ children }: { children: ReactNode }) {
             router.push('/docuvault/review');
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Assembly failed. Please try again.';
-            dispatch({ type: 'ERROR', message });
+            const errorCode = err instanceof Error && 'code' in err ? String((err as Error & { code: string }).code) : undefined;
+            dispatch({ type: 'ERROR', message, errorCode });
         }
     }, [convex, router]);
 

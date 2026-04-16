@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X,
@@ -134,11 +134,12 @@ export default function CreateExportModal({
     }, [isValid, selectedCaseId, selectedPath, includeTimeline, includeExhibits, narrativeDepth, onSubmit]);
 
     // Auto-select first case if none provided
-    if (selectedCaseId === null && cases && cases.length > 0) {
-        const active = cases.find(c => c.status === 'active');
-        if (active) setSelectedCaseId(active._id);
-        else setSelectedCaseId(cases[0]._id);
-    }
+    useEffect(() => {
+        if (selectedCaseId === null && cases && cases.length > 0) {
+            const active = cases.find(c => c.status === 'active');
+            setSelectedCaseId(active?._id ?? cases[0]._id);
+        }
+    }, [selectedCaseId, cases]);
 
     if (!isOpen) return null;
 

@@ -122,7 +122,7 @@ function normalizeIncident(doc: Doc<'incidents'>): WorkspaceNode {
     };
 }
 
-/** Infer TimelineEventType from tags. */
+/** Infer the timeline event type from a set of user-applied tags. */
 function inferEventType(tags?: string[]): TimelineEventType {
     if (!tags || tags.length === 0) return 'other';
     const tagStr = tags.join(' ').toLowerCase();
@@ -138,7 +138,7 @@ function inferEventType(tags?: string[]): TimelineEventType {
     return 'other';
 }
 
-/** Normalize a timelineCandidate doc into a TimelineEventNode. */
+/** Normalize a timelineCandidate doc into a canonical TimelineEventNode. */
 function normalizeTimelineEvent(doc: Doc<'timelineCandidates'>): TimelineEventNode {
     return {
         id: doc._id,
@@ -189,7 +189,7 @@ export async function getAssemblyInputs(
     // ── Normalize timeline events ──
     const timelineEvents: TimelineEventNode[] = eventData.map(normalizeTimelineEvent);
 
-    // Deterministic ordering: eventDate asc, then createdAt asc, then ID asc
+    // Deterministic ordering: eventDate asc, then ID asc
     timelineEvents.sort((a, b) => {
         const dateDiff = (a.date ?? '').localeCompare(b.date ?? '');
         if (dateDiff !== 0) return dateDiff;

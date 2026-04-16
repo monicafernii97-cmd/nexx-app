@@ -26,6 +26,7 @@ export default function DocuVaultGalleryPage() {
     const [activeFilter, setActiveFilter] = useState<string>('all');
     const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name'>('newest');
     const [deletingId, setDeletingId] = useState<Id<'generatedDocuments'> | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     // ── Fetch real data from Convex ──
     const exports = useQuery(api.generatedDocumentsExport.getRecentExports, { limit: 100 });
@@ -73,14 +74,16 @@ export default function DocuVaultGalleryPage() {
     const completeDocs = filteredDocs.filter(d => d.status === 'complete');
     const draftDocs = filteredDocs.filter(d => d.status === 'draft');
 
-    /** Handle delete with confirmation */
+    /** Handle delete with confirmation and user-visible error feedback. */
     const handleDelete = async (docId: Id<'generatedDocuments'>) => {
         if (!window.confirm('Delete this document? This cannot be undone.')) return;
         setDeletingId(docId);
+        setDeleteError(null);
         try {
             await deleteExport({ documentId: docId });
         } catch (err) {
             console.error('[Gallery] Delete failed:', err);
+            setDeleteError('Failed to delete document. Please try again.');
         } finally {
             setDeletingId(null);
         }
@@ -160,6 +163,18 @@ export default function DocuVaultGalleryPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
             >
+                {/* Delete error banner */}
+                {deleteError && (
+                    <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-between">
+                        <p className="text-[13px] text-red-400 font-medium">{deleteError}</p>
+                        <button
+                            onClick={() => setDeleteError(null)}
+                            className="text-[12px] text-red-300/60 hover:text-red-300 transition-colors ml-4"
+                        >
+                            Dismiss
+                        </button>
+                    </div>
+                )}
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-[14px] font-bold tracking-[0.2em] uppercase text-white drop-shadow-sm m-0">
                         Document Gallery

@@ -14,7 +14,6 @@
  */
 
 import type { OrchestratorAssemblyResult } from '../orchestrator';
-import type { ExportPath } from '../types/exports';
 import type { AssemblyValidation, ValidationItem, ExportConfig } from '@/app/(app)/docuvault/context/ExportContext';
 
 // ---------------------------------------------------------------------------
@@ -22,6 +21,7 @@ import type { AssemblyValidation, ValidationItem, ExportConfig } from '@/app/(ap
 // ---------------------------------------------------------------------------
 
 let _validationCounter = 0;
+/** Generate a unique sequential ID for a validation item within a single run. */
 function nextId(prefix: string): string {
     return `${prefix}_${++_validationCounter}`;
 }
@@ -30,6 +30,7 @@ function nextId(prefix: string): string {
 // Path-Specific Validators
 // ---------------------------------------------------------------------------
 
+/** Validate court document assembly for structural completeness. */
 function validateCourtDocument(
     result: OrchestratorAssemblyResult,
 ): { warnings: ValidationItem[]; errors: ValidationItem[]; critical: ValidationItem[] } {
@@ -105,6 +106,7 @@ function validateCourtDocument(
         includedItems
             .filter(i => i.dominantType === 'evidence_reference')
             .map(i => i.suggestedSections[0])
+            .filter(Boolean)
     );
     if (includedItems.length > 3 && evidenceTypes.size <= 1) {
         warnings.push({
@@ -117,6 +119,7 @@ function validateCourtDocument(
     return { warnings, errors, critical };
 }
 
+/** Validate case summary assembly for structural completeness. */
 function validateSummaryReport(
     result: OrchestratorAssemblyResult,
 ): { warnings: ValidationItem[]; errors: ValidationItem[]; critical: ValidationItem[] } {
@@ -185,6 +188,7 @@ function validateSummaryReport(
     return { warnings, errors, critical };
 }
 
+/** Validate exhibit packet assembly for structural completeness. */
 function validateExhibitPacket(
     result: OrchestratorAssemblyResult,
 ): { warnings: ValidationItem[]; errors: ValidationItem[]; critical: ValidationItem[] } {
@@ -232,6 +236,7 @@ function validateExhibitPacket(
         includedItems
             .filter(i => i.dominantType === 'evidence_reference')
             .map(i => i.suggestedSections[0])
+            .filter(Boolean)
     );
     if (evidenceTypes.size <= 1 && includedItems.length > 2) {
         warnings.push({

@@ -62,7 +62,7 @@ const DRAFTING_STAGES: { key: DraftingStage; label: string }[] = [
     { key: 'saving', label: 'Saving to DocuVault' },
 ];
 
-/** Map error codes to user-friendly messages. */
+/** Map error codes to user-friendly descriptions for the error phase. */
 function getErrorDescription(code: string | null): string {
     switch (code) {
         case 'client_aborted': return 'Export was canceled before completion.';
@@ -389,78 +389,11 @@ export default function ReviewHubContent() {
 
                 {/* ── Assembly Validation Banner ── */}
                 {state.assemblyValidation && (
-                    (() => {
-                        const { critical, errors, warnings } = state.assemblyValidation;
-                        const totalIssues = critical.length + errors.length + warnings.length;
-                        if (totalIssues === 0) return null;
-                        const highestSeverity = critical.length > 0 ? 'critical' : errors.length > 0 ? 'error' : 'warning';
-                        const bannerColors = {
-                            critical: 'bg-red-500/10 border-red-500/30 text-red-400',
-                            error: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-                            warning: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
-                        };
-                        return (
-                            <div className={`shrink-0 mx-6 mt-4 rounded-xl border ${bannerColors[highestSeverity]} overflow-hidden`}>
-                                <button
-                                    onClick={() => setValidationExpanded(!validationExpanded)}
-                                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
-                                >
-                                    <ShieldWarning size={18} weight="fill" />
-                                    <span className="text-[13px] font-bold">
-                                        {critical.length > 0 && `${critical.length} critical`}
-                                        {critical.length > 0 && errors.length > 0 && ' · '}
-                                        {errors.length > 0 && `${errors.length} error${errors.length > 1 ? 's' : ''}`}
-                                        {(critical.length > 0 || errors.length > 0) && warnings.length > 0 && ' · '}
-                                        {warnings.length > 0 && `${warnings.length} warning${warnings.length > 1 ? 's' : ''}`}
-                                    </span>
-                                    {critical.length > 0 && (
-                                        <span className="text-[11px] font-medium ml-auto mr-2 text-red-300">
-                                            Blocks drafting
-                                        </span>
-                                    )}
-                                    {validationExpanded ? <CaretUp size={14} /> : <CaretDown size={14} />}
-                                </button>
-                                <AnimatePresence>{validationExpanded && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: 'auto', opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        className="overflow-hidden"
-                                    >
-                                        <div className="px-4 pb-3 space-y-1.5">
-                                            {critical.map(item => (
-                                                <div key={item.id} className="flex items-start gap-2.5 text-[12px]">
-                                                    <XCircle size={14} weight="fill" className="text-red-400 mt-0.5 shrink-0" />
-                                                    <div>
-                                                        <span className="font-bold text-red-300">{item.label}</span>
-                                                        <span className="text-red-400/80 ml-1">{item.detail}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {errors.map(item => (
-                                                <div key={item.id} className="flex items-start gap-2.5 text-[12px]">
-                                                    <WarningCircle size={14} weight="fill" className="text-amber-400 mt-0.5 shrink-0" />
-                                                    <div>
-                                                        <span className="font-bold text-amber-300">{item.label}</span>
-                                                        <span className="text-amber-400/80 ml-1">{item.detail}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {warnings.map(item => (
-                                                <div key={item.id} className="flex items-start gap-2.5 text-[12px]">
-                                                    <WarningCircle size={14} weight="regular" className="text-yellow-400 mt-0.5 shrink-0" />
-                                                    <div>
-                                                        <span className="font-bold text-yellow-300">{item.label}</span>
-                                                        <span className="text-yellow-400/80 ml-1">{item.detail}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </motion.div>
-                                )}</AnimatePresence>
-                            </div>
-                        );
-                    })()
+                    <AssemblyValidationBanner
+                        validation={state.assemblyValidation}
+                        expanded={validationExpanded}
+                        onToggle={() => setValidationExpanded(!validationExpanded)}
+                    />
                 )}
 
                 {/* Canvas + Preflight */}
@@ -530,6 +463,94 @@ export default function ReviewHubContent() {
                     </motion.div>
                 )}
             </AnimatePresence>
+        </div>
+    );
+}
+
+// =========================================================================
+// Assembly Validation Banner (extracted for testability)
+// =========================================================================
+
+/** Collapsible banner displaying assembly integrity validation results. */
+function AssemblyValidationBanner({
+    validation,
+    expanded,
+    onToggle,
+}: {
+    validation: { critical: { id: string; label: string; detail: string }[]; errors: { id: string; label: string; detail: string }[]; warnings: { id: string; label: string; detail: string }[] };
+    expanded: boolean;
+    onToggle: () => void;
+}) {
+    const { critical, errors, warnings } = validation;
+    const totalIssues = critical.length + errors.length + warnings.length;
+    if (totalIssues === 0) return null;
+
+    const highestSeverity = critical.length > 0 ? 'critical' : errors.length > 0 ? 'error' : 'warning';
+    const bannerColors = {
+        critical: 'bg-red-500/10 border-red-500/30 text-red-400',
+        error: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
+        warning: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
+    };
+
+    return (
+        <div className={`shrink-0 mx-6 mt-4 rounded-xl border ${bannerColors[highestSeverity]} overflow-hidden`}>
+            <button
+                onClick={onToggle}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
+            >
+                <ShieldWarning size={18} weight="fill" />
+                <span className="text-[13px] font-bold">
+                    {critical.length > 0 && `${critical.length} critical`}
+                    {critical.length > 0 && errors.length > 0 && ' · '}
+                    {errors.length > 0 && `${errors.length} error${errors.length > 1 ? 's' : ''}`}
+                    {(critical.length > 0 || errors.length > 0) && warnings.length > 0 && ' · '}
+                    {warnings.length > 0 && `${warnings.length} warning${warnings.length > 1 ? 's' : ''}`}
+                </span>
+                {critical.length > 0 && (
+                    <span className="text-[11px] font-medium ml-auto mr-2 text-red-300">
+                        Blocks drafting
+                    </span>
+                )}
+                {expanded ? <CaretUp size={14} /> : <CaretDown size={14} />}
+            </button>
+            <AnimatePresence>{expanded && (
+                <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                >
+                    <div className="px-4 pb-3 space-y-1.5">
+                        {critical.map(item => (
+                            <div key={item.id} className="flex items-start gap-2.5 text-[12px]">
+                                <XCircle size={14} weight="fill" className="text-red-400 mt-0.5 shrink-0" />
+                                <div>
+                                    <span className="font-bold text-red-300">{item.label}</span>
+                                    <span className="text-red-400/80 ml-1">{item.detail}</span>
+                                </div>
+                            </div>
+                        ))}
+                        {errors.map(item => (
+                            <div key={item.id} className="flex items-start gap-2.5 text-[12px]">
+                                <WarningCircle size={14} weight="fill" className="text-amber-400 mt-0.5 shrink-0" />
+                                <div>
+                                    <span className="font-bold text-amber-300">{item.label}</span>
+                                    <span className="text-amber-400/80 ml-1">{item.detail}</span>
+                                </div>
+                            </div>
+                        ))}
+                        {warnings.map(item => (
+                            <div key={item.id} className="flex items-start gap-2.5 text-[12px]">
+                                <WarningCircle size={14} weight="regular" className="text-yellow-400 mt-0.5 shrink-0" />
+                                <div>
+                                    <span className="font-bold text-yellow-300">{item.label}</span>
+                                    <span className="text-yellow-400/80 ml-1">{item.detail}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </motion.div>
+            )}</AnimatePresence>
         </div>
     );
 }

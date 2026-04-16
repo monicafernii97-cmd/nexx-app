@@ -671,7 +671,12 @@ function DocuVaultPageInner() {
                         onClose={() => setShowCreateExport(false)}
                         onSubmit={async (config) => {
                             setShowCreateExport(false);
-                            await startStructuredExport(config);
+                            try {
+                                await startStructuredExport(config);
+                            } catch (err) {
+                                console.error('[DocuVault] Export start failed:', err);
+                                setShowCreateExport(true); // Re-open so user sees the failure
+                            }
                         }}
                         defaultCaseId={activeCaseId ?? undefined}
                         lockCaseSelection={!!activeCaseId}

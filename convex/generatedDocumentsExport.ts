@@ -64,11 +64,11 @@ export const createExportRun = mutation({
 
         const now = Date.now();
 
-        // Auto-compute version from parent chain
+        // Auto-compute version from parent chain (same user + same case)
         let version = 1;
         if (args.parentExportId) {
             const parent = await ctx.db.get(args.parentExportId);
-            if (parent && parent.userId === user._id) {
+            if (parent && parent.userId === user._id && parent.caseId === args.caseId) {
                 version = (parent.version ?? 1) + 1;
             }
         }

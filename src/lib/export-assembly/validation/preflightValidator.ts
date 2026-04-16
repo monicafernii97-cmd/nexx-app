@@ -425,7 +425,9 @@ export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
             id: 'no_included_items',
             label: 'No items included',
             severity: 'critical',
-            detail: 'No items are included in the export. Cannot generate an empty document.',
+            detail: exportPath === 'exhibit_document'
+                ? 'Exhibit packet requires at least one exhibit entry.'
+                : 'No items are included in the export. Cannot generate an empty document.',
             category: 'required_content',
         });
     } else {
@@ -438,9 +440,9 @@ export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
         });
     }
 
-    // ── Critical: Court doc without caption data ──
+    // ── Critical: Court doc without caption data (both fields required) ──
     if (exportPath === 'court_document') {
-        const hasCaption = !!config.courtState || !!config.petitionerName;
+        const hasCaption = !!config.courtState && !!config.petitionerName;
         if (!hasCaption) {
             checks.push({
                 id: 'missing_caption',
@@ -450,17 +452,6 @@ export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
                 category: 'required_content',
             });
         }
-    }
-
-    // ── Critical: Exhibit packet with zero exhibits ──
-    if (exportPath === 'exhibit_document' && includedCount === 0) {
-        checks.push({
-            id: 'no_exhibits',
-            label: 'No exhibits',
-            severity: 'critical',
-            detail: 'Exhibit packet requires at least one exhibit entry.',
-            category: 'required_content',
-        });
     }
 
     // ── Required: Court settings (for court document path) ──

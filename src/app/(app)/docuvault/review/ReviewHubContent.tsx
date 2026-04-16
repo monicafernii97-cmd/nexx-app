@@ -13,6 +13,7 @@
  */
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowLeft,
@@ -94,6 +95,7 @@ export default function ReviewHubContent() {
         reset,
     } = useExport();
 
+    const router = useRouter();
     const { startStream, abort } = useDraftingStream({ dispatch });
 
     // Local UI state
@@ -252,8 +254,9 @@ export default function ReviewHubContent() {
             draftingGuardRef.current = false;
             setIsDrafting(false);
             reset();
+            router.push('/docuvault');
         }
-    }, [reset, abort]);
+    }, [reset, abort, router]);
 
     /** Retry: preserve failed exportId for linkage, then reset to reviewing. */
     const handleRetry = useCallback(() => {

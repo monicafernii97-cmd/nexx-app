@@ -45,6 +45,54 @@ import { getAssemblyInputs } from '@/lib/export-assembly/services/getAssemblyInp
 import { validateAssemblyOutput } from '@/lib/export-assembly/validation/assemblyIntegrityValidator';
 
 // ---------------------------------------------------------------------------
+// Fast-Path Caption Parser
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract court caption metadata from raw pasted document text.
+ * Regex-based — no LLM needed. Covers common Texas family court formats.
+ */
+function parseCaptionFromText(text: string): {
+    courtName?: string;
+    county?: string;
+    state?: string;
+    causeNumber?: string;
+    caseStyle?: string;
+    partyRoles?: string[];
+} {
+    const lines = text.slice(0, 2000); // Only scan first ~2000 chars for caption
+
+    // Cause number: "CAUSE NO. 20-DCV-271717" or "Cause No.: 2022-12345"
+    const causeMatch = lines.match(/CAUSE\s+NO\.?\s*:?\s*([\w\d\-]+)/i);
+
+    // Court: "387TH JUDICIAL DISTRICT" or "IN THE DISTRICT COURT"
+    const courtMatch = lines.match(/(\d+\w*)\s+JUDICIAL\s+DISTRICT/i)
+        ?? lines.match(/IN\s+THE\s+([\w\s]+COURT)/i);
+
+    // County: "FORT BEND COUNTY, TEXAS" or "HARRIS COUNTY, TEXAS"
+    const countyMatch = lines.match(/([\w\s]+)\s+COUNTY,\s+(TEXAS|TX|CALIFORNIA|CA|FLORIDA|FL|NEW YORK|NY|[\w\s]+)/i);
+
+    // Petitioner/Respondent: "COMES NOW Monica Fernandez, Petitioner"
+    const petitionerMatch = lines.match(/COMES\s+NOW\s+([\w\s]+),\s*(?:Petitioner|Movant)/i);
+
+    // Case style: "IN THE INTEREST OF ... A CHILD"
+    const caseStyleMatch = lines.match(/IN\s+THE\s+INTEREST\s+OF[§\s]*([^§\n]+)/i);
+
+    const courtName = courtMatch
+        ? (courtMatch[1]?.match(/\d+/) ? `${courtMatch[1]} Judicial District` : courtMatch[1]?.trim())
+        : undefined;
+
+    return {
+        causeNumber: causeMatch?.[1],
+        courtName,
+        county: countyMatch?.[1]?.trim(),
+        state: countyMatch?.[2]?.trim(),
+        caseStyle: caseStyleMatch?.[1]?.trim(),
+        partyRoles: petitionerMatch ? [`Petitioner: ${petitionerMatch[1].trim()}`] : undefined,
+    };
+}
+
+// ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
@@ -484,16 +532,13 @@ export function ExportProvider({ children }: { children: ReactNode }) {
             // 2. Fetch canonical assembly inputs
             const inputs = await getAssemblyInputs(convex, config.caseId);
 
-            // 2b. Inject pasted content as a synthetic workspace node if provided
-            if (config.pastedContent?.trim()) {
-                inputs.workspaceNodes.unshift({
-                    id: `pasted_${Date.now()}`,
-                    type: 'user_pasted_content',
-                    text: config.pastedContent.trim(),
-                    title: 'User-Provided Document Content',
-                    createdAt: Date.now(),
-                });
-            }
+            // ── FAST PATH: Pre-drafted pasted content ──
+            // When user pastes a complete document and no workspace data exists,
+            // skip the classifier/assembly engine entirely. The content is already
+            // drafted — just format and export.
+            const hasPastedContent = Boolean(config.pastedContent?.trim());
+            const hasWorkspaceData = inputs.workspaceNodes.length > 0;
+            const isFastPath = hasPastedContent && !hasWorkspaceData;
 
             // 3. Build ExportRequest from config
             const exportRequest: ExportRequest = {
@@ -507,7 +552,6 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                 selectedNodeIds: [],   // use all — assembly filters internally
                 selectedEvidenceIds: [],
                 selectedTimelineIds: [],
-                // TODO: Pull tone, detailLevel, etc. from config or user jurisdiction profile when available
                 config: config.path === 'court_document'
                     ? {
                         documentType: 'motion' as const,
@@ -546,13 +590,147 @@ export function ExportProvider({ children }: { children: ReactNode }) {
             };
             dispatch({ type: 'SET_REQUEST', request: exportRequest });
 
-            // 4. Run assembly (synchronous — deterministic engine)
-            const result = runAssembly(
-                exportRequest,
-                inputs.workspaceNodes,
-                inputs.timelineEvents,
-                (status) => dispatch({ type: 'ASSEMBLY_PROGRESS', status }),
-            );
+            let result: import('@/lib/export-assembly/orchestrator').OrchestratorAssemblyResult;
+
+            if (isFastPath) {
+                // ── FAST PATH: Build synthetic assembly result from pasted text ──
+                const pastedText = config.pastedContent!.trim();
+                const nodeId = `pasted_${Date.now()}`;
+
+                // Parse caption data from the text using regex
+                const captionData = parseCaptionFromText(pastedText);
+
+                dispatch({
+                    type: 'ASSEMBLY_PROGRESS',
+                    status: { phase: 'collecting', progress: 10, detail: 'Using pasted document content (fast path)' },
+                });
+
+                // Build a complete assembly result with the pasted text
+                const mappedSections = config.path === 'court_document'
+                    ? {
+                        generatedAt: new Date().toISOString(),
+                        captionData,
+                        title: captionData.caseStyle ?? 'Court Document',
+                        factualBackground: [{ heading: 'Document Content', body: pastedText, startDate: '', sources: [] }],
+                        legalGrounds: [],
+                        argumentSections: [],
+                        requestedRelief: [],
+                        exhibitReferences: [],
+                        procedureNotes: [],
+                        supportingNodeIds: [nodeId],
+                    }
+                    : config.path === 'case_summary'
+                        ? {
+                            generatedAt: new Date().toISOString(),
+                            keyIssues: [],
+                            incidents: [],
+                            timelineSummary: [{ heading: 'Document Content', body: pastedText, startDate: '', sources: [] }],
+                            evidenceOverview: [],
+                            patternSummary: [],
+                            gapsOrOpenQuestions: [],
+                            recommendedNextSteps: [],
+                            supportingNodeIds: [nodeId],
+                        }
+                        : {
+                            generatedAt: new Date().toISOString(),
+                            indexEntries: [],
+                            groupedExhibits: [],
+                            coverSheetSummaries: [],
+                            supportingNodeIds: [nodeId],
+                        };
+
+                result = {
+                    assembly: {
+                        path: config.path,
+                        classifiedNodes: [{
+                            nodeId,
+                            nodeType: 'user_pasted_content' as const,
+                            rawText: pastedText,
+                            cleanedText: pastedText,
+                            sentenceClassifications: [],
+                            scores: { fact: 1, argument: 0, request: 0, emotion: 0, opinion: 0, procedure: 0, evidence_reference: 0, timeline_event: 0, issue: 0, risk: 0, unknown: 0 },
+                            dominantType: 'fact' as const,
+                            confidence: 1.0,
+                            tags: ['pre_drafted'],
+                            issueTags: [],
+                            patternTags: [],
+                            extractedEntities: { people: [], dates: [], locations: [], courts: [], filings: [], exhibits: [], statutesOrRules: [] },
+                            suggestedSections: {
+                                case_summary: ['document_content'],
+                                court_document: ['document_content'],
+                                exhibit_document: ['document_content'],
+                            },
+                            exportRelevance: { case_summary: 1, court_document: 1, exhibit_document: 1 },
+                            transformedText: { courtSafe: pastedText, summarySafe: pastedText },
+                            provenance: {
+                                linkedEvidenceIds: [],
+                                linkedTimelineIds: [],
+                                originatingNodeId: nodeId,
+                            },
+                        }],
+                        narrative: {
+                            chronology: [],
+                            turningPoints: [],
+                            patternSections: [],
+                            reliefConnections: [],
+                            issueSummaries: [],
+                        },
+                        mappedSections: mappedSections as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                        meta: {
+                            totalNodes: 1,
+                            selectedNodes: 1,
+                            classifiedNodes: 1,
+                            narrativeSections: 1,
+                            detectedPatterns: 0,
+                            reliefConnections: 0,
+                            assemblyTimeMs: 0,
+                        },
+                    },
+                    reviewItems: [{
+                        nodeId,
+                        originalText: pastedText,
+                        dominantType: 'fact' as const,
+                        confidence: 1.0,
+                        suggestedSections: ['document_content'],
+                        transformedCourtSafeText: pastedText,
+                        includedInExport: true,
+                    }],
+                    meta: {
+                        totalNodes: 1,
+                        selectedNodes: 1,
+                        classifiedNodes: 1,
+                        narrativeSections: 1,
+                        detectedPatterns: 0,
+                        reliefConnections: 0,
+                        assemblyTimeMs: 0,
+                    },
+                };
+
+                dispatch({
+                    type: 'ASSEMBLY_PROGRESS',
+                    status: { phase: 'ready_for_review', progress: 50, detail: 'Document ready for review' },
+                });
+            } else {
+                // ── FULL PATH: Run normal assembly pipeline ──
+                // Inject pasted content as supplementary node if available
+                if (hasPastedContent) {
+                    inputs.workspaceNodes.unshift({
+                        id: `pasted_${Date.now()}`,
+                        type: 'user_pasted_content',
+                        text: config.pastedContent!.trim(),
+                        title: 'User-Provided Document Content',
+                        createdAt: Date.now(),
+                    });
+                }
+
+                // 4. Run assembly (synchronous — deterministic engine)
+                result = runAssembly(
+                    exportRequest,
+                    inputs.workspaceNodes,
+                    inputs.timelineEvents,
+                    (status) => dispatch({ type: 'ASSEMBLY_PROGRESS', status }),
+                );
+            }
 
             // 5. Validate assembly
             const validation = validateAssemblyOutput(result, config);

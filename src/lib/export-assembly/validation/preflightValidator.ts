@@ -399,6 +399,11 @@ export interface RunPreflightInput {
 export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
     const { exportPath, config, reviewItems } = input;
 
+    // Detect fast path: single item at 100% confidence = pre-drafted pasted content
+    const isFastPath = reviewItems.length === 1
+        && reviewItems[0].confidence === 1.0
+        && reviewItems[0].originalText?.length > 100;
+
     // Build a minimal quality-only check from review items
     // (the full path-specific validators need typed config + mapped sections,
     //  which may not be available in the generic path)
@@ -418,16 +423,14 @@ export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
         category: 'quality',
     });
 
-    // ── Critical: Zero included items ──
+    // ── Content: Items included ──
     const includedCount = reviewItems.filter(item => item.includedInExport).length;
-    if (includedCount === 0) {
+    if (includedCount === 0 && !isFastPath) {
         checks.push({
             id: 'no_included_items',
             label: 'No items included',
-            severity: 'critical',
-            detail: exportPath === 'exhibit_document'
-                ? 'Exhibit packet requires at least one exhibit entry.'
-                : 'No items are included in the export. Cannot generate an empty document.',
+            severity: 'warning',
+            detail: 'No items are currently included in the export.',
             category: 'required_content',
         });
     } else {
@@ -435,59 +438,72 @@ export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
             id: 'items_included',
             label: 'Items included in export',
             severity: 'pass',
-            detail: `${includedCount} item${includedCount > 1 ? 's' : ''} included`,
+            detail: isFastPath
+                ? 'Pre-drafted document content detected'
+                : `${includedCount} item${includedCount > 1 ? 's' : ''} included`,
             category: 'required_content',
         });
     }
 
-    // ── Critical: Court doc without caption data (both fields required) ──
+    // ── Court-specific checks (only if court data is set — don't block without it) ──
     if (exportPath === 'court_document') {
-        const hasCaption = !!config.courtState && !!config.petitionerName;
-        if (!hasCaption) {
+        const hasCourtState = Boolean(config.courtState);
+        const hasCourtCounty = Boolean(config.courtCounty);
+        const hasPetitioner = Boolean(config.petitionerName);
+
+        // Only add jurisdiction check if the fields exist in config
+        if (hasCourtState || hasCourtCounty) {
             checks.push({
-                id: 'missing_caption',
-                label: 'Missing caption data',
-                severity: 'critical',
-                detail: 'Court document requires caption data (court, parties). Set court profile first.',
+                id: 'court_jurisdiction',
+                label: 'Court jurisdiction specified',
+                severity: hasCourtState && hasCourtCounty ? 'pass' : 'warning',
+                detail: hasCourtState && hasCourtCounty
+                    ? `${config.courtState}, ${config.courtCounty} County`
+                    : 'Court jurisdiction not fully specified — document will use defaults',
+                category: 'required_content',
+            });
+        } else if (!isFastPath) {
+            // Only warn if NOT fast path — fast path may have it in the text itself
+            checks.push({
+                id: 'court_jurisdiction',
+                label: 'Court jurisdiction',
+                severity: 'warning',
+                detail: 'No jurisdiction specified. Set court settings in Legal Suite for formatted output.',
+                category: 'required_content',
+            });
+        }
+
+        if (hasPetitioner) {
+            checks.push({
+                id: 'petitioner_name',
+                label: 'Petitioner identified',
+                severity: 'pass',
+                detail: String(config.petitionerName),
+                category: 'required_content',
+            });
+        } else if (!isFastPath) {
+            checks.push({
+                id: 'petitioner_name',
+                label: 'Petitioner identified',
+                severity: 'warning',
+                detail: 'Petitioner name not set in court settings',
                 category: 'required_content',
             });
         }
     }
 
-    // ── Required: Court settings (for court document path) ──
-    if (exportPath === 'court_document') {
-        const hasState = !!config.courtState;
-        const hasCounty = !!config.courtCounty;
-        checks.push({
-            id: 'court_jurisdiction',
-            label: 'Court jurisdiction specified',
-            severity: hasState && hasCounty ? 'pass' : 'error',
-            detail: hasState && hasCounty
-                ? `${config.courtState}, ${config.courtCounty} County`
-                : 'Missing court state or county',
-            category: 'required_content',
-        });
-
-        const hasPetitioner = !!config.petitionerName;
-        checks.push({
-            id: 'petitioner_name',
-            label: 'Petitioner identified',
-            severity: hasPetitioner ? 'pass' : 'warning',
-            detail: hasPetitioner ? String(config.petitionerName) : 'Petitioner name not set',
-            category: 'required_content',
-        });
-    }
-
-    // ── Evidence: Variety of evidence types ──
+    // ── Evidence: Variety (advisory only) ──
     const includedForVariety = reviewItems.filter(item => item.includedInExport);
     const types = new Set(includedForVariety.map(item => item.dominantType));
-    checks.push({
-        id: 'evidence_variety',
-        label: 'Evidence type coverage',
-        severity: includedForVariety.length === 0 ? 'error' : types.size >= 2 ? 'pass' : 'warning',
-        detail: `${types.size} evidence type${types.size !== 1 ? 's' : ''} represented`,
-        category: 'evidence',
-    });
+    if (!isFastPath) {
+        checks.push({
+            id: 'evidence_variety',
+            label: 'Evidence type coverage',
+            severity: includedForVariety.length === 0 ? 'warning' : types.size >= 2 ? 'pass' : 'warning',
+            detail: `${types.size} evidence type${types.size !== 1 ? 's' : ''} represented`,
+            category: 'evidence',
+        });
+    }
 
     return buildResult(checks);
 }

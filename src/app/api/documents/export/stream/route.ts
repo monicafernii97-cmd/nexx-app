@@ -228,33 +228,62 @@ export async function POST(request: NextRequest) {
                 });
 
                 // ────────────────────────────────────────────────
-                // 2. DRAFT SECTIONS VIA GPT
+                // 2. DRAFT SECTIONS VIA GPT (or skip for pasted content)
                 // ────────────────────────────────────────────────
-                send({
-                    type: 'milestone',
-                    stage: 'drafting',
-                    percent: 55,
-                    message: 'Drafting sections with AI...',
-                });
 
-                const pipelineResult = await runDraftingPhase({
-                    assemblyResult: body.assemblyResult,
-                    overrides: body.overrides,
-                    request: body.exportRequest,
-                    reviewItems: body.reviewItems,
-                    onStatus: (status) => {
-                        send({
-                            type: 'milestone',
-                            stage: 'drafting',
-                            percent: Math.min(status.progress, 70),
-                            message: status.detail ?? 'Drafting...',
-                        });
-                    },
-                });
+                // Detect fast path: single node at 100% confidence = pre-drafted pasted content
+                const classifiedNodes = body.assemblyResult?.assembly?.classifiedNodes ?? [];
+                const isFastPath = classifiedNodes.length === 1
+                    && classifiedNodes[0].confidence === 1.0
+                    && classifiedNodes[0].rawText?.length > 100;
+
+                let draftedSections: DraftedSection[];
+
+                if (isFastPath) {
+                    // ── FAST PATH: Content is already drafted — skip GPT ──
+                    send({
+                        type: 'milestone',
+                        stage: 'drafting',
+                        percent: 65,
+                        message: 'Using pre-drafted document content...',
+                    });
+
+                    const rawText = classifiedNodes[0].rawText;
+                    draftedSections = [{
+                        sectionId: 'document_body',
+                        heading: '',
+                        body: rawText,
+                        source: 'user_locked' as const,
+                    }];
+                } else {
+                    // ── FULL PATH: Draft via GPT ──
+                    send({
+                        type: 'milestone',
+                        stage: 'drafting',
+                        percent: 55,
+                        message: 'Drafting sections with AI...',
+                    });
+
+                    const pipelineResult = await runDraftingPhase({
+                        assemblyResult: body.assemblyResult,
+                        overrides: body.overrides,
+                        request: body.exportRequest,
+                        reviewItems: body.reviewItems,
+                        onStatus: (status) => {
+                            send({
+                                type: 'milestone',
+                                stage: 'drafting',
+                                percent: Math.min(status.progress, 70),
+                                message: status.detail ?? 'Drafting...',
+                            });
+                        },
+                    });
+
+                    draftedSections = pipelineResult.draftedSections;
+                }
 
                 checkAborted();
 
-                const { draftedSections } = pipelineResult;
                 const aiDraftedCount = draftedSections.filter(s => s.source === 'ai_drafted').length;
                 const lockedCount = draftedSections.filter(s => s.source === 'user_locked').length;
 

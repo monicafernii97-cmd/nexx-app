@@ -15,9 +15,8 @@ import Link from 'next/link';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
-import { EXPORT_PATH_LABELS } from '@/lib/export-assembly/exportPathLabels';
+import { EXPORT_PATH_LABELS, EXPORT_PATHS } from '@/lib/export-assembly/exportPathLabels';
 import type { ExportPath } from '@/lib/export-assembly/types/exports';
-import { UI_TABS } from '@/lib/legal/templateCategories';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 
 /** Gallery page displaying saved and generated legal documents. */
@@ -34,9 +33,9 @@ export default function DocuVaultGalleryPage() {
 
     const filterTabs = [
         { id: 'all', label: 'All' },
-        ...UI_TABS.filter(t => t.id !== 'create_own').map(t => ({
-            id: t.id,
-            label: t.label === 'LEAD' ? 'LEAD' : t.label,
+        ...EXPORT_PATHS.map(path => ({
+            id: path,
+            label: EXPORT_PATH_LABELS[path],
         })),
     ];
 
@@ -49,6 +48,7 @@ export default function DocuVaultGalleryPage() {
             category: doc.exportPath ?? doc.templateId,
             createdAt: new Date(doc.createdAt),
             status: (['completed', 'final', 'filed'].includes(doc.status) ? 'complete' : 'draft') as 'complete' | 'draft',
+            canDelete: ['draft', 'drafting', 'failed'].includes(doc.status),
             fileSize: '-',
             exportPath: doc.exportPath as ExportPath | undefined,
             version: doc.version,
@@ -350,15 +350,17 @@ export default function DocuVaultGalleryPage() {
                                             )}
                                         </div>
                                     </div>
-                                    {/* Delete draft/failed */}
-                                    <button
-                                        onClick={() => handleDelete(doc.id)}
-                                        disabled={deletingId === doc.id}
-                                        className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-[#F87171] hover:bg-red-500/10 hover:border-red-500/30 transition-colors shadow-sm disabled:opacity-40"
-                                        aria-label="Delete document"
-                                    >
-                                        <Trash2 size={16} strokeWidth={2.5} />
-                                    </button>
+                                    {/* Delete draft/failed only */}
+                                    {doc.canDelete && (
+                                        <button
+                                            onClick={() => handleDelete(doc.id)}
+                                            disabled={deletingId === doc.id}
+                                            className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-[#F87171] hover:bg-red-500/10 hover:border-red-500/30 transition-colors shadow-sm disabled:opacity-40"
+                                            aria-label="Delete document"
+                                        >
+                                            <Trash2 size={16} strokeWidth={2.5} />
+                                        </button>
+                                    )}
                                 </motion.div>
                             ))}
                         </div>

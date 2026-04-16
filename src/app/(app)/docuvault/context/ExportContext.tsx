@@ -553,6 +553,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
             const message = err instanceof Error ? err.message : 'Assembly failed. Please try again.';
             const errorCode = err instanceof Error && 'code' in err ? String((err as Error & { code: string }).code) : undefined;
             dispatch({ type: 'ERROR', message, errorCode });
+            throw err instanceof Error ? err : new Error(message);
         }
     }, [convex, router]);
 

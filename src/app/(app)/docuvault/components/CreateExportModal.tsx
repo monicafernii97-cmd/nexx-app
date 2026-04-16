@@ -133,6 +133,16 @@ export default function CreateExportModal({
         }
     }, [isValid, selectedCaseId, selectedPath, includeTimeline, includeExhibits, narrativeDepth, onSubmit]);
 
+    // Resync case selection when the modal opens or the active case changes
+    useEffect(() => {
+        if (!isOpen) return;
+        if (defaultCaseId) {
+            setSelectedCaseId(defaultCaseId);
+        } else {
+            setSelectedCaseId(null);
+        }
+    }, [isOpen, defaultCaseId]);
+
     // Auto-select first case if none provided
     useEffect(() => {
         if (selectedCaseId === null && cases && cases.length > 0) {

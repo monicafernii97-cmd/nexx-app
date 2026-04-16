@@ -64,12 +64,21 @@ export const createExportRun = mutation({
 
         const now = Date.now();
 
-        // Auto-compute version from parent chain (same user + same case)
+        // Auto-compute version and normalize lineage from validated parent
         let version = 1;
+        let parentExportId: typeof args.parentExportId | undefined = undefined;
+        let rootExportId: typeof args.rootExportId | undefined = args.rootExportId ?? undefined;
+
         if (args.parentExportId) {
             const parent = await ctx.db.get(args.parentExportId);
-            if (parent && parent.userId === user._id && parent.caseId === args.caseId) {
-                version = (parent.version ?? 1) + 1;
+            if (!parent || parent.userId !== user._id || parent.caseId !== args.caseId) {
+                throw new Error('Parent export not found or access denied');
+            }
+            parentExportId = parent._id;
+            version = (parent.version ?? 1) + 1;
+            // Derive root from parent chain when caller omits it
+            if (!rootExportId) {
+                rootExportId = parent.rootExportId ?? parent._id;
             }
         }
 
@@ -94,8 +103,8 @@ export const createExportRun = mutation({
             status: 'drafting',
             startedAt: now,
             version,
-            rootExportId: args.rootExportId ?? undefined,
-            parentExportId: args.parentExportId ?? undefined,
+            rootExportId,
+            parentExportId,
             currentStage: 'draft',
             createdAt: now,
             updatedAt: now,

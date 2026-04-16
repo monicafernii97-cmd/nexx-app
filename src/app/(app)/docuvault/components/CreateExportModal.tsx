@@ -292,8 +292,8 @@ export default function CreateExportModal({
                                             <div className="flex items-center gap-1.5">
                                                 <p className="text-[14px] font-bold text-white">Include Timeline</p>
                                                 <span className="group relative">
-                                                    <Info size={14} className="text-white/30 hover:text-white/60 transition-colors cursor-help" />
-                                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-[11px] text-white/90 bg-[#1a1f35] border border-white/10 rounded-lg shadow-xl w-52 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
+                                                    <Info size={14} className="text-white/30 hover:text-white/60 transition-colors cursor-help" aria-describedby="timeline-tooltip" tabIndex={0} />
+                                                    <span id="timeline-tooltip" role="tooltip" className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-[11px] text-white/90 bg-[#1a1f35] border border-white/10 rounded-lg shadow-xl w-52 opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50">
                                                         Toggle ON to include a chronological summary from your case timeline. Leave OFF for simple document export.
                                                     </span>
                                                 </span>
@@ -323,8 +323,8 @@ export default function CreateExportModal({
                                             <div className="flex items-center gap-1.5">
                                                 <p className="text-[14px] font-bold text-white">Include Exhibits</p>
                                                 <span className="group relative">
-                                                    <Info size={14} className="text-white/30 hover:text-white/60 transition-colors cursor-help" />
-                                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-[11px] text-white/90 bg-[#1a1f35] border border-white/10 rounded-lg shadow-xl w-52 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
+                                                    <Info size={14} className="text-white/30 hover:text-white/60 transition-colors cursor-help" aria-describedby="exhibits-tooltip" tabIndex={0} />
+                                                    <span id="exhibits-tooltip" role="tooltip" className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-[11px] text-white/90 bg-[#1a1f35] border border-white/10 rounded-lg shadow-xl w-52 opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50">
                                                         Toggle ON to attach evidence and exhibits. Best for court filings that reference documents.
                                                     </span>
                                                 </span>
@@ -353,8 +353,8 @@ export default function CreateExportModal({
                                         <label className="text-[13px] font-bold text-white/70 mb-2 flex items-center gap-1.5">
                                             Narrative Depth
                                             <span className="group relative">
-                                                <Info size={13} className="text-white/30 hover:text-white/60 transition-colors cursor-help" />
-                                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-[11px] text-white/90 bg-[#1a1f35] border border-white/10 rounded-lg shadow-xl w-52 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
+                                                <Info size={13} className="text-white/30 hover:text-white/60 transition-colors cursor-help" aria-describedby="depth-tooltip" tabIndex={0} />
+                                                <span id="depth-tooltip" role="tooltip" className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-[11px] text-white/90 bg-[#1a1f35] border border-white/10 rounded-lg shadow-xl w-52 opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50">
                                                     Controls AI summary detail. &quot;Light&quot; for quick exports, &quot;Standard&quot; for balanced, &quot;Full&quot; for comprehensive documents.
                                                 </span>
                                             </span>

@@ -300,7 +300,7 @@ function DocuVaultPageInner() {
             setGenerationError(error instanceof Error ? error.message : 'Generation failed');
             setView('compose');
         }
-    }, [documentContent, selectedTemplate, isUserProfileLoading, user?.state, user?.county, user?.name]);
+    }, [documentContent, selectedTemplate, isUserProfileLoading, resolvedState, resolvedCounty, courtSettings?.petitionerLegalName, user?.name]);
 
     /** Reset all state to begin composing a new document, aborting any in-flight generation. */
     const handleNewDocument = useCallback(() => {

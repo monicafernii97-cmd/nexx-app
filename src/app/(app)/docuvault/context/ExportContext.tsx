@@ -487,7 +487,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
             // 2b. Inject pasted content as a synthetic workspace node if provided
             if (config.pastedContent?.trim()) {
                 inputs.workspaceNodes.unshift({
-                    id: `pasted_${Date.now()}` as any,
+                    id: `pasted_${Date.now()}`,
                     type: 'user_pasted_content',
                     text: config.pastedContent.trim(),
                     title: 'User-Provided Document Content',

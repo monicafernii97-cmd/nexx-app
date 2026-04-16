@@ -186,6 +186,7 @@ const SOURCE_TYPE_DEFAULTS: Partial<Record<WorkspaceNodeType, Partial<Record<Sen
     evidence_item: { evidence_reference: 0.25, fact: 0.10 },
     pinned_item: { fact: 0.05, argument: 0.05 },
     pattern_analysis: { argument: 0.15, fact: 0.10 },
+    user_pasted_content: { fact: 0.10, argument: 0.10 },
 };
 
 // ---------------------------------------------------------------------------

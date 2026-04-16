@@ -5,12 +5,9 @@
  * Distinct from preflight, which validates the drafted/render-ready payload.
  *
  * Uses a 3-severity model:
- *   - critical → export cannot proceed (blocks "Approve & Draft")
- *   - error → export may proceed but has known quality issues
- *   - warning → informational, does not block
- *
- * Path-specific checks ensure each export type has minimum structural
- * requirements met before entering the review phase.
+ *   - critical → blocks "Approve & Draft" (ONLY fires on zero content)
+ *   - error → reserved for future quality-gate checks (currently unused)
+ *   - warning → informational hints, does not block
  */
 
 import type { OrchestratorAssemblyResult } from '../orchestrator';

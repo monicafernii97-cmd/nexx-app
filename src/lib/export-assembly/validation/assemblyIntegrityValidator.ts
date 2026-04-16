@@ -5,12 +5,9 @@
  * Distinct from preflight, which validates the drafted/render-ready payload.
  *
  * Uses a 3-severity model:
- *   - critical → export cannot proceed (blocks "Approve & Draft")
- *   - error → export may proceed but has known quality issues
- *   - warning → informational, does not block
- *
- * Path-specific checks ensure each export type has minimum structural
- * requirements met before entering the review phase.
+ *   - critical → blocks "Approve & Draft" (ONLY fires on zero content)
+ *   - error → reserved for future quality-gate checks (currently unused)
+ *   - warning → informational hints, does not block
  */
 
 import type { OrchestratorAssemblyResult } from '../orchestrator';
@@ -40,23 +37,25 @@ function validateCourtDocument(
 
     const { assembly, reviewItems, meta } = result;
     const includedItems = reviewItems.filter(i => i.includedInExport);
+    const hasAnyDiscoveredContent = reviewItems.length > 0;
 
-    // ── Critical ──
-    if (includedItems.length === 0) {
+    // ── Critical — ONLY when zero data (nothing to build a document from) ──
+    if (!hasAnyDiscoveredContent) {
         critical.push({
             id: nextId('court_crit'),
-            label: 'No included content',
-            detail: 'No workspace items are included in this export. Add case data before proceeding.',
+            label: 'No content available',
+            detail: 'No content is available for this export. Paste document text or add case data first.',
         });
     }
 
+    // ── Warnings — informational, do NOT block ──
     if (assembly.path === 'court_document') {
         const mapped = assembly.mappedSections;
         if (!mapped.captionData || (!mapped.captionData.courtName && !mapped.captionData.caseStyle)) {
-            critical.push({
-                id: nextId('court_crit'),
-                label: 'Missing caption data',
-                detail: 'Court document requires caption data (court name, case number). Add court profile information.',
+            warnings.push({
+                id: nextId('court_warn'),
+                label: 'No caption data',
+                detail: 'Court caption (court name, case number) not found. The document will generate without a formal caption.',
             });
         }
 
@@ -65,35 +64,30 @@ function validateCourtDocument(
             mapped.legalGrounds.length +
             mapped.argumentSections.length;
         if (sectionsPresent === 0 && includedItems.length > 0) {
-            critical.push({
-                id: nextId('court_crit'),
-                label: 'No valid sections produced',
-                detail: 'Assembly produced classified nodes but no court sections mapped. Check node classification.',
+            warnings.push({
+                id: nextId('court_warn'),
+                label: 'No structured sections mapped',
+                detail: 'Content will be included as-is without section classification.',
             });
         }
-    }
 
-    // ── Error ──
-    if (assembly.path === 'court_document') {
-        const mapped = assembly.mappedSections;
         if (mapped.factualBackground.length === 0 && includedItems.length > 0) {
-            errors.push({
-                id: nextId('court_err'),
-                label: 'Empty factual background',
-                detail: 'No factual background sections were generated. This is a key section for court filings.',
+            warnings.push({
+                id: nextId('court_warn'),
+                label: 'No factual background section',
+                detail: 'No factual background was generated. Consider adding more case facts.',
             });
         }
 
         if (mapped.exhibitReferences.length > 0 && includedItems.filter(i => i.dominantType === 'evidence_reference').length === 0) {
-            errors.push({
-                id: nextId('court_err'),
+            warnings.push({
+                id: nextId('court_warn'),
                 label: 'Exhibits referenced but no evidence',
-                detail: 'The assembly references exhibits but no evidence items were classified. Add or re-classify items.',
+                detail: 'The assembly references exhibits but no evidence items were classified.',
             });
         }
     }
 
-    // ── Warning ──
     if (meta.narrativeSections < 3) {
         warnings.push({
             id: nextId('court_warn'),
@@ -129,16 +123,18 @@ function validateSummaryReport(
 
     const { assembly, reviewItems, meta } = result;
     const includedItems = reviewItems.filter(i => i.includedInExport);
+    const hasAnyDiscoveredContent = reviewItems.length > 0;
 
-    // ── Critical ──
-    if (includedItems.length === 0) {
+    // ── Critical — ONLY when zero data ──
+    if (!hasAnyDiscoveredContent) {
         critical.push({
             id: nextId('summary_crit'),
-            label: 'No included content',
-            detail: 'No workspace items are included in this export. Add case data before proceeding.',
+            label: 'No content available',
+            detail: 'No content is available for this export. Paste document text or add case data first.',
         });
     }
 
+    // ── Warnings — informational, do NOT block ──
     if (assembly.path === 'case_summary') {
         const mapped = assembly.mappedSections;
         const sectionsPresent =
@@ -147,20 +143,16 @@ function validateSummaryReport(
             mapped.keyIssues.length +
             mapped.patternSummary.length;
         if (sectionsPresent === 0 && includedItems.length > 0) {
-            critical.push({
-                id: nextId('summary_crit'),
-                label: 'No sections produced',
-                detail: 'Assembly classified nodes but produced no summary sections. Try adding more varied case data.',
+            warnings.push({
+                id: nextId('summary_warn'),
+                label: 'No structured sections mapped',
+                detail: 'Content will be included as-is without section classification.',
             });
         }
-    }
 
-    // ── Error ──
-    if (assembly.path === 'case_summary') {
-        const mapped = assembly.mappedSections;
         if (mapped.timelineSummary.length === 0 && meta.narrativeSections > 0) {
-            errors.push({
-                id: nextId('summary_err'),
+            warnings.push({
+                id: nextId('summary_warn'),
                 label: 'Missing chronology',
                 detail: 'Narrative data exists but no chronological summary was produced.',
             });
@@ -168,15 +160,14 @@ function validateSummaryReport(
 
         const evidenceCount = includedItems.filter(i => i.dominantType === 'evidence_reference').length;
         if (evidenceCount <= 1 && includedItems.length > 5) {
-            errors.push({
-                id: nextId('summary_err'),
-                label: 'Insufficient evidence items',
+            warnings.push({
+                id: nextId('summary_warn'),
+                label: 'Few evidence items',
                 detail: `Only ${evidenceCount} evidence item(s) found among ${includedItems.length} total items.`,
             });
         }
     }
 
-    // ── Warning ──
     if (meta.narrativeSections < 2) {
         warnings.push({
             id: nextId('summary_warn'),
@@ -198,40 +189,37 @@ function validateExhibitPacket(
 
     const { assembly, reviewItems } = result;
     const includedItems = reviewItems.filter(i => i.includedInExport);
+    const hasAnyDiscoveredContent = reviewItems.length > 0;
 
-    // ── Critical ──
-    if (assembly.path === 'exhibit_document') {
-        const mapped = assembly.mappedSections;
-        if (mapped.indexEntries.length === 0) {
-            critical.push({
-                id: nextId('exhibit_crit'),
-                label: 'Zero exhibits',
-                detail: 'No exhibit entries were produced. Add evidence or exhibit-linked items to your case.',
-            });
-        }
-    }
-
-    if (includedItems.length === 0) {
+    // ── Critical — ONLY when zero data ──
+    if (!hasAnyDiscoveredContent) {
         critical.push({
             id: nextId('exhibit_crit'),
-            label: 'No included content',
-            detail: 'No workspace items are included in this export.',
+            label: 'No content available',
+            detail: 'No content is available for this export. Paste document text or add case data first.',
         });
     }
 
-    // ── Error ──
+    // ── Warnings — informational, do NOT block ──
     if (assembly.path === 'exhibit_document') {
         const mapped = assembly.mappedSections;
+        if (mapped.indexEntries.length === 0 && includedItems.length > 0) {
+            warnings.push({
+                id: nextId('exhibit_warn'),
+                label: 'No exhibit entries mapped',
+                detail: 'Content is available but no exhibits were classified. The document will use content as-is.',
+            });
+        }
+
         if (mapped.coverSheetSummaries.length === 0 && mapped.indexEntries.length > 0) {
-            errors.push({
-                id: nextId('exhibit_err'),
+            warnings.push({
+                id: nextId('exhibit_warn'),
                 label: 'Missing cover sheets',
                 detail: 'Exhibits exist but no cover sheet summaries were generated.',
             });
         }
     }
 
-    // ── Warning ──
     const evidenceTypes = new Set(
         includedItems
             .filter(i => i.dominantType === 'evidence_reference')

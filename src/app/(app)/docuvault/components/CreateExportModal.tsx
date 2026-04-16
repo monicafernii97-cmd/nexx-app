@@ -12,6 +12,7 @@ import {
     Lightning,
     Sliders,
     ArrowsClockwise,
+    Info,
 } from '@phosphor-icons/react';
 import { useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
@@ -68,7 +69,7 @@ const DEPTH_OPTIONS: { value: ExportConfig['narrativeDepth']; label: string }[] 
 
 /** Default "Include Exhibits" per path. */
 const DEFAULT_EXHIBITS: Record<ExportPath, boolean> = {
-    court_document: true,
+    court_document: false,
     case_summary: false,
     exhibit_document: true,
 };
@@ -94,7 +95,7 @@ export default function CreateExportModal({
     // ── Form state ──
     const [selectedPath, setSelectedPath] = useState<ExportPath>('court_document');
     const [selectedCaseId, setSelectedCaseId] = useState<Id<'cases'> | null>(defaultCaseId ?? null);
-    const [includeTimeline, setIncludeTimeline] = useState(true);
+    const [includeTimeline, setIncludeTimeline] = useState(false);
     const [includeExhibits, setIncludeExhibits] = useState(DEFAULT_EXHIBITS['court_document']);
     const [narrativeDepth, setNarrativeDepth] = useState<ExportConfig['narrativeDepth']>('standard');
 
@@ -287,8 +288,16 @@ export default function CreateExportModal({
 
                                     {/* Include Timeline Toggle */}
                                     <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
-                                        <div>
-                                            <p className="text-[14px] font-bold text-white">Include Timeline</p>
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <p className="text-[14px] font-bold text-white">Include Timeline</p>
+                                                <span className="group relative">
+                                                    <Info size={14} className="text-white/30 hover:text-white/60 transition-colors cursor-help" aria-describedby="timeline-tooltip" tabIndex={0} />
+                                                    <span id="timeline-tooltip" role="tooltip" className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-[11px] text-white/90 bg-[#1a1f35] border border-white/10 rounded-lg shadow-xl w-52 opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50">
+                                                        Toggle ON to include a chronological summary from your case timeline. Leave OFF for simple document export.
+                                                    </span>
+                                                </span>
+                                            </div>
                                             <p className="text-[12px] text-white/50 mt-0.5">Add chronological event data</p>
                                         </div>
                                         <button
@@ -310,8 +319,16 @@ export default function CreateExportModal({
 
                                     {/* Include Exhibits Toggle */}
                                     <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
-                                        <div>
-                                            <p className="text-[14px] font-bold text-white">Include Exhibits</p>
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <p className="text-[14px] font-bold text-white">Include Exhibits</p>
+                                                <span className="group relative">
+                                                    <Info size={14} className="text-white/30 hover:text-white/60 transition-colors cursor-help" aria-describedby="exhibits-tooltip" tabIndex={0} />
+                                                    <span id="exhibits-tooltip" role="tooltip" className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-[11px] text-white/90 bg-[#1a1f35] border border-white/10 rounded-lg shadow-xl w-52 opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50">
+                                                        Toggle ON to attach evidence and exhibits. Best for court filings that reference documents.
+                                                    </span>
+                                                </span>
+                                            </div>
                                             <p className="text-[12px] text-white/50 mt-0.5">Attach evidence references and exhibits</p>
                                         </div>
                                         <button
@@ -333,8 +350,14 @@ export default function CreateExportModal({
 
                                     {/* Narrative Depth Segmented Control */}
                                     <div>
-                                        <label className="text-[13px] font-bold text-white/70 mb-2 block">
+                                        <label className="text-[13px] font-bold text-white/70 mb-2 flex items-center gap-1.5">
                                             Narrative Depth
+                                            <span className="group relative">
+                                                <Info size={13} className="text-white/30 hover:text-white/60 transition-colors cursor-help" aria-describedby="depth-tooltip" tabIndex={0} />
+                                                <span id="depth-tooltip" role="tooltip" className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-[11px] text-white/90 bg-[#1a1f35] border border-white/10 rounded-lg shadow-xl w-52 opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50">
+                                                    Controls AI summary detail. &quot;Light&quot; for quick exports, &quot;Standard&quot; for balanced, &quot;Full&quot; for comprehensive documents.
+                                                </span>
+                                            </span>
                                         </label>
                                         <div className="flex rounded-xl border border-white/15 overflow-hidden bg-white/5">
                                             {DEPTH_OPTIONS.map(opt => (

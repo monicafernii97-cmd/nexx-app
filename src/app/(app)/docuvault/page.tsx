@@ -63,8 +63,13 @@ function DocuVaultPageInner() {
     const { userId } = useUser();
     const { activeCaseId } = useWorkspace();
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
+    const courtSettings = useQuery(api.courtSettings.get);
     /** True while user profile query is in-flight (prevents generation with wrong defaults). */
-    const isUserProfileLoading = Boolean(userId) && user === undefined;
+    const isUserProfileLoading = Boolean(userId) && (user === undefined || courtSettings === undefined);
+
+    // Resolved court settings — courtSettings table is canonical, user profile is fallback
+    const resolvedState = courtSettings?.state || user?.state || '';
+    const resolvedCounty = courtSettings?.county || user?.county || '';
 
     // Tab & template state
     const [activeTab, setActiveTab] = useState<UITabCategory>('lead');
@@ -156,8 +161,8 @@ function DocuVaultPageInner() {
         }
 
         // Fail fast if required profile data is missing
-        if (!user?.state || !user?.county) {
-            setGenerationError('Please set your state and county in Court Settings before generating documents.');
+        if (!resolvedState || !resolvedCounty) {
+            setGenerationError('Please set your state and county in Court Settings (Legal Suite → Court Settings) before generating documents.');
             return;
         }
 
@@ -194,10 +199,10 @@ function DocuVaultPageInner() {
                 body: JSON.stringify({
                     templateId: selectedTemplate?.id ?? 'general',
                     courtSettings: {
-                        state: user.state,
-                        county: user.county,
+                        state: resolvedState,
+                        county: resolvedCounty,
                     },
-                    petitioner: { name: user.name || 'Petitioner' },
+                    petitioner: { name: courtSettings?.petitionerLegalName || user?.name || 'Petitioner' },
                     caseType: selectedTemplate?.caseTypes?.[0] ?? undefined,
                     bodyContent: documentContent ? [{ heading: 'Content', paragraphs: [documentContent] }] : [],
                 }),
@@ -295,7 +300,7 @@ function DocuVaultPageInner() {
             setGenerationError(error instanceof Error ? error.message : 'Generation failed');
             setView('compose');
         }
-    }, [documentContent, selectedTemplate, isUserProfileLoading, user?.state, user?.county, user?.name]);
+    }, [documentContent, selectedTemplate, isUserProfileLoading, resolvedState, resolvedCounty, courtSettings?.petitionerLegalName, user?.name]);
 
     /** Reset all state to begin composing a new document, aborting any in-flight generation. */
     const handleNewDocument = useCallback(() => {
@@ -647,10 +652,11 @@ function DocuVaultPageInner() {
                             <button
                                 id="create-export-btn"
                                 onClick={() => setShowCreateExport(true)}
-                                className="flex items-center justify-center gap-3 py-5 rounded-[2rem] text-[14px] font-bold tracking-[0.15em] uppercase text-white transition-all bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_28px_rgba(0,0,0,0.5)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_12px_36px_rgba(0,0,0,0.6)] group hover:-translate-y-1"
+                                disabled={isParsing}
+                                className={`flex items-center justify-center gap-3 py-5 rounded-[2rem] text-[14px] font-bold tracking-[0.15em] uppercase text-white transition-all bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_28px_rgba(0,0,0,0.5)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_12px_36px_rgba(0,0,0,0.6)] group hover:-translate-y-1 ${isParsing ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 <Export size={22} weight="bold" className="text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)] group-hover:scale-110 transition-transform duration-300" />
-                                <span className="drop-shadow-sm">Create Export</span>
+                                <span className="drop-shadow-sm">{isParsing ? 'Extracting…' : 'Create Export'}</span>
                             </button>
                         </div>
 
@@ -672,10 +678,13 @@ function DocuVaultPageInner() {
                         onSubmit={async (config) => {
                             setShowCreateExport(false);
                             try {
-                                await startStructuredExport(config);
+                                await startStructuredExport({
+                                    ...config,
+                                    pastedContent: documentContent || undefined,
+                                });
                             } catch (err) {
                                 console.error('[DocuVault] Export start failed:', err);
-                                setShowCreateExport(true); // Re-open so user sees the failure
+                                setShowCreateExport(true);
                             }
                         }}
                         defaultCaseId={activeCaseId ?? undefined}

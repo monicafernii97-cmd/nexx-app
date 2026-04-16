@@ -385,6 +385,8 @@ export interface RunPreflightInput {
     config: Record<string, unknown>;
     reviewItems: MappingReviewItem[];
     overrides: ExportOverrides;
+    /** Explicit flag from upstream — true when pasted content with no workspace data. */
+    isFastPath?: boolean;
 }
 
 /**
@@ -395,14 +397,12 @@ export interface RunPreflightInput {
  * - Auto-preflight in the SSE pipeline (stream/route.ts)
  *
  * Same function, same config, same output — guaranteed consistency.
+ *
+ * @param input - Preflight input with export path, config, items, overrides, and optional fast-path flag
+ * @returns     - Preflight result with checklist, scores, and canProceed flag
  */
 export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
-    const { exportPath, config, reviewItems } = input;
-
-    // Detect fast path: single item at 100% confidence = pre-drafted pasted content
-    const isFastPath = reviewItems.length === 1
-        && reviewItems[0].confidence === 1.0
-        && reviewItems[0].originalText?.length > 100;
+    const { exportPath, config, reviewItems, isFastPath = false } = input;
 
     // Build a minimal quality-only check from review items
     // (the full path-specific validators need typed config + mapped sections,

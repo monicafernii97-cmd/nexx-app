@@ -600,6 +600,18 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                 // Parse caption data from the text using regex
                 const captionData = parseCaptionFromText(pastedText);
 
+                // Wire parsed caption into export config so the renderer receives it
+                if (config.path === 'court_document') {
+                    const courtConfig = exportRequest.config as unknown as Record<string, unknown>;
+                    if (captionData.courtName) courtConfig.courtName = captionData.courtName;
+                    if (captionData.state) courtConfig.courtState = captionData.state;
+                    if (captionData.county) courtConfig.courtCounty = captionData.county;
+                    if (captionData.causeNumber) courtConfig.causeNumber = captionData.causeNumber;
+                    // Extract petitioner name from partyRoles if available
+                    const petitionerRole = captionData.partyRoles?.find(r => r.startsWith('Petitioner:'));
+                    if (petitionerRole) courtConfig.petitionerName = petitionerRole.replace('Petitioner: ', '');
+                }
+
                 dispatch({
                     type: 'ASSEMBLY_PROGRESS',
                     status: { phase: 'collecting', progress: 10, detail: 'Using pasted document content (fast path)' },

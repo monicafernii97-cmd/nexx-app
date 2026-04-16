@@ -113,6 +113,14 @@ function getExportRules(request: ExportRequest): CourtFormattingRules {
 // Route Handler
 // ---------------------------------------------------------------------------
 
+/**
+ * POST /api/documents/export/stream
+ *
+ * Full export pipeline with real-time SSE milestone events.
+ * Supports two modes:
+ * - **Fast path**: Pre-drafted pasted content → skip GPT → format + render PDF
+ * - **Full path**: Workspace data assembly → GPT drafting → format + render PDF
+ */
 export async function POST(request: NextRequest) {
     // ── Auth guard ──
     const { userId } = await auth();
@@ -248,7 +256,27 @@ export async function POST(request: NextRequest) {
                         message: 'Using pre-drafted document content...',
                     });
 
-                    const rawText = classifiedNodes[0].rawText;
+                    // Respect Review Hub edits and exclusions
+                    const nodeId = classifiedNodes[0].nodeId;
+                    const itemOverride = body.overrides?.itemOverrides?.find(
+                        (o: { nodeId: string }) => o.nodeId === nodeId,
+                    );
+                    const reviewedItem = body.reviewItems?.find(
+                        (item: { nodeId: string }) => item.nodeId === nodeId,
+                    );
+
+                    if (itemOverride?.excluded || reviewedItem?.includedInExport === false) {
+                        throw Object.assign(
+                            new Error('Pasted content was excluded in review. Nothing to export.'),
+                            { code: 'draft_failed' },
+                        );
+                    }
+
+                    const rawText =
+                        itemOverride?.editedText
+                        ?? reviewedItem?.originalText
+                        ?? classifiedNodes[0].rawText;
+
                     draftedSections = [{
                         sectionId: 'document_body',
                         heading: '',
@@ -319,6 +347,7 @@ export async function POST(request: NextRequest) {
                         config: (body.exportRequest?.config ?? {}) as unknown as Record<string, unknown>,
                         reviewItems: body.reviewItems,
                         overrides: body.overrides,
+                        isFastPath,
                     });
                 } catch (pfErr) {
                     // Preflight failure is non-blocking (advisory)

@@ -179,11 +179,14 @@ export default function ReviewHubContent() {
     /** Run manual preflight checks. */
     const handleRunPreflight = useCallback(() => {
         try {
+            const classifiedNodes = state.assemblyResult?.assembly?.classifiedNodes ?? [];
+            const fastPath = classifiedNodes.length === 1 && classifiedNodes[0].tags?.includes('pre_drafted');
             const result = runPreflightChecks({
                 exportPath: state.exportPath ?? 'court_document',
                 config: (state.exportRequest?.config ?? {}) as Record<string, unknown>,
                 reviewItems: effectiveItems,
                 overrides: state.overrides,
+                isFastPath: fastPath,
             });
             setPreflight(result);
             setShowPreflight(true);
@@ -562,6 +565,7 @@ function AssemblyValidationBanner({
 // Drafting Phase — Step Checklist
 // =========================================================================
 
+/** Step-by-step drafting progress checklist with animated indicators. */
 function DraftingPhaseUI({
     state,
     onCancel,
@@ -641,6 +645,7 @@ function DraftingPhaseUI({
 // Completed Phase — Success Card
 // =========================================================================
 
+/** Success card shown after export completes — download link, stats, and new export button. */
 function CompletedPhaseUI({
     state,
     onNewExport,
@@ -740,6 +745,7 @@ function CompletedPhaseUI({
 // Error Phase
 // =========================================================================
 
+/** Error recovery UI with stage-aware retry and back-to-DocuVault navigation. */
 function ErrorPhaseUI({
     state,
     onRetry,

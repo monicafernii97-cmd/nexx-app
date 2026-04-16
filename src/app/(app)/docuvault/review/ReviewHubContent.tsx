@@ -305,8 +305,17 @@ export default function ReviewHubContent() {
     // Guard: only render canvas during reviewing phase
     if (state.phase !== 'reviewing') {
         return (
-            <div className="flex items-center justify-center h-full text-white/40">
-                <p>No active review session. Start an export from DocuVault.</p>
+            <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-4">
+                    <p className="text-white/40">No active review session.</p>
+                    <button
+                        type="button"
+                        onClick={() => router.push('/docuvault')}
+                        className="px-6 py-3 rounded-xl text-[13px] font-bold text-white bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-white/20 shadow-[0_4px_16px_rgba(26,75,155,0.3)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] transition-all"
+                    >
+                        Back to DocuVault
+                    </button>
+                </div>
             </div>
         );
     }

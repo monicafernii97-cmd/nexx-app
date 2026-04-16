@@ -1,10 +1,11 @@
 'use client';
 
 /**
- * Draft Style Toggle — Switch between original text and court-safe version.
+ * Draft Style Toggle — Switch between original text and court-ready version.
  *
- * "Original" shows the raw workspace text.
- * "Court Safe" shows the transformed, emotion-stripped version.
+ * "As Written" shows the raw workspace text exactly as the user entered it.
+ * "Court-Ready" shows the transformed version with emotional language removed
+ * and formal court tone applied — suitable for filing.
  */
 
 import { FileText, ShieldCheck } from '@phosphor-icons/react';
@@ -14,7 +15,7 @@ interface DraftStyleToggleProps {
     onChange: (mode: 'original' | 'court_safe') => void;
 }
 
-/** Segmented toggle for switching between original and court-safe text. */
+/** Segmented toggle for switching between original and court-ready text. */
 export default function DraftStyleToggle({ mode, onChange }: DraftStyleToggleProps) {
     return (
         <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5" role="group" aria-label="Text display mode">
@@ -27,10 +28,10 @@ export default function DraftStyleToggle({ mode, onChange }: DraftStyleTogglePro
                         ? 'bg-white/10 text-white shadow-sm'
                         : 'text-white/40 hover:text-white/60'
                 }`}
-                title="Show original workspace text"
+                title="Your original text, exactly as entered"
             >
                 <FileText size={13} weight="bold" />
-                Original
+                As Written
             </button>
             <button
                 type="button"
@@ -41,10 +42,10 @@ export default function DraftStyleToggle({ mode, onChange }: DraftStyleTogglePro
                         ? 'bg-emerald-500/15 text-emerald-400 shadow-sm'
                         : 'text-white/40 hover:text-white/60'
                 }`}
-                title="Show court-safe transformed text"
+                title="Reformatted for court: emotional language removed, formal tone applied"
             >
                 <ShieldCheck size={13} weight="bold" />
-                Court Safe
+                Court-Ready
             </button>
         </div>
     );

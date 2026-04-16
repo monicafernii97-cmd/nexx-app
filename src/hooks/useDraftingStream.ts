@@ -104,10 +104,18 @@ export function useDraftingStream({ dispatch }: ContextDispatchers) {
             });
 
             if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({ error: 'Request failed' }));
+                const errorText = await response.text().catch(() => '');
+                let errorMessage = `Server error ${response.status}`;
+                try {
+                    const errorBody = JSON.parse(errorText);
+                    errorMessage = errorBody.error ?? errorMessage;
+                } catch {
+                    if (errorText) errorMessage = errorText.slice(0, 500);
+                }
+                console.error('[useDraftingStream] Non-OK response:', response.status, errorMessage);
                 dispatch({
                     type: 'ERROR',
-                    message: errorBody.error ?? `Server error: ${response.status}`,
+                    message: errorMessage,
                     errorCode: 'unknown_failed',
                 });
                 return runId;

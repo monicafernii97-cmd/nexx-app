@@ -479,7 +479,7 @@ export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
         checks.push({
             id: 'petitioner_name',
             label: 'Petitioner identified',
-            severity: hasPetitioner ? 'pass' : 'warning',
+            severity: hasPetitioner ? 'pass' : isFastPath ? 'warning' : 'error',
             detail: hasPetitioner
                 ? String(config.petitionerName)
                 : isFastPath

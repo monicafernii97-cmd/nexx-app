@@ -445,51 +445,35 @@ export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
         });
     }
 
-    // ── Court-specific checks (only if court data is set — don't block without it) ──
+    // ── Court-specific checks (always emit — downgraded to warning on fast path) ──
     if (exportPath === 'court_document') {
         const hasCourtState = Boolean(config.courtState);
         const hasCourtCounty = Boolean(config.courtCounty);
         const hasPetitioner = Boolean(config.petitionerName);
 
-        // Only add jurisdiction check if the fields exist in config
-        if (hasCourtState || hasCourtCounty) {
-            checks.push({
-                id: 'court_jurisdiction',
-                label: 'Court jurisdiction specified',
-                severity: hasCourtState && hasCourtCounty ? 'pass' : 'warning',
-                detail: hasCourtState && hasCourtCounty
-                    ? `${config.courtState}, ${config.courtCounty} County`
-                    : 'Court jurisdiction not fully specified — document will use defaults',
-                category: 'required_content',
-            });
-        } else if (!isFastPath) {
-            // Only warn if NOT fast path — fast path may have it in the text itself
-            checks.push({
-                id: 'court_jurisdiction',
-                label: 'Court jurisdiction',
-                severity: 'warning',
-                detail: 'No jurisdiction specified. Set court settings in Legal Suite for formatted output.',
-                category: 'required_content',
-            });
-        }
+        checks.push({
+            id: 'court_jurisdiction',
+            label: 'Court jurisdiction specified',
+            severity: hasCourtState && hasCourtCounty ? 'pass' : 'warning',
+            detail: hasCourtState && hasCourtCounty
+                ? `${config.courtState}, ${config.courtCounty} County`
+                : isFastPath
+                    ? 'Court jurisdiction could not be parsed from document — defaults will be used'
+                    : 'No jurisdiction specified. Set court settings in Legal Suite for formatted output.',
+            category: 'required_content',
+        });
 
-        if (hasPetitioner) {
-            checks.push({
-                id: 'petitioner_name',
-                label: 'Petitioner identified',
-                severity: 'pass',
-                detail: String(config.petitionerName),
-                category: 'required_content',
-            });
-        } else if (!isFastPath) {
-            checks.push({
-                id: 'petitioner_name',
-                label: 'Petitioner identified',
-                severity: 'warning',
-                detail: 'Petitioner name not set in court settings',
-                category: 'required_content',
-            });
-        }
+        checks.push({
+            id: 'petitioner_name',
+            label: 'Petitioner identified',
+            severity: hasPetitioner ? 'pass' : 'warning',
+            detail: hasPetitioner
+                ? String(config.petitionerName)
+                : isFastPath
+                    ? 'Petitioner name could not be parsed from document'
+                    : 'Petitioner name not set in court settings',
+            category: 'required_content',
+        });
     }
 
     // ── Evidence: Variety (advisory only) ──

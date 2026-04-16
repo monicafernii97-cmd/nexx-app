@@ -70,7 +70,7 @@ function parseCaptionFromText(text: string): {
         ?? lines.match(/IN\s+THE\s+([\w\s]+COURT)/i);
 
     // County: "FORT BEND COUNTY, TEXAS" or "HARRIS COUNTY, TEXAS"
-    const countyMatch = lines.match(/([\w\s]+)\s+COUNTY,\s+(TEXAS|TX|CALIFORNIA|CA|FLORIDA|FL|NEW YORK|NY|[\w\s]+)/i);
+    const countyMatch = lines.match(/([\w ]+)\s+COUNTY,\s+(TEXAS|TX|CALIFORNIA|CA|FLORIDA|FL|NEW YORK|NY|[\w ]+)/i);
 
     // Petitioner/Respondent: "COMES NOW Monica Fernandez, Petitioner"
     const petitionerMatch = lines.match(/COMES\s+NOW\s+([\w\s]+),\s*(?:Petitioner|Movant)/i);
@@ -538,7 +538,9 @@ export function ExportProvider({ children }: { children: ReactNode }) {
             // drafted — just format and export.
             const hasPastedContent = Boolean(config.pastedContent?.trim());
             const hasWorkspaceData = inputs.workspaceNodes.length > 0;
-            const isFastPath = hasPastedContent && !hasWorkspaceData;
+            const isFastPath = config.path === 'court_document'
+                && hasPastedContent
+                && !hasWorkspaceData;
 
             // 3. Build ExportRequest from config
             const exportRequest: ExportRequest = {

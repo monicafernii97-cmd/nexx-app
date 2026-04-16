@@ -176,17 +176,21 @@ export default function ReviewHubContent() {
         [effectiveItems, selectedItemId],
     );
 
+    /** Whether the current assembly is a fast-path (pre-drafted pasted content). */
+    const isFastPath = useMemo(() => {
+        const nodes = state.assemblyResult?.assembly?.classifiedNodes ?? [];
+        return nodes.length === 1 && nodes[0].tags?.includes('pre_drafted');
+    }, [state.assemblyResult]);
+
     /** Run manual preflight checks. */
     const handleRunPreflight = useCallback(() => {
         try {
-            const classifiedNodes = state.assemblyResult?.assembly?.classifiedNodes ?? [];
-            const fastPath = classifiedNodes.length === 1 && classifiedNodes[0].tags?.includes('pre_drafted');
             const result = runPreflightChecks({
                 exportPath: state.exportPath ?? 'court_document',
                 config: (state.exportRequest?.config ?? {}) as Record<string, unknown>,
                 reviewItems: effectiveItems,
                 overrides: state.overrides,
-                isFastPath: fastPath,
+                isFastPath,
             });
             setPreflight(result);
             setShowPreflight(true);
@@ -209,7 +213,7 @@ export default function ReviewHubContent() {
             });
             setShowPreflight(true);
         }
-    }, [state.exportPath, state.exportRequest, effectiveItems, state.overrides, setPreflight]);
+    }, [state.exportPath, state.exportRequest, effectiveItems, state.overrides, setPreflight, isFastPath]);
 
     /** Flush any pending sidebar edit + start GPT drafting (synchronous guard). */
     const handleApproveAndDraft = useCallback(() => {

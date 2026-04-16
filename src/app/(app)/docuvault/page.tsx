@@ -16,6 +16,8 @@ import {
     DownloadSimple,
     ArrowsClockwise,
     MagicWand,
+    Export,
+    Lightning,
 } from '@phosphor-icons/react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from 'convex/react';
@@ -25,6 +27,9 @@ import { UI_TABS, getTemplatesForTab } from '@/lib/legal/templateCategories';
 import type { UITabCategory } from '@/lib/legal/templateCategories';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import type { DocumentTemplate } from '@/lib/legal/types';
+import CreateExportModal from './components/CreateExportModal';
+import { useWorkspace } from '@/lib/workspace-context';
+import { useExport } from './context/ExportContext';
 
 /** State for the 3-step generation flow */
 type GeneratorView = 'compose' | 'working' | 'result';
@@ -56,6 +61,7 @@ export default function DocuVaultPage() {
 function DocuVaultPageInner() {
     const searchParams = useSearchParams();
     const { userId } = useUser();
+    const { activeCaseId } = useWorkspace();
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
     /** True while user profile query is in-flight (prevents generation with wrong defaults). */
     const isUserProfileLoading = Boolean(userId) && user === undefined;
@@ -78,6 +84,10 @@ function DocuVaultPageInner() {
     const [caseNumber, setCaseNumber] = useState<string | null>(null);
     const [isParsing, setIsParsing] = useState(false);
     const parseAbortRef = useRef<AbortController | null>(null);
+
+    // Structured export modal state
+    const [showCreateExport, setShowCreateExport] = useState(false);
+    const { startStructuredExport } = useExport();
 
     // Abort mechanism for generation
     const generationTokenRef = useRef(0);
@@ -614,21 +624,63 @@ function DocuVaultPageInner() {
                         </div>
                     </motion.div>
 
-                    {/* ── Generate Button ── */}
+                    {/* ── Dual Action CTAs ── */}
                     <motion.div
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3 }}
+                        className="space-y-4"
                     >
-                        <button
-                            onClick={handleGenerate}
-                            disabled={(!documentContent.trim() && !selectedTemplate) || isUserProfileLoading || isParsing}
-                            className="w-full flex items-center justify-center gap-4 py-6 rounded-[2rem] text-[15px] font-bold tracking-[0.2em] uppercase text-white transition-all border border-white/20 bg-white/5 backdrop-blur-3xl shadow-[inset_0_1px_2px_rgba(255,255,255,0.2),0_12px_40px_rgba(0,0,0,0.4)] hover:bg-white/10 hover:border-white/30 hover:shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_16px_48px_rgba(0,0,0,0.5)] disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed group hover:-translate-y-1"
-                        >
-                            <ArrowsClockwise size={26} weight="bold" className={`text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.8)] group-hover:scale-110 group-hover:rotate-180 transition-transform duration-500 ${isParsing ? 'animate-spin' : ''}`} />
-                            <span className="drop-shadow-sm">{isParsing ? 'Extracting File…' : 'Generate Formal Document'}</span>
-                        </button>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Quick Generate — existing template-based flow */}
+                            <button
+                                id="quick-generate-btn"
+                                onClick={handleGenerate}
+                                disabled={(!documentContent.trim() && !selectedTemplate) || isUserProfileLoading || isParsing}
+                                className="flex items-center justify-center gap-3 py-5 rounded-[2rem] text-[14px] font-bold tracking-[0.15em] uppercase text-white transition-all border border-white/20 bg-white/5 backdrop-blur-3xl shadow-[inset_0_1px_2px_rgba(255,255,255,0.2),0_8px_28px_rgba(0,0,0,0.4)] hover:bg-white/10 hover:border-white/30 hover:shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_12px_36px_rgba(0,0,0,0.5)] disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed group hover:-translate-y-1"
+                            >
+                                <Lightning size={22} weight="fill" className={`text-[#E5A84A] drop-shadow-[0_2px_8px_rgba(229,168,74,0.8)] group-hover:scale-110 transition-transform duration-300 ${isParsing ? 'animate-pulse' : ''}`} />
+                                <span className="drop-shadow-sm">{isParsing ? 'Extracting…' : 'Quick Generate'}</span>
+                            </button>
+
+                            {/* Create Export — structured reviewed export pipeline */}
+                            <button
+                                id="create-export-btn"
+                                onClick={() => setShowCreateExport(true)}
+                                className="flex items-center justify-center gap-3 py-5 rounded-[2rem] text-[14px] font-bold tracking-[0.15em] uppercase text-white transition-all bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_28px_rgba(0,0,0,0.5)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_12px_36px_rgba(0,0,0,0.6)] group hover:-translate-y-1"
+                            >
+                                <Export size={22} weight="bold" className="text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)] group-hover:scale-110 transition-transform duration-300" />
+                                <span className="drop-shadow-sm">Create Export</span>
+                            </button>
+                        </div>
+
+                        {/* Helper text */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-2">
+                            <p className="text-[12px] font-medium text-white/50 text-center">
+                                Fast template-based PDF
+                            </p>
+                            <p className="text-[12px] font-medium text-white/50 text-center">
+                                Structured export with drafting + validation
+                            </p>
+                        </div>
                     </motion.div>
+
+                    {/* ── Create Export Modal ── */}
+                    <CreateExportModal
+                        isOpen={showCreateExport}
+                        onClose={() => setShowCreateExport(false)}
+                        onSubmit={async (config) => {
+                            setShowCreateExport(false);
+                            try {
+                                await startStructuredExport(config);
+                            } catch (err) {
+                                console.error('[DocuVault] Export start failed:', err);
+                                setShowCreateExport(true); // Re-open so user sees the failure
+                            }
+                        }}
+                        defaultCaseId={activeCaseId ?? undefined}
+                        lockCaseSelection={!!activeCaseId}
+                    />
 
                     {/* ── Error Message ── */}
                     <AnimatePresence>
@@ -658,8 +710,8 @@ function DocuVaultPageInner() {
                     >
                         {[
                             { label: 'Describe\nContext', icon: FileText, color: 'text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]' },
-                            { label: 'NEXX Generates\nDraft', icon: ArrowsClockwise, color: 'text-[#E5A84A] drop-shadow-[0_2px_8px_rgba(229,168,74,0.8)]' },
-                            { label: 'Download\n& File', icon: ArrowRight, color: 'text-[#10B981] drop-shadow-[0_2px_8px_rgba(16,185,129,0.8)]' },
+                            { label: 'Generate or\nAssemble', icon: ArrowsClockwise, color: 'text-[#E5A84A] drop-shadow-[0_2px_8px_rgba(229,168,74,0.8)]' },
+                            { label: 'Review\n& Export', icon: ArrowRight, color: 'text-[#10B981] drop-shadow-[0_2px_8px_rgba(16,185,129,0.8)]' },
                         ].map((item, i) => {
                             const Icon = item.icon;
                             return (

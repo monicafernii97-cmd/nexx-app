@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as assemblyQueries from "../assemblyQueries.js";
 import type * as caseGraphs from "../caseGraphs.js";
 import type * as caseMemory from "../caseMemory.js";
 import type * as casePins from "../casePins.js";
@@ -42,6 +43,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  assemblyQueries: typeof assemblyQueries;
   caseGraphs: typeof caseGraphs;
   caseMemory: typeof caseMemory;
   casePins: typeof casePins;

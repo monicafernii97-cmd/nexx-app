@@ -48,6 +48,10 @@ export const createExportRun = mutation({
         assemblySnapshotJson: v.optional(v.string()),
         /** GPT model used for drafting */
         model: v.optional(v.string()),
+        /** Version lineage — root export ID */
+        rootExportId: v.optional(v.id('generatedDocuments')),
+        /** Version lineage — parent export ID */
+        parentExportId: v.optional(v.id('generatedDocuments')),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
@@ -59,6 +63,25 @@ export const createExportRun = mutation({
         }
 
         const now = Date.now();
+
+        // Auto-compute version and normalize lineage from validated parent
+        let version = 1;
+        let parentExportId: typeof args.parentExportId | undefined = undefined;
+        let rootExportId: typeof args.rootExportId | undefined = args.rootExportId ?? undefined;
+
+        if (args.parentExportId) {
+            const parent = await ctx.db.get(args.parentExportId);
+            if (!parent || parent.userId !== user._id || parent.caseId !== args.caseId) {
+                throw new Error('Parent export not found or access denied');
+            }
+            parentExportId = parent._id;
+            version = (parent.version ?? 1) + 1;
+            // Derive root from parent chain when caller omits it
+            if (!rootExportId) {
+                rootExportId = parent.rootExportId ?? parent._id;
+            }
+        }
+
         return await ctx.db.insert('generatedDocuments', {
             userId: user._id,
             caseId: args.caseId,
@@ -79,6 +102,10 @@ export const createExportRun = mutation({
             pipelineVersion: PIPELINE_VERSION,
             status: 'drafting',
             startedAt: now,
+            version,
+            rootExportId,
+            parentExportId,
+            currentStage: 'draft',
             createdAt: now,
             updatedAt: now,
         });
@@ -114,6 +141,14 @@ export const updateExportRun = mutation({
         sectionCount: v.optional(v.number()),
         aiDraftedCount: v.optional(v.number()),
         lockedCount: v.optional(v.number()),
+        /** Pipeline stage tracking */
+        currentStage: v.optional(v.union(
+            v.literal('draft'),
+            v.literal('preflight'),
+            v.literal('render'),
+            v.literal('upload'),
+            v.literal('finalize')
+        )),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
@@ -175,6 +210,7 @@ export const finalizeExportRun = mutation({
             filename: args.filename,
             byteSize: args.byteSize,
             mimeType: args.mimeType ?? 'application/pdf',
+            currentStage: 'finalize',
             completedAt: now,
             durationMs: doc.startedAt ? now - doc.startedAt : undefined,
             updatedAt: now,
@@ -272,6 +308,10 @@ export const getRecentExports = query({
             filename: doc.filename,
             exportPath: doc.exportPath,
             sectionCount: doc.sectionCount,
+            version: doc.version,
+            rootExportId: doc.rootExportId,
+            parentExportId: doc.parentExportId,
+            currentStage: doc.currentStage,
             createdAt: doc.createdAt,
             updatedAt: doc.updatedAt,
         }));
@@ -390,6 +430,51 @@ export const getStorageUrl = query({
     handler: async (ctx, { storageId }) => {
         await getAuthenticatedUser(ctx);
         return await ctx.storage.getUrl(storageId);
+    },
+});
+
+// ---------------------------------------------------------------------------
+// Get full export session for Review Hub re-entry
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch full export data for Review Hub re-entry ("Rerun from Review").
+ *
+ * Returns the full doc including assembly snapshot, export config, draft
+ * output, and preflight data so the review page can hydrate state.
+ */
+export const getExportSessionForReview = query({
+    args: {
+        exportId: v.id('generatedDocuments'),
+    },
+    handler: async (ctx, { exportId }) => {
+        const user = await getAuthenticatedUser(ctx);
+        const doc = await ctx.db.get(exportId);
+
+        if (!doc || doc.userId !== user._id) {
+            throw new Error('Export not found or access denied');
+        }
+
+        return {
+            _id: doc._id,
+            caseId: doc.caseId,
+            templateId: doc.templateId,
+            templateTitle: doc.templateTitle,
+            caseType: doc.caseType,
+            exportPath: doc.exportPath,
+            status: doc.status,
+            version: doc.version,
+            rootExportId: doc.rootExportId,
+            parentExportId: doc.parentExportId,
+            currentStage: doc.currentStage,
+            exportConfigJson: doc.exportConfigJson,
+            assemblySnapshotJson: doc.assemblySnapshotJson,
+            draftOutputJson: doc.draftOutputJson,
+            preflightJson: doc.preflightJson,
+            errorCode: doc.errorCode,
+            errorMessage: doc.errorMessage,
+            createdAt: doc.createdAt,
+        };
     },
 });
 

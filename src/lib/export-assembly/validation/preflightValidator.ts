@@ -402,7 +402,14 @@ export interface RunPreflightInput {
  * @returns     - Preflight result with checklist, scores, and canProceed flag
  */
 export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
-    const { exportPath, config, reviewItems, isFastPath = false } = input;
+    const { exportPath, config, reviewItems, overrides, isFastPath = false } = input;
+
+    // Build excluded set from overrides for accurate inclusion counting
+    const excludedNodeIds = new Set(
+        (overrides.itemOverrides ?? [])
+            .filter(override => override.excluded)
+            .map(override => override.nodeId),
+    );
 
     // Build a minimal quality-only check from review items
     // (the full path-specific validators need typed config + mapped sections,
@@ -423,16 +430,18 @@ export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
         category: 'quality',
     });
 
-    // ── Content: Items included ──
-    const includedCount = reviewItems.filter(item => item.includedInExport).length;
+    // ── Content: Items included (respects both reviewItem flags and override exclusions) ──
+    const includedCount = reviewItems.filter(
+        item => item.includedInExport && !excludedNodeIds.has(item.nodeId),
+    ).length;
     if (includedCount === 0) {
         checks.push({
             id: 'no_included_items',
             label: 'No items included',
-            severity: 'warning',
+            severity: isFastPath ? 'warning' : 'critical',
             detail: isFastPath
                 ? 'Pre-drafted content was excluded — nothing to export'
-                : 'No items are currently included in the export.',
+                : 'No items are included in the export. Cannot generate an empty document.',
             category: 'required_content',
         });
     } else {
@@ -456,7 +465,9 @@ export function runPreflightChecks(input: RunPreflightInput): PreflightResult {
         checks.push({
             id: 'court_jurisdiction',
             label: 'Court jurisdiction specified',
-            severity: hasCourtState && hasCourtCounty ? 'pass' : 'warning',
+            severity: hasCourtState && hasCourtCounty
+                ? 'pass'
+                : isFastPath ? 'warning' : 'error',
             detail: hasCourtState && hasCourtCounty
                 ? `${config.courtState}, ${config.courtCounty} County`
                 : isFastPath

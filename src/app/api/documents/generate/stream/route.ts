@@ -64,12 +64,16 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Validate ──
-  if (!body.templateId || !body.courtSettings?.state || !body.courtSettings?.county || !body.petitioner?.name || !body.caseType) {
-    return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+  if (!body.templateId || !body.courtSettings?.state || !body.petitioner?.name) {
+    return new Response(JSON.stringify({ error: 'Missing required fields: templateId, courtSettings.state, and petitioner.name are required' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  // Default optional fields
+  if (!body.courtSettings.county) body.courtSettings.county = '';
+  if (!body.caseType) body.caseType = 'other';
 
   // ── Rate limit (only after valid request) ──
   const rl = checkRateLimit(userId, 'document_generation');
@@ -294,7 +298,9 @@ function buildStreamCaption(
       ? `IN THE ${trimmedCourtName.toUpperCase()}`
       : 'IN THE DISTRICT COURT',
     courtSettings.judicialDistrict?.toUpperCase() ?? '',
-    `${normalizedCounty.toUpperCase()} COUNTY, ${normalizedState.toUpperCase()}`,
+    normalizedCounty
+      ? `${normalizedCounty.toUpperCase()} COUNTY, ${normalizedState.toUpperCase()}`
+      : normalizedState.toUpperCase(),
   ].filter(Boolean);
 
   return {

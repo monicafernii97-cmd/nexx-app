@@ -10,7 +10,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import createDOMPurify from 'dompurify';
-import { JSDOM } from 'jsdom';
 import type {
   CourtFormattingRules,
   CaptionData,
@@ -174,23 +173,22 @@ function renderCourtAddress(): string {
 }
 
 /** Render the opening introduction paragraph identifying the filer and document purpose. */
-function renderIntroduction(content: string): string {
-  return `<div class="body-paragraph">${sanitizeTrustedHtml(content)}</div>`;
+async function renderIntroduction(content: string): Promise<string> {
+  return `<div class="body-paragraph">${await sanitizeTrustedHtml(content)}</div>`;
 }
 
 /** Render Roman-numeral-headed body sections (I. Background, II. Argument, etc.). */
-function renderBodySections(sections: GeneratedSection[]): string {
-  return sections
-    .filter(s => s.sectionType === 'body_sections')
-    .map(s => {
-      let html = '';
-      if (s.heading) {
-        html += `<div class="section-heading">${escapeHtml(s.heading)}</div>`;
-      }
-      html += `<div class="body-paragraph">${sanitizeTrustedHtml(s.content)}</div>`;
-      return html;
-    })
-    .join('\n');
+async function renderBodySections(sections: GeneratedSection[]): Promise<string> {
+  const bodyParts = sections.filter(s => s.sectionType === 'body_sections');
+  const rendered = await Promise.all(bodyParts.map(async (s) => {
+    let html = '';
+    if (s.heading) {
+      html += `<div class="section-heading">${escapeHtml(s.heading)}</div>`;
+    }
+    html += `<div class="body-paragraph">${await sanitizeTrustedHtml(s.content)}</div>`;
+    return html;
+  }));
+  return rendered.join('\n');
 }
 
 /** Render numbered paragraphs (1., 2., 3.) with hanging indent formatting. */
@@ -203,10 +201,10 @@ function renderNumberedParagraphs(items: string[]): string {
 }
 
 /** Render the Prayer for Relief section with WHEREFORE, PREMISES CONSIDERED preamble. */
-function renderPrayer(content: string): string {
+async function renderPrayer(content: string): Promise<string> {
   return `
     <div class="prayer">
-      <span class="formal-phrase">WHEREFORE, PREMISES CONSIDERED,</span> ${sanitizeTrustedHtml(content)}
+      <span class="formal-phrase">WHEREFORE, PREMISES CONSIDERED,</span> ${await sanitizeTrustedHtml(content)}
     </div>`;
 }
 
@@ -452,7 +450,7 @@ export interface RenderDocumentOptions {
  * Render a complete legal document as HTML.
  * This HTML is fed directly to Puppeteer for PDF conversion.
  */
-export function renderDocumentHTML(options: RenderDocumentOptions): string {
+export async function renderDocumentHTML(options: RenderDocumentOptions): Promise<string> {
   const {
     template,
     caption,
@@ -471,7 +469,7 @@ export function renderDocumentHTML(options: RenderDocumentOptions): string {
   for (const section of template.sections) {
     switch (section.type) {
       case 'caption':
-        sectionHTML.push(renderCaption(caption));
+        sectionHTML.push(renderCaption(caption)); // sync — no sanitization
         break;
 
       case 'title':
@@ -485,13 +483,13 @@ export function renderDocumentHTML(options: RenderDocumentOptions): string {
       case 'introduction': {
         const introContent = bodyContent.find(s => s.sectionType === 'introduction');
         if (introContent) {
-          sectionHTML.push(renderIntroduction(introContent.content));
+          sectionHTML.push(await renderIntroduction(introContent.content));
         }
         break;
       }
 
       case 'body_sections':
-        sectionHTML.push(renderBodySections(bodyContent));
+        sectionHTML.push(await renderBodySections(bodyContent));
         break;
 
       case 'body_numbered': {
@@ -511,7 +509,7 @@ export function renderDocumentHTML(options: RenderDocumentOptions): string {
       case 'prayer_for_relief': {
         const prayerContent = bodyContent.find(s => s.sectionType === 'prayer_for_relief');
         if (prayerContent) {
-          sectionHTML.push(renderPrayer(prayerContent.content));
+          sectionHTML.push(await renderPrayer(prayerContent.content));
         }
         break;
       }
@@ -611,10 +609,9 @@ function escapeHtml(text: string): string {
  *
  * Allows safe structural tags used in legal documents while stripping
  * dangerous elements. Use for content from our AI pipeline — NOT raw user input.
+ *
+ * jsdom is loaded lazily to avoid ESM/CJS bundling crashes on Vercel.
  */
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const DOMPurify = createDOMPurify(new JSDOM('').window as any);
 
 /** Allowlist of tags safe for legal document content */
 const ALLOWED_TAGS = [
@@ -629,9 +626,35 @@ const ALLOWED_TAGS = [
 
 const ALLOWED_ATTR: string[] = [];
 
+// Lazy singleton — initialized on first call to avoid module-scope jsdom import.
+// Uses a promise guard to prevent concurrent initialization (race-safe).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _domPurifyPromise: Promise<any> | null = null;
+
+/** Get or create the DOMPurify instance (lazy-loads jsdom). */
+async function getDOMPurify() {
+  if (!_domPurifyPromise) {
+    _domPurifyPromise = (async () => {
+      try {
+        const { JSDOM } = await import('jsdom');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return createDOMPurify(new JSDOM('').window as any);
+      } catch (err) {
+        _domPurifyPromise = null; // Reset so next call retries
+        throw new Error(
+          `Failed to load jsdom for HTML sanitization: ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err instanceof Error ? err : new Error(String(err)) }
+        );
+      }
+    })();
+  }
+  return _domPurifyPromise;
+}
+
 /** Sanitize AI-generated legal document HTML via DOMPurify, allowing only safe structural tags. */
-function sanitizeTrustedHtml(html: string): string {
-  return DOMPurify.sanitize(html, {
+async function sanitizeTrustedHtml(html: string): Promise<string> {
+  const purify = await getDOMPurify();
+  return purify.sanitize(html, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
     ALLOW_DATA_ATTR: false,

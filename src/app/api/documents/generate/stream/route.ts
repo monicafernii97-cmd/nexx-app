@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
 
         if (isAborted()) return;
 
-        const html = renderDocumentHTML({
+        const html = await renderDocumentHTML({
           template,
           caption,
           titleText: titleText.toUpperCase(),

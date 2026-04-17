@@ -215,7 +215,7 @@ export function getMergedRules(
     },
     // Merge notes arrays instead of replacing
     notes: [
-      ...base.notes,
+      ...(base.notes ?? []),
       ...(overrides?.notes ?? []),
     ],
   });

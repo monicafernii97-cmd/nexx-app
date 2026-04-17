@@ -73,7 +73,6 @@ export async function POST(request: NextRequest) {
 
   // Default optional fields
   if (!body.courtSettings.county) body.courtSettings.county = '';
-  if (!body.caseType) body.caseType = 'other';
 
   // ── Rate limit (only after valid request) ──
   const rl = checkRateLimit(userId, 'document_generation');
@@ -119,6 +118,11 @@ export async function POST(request: NextRequest) {
             status: 'error',
           })));
           return;  // finally block will close the controller
+        }
+
+        // Infer caseType from template when caller omits it
+        if (!body.caseType) {
+          body.caseType = template.caseTypes[0] ?? 'other';
         }
 
         if (isAborted()) return;

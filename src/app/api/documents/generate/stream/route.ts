@@ -64,12 +64,16 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Validate ──
-  if (!body.templateId || !body.courtSettings?.state || !body.courtSettings?.county || !body.petitioner?.name || !body.caseType) {
-    return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+  if (!body.templateId || !body.courtSettings?.state || !body.petitioner?.name) {
+    return new Response(JSON.stringify({ error: 'Missing required fields: templateId, courtSettings.state, and petitioner.name are required' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  // Default optional fields
+  if (!body.courtSettings.county) body.courtSettings.county = '';
+  if (!body.caseType) body.caseType = body.templateId;
 
   // ── Rate limit (only after valid request) ──
   const rl = checkRateLimit(userId, 'document_generation');

@@ -191,7 +191,7 @@ function buildRulesChecklist(
   }
 
   // State-specific notes
-  for (const note of rules.notes) {
+  for (const note of (rules.notes ?? [])) {
     checks.push(`STATE RULE: ${note}`);
   }
 

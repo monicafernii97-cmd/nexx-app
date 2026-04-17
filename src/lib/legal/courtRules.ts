@@ -210,12 +210,12 @@ export function getMergedRules(
     ...overrides,
     // Deep-merge nested objects so partial overrides preserve siblings
     captionColumnWidths: {
-      ...base.captionColumnWidths,
+      ...(base.captionColumnWidths ?? {}),
       ...overrides?.captionColumnWidths,
     },
     // Merge notes arrays instead of replacing
     notes: [
-      ...base.notes,
+      ...(base.notes ?? []),
       ...(overrides?.notes ?? []),
     ],
   });

@@ -298,7 +298,9 @@ function buildStreamCaption(
       ? `IN THE ${trimmedCourtName.toUpperCase()}`
       : 'IN THE DISTRICT COURT',
     courtSettings.judicialDistrict?.toUpperCase() ?? '',
-    `${normalizedCounty.toUpperCase()} COUNTY, ${normalizedState.toUpperCase()}`,
+    normalizedCounty
+      ? `${normalizedCounty.toUpperCase()} COUNTY, ${normalizedState.toUpperCase()}`
+      : normalizedState.toUpperCase(),
   ].filter(Boolean);
 
   return {

@@ -88,7 +88,10 @@ function validateCourtDocument(
         }
     }
 
-    if (meta.narrativeSections < 3) {
+    // Skip timeline warning for pre-drafted content (no timeline analysis was requested)
+    const isFastPath = assembly.classifiedNodes.length === 1
+        && assembly.classifiedNodes[0].tags?.includes('pre_drafted');
+    if (meta.narrativeSections < 3 && !isFastPath) {
         warnings.push({
             id: nextId('court_warn'),
             label: 'Sparse timeline data',

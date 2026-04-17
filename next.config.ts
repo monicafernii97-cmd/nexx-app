@@ -1,11 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Exclude puppeteer-core and Chromium from the serverless bundle —
-  // they use native binaries that must be resolved at runtime, not bundled.
+  // Exclude packages with native binaries or ESM/CJS conflicts from the
+  // serverless bundle — they must be resolved at runtime, not bundled.
   serverExternalPackages: [
     'puppeteer-core',
     '@sparticuz/chromium-min',
+    'jsdom',
   ],
   // Ensure non-imported files (read via fs.readFileSync at runtime)
   // are included in the serverless function bundle for PDF generation.

@@ -642,7 +642,8 @@ async function getDOMPurify() {
       } catch (err) {
         _domPurifyPromise = null; // Reset so next call retries
         throw new Error(
-          `Failed to load jsdom for HTML sanitization: ${err instanceof Error ? err.message : String(err)}`
+          `Failed to load jsdom for HTML sanitization: ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err instanceof Error ? err : new Error(String(err)) }
         );
       }
     })();

@@ -180,15 +180,14 @@ async function renderIntroduction(content: string): Promise<string> {
 /** Render Roman-numeral-headed body sections (I. Background, II. Argument, etc.). */
 async function renderBodySections(sections: GeneratedSection[]): Promise<string> {
   const bodyParts = sections.filter(s => s.sectionType === 'body_sections');
-  const rendered: string[] = [];
-  for (const s of bodyParts) {
+  const rendered = await Promise.all(bodyParts.map(async (s) => {
     let html = '';
     if (s.heading) {
       html += `<div class="section-heading">${escapeHtml(s.heading)}</div>`;
     }
     html += `<div class="body-paragraph">${await sanitizeTrustedHtml(s.content)}</div>`;
-    rendered.push(html);
-  }
+    return html;
+  }));
   return rendered.join('\n');
 }
 
@@ -627,18 +626,28 @@ const ALLOWED_TAGS = [
 
 const ALLOWED_ATTR: string[] = [];
 
-// Lazy singleton — initialized on first call to avoid module-scope jsdom import
+// Lazy singleton — initialized on first call to avoid module-scope jsdom import.
+// Uses a promise guard to prevent concurrent initialization (race-safe).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _domPurify: any = null;
+let _domPurifyPromise: Promise<any> | null = null;
 
 /** Get or create the DOMPurify instance (lazy-loads jsdom). */
 async function getDOMPurify() {
-  if (!_domPurify) {
-    const { JSDOM } = await import('jsdom');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    _domPurify = createDOMPurify(new JSDOM('').window as any);
+  if (!_domPurifyPromise) {
+    _domPurifyPromise = (async () => {
+      try {
+        const { JSDOM } = await import('jsdom');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return createDOMPurify(new JSDOM('').window as any);
+      } catch (err) {
+        _domPurifyPromise = null; // Reset so next call retries
+        throw new Error(
+          `Failed to load jsdom for HTML sanitization: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    })();
   }
-  return _domPurify;
+  return _domPurifyPromise;
 }
 
 /** Sanitize AI-generated legal document HTML via DOMPurify, allowing only safe structural tags. */

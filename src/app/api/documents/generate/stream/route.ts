@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
   // Default optional fields
   if (!body.courtSettings.county) body.courtSettings.county = '';
-  if (!body.caseType) body.caseType = body.templateId;
+  if (!body.caseType) body.caseType = 'other';
 
   // ── Rate limit (only after valid request) ──
   const rl = checkRateLimit(userId, 'document_generation');

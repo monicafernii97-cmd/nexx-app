@@ -810,6 +810,25 @@ const certificates: DocumentTemplate[] = [
 
 
 // ═══════════════════════════════════════════════════════════════
+// 13. GENERAL FALLBACK — Used by Quick Generate when no template selected
+// ═══════════════════════════════════════════════════════════════
+
+const generalFallback: DocumentTemplate[] = [
+  {
+    id: 'general',
+    title: 'General Legal Document',
+    category: 'other',
+    caseTypes: ['other'],
+    description: 'Generic legal document with standard sections. Used when no specific template is selected.',
+    sections: standardMotionSections('LEGAL DOCUMENT'),
+    requiresDeclaration: false,
+    requiresProposedOrder: false,
+    supportsExhibits: true,
+  },
+];
+
+
+// ═══════════════════════════════════════════════════════════════
 // FULL TEMPLATE LIBRARY — Exported
 // ═══════════════════════════════════════════════════════════════
 
@@ -826,6 +845,7 @@ export const TEMPLATE_LIBRARY: readonly DocumentTemplate[] = Object.freeze([
   ...declarations,
   ...orders,
   ...certificates,
+  ...generalFallback,
 ]);
 
 /**

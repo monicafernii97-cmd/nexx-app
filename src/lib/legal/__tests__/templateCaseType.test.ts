@@ -19,25 +19,17 @@ describe('caseType inference from templates', () => {
     expect(general!.caseTypes[0]).toBe('other');
   });
 
-  // ── (b) Multi-caseType templates: first entry is stable ──
-  it('petition-divorce-children infers "divorce_with_children"', () => {
-    const tmpl = getTemplate('petition-divorce-children');
-    expect(tmpl).toBeDefined();
-    expect(tmpl!.caseTypes[0]).toBe('divorce_with_children');
-  });
+  const inferenceCases = [
+    { id: 'petition-divorce-children', expected: 'divorce_with_children', minLen: 1 },
+    { id: 'motion-temporary-orders', expected: 'divorce_with_children', minLen: 2 },
+    { id: 'petition-modify-pcr', expected: 'custody_modification', minLen: 1 },
+  ] as const;
 
-  it('motion-temporary-orders infers "divorce_with_children" (first of multi)', () => {
-    const tmpl = getTemplate('motion-temporary-orders');
+  it.each(inferenceCases)('$id infers "$expected" from first caseType entry', ({ id, expected, minLen }) => {
+    const tmpl = getTemplate(id);
     expect(tmpl).toBeDefined();
-    // This template supports multiple case types — first entry determines caption
-    expect(tmpl!.caseTypes.length).toBeGreaterThan(1);
-    expect(tmpl!.caseTypes[0]).toBe('divorce_with_children');
-  });
-
-  it('petition-modify-pcr infers "custody_modification"', () => {
-    const tmpl = getTemplate('petition-modify-pcr');
-    expect(tmpl).toBeDefined();
-    expect(tmpl!.caseTypes[0]).toBe('custody_modification');
+    expect(tmpl!.caseTypes.length).toBeGreaterThanOrEqual(minLen);
+    expect(tmpl!.caseTypes[0]).toBe(expected);
   });
 
   // ── Guard: every template has at least one caseType ──

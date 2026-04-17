@@ -264,7 +264,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 5. Render HTML ──
-    const html = renderDocumentHTML({
+    const html = await renderDocumentHTML({
       template,
       caption,
       titleText: titleText.toUpperCase(),

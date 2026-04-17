@@ -407,7 +407,7 @@ export async function POST(request: NextRequest) {
 
                 let html: string;
                 if (template) {
-                    html = renderDocumentHTML({
+                    html = await renderDocumentHTML({
                         template,
                         caption: {
                             causeNumber: causeNumber ?? '_______________',

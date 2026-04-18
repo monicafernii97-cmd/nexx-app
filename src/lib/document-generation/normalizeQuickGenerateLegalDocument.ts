@@ -102,9 +102,24 @@ const IN_THE_INTEREST_RE = /^IN\s+THE\s+INTEREST\s+OF\s*$/i;
 const A_CHILD_RE = /^A\s+CHILD\s*$/i;
 const CHILDREN_RE = /^CHILDREN\s*$/i;
 
-// Valid section types from the renderer
+// Valid section types from the renderer — all SectionType values so
+// already-normalized payloads (e.g. from Export Assembly) pass through.
 const VALID_SECTION_TYPES: SectionType[] = [
-  'introduction', 'body_sections', 'body_numbered', 'prayer_for_relief',
+  'caption',
+  'title',
+  'court_address',
+  'introduction',
+  'body_numbered',
+  'body_sections',
+  'prayer_for_relief',
+  'signature_block',
+  'certificate_of_service',
+  'verification',
+  'judge_signature',
+  'approval_line',
+  'notary_block',
+  'exhibit_index',
+  'horizontal_rule',
 ];
 
 
@@ -349,12 +364,38 @@ function extractShellMetadata(lines: string[], start: number, result: ParsedLega
       for (let j = i + 1; j < maxScan; j++) {
         const cl = lines[j].trim();
         if (!cl || cl === '§') continue;
-        if (A_CHILD_RE.test(cl) || CHILDREN_RE.test(cl)) {
-          captionLeft.push(cl.toUpperCase());
+
+        // Split inline § rows (e.g. "A CHILD §  FORT BEND COUNTY, TEXAS")
+        const parts = cl.includes('§')
+          ? cl.split('§').map(p => p.trim()).filter(Boolean)
+          : [cl];
+        const leftPart = parts[0] ?? '';
+        const rightPart = parts.length > 1 ? parts[parts.length - 1] : '';
+
+        if (A_CHILD_RE.test(leftPart) || CHILDREN_RE.test(leftPart)) {
+          captionLeft.push(leftPart.toUpperCase());
           cursor = j + 1;
+          if (rightPart) {
+            const courtM = IN_THE_COURT_RE.exec(rightPart);
+            if (courtM) {
+              result.courtLabel = `IN THE ${courtM[1].toUpperCase()}`;
+              captionRight.push(result.courtLabel);
+            }
+            const distM = JUDICIAL_DISTRICT_RE.exec(rightPart);
+            if (distM) {
+              result.district = distM[1].toUpperCase();
+              captionRight.push(result.district);
+            }
+            const venueM = COUNTY_VENUE_RE.exec(rightPart);
+            if (venueM) {
+              result.venue = venueM[1].toUpperCase();
+              captionRight.push(result.venue);
+            }
+          }
           break;
         }
-        captionLeft.push(cl.replace(/,\s*$/, '').toUpperCase());
+
+        captionLeft.push(leftPart.replace(/,\s*$/, '').toUpperCase());
       }
       continue;
     }
@@ -442,8 +483,14 @@ function extractIntroduction(lines: string[], start: number, result: ParsedLegal
       while (j < lines.length) {
         const next = lines[j].trim();
         if (!next) { j++; break; }
-        // Stop if we hit a Roman numeral heading
-        if (ROMAN_HEADING_RE.test(next)) break;
+        // Stop at structural boundaries
+        if (
+          ROMAN_HEADING_RE.test(next) ||
+          LETTER_HEADING_RE.test(next) ||
+          PRAYER_HEADING_RE.test(next) ||
+          WHEREFORE_RE.test(next) ||
+          RESPECTFULLY_RE.test(next)
+        ) break;
         introParts.push(next);
         j++;
       }
@@ -452,8 +499,14 @@ function extractIntroduction(lines: string[], start: number, result: ParsedLegal
       return cursor;
     }
 
-    // If we hit a Roman numeral heading before finding COMES NOW, stop looking
-    if (ROMAN_HEADING_RE.test(line)) {
+    // Stop intro search when body/prayer/signature begins
+    if (
+      ROMAN_HEADING_RE.test(line) ||
+      LETTER_HEADING_RE.test(line) ||
+      PRAYER_HEADING_RE.test(line) ||
+      WHEREFORE_RE.test(line) ||
+      RESPECTFULLY_RE.test(line)
+    ) {
       cursor = i;
       return cursor;
     }

@@ -208,7 +208,6 @@ export async function POST(request: NextRequest) {
           respondentName: normalized.respondentName ?? body.respondent?.name,
           exhibits: body.exhibits,
           rules,
-          footerText: `Cause No. ${caption.causeNumber ?? ''} ${titleText}`,
         });
 
         controller.enqueue(new TextEncoder().encode(encodeEvent({

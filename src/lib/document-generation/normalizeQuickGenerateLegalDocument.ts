@@ -283,7 +283,7 @@ function extractShellMetadata(lines: string[], start: number, result: ParsedLega
   const captionRight: string[] = [];
 
   for (let i = cursor; i < maxScan; i++) {
-    let line = lines[i].trim();
+    const line = lines[i].trim();
     if (!line) continue;
 
     // Split inline § caption rows: "IN THE INTEREST OF §  IN THE DISTRICT COURT"
@@ -568,9 +568,7 @@ function extractBodyBlocks(lines: string[], start: number, result: ParsedLegalTe
       contentLines.push(line);
     } else {
       // Content before any heading — create an implicit paragraph block
-      if (!currentBlock) {
-        currentBlock = { content: '', blockType: 'paragraph' };
-      }
+      currentBlock = { content: '', blockType: 'paragraph' };
       contentLines.push(line);
     }
   }

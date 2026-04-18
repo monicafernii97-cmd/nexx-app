@@ -175,6 +175,7 @@ export async function POST(request: NextRequest) {
         const petitionerData = {
           ...body.petitioner,
           ...(normalized.signatureName ? { name: normalized.signatureName } : {}),
+          ...(normalized.signatureRole ? { role: normalized.signatureRole } : {}),
         };
 
         await sleep(500); // Allow UI to show step

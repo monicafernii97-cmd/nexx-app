@@ -278,6 +278,11 @@ Petitioner, Pro Se`;
     expect(result.causeNumber).toBe('22-FAM-12345');
     expect(result.signatureName).toBe('Jane Doe');
     expect(result.signatureRole).toBe('Petitioner, Pro Se');
+
+    // § splitting populates caption metadata
+    expect(result.caseStyleLeft).toBeDefined();
+    expect(result.caseStyleLeft!.some(l => l.includes('INTEREST'))).toBe(true);
+    expect(result.courtLabel).toMatch(/DISTRICT COURT/i);
   });
 });
 
@@ -310,6 +315,11 @@ describe('validateGeneratedSections', () => {
     ];
     const result = validateGeneratedSections(sections, 'fallback');
     expect(result[0].content).toBe('fallback');
+  });
+
+  it('trims whitespace-only fallback to placeholder', () => {
+    const result = validateGeneratedSections([], '   \n  ');
+    expect(result[0].content).toBe('[No content provided]');
   });
 });
 

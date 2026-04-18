@@ -283,8 +283,45 @@ function extractShellMetadata(lines: string[], start: number, result: ParsedLega
   const captionRight: string[] = [];
 
   for (let i = cursor; i < maxScan; i++) {
-    const line = lines[i].trim();
+    let line = lines[i].trim();
     if (!line) continue;
+
+    // Split inline § caption rows: "IN THE INTEREST OF §  IN THE DISTRICT COURT"
+    // Process left half as caption-left, right half as caption-right
+    if (line.includes('§')) {
+      const parts = line.split('§').map(p => p.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        // Process left part
+        const leftPart = parts[0];
+        if (IN_THE_INTEREST_RE.test(leftPart)) {
+          captionLeft.push('IN THE INTEREST OF');
+        } else if (A_CHILD_RE.test(leftPart) || CHILDREN_RE.test(leftPart)) {
+          captionLeft.push(leftPart.toUpperCase());
+        } else if (leftPart.length > 1) {
+          captionLeft.push(leftPart.replace(/,\s*$/, '').toUpperCase());
+        }
+        // Process right part
+        const rightPart = parts[parts.length - 1];
+        const courtM = IN_THE_COURT_RE.exec(rightPart);
+        if (courtM) {
+          result.courtLabel = `IN THE ${courtM[1].toUpperCase()}`;
+          captionRight.push(result.courtLabel);
+        }
+        const distM = JUDICIAL_DISTRICT_RE.exec(rightPart);
+        if (distM) {
+          result.district = distM[1].toUpperCase();
+          captionRight.push(result.district);
+        }
+        const venueM = COUNTY_VENUE_RE.exec(rightPart);
+        if (venueM) {
+          result.venue = venueM[1].toUpperCase();
+          captionRight.push(result.venue);
+        }
+        continue;
+      }
+      // Single § on a line — skip
+      if (line === '§') continue;
+    }
 
     // Court/district/venue on the right
     const courtMatch = IN_THE_COURT_RE.exec(line);

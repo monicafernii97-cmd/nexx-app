@@ -55,7 +55,7 @@ export function validateGeneratedSections(
     return [{
       sectionType: 'body_sections',
       heading: 'Content',
-      content: fallbackText || '[No content provided]',
+      content: fallbackText?.trim() || '[No content provided]',
     }];
   }
 

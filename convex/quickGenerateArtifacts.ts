@@ -78,10 +78,7 @@ export const getQuickGenDownloadInfo = query({
         artifactId: v.id('generatedDocuments'),
     },
     handler: async (ctx, { artifactId }) => {
-        const artifact = await ctx.db.get(artifactId);
-        if (!artifact) return null;
-
-        // Auth check: must be the owner
+        // Auth check first to prevent timing-based enumeration
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) return null;
 
@@ -89,7 +86,10 @@ export const getQuickGenDownloadInfo = query({
             .query('users')
             .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
             .first();
-        if (!user || artifact.userId !== user._id) return null;
+        if (!user) return null;
+
+        const artifact = await ctx.db.get(artifactId);
+        if (!artifact || artifact.userId !== user._id) return null;
 
         if (artifact.status !== 'completed' && artifact.status !== 'final' && artifact.status !== 'filed') {
             return null;

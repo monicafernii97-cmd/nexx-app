@@ -13,6 +13,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { fetchMutation } from 'convex/nextjs';
 import { api } from '@convex/_generated/api';
+import type { Id } from '@convex/_generated/dataModel';
 import { getMergedRules } from '@/lib/legal/courtRules';
 import { getTemplate } from '@/lib/legal/templates';
 import { renderDocumentHTML } from '@/lib/legal/templateRenderer';
@@ -216,8 +217,11 @@ export async function POST(request: NextRequest) {
 
         if (isAborted()) return;
 
-        // Upload PDF to Convex storage
+        // Upload PDF to Convex storage (30s timeout to prevent hanging)
         const uploadUrl = await fetchMutation(api.documents.generateUploadUrl, {});
+        const uploadController = new AbortController();
+        const uploadTimeout = setTimeout(() => uploadController.abort(), 30_000);
+
         const uploadRes = await fetch(uploadUrl, {
           method: 'POST',
           headers: {
@@ -226,20 +230,23 @@ export async function POST(request: NextRequest) {
           },
           body: new Uint8Array(pdfBuffer),
           cache: 'no-store',
+          signal: uploadController.signal,
         });
+
+        clearTimeout(uploadTimeout);
 
         if (!uploadRes.ok) {
           throw new Error(`Storage upload failed (${uploadRes.status})`);
         }
 
-        const { storageId } = (await uploadRes.json()) as { storageId?: string };
+        const { storageId } = (await uploadRes.json()) as { storageId?: Id<'_storage'> };
         if (!storageId) {
           throw new Error('Storage upload did not return storageId.');
         }
 
         // Create artifact record in Convex
         const artifact = await fetchMutation(api.quickGenerateArtifacts.createQuickGenArtifact, {
-          storageId: storageId as never, // Convex ID type
+          storageId,
           filename,
           byteSize: byteLength,
           sha256,

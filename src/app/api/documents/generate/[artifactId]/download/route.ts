@@ -43,11 +43,17 @@ export async function GET(
     return new Response('PDF not found.', { status: 404 });
   }
 
-  // Fetch the PDF from Convex storage
+  // Fetch the PDF from Convex storage (30s timeout)
+  const fetchController = new AbortController();
+  const fetchTimeout = setTimeout(() => fetchController.abort(), 30_000);
+
   const upstream = await fetch(info.storageUrl, {
     method: 'GET',
     cache: 'no-store',
+    signal: fetchController.signal,
   });
+
+  clearTimeout(fetchTimeout);
 
   if (!upstream.ok || !upstream.body) {
     console.error(`[Download] Storage fetch failed for ${artifactId}: ${upstream.status}`);
@@ -58,7 +64,7 @@ export async function GET(
     status: 200,
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Length': String(info.byteLength),
+      ...(info.byteLength > 0 ? { 'Content-Length': String(info.byteLength) } : {}),
       'Content-Disposition': contentDispositionAttachment(info.filename),
       'Cache-Control': 'private, no-store, max-age=0',
       'X-Content-Type-Options': 'nosniff',

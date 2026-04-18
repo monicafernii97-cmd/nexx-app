@@ -663,6 +663,13 @@ async function getDOMPurify() {
 
 /** Sanitize AI-generated legal document HTML via DOMPurify, allowing only safe structural tags. */
 async function sanitizeTrustedHtml(html: string): Promise<string> {
+  // Fast path: if content has no HTML tags, just escape it — no jsdom needed.
+  // This handles Quick Generate (user-pasted plain text) without triggering
+  // the jsdom ESM incompatibility on Vercel's serverless runtime.
+  if (!/<[a-z][\s\S]*>/i.test(html)) {
+    return escapeHtml(html);
+  }
+
   try {
     const purify = await getDOMPurify();
     return purify.sanitize(html, {
@@ -672,7 +679,7 @@ async function sanitizeTrustedHtml(html: string): Promise<string> {
     });
   } catch {
     // Fallback: jsdom unavailable (Vercel ESM compat issue).
-    // Content is from our own pipeline or user paste — escape for safety.
+    // Content is from our own pipeline — escape for safety.
     console.warn('[sanitizeTrustedHtml] jsdom unavailable, falling back to escapeHtml');
     return escapeHtml(html);
   }

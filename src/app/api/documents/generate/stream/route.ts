@@ -3,12 +3,16 @@
  *
  * POST /api/documents/generate/stream
  *
- * Streams real-time progress updates during document generation.
- * Uses Vercel AI SDK for server-sent events streaming.
+ * Streams real-time progress updates during document generation via SSE.
+ * PDF is validated, stored to Convex, and a download URL is returned.
+ * No binary data (HTML/base64) is ever sent over the SSE stream.
  */
 
+import crypto from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { fetchMutation } from 'convex/nextjs';
+import { api } from '@convex/_generated/api';
 import { getMergedRules } from '@/lib/legal/courtRules';
 import { getTemplate } from '@/lib/legal/templates';
 import { renderDocumentHTML } from '@/lib/legal/templateRenderer';
@@ -19,32 +23,19 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { titleCase } from '@/lib/utils/stringHelpers';
 import { normalizeQuickGenerateLegalDocument } from '@/lib/document-generation/normalizeQuickGenerateLegalDocument';
 import { validateGeneratedSections } from '@/lib/document-generation/validateGeneratedSections';
+import { encodeSseEvent, encodeSseComment } from '@/lib/server/sse';
+import { validatePdfBuffer } from '@/lib/pdf/validatePdf';
 
-/** Maximum serverless function duration in seconds (Vercel Pro plan). */
+/** Force Node.js runtime for Puppeteer compatibility. */
+export const runtime = 'nodejs';
+
+/** Maximum serverless function duration in seconds. */
 export const maxDuration = 60;
-
-/** Progress event sent to client */
-interface ProgressEvent {
-  step: string;
-  message: string;
-  progress: number;
-  status: 'active' | 'complete' | 'error';
-  /** Result data on final event */
-  result?: {
-    html?: string;
-    pdfBase64?: string;
-    compliance?: ReturnType<typeof quickComplianceCheck>;
-    filename?: string;
-  };
-}
-
-/** Encode a progress event as a server-sent event (SSE) data line. */
-function encodeEvent(event: ProgressEvent): string {
-  return `data: ${JSON.stringify(event)}\n\n`;
-}
 
 /** Handle POST requests to stream document generation progress via SSE. */
 export async function POST(request: NextRequest) {
+  const requestId = crypto.randomUUID();
+
   // ── Auth guard ──
   const { userId } = await auth();
   if (!userId) {
@@ -86,40 +77,44 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // ── Stream response ──
-  const stream = new ReadableStream({
-    /** Start the SSE stream: generate the document in stages and emit progress events. */
+  // ── SSE Stream ──
+  const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      /** Close the stream controller when the client disconnects. */
-      const abortHandler = () => { try { controller.close(); } catch { /* already closed */ } };
+      let heartbeat: ReturnType<typeof setInterval> | undefined;
+
+      const abortHandler = () => {
+        clearInterval(heartbeat);
+        try { controller.close(); } catch { /* already closed */ }
+      };
       request.signal.addEventListener('abort', abortHandler);
 
-      /** Check if the client has disconnected. */
       const isAborted = () => request.signal.aborted;
-      if (isAborted()) {
-        abortHandler();
-        request.signal.removeEventListener('abort', abortHandler);
-        return;
-      }
+
+      /** Emit a progress event. */
+      const sendProgress = (step: string, message: string, progress: number) => {
+        controller.enqueue(encodeSseEvent('progress', { step, message, progress }, requestId));
+      };
 
       try {
-        // Step 1: Analyzing Legal Frameworks
-        controller.enqueue(new TextEncoder().encode(encodeEvent({
-          step: 'analyzing',
-          message: 'Analyzing Legal Frameworks',
-          progress: 10,
-          status: 'active',
-        })));
+        // Connected event
+        controller.enqueue(encodeSseEvent('connected', { requestId, ok: true }, requestId));
+
+        // Keep-alive heartbeat every 15s
+        heartbeat = setInterval(() => {
+          try { controller.enqueue(encodeSseComment('keep-alive')); }
+          catch { clearInterval(heartbeat); }
+        }, 15_000);
+
+        // ── Step 1: Analyzing Legal Frameworks ──
+        sendProgress('analyzing', 'Analyzing Legal Frameworks', 10);
 
         const template = getTemplate(body.templateId);
         if (!template) {
-          controller.enqueue(new TextEncoder().encode(encodeEvent({
-            step: 'error',
+          controller.enqueue(encodeSseEvent('error', {
             message: `Template "${body.templateId}" not found`,
-            progress: 0,
-            status: 'error',
-          })));
-          return;  // finally block will close the controller
+            code: 'TEMPLATE_NOT_FOUND',
+          }, requestId));
+          return;
         }
 
         // Infer caseType from template when caller omits it
@@ -133,22 +128,11 @@ export async function POST(request: NextRequest) {
         const normalizedCounty = titleCase(body.courtSettings.county);
         const rules = getMergedRules(normalizedState, normalizedCounty, body.formattingOverrides ?? {});
 
-        controller.enqueue(new TextEncoder().encode(encodeEvent({
-          step: 'analyzing',
-          message: 'Analyzing Legal Frameworks',
-          progress: 20,
-          status: 'complete',
-        })));
+        sendProgress('analyzing', 'Analyzing Legal Frameworks', 20);
 
-        // Step 2: Drafting Document Structure
-        controller.enqueue(new TextEncoder().encode(encodeEvent({
-          step: 'drafting',
-          message: 'Drafting Document Structure',
-          progress: 35,
-          status: 'active',
-        })));
+        // ── Step 2: Normalizing Content ──
+        sendProgress('normalizing', 'Normalizing Document Content', 30);
 
-        // ── Normalize body content ──
         const normalized = normalizeQuickGenerateLegalDocument(body.bodyContent);
         const flatText = Array.isArray(body.bodyContent)
           ? (body.bodyContent as Array<{ paragraphs?: string[] }>)
@@ -157,7 +141,7 @@ export async function POST(request: NextRequest) {
           : '';
         const validatedSections = validateGeneratedSections(normalized.sections, flatText);
 
-        console.log(`[QuickGen] normalizationMode=${normalized.normalizationMode}, sections=${validatedSections.length}`);
+        console.log(`[QuickGen:${requestId}] normalizationMode=${normalized.normalizationMode}, sections=${validatedSections.length}`);
 
         // Build caption — override with parsed metadata when available
         const caption: CaptionData = body.caption ?? buildStreamCaption(body, normalizedState, normalizedCounty);
@@ -178,24 +162,12 @@ export async function POST(request: NextRequest) {
           ...(normalized.signatureRole ? { role: normalized.signatureRole } : {}),
         };
 
-        await sleep(500); // Allow UI to show step
-
         if (isAborted()) return;
 
-        controller.enqueue(new TextEncoder().encode(encodeEvent({
-          step: 'drafting',
-          message: 'Drafting Document Structure',
-          progress: 45,
-          status: 'complete',
-        })));
+        sendProgress('normalizing', 'Normalizing Document Content', 40);
 
-        // Step 3: Applying Court Formatting
-        controller.enqueue(new TextEncoder().encode(encodeEvent({
-          step: 'formatting',
-          message: 'Applying Court Formatting',
-          progress: 55,
-          status: 'active',
-        })));
+        // ── Step 3: Applying Court Formatting ──
+        sendProgress('formatting', 'Applying Court Formatting', 50);
 
         if (isAborted()) return;
 
@@ -210,81 +182,111 @@ export async function POST(request: NextRequest) {
           rules,
         });
 
-        controller.enqueue(new TextEncoder().encode(encodeEvent({
-          step: 'formatting',
-          message: 'Applying Court Formatting',
-          progress: 65,
-          status: 'complete',
-        })));
+        if (!html || html.trim().length < 200) {
+          throw new Error('Rendered HTML is empty or too small.');
+        }
 
-        // Step 4: NEXXverification Compliance
-        controller.enqueue(new TextEncoder().encode(encodeEvent({
-          step: 'compliance',
-          message: 'NEXXverification Compliance',
-          progress: 75,
-          status: 'active',
-        })));
+        sendProgress('formatting', 'Applying Court Formatting', 60);
+
+        // ── Step 4: Compliance Check ──
+        sendProgress('compliance', 'NEXXverification Compliance', 70);
 
         if (isAborted()) return;
 
-        const complianceChecks = quickComplianceCheck(html, rules);
+        quickComplianceCheck(html, rules);
 
-        controller.enqueue(new TextEncoder().encode(encodeEvent({
-          step: 'compliance',
-          message: 'NEXXverification Compliance',
-          progress: 80,
-          status: 'complete',
-        })));
+        sendProgress('compliance', 'NEXXverification Compliance', 75);
 
-        // Step 5: Generating PDF
-        controller.enqueue(new TextEncoder().encode(encodeEvent({
-          step: 'pdf',
-          message: 'Rendering PDF',
-          progress: 85,
-          status: 'active',
-        })));
+        // ── Step 5: Rendering PDF ──
+        sendProgress('pdf', 'Rendering PDF', 80);
 
         if (isAborted()) return;
 
-        const pdfBytes = await renderHTMLToPDF(html, rules, caption.causeNumber);
-        const pdfBase64 = Buffer.from(pdfBytes).toString('base64');
-        const filename = `${template.id}_${Date.now()}.pdf`;
+        const pdfBuffer = await renderHTMLToPDF(html, rules, caption.causeNumber);
+        const { byteLength, sha256 } = validatePdfBuffer(pdfBuffer);
 
-        controller.enqueue(new TextEncoder().encode(encodeEvent({
-          step: 'pdf',
-          message: 'Rendering PDF',
-          progress: 95,
-          status: 'complete',
-        })));
+        const filename = buildPdfFilename(titleText, caption.causeNumber);
 
-        // Final: Complete
-        controller.enqueue(new TextEncoder().encode(encodeEvent({
-          step: 'complete',
-          message: 'Document Ready',
-          progress: 100,
-          status: 'complete',
-          result: {
-            html,
-            pdfBase64,
-            compliance: complianceChecks,
-            filename,
+        console.log(`[QuickGen:${requestId}] PDF validated: ${byteLength} bytes, sha256=${sha256.slice(0, 12)}…`);
+
+        sendProgress('pdf', 'Rendering PDF', 88);
+
+        // ── Step 6: Storing PDF ──
+        sendProgress('storing', 'Storing Document', 90);
+
+        if (isAborted()) return;
+
+        // Upload PDF to Convex storage
+        const uploadUrl = await fetchMutation(api.documents.generateUploadUrl, {});
+        const uploadRes = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Length': String(byteLength),
           },
-        })));
+          body: new Uint8Array(pdfBuffer),
+          cache: 'no-store',
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error(`Storage upload failed (${uploadRes.status})`);
+        }
+
+        const { storageId } = (await uploadRes.json()) as { storageId?: string };
+        if (!storageId) {
+          throw new Error('Storage upload did not return storageId.');
+        }
+
+        // Create artifact record in Convex
+        const artifact = await fetchMutation(api.quickGenerateArtifacts.createQuickGenArtifact, {
+          storageId: storageId as never, // Convex ID type
+          filename,
+          byteSize: byteLength,
+          sha256,
+          requestId,
+          templateId: body.templateId,
+          templateTitle: titleText,
+          caseType: body.caseType,
+          courtState: normalizedState,
+          courtCounty: normalizedCounty,
+          petitionerName: petitionerData.name,
+          respondentName: normalized.respondentName ?? body.respondent?.name,
+          causeNumber: caption.causeNumber !== '_______________' ? caption.causeNumber : undefined,
+        });
+
+        console.log(`[QuickGen:${requestId}] Artifact stored: ${artifact.artifactId}`);
+
+        sendProgress('storing', 'Storing Document', 95);
+
+        // ── Final: Complete (metadata only — no binary) ──
+        controller.enqueue(encodeSseEvent('complete', {
+          artifactId: artifact.artifactId,
+          filename: artifact.filename,
+          byteLength: artifact.byteLength,
+          sha256: artifact.sha256,
+          downloadUrl: `/api/documents/generate/${artifact.artifactId}/download`,
+        }, requestId));
+
+        clearInterval(heartbeat);
+
+        // Small flush cushion — payload is tiny so this is just safety
+        await new Promise(r => setTimeout(r, 50));
       } catch (error) {
-        if (
-          request.signal.aborted ||
-          (error instanceof Error && error.name === 'AbortError')
-        ) return;
-        console.error('[Stream Generation Error]', error);
+        clearInterval(heartbeat);
+        if (request.signal.aborted || (error instanceof Error && error.name === 'AbortError')) return;
+
+        const message = error instanceof Error ? error.message : 'Document generation failed';
+        console.error(`[QuickGen:${requestId}] FAILED`, error);
+
         try {
-          controller.enqueue(new TextEncoder().encode(encodeEvent({
-            step: 'error',
-            message: 'Document generation failed',
-            progress: 0,
-            status: 'error',
-          })));
+          controller.enqueue(encodeSseEvent('error', {
+            message,
+            code: 'QUICK_GENERATE_FAILED',
+          }, requestId));
+          await new Promise(r => setTimeout(r, 50));
         } catch { /* controller may already be closed */ }
       } finally {
+        clearInterval(heartbeat);
         request.signal.removeEventListener('abort', abortHandler);
         try { controller.close(); } catch { /* already closed */ }
       }
@@ -293,9 +295,10 @@ export async function POST(request: NextRequest) {
 
   return new Response(stream, {
     headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
       'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
     },
   });
 }
@@ -342,7 +345,21 @@ function buildStreamCaption(
   };
 }
 
-/** Return a promise that resolves after the given number of milliseconds. */
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+/** Build a descriptive PDF filename from the document title and cause number. */
+function buildPdfFilename(title: string, causeNumber?: string): string {
+  const safeTitle = (title || 'document')
+    .replace(/[^\w\- ]+/g, '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .slice(0, 80);
+
+  const cause = (causeNumber && causeNumber !== '_______________')
+    ? causeNumber.replace(/[^\w\-]+/g, '_').slice(0, 50)
+    : '';
+
+  const datePart = new Date().toISOString().slice(0, 10);
+
+  return cause
+    ? `${safeTitle}_${cause}_${datePart}.pdf`
+    : `${safeTitle}_${datePart}.pdf`;
 }

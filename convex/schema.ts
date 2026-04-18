@@ -341,7 +341,9 @@ export default defineSchema({
         mimeType: v.optional(v.string()),
         /** PDF file size in bytes */
         byteSize: v.optional(v.number()),
-        /** Export path (court_document, case_summary, exhibit_document) */
+        /** SHA-256 hash of the PDF for integrity verification */
+        sha256: v.optional(v.string()),
+        /** Export path (court_document, case_summary, exhibit_document, quick_generate) */
         exportPath: v.optional(v.string()),
 
         // ── Counts ──

@@ -76,6 +76,17 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+  // ── Convex client (must be created BEFORE the stream — Clerk auth context
+  //    is not available inside the ReadableStream start() callback) ──
+  let convex;
+  try {
+    convex = await getAuthenticatedConvexClient();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Failed to authenticate with Convex' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   // ── SSE Stream ──
   const stream = new ReadableStream<Uint8Array>({
@@ -217,7 +228,6 @@ export async function POST(request: NextRequest) {
         if (isAborted()) return;
 
         // Upload PDF to Convex storage (30s timeout to prevent hanging)
-        const convex = await getAuthenticatedConvexClient();
         const uploadUrl = await convex.mutation(api.documents.generateUploadUrl, {});
         const uploadController = new AbortController();
         const uploadTimeout = setTimeout(() => uploadController.abort(), 30_000);

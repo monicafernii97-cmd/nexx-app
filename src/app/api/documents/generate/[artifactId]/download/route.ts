@@ -9,9 +9,8 @@
 
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { fetchQuery } from 'convex/nextjs';
 import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
+import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,11 +33,19 @@ export async function GET(
 
   const { artifactId } = await context.params;
 
-  // Fetch artifact info from Convex (ownership-checked in the query)
-  let info: Awaited<ReturnType<typeof fetchQuery<typeof api.quickGenerateArtifacts.getQuickGenDownloadInfo>>>;
+  // ── Convex client (established auth pattern) ──
+  let convex;
   try {
-    info = await fetchQuery(api.quickGenerateArtifacts.getQuickGenDownloadInfo, {
-      artifactId: artifactId as Id<'generatedDocuments'>,
+    convex = await getAuthenticatedConvexClient();
+  } catch {
+    return new Response('Failed to authenticate with Convex', { status: 401 });
+  }
+
+  // Fetch artifact info from Convex (ownership-checked in the query)
+  let info;
+  try {
+    info = await convex.query(api.quickGenerateArtifacts.getQuickGenDownloadInfo, {
+      artifactId: artifactId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

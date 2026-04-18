@@ -177,15 +177,25 @@ async function renderIntroduction(content: string): Promise<string> {
   return `<div class="body-paragraph">${await sanitizeTrustedHtml(content)}</div>`;
 }
 
-/** Render Roman-numeral-headed body sections (I. Background, II. Argument, etc.). */
+/** Render body sections — both body_sections (Roman-numeral headed) and body_numbered types. */
 async function renderBodySections(sections: GeneratedSection[]): Promise<string> {
-  const bodyParts = sections.filter(s => s.sectionType === 'body_sections');
+  const bodyParts = sections.filter(s =>
+    s.sectionType === 'body_sections' || s.sectionType === 'body_numbered'
+  );
   const rendered = await Promise.all(bodyParts.map(async (s) => {
     let html = '';
     if (s.heading) {
       html += `<div class="section-heading">${escapeHtml(s.heading)}</div>`;
     }
-    html += `<div class="body-paragraph">${await sanitizeTrustedHtml(s.content)}</div>`;
+    // Render numbered items if present
+    if (s.sectionType === 'body_numbered' && s.numberedItems?.length) {
+      if (s.content?.trim()) {
+        html += `<div class="body-paragraph">${await sanitizeTrustedHtml(s.content)}</div>`;
+      }
+      html += renderNumberedParagraphs(s.numberedItems);
+    } else if (s.content?.trim()) {
+      html += `<div class="body-paragraph">${await sanitizeTrustedHtml(s.content)}</div>`;
+    }
     return html;
   }));
   return rendered.join('\n');

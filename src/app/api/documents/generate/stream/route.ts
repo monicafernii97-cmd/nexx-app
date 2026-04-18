@@ -17,6 +17,8 @@ import { quickComplianceCheck } from '@/lib/legal/complianceChecker';
 import type { DocumentGenerationRequest, CaptionData } from '@/lib/legal/types';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { titleCase } from '@/lib/utils/stringHelpers';
+import { normalizeQuickGenerateLegalDocument } from '@/lib/document-generation/normalizeQuickGenerateLegalDocument';
+import { validateGeneratedSections } from '@/lib/document-generation/validateGeneratedSections';
 
 /** Maximum serverless function duration in seconds (Vercel Pro plan). */
 export const maxDuration = 60;
@@ -146,9 +148,35 @@ export async function POST(request: NextRequest) {
           status: 'active',
         })));
 
-        // Build caption
+        // ── Normalize body content ──
+        const normalized = normalizeQuickGenerateLegalDocument(body.bodyContent);
+        const flatText = Array.isArray(body.bodyContent)
+          ? (body.bodyContent as Array<{ paragraphs?: string[] }>)
+              .flatMap(i => i.paragraphs ?? [])
+              .join('\n')
+          : '';
+        const validatedSections = validateGeneratedSections(normalized.sections, flatText);
+
+        console.log(`[QuickGen] normalizationMode=${normalized.normalizationMode}, sections=${validatedSections.length}`);
+
+        // Build caption — override with parsed metadata when available
         const caption: CaptionData = body.caption ?? buildStreamCaption(body, normalizedState, normalizedCounty);
-        const titleText = template.sections.find(s => s.type === 'title')?.title ?? template.title;
+
+        // Override caption with parsed shell metadata
+        if (normalized.causeNumber) caption.causeNumber = normalized.causeNumber;
+        if (normalized.caseStyleLeft?.length) caption.leftLines = normalized.caseStyleLeft;
+        if (normalized.caseStyleRight?.length) caption.rightLines = normalized.caseStyleRight;
+
+        // Override title with parsed title
+        const defaultTitle = template.sections.find(s => s.type === 'title')?.title ?? template.title;
+        const titleText = normalized.title ?? defaultTitle;
+
+        // Override petitioner/signature with parsed values
+        const petitionerData = {
+          ...body.petitioner,
+          ...(normalized.signatureName ? { name: normalized.signatureName } : {}),
+          ...(normalized.signatureRole ? { role: normalized.signatureRole } : {}),
+        };
 
         await sleep(500); // Allow UI to show step
 
@@ -175,9 +203,9 @@ export async function POST(request: NextRequest) {
           template,
           caption,
           titleText: titleText.toUpperCase(),
-          bodyContent: body.bodyContent ?? [],
-          petitioner: body.petitioner,
-          respondentName: body.respondent?.name,
+          bodyContent: validatedSections,
+          petitioner: petitionerData,
+          respondentName: normalized.respondentName ?? body.respondent?.name,
           exhibits: body.exhibits,
           rules,
           footerText: `Cause No. ${caption.causeNumber ?? ''} ${titleText}`,

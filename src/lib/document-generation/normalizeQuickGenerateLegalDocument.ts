@@ -166,7 +166,6 @@ export function normalizeQuickGenerateLegalDocument(
     caseStyleLeft: parsed.caseStyleLeft,
     caseStyleRight: parsed.caseStyleRight,
 
-    petitionerName: parsed.signatureName,
     signatureName: parsed.signatureName,
     signatureRole: parsed.signatureRole,
 
@@ -590,7 +589,7 @@ function extractNumberedItems(lines: string[]): { numbered: string[]; remaining:
 
     // Check for bullet items
     const bulletMatch = BULLET_RE.exec(line);
-    if (bulletMatch && numbered.length === 0) {
+    if (bulletMatch && lastNum === 0) {
       // If we haven't started numbered items, treat bullets as numbered
       numbered.push(bulletMatch[1].trim());
       continue;

@@ -663,10 +663,17 @@ async function getDOMPurify() {
 
 /** Sanitize AI-generated legal document HTML via DOMPurify, allowing only safe structural tags. */
 async function sanitizeTrustedHtml(html: string): Promise<string> {
-  const purify = await getDOMPurify();
-  return purify.sanitize(html, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-    ALLOW_DATA_ATTR: false,
-  });
+  try {
+    const purify = await getDOMPurify();
+    return purify.sanitize(html, {
+      ALLOWED_TAGS,
+      ALLOWED_ATTR,
+      ALLOW_DATA_ATTR: false,
+    });
+  } catch {
+    // Fallback: jsdom unavailable (Vercel ESM compat issue).
+    // Content is from our own pipeline or user paste — escape for safety.
+    console.warn('[sanitizeTrustedHtml] jsdom unavailable, falling back to escapeHtml');
+    return escapeHtml(html);
+  }
 }

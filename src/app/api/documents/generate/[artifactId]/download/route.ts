@@ -35,9 +35,18 @@ export async function GET(
   const { artifactId } = await context.params;
 
   // Fetch artifact info from Convex (ownership-checked in the query)
-  const info = await fetchQuery(api.quickGenerateArtifacts.getQuickGenDownloadInfo, {
-    artifactId: artifactId as Id<'generatedDocuments'>,
-  });
+  let info: Awaited<ReturnType<typeof fetchQuery<typeof api.quickGenerateArtifacts.getQuickGenDownloadInfo>>>;
+  try {
+    info = await fetchQuery(api.quickGenerateArtifacts.getQuickGenDownloadInfo, {
+      artifactId: artifactId as Id<'generatedDocuments'>,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('Invalid') || msg.includes('validation') || msg.includes('is not a valid ID')) {
+      return new Response('Invalid artifact id.', { status: 400 });
+    }
+    throw err;
+  }
 
   if (!info) {
     return new Response('PDF not found.', { status: 404 });
@@ -47,13 +56,23 @@ export async function GET(
   const fetchController = new AbortController();
   const fetchTimeout = setTimeout(() => fetchController.abort(), 30_000);
 
-  const upstream = await fetch(info.storageUrl, {
-    method: 'GET',
-    cache: 'no-store',
-    signal: fetchController.signal,
-  });
-
-  clearTimeout(fetchTimeout);
+  let upstream: Response;
+  try {
+    upstream = await fetch(info.storageUrl, {
+      method: 'GET',
+      cache: 'no-store',
+      signal: fetchController.signal,
+    });
+  } catch (error) {
+    const isAbort = error instanceof DOMException && error.name === 'AbortError';
+    console.error(
+      `[Download] Storage fetch ${isAbort ? 'timed out' : 'failed'} for ${artifactId}:`,
+      error,
+    );
+    return new Response('Stored PDF could not be retrieved.', { status: 502 });
+  } finally {
+    clearTimeout(fetchTimeout);
+  }
 
   if (!upstream.ok || !upstream.body) {
     console.error(`[Download] Storage fetch failed for ${artifactId}: ${upstream.status}`);
@@ -81,6 +100,6 @@ function contentDispositionAttachment(filename: string): string {
 
 function encodeRFC5987ValueChars(str: string): string {
   return encodeURIComponent(str)
-    .replace(/['()]/g, escape)
+    .replace(/['()]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`)
     .replace(/\*/g, '%2A');
 }

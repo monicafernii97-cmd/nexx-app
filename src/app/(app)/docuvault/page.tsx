@@ -84,7 +84,15 @@ function DocuVaultPageInner() {
     const [view, setView] = useState<GeneratorView>('compose');
     const [progress, setProgress] = useState(0);
     const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
-    const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
+    /** Metadata returned from the Quick Generate stream (no binary). */
+    type QuickGenResult = {
+      artifactId: string;
+      filename: string;
+      byteLength: number;
+      sha256: string;
+      downloadUrl: string;
+    };
+    const [generatedResult, setGeneratedResult] = useState<QuickGenResult | null>(null);
     const [generationError, setGenerationError] = useState<string | null>(null);
     const [caseNumber, setCaseNumber] = useState<string | null>(null);
     const [isParsing, setIsParsing] = useState(false);
@@ -97,21 +105,16 @@ function DocuVaultPageInner() {
     // Abort mechanism for generation
     const generationTokenRef = useRef(0);
     const completedRef = useRef(false);
-    const pdfUrlRef = useRef<string | null>(null);
     const generationAbortRef = useRef<AbortController | null>(null);
     /** Tracks the active timeout for the popup-blocked print warning so rapid clicks don't race. */
     const printWarningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Revoke blob URL and abort streams on unmount to prevent leaks
+    // Abort streams on unmount
     useEffect(() => {
         return () => {
             parseAbortRef.current?.abort();
             parseAbortRef.current = null;
             generationAbortRef.current?.abort();
-            if (pdfUrlRef.current) {
-                URL.revokeObjectURL(pdfUrlRef.current);
-                pdfUrlRef.current = null;
-            }
             if (printWarningTimeoutRef.current) {
                 clearTimeout(printWarningTimeoutRef.current);
             }
@@ -176,18 +179,14 @@ function DocuVaultPageInner() {
         setProgress(0);
         setGenerationError(null);
         completedRef.current = false;
-        if (pdfUrlRef.current) {
-            URL.revokeObjectURL(pdfUrlRef.current);
-            pdfUrlRef.current = null;
-            setGeneratedPdfUrl(null);
-        }
+        setGeneratedResult(null);
 
         const steps: ProgressStep[] = [
             { label: 'Analyzing Legal Frameworks', status: 'active' },
-            { label: 'Drafting Document Structure', status: 'pending' },
+            { label: 'Normalizing Document Content', status: 'pending' },
             { label: 'Applying Court Formatting', status: 'pending' },
             { label: 'NEXXverification Compliance', status: 'pending' },
-            { label: 'Rendering PDF', status: 'pending' },
+            { label: 'Rendering & Storing PDF', status: 'pending' },
         ];
         setProgressSteps(steps);
 
@@ -227,63 +226,57 @@ function DocuVaultPageInner() {
                 if (done) break;
 
                 buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n\n');
-                buffer = lines.pop() ?? '';
 
-                for (const line of lines) {
+                // Parse SSE events (separated by \n\n)
+                let boundaryIndex: number;
+                while ((boundaryIndex = buffer.indexOf('\n\n')) !== -1) {
+                    const rawEvent = buffer.slice(0, boundaryIndex);
+                    buffer = buffer.slice(boundaryIndex + 2);
+
                     if (generationTokenRef.current !== currentToken) return;
-                    if (!line.startsWith('data: ')) continue;
 
-                    /** Parse an SSE data line as JSON; warn and return null on failure. */
-                    const event = (() => {
-                        try {
-                            return JSON.parse(line.slice(6));
-                        } catch {
-                            console.warn('[DocuVault] Malformed SSE event:', line);
-                            return null;
+                    const parsed = parseSseEvent(rawEvent);
+                    if (!parsed) continue;
+
+                    const { event: eventName, data } = parsed;
+
+                    // Handle progress events
+                    if (eventName === 'progress' && data?.progress != null) {
+                        setProgress(data.progress);
+
+                        // Map SSE step names to UI step indices
+                        const stepMap: Record<string, number> = {
+                            analyzing: 0, normalizing: 1, formatting: 2, compliance: 3, pdf: 4, storing: 4,
+                        };
+                        const stepIdx = stepMap[data.step] ?? -1;
+                        if (stepIdx >= 0) {
+                            setProgressSteps(prev => prev.map((s, idx) => ({
+                                ...s,
+                                status: idx < stepIdx ? 'complete' as const
+                                    : idx === stepIdx ? 'active' as const
+                                    : 'pending' as const,
+                            })));
                         }
-                    })();
-                    if (!event) continue;
-
-                    // Update progress
-                    setProgress(event.progress);
-
-                    // Map SSE step names to UI labels
-                    const stepMap: Record<string, number> = {
-                        analyzing: 0, drafting: 1, formatting: 2, compliance: 3, pdf: 4, complete: 4,
-                    };
-                    const stepIdx = stepMap[event.step] ?? -1;
-                    if (stepIdx >= 0) {
-                        setProgressSteps(prev => prev.map((s, idx) => ({
-                            ...s,
-                            status: idx < stepIdx ? 'complete' as const
-                                : idx === stepIdx ? (event.status === 'complete' ? 'complete' as const : 'active' as const)
-                                : 'pending' as const,
-                        })));
                     }
 
-                    // Handle error
-                    if (event.status === 'error') {
-                        throw new Error(event.message);
+                    // Handle error events
+                    if (eventName === 'error') {
+                        throw new Error(data?.message ?? 'Generation failed');
                     }
 
-                    // Handle completion
-                    if (event.step === 'complete' && event.result?.pdfBase64) {
+                    // Handle completion — metadata only, no binary
+                    if (eventName === 'complete' && data?.artifactId) {
                         if (generationTokenRef.current !== currentToken) return;
                         completedRef.current = true;
-                        try {
-                            const bytes = Uint8Array.from(atob(event.result.pdfBase64), c => c.charCodeAt(0));
-                            const blob = new Blob([bytes], { type: 'application/pdf' });
-                            const url = URL.createObjectURL(blob);
-
-                            pdfUrlRef.current = url;
-                            setGeneratedPdfUrl(url);
-                            setCaseNumber(`LOCAL-DRAFT-${Math.random().toString(36).substring(2, 8).toUpperCase()} [UNSAVED]`);
-                            setView('result');
-                        } catch (decodeErr) {
-                            console.error('[DocuVault] Failed to decode PDF:', decodeErr);
-                            throw new Error('Failed to decode generated PDF');
-                        }
+                        setGeneratedResult({
+                            artifactId: data.artifactId,
+                            filename: data.filename,
+                            byteLength: data.byteLength,
+                            sha256: data.sha256,
+                            downloadUrl: data.downloadUrl,
+                        });
+                        setCaseNumber(data.filename?.replace('.pdf', '') ?? 'document');
+                        setView('result');
                     }
                 }
             }
@@ -301,6 +294,33 @@ function DocuVaultPageInner() {
             setView('compose');
         }
     }, [documentContent, selectedTemplate, isUserProfileLoading, resolvedState, resolvedCounty, courtSettings?.petitionerLegalName, user?.name]);
+
+    /** Parse a raw SSE event block into event name + data. */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function parseSseEvent(rawEvent: string): { event: string; data: Record<string, any> } | null {
+        const lines = rawEvent.split(/\r?\n/);
+        let event = 'message';
+        const dataLines: string[] = [];
+
+        for (const line of lines) {
+            if (!line || line.startsWith(':')) continue;
+            if (line.startsWith('event:')) {
+                event = line.slice('event:'.length).trim();
+                continue;
+            }
+            if (line.startsWith('data:')) {
+                dataLines.push(line.slice('data:'.length).trimStart());
+            }
+        }
+
+        if (dataLines.length === 0) return null;
+        try {
+            return { event, data: JSON.parse(dataLines.join('\n')) };
+        } catch {
+            console.warn('[DocuVault] Malformed SSE data:', dataLines.join('\n'));
+            return null;
+        }
+    }
 
     /** Reset all state to begin composing a new document, aborting any in-flight generation. */
     const handleNewDocument = useCallback(() => {
@@ -325,9 +345,7 @@ function DocuVaultPageInner() {
         setDocumentContent('');
         setProgress(0);
         setProgressSteps([]);
-        if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
-        pdfUrlRef.current = null;
-        setGeneratedPdfUrl(null);
+        setGeneratedResult(null);
         setGenerationError(null);
         setCaseNumber(null);
     }, []);
@@ -997,13 +1015,16 @@ function DocuVaultPageInner() {
                             <div className="grid grid-cols-2 gap-4">
                                 <button
                                     onClick={() => {
-                                        if (!generatedPdfUrl) return;
+                                        if (!generatedResult?.downloadUrl) return;
                                         const a = document.createElement('a');
-                                        a.href = generatedPdfUrl;
-                                        a.download = `${selectedTemplate?.id ?? 'document'}_${Date.now()}.pdf`;
+                                        a.href = generatedResult.downloadUrl;
+                                        a.download = generatedResult.filename;
+                                        a.rel = 'noopener';
+                                        document.body.appendChild(a);
                                         a.click();
+                                        document.body.removeChild(a);
                                     }}
-                                    disabled={!generatedPdfUrl}
+                                    disabled={!generatedResult?.downloadUrl}
                                     className="btn-primary flex items-center justify-center gap-3 py-4 text-base shadow-md disabled:opacity-50 h-full"
                                 >
                                     <DownloadSimple size={20} weight="bold" />
@@ -1013,20 +1034,10 @@ function DocuVaultPageInner() {
                                 <div className="grid grid-rows-2 gap-3">
                                     <button
                                         onClick={() => {
-                                            if (!generatedPdfUrl) return;
-                                            const win = window.open(generatedPdfUrl, '_blank');
-                                            if (win) {
-                                                setTimeout(() => {
-                                                    try { win.print(); }
-                                                    catch { console.warn('Print dialog could not be opened'); }
-                                                }, 500);
-                                            } else {
-                                                if (printWarningTimeoutRef.current) clearTimeout(printWarningTimeoutRef.current);
-                                                setGenerationError('Please allow popups to print, or use Download instead.');
-                                                printWarningTimeoutRef.current = setTimeout(() => setGenerationError(null), 5000);
-                                            }
+                                            if (!generatedResult?.downloadUrl) return;
+                                            window.open(generatedResult.downloadUrl, '_blank');
                                         }}
-                                        disabled={!generatedPdfUrl}
+                                        disabled={!generatedResult?.downloadUrl}
                                         className="btn-outline flex items-center justify-center gap-2 py-3 text-sm disabled:opacity-50"
                                     >
                                         <FileText size={18} weight="bold" />

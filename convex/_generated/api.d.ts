@@ -27,6 +27,7 @@ import type * as incidents from "../incidents.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as messages from "../messages.js";
 import type * as nexProfiles from "../nexProfiles.js";
+import type * as quickGenerateArtifacts from "../quickGenerateArtifacts.js";
 import type * as resourcesCache from "../resourcesCache.js";
 import type * as retrievedSources from "../retrievedSources.js";
 import type * as stripe from "../stripe.js";
@@ -62,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   messages: typeof messages;
   nexProfiles: typeof nexProfiles;
+  quickGenerateArtifacts: typeof quickGenerateArtifacts;
   resourcesCache: typeof resourcesCache;
   retrievedSources: typeof retrievedSources;
   stripe: typeof stripe;

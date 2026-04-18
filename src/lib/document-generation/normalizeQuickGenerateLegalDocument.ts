@@ -538,16 +538,7 @@ function extractBodyBlocks(lines: string[], start: number, result: ParsedLegalTe
 
     // ── Detect lettered subsection heading ──
     const letterMatch = LETTER_HEADING_RE.exec(line);
-    if (letterMatch && currentBlock) {
-      // Flush current block, start a new lettered sub-block
-      flushBlock();
-      currentBlock = {
-        heading: `${letterMatch[1]}. ${letterMatch[2]}`,
-        content: '',
-        blockType: 'lettered',
-      };
-      continue;
-    } else if (letterMatch && !currentBlock) {
+    if (letterMatch) {
       flushBlock();
       currentBlock = {
         heading: `${letterMatch[1]}. ${letterMatch[2]}`,

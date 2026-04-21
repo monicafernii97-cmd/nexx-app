@@ -181,6 +181,7 @@ export async function POST(request: NextRequest) {
         );
 
         // Build minimal case context from the request body for the AI drafter
+        // Uses effectiveSettings (canonical source) so drafting matches rendering
         const caseContext: Record<string, unknown> = {
           caseType: body.caseType,
           petitioner: body.petitioner?.name,
@@ -189,9 +190,9 @@ export async function POST(request: NextRequest) {
             name: c.name,
             age: c.age,
           })),
-          court: body.courtSettings?.courtName,
-          county: body.courtSettings?.county,
-          state: body.courtSettings?.state,
+          court: effectiveSettings?.courtName ?? body.courtSettings?.courtName,
+          county: effectiveSettings?.county ?? body.courtSettings?.county,
+          state: effectiveSettings?.state ?? body.courtSettings?.state,
         };
 
         let drafted;

@@ -24,7 +24,6 @@ import type {
   LegalDocument,
   CaptionBlock,
   LegalSection,
-  LegalBlock,
   PrayerBlock,
   SignatureBlock,
   CertificateBlock,
@@ -142,9 +141,11 @@ function extractCauseNumber(lines: string[]): string | undefined {
  */
 function extractGeneralCaption(lines: string[]): CaptionBlock | null {
   const titleIndex = findTitleIndex(lines);
-  if (titleIndex === -1) return tryMinimalCaption(lines);
 
-  const captionSlice = lines.slice(0, titleIndex);
+  // When title is found, use lines above it as caption slice.
+  // When title is NOT found, still attempt full header parsing
+  // against all lines — don't short-circuit to minimal caption.
+  const captionSlice = titleIndex !== -1 ? lines.slice(0, titleIndex) : lines;
 
   const texas = tryTexasCaption(captionSlice);
   if (texas) return texas;
@@ -479,16 +480,31 @@ function explodeMergedNumberedParagraphs(lines: string[]): string[] {
 // List Collectors
 // ═══════════════════════════════════════════════════════════════
 
-/** Collect consecutive numbered list items starting at startIndex. */
+/**
+ * Collect numbered list items starting at startIndex.
+ * Handles wrapped lines: continuation lines without a numeric prefix
+ * are appended to the previous item instead of becoming paragraphs.
+ */
 function collectNumberedList(lines: string[], startIndex: number) {
   const items: string[] = [];
   let i = startIndex;
 
   while (i < lines.length) {
     const line = lines[i];
-    if (!NUMBERED_ITEM_RE.test(line)) break;
-    items.push(line.replace(/^\d+\.\s+/, '').trim());
-    i++;
+    if (NUMBERED_ITEM_RE.test(line)) {
+      items.push(line.replace(/^\d+\.\s+/, '').trim());
+      i++;
+    } else if (
+      items.length > 0 &&
+      line.trim() &&
+      !isStructuralLine(line)
+    ) {
+      // Continuation of the previous list item (wrapped line)
+      items[items.length - 1] += ' ' + line.trim();
+      i++;
+    } else {
+      break;
+    }
   }
 
   return {
@@ -497,22 +513,52 @@ function collectNumberedList(lines: string[], startIndex: number) {
   };
 }
 
-/** Collect consecutive bullet list items starting at startIndex. */
+/**
+ * Collect bullet list items starting at startIndex.
+ * Handles wrapped lines the same way as numbered lists.
+ */
 function collectBulletList(lines: string[], startIndex: number) {
   const items: string[] = [];
   let i = startIndex;
 
   while (i < lines.length) {
     const line = lines[i];
-    if (!BULLET_ITEM_RE.test(line)) break;
-    items.push(line.replace(BULLET_ITEM_RE, '').trim());
-    i++;
+    if (BULLET_ITEM_RE.test(line)) {
+      items.push(line.replace(BULLET_ITEM_RE, '').trim());
+      i++;
+    } else if (
+      items.length > 0 &&
+      line.trim() &&
+      !isStructuralLine(line)
+    ) {
+      // Continuation of the previous list item (wrapped line)
+      items[items.length - 1] += ' ' + line.trim();
+      i++;
+    } else {
+      break;
+    }
   }
 
   return {
     block: { type: 'bullet_list', items } as const,
     nextIndex: i,
   };
+}
+
+/** Check if a line is a structural marker that should NOT be treated as list continuation. */
+function isStructuralLine(line: string): boolean {
+  return (
+    ROMAN_HEADING_RE.test(line) ||
+    LETTER_HEADING_RE.test(line) ||
+    PRAYER_RE.test(line) ||
+    WHEREFORE_RE.test(line) ||
+    RESPECTFULLY_RE.test(line) ||
+    CERTIFICATE_RE.test(line) ||
+    TO_HONORABLE_RE.test(line) ||
+    NUMBERED_ITEM_RE.test(line) ||
+    BULLET_ITEM_RE.test(line) ||
+    line === SEPARATOR_MARKER
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -622,7 +668,9 @@ function parseCertificate(lines: string[], startIndex: number): { block: Certifi
   while (i < lines.length) {
     const line = lines[i];
     if (line !== SEPARATOR_MARKER) {
-      if (/^_{5,}$/.test(line) || /\/s\//i.test(line) || /Esq\.|Pro Se|Attorney|Petitioner/i.test(line)) {
+      // Match real signature markers: underline bars, /s/ signatures,
+      // or lines where title words appear at end (not in running text)
+      if (/^_{5,}$/.test(line) || /\/s\//i.test(line) || /\b(?:Esq\.|Pro Se|Attorney|Petitioner)\s*[.,;:]*$/i.test(line)) {
         signerLines.push(line);
       } else {
         bodyLines.push(line);

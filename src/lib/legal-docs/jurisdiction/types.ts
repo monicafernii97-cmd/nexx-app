@@ -47,8 +47,8 @@ export type JurisdictionProfile = {
   };
 
   sections: {
-    romanHeadingStyle: 'roman';
-    letterHeadingStyle: 'letter';
+    romanHeadingStyle: 'roman' | 'numeric';
+    letterHeadingStyle: 'letter' | 'numeric';
     prayerHeadingRequired: boolean;
     certificateSeparatePage: boolean;
     signatureKeepTogether: boolean;

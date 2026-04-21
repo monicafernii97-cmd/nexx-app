@@ -17,7 +17,6 @@
  */
 
 import type { JurisdictionProfile } from './types';
-import type { LegalDocument } from '../types';
 import type { CourtFormattingRules } from '@/lib/legal/types';
 
 // ═══════════════════════════════════════════════════════════════
@@ -163,7 +162,7 @@ const TX_FORT_BEND_387TH: JurisdictionProfile = {
  */
 export function resolveJurisdictionProfile(
   settings: SavedCourtSettings,
-  doc: LegalDocument,
+  _doc?: unknown,
 ): JurisdictionProfile {
   const state = norm(settings?.state);
   const county = norm(settings?.county);
@@ -346,17 +345,21 @@ export async function getEffectiveCourtSettings({
 
   // 2. Payload fallback
   if (payloadCourtSettings && typeof payloadCourtSettings === 'object') {
-    const p = payloadCourtSettings as Record<string, string | undefined>;
+    const p = payloadCourtSettings as Record<string, unknown>;
     if (p.state) {
       console.log('[LegalDocs] Using payload court settings as fallback');
       return {
-        state: p.state || '',
-        county: p.county || '',
-        courtName: p.courtName,
-        judicialDistrict: p.judicialDistrict,
-        causeNumber: p.causeNumber,
-        petitionerLegalName: p.petitionerLegalName,
-        respondentLegalName: p.respondentLegalName,
+        state: String(p.state || ''),
+        county: String(p.county || ''),
+        courtName: typeof p.courtName === 'string' ? p.courtName : undefined,
+        judicialDistrict: typeof p.judicialDistrict === 'string' ? p.judicialDistrict : undefined,
+        causeNumber: typeof p.causeNumber === 'string' ? p.causeNumber : undefined,
+        petitionerLegalName: typeof p.petitionerLegalName === 'string' ? p.petitionerLegalName : undefined,
+        respondentLegalName: typeof p.respondentLegalName === 'string' ? p.respondentLegalName : undefined,
+        formattingOverrides:
+          p.formattingOverrides && typeof p.formattingOverrides === 'object'
+            ? (p.formattingOverrides as Partial<CourtFormattingRules>)
+            : undefined,
       };
     }
   }

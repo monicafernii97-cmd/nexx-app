@@ -213,7 +213,7 @@ export function renderLegalDocumentHTML(
   <div class="document">
     ${renderCaption(doc, profile)}
     ${renderTitle(doc)}
-    ${renderSections(doc, profile)}
+    ${renderSections(doc)}
     ${renderPrayer(doc)}
     ${renderSignature(doc, profile)}
     ${renderCertificate(doc, profile)}
@@ -286,7 +286,7 @@ function renderTitle(doc: LegalDocument): string {
 // Sections
 // ═══════════════════════════════════════════════════════════════
 
-function renderSections(doc: LegalDocument, _profile: JurisdictionProfile): string {
+function renderSections(doc: LegalDocument): string {
   return doc.sections.map((section) => {
     const heading = section.heading
       ? `<div class="section-heading">${esc(section.heading)}</div>`

@@ -297,8 +297,9 @@ export async function POST(request: NextRequest) {
         convexQuery: () => convex.query(api.courtSettings.get, {}),
         payloadCourtSettings: body.courtSettings,
       });
-    } catch {
+    } catch (err) {
       // If Convex client fails (edge case), fall back to payload
+      console.warn('[DocuVault] Convex client unavailable, falling back to payload settings', err);
       effectiveSettings = await getEffectiveCourtSettings({
         convexQuery: async () => null,
         payloadCourtSettings: body.courtSettings,
@@ -313,8 +314,7 @@ export async function POST(request: NextRequest) {
     // ── 7. Render Legal HTML ──
     const html = renderLegalDocumentHTML(parsed, jurisdictionProfile);
 
-    // Resolve final title
-    const finalTitleText = parsed.title.main !== 'UNTITLED DOCUMENT' ? parsed.title.main : titleText;
+
 
     // ── 8. Check if user just wants HTML preview ──
     const format = request.nextUrl.searchParams.get('format');

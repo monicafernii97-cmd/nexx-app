@@ -30,7 +30,7 @@ function sanitizeSegment(input: string): string {
     .replace(/[""]/g, '')                     // strip double smart quotes
     .replace(/[()]/g, '')                     // strip parentheses
     .replace(/&/g, 'AND')                     // ampersand → AND
-    .replace(/[^\w\s-]/g, ' ')               // non-word chars → space
+    .replace(/[^\w\s]/g, ' ')                // non-word chars (incl. hyphens) → space
     .replace(/\s+/g, '_')                     // spaces → underscore
     .replace(/_+/g, '_')                      // collapse multiple underscores
     .replace(/^_+|_+$/g, '')                  // trim leading/trailing underscores

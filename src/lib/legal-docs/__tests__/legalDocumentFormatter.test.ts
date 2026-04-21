@@ -122,7 +122,6 @@ describe('legal document formatter', () => {
     const doc = parseLegalDocument(TEXAS_MOTION);
     const profile = resolveJurisdictionProfile(
       { state: 'Texas', county: 'Fort Bend' },
-      doc,
     );
     const html = renderLegalDocumentHTML(doc, profile);
     expect(html).toContain('certificate-page');
@@ -211,7 +210,6 @@ describe('block type preservation', () => {
     const doc = parseLegalDocument(TEXAS_MOTION);
     const profile = resolveJurisdictionProfile(
       { state: 'Texas', county: 'Fort Bend' },
-      doc,
     );
     const html = renderLegalDocumentHTML(doc, profile);
     expect(html).toContain('bullet-list');
@@ -264,12 +262,10 @@ describe('edge cases', () => {
 // ═══════════════════════════════════════════════════════════════
 
 describe('jurisdiction profile resolution', () => {
-  const doc = parseLegalDocument(TEXAS_MOTION);
-
   it('resolves Texas profile for Texas state', () => {
+    const doc = parseLegalDocument(TEXAS_MOTION);
     const profile = resolveJurisdictionProfile(
       { state: 'Texas', county: 'Harris' },
-      doc,
     );
     expect(profile.key).toBe('tx-default');
     expect(profile.caption.useThreeColumnTable).toBe(true);
@@ -279,7 +275,6 @@ describe('jurisdiction profile resolution', () => {
   it('resolves Fort Bend specific profile', () => {
     const profile = resolveJurisdictionProfile(
       { state: 'Texas', county: 'Fort Bend' },
-      doc,
     );
     expect(profile.key).toBe('tx-fort-bend-387th');
     expect(profile.county).toBe('Fort Bend');
@@ -288,14 +283,13 @@ describe('jurisdiction profile resolution', () => {
   it('resolves US default for unknown state', () => {
     const profile = resolveJurisdictionProfile(
       { state: 'Florida', county: 'Whatever' },
-      doc,
     );
     expect(profile.key).toBe('us-default');
     expect(profile.caption.useThreeColumnTable).toBe(false);
   });
 
   it('resolves US default for null settings', () => {
-    const profile = resolveJurisdictionProfile(null, doc);
+    const profile = resolveJurisdictionProfile(null);
     expect(profile.key).toBe('us-default');
   });
 });
@@ -309,7 +303,6 @@ describe('toCourtFormattingRules adapter', () => {
     const doc = parseLegalDocument(TEXAS_MOTION);
     const profile = resolveJurisdictionProfile(
       { state: 'Texas', county: 'Fort Bend' },
-      doc,
     );
     const rules = toCourtFormattingRules(profile);
 
@@ -326,7 +319,7 @@ describe('toCourtFormattingRules adapter', () => {
 
   it('converts US default profile correctly', () => {
     const doc = parseLegalDocument('');
-    const profile = resolveJurisdictionProfile(null, doc);
+    const profile = resolveJurisdictionProfile(null);
     const rules = toCourtFormattingRules(profile);
 
     expect(rules.captionStyle).toBe('centered');
@@ -383,7 +376,7 @@ describe('reusability across motion types', () => {
 
   it('renders federal motion with generic profile', () => {
     const doc = parseLegalDocument(FEDERAL_MOTION);
-    const profile = resolveJurisdictionProfile(null, doc);
+    const profile = resolveJurisdictionProfile(null);
     const html = renderLegalDocumentHTML(doc, profile);
     expect(html).toContain('MOTION FOR SUMMARY JUDGMENT');
     expect(html).toContain('PRAYER');

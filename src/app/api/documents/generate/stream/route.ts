@@ -177,10 +177,19 @@ export async function POST(request: NextRequest) {
         sendProgress('formatting', 'Resolving Jurisdiction Profile', 50);
 
         // Canonical precedence: saved Convex settings → payload → default
-        const effectiveSettings = await getEffectiveCourtSettings({
-          convexQuery: () => convex.query(api.courtSettings.get, {}),
-          payloadCourtSettings: body.courtSettings,
-        });
+        let effectiveSettings;
+        try {
+          effectiveSettings = await getEffectiveCourtSettings({
+            convexQuery: () => convex.query(api.courtSettings.get, {}),
+            payloadCourtSettings: body.courtSettings,
+          });
+        } catch (err) {
+          console.warn(`[QuickGen:${requestId}] Convex settings unavailable, falling back to payload`, err);
+          effectiveSettings = await getEffectiveCourtSettings({
+            convexQuery: async () => null,
+            payloadCourtSettings: body.courtSettings,
+          });
+        }
 
         const jurisdictionProfile = resolveJurisdictionProfile(effectiveSettings, parsed);
         const formattingRules = toCourtFormattingRules(jurisdictionProfile);
@@ -272,7 +281,7 @@ export async function POST(request: NextRequest) {
           courtState: normalizedState,
           courtCounty: normalizedCounty,
           petitionerName: body.petitioner.name,
-          respondentName: parsed.metadata.causeNumber ? body.respondent?.name : undefined,
+          respondentName: body.respondent?.name,
           causeNumber: causeNumber,
         });
 

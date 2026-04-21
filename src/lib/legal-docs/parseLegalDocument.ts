@@ -97,8 +97,8 @@ function normalizeRawText(input: string): string {
   return input
     .replace(/\r\n/g, '\n')
     .replace(/\u00A0/g, ' ')         // non-breaking space → space
-    .replace(/[""]/g, '"')           // smart double quotes
-    .replace(/['']/g, "'")           // smart single quotes
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"') // smart double quotes → ASCII
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'") // smart single quotes → ASCII
     .replace(/[‐–—]/g, '—')         // normalize dashes
     .replace(/\t/g, ' ')            // tabs → space
     .replace(/[ ]{2,}/g, ' ')       // collapse multiple spaces
@@ -107,12 +107,15 @@ function normalizeRawText(input: string): string {
     .trim();
 }
 
-/** Split text into trimmed non-empty lines. */
+/**
+ * Split text into trimmed lines, preserving blank-line separators
+ * as empty strings so downstream paragraph coalescing can detect
+ * logical paragraph boundaries.
+ */
 function splitLines(input: string): string[] {
   return input
     .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
+    .map((line) => line.trim());
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -328,10 +331,21 @@ function tryMinimalCaption(lines: string[]): CaptionBlock | null {
 // Title Detection
 // ═══════════════════════════════════════════════════════════════
 
-/** Find the title line index in the document. */
+/**
+ * Find the title line index, bounded to the header region.
+ * Only scans up to "TO THE HONORABLE" or the first section heading
+ * (Roman numeral) to avoid matching body sentences.
+ */
 function findTitleIndex(lines: string[]): number {
-  for (let i = 0; i < lines.length; i++) {
+  // Determine header boundary
+  const headerBound = lines.findIndex(
+    (l) => TO_HONORABLE_RE.test(l) || ROMAN_HEADING_RE.test(l)
+  );
+  const searchLimit = headerBound !== -1 ? headerBound : Math.min(lines.length, 25);
+
+  for (let i = 0; i < searchLimit; i++) {
     const line = lines[i];
+    if (!line) continue; // skip blank separator lines
     if (
       TITLE_CANDIDATE_RE.test(line) &&
       !CAUSE_RE.test(line) &&
@@ -477,8 +491,28 @@ function extractBodyStructure(
     }
 
     // ── Regular paragraph ──
-    if (line !== SEPARATOR_MARKER) {
-      currentSection.blocks.push({ type: 'paragraph', text: line });
+    // Coalesce consecutive non-structural lines into a single paragraph
+    // to avoid emitting one <p> per hard-wrapped visual line.
+    if (line !== SEPARATOR_MARKER && line !== '') {
+      const paragraphLines: string[] = [line];
+      while (
+        i + 1 < bodyLines.length &&
+        bodyLines[i + 1] !== '' &&
+        bodyLines[i + 1] !== SEPARATOR_MARKER &&
+        !ROMAN_HEADING_RE.test(bodyLines[i + 1]) &&
+        !LETTER_HEADING_RE.test(bodyLines[i + 1]) &&
+        !NUMBERED_ITEM_RE.test(bodyLines[i + 1]) &&
+        !BULLET_ITEM_RE.test(bodyLines[i + 1]) &&
+        !PRAYER_RE.test(bodyLines[i + 1]) &&
+        !WHEREFORE_RE.test(bodyLines[i + 1]) &&
+        !CERTIFICATE_RE.test(bodyLines[i + 1]) &&
+        !RESPECTFULLY_RE.test(bodyLines[i + 1]) &&
+        !TO_HONORABLE_RE.test(bodyLines[i + 1])
+      ) {
+        i++;
+        paragraphLines.push(bodyLines[i]);
+      }
+      currentSection.blocks.push({ type: 'paragraph', text: paragraphLines.join(' ') });
     }
 
     i++;

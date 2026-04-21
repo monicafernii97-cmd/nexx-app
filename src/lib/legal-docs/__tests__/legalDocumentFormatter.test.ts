@@ -263,7 +263,6 @@ describe('edge cases', () => {
 
 describe('jurisdiction profile resolution', () => {
   it('resolves Texas profile for Texas state', () => {
-    const doc = parseLegalDocument(TEXAS_MOTION);
     const profile = resolveJurisdictionProfile(
       { state: 'Texas', county: 'Harris' },
     );
@@ -272,12 +271,19 @@ describe('jurisdiction profile resolution', () => {
     expect(profile.caption.centerSymbol).toBe('§');
   });
 
-  it('resolves Fort Bend specific profile', () => {
+  it('resolves Fort Bend 387th specific profile', () => {
     const profile = resolveJurisdictionProfile(
-      { state: 'Texas', county: 'Fort Bend' },
+      { state: 'Texas', county: 'Fort Bend', judicialDistrict: '387th Judicial District' },
     );
     expect(profile.key).toBe('tx-fort-bend-387th');
     expect(profile.county).toBe('Fort Bend');
+  });
+
+  it('falls back to tx-default for Fort Bend without 387th', () => {
+    const profile = resolveJurisdictionProfile(
+      { state: 'Texas', county: 'Fort Bend' },
+    );
+    expect(profile.key).toBe('tx-default');
   });
 
   it('resolves US default for unknown state', () => {
@@ -300,9 +306,8 @@ describe('jurisdiction profile resolution', () => {
 
 describe('toCourtFormattingRules adapter', () => {
   it('converts Texas profile correctly', () => {
-    const doc = parseLegalDocument(TEXAS_MOTION);
     const profile = resolveJurisdictionProfile(
-      { state: 'Texas', county: 'Fort Bend' },
+      { state: 'Texas', county: 'Fort Bend', judicialDistrict: '387th Judicial District' },
     );
     const rules = toCourtFormattingRules(profile);
 
@@ -318,7 +323,6 @@ describe('toCourtFormattingRules adapter', () => {
   });
 
   it('converts US default profile correctly', () => {
-    const doc = parseLegalDocument('');
     const profile = resolveJurisdictionProfile(null);
     const rules = toCourtFormattingRules(profile);
 

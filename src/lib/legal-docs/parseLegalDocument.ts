@@ -454,6 +454,11 @@ function extractBodyStructure(
 /**
  * Split inline-merged numbered paragraphs.
  * E.g., "10. Alpha. 11. Beta. 12. Gamma." → three separate lines.
+ *
+ * Known limitation: the heuristic regex /(\\s)(\\d+\\.\\s)/ may incorrectly
+ * split mid-sentence if text like "costs $1. Further..." appears. This is
+ * rare in legal pleading body text and is an acceptable tradeoff to recover
+ * merged numbered items from pasted content.
  */
 function explodeMergedNumberedParagraphs(lines: string[]): string[] {
   const output: string[] = [];

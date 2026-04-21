@@ -158,17 +158,16 @@ const TX_FORT_BEND_387TH: JurisdictionProfile = {
  * Resolve the best-matching jurisdiction profile.
  *
  * @param settings - Saved court settings from Convex (or null for default)
- * @param doc      - Parsed legal document (for metadata hints)
  */
 export function resolveJurisdictionProfile(
   settings: SavedCourtSettings,
-  _doc?: unknown,
 ): JurisdictionProfile {
   const state = norm(settings?.state);
   const county = norm(settings?.county);
+  const venue = `${settings?.judicialDistrict ?? ''} ${settings?.courtName ?? ''}`.toLowerCase();
 
-  // Specific county profiles
-  if (state === 'texas' && county === 'fort bend') {
+  // Specific county profiles — only match 387th when court/district confirms it
+  if (state === 'texas' && county === 'fort bend' && /\b387(th)?\b/.test(venue)) {
     return applyFormattingOverrides(TX_FORT_BEND_387TH, settings);
   }
 
@@ -199,9 +198,13 @@ function applyFormattingOverrides(
       ...base.page,
       widthIn: overrides.paperWidth ?? base.page.widthIn,
       heightIn: overrides.paperHeight ?? base.page.heightIn,
-      marginsPt: overrides.marginTop != null
+      marginsPt:
+        overrides.marginTop != null ||
+        overrides.marginRight != null ||
+        overrides.marginBottom != null ||
+        overrides.marginLeft != null
         ? {
-            top: overrides.marginTop * 72,
+            top: (overrides.marginTop ?? base.page.marginsPt.top / 72) * 72,
             right: (overrides.marginRight ?? base.page.marginsPt.right / 72) * 72,
             bottom: (overrides.marginBottom ?? base.page.marginsPt.bottom / 72) * 72,
             left: (overrides.marginLeft ?? base.page.marginsPt.left / 72) * 72,

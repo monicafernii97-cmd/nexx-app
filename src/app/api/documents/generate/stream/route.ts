@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        const jurisdictionProfile = resolveJurisdictionProfile(effectiveSettings, parsed);
+        const jurisdictionProfile = resolveJurisdictionProfile(effectiveSettings);
         const formattingRules = toCourtFormattingRules(jurisdictionProfile);
 
         console.log(`[QuickGen:${requestId}] jurisdiction=${jurisdictionProfile.key}, profile="${jurisdictionProfile.name}"`);

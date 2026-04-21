@@ -13,16 +13,21 @@ import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { api } from '@convex/_generated/api';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
-import { getMergedRules } from '@/lib/legal/courtRules';
 import { getTemplate } from '@/lib/legal/templates';
-import { renderDocumentHTML } from '@/lib/legal/templateRenderer';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
 import { quickComplianceCheck } from '@/lib/legal/complianceChecker';
-import type { DocumentGenerationRequest, CaptionData } from '@/lib/legal/types';
+import type { DocumentGenerationRequest } from '@/lib/legal/types';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { titleCase } from '@/lib/utils/stringHelpers';
-import { normalizeQuickGenerateLegalDocument } from '@/lib/document-generation/normalizeQuickGenerateLegalDocument';
-import { validateGeneratedSections } from '@/lib/document-generation/validateGeneratedSections';
+import { parseLegalDocument } from '@/lib/legal-docs/parseLegalDocument';
+import { renderLegalDocumentHTML } from '@/lib/legal-docs/renderLegalDocumentHTML';
+import { generateLegalFilename } from '@/lib/legal-docs/generateLegalFilename';
+import { preflightLegalDocument } from '@/lib/legal-docs/preflightLegalDocument';
+import {
+  resolveJurisdictionProfile,
+  toCourtFormattingRules,
+  getEffectiveCourtSettings,
+} from '@/lib/legal-docs/jurisdiction/resolveJurisdictionProfile';
 import { encodeSseEvent, encodeSseComment } from '@/lib/server/sse';
 import { validatePdfBuffer } from '@/lib/pdf/validatePdf';
 
@@ -137,65 +142,64 @@ export async function POST(request: NextRequest) {
 
         const normalizedState = titleCase(body.courtSettings.state);
         const normalizedCounty = titleCase(body.courtSettings.county);
-        const rules = getMergedRules(normalizedState, normalizedCounty, body.formattingOverrides ?? {});
 
         sendProgress('analyzing', 'Analyzing Legal Frameworks', 20);
 
-        // ── Step 2: Normalizing Content ──
-        sendProgress('normalizing', 'Normalizing Document Content', 30);
+        // ── Step 2: Parse Legal Document ──
+        sendProgress('normalizing', 'Parsing Document Structure', 30);
 
-        const normalized = normalizeQuickGenerateLegalDocument(body.bodyContent);
-        const flatText = Array.isArray(body.bodyContent)
-          ? (body.bodyContent as Array<{ paragraphs?: string[] }>)
-              .flatMap(i => i.paragraphs ?? [])
+        // Flatten raw pasted content into a single string for parsing
+        const rawText = Array.isArray(body.bodyContent)
+          ? (body.bodyContent as Array<{ heading?: string; paragraphs?: string[]; content?: string }>)
+              .flatMap(item => {
+                const parts: string[] = [];
+                if (item.heading) parts.push(item.heading);
+                if (item.paragraphs) parts.push(...item.paragraphs);
+                if (item.content) parts.push(item.content);
+                return parts;
+              })
               .join('\n')
-          : '';
-        const validatedSections = validateGeneratedSections(normalized.sections, flatText);
+          : String(body.bodyContent ?? '');
 
-        console.log(`[QuickGen:${requestId}] normalizationMode=${normalized.normalizationMode}, sections=${validatedSections.length}`);
+        const parsed = parseLegalDocument(rawText);
+        const preflight = preflightLegalDocument(parsed);
 
-        // Build caption — override with parsed metadata when available
-        const caption: CaptionData = body.caption ?? buildStreamCaption(body, normalizedState, normalizedCounty);
-
-        // Override caption with parsed shell metadata
-        if (normalized.causeNumber) caption.causeNumber = normalized.causeNumber;
-        if (normalized.caseStyleLeft?.length) caption.leftLines = normalized.caseStyleLeft;
-        if (normalized.caseStyleRight?.length) caption.rightLines = normalized.caseStyleRight;
-
-        // Override title with parsed title
-        const defaultTitle = template.sections.find(s => s.type === 'title')?.title ?? template.title;
-        const titleText = normalized.title ?? defaultTitle;
-
-        // Override petitioner/signature with parsed values
-        const petitionerData = {
-          ...body.petitioner,
-          ...(normalized.signatureName ? { name: normalized.signatureName } : {}),
-          ...(normalized.signatureRole ? { role: normalized.signatureRole } : {}),
-        };
+        console.log(`[QuickGen:${requestId}] parsed: ${parsed.sections.length} sections, title="${parsed.title.main}"`);
+        if (!preflight.ok) {
+          console.warn(`[QuickGen:${requestId}] preflight warnings:`, preflight.warnings);
+        }
 
         if (isAborted()) return;
 
-        sendProgress('normalizing', 'Normalizing Document Content', 40);
+        sendProgress('normalizing', 'Parsing Document Structure', 40);
 
-        // ── Step 3: Applying Court Formatting ──
-        sendProgress('formatting', 'Applying Court Formatting', 50);
+        // ── Step 3: Resolve Jurisdiction Profile ──
+        sendProgress('formatting', 'Resolving Jurisdiction Profile', 50);
 
-        if (isAborted()) return;
-
-        const html = await renderDocumentHTML({
-          template,
-          caption,
-          titleText: titleText.toUpperCase(),
-          bodyContent: validatedSections,
-          petitioner: petitionerData,
-          respondentName: normalized.respondentName ?? body.respondent?.name,
-          exhibits: body.exhibits,
-          rules,
+        // Canonical precedence: saved Convex settings → payload → default
+        const effectiveSettings = await getEffectiveCourtSettings({
+          convexQuery: () => convex.query(api.courtSettings.get, {}),
+          payloadCourtSettings: body.courtSettings,
         });
+
+        const jurisdictionProfile = resolveJurisdictionProfile(effectiveSettings, parsed);
+        const formattingRules = toCourtFormattingRules(jurisdictionProfile);
+
+        console.log(`[QuickGen:${requestId}] jurisdiction=${jurisdictionProfile.key}, profile="${jurisdictionProfile.name}"`);
+
+        if (isAborted()) return;
+
+        // ── Step 3b: Render Legal HTML ──
+        const html = renderLegalDocumentHTML(parsed, jurisdictionProfile);
 
         if (!html || html.trim().length < 200) {
           throw new Error('Rendered HTML is empty or too small.');
         }
+
+        // Resolve title for artifact metadata
+        const defaultTitle = template.sections.find(s => s.type === 'title')?.title ?? template.title;
+        const titleText = parsed.title.main !== 'UNTITLED DOCUMENT' ? parsed.title.main : defaultTitle;
+        const causeNumber = parsed.metadata.causeNumber;
 
         sendProgress('formatting', 'Applying Court Formatting', 60);
 
@@ -204,7 +208,7 @@ export async function POST(request: NextRequest) {
 
         if (isAborted()) return;
 
-        quickComplianceCheck(html, rules);
+        quickComplianceCheck(html, formattingRules);
 
         sendProgress('compliance', 'NEXXverification Compliance', 75);
 
@@ -213,10 +217,10 @@ export async function POST(request: NextRequest) {
 
         if (isAborted()) return;
 
-        const pdfBuffer = await renderHTMLToPDF(html, rules, caption.causeNumber);
+        const pdfBuffer = await renderHTMLToPDF(html, formattingRules, causeNumber);
         const { byteLength, sha256 } = validatePdfBuffer(pdfBuffer);
 
-        const filename = buildPdfFilename(titleText, caption.causeNumber);
+        const filename = generateLegalFilename(parsed);
 
         console.log(`[QuickGen:${requestId}] PDF validated: ${byteLength} bytes, sha256=${sha256.slice(0, 12)}…`);
 
@@ -267,9 +271,9 @@ export async function POST(request: NextRequest) {
           caseType: body.caseType,
           courtState: normalizedState,
           courtCounty: normalizedCounty,
-          petitionerName: petitionerData.name,
-          respondentName: normalized.respondentName ?? body.respondent?.name,
-          causeNumber: caption.causeNumber !== '_______________' ? caption.causeNumber : undefined,
+          petitionerName: body.petitioner.name,
+          respondentName: parsed.metadata.causeNumber ? body.respondent?.name : undefined,
+          causeNumber: causeNumber,
         });
 
         console.log(`[QuickGen:${requestId}] Artifact stored: ${artifact.artifactId}`);
@@ -319,65 +323,4 @@ export async function POST(request: NextRequest) {
       'X-Accel-Buffering': 'no',
     },
   });
-}
-
-
-/** Build a default caption from the request data for the streaming generation route. */
-function buildStreamCaption(
-  body: DocumentGenerationRequest,
-  normalizedState: string,
-  normalizedCounty: string,
-): CaptionData {
-  const { courtSettings, petitioner, respondent, children, caseType } = body;
-
-  const isSAPCR = ['divorce_with_children', 'custody_establishment', 'custody_modification', 'sapcr', 'child_support', 'child_support_modification', 'visitation', 'relocation'].includes(caseType);
-
-  /** Filter to children with valid name strings to prevent runtime crashes. */
-  const validChildren = (children ?? []).filter(
-    (c): c is { name: string } => typeof c?.name === 'string' && c.name.trim().length > 0
-  );
-
-  let leftLines: string[];
-  if (isSAPCR && validChildren.length > 0) {
-    leftLines = ['IN THE INTEREST OF', '', ...validChildren.map(c => `${c.name.toUpperCase()},`), '', validChildren.length === 1 ? 'A CHILD' : 'CHILDREN'];
-  } else {
-    leftLines = [`${petitioner.name.toUpperCase()},`, 'Petitioner', '', 'v.', '', `${respondent?.name?.toUpperCase() ?? 'RESPONDENT'},`, 'Respondent'];
-  }
-
-  const trimmedCourtName = courtSettings.courtName?.trim();
-  const rightLines = [
-    trimmedCourtName
-      ? `IN THE ${trimmedCourtName.toUpperCase()}`
-      : 'IN THE DISTRICT COURT',
-    courtSettings.judicialDistrict?.toUpperCase() ?? '',
-    normalizedCounty
-      ? `${normalizedCounty.toUpperCase()} COUNTY, ${normalizedState.toUpperCase()}`
-      : normalizedState.toUpperCase(),
-  ].filter(Boolean);
-
-  return {
-    causeNumber: body.caption?.causeNumber ?? '_______________',
-    leftLines,
-    rightLines,
-    style: normalizedState === 'Texas' ? 'section-symbol' : 'versus',
-  };
-}
-
-/** Build a descriptive PDF filename from the document title and cause number. */
-function buildPdfFilename(title: string, causeNumber?: string): string {
-  const safeTitle = (title || 'document')
-    .replace(/[^\w\- ]+/g, '')
-    .trim()
-    .replace(/\s+/g, '_')
-    .slice(0, 80);
-
-  const cause = (causeNumber && causeNumber !== '_______________')
-    ? causeNumber.replace(/[^\w\-]+/g, '_').slice(0, 50)
-    : '';
-
-  const datePart = new Date().toISOString().slice(0, 10);
-
-  return cause
-    ? `${safeTitle}_${cause}_${datePart}.pdf`
-    : `${safeTitle}_${datePart}.pdf`;
 }

@@ -219,7 +219,10 @@ function applyFormattingOverrides(
       fontSizePt: overrides.fontSize ?? base.typography.fontSizePt,
       lineHeightPt: overrides.lineSpacing
         ? Math.round((overrides.fontSize ?? base.typography.fontSizePt) * overrides.lineSpacing)
-        : base.typography.lineHeightPt,
+        : overrides.fontSize
+          // fontSize changed but lineSpacing not specified — preserve base ratio
+          ? Math.round(overrides.fontSize * (base.typography.lineHeightPt / base.typography.fontSizePt))
+          : base.typography.lineHeightPt,
       bodyAlign: overrides.bodyAlignment ?? base.typography.bodyAlign,
     },
     caption: {

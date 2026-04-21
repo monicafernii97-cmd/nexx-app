@@ -229,24 +229,58 @@ function splitTexasCaptionLine(line: string): { left: string; center: string; ri
 function tryFederalCaption(lines: string[]): CaptionBlock | null {
   const causeLine = lines.find((l) => CAUSE_RE.test(l) || DOCKET_RE.test(l));
   const courtLines = lines.filter((l) => /COURT/i.test(l));
-  const versusIndex = lines.findIndex((l) => /^v\.?$|^vs\.?$/i.test(l) || /\bv\.\b/i.test(l));
 
-  if (versusIndex === -1 || !courtLines.length) return null;
+  // Try standalone "v." or "vs." line first
+  let versusIndex = lines.findIndex((l) => /^v\.?$|^vs\.?$/i.test(l));
 
-  const leftLines = lines
-    .slice(0, versusIndex)
-    .filter((l) => !CAUSE_RE.test(l) && !DOCKET_RE.test(l));
-  const rightLines = [
-    ...courtLines,
-    ...lines.filter((l) => /Civil Action|Case No|Judge|Division/i.test(l)),
-  ];
+  if (versusIndex !== -1 && courtLines.length) {
+    const leftLines = lines
+      .slice(0, versusIndex)
+      .filter((l) => !CAUSE_RE.test(l) && !DOCKET_RE.test(l));
+    const rightLines = [
+      ...courtLines,
+      ...lines.filter((l) => /Civil Action|Case No|Judge|Division/i.test(l)),
+    ];
 
-  return {
-    causeLine,
-    leftLines: dedupePreserve(leftLines).slice(-6),
-    centerLines: ['v.'],
-    rightLines: dedupePreserve(rightLines).slice(0, 6),
-  };
+    return {
+      causeLine,
+      leftLines: dedupePreserve(leftLines).slice(-6),
+      centerLines: ['v.'],
+      rightLines: dedupePreserve(rightLines).slice(0, 6),
+    };
+  }
+
+  // Try inline "v." or "vs." within a line (e.g., "JANE DOE v. JOHN SMITH")
+  const inlineVersusRe = /\b(v\.?|vs\.?)\b/i;
+  const inlineIndex = lines.findIndex((l) => inlineVersusRe.test(l) && !CAUSE_RE.test(l) && !DOCKET_RE.test(l));
+
+  if (inlineIndex !== -1 && courtLines.length) {
+    const line = lines[inlineIndex];
+    const match = line.match(inlineVersusRe);
+    if (match && match.index != null) {
+      const leftPart = line.slice(0, match.index).trim();
+      const rightPart = line.slice(match.index + match[0].length).trim();
+
+      const leftLines = [
+        ...lines.slice(0, inlineIndex).filter((l) => !CAUSE_RE.test(l) && !DOCKET_RE.test(l) && !/COURT/i.test(l)),
+        ...(leftPart ? [leftPart] : []),
+      ];
+      const rightLines = [
+        ...(rightPart ? [rightPart] : []),
+        ...courtLines,
+        ...lines.filter((l) => /Civil Action|Case No|Judge|Division/i.test(l)),
+      ];
+
+      return {
+        causeLine,
+        leftLines: dedupePreserve(leftLines).slice(-6),
+        centerLines: ['v.'],
+        rightLines: dedupePreserve(rightLines).slice(0, 6),
+      };
+    }
+  }
+
+  return null;
 }
 
 /** Try to extract a generic state-style caption. */

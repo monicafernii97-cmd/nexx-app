@@ -140,9 +140,6 @@ export async function POST(request: NextRequest) {
 
         if (isAborted()) return;
 
-        const normalizedState = titleCase(body.courtSettings.state);
-        const normalizedCounty = titleCase(body.courtSettings.county);
-
         sendProgress('analyzing', 'Analyzing Legal Frameworks', 20);
 
         // ── Step 2: Parse Legal Document ──
@@ -150,12 +147,15 @@ export async function POST(request: NextRequest) {
 
         // Flatten raw pasted content into a single string for parsing
         const rawText = Array.isArray(body.bodyContent)
-          ? (body.bodyContent as Array<{ heading?: string; paragraphs?: string[]; content?: string }>)
+          ? (body.bodyContent as Array<{ heading?: string; paragraphs?: string[]; content?: string; numberedItems?: string[] }>)
               .flatMap(item => {
                 const parts: string[] = [];
                 if (item.heading) parts.push(item.heading);
                 if (item.paragraphs) parts.push(...item.paragraphs);
                 if (item.content) parts.push(item.content);
+                if (item.numberedItems) {
+                  parts.push(...item.numberedItems.map((ni, idx) => `${idx + 1}. ${ni}`));
+                }
                 return parts;
               })
               .join('\n')
@@ -199,15 +199,23 @@ export async function POST(request: NextRequest) {
         if (isAborted()) return;
 
         // ── Step 3b: Render Legal HTML ──
+        // Apply title fallback so render + filename get the resolved title
+        const defaultTitle = template.sections.find(s => s.type === 'title')?.title ?? template.title;
+        if (parsed.title.main === 'UNTITLED DOCUMENT') {
+          parsed.title = { ...parsed.title, main: defaultTitle };
+        }
+        const titleText = parsed.title.main;
+
         const html = renderLegalDocumentHTML(parsed, jurisdictionProfile);
 
         if (!html || html.trim().length < 200) {
           throw new Error('Rendered HTML is empty or too small.');
         }
 
-        // Resolve title for artifact metadata
-        const defaultTitle = template.sections.find(s => s.type === 'title')?.title ?? template.title;
-        const titleText = parsed.title.main !== 'UNTITLED DOCUMENT' ? parsed.title.main : defaultTitle;
+        // Derive venue metadata from effective settings (canonical source)
+        const normalizedState = effectiveSettings?.state ? titleCase(effectiveSettings.state) : titleCase(body.courtSettings.state);
+        const normalizedCounty = effectiveSettings?.county ? titleCase(effectiveSettings.county) : titleCase(body.courtSettings.county);
+
         const causeNumber = parsed.metadata.causeNumber;
 
         sendProgress('formatting', 'Applying Court Formatting', 60);

@@ -269,12 +269,15 @@ export async function POST(request: NextRequest) {
 
     // Flatten bodyContent into raw text for the legal document parser
     const rawText = Array.isArray(bodyContent)
-      ? (bodyContent as Array<{ heading?: string; paragraphs?: string[]; content?: string }>)
+      ? (bodyContent as Array<{ heading?: string; paragraphs?: string[]; content?: string; numberedItems?: string[] }>)
           .flatMap(item => {
             const parts: string[] = [];
             if (item.heading) parts.push(item.heading);
             if (item.paragraphs) parts.push(...item.paragraphs);
             if (item.content) parts.push(item.content);
+            if (item.numberedItems) {
+              parts.push(...item.numberedItems.map((ni, idx) => `${idx + 1}. ${ni}`));
+            }
             return parts;
           })
           .join('\n')
@@ -288,8 +291,16 @@ export async function POST(request: NextRequest) {
       console.warn('[DocuVault] preflight warnings:', preflight.warnings);
     }
 
+    // Apply title fallback so render + filename use the resolved title
+    if (parsed.title.main === 'UNTITLED DOCUMENT') {
+      parsed.title = { ...parsed.title, main: titleText };
+    }
+
     // ── 6. Resolve Jurisdiction Profile ──
     // Canonical precedence: Convex saved settings → payload → default
+    // Note: effectiveSettings is intentionally resolved after AI drafting.
+    // The drafter uses template rules (getMergedRules), not jurisdiction profiles.
+    // Jurisdiction profiles only drive HTML rendering + PDF output.
     let effectiveSettings;
     try {
       const convex = await getAuthenticatedConvexClient();

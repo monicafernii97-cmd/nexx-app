@@ -22,23 +22,39 @@ export type PinConfidence = 'low' | 'medium' | 'high';
 // Runtime Constants (shared across Next.js-side files)
 // ═══════════════════════════════════════════════════════════════
 
+/** UI metadata for each pinnable type. */
+export interface PinOptionConfig {
+  type: PinnableType;
+  label: string;
+  emoji: string;
+}
+
 /**
- * Canonical set of valid pin types for runtime validation.
+ * Canonical ordered list of pin types with display metadata.
  *
- * Single source of truth for Next.js-side code. Convex validators
- * maintain their own copy due to the server isolation boundary.
+ * Single source of truth for Next.js-side code. Used by:
+ *  - PinToWorkspaceModal (UI selector chips)
+ *  - VALID_PIN_TYPES (runtime validation set)
+ *  - PinnedItemsRail (type badge labels)
+ *
+ * Convex validators maintain their own copy due to the server isolation boundary.
  */
-export const VALID_PIN_TYPES = new Set<string>([
-  'key_fact',
-  'strategy_point',
-  'good_faith_point',
-  'strength_highlight',
-  'risk_concern',
-  'hearing_prep_point',
-  'draft_snippet',
-  'question_to_verify',
-  'timeline_anchor',
-]);
+export const PIN_OPTIONS_CONFIG: readonly PinOptionConfig[] = [
+  { type: 'key_fact', label: 'Key Fact', emoji: '📌' },
+  { type: 'strategy_point', label: 'Strategy Point', emoji: '♟️' },
+  { type: 'good_faith_point', label: 'Good-Faith Point', emoji: '🤝' },
+  { type: 'strength_highlight', label: 'Strength', emoji: '💪' },
+  { type: 'risk_concern', label: 'Risk / Concern', emoji: '⚠️' },
+  { type: 'hearing_prep_point', label: 'Hearing Prep', emoji: '🏛️' },
+  { type: 'draft_snippet', label: 'Draft Snippet', emoji: '✍️' },
+  { type: 'question_to_verify', label: 'Question to Verify', emoji: '❓' },
+  { type: 'timeline_anchor', label: 'Timeline Anchor', emoji: '📅' },
+] as const;
+
+/** Derived validation set — always in sync with PIN_OPTIONS_CONFIG. */
+export const VALID_PIN_TYPES = new Set<string>(
+  PIN_OPTIONS_CONFIG.map(o => o.type),
+);
 
 /** Canonical set of valid confidence levels for runtime validation. */
 export const VALID_CONFIDENCE = new Set<string>(['low', 'medium', 'high']);

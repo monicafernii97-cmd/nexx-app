@@ -11,7 +11,7 @@
  * the `onAction` handler to AssistantMessageCard → ContextualActionBar.
  */
 
-import { useState, useCallback, type ReactNode } from 'react';
+import { useState, useCallback, useRef, type ReactNode } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { ActionType, PanelData } from '@/lib/ui-intelligence/types';
@@ -91,6 +91,8 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
         detectedDate?: string | null;
         aiVersion?: string;
     }>({});
+    /** Monotonic counter to discard stale autofill responses. */
+    const autofillRequestToken = useRef(0);
 
     // ── Copy to clipboard ──
     const handleCopy = useCallback(
@@ -189,8 +191,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
     // ── Fetch pin autofill from API ──
     const fetchPinAutofill = useCallback(
         async (rawText: string, pinType: PinnableType = DEFAULT_PIN_TYPE) => {
-            // Record which type we’re formatting for
-            setAutofilledType(pinType);
+            const token = ++autofillRequestToken.current;
             try {
                 const res = await fetch('/api/pins/autofill', {
                     method: 'POST',
@@ -204,6 +205,11 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
                 const result = (await res.json()) as PinAutofillResult;
+
+                // Only apply if this is still the latest request
+                if (token !== autofillRequestToken.current) return;
+
+                setAutofilledType(result.pinType);
                 setModalSeedTitle(result.title);
                 setModalSeedContent(result.content);
                 setAutofillMeta({
@@ -212,10 +218,13 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                     aiVersion: result.aiVersion,
                 });
             } catch (err) {
+                if (token !== autofillRequestToken.current) return;
                 console.warn('[WorkspaceClient] Pin autofill failed, using raw text', err);
                 // Fallback: keep raw text already set
             } finally {
-                setIsAutofilling(false);
+                if (token === autofillRequestToken.current) {
+                    setIsAutofilling(false);
+                }
             }
         },
         [],

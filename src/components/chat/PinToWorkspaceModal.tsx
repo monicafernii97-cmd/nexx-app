@@ -19,28 +19,13 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, PushPin, Check, ArrowsClockwise } from '@phosphor-icons/react';
 import type { PinnableType } from '@/lib/integration/types';
+import { PIN_OPTIONS_CONFIG } from '@/lib/pins/types';
 
 // ---------------------------------------------------------------------------
-// Pin type options
+// Pin type options — derived from shared config (single source of truth)
 // ---------------------------------------------------------------------------
 
-interface PinOption {
-    type: PinnableType;
-    label: string;
-    emoji: string;
-}
-
-const PIN_OPTIONS: PinOption[] = [
-    { type: 'key_fact', label: 'Key Fact', emoji: '📌' },
-    { type: 'strategy_point', label: 'Strategy Point', emoji: '♟️' },
-    { type: 'good_faith_point', label: 'Good-Faith Point', emoji: '🤝' },
-    { type: 'strength_highlight', label: 'Strength', emoji: '💪' },
-    { type: 'risk_concern', label: 'Risk / Concern', emoji: '⚠️' },
-    { type: 'hearing_prep_point', label: 'Hearing Prep', emoji: '🏛️' },
-    { type: 'draft_snippet', label: 'Draft Snippet', emoji: '✍️' },
-    { type: 'question_to_verify', label: 'Question to Verify', emoji: '❓' },
-    { type: 'timeline_anchor', label: 'Timeline Anchor', emoji: '📅' },
-];
+const PIN_OPTIONS = PIN_OPTIONS_CONFIG;
 
 // ---------------------------------------------------------------------------
 // Skeleton loader for autofill loading state
@@ -336,7 +321,6 @@ export function PinToWorkspaceModal({
                         "
                     >
                         <PinModalForm
-                            key={`${initialContent}-${initialTitle}`}
                             onPin={onPin}
                             initialContent={initialContent}
                             initialTitle={initialTitle}

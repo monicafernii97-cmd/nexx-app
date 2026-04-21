@@ -83,11 +83,14 @@ function PinModalForm({
         if (!isAutofilling) {
             setTitle(initialTitle);
             setContent(initialContent);
-            setTypeChangedSinceAutofill(false);
             // Use the explicit prop — not selectedType — so we track
             // the type the AI actually formatted for, even if the user
             // changed selectedType during the autofill request.
             lastAutofilledType.current = autofilledType;
+            // Only clear the "type changed" flag if the user's current
+            // selection still matches what the AI formatted for.
+            // Otherwise keep it true so the Reformat button stays visible.
+            setTypeChangedSinceAutofill(selectedType !== autofilledType);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialTitle, initialContent, isAutofilling, autofilledType]);

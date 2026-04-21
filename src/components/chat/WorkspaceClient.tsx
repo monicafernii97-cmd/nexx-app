@@ -220,7 +220,9 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
             } catch (err) {
                 if (token !== autofillRequestToken.current) return;
                 console.warn('[WorkspaceClient] Pin autofill failed, using raw text', err);
-                // Fallback: keep raw text already set
+                // Restore raw fallback and clear stale AI metadata
+                setModalSeedContent(rawText);
+                setAutofillMeta({});
             } finally {
                 if (token === autofillRequestToken.current) {
                     setIsAutofilling(false);
@@ -386,6 +388,9 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                 autofilledType={autofilledType}
                 rawSourceText={rawPinSource}
                 onReformat={(pinType) => {
+                    // Clear stale AI metadata and restore raw fallback before re-running
+                    setAutofillMeta({});
+                    setModalSeedContent(rawPinSource);
                     setIsAutofilling(true);
                     fetchPinAutofill(rawPinSource, pinType);
                 }}

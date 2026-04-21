@@ -312,7 +312,7 @@ export async function POST(request: NextRequest) {
       // Reject AI-generated documents that are missing required structural blocks
       // (caption, signature, certificate) since the parser/render path won't synthesize them.
       const critical = (preflight.warnings ?? []).filter(
-        (w: string) => /missing|no .*(caption|signature|certificate)/i.test(w)
+        (w: string) => /(caption|signature|certificate).*not detected/i.test(w)
       );
       if (critical.length > 0) {
         return NextResponse.json(

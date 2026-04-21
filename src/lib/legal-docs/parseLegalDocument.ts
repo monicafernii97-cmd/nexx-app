@@ -231,7 +231,7 @@ function tryFederalCaption(lines: string[]): CaptionBlock | null {
   const courtLines = lines.filter((l) => /COURT/i.test(l));
 
   // Try standalone "v." or "vs." line first
-  let versusIndex = lines.findIndex((l) => /^v\.?$|^vs\.?$/i.test(l));
+  const versusIndex = lines.findIndex((l) => /^v\.?$|^vs\.?$/i.test(l));
 
   if (versusIndex !== -1 && courtLines.length) {
     const leftLines = lines

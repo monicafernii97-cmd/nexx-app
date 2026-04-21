@@ -293,8 +293,10 @@ export function toCourtFormattingRules(profile: JurisdictionProfile): CourtForma
     spacingBetweenParagraphs: 1,
 
     // ── Required Sections ──
-    requiresCertificateOfService: profile.sections.certificateSeparatePage,
-    requiresSignatureBlock: profile.sections.signatureKeepTogether,
+    // These are validation flags (does the court require these sections?),
+    // not layout flags. Most US jurisdictions require both.
+    requiresCertificateOfService: true,
+    requiresSignatureBlock: true,
     requiresVerification: false,
     requiresCivilCaseInfoSheet: false,
 

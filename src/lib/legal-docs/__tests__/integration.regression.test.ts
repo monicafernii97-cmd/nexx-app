@@ -84,10 +84,8 @@ describeIfChrome('integration regression — multi-state legal PDF generation', 
     const { renderHTMLToPDF } = await import('@/lib/legal/pdfRenderer');
 
     const doc = parseLegalDocument(federalPleadingFixture);
-    const profile = resolveJurisdictionProfile({
-      state: 'Texas',
-      county: '',
-    });
+    // Use us-default profile for federal pleading — not Texas
+    const profile = resolveJurisdictionProfile(null);
     const rules = toCourtFormattingRules(profile);
     const html = renderLegalDocumentHTML(doc, profile);
     const pdf = await renderHTMLToPDF(html, rules);

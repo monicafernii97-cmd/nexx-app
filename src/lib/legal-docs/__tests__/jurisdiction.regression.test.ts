@@ -14,12 +14,11 @@ describe('jurisdiction profile regression — multi-state pleadings', () => {
   it('applies Texas profile for Texas settings', () => {
     const profile = resolveJurisdictionProfile({
       state: 'Texas',
-      county: 'Fort Bend',
-      courtName: '387th Judicial District Court',
-      judicialDistrict: '387th Judicial District',
+      county: 'Harris',
+      courtName: 'District Court',
     });
 
-    expect(profile.key).toContain('tx');
+    expect(profile.key).toBe('tx-default');
     expect(profile.caption.style).toBe('texas_pleading');
     expect(profile.caption.useThreeColumnTable).toBe(true);
   });

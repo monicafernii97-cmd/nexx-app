@@ -126,7 +126,7 @@ describe('parser regression — multi-state pleadings', () => {
     expect(doc.title.main).toContain('MOTION FOR LEAVE TO AMEND');
   });
 
-  it('extracts federal cause number when present as Civil Action No.', () => {
+  it('parses federal pleading even though Civil Action No. is not yet extracted', () => {
     const doc = parseLegalDocument(federalPleadingFixture);
 
     // Parser currently does not recognize "Civil Action No." format.

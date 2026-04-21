@@ -10,23 +10,32 @@ import { describe, it, expect } from 'vitest';
 import { parseLegalDocument } from '../parseLegalDocument';
 import { renderLegalDocumentHTML } from '../renderLegalDocumentHTML';
 import { resolveJurisdictionProfile } from '../jurisdiction/resolveJurisdictionProfile';
+import type { SavedCourtSettings } from '../jurisdiction/resolveJurisdictionProfile';
 
 import { texasPleadingFixture } from './fixtures/texas-pleading';
 import { floridaPleadingFixture } from './fixtures/florida-pleading';
 import { californiaPleadingFixture } from './fixtures/california-pleading';
 import { federalPleadingFixture } from './fixtures/federal-pleading';
 
+/**
+ * Render a fixture through the full parse → profile → HTML pipeline.
+ * Reduces repeated boilerplate across test cases.
+ */
+function renderFixture(fixture: string, settings: SavedCourtSettings) {
+  const doc = parseLegalDocument(fixture);
+  const profile = resolveJurisdictionProfile(settings);
+  const html = renderLegalDocumentHTML(doc, profile);
+  return { doc, profile, html };
+}
+
 describe('renderer regression — multi-state pleadings', () => {
   // ── Texas ──
 
   it('renders Texas caption as a three-column pleading table', () => {
-    const doc = parseLegalDocument(texasPleadingFixture);
-    const profile = resolveJurisdictionProfile({
+    const { html } = renderFixture(texasPleadingFixture, {
       state: 'Texas',
       county: 'Fort Bend',
     });
-
-    const html = renderLegalDocumentHTML(doc, profile);
 
     expect(html).toContain('caption-table');
     expect(html).toContain('caption-left');
@@ -35,52 +44,40 @@ describe('renderer regression — multi-state pleadings', () => {
   });
 
   it('renders Texas title and subtitle in output', () => {
-    const doc = parseLegalDocument(texasPleadingFixture);
-    const profile = resolveJurisdictionProfile({
+    const { html } = renderFixture(texasPleadingFixture, {
       state: 'Texas',
       county: 'Fort Bend',
     });
-
-    const html = renderLegalDocumentHTML(doc, profile);
 
     expect(html).toContain('MOTION FOR TEMPORARY ORDERS');
     expect(html).toContain('Pending Final Hearing');
   });
 
   it('renders PRAYER heading when prayer block exists', () => {
-    const doc = parseLegalDocument(texasPleadingFixture);
-    const profile = resolveJurisdictionProfile({
+    const { html } = renderFixture(texasPleadingFixture, {
       state: 'Texas',
       county: 'Fort Bend',
     });
-
-    const html = renderLegalDocumentHTML(doc, profile);
 
     expect(html).toContain('PRAYER');
     expect(html).toContain('prayer-heading');
   });
 
   it('renders numbered lists as structured list blocks', () => {
-    const doc = parseLegalDocument(texasPleadingFixture);
-    const profile = resolveJurisdictionProfile({
+    const { html } = renderFixture(texasPleadingFixture, {
       state: 'Texas',
       county: 'Fort Bend',
     });
-
-    const html = renderLegalDocumentHTML(doc, profile);
 
     expect(html).toContain('numbered-list');
     expect(html).toContain('<li>1.');
   });
 
   it('renders bullet lists as structured bullet blocks', () => {
-    const doc = parseLegalDocument(texasPleadingFixture);
-    const profile = resolveJurisdictionProfile({
+    const { html } = renderFixture(texasPleadingFixture, {
       state: 'Texas',
       county: 'Fort Bend',
     });
-
-    const html = renderLegalDocumentHTML(doc, profile);
 
     expect(html).toContain('bullet-list');
   });
@@ -88,13 +85,10 @@ describe('renderer regression — multi-state pleadings', () => {
   // ── Cross-Jurisdiction Guard ──
 
   it('does not render Florida pleading with Texas three-column table', () => {
-    const doc = parseLegalDocument(floridaPleadingFixture);
-    const profile = resolveJurisdictionProfile({
+    const { profile, html } = renderFixture(floridaPleadingFixture, {
       state: 'Florida',
       county: 'Miami-Dade',
     });
-
-    const html = renderLegalDocumentHTML(doc, profile);
 
     expect(profile.caption.useThreeColumnTable).toBe(false);
     // No three-column table element should be present
@@ -102,13 +96,10 @@ describe('renderer regression — multi-state pleadings', () => {
   });
 
   it('does not render California pleading with Texas three-column table', () => {
-    const doc = parseLegalDocument(californiaPleadingFixture);
-    const profile = resolveJurisdictionProfile({
+    const { profile, html } = renderFixture(californiaPleadingFixture, {
       state: 'California',
       county: 'Los Angeles',
     });
-
-    const html = renderLegalDocumentHTML(doc, profile);
 
     expect(profile.caption.style).not.toBe('texas_pleading');
     // No three-column table element should be present
@@ -116,13 +107,8 @@ describe('renderer regression — multi-state pleadings', () => {
   });
 
   it('renders federal pleading title correctly', () => {
-    const doc = parseLegalDocument(federalPleadingFixture);
-    const profile = resolveJurisdictionProfile({
-      state: 'Texas',
-      county: '',
-    });
-
-    const html = renderLegalDocumentHTML(doc, profile);
+    // Use us-default profile for federal pleading
+    const { html } = renderFixture(federalPleadingFixture, null);
 
     expect(html).toContain('MOTION FOR LEAVE TO AMEND');
   });

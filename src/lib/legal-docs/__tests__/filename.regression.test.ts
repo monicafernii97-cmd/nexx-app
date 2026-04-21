@@ -70,4 +70,14 @@ describe('filename regression — multi-state pleadings', () => {
       expect(generateLegalFilename(doc)).toMatch(/\.pdf$/);
     }
   });
+
+  it('generates filename without trailing separator when cause number is missing', () => {
+    const doc = parseLegalDocument(genericStatePleadingFixture);
+    doc.metadata.causeNumber = undefined;
+    const filename = generateLegalFilename(doc);
+
+    expect(filename).toMatch(/^[A-Z0-9_]+\.pdf$/);
+    expect(filename).not.toContain('__');
+    expect(filename).not.toMatch(/_\.pdf$/);
+  });
 });

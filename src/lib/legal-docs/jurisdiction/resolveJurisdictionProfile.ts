@@ -16,7 +16,7 @@
  *   3. tx-fort-bend-387th — Texas Fort Bend County 387th
  */
 
-import type { JurisdictionProfile } from './types';
+import type { JurisdictionProfile, CourtSettings } from './types';
 import type { CourtFormattingRules } from '@/lib/legal/types';
 
 // ═══════════════════════════════════════════════════════════════
@@ -375,6 +375,96 @@ export async function getEffectiveCourtSettings({
   // 3. No settings available — resolver will use default profile
   console.log('[LegalDocs] No court settings found, using default jurisdiction profile');
   return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Domain Converter: SavedCourtSettings → CourtSettings
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Map Convex-native SavedCourtSettings to the clean external CourtSettings contract.
+ *
+ * This bridges the storage shape (Convex record) and the domain shape
+ * (used by routes, export pipelines, and external integrations).
+ *
+ * Returns a minimal fallback if saved is null/undefined.
+ */
+export function mapSavedToCourtSettings(
+  saved: SavedCourtSettings,
+): CourtSettings {
+  if (!saved) {
+    return { jurisdiction: {} };
+  }
+
+  const overrides = saved.formattingOverrides;
+
+  return {
+    jurisdiction: {
+      country: 'United States',
+      state: saved.state || undefined,
+      county: saved.county || undefined,
+      courtName: saved.courtName,
+      district: saved.judicialDistrict,
+    },
+    formatting: overrides
+      ? {
+          pleadingStyle: overrides.captionStyle === 'section-symbol'
+            ? 'caption_table'
+            : overrides.captionStyle === 'versus'
+              ? 'federal_caption'
+              : overrides.captionStyle === 'centered'
+                ? 'simple_caption'
+                : undefined,
+          defaultFont: overrides.fontFamily
+            ? `"${overrides.fontFamily}", Times, serif`
+            : undefined,
+          defaultFontSizePt: overrides.fontSize,
+          lineSpacing: overrides.lineSpacing,
+          pageSize: overrides.paperHeight === 14
+            ? 'LEGAL'
+            : overrides.paperHeight === 11 || !overrides.paperHeight
+              ? 'LETTER'
+              : undefined,
+          pageMarginsPt:
+            overrides.marginTop != null
+              ? {
+                  top: Math.round((overrides.marginTop ?? 1) * 72),
+                  right: Math.round((overrides.marginRight ?? 1) * 72),
+                  bottom: Math.round((overrides.marginBottom ?? 1) * 72),
+                  left: Math.round((overrides.marginLeft ?? 1) * 72),
+                }
+              : undefined,
+        }
+      : undefined,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Ergonomic Loader Wrapper
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Load court settings for a user/case and return the clean domain contract.
+ *
+ * This is the preferred entry point for routes and pipelines.
+ * Internally delegates to `getEffectiveCourtSettings()`, then maps
+ * the result to `CourtSettings`.
+ *
+ * @param convexQuery - Async function to query Convex for saved settings
+ * @param payloadFallback - Optional fallback from request body
+ */
+export async function loadCourtSettings({
+  convexQuery,
+  payloadFallback,
+}: {
+  convexQuery: () => Promise<SavedCourtSettings>;
+  payloadFallback?: Record<string, unknown> | null;
+}): Promise<CourtSettings> {
+  const saved = await getEffectiveCourtSettings({
+    convexQuery,
+    payloadCourtSettings: payloadFallback,
+  });
+  return mapSavedToCourtSettings(saved);
 }
 
 // ═══════════════════════════════════════════════════════════════

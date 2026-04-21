@@ -416,3 +416,100 @@ describe('reusability across motion types', () => {
     expect(doc.title.main).toContain('NOTICE OF HEARING');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// mapSavedToCourtSettings Tests
+// ═══════════════════════════════════════════════════════════════
+
+import { mapSavedToCourtSettings } from '../jurisdiction/resolveJurisdictionProfile';
+
+describe('mapSavedToCourtSettings', () => {
+  it('returns minimal fallback for null saved settings', () => {
+    const result = mapSavedToCourtSettings(null);
+    expect(result).toEqual({ jurisdiction: {} });
+  });
+
+  it('returns minimal fallback for undefined saved settings', () => {
+    const result = mapSavedToCourtSettings(undefined);
+    expect(result).toEqual({ jurisdiction: {} });
+  });
+
+  it('maps basic court identity fields', () => {
+    const result = mapSavedToCourtSettings({
+      state: 'Texas',
+      county: 'Fort Bend',
+      courtName: '387th Judicial District Court',
+      judicialDistrict: '387th Judicial District',
+    });
+
+    expect(result.jurisdiction.country).toBe('United States');
+    expect(result.jurisdiction.state).toBe('Texas');
+    expect(result.jurisdiction.county).toBe('Fort Bend');
+    expect(result.jurisdiction.courtName).toBe('387th Judicial District Court');
+    expect(result.jurisdiction.district).toBe('387th Judicial District');
+  });
+
+  it('maps formatting overrides when present', () => {
+    const result = mapSavedToCourtSettings({
+      state: 'Texas',
+      county: 'Fort Bend',
+      formattingOverrides: {
+        captionStyle: 'section-symbol',
+        fontFamily: 'Arial',
+        fontSize: 14,
+        lineSpacing: 2.0,
+        marginTop: 1.0,
+        marginRight: 1.0,
+        marginBottom: 1.0,
+        marginLeft: 1.0,
+      },
+    });
+
+    expect(result.formatting).toBeDefined();
+    expect(result.formatting!.pleadingStyle).toBe('caption_table');
+    expect(result.formatting!.defaultFont).toBe('"Arial", Times, serif');
+    expect(result.formatting!.defaultFontSizePt).toBe(14);
+    expect(result.formatting!.lineSpacing).toBe(2.0);
+    expect(result.formatting!.pageMarginsPt).toEqual({
+      top: 72,
+      right: 72,
+      bottom: 72,
+      left: 72,
+    });
+  });
+
+  it('maps versus captionStyle to federal_caption', () => {
+    const result = mapSavedToCourtSettings({
+      state: 'California',
+      county: 'Los Angeles',
+      formattingOverrides: { captionStyle: 'versus' },
+    });
+    expect(result.formatting!.pleadingStyle).toBe('federal_caption');
+  });
+
+  it('maps centered captionStyle to simple_caption', () => {
+    const result = mapSavedToCourtSettings({
+      state: 'Florida',
+      county: 'Miami-Dade',
+      formattingOverrides: { captionStyle: 'centered' },
+    });
+    expect(result.formatting!.pleadingStyle).toBe('simple_caption');
+  });
+
+  it('omits formatting when no overrides present', () => {
+    const result = mapSavedToCourtSettings({
+      state: 'Texas',
+      county: 'Harris',
+    });
+    expect(result.formatting).toBeUndefined();
+  });
+
+  it('detects LEGAL page size from paperHeight', () => {
+    const result = mapSavedToCourtSettings({
+      state: 'Texas',
+      county: 'Fort Bend',
+      formattingOverrides: { paperHeight: 14 },
+    });
+    expect(result.formatting!.pageSize).toBe('LEGAL');
+  });
+});

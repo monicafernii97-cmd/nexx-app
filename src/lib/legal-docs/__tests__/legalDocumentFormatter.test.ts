@@ -512,4 +512,27 @@ describe('mapSavedToCourtSettings', () => {
     });
     expect(result.formatting!.pageSize).toBe('LEGAL');
   });
+
+  it('produces margins when only right and left are overridden', () => {
+    const result = mapSavedToCourtSettings({
+      state: 'Texas',
+      county: 'Fort Bend',
+      formattingOverrides: { marginRight: 1.5, marginLeft: 1.5 },
+    });
+    expect(result.formatting!.pageMarginsPt).toEqual({
+      top: 72,       // default 1in * 72
+      right: 108,    // 1.5in * 72
+      bottom: 72,    // default 1in * 72
+      left: 108,     // 1.5in * 72
+    });
+  });
+
+  it('returns undefined pageSize for non-standard paperHeight', () => {
+    const result = mapSavedToCourtSettings({
+      state: 'Texas',
+      county: 'Fort Bend',
+      formattingOverrides: { paperHeight: 12.5 },
+    });
+    expect(result.formatting!.pageSize).toBeUndefined();
+  });
 });

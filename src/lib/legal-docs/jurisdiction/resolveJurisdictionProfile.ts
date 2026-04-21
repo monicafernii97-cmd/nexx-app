@@ -426,7 +426,10 @@ export function mapSavedToCourtSettings(
               ? 'LETTER'
               : undefined,
           pageMarginsPt:
-            overrides.marginTop != null
+            overrides.marginTop != null ||
+            overrides.marginRight != null ||
+            overrides.marginBottom != null ||
+            overrides.marginLeft != null
               ? {
                   top: Math.round((overrides.marginTop ?? 1) * 72),
                   right: Math.round((overrides.marginRight ?? 1) * 72),
@@ -460,9 +463,25 @@ export async function loadCourtSettings({
   convexQuery: () => Promise<SavedCourtSettings>;
   payloadFallback?: Record<string, unknown> | null;
 }): Promise<CourtSettings> {
+  // Normalize CourtSettings-shaped payloads ({ jurisdiction: { ... } })
+  // into the flat shape that getEffectiveCourtSettings expects.
+  const normalizedFallback: Record<string, unknown> | null | undefined = (() => {
+    if (!payloadFallback || typeof payloadFallback !== 'object') return payloadFallback;
+
+    const j = payloadFallback.jurisdiction as Record<string, unknown> | undefined;
+    if (!j || typeof j !== 'object') return payloadFallback;
+
+    return {
+      state: typeof j.state === 'string' ? j.state : '',
+      county: typeof j.county === 'string' ? j.county : '',
+      courtName: typeof j.courtName === 'string' ? j.courtName : undefined,
+      judicialDistrict: typeof j.district === 'string' ? j.district : undefined,
+    };
+  })();
+
   const saved = await getEffectiveCourtSettings({
     convexQuery,
-    payloadCourtSettings: payloadFallback,
+    payloadCourtSettings: normalizedFallback,
   });
   return mapSavedToCourtSettings(saved);
 }

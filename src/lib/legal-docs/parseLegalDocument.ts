@@ -234,10 +234,17 @@ function tryFederalCaption(lines: string[]): CaptionBlock | null {
   const versusIndex = lines.findIndex((l) => /^v\.?$|^vs\.?$/i.test(l));
 
   if (versusIndex !== -1 && courtLines.length) {
+    // Left = plaintiff lines (before v.), excluding cause/docket/court metadata
     const leftLines = lines
       .slice(0, versusIndex)
-      .filter((l) => !CAUSE_RE.test(l) && !DOCKET_RE.test(l));
+      .filter((l) => !CAUSE_RE.test(l) && !DOCKET_RE.test(l) && !/COURT/i.test(l));
+    // Right = defendant lines (after v.) + court metadata
+    const defendantLines = lines
+      .slice(versusIndex + 1)
+      .filter((l) => !CAUSE_RE.test(l) && !DOCKET_RE.test(l) && !/COURT/i.test(l)
+        && !/Civil Action|Case No|Judge|Division/i.test(l));
     const rightLines = [
+      ...defendantLines,
       ...courtLines,
       ...lines.filter((l) => /Civil Action|Case No|Judge|Division/i.test(l)),
     ];
@@ -251,7 +258,8 @@ function tryFederalCaption(lines: string[]): CaptionBlock | null {
   }
 
   // Try inline "v." or "vs." within a line (e.g., "JANE DOE v. JOHN SMITH")
-  const inlineVersusRe = /\b(v\.?|vs\.?)\b/i;
+  // Use lookahead so the period is consumed but we stop before the next word
+  const inlineVersusRe = /\b(?:v\.|vs\.)(?=\s|$)/i;
   const inlineIndex = lines.findIndex((l) => inlineVersusRe.test(l) && !CAUSE_RE.test(l) && !DOCKET_RE.test(l));
 
   if (inlineIndex !== -1 && courtLines.length) {
@@ -708,8 +716,15 @@ function parseCertificate(lines: string[], startIndex: number): { block: Certifi
     const line = lines[i];
     if (line !== SEPARATOR_MARKER) {
       // Match real signature markers: underline bars, /s/ signatures,
-      // or lines where title words appear at end (not in running text)
-      if (/^_{5,}$/.test(line) || /\/s\//i.test(line) || /\b(?:Esq\.|Pro Se|Attorney|Petitioner)\s*[.,;:]*$/i.test(line)) {
+      // or lines where title words appear at end (not in running text).
+      // Exclude common service-language phrases to avoid false positives.
+      const isSignatureBar = /^_{5,}$/.test(line);
+      const isSlashSignature = /^\/s\/\s*\S+/i.test(line);
+      const isSignerTitle =
+        /\b(?:Esq\.|Pro Se|Attorney|Petitioner)\s*[.,;:]*$/i.test(line) &&
+        !/\b(?:served|service|counsel for|copy of)\b/i.test(line);
+
+      if (isSignatureBar || isSlashSignature || isSignerTitle) {
         signerLines.push(line);
       } else {
         bodyLines.push(line);

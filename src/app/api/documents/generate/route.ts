@@ -67,12 +67,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!body.courtSettings?.state || !body.courtSettings?.county) {
-      return NextResponse.json(
-        { error: 'courtSettings with state and county is required' },
-        { status: 400 }
-      );
-    }
+    // Defer courtSettings validation until after canonical settings are resolved
+    // so requests can rely on saved Convex settings or the us-default fallback.
 
     if (!body.petitioner?.name) {
       return NextResponse.json(
@@ -113,9 +109,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Use effective settings for all downstream lookups
-    const normalizedState = titleCase(effectiveSettings?.state ?? body.courtSettings.state);
-    const normalizedCounty = titleCase(effectiveSettings?.county ?? body.courtSettings.county);
+    // Validate resolved settings (not raw payload) so Convex/default fallback works
+    const normalizedState = titleCase(effectiveSettings?.state ?? body.courtSettings?.state ?? '');
+    const normalizedCounty = titleCase(effectiveSettings?.county ?? body.courtSettings?.county ?? '');
+
+    if (!normalizedState || !normalizedCounty) {
+      return NextResponse.json(
+        { error: 'Court settings with state and county are required (via payload or saved settings)' },
+        { status: 400 }
+      );
+    }
 
     // Priority: NEXX defaults → State → County → User overrides
     const rules = getMergedRules(
@@ -305,6 +308,21 @@ export async function POST(request: NextRequest) {
     console.log(`[DocuVault] parsed: ${parsed.sections.length} sections, title="${parsed.title.main}"`);
     if (!preflight.ok) {
       console.warn('[DocuVault] preflight warnings:', preflight.warnings);
+
+      // Reject AI-generated documents that are missing required structural blocks
+      // (caption, signature, certificate) since the parser/render path won't synthesize them.
+      const critical = (preflight.warnings ?? []).filter(
+        (w: string) => /missing|no .*(caption|signature|certificate)/i.test(w)
+      );
+      if (critical.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'Generated document is missing required structural sections',
+            warnings: preflight.warnings,
+          },
+          { status: 422 }
+        );
+      }
     }
 
     // Apply title fallback so render + filename use the resolved title

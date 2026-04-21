@@ -146,9 +146,19 @@ function extractGeneralCaption(lines: string[]): CaptionBlock | null {
   const titleIndex = findTitleIndex(lines);
 
   // When title is found, use lines above it as caption slice.
-  // When title is NOT found, still attempt full header parsing
-  // against all lines — don't short-circuit to minimal caption.
-  const captionSlice = titleIndex !== -1 ? lines.slice(0, titleIndex) : lines;
+  // When title is NOT found, bound the caption window to the header
+  // region (up to TO THE HONORABLE or first section heading, max 25 lines)
+  // to avoid parsing body content as caption.
+  let captionSlice: string[];
+  if (titleIndex !== -1) {
+    captionSlice = lines.slice(0, titleIndex);
+  } else {
+    const headerBound = lines.findIndex(
+      (l) => l !== '' && (TO_HONORABLE_RE.test(l) || ROMAN_HEADING_RE.test(l))
+    );
+    const limit = headerBound !== -1 ? headerBound : Math.min(lines.length, 25);
+    captionSlice = lines.slice(0, limit);
+  }
 
   const texas = tryTexasCaption(captionSlice);
   if (texas) return texas;
@@ -276,8 +286,19 @@ function tryFederalCaption(lines: string[]): CaptionBlock | null {
         ...lines.slice(0, inlineIndex).filter((l) => !CAUSE_RE.test(l) && !DOCKET_RE.test(l) && !/COURT/i.test(l)),
         ...(leftPart ? [leftPart] : []),
       ];
+      const defendantLines = lines
+        .slice(inlineIndex + 1)
+        .filter(
+          (l) =>
+            l !== '' &&
+            !CAUSE_RE.test(l) &&
+            !DOCKET_RE.test(l) &&
+            !/COURT/i.test(l) &&
+            !/Civil Action|Case No|Judge|Division/i.test(l),
+        );
       const rightLines = [
         ...(rightPart ? [rightPart] : []),
+        ...defendantLines,
         ...courtLines,
         ...lines.filter((l) => /Civil Action|Case No|Judge|Division/i.test(l)),
       ];
@@ -390,7 +411,15 @@ function extractBodyStructure(
 } {
   const titleIndex = lines.findIndex((l) => l === mainTitle);
   const bodyStart = lines.findIndex((l) => TO_HONORABLE_RE.test(l));
-  const startIndex = bodyStart !== -1 ? bodyStart : titleIndex !== -1 ? titleIndex + 1 : 0;
+  // Skip past subtitle line (parenthetical) to avoid duplicating it as body paragraph
+  const hasSubtitle =
+    titleIndex !== -1 && lines[titleIndex + 1]?.startsWith('(');
+  const startIndex =
+    bodyStart !== -1
+      ? bodyStart
+      : titleIndex !== -1
+        ? titleIndex + (hasSubtitle ? 2 : 1)
+        : 0;
 
   const bodyLines = explodeMergedNumberedParagraphs(lines.slice(startIndex));
 
@@ -745,6 +774,7 @@ function parseCertificate(lines: string[], startIndex: number): { block: Certifi
   let i = startIndex + 1;
   const bodyLines: string[] = [];
   const signerLines: string[] = [];
+  let inSignerBlock = false;
 
   while (i < lines.length) {
     const line = lines[i];
@@ -759,8 +789,13 @@ function parseCertificate(lines: string[], startIndex: number): { block: Certifi
         !/\b(?:served|service|counsel for|copy of)\b/i.test(line);
 
       if (isSignatureBar || isSlashSignature || isSignerTitle) {
+        inSignerBlock = true;
+        signerLines.push(line);
+      } else if (inSignerBlock && line.trim() !== '') {
+        // Keep contiguous signer metadata (name, address, bar number)
         signerLines.push(line);
       } else {
+        if (inSignerBlock) inSignerBlock = false; // blank line ends signer block
         bodyLines.push(line);
       }
     }

@@ -96,11 +96,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 2. Normalize and merge court formatting rules ──
-    // Title-case state/county so lookups match STATE_RULES['Texas'] and
-    // COUNTY_OVERRIDES['Texas:Fort Bend'] regardless of input casing.
-    const normalizedState = titleCase(body.courtSettings.state);
-    const normalizedCounty = titleCase(body.courtSettings.county);
+    // ── 2. Resolve effective court settings (canonical source) ──
+    // Precedence: Convex saved settings → payload → default
+    let effectiveSettings;
+    try {
+      const convex = await getAuthenticatedConvexClient();
+      effectiveSettings = await getEffectiveCourtSettings({
+        convexQuery: () => convex.query(api.courtSettings.get, {}),
+        payloadCourtSettings: body.courtSettings,
+      });
+    } catch (err) {
+      console.warn('[DocuVault] Convex client unavailable, falling back to payload settings', err);
+      effectiveSettings = await getEffectiveCourtSettings({
+        convexQuery: async () => null,
+        payloadCourtSettings: body.courtSettings,
+      });
+    }
+
+    // Use effective settings for all downstream lookups
+    const normalizedState = titleCase(effectiveSettings?.state ?? body.courtSettings.state);
+    const normalizedCounty = titleCase(effectiveSettings?.county ?? body.courtSettings.county);
 
     // Priority: NEXX defaults → State → County → User overrides
     const rules = getMergedRules(
@@ -297,26 +312,6 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 6. Resolve Jurisdiction Profile ──
-    // Canonical precedence: Convex saved settings → payload → default
-    // Note: effectiveSettings is intentionally resolved after AI drafting.
-    // The drafter uses template rules (getMergedRules), not jurisdiction profiles.
-    // Jurisdiction profiles only drive HTML rendering + PDF output.
-    let effectiveSettings;
-    try {
-      const convex = await getAuthenticatedConvexClient();
-      effectiveSettings = await getEffectiveCourtSettings({
-        convexQuery: () => convex.query(api.courtSettings.get, {}),
-        payloadCourtSettings: body.courtSettings,
-      });
-    } catch (err) {
-      // If Convex client fails (edge case), fall back to payload
-      console.warn('[DocuVault] Convex client unavailable, falling back to payload settings', err);
-      effectiveSettings = await getEffectiveCourtSettings({
-        convexQuery: async () => null,
-        payloadCourtSettings: body.courtSettings,
-      });
-    }
-
     const jurisdictionProfile = resolveJurisdictionProfile(effectiveSettings);
     const formattingRules = toCourtFormattingRules(jurisdictionProfile);
 

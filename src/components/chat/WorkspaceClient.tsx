@@ -323,6 +323,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
 
                 case 'pin':
                     setRawPinSource(content);
+                    setAutofilledType(DEFAULT_PIN_TYPE);
                     setModalSeedTitle(title);
                     setModalSeedContent(content);
                     setAutofillMeta({});

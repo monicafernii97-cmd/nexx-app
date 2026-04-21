@@ -21,6 +21,7 @@ import { useToast } from '@/components/feedback/ToastProvider';
 import { useWorkspace } from '@/lib/workspace-context';
 import { SaveToCaseModal } from '@/components/chat/SaveToCaseModal';
 import { PinToWorkspaceModal } from '@/components/chat/PinToWorkspaceModal';
+import type { PinAutofillResult, PinConfidence } from '@/lib/pins/types';
 
 // ---------------------------------------------------------------------------
 // Save-type mapping (action → caseMemory save type)
@@ -76,6 +77,15 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
     const [modalSeedTitle, setModalSeedTitle] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [isPinning, setIsPinning] = useState(false);
+
+    // ── Pin autofill state ──
+    const [isAutofilling, setIsAutofilling] = useState(false);
+    const [rawPinSource, setRawPinSource] = useState('');
+    const [autofillMeta, setAutofillMeta] = useState<{
+        confidence?: PinConfidence;
+        detectedDate?: string | null;
+        aiVersion?: string;
+    }>({});
 
     // ── Copy to clipboard ──
     const handleCopy = useCallback(
@@ -146,6 +156,10 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                     content,
                     caseId: activeCaseId ?? undefined,
                     requestId,
+                    rawSourceText: rawPinSource || undefined,
+                    confidence: autofillMeta.confidence ?? undefined,
+                    detectedDate: autofillMeta.detectedDate ?? undefined,
+                    aiVersion: autofillMeta.aiVersion ?? undefined,
                 });
 
                 showToast({
@@ -164,7 +178,40 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                 setIsPinning(false);
             }
         },
-        [createPin, showToast, activeCaseId]
+        [createPin, showToast, activeCaseId, rawPinSource, autofillMeta]
+    );
+
+    // ── Fetch pin autofill from API ──
+    const fetchPinAutofill = useCallback(
+        async (rawText: string, pinType: PinnableType = 'key_fact') => {
+            try {
+                const res = await fetch('/api/pins/autofill', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pinType,
+                        rawSourceText: rawText,
+                    }),
+                });
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                const result = (await res.json()) as PinAutofillResult;
+                setModalSeedTitle(result.title);
+                setModalSeedContent(result.content);
+                setAutofillMeta({
+                    confidence: result.confidence,
+                    detectedDate: result.detectedDate,
+                    aiVersion: result.aiVersion,
+                });
+            } catch (err) {
+                console.warn('[WorkspaceClient] Pin autofill failed, using raw text', err);
+                // Fallback: keep raw text already set
+            } finally {
+                setIsAutofilling(false);
+            }
+        },
+        [],
     );
 
     // ── Add to timeline ──
@@ -257,9 +304,13 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                     break;
 
                 case 'pin':
+                    setRawPinSource(content);
                     setModalSeedTitle(title);
                     setModalSeedContent(content);
+                    setAutofillMeta({});
+                    setIsAutofilling(true);
                     setPinModalOpen(true);
+                    fetchPinAutofill(content);
                     break;
 
                 case 'add_to_timeline':
@@ -285,7 +336,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                     });
             }
         },
-        [handleCopy, handleAddToTimeline, handleQuickSave, showToast]
+        [handleCopy, handleAddToTimeline, handleQuickSave, showToast, fetchPinAutofill]
     );
 
     // ── Build context ──
@@ -315,6 +366,12 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                 initialContent={modalSeedContent}
                 initialTitle={modalSeedTitle}
                 isPinning={isPinning}
+                isAutofilling={isAutofilling}
+                rawSourceText={rawPinSource}
+                onReformat={(pinType) => {
+                    setIsAutofilling(true);
+                    fetchPinAutofill(rawPinSource, pinType);
+                }}
             />
         </>
     );

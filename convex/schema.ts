@@ -616,6 +616,18 @@ export default defineSchema({
         requestId: v.optional(v.string()),
         /** Sort order within user's pin rail */
         sortOrder: v.optional(v.number()),
+        /** Original unformatted source text (pre-AI cleanup) for traceability */
+        rawSourceText: v.optional(v.string()),
+        /** AI confidence level in the autofill quality */
+        confidence: v.optional(v.union(
+            v.literal('low'),
+            v.literal('medium'),
+            v.literal('high')
+        )),
+        /** Detected date from source text (ISO string), null if unclear */
+        detectedDate: v.optional(v.string()),
+        /** AI formatter version for traceability (e.g. 'pin-autofill-v1') */
+        aiVersion: v.optional(v.string()),
         createdAt: v.number(),
     })
         .index('by_userId', ['userId'])

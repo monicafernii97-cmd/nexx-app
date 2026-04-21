@@ -9,13 +9,23 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { api } from '@convex/_generated/api';
+import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { getMergedRules, getCountyRequirements } from '@/lib/legal/courtRules';
 import { getTemplate } from '@/lib/legal/templates';
-import { renderDocumentHTML } from '@/lib/legal/templateRenderer';
 import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
-import type { DocumentGenerationRequest, CaptionData } from '@/lib/legal/types';
+import type { DocumentGenerationRequest } from '@/lib/legal/types';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { titleCase } from '@/lib/utils/stringHelpers';
+import { parseLegalDocument } from '@/lib/legal-docs/parseLegalDocument';
+import { renderLegalDocumentHTML } from '@/lib/legal-docs/renderLegalDocumentHTML';
+import { generateLegalFilename } from '@/lib/legal-docs/generateLegalFilename';
+import { preflightLegalDocument } from '@/lib/legal-docs/preflightLegalDocument';
+import {
+  resolveJurisdictionProfile,
+  toCourtFormattingRules,
+  getEffectiveCourtSettings,
+} from '@/lib/legal-docs/jurisdiction/resolveJurisdictionProfile';
 
 export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
 
@@ -57,12 +67,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!body.courtSettings?.state || !body.courtSettings?.county) {
-      return NextResponse.json(
-        { error: 'courtSettings with state and county is required' },
-        { status: 400 }
-      );
-    }
+    // Defer courtSettings validation until after canonical settings are resolved
+    // so requests can rely on saved Convex settings or the us-default fallback.
 
     if (!body.petitioner?.name) {
       return NextResponse.json(
@@ -86,11 +92,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 2. Normalize and merge court formatting rules ──
-    // Title-case state/county so lookups match STATE_RULES['Texas'] and
-    // COUNTY_OVERRIDES['Texas:Fort Bend'] regardless of input casing.
-    const normalizedState = titleCase(body.courtSettings.state);
-    const normalizedCounty = titleCase(body.courtSettings.county);
+    // ── 2. Resolve effective court settings (canonical source) ──
+    // Precedence: Convex saved settings → payload → default
+    let effectiveSettings;
+    try {
+      const convex = await getAuthenticatedConvexClient();
+      effectiveSettings = await getEffectiveCourtSettings({
+        convexQuery: () => convex.query(api.courtSettings.get, {}),
+        payloadCourtSettings: body.courtSettings,
+      });
+    } catch (err) {
+      console.warn('[DocuVault] Convex client unavailable, falling back to payload settings', err);
+      effectiveSettings = await getEffectiveCourtSettings({
+        convexQuery: async () => null,
+        payloadCourtSettings: body.courtSettings,
+      });
+    }
+
+    // Validate resolved settings (not raw payload) so Convex/default fallback works
+    const normalizedState = titleCase(effectiveSettings?.state ?? body.courtSettings?.state ?? '');
+    const normalizedCounty = titleCase(effectiveSettings?.county ?? body.courtSettings?.county ?? '');
+
+    if (!normalizedState || !normalizedCounty) {
+      return NextResponse.json(
+        { error: 'Court settings with state and county are required (via payload or saved settings)' },
+        { status: 400 }
+      );
+    }
 
     // Priority: NEXX defaults → State → County → User overrides
     const rules = getMergedRules(
@@ -112,15 +140,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── 3. Build caption data ──
-    // Use normalized values for consistent caption output
-    const captionBody = {
-      ...body,
-      courtSettings: { ...body.courtSettings, state: normalizedState, county: normalizedCounty },
-    };
-    const caption: CaptionData = body.caption ?? buildDefaultCaption(captionBody);
-
-    // ── 4. Determine document title ──
+    // ── 3. Determine document title ──
     const titleText = template.sections.find(s => s.type === 'title')?.title ?? template.title;
 
     // ── 4b. AI drafting — generate content when bodyContent is empty ──
@@ -164,6 +184,7 @@ export async function POST(request: NextRequest) {
         );
 
         // Build minimal case context from the request body for the AI drafter
+        // Uses effectiveSettings (canonical source) so drafting matches rendering
         const caseContext: Record<string, unknown> = {
           caseType: body.caseType,
           petitioner: body.petitioner?.name,
@@ -172,9 +193,9 @@ export async function POST(request: NextRequest) {
             name: c.name,
             age: c.age,
           })),
-          court: body.courtSettings?.courtName,
-          county: body.courtSettings?.county,
-          state: body.courtSettings?.state,
+          court: effectiveSettings?.courtName ?? body.courtSettings?.courtName,
+          county: effectiveSettings?.county ?? body.courtSettings?.county,
+          state: effectiveSettings?.state ?? body.courtSettings?.state,
         };
 
         let drafted;
@@ -263,20 +284,64 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── 5. Render HTML ──
-    const html = await renderDocumentHTML({
-      template,
-      caption,
-      titleText: titleText.toUpperCase(),
-      bodyContent,
-      petitioner: body.petitioner,
-      respondentName: body.respondent?.name,
-      exhibits: body.exhibits,
-      rules,
-      footerText: buildFooterText(body, titleText),
-    });
+    // ── 5. Parse + Render via Jurisdiction-Aware Pipeline ──
 
-    // ── 6. Check if user just wants HTML preview ──
+    // Flatten bodyContent into raw text for the legal document parser
+    const rawText = Array.isArray(bodyContent)
+      ? (bodyContent as Array<{ heading?: string; paragraphs?: string[]; content?: string; numberedItems?: string[] }>)
+          .flatMap(item => {
+            const parts: string[] = [];
+            if (item.heading) parts.push(item.heading);
+            if (item.paragraphs) parts.push(...item.paragraphs);
+            if (item.content) parts.push(item.content);
+            if (item.numberedItems) {
+              parts.push(...item.numberedItems.map((ni, idx) => `${idx + 1}. ${ni}`));
+            }
+            return parts;
+          })
+          .join('\n')
+      : String(bodyContent ?? '');
+
+    const parsed = parseLegalDocument(rawText);
+    const preflight = preflightLegalDocument(parsed);
+
+    console.log(`[DocuVault] parsed: ${parsed.sections.length} sections, title="${parsed.title.main}"`);
+    if (!preflight.ok) {
+      console.warn('[DocuVault] preflight warnings:', preflight.warnings);
+
+      // Reject AI-generated documents that are missing required structural blocks
+      // (caption, signature, certificate) since the parser/render path won't synthesize them.
+      const critical = (preflight.warnings ?? []).filter(
+        (w: string) => /(caption|signature|certificate).*not detected/i.test(w)
+      );
+      if (critical.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'Generated document is missing required structural sections',
+            warnings: preflight.warnings,
+          },
+          { status: 422 }
+        );
+      }
+    }
+
+    // Apply title fallback so render + filename use the resolved title
+    if (parsed.title.main === 'UNTITLED DOCUMENT') {
+      parsed.title = { ...parsed.title, main: titleText };
+    }
+
+    // ── 6. Resolve Jurisdiction Profile ──
+    const jurisdictionProfile = resolveJurisdictionProfile(effectiveSettings);
+    const formattingRules = toCourtFormattingRules(jurisdictionProfile);
+
+    console.log(`[DocuVault] jurisdiction=${jurisdictionProfile.key}, profile="${jurisdictionProfile.name}"`);
+
+    // ── 7. Render Legal HTML ──
+    const html = renderLegalDocumentHTML(parsed, jurisdictionProfile);
+
+
+
+    // ── 8. Check if user just wants HTML preview ──
     const format = request.nextUrl.searchParams.get('format');
     if (format === 'html') {
       return NextResponse.json({
@@ -285,12 +350,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ── 7. Render PDF ──
-    const pdfBytes = await renderHTMLToPDF(html, rules, caption.causeNumber);
+    // ── 9. Render PDF ──
+    const pdfBytes = await renderHTMLToPDF(html, formattingRules, parsed.metadata.causeNumber);
 
-    // ── 8. Return PDF ──
-    // Include missing forms warning in a custom header so clients can detect it
-    const filename = `${template.id}_${Date.now()}.pdf`;
+    // ── 10. Return PDF ──
+    const filename = generateLegalFilename(parsed);
     const headers: Record<string, string> = {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${filename}"`,
@@ -311,75 +375,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-
-// ── Helper: Build default caption from request data ──
-
-/**
- * Build a default caption from the request data.
- * Automatically detects SAPCR cases and uses "IN THE INTEREST OF" caption style.
- */
-function buildDefaultCaption(body: DocumentGenerationRequest): CaptionData {
-  const { courtSettings, petitioner, respondent, children, caseType } = body;
-
-  // Texas-style SAPCR caption: "IN THE INTEREST OF [CHILD], A CHILD"
-  const isSAPCR = [
-    'divorce_with_children',
-    'custody_establishment',
-    'custody_modification',
-    'sapcr',
-    'child_support',
-    'child_support_modification',
-    'visitation',
-    'relocation',
-  ].includes(caseType);
-
-  let leftLines: string[];
-  if (isSAPCR && children && children.length > 0) {
-    leftLines = [
-      'IN THE INTEREST OF',
-      '',
-      ...children.map(c => `${c.name.toUpperCase()},`),
-      '',
-      children.length === 1 ? 'A CHILD' : 'CHILDREN',
-    ];
-  } else {
-    // Standard versus-style caption
-    // Use party designation ('Petitioner'), NOT the signing role
-    // (e.g., 'Attorney for Petitioner') — SignatureBlockData.role models
-    // the signer's capacity, not the caption party designation.
-    leftLines = [
-      `${petitioner.name.toUpperCase()},`,
-      'Petitioner',
-      '',
-      'v.',
-      '',
-      `${respondent?.name?.toUpperCase() ?? 'RESPONDENT'},`,
-      'Respondent',
-    ];
-  }
-
-  // Right column — court info
-  const rightLines = [
-    `IN THE ${courtSettings.courtName?.toUpperCase() ?? 'DISTRICT COURT'}`,
-    courtSettings.judicialDistrict?.toUpperCase() ?? '',
-    `${courtSettings.county.toUpperCase()} COUNTY, ${courtSettings.state.toUpperCase()}`,
-  ].filter(Boolean);
-
-  return {
-    causeNumber: body.caption?.causeNumber ?? '_______________',
-    leftLines,
-    rightLines,
-    style: courtSettings.state === 'Texas' ? 'section-symbol' : 'versus',
-  };
-}
-
-
-// ── Helper: Build footer text ──
-
-/** Build the page footer text containing the cause number and document title. */
-function buildFooterText(body: DocumentGenerationRequest, docTitle: string): string {
-  const causeNo = body.caption?.causeNumber ?? '';
-  return `Cause No. ${causeNo}        ${docTitle}`;
 }

@@ -11,7 +11,7 @@
  * the `onAction` handler to AssistantMessageCard → ContextualActionBar.
  */
 
-import { useState, useCallback, type ReactNode } from 'react';
+import { useState, useCallback, useRef, type ReactNode } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { ActionType, PanelData } from '@/lib/ui-intelligence/types';
@@ -21,6 +21,10 @@ import { useToast } from '@/components/feedback/ToastProvider';
 import { useWorkspace } from '@/lib/workspace-context';
 import { SaveToCaseModal } from '@/components/chat/SaveToCaseModal';
 import { PinToWorkspaceModal } from '@/components/chat/PinToWorkspaceModal';
+import type { PinAutofillResult, PinConfidence } from '@/lib/pins/types';
+
+// Re-export PinnableType default used for initial autofill
+const DEFAULT_PIN_TYPE: PinnableType = 'key_fact';
 
 // ---------------------------------------------------------------------------
 // Save-type mapping (action → caseMemory save type)
@@ -76,6 +80,19 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
     const [modalSeedTitle, setModalSeedTitle] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [isPinning, setIsPinning] = useState(false);
+
+    // ── Pin autofill state ──
+    const [isAutofilling, setIsAutofilling] = useState(false);
+    const [rawPinSource, setRawPinSource] = useState('');
+    /** Tracks the pin type that was used for the most recent autofill request. */
+    const [autofilledType, setAutofilledType] = useState<PinnableType>(DEFAULT_PIN_TYPE);
+    const [autofillMeta, setAutofillMeta] = useState<{
+        confidence?: PinConfidence;
+        detectedDate?: string | null;
+        aiVersion?: string;
+    }>({});
+    /** Monotonic counter to discard stale autofill responses. */
+    const autofillRequestToken = useRef(0);
 
     // ── Copy to clipboard ──
     const handleCopy = useCallback(
@@ -146,6 +163,10 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                     content,
                     caseId: activeCaseId ?? undefined,
                     requestId,
+                    rawSourceText: rawPinSource || undefined,
+                    confidence: autofillMeta.confidence ?? undefined,
+                    detectedDate: autofillMeta.detectedDate ?? undefined,
+                    aiVersion: autofillMeta.aiVersion ?? undefined,
                 });
 
                 showToast({
@@ -164,7 +185,51 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                 setIsPinning(false);
             }
         },
-        [createPin, showToast, activeCaseId]
+        [createPin, showToast, activeCaseId, rawPinSource, autofillMeta]
+    );
+
+    // ── Fetch pin autofill from API ──
+    const fetchPinAutofill = useCallback(
+        async (rawText: string, pinType: PinnableType = DEFAULT_PIN_TYPE) => {
+            const token = ++autofillRequestToken.current;
+            try {
+                const res = await fetch('/api/pins/autofill', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pinType,
+                        rawSourceText: rawText,
+                    }),
+                });
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                const result = (await res.json()) as PinAutofillResult;
+
+                // Only apply if this is still the latest request
+                if (token !== autofillRequestToken.current) return;
+
+                setAutofilledType(result.pinType);
+                setModalSeedTitle(result.title);
+                setModalSeedContent(result.content);
+                setAutofillMeta({
+                    confidence: result.confidence,
+                    detectedDate: result.detectedDate,
+                    aiVersion: result.aiVersion,
+                });
+            } catch (err) {
+                if (token !== autofillRequestToken.current) return;
+                console.warn('[WorkspaceClient] Pin autofill failed, using raw text', err);
+                // Restore raw fallback and clear stale AI metadata
+                setModalSeedContent(rawText);
+                setAutofillMeta({});
+            } finally {
+                if (token === autofillRequestToken.current) {
+                    setIsAutofilling(false);
+                }
+            }
+        },
+        [],
     );
 
     // ── Add to timeline ──
@@ -257,9 +322,14 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                     break;
 
                 case 'pin':
+                    setRawPinSource(content);
+                    setAutofilledType(DEFAULT_PIN_TYPE);
                     setModalSeedTitle(title);
                     setModalSeedContent(content);
+                    setAutofillMeta({});
+                    setIsAutofilling(true);
                     setPinModalOpen(true);
+                    fetchPinAutofill(content);
                     break;
 
                 case 'add_to_timeline':
@@ -285,7 +355,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                     });
             }
         },
-        [handleCopy, handleAddToTimeline, handleQuickSave, showToast]
+        [handleCopy, handleAddToTimeline, handleQuickSave, showToast, fetchPinAutofill]
     );
 
     // ── Build context ──
@@ -315,6 +385,16 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                 initialContent={modalSeedContent}
                 initialTitle={modalSeedTitle}
                 isPinning={isPinning}
+                isAutofilling={isAutofilling}
+                autofilledType={autofilledType}
+                rawSourceText={rawPinSource}
+                onReformat={(pinType) => {
+                    // Clear stale AI metadata and restore raw fallback before re-running
+                    setAutofillMeta({});
+                    setModalSeedContent(rawPinSource);
+                    setIsAutofilling(true);
+                    fetchPinAutofill(rawPinSource, pinType);
+                }}
             />
         </>
     );

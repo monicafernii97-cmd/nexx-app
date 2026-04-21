@@ -20,6 +20,13 @@ const pinnableTypeValidator = v.union(
     v.literal('timeline_anchor')
 );
 
+/** AI confidence level validator. */
+const confidenceValidator = v.union(
+    v.literal('low'),
+    v.literal('medium'),
+    v.literal('high')
+);
+
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
@@ -56,6 +63,14 @@ export const create = mutation({
         sourceMessageId: v.optional(v.id('messages')),
         sourceConversationId: v.optional(v.id('conversations')),
         requestId: v.optional(v.string()),
+        /** Original unformatted source text (pre-AI cleanup) */
+        rawSourceText: v.optional(v.string()),
+        /** AI confidence level in the autofill quality */
+        confidence: v.optional(confidenceValidator),
+        /** Detected date from source text (ISO string) */
+        detectedDate: v.optional(v.string()),
+        /** AI formatter version for traceability */
+        aiVersion: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
@@ -88,6 +103,10 @@ export const create = mutation({
             sourceConversationId: args.sourceConversationId,
             requestId: args.requestId,
             sortOrder: maxOrder + 1,
+            rawSourceText: args.rawSourceText,
+            confidence: args.confidence,
+            detectedDate: args.detectedDate,
+            aiVersion: args.aiVersion,
             createdAt: Date.now(),
         });
     },

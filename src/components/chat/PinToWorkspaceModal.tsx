@@ -3,9 +3,11 @@
 /**
  * PinToWorkspaceModal — Pin an AI response section to the workspace rail.
  *
- * Flow: User clicks "Pin" → modal with editable title + content →
- * confirm → item instantly appears in right rail (optimistic) →
- * persists to casePins backend.
+ * Flow: User clicks "Pin" → AI autofill runs → modal opens with cleaned
+ * title + content → user can edit before saving → item appears in rail.
+ *
+ * If AI autofill fails, raw text is shown as fallback.
+ * If user changes pin type, a "Reformat" button lets them re-run AI.
  *
  * State reset strategy: The inner `PinModalForm` is keyed on
  * `initialContent + initialTitle`. When the modal closes, AnimatePresence
@@ -13,32 +15,35 @@
  * change while the modal stays open, the key forces a remount.
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, PushPin, Check } from '@phosphor-icons/react';
+import { X, PushPin, Check, ArrowsClockwise } from '@phosphor-icons/react';
 import type { PinnableType } from '@/lib/integration/types';
+import { PIN_OPTIONS_CONFIG } from '@/lib/pins/types';
 
 // ---------------------------------------------------------------------------
-// Pin type options
+// Pin type options — derived from shared config (single source of truth)
 // ---------------------------------------------------------------------------
 
-interface PinOption {
-    type: PinnableType;
-    label: string;
-    emoji: string;
+const PIN_OPTIONS = PIN_OPTIONS_CONFIG;
+
+// ---------------------------------------------------------------------------
+// Skeleton loader for autofill loading state
+// ---------------------------------------------------------------------------
+
+function FieldSkeleton({ lines = 1 }: { lines?: number }) {
+    return (
+        <div className="space-y-2 animate-pulse">
+            {Array.from({ length: lines }).map((_, i) => (
+                <div
+                    key={i}
+                    className="h-3.5 rounded-md bg-[var(--surface-elevated)]"
+                    style={{ width: i === lines - 1 && lines > 1 ? '65%' : '100%' }}
+                />
+            ))}
+        </div>
+    );
 }
-
-const PIN_OPTIONS: PinOption[] = [
-    { type: 'key_fact', label: 'Key Fact', emoji: '📌' },
-    { type: 'strategy_point', label: 'Strategy Point', emoji: '♟️' },
-    { type: 'good_faith_point', label: 'Good-Faith Point', emoji: '🤝' },
-    { type: 'strength_highlight', label: 'Strength', emoji: '💪' },
-    { type: 'risk_concern', label: 'Risk / Concern', emoji: '⚠️' },
-    { type: 'hearing_prep_point', label: 'Hearing Prep', emoji: '🏛️' },
-    { type: 'draft_snippet', label: 'Draft Snippet', emoji: '✍️' },
-    { type: 'question_to_verify', label: 'Question to Verify', emoji: '❓' },
-    { type: 'timeline_anchor', label: 'Timeline Anchor', emoji: '📅' },
-];
 
 // ---------------------------------------------------------------------------
 // Inner form (remounts via key when seed props change → fresh state)
@@ -50,17 +55,62 @@ function PinModalForm({
     initialContent,
     initialTitle,
     isPinning,
+    isAutofilling,
+    autofilledType,
     onClose,
+    onReformat,
 }: {
     onPin: (type: PinnableType, title: string, content: string) => void;
     initialContent: string;
     initialTitle: string;
     isPinning: boolean;
+    isAutofilling: boolean;
+    /** The pin type that was used for the most recent autofill request. */
+    autofilledType: PinnableType;
     onClose: () => void;
+    onReformat?: (pinType: PinnableType) => void;
 }) {
     const [selectedType, setSelectedType] = useState<PinnableType>('key_fact');
     const [title, setTitle] = useState(initialTitle);
     const [content, setContent] = useState(initialContent);
+
+    // Track whether the user has changed the pin type since last autofill
+    const [typeChangedSinceAutofill, setTypeChangedSinceAutofill] = useState(false);
+    const lastAutofilledType = useRef<PinnableType>(autofilledType);
+
+    // Sync title/content when autofill result arrives (props change)
+    useEffect(() => {
+        if (!isAutofilling) {
+            setTitle(initialTitle);
+            setContent(initialContent);
+            // Use the explicit prop — not selectedType — so we track
+            // the type the AI actually formatted for, even if the user
+            // changed selectedType during the autofill request.
+            lastAutofilledType.current = autofilledType;
+            // Only clear the "type changed" flag if the user's current
+            // selection still matches what the AI formatted for.
+            // Otherwise keep it true so the Reformat button stays visible.
+            setTypeChangedSinceAutofill(selectedType !== autofilledType);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialTitle, initialContent, isAutofilling, autofilledType]);
+
+    const handleTypeChange = (newType: PinnableType) => {
+        setSelectedType(newType);
+        if (newType !== lastAutofilledType.current) {
+            setTypeChangedSinceAutofill(true);
+        } else {
+            setTypeChangedSinceAutofill(false);
+        }
+    };
+
+    const handleReformat = () => {
+        if (onReformat) {
+            setTypeChangedSinceAutofill(false);
+            lastAutofilledType.current = selectedType;
+            onReformat(selectedType);
+        }
+    };
 
     const handlePin = () => {
         const finalTitle = title.trim() || PIN_OPTIONS.find(o => o.type === selectedType)?.label || 'Pinned Item';
@@ -95,7 +145,7 @@ function PinModalForm({
                             <button
                                 key={option.type}
                                 type="button"
-                                onClick={() => setSelectedType(option.type)}
+                                onClick={() => handleTypeChange(option.type)}
                                 className={`
                                     inline-flex items-center gap-1 px-2.5 py-1.5
                                     text-xs font-medium rounded-full
@@ -111,41 +161,74 @@ function PinModalForm({
                             </button>
                         ))}
                     </div>
+
+                    {/* Reformat button — shown when user changes pin type */}
+                    {typeChangedSinceAutofill && onReformat && !isAutofilling && (
+                        <motion.button
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            type="button"
+                            onClick={handleReformat}
+                            className="
+                                mt-2 inline-flex items-center gap-1.5 px-3 py-1.5
+                                text-xs font-medium rounded-lg
+                                text-[var(--accent-icy)] bg-[var(--accent-icy)]/8
+                                hover:bg-[var(--accent-icy)]/15
+                                border border-[var(--accent-icy)]/20
+                                transition-all duration-150
+                            "
+                        >
+                            <ArrowsClockwise size={13} weight="bold" />
+                            Reformat for {PIN_OPTIONS.find(o => o.type === selectedType)?.label}
+                        </motion.button>
+                    )}
                 </div>
 
                 {/* Title input */}
                 <div>
                     <label className="text-eyebrow block mb-1.5">Title</label>
-                    <input
-                        type="text"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        placeholder="Enter a title..."
-                        className="
-                            w-full px-3 py-2 text-sm rounded-xl
-                            bg-[var(--surface-elevated)] text-[var(--text-body)]
-                            border border-[var(--border-subtle)]
-                            focus:outline-none focus:border-[var(--accent-icy)]/50
-                            placeholder:text-[var(--text-muted)]
-                        "
-                    />
+                    {isAutofilling ? (
+                        <div className="px-3 py-2.5">
+                            <FieldSkeleton />
+                        </div>
+                    ) : (
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="Enter a title..."
+                            className="
+                                w-full px-3 py-2 text-sm rounded-xl
+                                bg-[var(--surface-elevated)] text-[var(--text-body)]
+                                border border-[var(--border-subtle)]
+                                focus:outline-none focus:border-[var(--accent-icy)]/50
+                                placeholder:text-[var(--text-muted)]
+                            "
+                        />
+                    )}
                 </div>
 
                 {/* Content textarea */}
                 <div>
                     <label className="text-eyebrow block mb-1.5">Content</label>
-                    <textarea
-                        value={content}
-                        onChange={(e) => setContent(e.target.value)}
-                        rows={4}
-                        className="
-                            w-full px-3 py-2 text-sm rounded-xl resize-none
-                            bg-[var(--surface-elevated)] text-[var(--text-body)]
-                            border border-[var(--border-subtle)]
-                            focus:outline-none focus:border-[var(--accent-icy)]/50
-                            placeholder:text-[var(--text-muted)]
-                        "
-                    />
+                    {isAutofilling ? (
+                        <div className="px-3 py-2.5">
+                            <FieldSkeleton lines={3} />
+                        </div>
+                    ) : (
+                        <textarea
+                            value={content}
+                            onChange={(e) => setContent(e.target.value)}
+                            rows={4}
+                            className="
+                                w-full px-3 py-2 text-sm rounded-xl resize-none
+                                bg-[var(--surface-elevated)] text-[var(--text-body)]
+                                border border-[var(--border-subtle)]
+                                focus:outline-none focus:border-[var(--accent-icy)]/50
+                                placeholder:text-[var(--text-muted)]
+                            "
+                        />
+                    )}
                 </div>
             </div>
 
@@ -161,7 +244,7 @@ function PinModalForm({
                 <button
                     type="button"
                     onClick={handlePin}
-                    disabled={!content.trim() || isPinning}
+                    disabled={!content.trim() || isPinning || isAutofilling}
                     className="
                         inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold
                         rounded-xl transition-all duration-150
@@ -171,7 +254,7 @@ function PinModalForm({
                     "
                 >
                     <Check size={14} weight="bold" />
-                    {isPinning ? 'Pinning...' : 'Pin'}
+                    {isPinning ? 'Pinning...' : isAutofilling ? 'Formatting...' : 'Pin'}
                 </button>
             </div>
         </>
@@ -186,12 +269,20 @@ interface PinToWorkspaceModalProps {
     isOpen: boolean;
     onClose: () => void;
     onPin: (type: PinnableType, title: string, content: string) => void;
-    /** Pre-filled content */
+    /** Pre-filled content (raw or AI-cleaned) */
     initialContent: string;
     /** Pre-filled title */
     initialTitle?: string;
     /** Whether pin is in progress */
     isPinning?: boolean;
+    /** Whether AI autofill is running */
+    isAutofilling?: boolean;
+    /** The pin type used for the most recent autofill (tracks correct type even if user changes during autofill) */
+    autofilledType?: PinnableType;
+    /** Original raw source text (preserved for metadata) */
+    rawSourceText?: string;
+    /** Callback to re-run autofill with a different pin type */
+    onReformat?: (pinType: PinnableType) => void;
 }
 
 /** Modal for pinning a response section to the workspace rail with editable title and type selection. */
@@ -202,6 +293,9 @@ export function PinToWorkspaceModal({
     initialContent,
     initialTitle = '',
     isPinning = false,
+    isAutofilling = false,
+    autofilledType = 'key_fact',
+    onReformat,
 }: PinToWorkspaceModalProps) {
     return (
         <AnimatePresence>
@@ -230,12 +324,14 @@ export function PinToWorkspaceModal({
                         "
                     >
                         <PinModalForm
-                            key={`${initialContent}-${initialTitle}`}
                             onPin={onPin}
                             initialContent={initialContent}
                             initialTitle={initialTitle}
                             isPinning={isPinning}
+                            isAutofilling={isAutofilling}
+                            autofilledType={autofilledType}
                             onClose={onClose}
+                            onReformat={onReformat}
                         />
                     </motion.div>
                 </>

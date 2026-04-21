@@ -15,6 +15,7 @@ import {
   PIN_AUTOFILL_JSON_SCHEMA,
 } from './pin-autofill-prompts';
 import type { PinAutofillInput, PinAutofillResult, PinConfidence } from './types';
+import { VALID_PIN_TYPES, VALID_CONFIDENCE } from './types';
 import type { PinnableType } from '@/lib/integration/types';
 
 // ═══════════════════════════════════════════════════════════════
@@ -32,24 +33,6 @@ const AUTOFILL_TIMEOUT_MS = 8_000;
 
 /** Maximum raw source text length sent to the model. */
 const MAX_SOURCE_LENGTH = 2_000;
-
-// ═══════════════════════════════════════════════════════════════
-// Valid PinnableType set (runtime check)
-// ═══════════════════════════════════════════════════════════════
-
-const VALID_PIN_TYPES = new Set<string>([
-  'key_fact',
-  'strategy_point',
-  'good_faith_point',
-  'strength_highlight',
-  'risk_concern',
-  'hearing_prep_point',
-  'draft_snippet',
-  'question_to_verify',
-  'timeline_anchor',
-]);
-
-const VALID_CONFIDENCE = new Set<string>(['low', 'medium', 'high']);
 
 // ═══════════════════════════════════════════════════════════════
 // Main Entry Point

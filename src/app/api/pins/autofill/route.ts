@@ -8,28 +8,53 @@
  *
  * On any AI failure, returns a fallback result with 200 —
  * the pin flow must never be blocked by this endpoint.
+ *
+ * Rate-limited per user to prevent excessive OpenAI API costs.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { generatePinAutofill } from '@/lib/pins/generatePinAutofill';
 import type { PinAutofillInput } from '@/lib/pins/types';
+import { VALID_PIN_TYPES } from '@/lib/pins/types';
 
 // ═══════════════════════════════════════════════════════════════
-// Valid pin types (runtime validation)
+// In-memory per-user rate limiter (token bucket)
 // ═══════════════════════════════════════════════════════════════
 
-const VALID_PIN_TYPES = new Set([
-  'key_fact',
-  'strategy_point',
-  'good_faith_point',
-  'strength_highlight',
-  'risk_concern',
-  'hearing_prep_point',
-  'draft_snippet',
-  'question_to_verify',
-  'timeline_anchor',
-]);
+/** Max requests per user within the sliding window. */
+const RATE_LIMIT_MAX = 20;
+
+/** Sliding window duration in milliseconds (60 seconds). */
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+/**
+ * In-memory rate limit store.
+ * Maps userId → array of request timestamps within the window.
+ *
+ * NOTE: This is per-process only. For multi-instance deployments,
+ * swap with Redis INCR/EXPIRE or an external rate limiter.
+ */
+const rateLimitStore = new Map<string, number[]>();
+
+/** Returns true if the user has exceeded the rate limit. */
+function isRateLimited(userId: string): boolean {
+  const now = Date.now();
+  const windowStart = now - RATE_LIMIT_WINDOW_MS;
+
+  // Get existing timestamps, filter to current window
+  const timestamps = (rateLimitStore.get(userId) ?? []).filter(t => t > windowStart);
+
+  if (timestamps.length >= RATE_LIMIT_MAX) {
+    rateLimitStore.set(userId, timestamps);
+    return true;
+  }
+
+  // Record this request
+  timestamps.push(now);
+  rateLimitStore.set(userId, timestamps);
+  return false;
+}
 
 // ═══════════════════════════════════════════════════════════════
 // POST Handler
@@ -42,6 +67,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: 'Authentication required' },
       { status: 401 },
+    );
+  }
+
+  // ── Rate limit check ──
+  if (isRateLimited(userId)) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please try again shortly.' },
+      { status: 429 },
     );
   }
 

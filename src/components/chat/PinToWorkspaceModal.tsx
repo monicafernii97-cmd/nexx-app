@@ -71,6 +71,7 @@ function PinModalForm({
     initialTitle,
     isPinning,
     isAutofilling,
+    autofilledType,
     onClose,
     onReformat,
 }: {
@@ -79,6 +80,8 @@ function PinModalForm({
     initialTitle: string;
     isPinning: boolean;
     isAutofilling: boolean;
+    /** The pin type that was used for the most recent autofill request. */
+    autofilledType: PinnableType;
     onClose: () => void;
     onReformat?: (pinType: PinnableType) => void;
 }) {
@@ -88,7 +91,7 @@ function PinModalForm({
 
     // Track whether the user has changed the pin type since last autofill
     const [typeChangedSinceAutofill, setTypeChangedSinceAutofill] = useState(false);
-    const lastAutofilledType = useRef<PinnableType>('key_fact');
+    const lastAutofilledType = useRef<PinnableType>(autofilledType);
 
     // Sync title/content when autofill result arrives (props change)
     useEffect(() => {
@@ -96,10 +99,13 @@ function PinModalForm({
             setTitle(initialTitle);
             setContent(initialContent);
             setTypeChangedSinceAutofill(false);
-            lastAutofilledType.current = selectedType;
+            // Use the explicit prop — not selectedType — so we track
+            // the type the AI actually formatted for, even if the user
+            // changed selectedType during the autofill request.
+            lastAutofilledType.current = autofilledType;
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [initialTitle, initialContent, isAutofilling]);
+    }, [initialTitle, initialContent, isAutofilling, autofilledType]);
 
     const handleTypeChange = (newType: PinnableType) => {
         setSelectedType(newType);
@@ -283,6 +289,8 @@ interface PinToWorkspaceModalProps {
     isPinning?: boolean;
     /** Whether AI autofill is running */
     isAutofilling?: boolean;
+    /** The pin type used for the most recent autofill (tracks correct type even if user changes during autofill) */
+    autofilledType?: PinnableType;
     /** Original raw source text (preserved for metadata) */
     rawSourceText?: string;
     /** Callback to re-run autofill with a different pin type */
@@ -298,6 +306,7 @@ export function PinToWorkspaceModal({
     initialTitle = '',
     isPinning = false,
     isAutofilling = false,
+    autofilledType = 'key_fact',
     onReformat,
 }: PinToWorkspaceModalProps) {
     return (
@@ -333,6 +342,7 @@ export function PinToWorkspaceModal({
                             initialTitle={initialTitle}
                             isPinning={isPinning}
                             isAutofilling={isAutofilling}
+                            autofilledType={autofilledType}
                             onClose={onClose}
                             onReformat={onReformat}
                         />

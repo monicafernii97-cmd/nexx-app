@@ -23,6 +23,9 @@ import { SaveToCaseModal } from '@/components/chat/SaveToCaseModal';
 import { PinToWorkspaceModal } from '@/components/chat/PinToWorkspaceModal';
 import type { PinAutofillResult, PinConfidence } from '@/lib/pins/types';
 
+// Re-export PinnableType default used for initial autofill
+const DEFAULT_PIN_TYPE: PinnableType = 'key_fact';
+
 // ---------------------------------------------------------------------------
 // Save-type mapping (action → caseMemory save type)
 // ---------------------------------------------------------------------------
@@ -81,6 +84,8 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
     // ── Pin autofill state ──
     const [isAutofilling, setIsAutofilling] = useState(false);
     const [rawPinSource, setRawPinSource] = useState('');
+    /** Tracks the pin type that was used for the most recent autofill request. */
+    const [autofilledType, setAutofilledType] = useState<PinnableType>(DEFAULT_PIN_TYPE);
     const [autofillMeta, setAutofillMeta] = useState<{
         confidence?: PinConfidence;
         detectedDate?: string | null;
@@ -183,7 +188,9 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
 
     // ── Fetch pin autofill from API ──
     const fetchPinAutofill = useCallback(
-        async (rawText: string, pinType: PinnableType = 'key_fact') => {
+        async (rawText: string, pinType: PinnableType = DEFAULT_PIN_TYPE) => {
+            // Record which type we’re formatting for
+            setAutofilledType(pinType);
             try {
                 const res = await fetch('/api/pins/autofill', {
                     method: 'POST',
@@ -367,6 +374,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                 initialTitle={modalSeedTitle}
                 isPinning={isPinning}
                 isAutofilling={isAutofilling}
+                autofilledType={autofilledType}
                 rawSourceText={rawPinSource}
                 onReformat={(pinType) => {
                     setIsAutofilling(true);

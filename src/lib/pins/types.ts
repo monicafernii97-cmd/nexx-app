@@ -19,6 +19,31 @@ import type { PinnableType } from '@/lib/integration/types';
 export type PinConfidence = 'low' | 'medium' | 'high';
 
 // ═══════════════════════════════════════════════════════════════
+// Runtime Constants (shared across Next.js-side files)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Canonical set of valid pin types for runtime validation.
+ *
+ * Single source of truth for Next.js-side code. Convex validators
+ * maintain their own copy due to the server isolation boundary.
+ */
+export const VALID_PIN_TYPES = new Set<string>([
+  'key_fact',
+  'strategy_point',
+  'good_faith_point',
+  'strength_highlight',
+  'risk_concern',
+  'hearing_prep_point',
+  'draft_snippet',
+  'question_to_verify',
+  'timeline_anchor',
+]);
+
+/** Canonical set of valid confidence levels for runtime validation. */
+export const VALID_CONFIDENCE = new Set<string>(['low', 'medium', 'high']);
+
+// ═══════════════════════════════════════════════════════════════
 // Autofill Input / Output
 // ═══════════════════════════════════════════════════════════════
 

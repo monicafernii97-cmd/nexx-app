@@ -4,9 +4,54 @@
  * JurisdictionProfile drives how rendered HTML looks — page geometry,
  * typography, caption layout, section rules, and PDF settings.
  *
+ * CourtSettings is the clean, external-facing domain contract for
+ * court configuration. SavedCourtSettings (in the resolver) is the
+ * Convex-native storage shape — the two are bridged by
+ * mapSavedToCourtSettings().
+ *
  * Profiles are resolved per state/county/court and can be extended
  * over time without changing the parser.
  */
+
+// ═══════════════════════════════════════════════════════════════
+// External-Facing Court Settings (Domain Contract)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Clean, external-facing court settings contract.
+ *
+ * Used by:
+ *  - API routes & export pipelines (domain boundary)
+ *  - `loadCourtSettings()` return type
+ *  - Future external integrations
+ *
+ * NOT coupled to Convex record shape. The internal
+ * `SavedCourtSettings` is mapped to this via `mapSavedToCourtSettings()`.
+ */
+export type CourtSettings = {
+  jurisdiction: {
+    country?: string;
+    state?: string;
+    county?: string;
+    courtName?: string;
+    courtType?: string;
+    district?: string;
+    division?: string;
+  };
+  formatting?: {
+    pleadingStyle?: 'caption_table' | 'federal_caption' | 'simple_caption';
+    defaultFont?: string;
+    defaultFontSizePt?: number;
+    lineSpacing?: number;
+    pageSize?: 'LETTER' | 'A4' | 'LEGAL';
+    pageMarginsPt?: {
+      top: number;
+      right: number;
+      bottom: number;
+      left: number;
+    };
+  };
+};
 
 // ═══════════════════════════════════════════════════════════════
 // Jurisdiction Profile
@@ -72,3 +117,4 @@ export type JurisdictionProfile = {
     waitUntil: 'networkidle0' | 'networkidle2';
   };
 };
+

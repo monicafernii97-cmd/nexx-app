@@ -19,13 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-
-      - uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4.0.3
-        with:
-          node-version: 20
-          cache: npm
-
-      - run: npm ci
+      - uses: ./.github/actions/setup-node
 
       - name: Type Check
         run: npx tsc --noEmit
@@ -36,13 +30,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-
-      - uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4.0.3
-        with:
-          node-version: 20
-          cache: npm
-
-      - run: npm ci
+      - uses: ./.github/actions/setup-node
 
       - name: Run Tests
         run: npx vitest run --reporter=verbose
@@ -52,13 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-
-      - uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4.0.3
-        with:
-          node-version: 20
-          cache: npm
-
-      - run: npm ci
+      - uses: ./.github/actions/setup-node
 
       - name: Lint
         run: npm run lint
@@ -74,14 +56,7 @@ jobs:
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_placeholder"
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-
-      - uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4.0.3
-        with:
-          node-version: 20
-          cache: npm
-
-      - run: npm ci
+      - uses: ./.github/actions/setup-node
 
       - name: Build
         run: npm run build
-

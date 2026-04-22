@@ -349,10 +349,27 @@ export async function POST(request: NextRequest) {
                                 drafts,
                             );
 
-                            // Update the assembly result in-place for downstream use
+                            // Store patched sections for downstream exhibit renderer.
+                            // Currently the exhibit path renders through draftedSections
+                            // (GPT-drafted body content). When the dedicated exhibit
+                            // packet renderer is built, it will consume these patched
+                            // mappedSections for cover sheet headings/summaries.
                             if (body.assemblyResult?.assembly) {
                                 (body.assemblyResult.assembly as { mappedSections: ExhibitMappedSections })
                                     .mappedSections = patchedSections;
+                            }
+
+                            // Also inject patched cover data into draftedSections
+                            // so the current render path picks up updated headings.
+                            for (const draft of Object.values(drafts)) {
+                                if (draft.source === 'ai_drafted' && draft.summaryLines.length > 0) {
+                                    draftedSections.push({
+                                        sectionId: `exhibit_cover_${draft.label}`,
+                                        heading: draft.title || `Exhibit ${draft.label}`,
+                                        body: draft.summaryLines.join('\n'),
+                                        source: 'ai_drafted' as const,
+                                    });
+                                }
                             }
 
                             const aiCount = Object.values(drafts)

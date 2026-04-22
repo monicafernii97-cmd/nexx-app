@@ -2,7 +2,8 @@
  * Exhibit Cover Draft Response Parser (Hardened)
  *
  * Parses JSON output from the AI response with strict validation:
- * - Ensures summaryLines is an array of non-empty strings
+ * - Rejects non-string values (no String() coercion of objects)
+ * - Ensures summaryLines is an array of actual strings
  * - Caps at 4 lines
  * - Enforces minimum 2 lines (else signals parse failure)
  * - Enforces sentence formatting (ends with period)
@@ -29,11 +30,12 @@ export function parseExhibitCoverDraftResponse(raw: string): ParsedExhibitDraft 
       return { summaryLines: [] };
     }
 
-    // Extract and validate summaryLines
+    // Extract and validate summaryLines — reject non-string values
     const rawLines = Array.isArray(parsed.summaryLines) ? parsed.summaryLines : [];
 
     const cleaned = rawLines
-      .map((line: unknown) => String(line || '').trim())
+      .filter((line: unknown): line is string => typeof line === 'string')
+      .map((line: string) => line.trim())
       .filter(Boolean)
       // Enforce sentence formatting: must end with period
       .map((line: string) => (line.endsWith('.') ? line : `${line}.`))
@@ -45,12 +47,14 @@ export function parseExhibitCoverDraftResponse(raw: string): ParsedExhibitDraft 
     }
 
     return {
-      label: parsed.label ? String(parsed.label).trim() : undefined,
-      title: parsed.suggestedTitle
-        ? String(parsed.suggestedTitle).trim()
-        : parsed.title
-          ? String(parsed.title).trim()
-          : undefined,
+      // Validate types — only accept actual strings, never coerce
+      label: typeof parsed.label === 'string' ? parsed.label.trim() : undefined,
+      title:
+        typeof parsed.suggestedTitle === 'string'
+          ? parsed.suggestedTitle.trim()
+          : typeof parsed.title === 'string'
+            ? parsed.title.trim()
+            : undefined,
       summaryLines: cleaned,
     };
   } catch {

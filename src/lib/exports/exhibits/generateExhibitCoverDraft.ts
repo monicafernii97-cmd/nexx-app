@@ -137,7 +137,7 @@ async function tryGenerate(prompt: {
 }
 
 /**
- * Check if an error is non-retryable (auth, configuration, or transport).
+ * Check if an error is non-retryable (auth, transport, abort, or timeout).
  *
  * Uses duck-typing to detect OpenAI SDK error classes without
  * requiring specific imports that may change across SDK versions.
@@ -157,6 +157,13 @@ function isNonRetryableError(error: unknown): boolean {
   // API connection errors (DNS, network)
   if (err.name === 'APIConnectionError') return true;
   if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') return true;
+
+  // Abort / timeout errors — don't retry, respect the 30s ceiling
+  if (err.name === 'AbortError') return true;
+  if (err.name === 'TimeoutError') return true;
+  if (err.name === 'APIUserAbortError') return true;
+  if (err.name === 'APIConnectionTimeoutError') return true;
+  if (err.code === 'ETIMEDOUT') return true;
 
   return false;
 }

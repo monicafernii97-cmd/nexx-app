@@ -359,15 +359,18 @@ export async function POST(request: NextRequest) {
                                     .mappedSections = patchedSections;
                             }
 
-                            // Also inject patched cover data into draftedSections
-                            // so the current render path picks up updated headings.
+                            // Inject all cover drafts into draftedSections
+                            // so the current render path picks up both AI
+                            // and fallback summaries.
                             for (const draft of Object.values(drafts)) {
-                                if (draft.source === 'ai_drafted' && draft.summaryLines.length > 0) {
+                                if (draft.summaryLines.length > 0) {
                                     draftedSections.push({
                                         sectionId: `exhibit_cover_${draft.label}`,
                                         heading: draft.title || `Exhibit ${draft.label}`,
                                         body: draft.summaryLines.join('\n'),
-                                        source: 'ai_drafted' as const,
+                                        source: draft.source === 'ai_drafted'
+                                            ? 'ai_drafted' as const
+                                            : 'user_locked' as const,
                                     });
                                 }
                             }
@@ -388,6 +391,15 @@ export async function POST(request: NextRequest) {
                                     aiCount,
                                     fallbackCount,
                                 },
+                            });
+                        } else {
+                            // No cover sheet summaries to draft — complete SSE contract
+                            send({
+                                type: 'milestone',
+                                stage: 'drafting',
+                                percent: 72,
+                                message: 'No exhibit covers to draft',
+                                exhibitCoverDrafting: { mode: 'fallback', count: 0, aiCount: 0, fallbackCount: 0 },
                             });
                         }
                     } catch (exhibitErr) {

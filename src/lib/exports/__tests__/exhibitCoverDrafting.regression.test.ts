@@ -575,4 +575,20 @@ describe('generateExhibitCoverDraft — orchestration', () => {
     expect(createMock).toHaveBeenCalledTimes(1);
     expect(result.source).toBe('raw_fallback_no_ai');
   });
+
+  it('skips retry on abort/timeout errors', async () => {
+    const abortError = Object.assign(new Error('Request was aborted'), {
+      name: 'AbortError',
+    });
+    const createMock = vi.fn().mockRejectedValue(abortError);
+    mockGetOpenAIClient.mockReturnValue({
+      responses: { create: createMock },
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    const result = await generateExhibitCoverDraft(testInput);
+
+    // Abort errors are non-retryable — only 1 call
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(result.source).toBe('raw_fallback_no_ai');
+  });
 });

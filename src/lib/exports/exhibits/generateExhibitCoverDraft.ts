@@ -53,6 +53,8 @@ const EXHIBIT_DRAFT_TIMEOUT_MS = 30_000;
 export async function generateExhibitCoverDraft(
   input: ExhibitCoverDraftInput,
 ): Promise<ExhibitCoverDraftResult> {
+  // Normalize: treat whitespace-only title as absent
+  const normalizedTitle = input.title?.trim() || undefined;
   const prompt = buildJurisdictionAwareExhibitPrompt(input);
 
   // First attempt
@@ -60,7 +62,7 @@ export async function generateExhibitCoverDraft(
   if (first.summaryLines.length >= 2) {
     return {
       label: input.label,
-      title: first.title || input.title,
+      title: first.title || normalizedTitle,
       summaryLines: first.summaryLines,
       source: 'ai_drafted',
     };
@@ -72,7 +74,7 @@ export async function generateExhibitCoverDraft(
     if (second.summaryLines.length >= 2) {
       return {
         label: input.label,
-        title: second.title || input.title,
+        title: second.title || normalizedTitle,
         summaryLines: second.summaryLines,
         source: 'ai_drafted',
       };
@@ -82,7 +84,7 @@ export async function generateExhibitCoverDraft(
   // Deterministic fallback — never returns empty
   return {
     label: input.label,
-    title: input.title || `Exhibit ${input.label}`,
+    title: normalizedTitle || `Exhibit ${input.label}`,
     summaryLines: buildFallbackSummaryLines(input),
     source: 'raw_fallback_no_ai',
   };
@@ -181,23 +183,28 @@ function isNonRetryableError(error: unknown): boolean {
 export function buildFallbackSummaryLines(input: ExhibitCoverDraftInput): string[] {
   const lines: string[] = [];
 
-  if (input.documentType && input.dateRange) {
+  // Normalize: treat whitespace-only values as absent
+  const documentType = input.documentType?.trim() || undefined;
+  const dateRange = input.dateRange?.trim() || undefined;
+  const title = input.title?.trim() || undefined;
+  const description = input.description?.trim().replace(/[.]+$/, '') || undefined;
+
+  if (documentType && dateRange) {
     lines.push(
-      `This exhibit contains ${input.documentType.toLowerCase()} dated ${input.dateRange}.`,
+      `This exhibit contains ${documentType.toLowerCase()} dated ${dateRange}.`,
     );
-  } else if (input.documentType) {
+  } else if (documentType) {
     lines.push(
-      `This exhibit contains ${input.documentType.toLowerCase()} relevant to the matters in this case.`,
+      `This exhibit contains ${documentType.toLowerCase()} relevant to the matters in this case.`,
     );
   }
 
-  if (input.title) {
-    lines.push(`The materials are identified as "${input.title}".`);
+  if (title) {
+    lines.push(`The materials are identified as "${title}".`);
   }
 
-  if (input.description) {
-    const desc = input.description.trim().replace(/\.$/, '');
-    lines.push(`The content relates to ${desc}.`);
+  if (description) {
+    lines.push(`The content relates to ${description}.`);
   }
 
   // Guarantee minimum 2 lines — always court-safe output

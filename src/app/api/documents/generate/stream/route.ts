@@ -117,17 +117,17 @@ export async function POST(request: NextRequest) {
         // Flatten raw pasted content into a single string for parsing
         const rawText = Array.isArray(body.bodyContent)
           ? (body.bodyContent as Array<{ heading?: string; paragraphs?: string[]; content?: string; numberedItems?: string[] }>)
-              .flatMap(item => {
-                const parts: string[] = [];
-                if (item.heading) parts.push(item.heading);
-                if (item.paragraphs) parts.push(...item.paragraphs);
-                if (item.content) parts.push(item.content);
-                if (item.numberedItems) {
-                  parts.push(...item.numberedItems.map((ni, idx) => `${idx + 1}. ${ni}`));
-                }
-                return parts;
-              })
-              .join('\n')
+            .flatMap(item => {
+              const parts: string[] = [];
+              if (item.heading) parts.push(item.heading);
+              if (item.paragraphs) parts.push(...item.paragraphs);
+              if (item.content) parts.push(item.content);
+              if (item.numberedItems) {
+                parts.push(...item.numberedItems.map((ni, idx) => `${idx + 1}. ${ni}`));
+              }
+              return parts;
+            })
+            .join('\n')
           : String(body.bodyContent ?? '');
 
         // Resolve template once for caseType and fallback title

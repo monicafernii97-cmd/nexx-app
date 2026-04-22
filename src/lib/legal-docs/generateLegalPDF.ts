@@ -52,7 +52,7 @@ const MIN_RENDERED_HTML_LENGTH = 200;
 /** How the jurisdiction profile was resolved — for observability and debugging. */
 export type ProfileResolutionSource =
   | 'court_exact_match'
-  | 'county_state_match'
+  | 'state_fallback_unmatched_county'
   | 'state_default'
   | 'global_default';
 
@@ -271,7 +271,8 @@ function deriveProfileResolutionMeta(
     // County-specific profile (e.g. tx-fort-bend-387th)
     source = 'court_exact_match';
   } else if (profile.state && settings.jurisdiction?.county) {
-    source = 'county_state_match';
+    // County was provided but no county-specific profile exists — fall back to state
+    source = 'state_fallback_unmatched_county';
   } else if (profile.state) {
     source = 'state_default';
   }

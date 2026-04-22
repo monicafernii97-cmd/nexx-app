@@ -106,7 +106,8 @@ describe('loadCourtSettingsForPipeline — merge precedence', () => {
     });
 
     // The loader normalizes nested shapes
-    expect(result.jurisdiction?.state).toBeTruthy();
+    expect(result.jurisdiction?.state).toBe('California');
+    expect(result.jurisdiction?.county).toBe('San Francisco');
   });
 
   it('formatting overrides from document level are preserved', async () => {

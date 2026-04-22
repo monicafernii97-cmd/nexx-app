@@ -342,11 +342,15 @@ export async function POST(request: NextRequest) {
       console.error(`[DocuVault] Pipeline error [${error.code}]:`, error.message);
 
       const statusMap: Record<string, number> = {
+        LEGAL_DOCUMENT_CLASSIFICATION_FAILED: 422,
+        LEGAL_DOCUMENT_PARSE_FAILED: 422,
+        LEGAL_DOCUMENT_PROFILE_RESOLUTION_FAILED: 422,
         LEGAL_DOCUMENT_VALIDATION_FAILED: 422,
         LEGAL_DOCUMENT_RENDER_TOO_SHORT: 500,
         LEGAL_DOCUMENT_RENDER_STRUCTURE_INVALID: 500,
         LEGAL_DOCUMENT_PDF_RENDER_FAILED: 500,
         LEGAL_DOCUMENT_PDF_INVALID: 500,
+        LEGAL_DOCUMENT_FILENAME_FAILED: 500,
       };
 
       return NextResponse.json(

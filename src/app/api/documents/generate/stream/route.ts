@@ -19,7 +19,6 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { titleCase } from '@/lib/utils/stringHelpers';
 import { generateLegalPDF } from '@/lib/legal-docs/generateLegalPDF';
 import { encodeSseEvent, encodeSseComment } from '@/lib/server/sse';
-import { validatePdfBuffer } from '@/lib/pdf/validatePdf';
 
 /** Force Node.js runtime for Puppeteer compatibility. */
 export const runtime = 'nodejs';
@@ -163,12 +162,14 @@ export async function POST(request: NextRequest) {
 
         sendProgress('formatting', 'Rendering Legal Pleading HTML', 60);
 
-        // ── Step 3: Validate PDF ──
+        // ── Step 3: Validate PDF (handled by orchestrator — use pdfMeta) ──
         sendProgress('compliance', 'Validating Document Structure', 70);
 
         if (isAborted()) return;
 
-        const { byteLength, sha256 } = validatePdfBuffer(legalPdf.pdfBuffer);
+        // PDF validation is performed inside generateLegalPDF().
+        // Use the orchestrator's validated result directly.
+        const { byteLength, sha256 } = legalPdf.pdfMeta;
 
         const titleText = legalPdf.parsed.title.main;
         const causeNumber = legalPdf.parsed.metadata.causeNumber;

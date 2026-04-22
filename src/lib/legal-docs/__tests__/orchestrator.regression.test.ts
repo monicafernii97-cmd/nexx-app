@@ -121,7 +121,7 @@ describe('generateLegalPDF — orchestrator', () => {
 
     expect(result.profileResolutionMeta).toBeDefined();
     expect(result.profileResolutionMeta.profileKey).toBe(result.jurisdictionProfile.key);
-    expect(['court_exact_match', 'county_state_match', 'state_default', 'global_default'])
+    expect(['court_exact_match', 'state_fallback_unmatched_county', 'state_default', 'global_default'])
       .toContain(result.profileResolutionMeta.source);
 
     expect(result.documentTypeProfile).toBeDefined();
@@ -160,23 +160,16 @@ describe('generateLegalPDF — orchestrator', () => {
   it('throws LEGAL_DOCUMENT_VALIDATION_FAILED for empty body', async () => {
     const { generateLegalPDF } = await import('../generateLegalPDF');
 
-    await expect(
-      generateLegalPDF({
-        rawText: EMPTY_BODY_TEXT,
-        convexQuery: mockConvexQuery,
-      }),
-    ).rejects.toThrow(LegalDocumentGenerationError);
+    const promise = generateLegalPDF({
+      rawText: EMPTY_BODY_TEXT,
+      convexQuery: mockConvexQuery,
+    });
 
-    try {
-      await generateLegalPDF({
-        rawText: EMPTY_BODY_TEXT,
-        convexQuery: mockConvexQuery,
-      });
-    } catch (err) {
+    await expect(promise).rejects.toThrow(LegalDocumentGenerationError);
+    await promise.catch((err) => {
       expect(err).toBeInstanceOf(LegalDocumentGenerationError);
-      const typed = err as LegalDocumentGenerationError;
-      expect(typed.code).toBe('LEGAL_DOCUMENT_VALIDATION_FAILED');
-    }
+      expect((err as LegalDocumentGenerationError).code).toBe('LEGAL_DOCUMENT_VALIDATION_FAILED');
+    });
   });
 
   it('uses fallbackTitle when parser returns UNTITLED DOCUMENT', async () => {
@@ -207,9 +200,6 @@ describe('generateLegalPDF — orchestrator', () => {
         convexQuery: mockConvexQuery,
       }),
     ).rejects.toThrow(LegalDocumentGenerationError);
-
-    // Restore
-    mockedRender.mockResolvedValue(VALID_PDF_BYTES);
   });
 
   it('includes preflight as advisory (non-blocking)', async () => {

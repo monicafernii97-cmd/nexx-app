@@ -24,7 +24,7 @@ describe('pagination regression — multi-state pleadings', () => {
     const html = renderLegalDocumentHTML(doc, profile);
 
     expect(profile.sections.certificateSeparatePage).toBe(true);
-    expect(html).toContain('certificate-page');
+    expect(html).toContain('certificate-of-service');
     expect(html).toContain('page-break-before: always');
   });
 

@@ -124,7 +124,7 @@ describe('legal document formatter', () => {
       { state: 'Texas', county: 'Fort Bend' },
     );
     const html = renderLegalDocumentHTML(doc, profile);
-    expect(html).toContain('certificate-page');
+    expect(html).toContain('certificate-of-service');
     expect(html).toContain('CERTIFICATE OF SERVICE');
   });
 
@@ -286,11 +286,11 @@ describe('jurisdiction profile resolution', () => {
     expect(profile.key).toBe('tx-default');
   });
 
-  it('resolves US default for unknown state', () => {
+  it('resolves FL default for Florida state', () => {
     const profile = resolveJurisdictionProfile(
       { state: 'Florida', county: 'Whatever' },
     );
-    expect(profile.key).toBe('us-default');
+    expect(profile.key).toBe('fl-default');
     expect(profile.caption.useThreeColumnTable).toBe(false);
   });
 
@@ -442,11 +442,11 @@ describe('mapSavedToCourtSettings', () => {
       judicialDistrict: '387th Judicial District',
     });
 
-    expect(result.jurisdiction.country).toBe('United States');
-    expect(result.jurisdiction.state).toBe('Texas');
-    expect(result.jurisdiction.county).toBe('Fort Bend');
-    expect(result.jurisdiction.courtName).toBe('387th Judicial District Court');
-    expect(result.jurisdiction.district).toBe('387th Judicial District');
+    expect(result.jurisdiction!.country).toBe('United States');
+    expect(result.jurisdiction!.state).toBe('Texas');
+    expect(result.jurisdiction!.county).toBe('Fort Bend');
+    expect(result.jurisdiction!.courtName).toBe('387th Judicial District Court');
+    expect(result.jurisdiction!.district).toBe('387th Judicial District');
   });
 
   it('maps formatting overrides when present', () => {

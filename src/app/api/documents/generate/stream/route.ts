@@ -14,20 +14,10 @@ import { auth } from '@clerk/nextjs/server';
 import { api } from '@convex/_generated/api';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { getTemplate } from '@/lib/legal/templates';
-import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
-import { quickComplianceCheck } from '@/lib/legal/complianceChecker';
 import type { DocumentGenerationRequest } from '@/lib/legal/types';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { titleCase } from '@/lib/utils/stringHelpers';
-import { parseLegalDocument } from '@/lib/legal-docs/parseLegalDocument';
-import { renderLegalDocumentHTML } from '@/lib/legal-docs/renderLegalDocumentHTML';
-import { generateLegalFilename } from '@/lib/legal-docs/generateLegalFilename';
-import { preflightLegalDocument } from '@/lib/legal-docs/preflightLegalDocument';
-import {
-  resolveJurisdictionProfile,
-  toCourtFormattingRules,
-  getEffectiveCourtSettings,
-} from '@/lib/legal-docs/jurisdiction/resolveJurisdictionProfile';
+import { generateLegalPDF } from '@/lib/legal-docs/generateLegalPDF';
 import { encodeSseEvent, encodeSseComment } from '@/lib/server/sse';
 import { validatePdfBuffer } from '@/lib/pdf/validatePdf';
 
@@ -124,27 +114,6 @@ export async function POST(request: NextRequest) {
         // ── Step 1: Analyzing Legal Frameworks ──
         sendProgress('analyzing', 'Analyzing Legal Frameworks', 10);
 
-        const template = getTemplate(body.templateId);
-        if (!template) {
-          controller.enqueue(encodeSseEvent('error', {
-            message: `Template "${body.templateId}" not found`,
-            code: 'TEMPLATE_NOT_FOUND',
-          }, requestId));
-          return;
-        }
-
-        // Infer caseType from template when caller omits it
-        if (!body.caseType) {
-          body.caseType = template.caseTypes[0] ?? 'other';
-        }
-
-        if (isAborted()) return;
-
-        sendProgress('analyzing', 'Analyzing Legal Frameworks', 20);
-
-        // ── Step 2: Parse Legal Document ──
-        sendProgress('normalizing', 'Parsing Document Structure', 30);
-
         // Flatten raw pasted content into a single string for parsing
         const rawText = Array.isArray(body.bodyContent)
           ? (body.bodyContent as Array<{ heading?: string; paragraphs?: string[]; content?: string; numberedItems?: string[] }>)
@@ -161,87 +130,57 @@ export async function POST(request: NextRequest) {
               .join('\n')
           : String(body.bodyContent ?? '');
 
-        const parsed = parseLegalDocument(rawText);
-        const preflight = preflightLegalDocument(parsed);
-
-        console.log(`[QuickGen:${requestId}] parsed: ${parsed.sections.length} sections, title="${parsed.title.main}"`);
-        if (!preflight.ok) {
-          console.warn(`[QuickGen:${requestId}] preflight warnings:`, preflight.warnings);
+        // Resolve template once for caseType and fallback title
+        const template = getTemplate(body.templateId);
+        if (!body.caseType) {
+          body.caseType = template?.caseTypes[0] ?? 'other';
         }
+        const fallbackTitle = template
+          ? template.sections.find(s => s.type === 'title')?.title ?? template.title
+          : undefined;
 
         if (isAborted()) return;
+        sendProgress('analyzing', 'Analyzing Legal Frameworks', 20);
 
-        sendProgress('normalizing', 'Parsing Document Structure', 40);
+        // ── Step 2: Generate via canonical pipeline ──
+        sendProgress('normalizing', 'Parsing Legal Document Structure', 30);
 
-        // ── Step 3: Resolve Jurisdiction Profile ──
+        const legalPdf = await generateLegalPDF({
+          rawText,
+          convexQuery: () => convex.query(api.courtSettings.get, {}),
+          payloadFallback: body.courtSettings,
+          fallbackTitle,
+        });
+
+        if (isAborted()) return;
         sendProgress('formatting', 'Resolving Jurisdiction Profile', 50);
 
-        // Canonical precedence: saved Convex settings → payload → default
-        let effectiveSettings;
-        try {
-          effectiveSettings = await getEffectiveCourtSettings({
-            convexQuery: () => convex.query(api.courtSettings.get, {}),
-            payloadCourtSettings: body.courtSettings,
-          });
-        } catch (err) {
-          console.warn(`[QuickGen:${requestId}] Convex settings unavailable, falling back to payload`, err);
-          effectiveSettings = await getEffectiveCourtSettings({
-            convexQuery: async () => null,
-            payloadCourtSettings: body.courtSettings,
-          });
+        console.log(`[QuickGen:${requestId}] type=${legalPdf.documentType}, jurisdiction=${legalPdf.jurisdictionProfile.key}, profile="${legalPdf.jurisdictionProfile.name}"`);
+        console.log(`[QuickGen:${requestId}] parsed: ${legalPdf.parsed.sections.length} sections, title="${legalPdf.parsed.title.main}"`);
+        if (legalPdf.validation.warnings.length) {
+          console.warn(`[QuickGen:${requestId}] validation warnings:`, legalPdf.validation.warnings);
         }
 
-        const jurisdictionProfile = resolveJurisdictionProfile(effectiveSettings);
-        const formattingRules = toCourtFormattingRules(jurisdictionProfile);
+        sendProgress('formatting', 'Rendering Legal Pleading HTML', 60);
 
-        console.log(`[QuickGen:${requestId}] jurisdiction=${jurisdictionProfile.key}, profile="${jurisdictionProfile.name}"`);
+        // ── Step 3: Validate PDF ──
+        sendProgress('compliance', 'Validating Document Structure', 70);
 
         if (isAborted()) return;
 
-        // ── Step 3b: Render Legal HTML ──
-        // Apply title fallback so render + filename get the resolved title
-        const defaultTitle = template.sections.find(s => s.type === 'title')?.title ?? template.title;
-        if (parsed.title.main === 'UNTITLED DOCUMENT') {
-          parsed.title = { ...parsed.title, main: defaultTitle };
-        }
-        const titleText = parsed.title.main;
+        const { byteLength, sha256 } = validatePdfBuffer(legalPdf.pdfBuffer);
 
-        const html = renderLegalDocumentHTML(parsed, jurisdictionProfile);
+        const titleText = legalPdf.parsed.title.main;
+        const causeNumber = legalPdf.parsed.metadata.causeNumber;
+        const filename = legalPdf.filename;
 
-        if (!html || html.trim().length < 200) {
-          throw new Error('Rendered HTML is empty or too small.');
-        }
-
-        // Derive venue metadata from effective settings (canonical source)
-        const normalizedState = effectiveSettings?.state ? titleCase(effectiveSettings.state) : titleCase(body.courtSettings.state);
-        const normalizedCounty = effectiveSettings?.county ? titleCase(effectiveSettings.county) : titleCase(body.courtSettings.county);
-
-        const causeNumber = parsed.metadata.causeNumber;
-
-        sendProgress('formatting', 'Applying Court Formatting', 60);
-
-        // ── Step 4: Compliance Check ──
-        sendProgress('compliance', 'NEXXverification Compliance', 70);
-
-        if (isAborted()) return;
-
-        quickComplianceCheck(html, formattingRules);
-
-        sendProgress('compliance', 'NEXXverification Compliance', 75);
-
-        // ── Step 5: Rendering PDF ──
-        sendProgress('pdf', 'Rendering PDF', 80);
-
-        if (isAborted()) return;
-
-        const pdfBuffer = await renderHTMLToPDF(html, formattingRules, causeNumber);
-        const { byteLength, sha256 } = validatePdfBuffer(pdfBuffer);
-
-        const filename = generateLegalFilename(parsed);
+        // Derive venue metadata from resolved court settings (canonical source)
+        const normalizedState = titleCase(legalPdf.courtSettings.jurisdiction?.state ?? body.courtSettings.state);
+        const normalizedCounty = titleCase(legalPdf.courtSettings.jurisdiction?.county ?? body.courtSettings.county);
 
         console.log(`[QuickGen:${requestId}] PDF validated: ${byteLength} bytes, sha256=${sha256.slice(0, 12)}…`);
 
-        sendProgress('pdf', 'Rendering PDF', 88);
+        sendProgress('pdf', 'Generating PDF', 85);
 
         // ── Step 6: Storing PDF ──
         sendProgress('storing', 'Storing Document', 90);
@@ -259,10 +198,11 @@ export async function POST(request: NextRequest) {
             'Content-Type': 'application/pdf',
             'Content-Length': String(byteLength),
           },
-          body: new Uint8Array(pdfBuffer),
+          body: new Uint8Array(legalPdf.pdfBuffer),
           cache: 'no-store',
           signal: uploadController.signal,
         });
+
 
         clearTimeout(uploadTimeout);
 

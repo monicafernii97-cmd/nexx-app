@@ -1,26 +1,29 @@
 /**
  * Jurisdiction Profile Resolver
  *
- * Resolves the best-matching JurisdictionProfile based on saved court
- * settings (from Convex userCourtSettings) and parsed document metadata.
+ * Resolves the best-matching JurisdictionProfile based on court
+ * settings and parsed document metadata.
  *
  * Also provides an adapter function to convert JurisdictionProfile
  * into CourtFormattingRules for the existing PDF renderer.
  *
  * Profile resolution order:
- *   specific county profile → state profile → default US profile
+ *   federal → specific county → state profile → default US profile
  *
- * Initial profiles:
- *   1. us-default       — US General Pleading (fallback)
- *   2. tx-default       — Texas State Pleading
- *   3. tx-fort-bend-387th — Texas Fort Bend County 387th
+ * Built-in profiles:
+ *   1. us-default          — US General Pleading (fallback)
+ *   2. tx-default          — Texas State Pleading
+ *   3. tx-fort-bend-387th  — Texas Fort Bend County 387th
+ *   4. fl-default          — Florida State Pleading
+ *   5. ca-default          — California State Pleading
+ *   6. federal-default     — Federal Pleading
  */
 
 import type { JurisdictionProfile, CourtSettings } from './types';
 import type { CourtFormattingRules } from '@/lib/legal/types';
 
 // ═══════════════════════════════════════════════════════════════
-// Saved Court Settings Shape
+// Saved Court Settings Shape (Convex-native)
 // ═══════════════════════════════════════════════════════════════
 
 /**
@@ -56,23 +59,23 @@ const US_DEFAULT_PROFILE: JurisdictionProfile = {
   typography: {
     fontFamily: '"Times New Roman", Times, serif',
     fontSizePt: 12,
-    lineHeightPt: 18,
-    bodyAlign: 'justify',
+    lineHeightPt: 24,
+    bodyAlign: 'left',
     headingBold: true,
     uppercaseHeadings: true,
+    uppercaseTitle: true,
+    uppercaseCaption: true,
   },
   caption: {
     style: 'generic_state_caption',
-    causeLabel: 'CAUSE NO.',
+    causeLabel: 'CASE NO.',
     useThreeColumnTable: false,
-    uppercaseCaption: true,
   },
   sections: {
-    romanHeadingStyle: 'roman',
-    letterHeadingStyle: 'letter',
     prayerHeadingRequired: false,
     certificateSeparatePage: true,
     signatureKeepTogether: true,
+    verificationKeepTogether: true,
   },
   filename: {
     uppercase: true,
@@ -108,6 +111,8 @@ const TX_DEFAULT_PROFILE: JurisdictionProfile = {
     bodyAlign: 'justify',
     headingBold: true,
     uppercaseHeadings: true,
+    uppercaseTitle: true,
+    uppercaseCaption: true,
   },
   caption: {
     style: 'texas_pleading',
@@ -117,14 +122,12 @@ const TX_DEFAULT_PROFILE: JurisdictionProfile = {
     centerWidthIn: 0.083,
     rightWidthIn: 3.125,
     centerSymbol: '§',
-    uppercaseCaption: true,
   },
   sections: {
-    romanHeadingStyle: 'roman',
-    letterHeadingStyle: 'letter',
     prayerHeadingRequired: true,
     certificateSeparatePage: true,
     signatureKeepTogether: true,
+    verificationKeepTogether: true,
   },
   filename: {
     uppercase: true,
@@ -150,6 +153,150 @@ const TX_FORT_BEND_387TH: JurisdictionProfile = {
   county: 'Fort Bend',
 };
 
+const FL_DEFAULT_PROFILE: JurisdictionProfile = {
+  key: 'fl-default',
+  name: 'Florida State Pleading',
+  state: 'Florida',
+  page: {
+    size: 'Letter',
+    widthIn: 8.5,
+    heightIn: 11,
+    marginsPt: { top: 72, right: 72, bottom: 72, left: 72 },
+  },
+  typography: {
+    fontFamily: '"Times New Roman", Times, serif',
+    fontSizePt: 12,
+    lineHeightPt: 24,
+    bodyAlign: 'left',
+    headingBold: true,
+    uppercaseHeadings: true,
+    uppercaseTitle: true,
+    uppercaseCaption: true,
+  },
+  caption: {
+    style: 'generic_state_caption',
+    causeLabel: 'CASE NO.',
+    useThreeColumnTable: false,
+  },
+  sections: {
+    prayerHeadingRequired: false,
+    certificateSeparatePage: true,
+    signatureKeepTogether: true,
+    verificationKeepTogether: true,
+  },
+  filename: {
+    uppercase: true,
+    underscoresOnly: true,
+    includeCauseNumber: true,
+  },
+  pageNumbering: {
+    enabled: false,
+    position: 'bottom-center',
+    format: 'simple',
+  },
+  pdf: {
+    preferCSSPageSize: true,
+    printBackground: true,
+    waitUntil: 'networkidle0',
+  },
+};
+
+const CA_DEFAULT_PROFILE: JurisdictionProfile = {
+  key: 'ca-default',
+  name: 'California State Pleading',
+  state: 'California',
+  page: {
+    size: 'Letter',
+    widthIn: 8.5,
+    heightIn: 11,
+    marginsPt: { top: 72, right: 72, bottom: 72, left: 72 },
+  },
+  typography: {
+    fontFamily: '"Times New Roman", Times, serif',
+    fontSizePt: 12,
+    lineHeightPt: 24,
+    bodyAlign: 'left',
+    headingBold: true,
+    uppercaseHeadings: false,
+    uppercaseTitle: true,
+    uppercaseCaption: true,
+  },
+  caption: {
+    style: 'generic_state_caption',
+    causeLabel: 'CASE NO.',
+    useThreeColumnTable: false,
+  },
+  sections: {
+    prayerHeadingRequired: false,
+    certificateSeparatePage: true,
+    signatureKeepTogether: true,
+    verificationKeepTogether: true,
+  },
+  filename: {
+    uppercase: true,
+    underscoresOnly: true,
+    includeCauseNumber: true,
+  },
+  pageNumbering: {
+    enabled: false,
+    position: 'bottom-center',
+    format: 'simple',
+  },
+  pdf: {
+    preferCSSPageSize: true,
+    printBackground: true,
+    waitUntil: 'networkidle0',
+  },
+};
+
+const FEDERAL_DEFAULT_PROFILE: JurisdictionProfile = {
+  key: 'federal-default',
+  name: 'Federal Pleading',
+  courtType: 'Federal',
+  page: {
+    size: 'Letter',
+    widthIn: 8.5,
+    heightIn: 11,
+    marginsPt: { top: 72, right: 72, bottom: 72, left: 72 },
+  },
+  typography: {
+    fontFamily: '"Times New Roman", Times, serif',
+    fontSizePt: 12,
+    lineHeightPt: 24,
+    bodyAlign: 'left',
+    headingBold: true,
+    uppercaseHeadings: true,
+    uppercaseTitle: true,
+    uppercaseCaption: true,
+  },
+  caption: {
+    style: 'federal_caption',
+    causeLabel: 'CIVIL ACTION NO.',
+    useThreeColumnTable: false,
+  },
+  sections: {
+    prayerHeadingRequired: true,
+    certificateSeparatePage: true,
+    signatureKeepTogether: true,
+    verificationKeepTogether: true,
+  },
+  filename: {
+    uppercase: true,
+    underscoresOnly: true,
+    includeCauseNumber: true,
+  },
+  pageNumbering: {
+    enabled: false,
+    position: 'bottom-center',
+    format: 'simple',
+  },
+  pdf: {
+    preferCSSPageSize: true,
+    printBackground: true,
+    waitUntil: 'networkidle0',
+  },
+};
+
 // ═══════════════════════════════════════════════════════════════
 // Profile Resolution
 // ═══════════════════════════════════════════════════════════════
@@ -157,16 +304,27 @@ const TX_FORT_BEND_387TH: JurisdictionProfile = {
 /**
  * Resolve the best-matching jurisdiction profile.
  *
- * @param settings - Saved court settings from Convex (or null for default)
+ * Accepts both `SavedCourtSettings` (Convex-native) and
+ * `CourtSettings` (clean domain contract). Normalizes internally.
  */
 export function resolveJurisdictionProfile(
-  settings: SavedCourtSettings,
+  settings: SavedCourtSettings | CourtSettings | null | undefined,
 ): JurisdictionProfile {
-  const state = norm(settings?.state);
-  const county = norm(settings?.county);
-  const venue = `${settings?.judicialDistrict ?? ''} ${settings?.courtName ?? ''}`.toLowerCase();
+  const { state, county, venue } = normalizeSettingsInput(settings);
 
-  // Specific county profiles — only match 387th when court/district confirms it
+  // Federal detection — matches full name and common abbreviations
+  const isFederalCourt =
+    venue.includes('united states district court') ||
+    venue.includes('u.s. district court') ||
+    venue.includes('us district court') ||
+    /\busdc\b/.test(venue) ||
+    /\bu\.?s\.?d\.?c\.?\b/.test(venue);
+
+  if (isFederalCourt) {
+    return applyFormattingOverrides(FEDERAL_DEFAULT_PROFILE, settings);
+  }
+
+  // Specific county profiles
   if (state === 'texas' && county === 'fort bend' && /\b387(th)?\b/.test(venue)) {
     return applyFormattingOverrides(TX_FORT_BEND_387TH, settings);
   }
@@ -176,22 +334,80 @@ export function resolveJurisdictionProfile(
     return applyFormattingOverrides(TX_DEFAULT_PROFILE, settings);
   }
 
+  if (state === 'florida') {
+    return applyFormattingOverrides(FL_DEFAULT_PROFILE, settings);
+  }
+
+  if (state === 'california') {
+    return applyFormattingOverrides(CA_DEFAULT_PROFILE, settings);
+  }
+
   // Default
   return applyFormattingOverrides(US_DEFAULT_PROFILE, settings);
 }
 
 /**
+ * Normalize both CourtSettings and SavedCourtSettings into
+ * flat lookup values for profile matching.
+ */
+function normalizeSettingsInput(
+  settings: SavedCourtSettings | CourtSettings | null | undefined,
+): { state: string; county: string; venue: string } {
+  if (!settings) {
+    return { state: '', county: '', venue: '' };
+  }
+
+  // CourtSettings shape: has `.jurisdiction.state`
+  if ('jurisdiction' in settings && settings.jurisdiction) {
+    const j = settings.jurisdiction;
+    return {
+      state: norm(j.state),
+      county: norm(j.county),
+      venue: `${j.courtName ?? ''} ${j.district ?? ''}`.toLowerCase(),
+    };
+  }
+
+  // SavedCourtSettings shape: has `.state` directly
+  if ('state' in settings) {
+    return {
+      state: norm(settings.state),
+      county: norm(settings.county),
+      venue: `${settings.judicialDistrict ?? ''} ${settings.courtName ?? ''}`.toLowerCase(),
+    };
+  }
+
+  return { state: '', county: '', venue: '' };
+}
+
+/**
  * Merge any user formatting overrides on top of the base profile.
- * Formatting overrides come from Convex userCourtSettings.formattingOverrides.
+ * Supports both SavedCourtSettings (Convex overrides) and
+ * CourtSettings (formatting block) shapes.
  */
 function applyFormattingOverrides(
   base: JurisdictionProfile,
-  settings: SavedCourtSettings,
+  settings: SavedCourtSettings | CourtSettings | null | undefined,
 ): JurisdictionProfile {
-  if (!settings?.formattingOverrides) return base;
+  if (!settings) return base;
 
-  const overrides = settings.formattingOverrides;
+  // SavedCourtSettings with formattingOverrides
+  if ('formattingOverrides' in settings && settings.formattingOverrides) {
+    return applySavedOverrides(base, settings.formattingOverrides);
+  }
 
+  // CourtSettings with formatting block
+  if ('formatting' in settings && settings.formatting) {
+    return applyCourtSettingsFormatting(base, settings.formatting);
+  }
+
+  return base;
+}
+
+/** Apply Convex formattingOverrides (CourtFormattingRules partial). */
+function applySavedOverrides(
+  base: JurisdictionProfile,
+  overrides: Partial<CourtFormattingRules>,
+): JurisdictionProfile {
   return {
     ...base,
     page: {
@@ -220,7 +436,6 @@ function applyFormattingOverrides(
       lineHeightPt: overrides.lineSpacing
         ? Math.round((overrides.fontSize ?? base.typography.fontSizePt) * overrides.lineSpacing)
         : overrides.fontSize
-          // fontSize changed but lineSpacing not specified — preserve base ratio
           ? Math.round(overrides.fontSize * (base.typography.lineHeightPt / base.typography.fontSizePt))
           : base.typography.lineHeightPt,
       bodyAlign: overrides.bodyAlignment ?? base.typography.bodyAlign,
@@ -240,6 +455,39 @@ function applyFormattingOverrides(
   };
 }
 
+/** Apply CourtSettings.formatting overrides. */
+function applyCourtSettingsFormatting(
+  base: JurisdictionProfile,
+  formatting: NonNullable<CourtSettings['formatting']>,
+): JurisdictionProfile {
+  const pageSize = formatting.pageSize;
+  const pageMargins = formatting.pageMarginsPt;
+  const fontFamily = formatting.defaultFont;
+  const fontSizePt = formatting.defaultFontSizePt;
+  const lineSpacing = formatting.lineSpacing;
+
+  return {
+    ...base,
+    page: {
+      ...base.page,
+      size:
+        pageSize === 'A4' ? 'A4' :
+        pageSize === 'LEGAL' ? 'Legal' :
+        pageSize === 'LETTER' ? 'Letter' :
+        base.page.size,
+      marginsPt: pageMargins ?? base.page.marginsPt,
+    },
+    typography: {
+      ...base.typography,
+      fontFamily: fontFamily || base.typography.fontFamily,
+      fontSizePt: fontSizePt || base.typography.fontSizePt,
+      lineHeightPt: lineSpacing
+        ? Math.round((fontSizePt || base.typography.fontSizePt) * lineSpacing)
+        : base.typography.lineHeightPt,
+    },
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Adapter: JurisdictionProfile → CourtFormattingRules
 // ═══════════════════════════════════════════════════════════════
@@ -250,7 +498,6 @@ function applyFormattingOverrides(
  */
 export function toCourtFormattingRules(profile: JurisdictionProfile): CourtFormattingRules {
   return {
-    // ── Page Setup ──
     paperWidth: profile.page.widthIn,
     paperHeight: profile.page.heightIn,
     marginTop: profile.page.marginsPt.top / 72,
@@ -258,14 +505,12 @@ export function toCourtFormattingRules(profile: JurisdictionProfile): CourtForma
     marginLeft: profile.page.marginsPt.left / 72,
     marginRight: profile.page.marginsPt.right / 72,
 
-    // ── Typography ──
     fontFamily: profile.typography.fontFamily.replace(/"/g, ''),
     fontSize: profile.typography.fontSizePt,
     lineSpacing: profile.typography.lineHeightPt / profile.typography.fontSizePt,
     footnoteFontSize: 10,
     bodyAlignment: profile.typography.bodyAlign,
 
-    // ── Caption Style ──
     captionStyle: profile.caption.style === 'texas_pleading'
       ? 'section-symbol'
       : profile.caption.style === 'federal_caption'
@@ -278,33 +523,26 @@ export function toCourtFormattingRules(profile: JurisdictionProfile): CourtForma
     },
     causeNumberPosition: 'centered-above',
 
-    // ── Page Structure ──
     pageNumbering: profile.pageNumbering.enabled,
     pageNumberPosition: profile.pageNumbering.position,
     pageNumberFormat: profile.pageNumbering.format,
     footerEnabled: profile.pageNumbering.enabled,
     footerFontSize: 10,
 
-    // ── Paragraph & Heading Formatting ──
     paragraphIndent: 0,
     sectionHeadingStyle: 'bold-caps',
     titleStyle: 'bold-caps-centered',
     spacingBeforeHeading: 1,
     spacingBetweenParagraphs: 1,
 
-    // ── Required Sections ──
-    // These are validation flags (does the court require these sections?),
-    // not layout flags. Most US jurisdictions require both.
     requiresCertificateOfService: true,
     requiresSignatureBlock: true,
     requiresVerification: false,
     requiresCivilCaseInfoSheet: false,
 
-    // ── E-Filing ──
     eFilingMandatory: false,
     redactionRequired: false,
 
-    // ── Notes ──
     notes: [],
   };
 }

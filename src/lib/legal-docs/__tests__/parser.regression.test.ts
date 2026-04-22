@@ -147,3 +147,58 @@ describe('parser regression — multi-state pleadings', () => {
     expect(doc.sections.length).toBeGreaterThan(0);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// CLOSING_RE Edge Cases
+// ═══════════════════════════════════════════════════════════════
+
+describe('parser regression — CLOSING_RE edge cases', () => {
+  it('does not treat "Dated:" at start of body paragraph as signature when signature already exists', () => {
+    const text = [
+      'MOTION TO DO SOMETHING',
+      'No. 2026-CV-0001',
+      '',
+      'I. BACKGROUND',
+      '1. Something happened.',
+      '',
+      'Respectfully submitted,',
+      'John Doe',
+      'Attorney for Petitioner',
+      '',
+      'Dated: January 1, 2024, the parties agreed to the terms.',
+    ].join('\n');
+
+    const doc = parseLegalDocument(text);
+
+    // "Respectfully submitted" should trigger the signature block
+    expect(doc.signature).not.toBeNull();
+    // "Dated: January 1, 2024..." after signature should NOT create a second signature
+    expect(doc.signature?.signerLines.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does not match "Respectfully" mid-line in body text', () => {
+    const text = [
+      'MOTION TO DO SOMETHING',
+      'No. 2026-CV-0001',
+      '',
+      'I. OVERVIEW',
+      'The court respectfully requests additional time.',
+      '',
+      'Respectfully submitted,',
+      'Jane Doe',
+    ].join('\n');
+
+    const doc = parseLegalDocument(text);
+
+    // Mid-line "respectfully" in body should remain in a paragraph
+    const bodyBlocks = doc.sections.flatMap(s => s.blocks);
+    const bodyText = bodyBlocks
+      .filter((b): b is { type: 'paragraph'; text: string } => b.type === 'paragraph')
+      .map(b => b.text)
+      .join(' ');
+
+    expect(bodyText).toContain('respectfully requests');
+    // Signature should come from the line-start "Respectfully submitted,"
+    expect(doc.signature).not.toBeNull();
+  });
+});

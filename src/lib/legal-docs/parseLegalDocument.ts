@@ -23,10 +23,12 @@
 import type {
   LegalDocument,
   CaptionBlock,
+  LegalBlock,
   LegalSection,
   PrayerBlock,
   SignatureBlock,
   CertificateBlock,
+  VerificationBlock,
 } from './types';
 
 // ═══════════════════════════════════════════════════════════════
@@ -44,9 +46,12 @@ const PRAYER_RE = /^PRAYER$/i;
 const WHEREFORE_RE = /^WHEREFORE/i;
 const CERTIFICATE_RE = /^CERTIFICATE OF SERVICE$/i;
 const RESPECTFULLY_RE = /^Respectfully submitted,?$/i;
+const VERIFICATION_RE = /^(VERIFICATION|DECLARATION|UNSWORN DECLARATION)$/i;
+const CLOSING_RE = /^(Respectfully|Signed on|Dated:)/i;
 
 const ROMAN_HEADING_RE = /^([IVXLC]+)\.\s+(.+)$/i;
 const LETTER_HEADING_RE = /^([A-Z])\.\s+(.+)$/;
+const LETTERED_LIST_RE = /^[A-Z]\.\s+/;
 const NUMBERED_ITEM_RE = /^\d+\.\s+/;
 const BULLET_ITEM_RE = /^[•\-]\s+/;
 
@@ -69,7 +74,8 @@ export function parseLegalDocument(rawInput: string): LegalDocument {
   const causeNumber = extractCauseNumber(lines);
   const caption = extractGeneralCaption(lines);
   const title = extractGeneralTitle(lines);
-  const { sections, prayer, signature, certificate } = extractBodyStructure(lines, title.main);
+  const { introBlocks, sections, prayer, signature, certificate, verification } =
+    extractBodyStructure(lines, title.main);
 
   return {
     metadata: {
@@ -80,10 +86,12 @@ export function parseLegalDocument(rawInput: string): LegalDocument {
     },
     caption,
     title,
+    introBlocks,
     sections,
     prayer,
     signature,
     certificate,
+    verification,
     rawText,
   };
 }
@@ -211,6 +219,7 @@ function tryTexasCaption(lines: string[]): CaptionBlock | null {
     leftLines: dedupePreserve(leftLines),
     centerLines: centerLines.length ? centerLines : ['§', '§', '§'],
     rightLines: dedupePreserve(rightLines),
+    styleHint: 'texas' as const,
   };
 }
 
@@ -267,6 +276,7 @@ function tryFederalCaption(lines: string[]): CaptionBlock | null {
       leftLines: dedupePreserve(leftLines).slice(-6),
       centerLines: ['v.'],
       rightLines: dedupePreserve(rightLines).slice(0, 6),
+      styleHint: 'federal' as const,
     };
   }
 
@@ -308,6 +318,7 @@ function tryFederalCaption(lines: string[]): CaptionBlock | null {
         leftLines: dedupePreserve(leftLines).slice(-6),
         centerLines: ['v.'],
         rightLines: dedupePreserve(rightLines).slice(0, 6),
+        styleHint: 'federal' as const,
       };
     }
   }
@@ -332,6 +343,7 @@ function tryGenericCaption(lines: string[]): CaptionBlock | null {
     leftLines: dedupePreserve(leftLines),
     centerLines: [''],
     rightLines: dedupePreserve(rightLines),
+    styleHint: /IN RE|IN THE MATTER/i.test(leftLines.join(' ')) ? 'in_re' as const : 'generic' as const,
   };
 }
 
@@ -381,8 +393,8 @@ function findTitleIndex(lines: string[]): number {
   return -1;
 }
 
-/** Extract the document title and optional subtitle from pasted text. */
-function extractGeneralTitle(lines: string[]): { main: string; subtitle?: string } {
+/** Extract the document title, optional subtitle, and additional title lines from pasted text. */
+function extractGeneralTitle(lines: string[]): { main: string; subtitle?: string; additionalTitleLines?: string[] } {
   const titleIndex = findTitleIndex(lines);
 
   if (titleIndex === -1) {
@@ -390,24 +402,49 @@ function extractGeneralTitle(lines: string[]): { main: string; subtitle?: string
   }
 
   const main = lines[titleIndex];
-  const subtitle = lines[titleIndex + 1]?.startsWith('(') ? lines[titleIndex + 1] : undefined;
 
-  return { main, subtitle };
+  // Merge consecutive uppercase title-word lines into additional title lines
+  const additionalTitleLines: string[] = [];
+  let nextIdx = titleIndex + 1;
+  while (
+    nextIdx < lines.length &&
+    lines[nextIdx] &&
+    !lines[nextIdx].startsWith('(') &&
+    TITLE_CANDIDATE_RE.test(lines[nextIdx]) &&
+    lines[nextIdx] === lines[nextIdx].toUpperCase() &&
+    !CAUSE_RE.test(lines[nextIdx]) &&
+    !DOCKET_RE.test(lines[nextIdx]) &&
+    !TO_HONORABLE_RE.test(lines[nextIdx]) &&
+    !ROMAN_HEADING_RE.test(lines[nextIdx])
+  ) {
+    additionalTitleLines.push(lines[nextIdx]);
+    nextIdx++;
+  }
+
+  const subtitle = lines[nextIdx]?.startsWith('(') ? lines[nextIdx] : undefined;
+
+  return {
+    main,
+    subtitle,
+    ...(additionalTitleLines.length ? { additionalTitleLines } : {}),
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════
 // Body Structure Extraction
 // ═══════════════════════════════════════════════════════════════
 
-/** Extract body sections, prayer, signature, and certificate. */
+/** Extract intro blocks, body sections, prayer, signature, certificate, and verification. */
 function extractBodyStructure(
   lines: string[],
   mainTitle: string,
 ): {
+  introBlocks: LegalBlock[];
   sections: LegalSection[];
   prayer: PrayerBlock | null;
   signature: SignatureBlock | null;
   certificate: CertificateBlock | null;
+  verification: VerificationBlock | null;
 } {
   const titleIndex = lines.findIndex((l) => l === mainTitle);
   const bodyStart = lines.findIndex((l) => TO_HONORABLE_RE.test(l));
@@ -423,11 +460,14 @@ function extractBodyStructure(
 
   const bodyLines = explodeMergedNumberedParagraphs(lines.slice(startIndex));
 
+  const introBlocks: LegalBlock[] = [];
   const sections: LegalSection[] = [];
   let prayer: PrayerBlock | null = null;
   let signature: SignatureBlock | null = null;
   let certificate: CertificateBlock | null = null;
+  let verification: VerificationBlock | null = null;
   let currentSection: LegalSection | null = null;
+  let foundFirstSection = false;
 
   let i = 0;
   while (i < bodyLines.length) {
@@ -451,11 +491,20 @@ function extractBodyStructure(
       continue;
     }
 
-    // ── Signature ──
-    if (RESPECTFULLY_RE.test(line)) {
+    // ── Signature (extended closing detection) ──
+    if (RESPECTFULLY_RE.test(line) || (!signature && CLOSING_RE.test(line))) {
       if (currentSection) { sections.push(currentSection); currentSection = null; }
       const parsed = parseSignature(bodyLines, i);
       signature = parsed.block;
+      i = parsed.nextIndex;
+      continue;
+    }
+
+    // ── Verification / Declaration ──
+    if (VERIFICATION_RE.test(line)) {
+      if (currentSection) { sections.push(currentSection); currentSection = null; }
+      const parsed = parseVerification(bodyLines, i);
+      verification = parsed.block;
       i = parsed.nextIndex;
       continue;
     }
@@ -473,6 +522,7 @@ function extractBodyStructure(
     const roman = line.match(ROMAN_HEADING_RE);
     if (roman) {
       if (currentSection) sections.push(currentSection);
+      foundFirstSection = true;
       currentSection = {
         id: slugify(line),
         heading: `${roman[1].toUpperCase()}. ${roman[2]}`,
@@ -486,27 +536,33 @@ function extractBodyStructure(
     // ── Letter subsection heading ──
     const letter = line.match(LETTER_HEADING_RE);
     if (letter) {
-      if (!currentSection) {
-        currentSection = { id: 'intro', heading: '', level: 'plain', blocks: [] };
+      const block = { type: 'paragraph' as const, text: `${letter[1]}. ${letter[2]}` };
+      if (!foundFirstSection) {
+        introBlocks.push(block);
+      } else {
+        if (!currentSection) {
+          currentSection = { id: 'intro', heading: '', level: 'plain', blocks: [] };
+        }
+        currentSection.blocks.push(block);
       }
-      // Render letter headings as paragraph blocks so they appear in output
-      currentSection.blocks.push({
-        type: 'paragraph',
-        text: `${letter[1]}. ${letter[2]}`,
-      });
       i++;
       continue;
     }
 
-    // ── Ensure we have a section container ──
-    if (!currentSection) {
-      currentSection = { id: 'intro', heading: '', level: 'plain', blocks: [] };
+    // ── Ensure we have a section container (only after first Roman heading) ──
+    if (foundFirstSection && !currentSection) {
+      currentSection = { id: 'plain', heading: '', level: 'plain', blocks: [] };
     }
 
     // ── Numbered list ──
     if (NUMBERED_ITEM_RE.test(line)) {
       const parsed = collectNumberedList(bodyLines, i);
-      currentSection.blocks.push(parsed.block);
+      if (!foundFirstSection) {
+        introBlocks.push(parsed.block);
+      } else {
+        if (!currentSection) currentSection = { id: 'plain', heading: '', level: 'plain', blocks: [] };
+        currentSection.blocks.push(parsed.block);
+      }
       i = parsed.nextIndex;
       continue;
     }
@@ -514,9 +570,33 @@ function extractBodyStructure(
     // ── Bullet list ──
     if (BULLET_ITEM_RE.test(line)) {
       const parsed = collectBulletList(bodyLines, i);
-      currentSection.blocks.push(parsed.block);
+      if (!foundFirstSection) {
+        introBlocks.push(parsed.block);
+      } else {
+        if (!currentSection) currentSection = { id: 'plain', heading: '', level: 'plain', blocks: [] };
+        currentSection.blocks.push(parsed.block);
+      }
       i = parsed.nextIndex;
       continue;
+    }
+
+    // ── Lettered list (A. B. C.) — only when multiple consecutive ──
+    // Single-item matches (items.length <= 1) intentionally fall through to
+    // paragraph handling to avoid false positives (e.g. "A. Background" heading
+    // being treated as a lettered list). The letter prefix is preserved in
+    // the paragraph text and rendered with bold subheading styling.
+    if (LETTERED_LIST_RE.test(line) && !LETTER_HEADING_RE.test(line)) {
+      const parsed = collectLetteredList(bodyLines, i);
+      if (parsed.block.items.length > 1) {
+        if (!foundFirstSection) {
+          introBlocks.push(parsed.block);
+        } else {
+          if (!currentSection) currentSection = { id: 'plain', heading: '', level: 'plain', blocks: [] };
+          currentSection.blocks.push(parsed.block);
+        }
+        i = parsed.nextIndex;
+        continue;
+      }
     }
 
     // ── Regular paragraph ──
@@ -536,12 +616,20 @@ function extractBodyStructure(
         !WHEREFORE_RE.test(bodyLines[i + 1]) &&
         !CERTIFICATE_RE.test(bodyLines[i + 1]) &&
         !RESPECTFULLY_RE.test(bodyLines[i + 1]) &&
+        !CLOSING_RE.test(bodyLines[i + 1]) &&
+        !VERIFICATION_RE.test(bodyLines[i + 1]) &&
         !TO_HONORABLE_RE.test(bodyLines[i + 1])
       ) {
         i++;
         paragraphLines.push(bodyLines[i]);
       }
-      currentSection.blocks.push({ type: 'paragraph', text: paragraphLines.join(' ') });
+      const block = { type: 'paragraph' as const, text: paragraphLines.join(' ') };
+      if (!foundFirstSection) {
+        introBlocks.push(block);
+      } else {
+        if (!currentSection) currentSection = { id: 'plain', heading: '', level: 'plain', blocks: [] };
+        currentSection.blocks.push(block);
+      }
     }
 
     i++;
@@ -549,7 +637,7 @@ function extractBodyStructure(
 
   if (currentSection) sections.push(currentSection);
 
-  return { sections, prayer, signature, certificate };
+  return { introBlocks, sections, prayer, signature, certificate, verification };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -655,6 +743,37 @@ function collectBulletList(lines: string[], startIndex: number) {
   };
 }
 
+/**
+ * Collect lettered list items (A., B., C.) starting at startIndex.
+ * Handles wrapped lines the same way as numbered lists.
+ */
+function collectLetteredList(lines: string[], startIndex: number) {
+  const items: string[] = [];
+  let i = startIndex;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    if (LETTERED_LIST_RE.test(line)) {
+      items.push(line.replace(/^[A-Z]\.\s+/, '').trim());
+      i++;
+    } else if (
+      items.length > 0 &&
+      line.trim() &&
+      !isStructuralLine(line)
+    ) {
+      items[items.length - 1] += ' ' + line.trim();
+      i++;
+    } else {
+      break;
+    }
+  }
+
+  return {
+    block: { type: 'lettered_list', items } as const,
+    nextIndex: i,
+  };
+}
+
 /** Check if a line is a structural marker that should NOT be treated as list continuation. */
 function isStructuralLine(line: string): boolean {
   return (
@@ -663,7 +782,9 @@ function isStructuralLine(line: string): boolean {
     PRAYER_RE.test(line) ||
     WHEREFORE_RE.test(line) ||
     RESPECTFULLY_RE.test(line) ||
+    CLOSING_RE.test(line) ||
     CERTIFICATE_RE.test(line) ||
+    VERIFICATION_RE.test(line) ||
     TO_HONORABLE_RE.test(line) ||
     NUMBERED_ITEM_RE.test(line) ||
     BULLET_ITEM_RE.test(line) ||
@@ -745,7 +866,7 @@ function parsePrayerFromWherefore(lines: string[], startIndex: number): { block:
 // Signature Parser
 // ═══════════════════════════════════════════════════════════════
 
-/** Parse a signature block starting from "Respectfully submitted,". */
+/** Parse a signature block starting from a closing line ("Respectfully submitted,", "Dated:", etc.). */
 function parseSignature(lines: string[], startIndex: number): { block: SignatureBlock; nextIndex: number } {
   let i = startIndex;
   const signerLines: string[] = [];
@@ -754,13 +875,52 @@ function parseSignature(lines: string[], startIndex: number): { block: Signature
 
   while (i < lines.length) {
     const line = lines[i];
-    if (CERTIFICATE_RE.test(line)) break;
+    if (CERTIFICATE_RE.test(line) || VERIFICATION_RE.test(line)) break;
     if (line !== SEPARATOR_MARKER) signerLines.push(line);
     i++;
   }
 
   return {
     block: { intro, signerLines },
+    nextIndex: i,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Verification Parser
+// ═══════════════════════════════════════════════════════════════
+
+/** Parse a verification/declaration block. */
+function parseVerification(lines: string[], startIndex: number): { block: VerificationBlock; nextIndex: number } {
+  const heading = lines[startIndex];
+  let i = startIndex + 1;
+  const bodyLines: string[] = [];
+  const signerLines: string[] = [];
+  let inSignerBlock = false;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    if (CERTIFICATE_RE.test(line)) break;
+
+    if (line !== SEPARATOR_MARKER && line !== '') {
+      const isSignatureBar = /^_{5,}$/.test(line);
+      const isSlashSignature = /^\/s\/\s*\S+/i.test(line);
+
+      if (isSignatureBar || isSlashSignature) {
+        inSignerBlock = true;
+        signerLines.push(line);
+      } else if (inSignerBlock && line.trim() !== '') {
+        signerLines.push(line);
+      } else {
+        if (inSignerBlock) inSignerBlock = false;
+        bodyLines.push(line);
+      }
+    }
+    i++;
+  }
+
+  return {
+    block: { heading, bodyLines, signerLines },
     nextIndex: i,
   };
 }

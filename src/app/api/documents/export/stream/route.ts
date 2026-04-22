@@ -35,6 +35,10 @@ import type { GeneratedSection, CourtFormattingRules } from '@/lib/legal/types';
 import type { OrchestratorAssemblyResult, ExportOverrides, DraftedSection } from '@/lib/export-assembly/orchestrator';
 import type { ExportRequest, MappingReviewItem } from '@/lib/export-assembly/types/exports';
 import type { PreflightResult } from '@/lib/export-assembly/validation/preflightValidator';
+import { buildExhibitCoverDraftInputs } from '@/lib/exports/exhibits/buildExhibitCoverDraftInputs';
+import { generateExhibitCoverDrafts } from '@/lib/exports/exhibits/generateExhibitCoverDrafts';
+import { applyExhibitCoverDrafts } from '@/lib/exports/exhibits/applyExhibitCoverDrafts';
+import type { ExhibitMappedSections } from '@/lib/export-assembly/types/exports';
 
 export const maxDuration = 120; // Extended for GPT + PDF rendering
 
@@ -312,6 +316,75 @@ export async function POST(request: NextRequest) {
                 }
 
                 checkAborted();
+
+                // ────────────────────────────────────────────────
+                // 2b. EXHIBIT COVER DRAFTING (exhibit_document only)
+                // ────────────────────────────────────────────────
+                if (body.exportRequest?.path === 'exhibit_document') {
+                    try {
+                        send({
+                            type: 'milestone',
+                            stage: 'drafting',
+                            percent: 71,
+                            message: 'Drafting exhibit cover summaries...',
+                        });
+
+                        const mappedSections = body.assemblyResult?.assembly
+                            ?.mappedSections as ExhibitMappedSections | undefined;
+
+                        if (mappedSections?.coverSheetSummaries?.length) {
+                            const draftInputs = buildExhibitCoverDraftInputs(
+                                mappedSections,
+                                {
+                                    state: courtState,
+                                    county: courtCounty,
+                                },
+                            );
+
+                            const drafts = await generateExhibitCoverDrafts(draftInputs);
+
+                            // Apply drafts back — mutates nothing, returns new object
+                            const patchedSections = applyExhibitCoverDrafts(
+                                mappedSections,
+                                drafts,
+                            );
+
+                            // Update the assembly result in-place for downstream use
+                            if (body.assemblyResult?.assembly) {
+                                (body.assemblyResult.assembly as { mappedSections: ExhibitMappedSections })
+                                    .mappedSections = patchedSections;
+                            }
+
+                            const aiCount = Object.values(drafts)
+                                .filter((d) => d.source === 'ai_drafted').length;
+                            const fallbackCount = Object.values(drafts)
+                                .filter((d) => d.source === 'raw_fallback_no_ai').length;
+
+                            send({
+                                type: 'milestone',
+                                stage: 'drafting',
+                                percent: 72,
+                                message: `Exhibit covers drafted (${aiCount} AI, ${fallbackCount} fallback)`,
+                                exhibitCoverDrafting: {
+                                    mode: fallbackCount === 0 ? 'ai' : (aiCount === 0 ? 'fallback' : 'mixed'),
+                                    count: Object.keys(drafts).length,
+                                    aiCount,
+                                    fallbackCount,
+                                },
+                            });
+                        }
+                    } catch (exhibitErr) {
+                        // Advisory — never blocks the export pipeline
+                        console.warn('[ExportStream] Exhibit cover drafting failed:', exhibitErr);
+                        send({
+                            type: 'milestone',
+                            stage: 'drafting',
+                            percent: 72,
+                            message: 'Exhibit cover drafting skipped (using defaults)',
+                            exhibitCoverDrafting: { mode: 'fallback', count: 0, aiCount: 0, fallbackCount: 0 },
+                        });
+                    }
+                }
 
                 const aiDraftedCount = draftedSections.filter(s => s.source === 'ai_drafted').length;
                 const lockedCount = draftedSections.filter(s => s.source === 'user_locked').length;

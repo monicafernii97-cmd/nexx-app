@@ -125,10 +125,28 @@ export async function generateLegalPDF(
   const startTime = Date.now();
 
   // ── 1. Parse ──
-  const rawParsed = parseLegalDocument(rawText);
+  let rawParsed;
+  try {
+    rawParsed = parseLegalDocument(rawText);
+  } catch (err) {
+    throw new LegalDocumentGenerationError({
+      code: 'LEGAL_DOCUMENT_PARSE_FAILED',
+      message: `Legal document parsing failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      details: err,
+    });
+  }
 
   // ── 2. Classify ──
-  const documentType = classifyDocumentType(rawParsed);
+  let documentType;
+  try {
+    documentType = classifyDocumentType(rawParsed);
+  } catch (err) {
+    throw new LegalDocumentGenerationError({
+      code: 'LEGAL_DOCUMENT_CLASSIFICATION_FAILED',
+      message: `Document classification failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      details: err,
+    });
+  }
 
   // ── 3. Enrich parsed document (immutable) ──
   const parsed: LegalDocument = {
@@ -153,8 +171,18 @@ export async function generateLegalPDF(
   });
 
   // ── 5. Resolve jurisdiction profile ──
-  const jurisdictionProfile = resolveJurisdictionProfile(courtSettings);
-  const profileResolutionMeta = deriveProfileResolutionMeta(jurisdictionProfile, courtSettings);
+  let jurisdictionProfile;
+  let profileResolutionMeta;
+  try {
+    jurisdictionProfile = resolveJurisdictionProfile(courtSettings);
+    profileResolutionMeta = deriveProfileResolutionMeta(jurisdictionProfile, courtSettings);
+  } catch (err) {
+    throw new LegalDocumentGenerationError({
+      code: 'LEGAL_DOCUMENT_PROFILE_RESOLUTION_FAILED',
+      message: `Jurisdiction profile resolution failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      details: err,
+    });
+  }
 
   // ── 6. Resolve document-type profile ──
   const documentTypeProfile = DOCUMENT_TYPE_PROFILES[documentType];
@@ -219,14 +247,22 @@ export async function generateLegalPDF(
   }
 
   // ── 14. Generate filename ──
-  const filename = generateLegalFilename(parsed);
+  let filename;
+  try {
+    filename = generateLegalFilename(parsed);
+  } catch (err) {
+    throw new LegalDocumentGenerationError({
+      code: 'LEGAL_DOCUMENT_FILENAME_FAILED',
+      message: `Filename generation failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      details: err,
+    });
+  }
 
   // ── Observability ──
   const durationMs = Date.now() - startTime;
   console.log(
     `[LegalPDF] Generated: type=${documentType}, profile=${profileResolutionMeta.profileKey} (${profileResolutionMeta.source}), ` +
-    `sections=${parsed.sections.length}, html=${html.length}ch, pdf=${pdfMeta.byteLength}b, ` +
-    `file="${filename}", duration=${durationMs}ms`,
+    `sections=${parsed.sections.length}, pdf=${pdfMeta.byteLength}b, duration=${durationMs}ms`,
   );
   if (validation.warnings.length > 0) {
     console.warn(`[LegalPDF] Warnings: ${validation.warnings.join('; ')}`);

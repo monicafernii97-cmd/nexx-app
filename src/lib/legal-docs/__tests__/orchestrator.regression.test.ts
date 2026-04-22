@@ -194,12 +194,16 @@ describe('generateLegalPDF — orchestrator', () => {
 
     const { generateLegalPDF } = await import('../generateLegalPDF');
 
-    await expect(
-      generateLegalPDF({
-        rawText: VALID_TEXAS_PLEADING,
-        convexQuery: mockConvexQuery,
-      }),
-    ).rejects.toThrow(LegalDocumentGenerationError);
+    const promise = generateLegalPDF({
+      rawText: VALID_TEXAS_PLEADING,
+      convexQuery: mockConvexQuery,
+    });
+
+    await expect(promise).rejects.toThrow(LegalDocumentGenerationError);
+    await promise.catch((err) => {
+      expect(err).toBeInstanceOf(LegalDocumentGenerationError);
+      expect((err as LegalDocumentGenerationError).code).toBe('LEGAL_DOCUMENT_PDF_INVALID');
+    });
   });
 
   it('includes preflight as advisory (non-blocking)', async () => {

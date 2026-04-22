@@ -443,10 +443,15 @@ function renderVerification(doc: LegalDocument, profile: JurisdictionProfile): s
 // Helpers
 // ═══════════════════════════════════════════════════════════════
 
-/** Convert 0-based index to letter label: 0→A, 25→Z, 26→AA, 27→AB, etc. */
+/** Convert 0-based index to Excel-style letter label: 0→A, 25→Z, 26→AA, 27→AB, etc. */
 function indexToLetter(idx: number): string {
-  if (idx < 26) return String.fromCharCode(65 + idx);
-  return `A${String.fromCharCode(65 + (idx - 26) % 26)}`;
+  let label = '';
+  let n = idx;
+  do {
+    label = String.fromCharCode(65 + (n % 26)) + label;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return label;
 }
 
 function esc(input: string): string {

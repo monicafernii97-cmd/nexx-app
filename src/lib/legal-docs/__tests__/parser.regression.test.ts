@@ -193,8 +193,8 @@ describe('parser regression — CLOSING_RE edge cases', () => {
     // Mid-line "respectfully" in body should remain in a paragraph
     const bodyBlocks = doc.sections.flatMap(s => s.blocks);
     const bodyText = bodyBlocks
-      .filter(b => b.type === 'paragraph')
-      .map(b => b.type === 'paragraph' ? b.text : '')
+      .filter((b): b is { type: 'paragraph'; text: string } => b.type === 'paragraph')
+      .map(b => b.text)
       .join(' ');
 
     expect(bodyText).toContain('respectfully requests');

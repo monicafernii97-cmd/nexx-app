@@ -81,6 +81,11 @@ export function buildAutoExhibitPacket(
   for (let idx = 0; idx < items.length; idx++) {
     const item = items[idx];
     const label = formatExhibitLabel(idx, config.labelStyle, config.partyName);
+    // For party_numeric labels (e.g. "PETITIONER'S EXHIBIT 1"), the label
+    // already includes "EXHIBIT". Avoid double-prefixing.
+    const displayHeading = label.toUpperCase().includes('EXHIBIT')
+      ? label
+      : `EXHIBIT ${label}`;
 
     // Cover sheet
     if (config.includeCoverSheets) {
@@ -88,7 +93,7 @@ export function buildAutoExhibitPacket(
       const coverSection: ExhibitCoverSection = {
         kind: 'exhibit_cover',
         id: `cover_${label}`,
-        heading: `EXHIBIT ${label}`,
+        heading: displayHeading,
         exhibitLabel: label,
         summaryLines,
         sourceType: item.sourceType,
@@ -97,19 +102,20 @@ export function buildAutoExhibitPacket(
       sections.push(coverSection);
     }
 
-    // Content
-    if (item.content?.trim()) {
+    // Content — use raw text if available, fall back to summary
+    const bodyText = item.content?.trim() || item.summary?.trim();
+    if (bodyText) {
       const contentSection: ExhibitContentSection = {
         kind: 'exhibit_content',
         id: `content_${label}`,
         exhibitLabel: label,
         heading: item.title,
-        paragraphs: item.content
+        paragraphs: bodyText
           .split(/\n\s*\n/)
           .map((p) => p.trim())
           .filter(Boolean),
         sourceType: item.sourceType,
-        stampedTitle: `EXHIBIT ${label}`,
+        stampedTitle: displayHeading,
       };
       sections.push(contentSection);
     }

@@ -27,11 +27,28 @@ describe('validatePdfBuffer', () => {
     expect(() => validatePdfBuffer(fakeBuf)).toThrow('Invalid PDF header');
   });
 
-  it('accepts valid PDF buffer', () => {
-    // Construct a minimal valid PDF-like buffer
-    const header = Buffer.from('%PDF-1.4 ');
-    const body = Buffer.alloc(2048, 'A');
-    const validBuf = Buffer.concat([header, body]);
+  it('accepts structurally valid PDF buffer', () => {
+    // Minimal structurally valid PDF — header, object, xref, trailer, %%EOF
+    const minimalPdf = [
+      '%PDF-1.4',
+      '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj',
+      '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
+      '3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj',
+      'xref',
+      '0 4',
+      '0000000000 65535 f ',
+      '0000000009 00000 n ',
+      '0000000058 00000 n ',
+      '0000000115 00000 n ',
+      'trailer<</Size 4/Root 1 0 R>>',
+      'startxref',
+      '190',
+      '%%EOF',
+    ].join('\n');
+
+    // Pad to exceed MIN_PDF_BYTES (1024)
+    const pdfContent = minimalPdf + '\n' + ' '.repeat(Math.max(0, 1100 - minimalPdf.length));
+    const validBuf = Buffer.from(pdfContent, 'utf8');
 
     const result = validatePdfBuffer(validBuf);
     expect(result.byteLength).toBe(validBuf.length);

@@ -7,8 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { renderExportHTML, MIN_RENDERED_EXPORT_HTML_LENGTH } from '../renderExportHTML';
-import type { CanonicalExportDocument } from '../types';
-import type { ExportJurisdictionProfile } from '../jurisdiction/types';
+import type { CanonicalExportDocument, ExportPath } from '../types';
 import { US_DEFAULT_EXPORT_PROFILE } from '../jurisdiction/profiles/us-default';
 import { TX_DEFAULT_EXPORT_PROFILE } from '../jurisdiction/profiles/tx-default';
 import { FEDERAL_DEFAULT_EXPORT_PROFILE } from '../jurisdiction/profiles/federal-default';
@@ -99,7 +98,7 @@ describe('renderExportHTML — dispatch', () => {
 
   it('falls back to summary renderer for unknown path', () => {
     const doc = makeDoc({
-      path: 'unknown_path' as any,
+      path: 'unknown_path' as ExportPath,
       sections: [{ kind: 'summary_section', id: 's1', heading: 'Test', paragraphs: ['Content.'] }],
     });
     const html = renderExportHTML(doc, US_DEFAULT_EXPORT_PROFILE);

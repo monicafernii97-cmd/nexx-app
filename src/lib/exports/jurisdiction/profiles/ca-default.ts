@@ -1,55 +1,20 @@
 /**
  * California Default Export Jurisdiction Profile
+ *
+ * Inherits from shared base, overrides CA-specific settings.
  */
 
 import type { ExportJurisdictionProfile } from '../types';
+import { BASE_EXPORT_PROFILE } from './base';
 
 export const CA_DEFAULT_EXPORT_PROFILE: ExportJurisdictionProfile = {
+  ...BASE_EXPORT_PROFILE,
   key: 'ca-default',
   name: 'California Default',
   state: 'california',
-
-  page: {
-    size: 'Letter',
-    marginsPt: { top: 72, right: 72, bottom: 72, left: 72 },
-  },
-
-  typography: {
-    fontFamily: "'Times New Roman', Times, serif",
-    fontSizePt: 12,
-    lineHeightPt: 24,
-    bodyAlign: 'left',
-    headingBold: true,
-    uppercaseHeadings: true,
-    uppercaseTitle: true,
-    uppercaseCaption: true,
-  },
-
-  court: {
-    captionStyle: 'generic_state_caption',
-    certificateSeparatePage: false,
-    signatureKeepTogether: true,
-    verificationKeepTogether: true,
-  },
-
   exhibit: {
+    ...BASE_EXPORT_PROFILE.exhibit,
     labelStyleDefault: 'numeric',
-    coverPageRequired: false,
-    indexRequired: true,
     stampedTitleRequired: true,
-    batesEnabledDefault: false,
-    batesPosition: 'footer-right',
-    coverSummaryTone: 'plain_neutral',
-  },
-
-  summary: {
-    includeOverviewHeading: true,
-    timelineAsTable: false,
-  },
-
-  pdf: {
-    preferCSSPageSize: true,
-    printBackground: true,
-    waitUntil: 'networkidle0',
   },
 };

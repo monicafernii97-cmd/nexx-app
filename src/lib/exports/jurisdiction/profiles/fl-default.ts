@@ -1,55 +1,24 @@
 /**
  * Florida Default Export Jurisdiction Profile
+ *
+ * Inherits from shared base, overrides FL-specific settings.
  */
 
 import type { ExportJurisdictionProfile } from '../types';
+import { BASE_EXPORT_PROFILE } from './base';
 
 export const FL_DEFAULT_EXPORT_PROFILE: ExportJurisdictionProfile = {
+  ...BASE_EXPORT_PROFILE,
   key: 'fl-default',
   name: 'Florida Default',
   state: 'florida',
-
-  page: {
-    size: 'Letter',
-    marginsPt: { top: 72, right: 72, bottom: 72, left: 72 },
-  },
-
   typography: {
-    fontFamily: "'Times New Roman', Times, serif",
-    fontSizePt: 12,
-    lineHeightPt: 24,
+    ...BASE_EXPORT_PROFILE.typography,
     bodyAlign: 'justify',
-    headingBold: true,
-    uppercaseHeadings: true,
-    uppercaseTitle: true,
     uppercaseCaption: false,
   },
-
-  court: {
-    captionStyle: 'generic_state_caption',
-    certificateSeparatePage: false,
-    signatureKeepTogether: true,
-    verificationKeepTogether: true,
-  },
-
   exhibit: {
+    ...BASE_EXPORT_PROFILE.exhibit,
     labelStyleDefault: 'numeric',
-    coverPageRequired: false,
-    indexRequired: true,
-    stampedTitleRequired: false,
-    batesEnabledDefault: false,
-    batesPosition: 'footer-right',
-    coverSummaryTone: 'plain_neutral',
-  },
-
-  summary: {
-    includeOverviewHeading: true,
-    timelineAsTable: false,
-  },
-
-  pdf: {
-    preferCSSPageSize: true,
-    printBackground: true,
-    waitUntil: 'networkidle0',
   },
 };

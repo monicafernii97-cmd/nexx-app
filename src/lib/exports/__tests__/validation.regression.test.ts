@@ -96,12 +96,20 @@ describe('validateExportDocument', () => {
   });
 
   describe('timeline_summary', () => {
-    it('warns on no timeline events', () => {
+    it('warns on no timeline events when sections have wrong kind', () => {
+      const result = validateExportDocument(makeDoc({
+        path: 'timeline_summary',
+        sections: [{ kind: 'court_section', id: 'wrong', paragraphs: ['text'] }],
+      }));
+      expect(result.issues.find(i => i.id === 'timeline_no_events')?.severity).toBe('warning');
+    });
+
+    it('does not warn when summary_section narrative content exists', () => {
       const result = validateExportDocument(makeDoc({
         path: 'timeline_summary',
         sections: [{ kind: 'summary_section', id: 's', heading: 'Summary', paragraphs: ['text'] }],
       }));
-      expect(result.issues.find(i => i.id === 'timeline_no_events')?.severity).toBe('warning');
+      expect(result.issues.find(i => i.id === 'timeline_no_events')).toBeUndefined();
     });
   });
 });

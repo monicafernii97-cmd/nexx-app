@@ -1,55 +1,30 @@
 /**
  * Texas Default Export Jurisdiction Profile
+ *
+ * Inherits from shared base, overrides TX-specific settings.
  */
 
 import type { ExportJurisdictionProfile } from '../types';
+import { BASE_EXPORT_PROFILE } from './base';
 
 export const TX_DEFAULT_EXPORT_PROFILE: ExportJurisdictionProfile = {
+  ...BASE_EXPORT_PROFILE,
   key: 'tx-default',
   name: 'Texas Default',
   state: 'texas',
-
-  page: {
-    size: 'Letter',
-    marginsPt: { top: 72, right: 72, bottom: 72, left: 72 },
-  },
-
   typography: {
-    fontFamily: "'Times New Roman', Times, serif",
-    fontSizePt: 12,
-    lineHeightPt: 24,
+    ...BASE_EXPORT_PROFILE.typography,
     bodyAlign: 'justify',
-    headingBold: true,
-    uppercaseHeadings: true,
-    uppercaseTitle: true,
-    uppercaseCaption: true,
   },
-
   court: {
+    ...BASE_EXPORT_PROFILE.court,
     captionStyle: 'texas_pleading',
     certificateSeparatePage: true,
-    signatureKeepTogether: true,
-    verificationKeepTogether: true,
   },
-
   exhibit: {
-    labelStyleDefault: 'alpha',
+    ...BASE_EXPORT_PROFILE.exhibit,
     coverPageRequired: true,
-    indexRequired: true,
     stampedTitleRequired: true,
-    batesEnabledDefault: false,
-    batesPosition: 'footer-right',
     coverSummaryTone: 'formal_neutral',
-  },
-
-  summary: {
-    includeOverviewHeading: true,
-    timelineAsTable: false,
-  },
-
-  pdf: {
-    preferCSSPageSize: true,
-    printBackground: true,
-    waitUntil: 'networkidle0',
   },
 };

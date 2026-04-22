@@ -111,7 +111,13 @@ function getPathChecks(path: ExportPath): CheckFn[] {
 
 const courtChecks: CheckFn[] = [
   (doc) => {
-    if (!doc.metadata.jurisdiction?.state) {
+    // Skip for federal filings — they key on district/division, not state
+    const isFederal =
+      doc.metadata.jurisdiction?.courtType === 'federal' ||
+      doc.metadata.jurisdiction?.courtName?.toLowerCase().includes('district court') ||
+      doc.metadata.jurisdiction?.courtName?.toLowerCase().includes('usdc');
+
+    if (!isFederal && !doc.metadata.jurisdiction?.state) {
       return {
         id: 'court_missing_state',
         severity: 'warning',
@@ -181,9 +187,13 @@ const summaryChecks: CheckFn[] = [
 
 const timelineChecks: CheckFn[] = [
   (doc) => {
+    // Count timeline visual events, dedicated timeline sections,
+    // AND narrative summary_sections (adapter emits these for timeline paths)
     const hasEvents =
-      doc.timelineVisual?.events?.length ||
-      doc.sections.some((s) => s.kind === 'timeline_section');
+      (doc.timelineVisual?.events?.length ?? 0) > 0 ||
+      doc.sections.some(
+        (s) => s.kind === 'timeline_section' || s.kind === 'summary_section',
+      );
     if (!hasEvents) {
       return {
         id: 'timeline_no_events',

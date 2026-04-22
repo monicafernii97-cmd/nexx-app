@@ -12,10 +12,11 @@ describe('buildIncidentTimeline', () => {
     expect(buildIncidentTimeline([])).toEqual([]);
   });
 
-  it('deduplicates events by title + date', () => {
+  it('deduplicates events by title + date (case-insensitive)', () => {
     const events: RawTimelineEvent[] = [
       { date: '2026-03-01', title: 'Incident at school' },
       { date: '2026-03-01', title: 'Incident at school' },
+      { date: '2026-03-01', title: 'INCIDENT AT SCHOOL' },
       { date: '2026-03-01', title: 'Different event' },
     ];
 

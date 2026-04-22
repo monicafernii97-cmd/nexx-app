@@ -60,12 +60,11 @@ describe('buildImageExhibits', () => {
       includeCoverSheets: false,
     });
 
-    if (sections[0].kind === 'exhibit_image') {
-      expect(sections[0].exhibitLabel).toBe('D');
-    }
-    if (sections[1].kind === 'exhibit_chart') {
-      expect(sections[1].exhibitLabel).toBe('E');
-    }
+    expect(sections[0].kind).toBe('exhibit_image');
+    expect((sections[0] as { exhibitLabel: string }).exhibitLabel).toBe('D');
+
+    expect(sections[1].kind).toBe('exhibit_chart');
+    expect((sections[1] as { exhibitLabel: string }).exhibitLabel).toBe('E');
   });
 
   it('uses party_numeric labels', () => {
@@ -76,8 +75,7 @@ describe('buildImageExhibits', () => {
       partyName: 'Respondent',
     });
 
-    if (sections[0].kind === 'exhibit_cover') {
-      expect(sections[0].exhibitLabel).toContain("RESPONDENT'S EXHIBIT 1");
-    }
+    expect(sections[0].kind).toBe('exhibit_cover');
+    expect((sections[0] as { exhibitLabel: string }).exhibitLabel).toContain("RESPONDENT'S EXHIBIT 1");
   });
 });

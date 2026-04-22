@@ -74,9 +74,14 @@ export function escapeHtml(input: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** Escape HTML attribute values. */
+/** Escape HTML attribute values (all XSS-relevant characters). */
 export function escapeAttribute(input: string): string {
-  return input.replace(/"/g, '&quot;');
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ═══════════════════════════════════════════════════════════════

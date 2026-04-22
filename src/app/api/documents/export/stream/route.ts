@@ -27,11 +27,6 @@ import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { runDraftingPhase } from '@/lib/export-assembly/pipelineBridge';
 import { runPreflightChecks } from '@/lib/export-assembly/validation/preflightValidator';
-import { renderDocumentHTML } from '@/lib/legal/templateRenderer';
-import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
-import { getMergedRules } from '@/lib/legal/courtRules';
-import { getTemplate } from '@/lib/legal/templates';
-import type { GeneratedSection, CourtFormattingRules } from '@/lib/legal/types';
 import type { OrchestratorAssemblyResult, ExportOverrides, DraftedSection } from '@/lib/export-assembly/orchestrator';
 import type { ExportRequest, MappingReviewItem } from '@/lib/export-assembly/types/exports';
 import type { PreflightResult } from '@/lib/export-assembly/validation/preflightValidator';
@@ -39,6 +34,17 @@ import { buildExhibitCoverDraftInputs } from '@/lib/exports/exhibits/buildExhibi
 import { generateExhibitCoverDrafts } from '@/lib/exports/exhibits/generateExhibitCoverDrafts';
 import { applyExhibitCoverDrafts } from '@/lib/exports/exhibits/applyExhibitCoverDrafts';
 import type { ExhibitMappedSections } from '@/lib/export-assembly/types/exports';
+import { adaptDraftedToCanonicalExport } from '@/lib/exports/adaptDraftedToCanonicalExport';
+import { renderExportHTML } from '@/lib/exports/renderExportHTML';
+import { validateExportDocument } from '@/lib/exports/validateExportDocument';
+import { buildExportCaption } from '@/lib/exports/buildExportCaption';
+import {
+  resolveExportJurisdictionProfile,
+  toExportFormattingRules,
+} from '@/lib/exports/jurisdiction/resolveExportJurisdictionProfile';
+import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
+import { validatePdfBuffer } from '@/lib/pdf/validatePdf';
+import type { ExportPath } from '@/lib/exports/types';
 
 export const maxDuration = 120; // Extended for GPT + PDF rendering
 
@@ -76,21 +82,9 @@ function generateFilename(caseType: string, exportPath: string, runId: string): 
     return `${sanitizeForFilename(caseType)}_${sanitizeForFilename(exportPath)}_${date}_${shortId}.pdf`;
 }
 
-/**
- * Adapt DraftedSection[] → GeneratedSection[] for the existing templateRenderer.
- *
- * This is a THIN ADAPTER, not a parallel formatting engine. The existing
- * renderDocumentHTML() does all the real work.
- */
-function adaptDraftedToGenerated(sections: DraftedSection[]): GeneratedSection[] {
-    return sections.map(s => ({
-        sectionId: s.sectionId,
-        sectionType: 'body_sections' as const,
-        heading: s.heading,
-        content: s.body,
-        numberedItems: s.numberedItems,
-    }));
-}
+// adaptDraftedToGenerated — REMOVED
+// Replaced by adaptDraftedToCanonicalExport from src/lib/exports/
+// which preserves structural identity per export path.
 
 /** Derive compliance status from preflight result. */
 function deriveComplianceStatus(preflight: PreflightResult): 'pass' | 'warning' | 'error' {
@@ -99,19 +93,9 @@ function deriveComplianceStatus(preflight: PreflightResult): 'pass' | 'warning' 
     return 'pass';
 }
 
-/** Get default court formatting rules for rendering. */
-function getExportRules(request: ExportRequest): CourtFormattingRules {
-    if (request.path === 'court_document' && request.config && 'courtState' in request.config) {
-        const config = request.config as { courtState?: string; courtCounty?: string };
-        return getMergedRules(
-            config.courtState ?? 'Texas',
-            config.courtCounty ?? 'Harris',
-            {},
-        );
-    }
-    // Default rules for non-court documents
-    return getMergedRules('Texas', 'Harris', {});
-}
+// getExportRules — REMOVED
+// Replaced by resolveExportJurisdictionProfile + toExportFormattingRules
+// from the canonical export pipeline.
 
 // ---------------------------------------------------------------------------
 // Route Handler
@@ -492,8 +476,104 @@ export async function POST(request: NextRequest) {
                 });
 
                 // ────────────────────────────────────────────────
-                // 4. RENDER HTML (via existing templateRenderer)
+                // 4. CANONICAL EXPORT: BUILD + VALIDATE + RENDER HTML
                 // ────────────────────────────────────────────────
+                send({
+                    type: 'milestone',
+                    stage: 'rendering_html',
+                    percent: 78,
+                    message: 'Building canonical document...',
+                });
+
+                checkAborted();
+
+                // 4a. Resolve jurisdiction profile
+                const exportProfile = resolveExportJurisdictionProfile({
+                    state: courtState,
+                    county: courtCounty,
+                });
+
+                // 4b. Build caption for court documents
+                const exportPath = (body.exportRequest?.path ?? 'court_document') as ExportPath;
+                const caption = exportPath === 'court_document'
+                    ? buildExportCaption({
+                        style: exportProfile.court.captionStyle,
+                        courtName: undefined,
+                        causeNumber,
+                        petitionerName,
+                        respondentName,
+                        state: courtState,
+                        county: courtCounty,
+                    })
+                    : null;
+
+                // 4c. Build canonical export document
+                const mappedSections = body.assemblyResult?.assembly
+                    ?.mappedSections as ExhibitMappedSections | undefined;
+
+                const canonicalDoc = adaptDraftedToCanonicalExport({
+                    path: exportPath,
+                    title: getTemplateName(body.exportRequest?.path ?? 'general').toUpperCase(),
+                    draftedSections: draftedSections.map((s) => ({
+                        sectionId: s.sectionId,
+                        heading: s.heading,
+                        body: s.body,
+                        numberedItems: s.numberedItems,
+                        source: s.source,
+                    })),
+                    caseId: body.caseId,
+                    causeNumber,
+                    jurisdiction: { state: courtState, county: courtCounty },
+                    partyRole: undefined,
+                    documentType: caseType,
+                    caption,
+                    signature: exportPath === 'court_document'
+                        ? {
+                            intro: 'Respectfully submitted,',
+                            signerLines: [
+                                `_________________________`,
+                                petitionerName,
+                                'Pro Se',
+                            ],
+                        }
+                        : null,
+                    certificate: exportPath === 'court_document'
+                        ? {
+                            heading: 'CERTIFICATE OF SERVICE',
+                            bodyLines: [
+                                `I certify that a true and correct copy of the foregoing was served on all parties of record in accordance with the applicable rules of procedure.`,
+                            ],
+                            signerLines: [
+                                `_________________________`,
+                                petitionerName,
+                            ],
+                        }
+                        : null,
+                    exhibitMappedSections: exportPath === 'exhibit_document'
+                        ? mappedSections ?? null
+                        : null,
+                    exhibitPacket: exportPath === 'exhibit_document'
+                        ? {
+                            packetTitle: getTemplateName('exhibit_document'),
+                            organizationMode: 'chronological',
+                            labelStyle: exportProfile.exhibit.labelStyleDefault,
+                        }
+                        : null,
+                });
+
+                // 4d. Validate canonical document
+                const exportValidation = validateExportDocument(canonicalDoc);
+                if (!exportValidation.canProceed) {
+                    const blockerMsg = exportValidation.issues
+                        .filter((i) => i.severity === 'blocker')
+                        .map((i) => i.message)
+                        .join('; ');
+                    throw Object.assign(
+                        new Error(`Export validation failed: ${blockerMsg}`),
+                        { code: 'render_html_failed' },
+                    );
+                }
+
                 send({
                     type: 'milestone',
                     stage: 'rendering_html',
@@ -501,38 +581,11 @@ export async function POST(request: NextRequest) {
                     message: 'Rendering document HTML...',
                 });
 
-                checkAborted();
-
-                const rules = getExportRules(body.exportRequest);
-                const generatedSections = adaptDraftedToGenerated(draftedSections);
-
-                // Try to use a matching template, fall back to a simple body-only render
-                const templateId = `export_${body.exportRequest?.path ?? 'general'}`;
-                const template = getTemplate(templateId) ?? getTemplate('court_filing_generic');
-
-                let html: string;
-                if (template) {
-                    html = await renderDocumentHTML({
-                        template,
-                        caption: {
-                            causeNumber: causeNumber ?? '_______________',
-                            leftLines: [petitionerName.toUpperCase()],
-                            rightLines: [`${(courtCounty || courtState).toUpperCase()} COUNTY`],
-                            style: courtState === 'Texas' ? 'section-symbol' : 'versus',
-                        },
-                        titleText: getTemplateName(body.exportRequest?.path ?? 'general').toUpperCase(),
-                        bodyContent: generatedSections,
-                        petitioner: { name: petitionerName, role: 'Pro Se', type: 'party' as const, electronicSignature: false },
-                        respondentName,
-                        rules,
-                    });
-                } else {
-                    // Fallback: simple HTML from drafted sections (still uses court CSS)
-                    html = buildFallbackHTML(draftedSections, rules, getTemplateName(body.exportRequest?.path ?? 'general'));
-                }
+                // 4e. Render HTML via path dispatcher
+                const html = renderExportHTML(canonicalDoc, exportProfile);
 
                 // ────────────────────────────────────────────────
-                // 5. RENDER PDF (via existing pdfRenderer)
+                // 5. RENDER PDF + VALIDATE BUFFER
                 // ────────────────────────────────────────────────
                 send({
                     type: 'milestone',
@@ -541,7 +594,11 @@ export async function POST(request: NextRequest) {
                     message: 'Generating PDF...',
                 });
 
+                const rules = toExportFormattingRules(exportProfile);
                 const pdfBuffer = await renderHTMLToPDF(html, rules, causeNumber);
+
+                // Validate PDF buffer before upload
+                validatePdfBuffer(pdfBuffer);
 
                 // Checkpoint: rendering complete
                 await convex.mutation(api.generatedDocumentsExport.updateExportRun, {
@@ -692,72 +749,11 @@ function getTemplateName(exportPath: string): string {
     }
 }
 
-/**
- * Fallback HTML when no matching template is found.
- * Uses the existing court CSS but with a simple section layout.
- * This is NOT a parallel renderer — it's a minimal fallback.
- */
-function buildFallbackHTML(sections: DraftedSection[], rules: CourtFormattingRules, title: string): string {
-    const sectionHTML = sections.map(s => `
-        <div class="section-heading">${escapeHtml(s.heading)}</div>
-        <div class="body-paragraph">${escapeHtml(s.body)}</div>
-        ${s.numberedItems?.length ? `
-        <ol class="numbered-list">
-            ${s.numberedItems.map(item => `<li>${escapeHtml(item)}</li>`).join('\n')}
-        </ol>
-        ` : ''}
-    `).join('\n');
+// buildFallbackHTML — REMOVED
+// Replaced by the canonical export pipeline:
+//   adaptDraftedToCanonicalExport → renderExportHTML (path dispatcher)
+// The generic fallback is no longer needed because every export path
+// now has a dedicated, path-specific renderer.
 
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>${escapeHtml(title)}</title>
-  <style>
-    body {
-      font-family: '${rules.fontFamily}', 'Times New Roman', serif;
-      font-size: ${rules.fontSize}pt;
-      line-height: ${rules.lineSpacing};
-    }
-    .document-title {
-      text-align: center;
-      font-weight: bold;
-      font-size: 14pt;
-      margin: 24pt 0;
-      text-transform: uppercase;
-    }
-    .section-heading {
-      font-weight: bold;
-      margin: 18pt 0 6pt;
-      text-transform: uppercase;
-    }
-    .body-paragraph {
-      text-align: ${rules.bodyAlignment};
-      text-indent: ${rules.paragraphIndent}in;
-      margin-bottom: 12pt;
-    }
-    .numbered-list {
-      margin: 6pt 0 12pt 24pt;
-      padding-left: 0;
-      text-align: ${rules.bodyAlignment};
-    }
-    .numbered-list li {
-      margin-bottom: 6pt;
-    }
-  </style>
-</head>
-<body>
-  <div class="document-title">${escapeHtml(title)}</div>
-  ${sectionHTML}
-</body>
-</html>`;
-}
-
-/** Escape HTML special characters. */
-function escapeHtml(text: string): string {
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
+// escapeHtml — REMOVED
+// Moved to shared renderer primitives at src/lib/exports/renderers/shared.ts

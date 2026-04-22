@@ -35,6 +35,10 @@ import type { GeneratedSection, CourtFormattingRules } from '@/lib/legal/types';
 import type { OrchestratorAssemblyResult, ExportOverrides, DraftedSection } from '@/lib/export-assembly/orchestrator';
 import type { ExportRequest, MappingReviewItem } from '@/lib/export-assembly/types/exports';
 import type { PreflightResult } from '@/lib/export-assembly/validation/preflightValidator';
+import { buildExhibitCoverDraftInputs } from '@/lib/exports/exhibits/buildExhibitCoverDraftInputs';
+import { generateExhibitCoverDrafts } from '@/lib/exports/exhibits/generateExhibitCoverDrafts';
+import { applyExhibitCoverDrafts } from '@/lib/exports/exhibits/applyExhibitCoverDrafts';
+import type { ExhibitMappedSections } from '@/lib/export-assembly/types/exports';
 
 export const maxDuration = 120; // Extended for GPT + PDF rendering
 
@@ -312,6 +316,107 @@ export async function POST(request: NextRequest) {
                 }
 
                 checkAborted();
+
+                // ────────────────────────────────────────────────
+                // 2b. EXHIBIT COVER DRAFTING (exhibit_document only)
+                // ────────────────────────────────────────────────
+                if (body.exportRequest?.path === 'exhibit_document') {
+                    try {
+                        send({
+                            type: 'milestone',
+                            stage: 'drafting',
+                            percent: 71,
+                            message: 'Drafting exhibit cover summaries...',
+                        });
+
+                        const mappedSections = body.assemblyResult?.assembly
+                            ?.mappedSections as ExhibitMappedSections | undefined;
+
+                        if (mappedSections?.coverSheetSummaries?.length) {
+                            const draftInputs = buildExhibitCoverDraftInputs(
+                                mappedSections,
+                                {
+                                    state: courtState,
+                                    county: courtCounty,
+                                },
+                            );
+
+                            const drafts = await generateExhibitCoverDrafts(draftInputs);
+
+                            // Apply drafts back — mutates nothing, returns new object
+                            const patchedSections = applyExhibitCoverDrafts(
+                                mappedSections,
+                                drafts,
+                            );
+
+                            // Store patched sections for downstream exhibit renderer.
+                            // Currently the exhibit path renders through draftedSections
+                            // (GPT-drafted body content). When the dedicated exhibit
+                            // packet renderer is built, it will consume these patched
+                            // mappedSections for cover sheet headings/summaries.
+                            if (body.assemblyResult?.assembly) {
+                                (body.assemblyResult.assembly as { mappedSections: ExhibitMappedSections })
+                                    .mappedSections = patchedSections;
+                            }
+
+                            // Inject all cover drafts into draftedSections
+                            // so the current render path picks up both AI
+                            // and fallback summaries.
+                            for (const draft of Object.values(drafts)) {
+                                if (draft.summaryLines.length > 0) {
+                                    draftedSections.push({
+                                        sectionId: `exhibit_cover_${draft.label}`,
+                                        heading: draft.title || `Exhibit ${draft.label}`,
+                                        body: draft.summaryLines.join('\n'),
+                                        // DraftedSection.source only supports: ai_drafted | user_locked | user_edited
+                                        // Fallback summaries map to user_locked because they are deterministic,
+                                        // non-AI content that should not be regenerated — same semantics as locked.
+                                        source: draft.source === 'ai_drafted'
+                                            ? 'ai_drafted' as const
+                                            : 'user_locked' as const,
+                                    });
+                                }
+                            }
+
+                            const aiCount = Object.values(drafts)
+                                .filter((d) => d.source === 'ai_drafted').length;
+                            const fallbackCount = Object.values(drafts)
+                                .filter((d) => d.source === 'raw_fallback_no_ai').length;
+
+                            send({
+                                type: 'milestone',
+                                stage: 'drafting',
+                                percent: 72,
+                                message: `Exhibit covers drafted (${aiCount} AI, ${fallbackCount} fallback)`,
+                                exhibitCoverDrafting: {
+                                    mode: fallbackCount === 0 ? 'ai' : (aiCount === 0 ? 'fallback' : 'mixed'),
+                                    count: Object.keys(drafts).length,
+                                    aiCount,
+                                    fallbackCount,
+                                },
+                            });
+                        } else {
+                            // No cover sheet summaries to draft — complete SSE contract
+                            send({
+                                type: 'milestone',
+                                stage: 'drafting',
+                                percent: 72,
+                                message: 'No exhibit covers to draft',
+                                exhibitCoverDrafting: { mode: 'fallback', count: 0, aiCount: 0, fallbackCount: 0 },
+                            });
+                        }
+                    } catch (exhibitErr) {
+                        // Advisory — never blocks the export pipeline
+                        console.warn('[ExportStream] Exhibit cover drafting failed:', exhibitErr);
+                        send({
+                            type: 'milestone',
+                            stage: 'drafting',
+                            percent: 72,
+                            message: 'Exhibit cover drafting skipped (using defaults)',
+                            exhibitCoverDrafting: { mode: 'fallback', count: 0, aiCount: 0, fallbackCount: 0 },
+                        });
+                    }
+                }
 
                 const aiDraftedCount = draftedSections.filter(s => s.source === 'ai_drafted').length;
                 const lockedCount = draftedSections.filter(s => s.source === 'user_locked').length;

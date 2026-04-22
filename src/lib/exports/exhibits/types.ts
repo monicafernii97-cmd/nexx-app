@@ -10,6 +10,7 @@
 // Input
 // ═══════════════════════════════════════════════════════════════
 
+/** Input contract for the exhibit cover summary drafting service. */
 export interface ExhibitCoverDraftInput {
   /** Exhibit label (e.g. "A", "B", "1") */
   label: string;
@@ -35,6 +36,7 @@ export interface ExhibitCoverDraftInput {
 // Output
 // ═══════════════════════════════════════════════════════════════
 
+/** Output contract from the exhibit cover summary drafting service. */
 export interface ExhibitCoverDraftResult {
   /** The exhibit label this result applies to */
   label: string;

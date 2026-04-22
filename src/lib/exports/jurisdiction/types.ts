@@ -9,6 +9,7 @@
  * profile resolution based on state/county/court combinations.
  */
 
+/** Jurisdiction-specific formatting profile for the export pipeline. */
 export interface ExportJurisdictionProfile {
   key: string;
   name: string;

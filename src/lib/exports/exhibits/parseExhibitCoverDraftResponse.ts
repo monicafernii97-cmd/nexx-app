@@ -10,6 +10,7 @@
  * - Never throws — returns empty result on failure
  */
 
+/** Parsed and validated result from AI exhibit cover draft response. */
 export interface ParsedExhibitDraft {
   label?: string;
   title?: string;

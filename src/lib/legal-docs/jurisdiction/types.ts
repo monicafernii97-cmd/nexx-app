@@ -29,7 +29,7 @@
  * `SavedCourtSettings` is mapped to this via `mapSavedToCourtSettings()`.
  */
 export type CourtSettings = {
-  jurisdiction: {
+  jurisdiction?: {
     country?: string;
     state?: string;
     county?: string;
@@ -78,25 +78,28 @@ export type JurisdictionProfile = {
     bodyAlign: 'justify' | 'left';
     headingBold: boolean;
     uppercaseHeadings: boolean;
+    /** Whether the document title should be rendered in uppercase. */
+    uppercaseTitle: boolean;
+    /** Whether caption text should be rendered in uppercase. */
+    uppercaseCaption: boolean;
   };
 
   caption: {
-    style: 'texas_pleading' | 'federal_caption' | 'generic_state_caption';
+    style: 'texas_pleading' | 'federal_caption' | 'generic_state_caption' | 'in_re_caption';
     causeLabel: string;
     useThreeColumnTable: boolean;
     leftWidthIn?: number;
     centerWidthIn?: number;
     rightWidthIn?: number;
     centerSymbol?: string;
-    uppercaseCaption: boolean;
   };
 
   sections: {
-    romanHeadingStyle: 'roman' | 'numeric';
-    letterHeadingStyle: 'letter' | 'numeric';
     prayerHeadingRequired: boolean;
     certificateSeparatePage: boolean;
     signatureKeepTogether: boolean;
+    /** Whether verification block should avoid page breaks inside. */
+    verificationKeepTogether: boolean;
   };
 
   filename: {
@@ -117,4 +120,3 @@ export type JurisdictionProfile = {
     waitUntil: 'networkidle0' | 'networkidle2';
   };
 };
-

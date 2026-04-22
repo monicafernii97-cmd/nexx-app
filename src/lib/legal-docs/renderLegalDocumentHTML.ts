@@ -23,6 +23,7 @@
 
 import type { LegalDocument, LegalBlock } from './types';
 import type { JurisdictionProfile } from './jurisdiction/types';
+import type { DocumentTypeProfile } from './document-type/profiles';
 
 // ═══════════════════════════════════════════════════════════════
 // Main Entry Point
@@ -31,6 +32,7 @@ import type { JurisdictionProfile } from './jurisdiction/types';
 export function renderLegalDocumentHTML(
   doc: LegalDocument,
   profile: JurisdictionProfile,
+  _documentTypeProfile?: DocumentTypeProfile,
 ): string {
   const pageSize = profile.page.size === 'Legal'
     ? '8.5in 14in'
@@ -72,7 +74,7 @@ export function renderLegalDocumentHTML(
   .cause-line {
     text-align: center;
     font-weight: 700;
-    ${profile.caption.uppercaseCaption ? 'text-transform: uppercase;' : ''}
+    ${profile.typography.uppercaseCaption ? 'text-transform: uppercase;' : ''}
     margin-bottom: 12pt;
   }
 
@@ -89,7 +91,7 @@ export function renderLegalDocumentHTML(
     vertical-align: middle;
     text-align: center;
     font-weight: 700;
-    ${profile.caption.uppercaseCaption ? 'text-transform: uppercase;' : ''}
+    ${profile.typography.uppercaseCaption ? 'text-transform: uppercase;' : ''}
   }
 
   .caption-left { width: ${profile.caption.leftWidthIn ?? 3.125}in; }
@@ -108,7 +110,7 @@ export function renderLegalDocumentHTML(
   .caption-generic-line {
     text-align: center;
     font-weight: 700;
-    ${profile.caption.uppercaseCaption ? 'text-transform: uppercase;' : ''}
+    ${profile.typography.uppercaseCaption ? 'text-transform: uppercase;' : ''}
     margin: 0;
   }
 
@@ -121,7 +123,7 @@ export function renderLegalDocumentHTML(
   .title-main {
     text-align: center;
     font-weight: 700;
-    text-transform: uppercase;
+    ${profile.typography.uppercaseTitle ? 'text-transform: uppercase;' : ''}
     margin: 8pt 0 4pt;
   }
 
@@ -199,7 +201,7 @@ export function renderLegalDocumentHTML(
   }
 
   /* ── Certificate page break ── */
-  .certificate-page {
+  .certificate-of-service {
     ${profile.sections.certificateSeparatePage ? 'page-break-before: always; break-before: page;' : ''}
   }
 
@@ -207,15 +209,39 @@ export function renderLegalDocumentHTML(
     page-break-inside: avoid;
     break-inside: avoid;
   }
+
+  /* ── Lettered list ── */
+  .lettered-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 12pt;
+  }
+
+  .lettered-list li {
+    margin: 0 0 6pt;
+    padding-left: 18pt;
+    text-indent: -18pt;
+    text-align: ${profile.typography.bodyAlign};
+  }
+
+  /* ── Verification ── */
+  .verification-heading {
+    font-weight: 700;
+    ${profile.typography.uppercaseHeadings ? 'text-transform: uppercase;' : ''}
+    text-align: left;
+    margin: 16pt 0 6pt;
+  }
 </style>
 </head>
 <body>
   <div class="document">
     ${renderCaption(doc, profile)}
-    ${renderTitle(doc)}
+    ${renderTitle(doc, profile)}
+    ${renderIntroBlocks(doc)}
     ${renderSections(doc)}
     ${renderPrayer(doc)}
     ${renderSignature(doc, profile)}
+    ${renderVerification(doc, profile)}
     ${renderCertificate(doc, profile)}
   </div>
 </body>
@@ -274,12 +300,26 @@ function renderCaption(doc: LegalDocument, profile: JurisdictionProfile): string
 // Title
 // ═══════════════════════════════════════════════════════════════
 
-function renderTitle(doc: LegalDocument): string {
+function renderTitle(doc: LegalDocument, _profile: JurisdictionProfile): string {
+  const additionalLines = doc.title.additionalTitleLines?.length
+    ? doc.title.additionalTitleLines.map(l => `<div class="title-main">${esc(l)}</div>`).join('')
+    : '';
+
   return `
     <div class="rule"></div>
     <div class="title-main">${esc(doc.title.main)}</div>
+    ${additionalLines}
     ${doc.title.subtitle ? `<div class="title-subtitle">${esc(doc.title.subtitle)}</div>` : ''}
     <div class="rule"></div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Intro Blocks
+// ═══════════════════════════════════════════════════════════════
+
+function renderIntroBlocks(doc: LegalDocument): string {
+  if (!doc.introBlocks.length) return '';
+  return doc.introBlocks.map(renderBlock).join('');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -309,6 +349,13 @@ function renderBlock(block: LegalBlock): string {
     return `
       <ol class="numbered-list">
         ${block.items.map((item, idx) => `<li>${idx + 1}. ${esc(item)}</li>`).join('')}
+      </ol>`;
+  }
+
+  if (block.type === 'lettered_list') {
+    return `
+      <ol class="lettered-list">
+        ${block.items.map((item, idx) => `<li>${String.fromCharCode(65 + idx)}. ${esc(item)}</li>`).join('')}
       </ol>`;
   }
 
@@ -359,7 +406,7 @@ function renderSignature(doc: LegalDocument, profile: JurisdictionProfile): stri
 function renderCertificate(doc: LegalDocument, profile: JurisdictionProfile): string {
   if (!doc.certificate) return '';
 
-  const pageClass = profile.sections.certificateSeparatePage ? 'certificate-page' : '';
+  const pageClass = profile.sections.certificateSeparatePage ? 'certificate-of-service' : '';
 
   return `
     <div class="${pageClass}">
@@ -367,6 +414,25 @@ function renderCertificate(doc: LegalDocument, profile: JurisdictionProfile): st
       ${doc.certificate.bodyLines.map((line) => `<p class="body-paragraph">${esc(line)}</p>`).join('')}
       <div class="signature-block">
         ${doc.certificate.signerLines.map((line) => `<p class="signature-line">${esc(line)}</p>`).join('')}
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Verification
+// ═══════════════════════════════════════════════════════════════
+
+function renderVerification(doc: LegalDocument, profile: JurisdictionProfile): string {
+  if (!doc.verification) return '';
+
+  const keepClass = profile.sections.verificationKeepTogether ? ' no-break-inside' : '';
+
+  return `
+    <div class="${keepClass}">
+      ${doc.verification.heading ? `<div class="verification-heading">${esc(doc.verification.heading)}</div>` : ''}
+      ${doc.verification.bodyLines.map((line) => `<p class="body-paragraph">${esc(line)}</p>`).join('')}
+      <div class="signature-block">
+        ${doc.verification.signerLines.map((line) => `<p class="signature-line">${esc(line)}</p>`).join('')}
       </div>
     </div>`;
 }

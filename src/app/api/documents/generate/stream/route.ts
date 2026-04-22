@@ -19,7 +19,6 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { titleCase } from '@/lib/utils/stringHelpers';
 import { generateLegalPDF } from '@/lib/legal-docs/generateLegalPDF';
 import { encodeSseEvent, encodeSseComment } from '@/lib/server/sse';
-import { validatePdfBuffer } from '@/lib/pdf/validatePdf';
 
 /** Force Node.js runtime for Puppeteer compatibility. */
 export const runtime = 'nodejs';
@@ -117,17 +116,17 @@ export async function POST(request: NextRequest) {
         // Flatten raw pasted content into a single string for parsing
         const rawText = Array.isArray(body.bodyContent)
           ? (body.bodyContent as Array<{ heading?: string; paragraphs?: string[]; content?: string; numberedItems?: string[] }>)
-              .flatMap(item => {
-                const parts: string[] = [];
-                if (item.heading) parts.push(item.heading);
-                if (item.paragraphs) parts.push(...item.paragraphs);
-                if (item.content) parts.push(item.content);
-                if (item.numberedItems) {
-                  parts.push(...item.numberedItems.map((ni, idx) => `${idx + 1}. ${ni}`));
-                }
-                return parts;
-              })
-              .join('\n')
+            .flatMap(item => {
+              const parts: string[] = [];
+              if (item.heading) parts.push(item.heading);
+              if (item.paragraphs) parts.push(...item.paragraphs);
+              if (item.content) parts.push(item.content);
+              if (item.numberedItems) {
+                parts.push(...item.numberedItems.map((ni, idx) => `${idx + 1}. ${ni}`));
+              }
+              return parts;
+            })
+            .join('\n')
           : String(body.bodyContent ?? '');
 
         // Resolve template once for caseType and fallback title
@@ -163,12 +162,14 @@ export async function POST(request: NextRequest) {
 
         sendProgress('formatting', 'Rendering Legal Pleading HTML', 60);
 
-        // ── Step 3: Validate PDF ──
+        // ── Step 3: Validate PDF (handled by orchestrator — use pdfMeta) ──
         sendProgress('compliance', 'Validating Document Structure', 70);
 
         if (isAborted()) return;
 
-        const { byteLength, sha256 } = validatePdfBuffer(legalPdf.pdfBuffer);
+        // PDF validation is performed inside generateLegalPDF().
+        // Use the orchestrator's validated result directly.
+        const { byteLength, sha256 } = legalPdf.pdfMeta;
 
         const titleText = legalPdf.parsed.title.main;
         const causeNumber = legalPdf.parsed.metadata.causeNumber;

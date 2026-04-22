@@ -3,29 +3,42 @@
  *
  * POST /api/documents/generate
  *
- * Accepts a document generation request, merges court rules,
- * renders HTML from template, converts to PDF, and returns the result.
+ * Accepts a document generation request, drafts content via AI
+ * if needed, and delegates PDF generation to the canonical
+ * `generateLegalPDF()` orchestrator.
+ *
+ * Route responsibilities:
+ *   - Auth / rate limiting
+ *   - Request parsing
+ *   - Template lookup
+ *   - AI drafting (when bodyContent is empty)
+ *   - Delegating to orchestrator
+ *   - HTTP response formatting
+ *
+ * Route does NOT:
+ *   - Parse legal documents
+ *   - Resolve jurisdiction profiles
+ *   - Render HTML or PDF
+ *   - Validate PDF buffers
+ *
+ * All of that is owned by `generateLegalPDF()`.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { api } from '@convex/_generated/api';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
-import { getMergedRules, getCountyRequirements } from '@/lib/legal/courtRules';
+// courtRules is used for AI drafting context and companion form warnings,
+// NOT for rendering — rendering is fully delegated to the orchestrator.
+// eslint-disable-next-line no-restricted-imports
+import { getCountyRequirements, getMergedRules } from '@/lib/legal/courtRules';
 import { getTemplate } from '@/lib/legal/templates';
-import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
 import type { DocumentGenerationRequest } from '@/lib/legal/types';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 import { titleCase } from '@/lib/utils/stringHelpers';
-import { parseLegalDocument } from '@/lib/legal-docs/parseLegalDocument';
-import { renderLegalDocumentHTML } from '@/lib/legal-docs/renderLegalDocumentHTML';
-import { generateLegalFilename } from '@/lib/legal-docs/generateLegalFilename';
-import { preflightLegalDocument } from '@/lib/legal-docs/preflightLegalDocument';
-import {
-  resolveJurisdictionProfile,
-  toCourtFormattingRules,
-  getEffectiveCourtSettings,
-} from '@/lib/legal-docs/jurisdiction/resolveJurisdictionProfile';
+import { generateLegalPDF } from '@/lib/legal-docs/generateLegalPDF';
+import { LegalDocumentGenerationError } from '@/lib/legal-docs/errors';
+import { getEffectiveCourtSettings } from '@/lib/legal-docs/jurisdiction/resolveJurisdictionProfile';
 
 export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
 
@@ -67,9 +80,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Defer courtSettings validation until after canonical settings are resolved
-    // so requests can rely on saved Convex settings or the us-default fallback.
-
     if (!body.petitioner?.name) {
       return NextResponse.json(
         { error: 'petitioner with name is required' },
@@ -92,13 +102,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 2. Resolve effective court settings (canonical source) ──
-    // Precedence: Convex saved settings → payload → default
+    // ── 2. Resolve effective court settings (for drafting context) ──
     let effectiveSettings;
+    let convex: Awaited<ReturnType<typeof getAuthenticatedConvexClient>> | null = null;
     try {
-      const convex = await getAuthenticatedConvexClient();
+      convex = await getAuthenticatedConvexClient();
+      const client = convex;
       effectiveSettings = await getEffectiveCourtSettings({
-        convexQuery: () => convex.query(api.courtSettings.get, {}),
+        convexQuery: () => client.query(api.courtSettings.get, {}),
         payloadCourtSettings: body.courtSettings,
       });
     } catch (err) {
@@ -109,7 +120,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Validate resolved settings (not raw payload) so Convex/default fallback works
+    // Validate resolved settings so Convex/default fallback works
     const normalizedState = titleCase(effectiveSettings?.state ?? body.courtSettings?.state ?? '');
     const normalizedCounty = titleCase(effectiveSettings?.county ?? body.courtSettings?.county ?? '');
 
@@ -120,14 +131,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Priority: NEXX defaults → State → County → User overrides
-    const rules = getMergedRules(
-      normalizedState,
-      normalizedCounty,
-      body.formattingOverrides ?? {}
-    );
-
     // ── 2b. Warn about missing required companion forms ──
+    const rules = getMergedRules(normalizedState, normalizedCounty, body.formattingOverrides ?? {});
     const countyReqs = getCountyRequirements(normalizedState, normalizedCounty);
     const missingForms: string[] = [];
 
@@ -143,12 +148,9 @@ export async function POST(request: NextRequest) {
     // ── 3. Determine document title ──
     const titleText = template.sections.find(s => s.type === 'title')?.title ?? template.title;
 
-    // ── 4b. AI drafting — generate content when bodyContent is empty ──
+    // ── 4. AI drafting — generate content when bodyContent is empty ──
     let bodyContent = body.bodyContent ?? [];
     if (bodyContent.length === 0) {
-      // Only draft section types that actually read from bodyContent.
-      // court_address and certificate_of_service are rendered structurally
-      // by templateRenderer — sending them to the drafter causes false 422s.
       const DRAFTABLE_TYPES = new Set([
         'introduction',
         'body_sections',
@@ -159,7 +161,7 @@ export async function POST(request: NextRequest) {
       const draftableSections = template.sections.filter(s => DRAFTABLE_TYPES.has(s.type));
       const sectionIds = draftableSections.map(s => s.id || s.type);
 
-      // Guard against duplicate keys before Set/Map collapse them
+      // Guard against duplicate keys
       const duplicateRequestedIds = sectionIds.filter((id, index, ids) => ids.indexOf(id) !== index);
       if (duplicateRequestedIds.length > 0) {
         console.error('[DocuVault] Template has non-unique draft section keys:', {
@@ -172,19 +174,13 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // If the template has no body-backed sections, continue with empty bodyContent.
-      // Structural sections (caption, title, signature, court_address, etc.) still render.
       if (sectionIds.length > 0) {
         const { generateDraftContent } = await import('@/lib/nexx/documentDrafter');
 
-        // Build a lookup map from template so we can derive sectionType per section
-        // Use || (not ??) to match sectionIds — treats '' the same as undefined
         const sectionTypeByKey = new Map(
           template.sections.map(section => [section.id || section.type, section.type] as const)
         );
 
-        // Build minimal case context from the request body for the AI drafter
-        // Uses effectiveSettings (canonical source) so drafting matches rendering
         const caseContext: Record<string, unknown> = {
           caseType: body.caseType,
           petitioner: body.petitioner?.name,
@@ -208,7 +204,6 @@ export async function POST(request: NextRequest) {
             caseGraph: caseContext,
           });
         } catch (draftError) {
-          // Sanitize: only log templateId + message, not raw error with case/party data
           const message = draftError instanceof Error ? draftError.message : 'Unknown AI drafting error';
           console.error('[DocuVault] AI drafting failed:', { templateId: body.templateId, message });
           return NextResponse.json(
@@ -238,7 +233,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Validate drafted section IDs against what was requested
+        // Validate drafted section IDs
         const requestedIds = new Set(sectionIds);
         const unknownIds = drafted.filter(d => !requestedIds.has(d.sectionId));
         if (unknownIds.length > 0) {
@@ -249,7 +244,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Reject duplicate sectionIds — schema doesn't enforce uniqueness
+        // Reject duplicate sectionIds
         const duplicateIds = drafted
           .map(d => d.sectionId)
           .filter((id, index, ids) => ids.indexOf(id) !== index);
@@ -272,7 +267,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Transform drafter output to GeneratedSection format, deriving sectionType from template
+        // Transform drafter output to GeneratedSection format
         bodyContent = drafted.map(d => ({
           sectionId: d.sectionId,
           sectionType: sectionTypeByKey.get(d.sectionId) ?? 'body_sections',
@@ -284,9 +279,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── 5. Parse + Render via Jurisdiction-Aware Pipeline ──
-
-    // Flatten bodyContent into raw text for the legal document parser
+    // ── 5. Flatten bodyContent into raw text ──
     const rawText = Array.isArray(bodyContent)
       ? (bodyContent as Array<{ heading?: string; paragraphs?: string[]; content?: string; numberedItems?: string[] }>)
           .flatMap(item => {
@@ -302,73 +295,70 @@ export async function POST(request: NextRequest) {
           .join('\n')
       : String(bodyContent ?? '');
 
-    const parsed = parseLegalDocument(rawText);
-    const preflight = preflightLegalDocument(parsed);
+    // ── 6. Delegate to canonical orchestrator ──
+    const convexQueryFn = convex
+      ? () => convex.query(api.courtSettings.get, {})
+      : async () => null;
 
-    console.log(`[DocuVault] parsed: ${parsed.sections.length} sections, title="${parsed.title.main}"`);
-    if (!preflight.ok) {
-      console.warn('[DocuVault] preflight warnings:', preflight.warnings);
+    const result = await generateLegalPDF({
+      rawText,
+      convexQuery: convexQueryFn,
+      payloadFallback: body.courtSettings,
+      fallbackTitle: titleText,
+    });
 
-      // Reject AI-generated documents that are missing required structural blocks
-      // (caption, signature, certificate) since the parser/render path won't synthesize them.
-      const critical = (preflight.warnings ?? []).filter(
-        (w: string) => /(caption|signature|certificate).*not detected/i.test(w)
-      );
-      if (critical.length > 0) {
-        return NextResponse.json(
-          {
-            error: 'Generated document is missing required structural sections',
-            warnings: preflight.warnings,
-          },
-          { status: 422 }
-        );
-      }
-    }
+    console.log(
+      `[DocuVault] Generated via orchestrator: type=${result.documentType}, ` +
+      `profile=${result.profileResolutionMeta.profileKey} (${result.profileResolutionMeta.source}), ` +
+      `pdf=${result.pdfMeta.byteLength}b, file="${result.filename}"`
+    );
 
-    // Apply title fallback so render + filename use the resolved title
-    if (parsed.title.main === 'UNTITLED DOCUMENT') {
-      parsed.title = { ...parsed.title, main: titleText };
-    }
-
-    // ── 6. Resolve Jurisdiction Profile ──
-    const jurisdictionProfile = resolveJurisdictionProfile(effectiveSettings);
-    const formattingRules = toCourtFormattingRules(jurisdictionProfile);
-
-    console.log(`[DocuVault] jurisdiction=${jurisdictionProfile.key}, profile="${jurisdictionProfile.name}"`);
-
-    // ── 7. Render Legal HTML ──
-    const html = renderLegalDocumentHTML(parsed, jurisdictionProfile);
-
-
-
-    // ── 8. Check if user just wants HTML preview ──
+    // ── 7. Check if user just wants HTML preview ──
     const format = request.nextUrl.searchParams.get('format');
     if (format === 'html') {
       return NextResponse.json({
-        html,
+        html: result.html,
         ...(missingForms.length > 0 ? { missingRequiredForms: missingForms } : {}),
       });
     }
 
-    // ── 9. Render PDF ──
-    const pdfBytes = await renderHTMLToPDF(html, formattingRules, parsed.metadata.causeNumber);
-
-    // ── 10. Return PDF ──
-    const filename = generateLegalFilename(parsed);
+    // ── 8. Return PDF ──
     const headers: Record<string, string> = {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': pdfBytes.length.toString(),
+      'Content-Disposition': `attachment; filename="${result.filename}"`,
+      'Content-Length': result.pdfMeta.byteLength.toString(),
     };
     if (missingForms.length > 0) {
       headers['X-Missing-Required-Forms'] = missingForms.join(', ');
     }
 
-    return new NextResponse(new Uint8Array(pdfBytes), {
+    return new NextResponse(new Uint8Array(result.pdfBuffer), {
       status: 200,
       headers,
     });
   } catch (error) {
+    // Map typed orchestrator errors to appropriate HTTP responses
+    if (error instanceof LegalDocumentGenerationError) {
+      console.error(`[DocuVault] Pipeline error [${error.code}]:`, error.message);
+
+      const statusMap: Record<string, number> = {
+        LEGAL_DOCUMENT_CLASSIFICATION_FAILED: 422,
+        LEGAL_DOCUMENT_PARSE_FAILED: 422,
+        LEGAL_DOCUMENT_PROFILE_RESOLUTION_FAILED: 422,
+        LEGAL_DOCUMENT_VALIDATION_FAILED: 422,
+        LEGAL_DOCUMENT_RENDER_TOO_SHORT: 500,
+        LEGAL_DOCUMENT_RENDER_STRUCTURE_INVALID: 500,
+        LEGAL_DOCUMENT_PDF_RENDER_FAILED: 500,
+        LEGAL_DOCUMENT_PDF_INVALID: 500,
+        LEGAL_DOCUMENT_FILENAME_FAILED: 500,
+      };
+
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: statusMap[error.code] ?? 500 }
+      );
+    }
+
     console.error('[Document Generation Error]', error);
     return NextResponse.json(
       { error: 'Document generation failed' },

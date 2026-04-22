@@ -64,8 +64,8 @@ export function renderPageShell(params: {
 // HTML Escaping
 // ═══════════════════════════════════════════════════════════════
 
-/** Escape HTML special characters. */
-export function escapeHtml(input: string): string {
+/** Shared escaping implementation — all XSS-relevant characters. */
+function escapeCommon(input: string): string {
   return input
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -74,14 +74,14 @@ export function escapeHtml(input: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/** Escape HTML special characters in text content. */
+export function escapeHtml(input: string): string {
+  return escapeCommon(input);
+}
+
 /** Escape HTML attribute values (all XSS-relevant characters). */
 export function escapeAttribute(input: string): string {
-  return input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+  return escapeCommon(input);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -91,6 +91,8 @@ export function escapeAttribute(input: string): string {
 /** Convert profile page size to CSS @page size value. */
 function pageSize(profile: ExportJurisdictionProfile): string {
   switch (profile.page.size) {
+    case 'Letter':
+      return '8.5in 11in';
     case 'Legal':
       return '8.5in 14in';
     case 'A4':

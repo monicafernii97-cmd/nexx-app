@@ -368,6 +368,9 @@ export async function POST(request: NextRequest) {
                                         sectionId: `exhibit_cover_${draft.label}`,
                                         heading: draft.title || `Exhibit ${draft.label}`,
                                         body: draft.summaryLines.join('\n'),
+                                        // DraftedSection.source only supports: ai_drafted | user_locked | user_edited
+                                        // Fallback summaries map to user_locked because they are deterministic,
+                                        // non-AI content that should not be regenerated — same semantics as locked.
                                         source: draft.source === 'ai_drafted'
                                             ? 'ai_drafted' as const
                                             : 'user_locked' as const,

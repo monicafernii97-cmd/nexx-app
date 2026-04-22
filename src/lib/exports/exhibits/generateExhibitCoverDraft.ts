@@ -196,9 +196,8 @@ export function buildFallbackSummaryLines(input: ExhibitCoverDraftInput): string
   }
 
   if (input.description) {
-    lines.push(
-      `The content relates to ${input.description.replace(/\.$/, '')}.`,
-    );
+    const desc = input.description.trim().replace(/\.$/, '');
+    lines.push(`The content relates to ${desc}.`);
   }
 
   // Guarantee minimum 2 lines — always court-safe output

@@ -76,8 +76,9 @@ export function validateLegalDocument(
     warnings.push('Jurisdiction expects captioned pleading format, but caption was not detected.');
   }
 
-  if (jurisdictionProfile.sections.certificateSeparatePage && !doc.certificate) {
-    warnings.push('Certificate of Service not detected — jurisdiction expects separate page.');
+  if (documentTypeProfile.allowsCertificate && !doc.certificate) {
+    // Only warn if the document type typically includes a certificate
+    warnings.push('Certificate of Service not detected — if present, jurisdiction renders it on a separate page.');
   }
 
   return {

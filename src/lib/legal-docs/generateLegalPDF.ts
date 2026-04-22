@@ -34,6 +34,9 @@ import type { CourtSettings } from './jurisdiction/types';
 import type { JurisdictionProfile } from './jurisdiction/types';
 import type { LegalDocument } from './types';
 
+/** Minimum acceptable HTML output length — anything shorter indicates a rendering failure. */
+const MIN_RENDERED_HTML_LENGTH = 200;
+
 // ═══════════════════════════════════════════════════════════════
 // Public Types
 // ═══════════════════════════════════════════════════════════════
@@ -75,7 +78,7 @@ export type GenerateLegalPDFResult = {
  * render HTML → render PDF → generate filename.
  *
  * @throws Error when validation blockers exist (title missing, no body)
- * @throws Error when HTML output is too short (< 200 chars)
+ * @throws Error when HTML output is shorter than MIN_RENDERED_HTML_LENGTH chars
  */
 export async function generateLegalPDF(
   params: GenerateLegalPDFParams,
@@ -83,31 +86,38 @@ export async function generateLegalPDF(
   const { rawText, convexQuery, payloadFallback, documentOverride, fallbackTitle } = params;
 
   // ── 1. Parse ──
-  const parsed = parseLegalDocument(rawText);
+  const rawParsed = parseLegalDocument(rawText);
 
-  // ── 2. Apply fallback title ──
-  if (parsed.title.main === 'UNTITLED DOCUMENT' && fallbackTitle) {
-    parsed.title.main = fallbackTitle;
-  }
+  // ── 2. Enrich parsed document (immutable) ──
+  const documentType = classifyDocumentType(rawParsed);
+  const parsed: LegalDocument = {
+    ...rawParsed,
+    title: {
+      ...rawParsed.title,
+      main: rawParsed.title.main === 'UNTITLED DOCUMENT' && fallbackTitle
+        ? fallbackTitle
+        : rawParsed.title.main,
+    },
+    metadata: {
+      ...rawParsed.metadata,
+      documentType,
+    },
+  };
 
-  // ── 3. Classify document type ──
-  const documentType = classifyDocumentType(parsed);
-  parsed.metadata.documentType = documentType;
-
-  // ── 4. Load court settings ──
+  // ── 3. Load court settings ──
   const courtSettings = await loadCourtSettingsForPipeline({
     convexQuery,
     payloadFallback,
     documentOverride,
   });
 
-  // ── 5. Resolve jurisdiction profile ──
+  // ── 4. Resolve jurisdiction profile ──
   const jurisdictionProfile = resolveJurisdictionProfile(courtSettings);
 
-  // ── 6. Resolve document-type profile ──
+  // ── 5. Resolve document-type profile ──
   const documentTypeProfile = DOCUMENT_TYPE_PROFILES[documentType];
 
-  // ── 7. Validate ──
+  // ── 6. Validate ──
   const validation = validateLegalDocument(parsed, jurisdictionProfile, documentTypeProfile);
   if (!validation.ok) {
     throw new Error(
@@ -115,17 +125,17 @@ export async function generateLegalPDF(
     );
   }
 
-  // ── 8. Render HTML ──
+  // ── 7. Render HTML ──
   const html = renderLegalDocumentHTML(parsed, jurisdictionProfile, documentTypeProfile);
-  if (html.length < 200) {
-    throw new Error('Rendered HTML is suspiciously short — possible rendering failure.');
+  if (html.length < MIN_RENDERED_HTML_LENGTH) {
+    throw new Error(`Rendered HTML is suspiciously short (${html.length} chars, minimum ${MIN_RENDERED_HTML_LENGTH}) — possible rendering failure.`);
   }
 
-  // ── 9. Render PDF ──
+  // ── 8. Render PDF ──
   const formattingRules = toCourtFormattingRules(jurisdictionProfile);
   const pdfBuffer = await renderHTMLToPDF(html, formattingRules, parsed.metadata.causeNumber);
 
-  // ── 10. Generate filename ──
+  // ── 9. Generate filename ──
   const filename = generateLegalFilename(parsed);
 
   return {

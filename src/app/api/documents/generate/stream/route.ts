@@ -130,18 +130,14 @@ export async function POST(request: NextRequest) {
               .join('\n')
           : String(body.bodyContent ?? '');
 
-        // Infer caseType from template when caller omits it
+        // Resolve template once for caseType and fallback title
+        const template = getTemplate(body.templateId);
         if (!body.caseType) {
-          const template = getTemplate(body.templateId);
           body.caseType = template?.caseTypes[0] ?? 'other';
         }
-
-        // Resolve fallback title from template (for UNTITLED DOCUMENT)
-        const fallbackTitle = (() => {
-          const template = getTemplate(body.templateId);
-          if (!template) return undefined;
-          return template.sections.find(s => s.type === 'title')?.title ?? template.title;
-        })();
+        const fallbackTitle = template
+          ? template.sections.find(s => s.type === 'title')?.title ?? template.title
+          : undefined;
 
         if (isAborted()) return;
         sendProgress('analyzing', 'Analyzing Legal Frameworks', 20);
@@ -178,9 +174,9 @@ export async function POST(request: NextRequest) {
         const causeNumber = legalPdf.parsed.metadata.causeNumber;
         const filename = legalPdf.filename;
 
-        // Derive venue metadata from court settings (canonical source)
-        const normalizedState = titleCase(body.courtSettings.state);
-        const normalizedCounty = titleCase(body.courtSettings.county);
+        // Derive venue metadata from resolved court settings (canonical source)
+        const normalizedState = titleCase(legalPdf.courtSettings.jurisdiction?.state ?? body.courtSettings.state);
+        const normalizedCounty = titleCase(legalPdf.courtSettings.jurisdiction?.county ?? body.courtSettings.county);
 
         console.log(`[QuickGen:${requestId}] PDF validated: ${byteLength} bytes, sha256=${sha256.slice(0, 12)}…`);
 

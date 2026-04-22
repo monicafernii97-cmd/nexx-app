@@ -312,8 +312,15 @@ export function resolveJurisdictionProfile(
 ): JurisdictionProfile {
   const { state, county, venue } = normalizeSettingsInput(settings);
 
-  // Federal detection
-  if (venue.includes('united states district court')) {
+  // Federal detection — matches full name and common abbreviations
+  const isFederalCourt =
+    venue.includes('united states district court') ||
+    venue.includes('u.s. district court') ||
+    venue.includes('us district court') ||
+    /\busdc\b/.test(venue) ||
+    /\bu\.?s\.?d\.?c\.?\b/.test(venue);
+
+  if (isFederalCourt) {
     return applyFormattingOverrides(FEDERAL_DEFAULT_PROFILE, settings);
   }
 

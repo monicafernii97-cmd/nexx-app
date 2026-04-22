@@ -581,6 +581,10 @@ function extractBodyStructure(
     }
 
     // ── Lettered list (A. B. C.) — only when multiple consecutive ──
+    // Single-item matches (items.length <= 1) intentionally fall through to
+    // paragraph handling to avoid false positives (e.g. "A. Background" heading
+    // being treated as a lettered list). The letter prefix is preserved in
+    // the paragraph text and rendered with bold subheading styling.
     if (LETTERED_LIST_RE.test(line) && !LETTER_HEADING_RE.test(line)) {
       const parsed = collectLetteredList(bodyLines, i);
       if (parsed.block.items.length > 1) {

@@ -32,6 +32,8 @@ import type { DocumentTypeProfile } from './document-type/profiles';
 export function renderLegalDocumentHTML(
   doc: LegalDocument,
   profile: JurisdictionProfile,
+  // Reserved for future document-type-specific rendering rules
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _documentTypeProfile?: DocumentTypeProfile,
 ): string {
   const pageSize = profile.page.size === 'Legal'
@@ -236,7 +238,7 @@ export function renderLegalDocumentHTML(
 <body>
   <div class="document">
     ${renderCaption(doc, profile)}
-    ${renderTitle(doc, profile)}
+    ${renderTitle(doc)}
     ${renderIntroBlocks(doc)}
     ${renderSections(doc)}
     ${renderPrayer(doc)}
@@ -300,7 +302,7 @@ function renderCaption(doc: LegalDocument, profile: JurisdictionProfile): string
 // Title
 // ═══════════════════════════════════════════════════════════════
 
-function renderTitle(doc: LegalDocument, _profile: JurisdictionProfile): string {
+function renderTitle(doc: LegalDocument): string {
   const additionalLines = doc.title.additionalTitleLines?.length
     ? doc.title.additionalTitleLines.map(l => `<div class="title-main">${esc(l)}</div>`).join('')
     : '';
@@ -355,7 +357,7 @@ function renderBlock(block: LegalBlock): string {
   if (block.type === 'lettered_list') {
     return `
       <ol class="lettered-list">
-        ${block.items.map((item, idx) => `<li>${String.fromCharCode(65 + idx)}. ${esc(item)}</li>`).join('')}
+        ${block.items.map((item, idx) => `<li>${indexToLetter(idx)}. ${esc(item)}</li>`).join('')}
       </ol>`;
   }
 
@@ -438,8 +440,14 @@ function renderVerification(doc: LegalDocument, profile: JurisdictionProfile): s
 }
 
 // ═══════════════════════════════════════════════════════════════
-// HTML Escaping
+// Helpers
 // ═══════════════════════════════════════════════════════════════
+
+/** Convert 0-based index to letter label: 0→A, 25→Z, 26→AA, 27→AB, etc. */
+function indexToLetter(idx: number): string {
+  if (idx < 26) return String.fromCharCode(65 + idx);
+  return `A${String.fromCharCode(65 + (idx - 26) % 26)}`;
+}
 
 function esc(input: string): string {
   return input

@@ -87,8 +87,11 @@ describe('registry sync — Convex vs PROFILE_REGISTRY', () => {
     const source = readFileSync(convexPath, 'utf-8');
 
     for (const key of PROFILE_REGISTRY.keys()) {
+      // Use quote-agnostic regex to handle both single and double quotes.
+      const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp(`['"]${escaped}['"]`);
       expect(
-        source.includes(`'${key}'`),
+        pattern.test(source),
         `Registry key "${key}" missing from convex/courtSettings.ts VALID_PROFILE_KEYS`,
       ).toBe(true);
     }

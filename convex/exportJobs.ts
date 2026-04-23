@@ -19,10 +19,11 @@ import { getAuthenticatedUser } from './lib/auth';
 
 // ── Config (mirrored from src/lib/exports/exportConfig.ts) ──
 // Convex server code can't import from src/, so we duplicate the values.
-// SYNC: src/lib/exports/exportConfig.ts — MAX_CONCURRENT_EXPORTS_PER_USER, JOB_TIMEOUT_MS
+// SYNC: src/lib/exports/exportConfig.ts — MAX_CONCURRENT_EXPORTS_PER_USER, JOB_TIMEOUT_MS, STALE_RUN_TTL_MS
 // Update both files if changing these values.
 export const MAX_CONCURRENT_EXPORTS_PER_USER = 2;
-export const JOB_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+export const JOB_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes (Vercel maxDuration constraint)
+export const STALE_RUN_TTL_MS = 10 * 60 * 1000; // 10 minutes (reaper boundary)
 
 // ---------------------------------------------------------------------------
 // 1. Enqueue Export Job (admission control)
@@ -77,7 +78,7 @@ export const enqueueExportJob = mutation({
             status: 'queued',
             priority: args.priority ?? 0,
             createdAt: now,
-            timeoutAt: now + JOB_TIMEOUT_MS,
+            timeoutAt: now + STALE_RUN_TTL_MS,
         });
 
         return {

@@ -59,26 +59,27 @@ export const reapStaleRuns = internalMutation({
         }
 
         // ── Reap timed-out exportJobs ──
+        // Use by_status_timeoutAt so we scan overdue jobs directly.
         const runningJobs = await ctx.db
             .query('exportJobs')
-            .withIndex('by_status_createdAt', (q) => q.eq('status', 'running'))
+            .withIndex('by_status_timeoutAt', (q) => q.eq('status', 'running'))
+            .filter((q) => q.lt(q.field('timeoutAt'), now))
             .take(BATCH_LIMIT);
 
         const queuedJobs = await ctx.db
             .query('exportJobs')
-            .withIndex('by_status_createdAt', (q) => q.eq('status', 'queued'))
+            .withIndex('by_status_timeoutAt', (q) => q.eq('status', 'queued'))
+            .filter((q) => q.lt(q.field('timeoutAt'), now))
             .take(BATCH_LIMIT);
 
         let reapedJobs = 0;
         for (const job of [...runningJobs, ...queuedJobs]) {
-            if (job.timeoutAt < now) {
-                await ctx.db.patch(job._id, {
-                    status: 'timeout',
-                    completedAt: now,
-                    errorCode: 'EXPORT_JOB_TIMEOUT',
-                });
-                reapedJobs++;
-            }
+            await ctx.db.patch(job._id, {
+                status: 'timeout',
+                completedAt: now,
+                errorCode: 'EXPORT_JOB_TIMEOUT',
+            });
+            reapedJobs++;
         }
 
         if (reapedRuns > 0 || reapedJobs > 0) {

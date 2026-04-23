@@ -23,6 +23,7 @@ import {
 import {
     MAX_CONCURRENT_EXPORTS_PER_USER as CONVEX_MAX_CONCURRENT_EXPORTS_PER_USER,
     JOB_TIMEOUT_MS as CONVEX_JOB_TIMEOUT_MS,
+    STALE_RUN_TTL_MS as CONVEX_JOBS_STALE_RUN_TTL_MS,
 } from '../../../../convex/exportJobs';
 
 describe('Stale Run Reaper — Configuration', () => {
@@ -91,5 +92,9 @@ describe('Stale Run Reaper — Config Sync (Convex ↔ src)', () => {
 
     it('JOB_TIMEOUT_MS matches between exportConfig and exportJobs', () => {
         expect(CONVEX_JOB_TIMEOUT_MS).toBe(JOB_TIMEOUT_MS);
+    });
+
+    it('STALE_RUN_TTL_MS matches between exportConfig and exportJobs', () => {
+        expect(CONVEX_JOBS_STALE_RUN_TTL_MS).toBe(STALE_RUN_TTL_MS);
     });
 });

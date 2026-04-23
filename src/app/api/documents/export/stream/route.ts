@@ -44,6 +44,10 @@ import type { ExportPath } from '@/lib/exports/types';
 import { hashPayload, generateRunFingerprint } from '@/lib/exports/idempotency';
 import { computeArtifactChecksum, verifyUploadedArtifact } from '@/lib/exports/artifactIntegrity';
 import { ExportDocumentGenerationError } from '@/lib/exports/errors';
+import {
+    MAX_TERMINAL_MUTATION_RETRIES,
+    RETRY_BACKOFF_BASE_MS,
+} from '@/lib/exports/exportConfig';
 
 export const maxDuration = 120; // Extended for GPT + PDF rendering
 
@@ -179,16 +183,19 @@ export async function POST(request: NextRequest) {
             let exportId: string | null = null;
             let runFingerprint: string | null = null;
             let claimedExportRun = false;
+            let jobId: string | null = null;
 
             try {
                 // ────────────────────────────────────────────────
-                // 1. CREATE EXPORT RECORD
+                // 1. PIPELINE START
                 // ────────────────────────────────────────────────
+                const pipelineStartTime = Date.now();
+
                 send({
                     type: 'milestone',
-                    stage: 'drafting',
-                    percent: 50,
-                    message: 'Initializing export...',
+                    stage: 'initializing',
+                    percent: 5,
+                    message: 'Checking admission...',
                 });
 
                 const exportConfig = body.exportRequest?.config ?? {};
@@ -283,7 +290,30 @@ export async function POST(request: NextRequest) {
                 }
 
                 // ────────────────────────────────────────────────
-                // 1b. CREATE EXPORT RECORD (only after claim succeeded)
+                // 1b. QUEUE ADMISSION CHECK (concurrency gate)
+                // ────────────────────────────────────────────────
+                const queueResult = await convex.mutation(api.exportJobs.enqueueExportJob, {
+                    caseId: body.caseId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                    exportPath,
+                    fingerprint: runFingerprint,
+                });
+
+                if (queueResult.status === 'rejected') {
+                    throw new ExportDocumentGenerationError({
+                        code: 'EXPORT_QUEUE_OVERLOADED',
+                        message: `Export queue full — ${queueResult.activeCount}/${queueResult.limit} active exports. Please wait and try again.`,
+                    });
+                }
+
+                jobId = queueResult.jobId as string;
+
+                // Transition job to running
+                await convex.mutation(api.exportJobs.startExportJob, {
+                    jobId: jobId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                });
+
+                // ────────────────────────────────────────────────
+                // 1c. CREATE EXPORT RECORD (only after claim + admission)
                 // ────────────────────────────────────────────────
                 exportId = await convex.mutation(api.generatedDocumentsExport.createExportRun, {
                     caseId: body.caseId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -777,7 +807,7 @@ export async function POST(request: NextRequest) {
                 // ────────────────────────────────────────────────
                 // Mark idempotency run as completed (only if this request claimed it)
                 if (runFingerprint && claimedExportRun) {
-                    for (let attempt = 1; attempt <= 3; attempt++) {
+                    for (let attempt = 1; attempt <= MAX_TERMINAL_MUTATION_RETRIES; attempt++) {
                         try {
                             await convex.mutation(api.exportRuns.completeExportRun, {
                                 fingerprint: runFingerprint,
@@ -785,7 +815,7 @@ export async function POST(request: NextRequest) {
                             });
                             break;
                         } catch (idempErr) {
-                            if (attempt === 3) {
+                            if (attempt === MAX_TERMINAL_MUTATION_RETRIES) {
                                 // Compensating mutation: force the run to 'failed' so it
                                 // doesn't remain stuck in 'in_progress' forever.
                                 try {
@@ -802,10 +832,21 @@ export async function POST(request: NextRequest) {
                                     );
                                 }
                             } else {
-                                console.warn(`[ExportStream] Retrying completeExportRun (attempt ${attempt}/3):`, idempErr);
-                                await new Promise((r) => setTimeout(r, 200 * attempt));
+                                console.warn(`[ExportStream] Retrying completeExportRun (attempt ${attempt}/${MAX_TERMINAL_MUTATION_RETRIES}):`, idempErr);
+                                await new Promise((r) => setTimeout(r, RETRY_BACKOFF_BASE_MS * attempt));
                             }
                         }
+                    }
+                }
+
+                // Mark queue job as completed
+                if (jobId) {
+                    try {
+                        await convex.mutation(api.exportJobs.completeExportJob, {
+                            jobId: jobId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                        });
+                    } catch (jobErr) {
+                        console.warn('[ExportStream] Failed to complete export job:', jobErr);
                     }
                 }
 
@@ -819,6 +860,8 @@ export async function POST(request: NextRequest) {
                     preflightSummary: preflightResult,
                     artifactVerified: verification.verified,
                     sha256: preUploadChecksum,
+                    elapsedMs: Date.now() - pipelineStartTime,
+                    jobId,
                 });
 
             } catch (error) {
@@ -844,7 +887,7 @@ export async function POST(request: NextRequest) {
 
                 // Mark idempotency run as failed (only if this request claimed it)
                 if (runFingerprint && claimedExportRun) {
-                    for (let attempt = 1; attempt <= 3; attempt++) {
+                    for (let attempt = 1; attempt <= MAX_TERMINAL_MUTATION_RETRIES; attempt++) {
                         try {
                             await convex.mutation(api.exportRuns.failExportRun, {
                                 fingerprint: runFingerprint,
@@ -852,9 +895,7 @@ export async function POST(request: NextRequest) {
                             });
                             break;
                         } catch (idempErr) {
-                            if (attempt === 3) {
-                                // All retries exhausted — the row will remain in_progress.
-                                // Log with full context for operational repair.
+                            if (attempt === MAX_TERMINAL_MUTATION_RETRIES) {
                                 console.error(
                                     `[ExportStream] CRITICAL: Failed to fail idempotency run after ${attempt} attempts. ` +
                                     `Fingerprint ${runFingerprint} is stuck in in_progress. ` +
@@ -862,10 +903,22 @@ export async function POST(request: NextRequest) {
                                     idempErr,
                                 );
                             } else {
-                                console.warn(`[ExportStream] Retrying failExportRun (attempt ${attempt}/3):`, idempErr);
-                                await new Promise((r) => setTimeout(r, 200 * attempt));
+                                console.warn(`[ExportStream] Retrying failExportRun (attempt ${attempt}/${MAX_TERMINAL_MUTATION_RETRIES}):`, idempErr);
+                                await new Promise((r) => setTimeout(r, RETRY_BACKOFF_BASE_MS * attempt));
                             }
                         }
+                    }
+                }
+
+                // Mark queue job as failed
+                if (jobId) {
+                    try {
+                        await convex.mutation(api.exportJobs.failExportJob, {
+                            jobId: jobId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                            errorCode,
+                        });
+                    } catch (jobErr) {
+                        console.warn('[ExportStream] Failed to fail export job:', jobErr);
                     }
                 }
 

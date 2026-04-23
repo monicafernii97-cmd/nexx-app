@@ -199,6 +199,63 @@ export async function POST(request: NextRequest) {
                 const causeNumber = ('causeNumber' in exportConfig ? String(exportConfig.causeNumber) : undefined) ?? undefined;
                 const caseType = ('caseType' in exportConfig ? String(exportConfig.caseType) : undefined) ?? body.exportRequest?.path ?? 'general';
 
+                // ────────────────────────────────────────────────
+                // 1a. IDEMPOTENCY CHECK (before any DB writes)
+                // ────────────────────────────────────────────────
+                // Hash all deterministic pre-generation inputs that affect output.
+                // Excludes AI-generated content (draftedSections) so identical
+                // requests always produce the same fingerprint.
+                const exportPath = (body.exportRequest?.path ?? 'court_document') as ExportPath;
+                const stablePreGenPayload = {
+                    caseId: body.caseId,
+                    exportPath,
+                    caseType,
+                    courtState,
+                    courtCounty,
+                    petitionerName,
+                    respondentName,
+                    causeNumber,
+                    exportRequest: body.exportRequest,
+                    assemblyResult: body.assemblyResult,
+                    reviewItems: (body as unknown as Record<string, unknown>).reviewItems ?? null,
+                    overrides: (body as unknown as Record<string, unknown>).overrides ?? null,
+                };
+                const payloadHash = hashPayload(stablePreGenPayload);
+                runFingerprint = generateRunFingerprint({
+                    userId,
+                    caseId: body.caseId,
+                    exportPath,
+                    payloadHash,
+                });
+
+                const claimResult = await convex.mutation(api.exportRuns.claimExportRun, {
+                    fingerprint: runFingerprint,
+                    caseId: body.caseId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                    exportPath,
+                });
+
+                claimedExportRun = claimResult.status === 'claimed';
+
+                if (claimResult.status === 'already_completed') {
+                    send({
+                        type: 'complete',
+                        exportId: claimResult.exportId,
+                        reused: true,
+                        message: 'Export already completed — returning cached result.',
+                    });
+                    return;
+                }
+
+                if (claimResult.status === 'in_progress') {
+                    throw new ExportDocumentGenerationError({
+                        code: 'EXPORT_IDEMPOTENCY_CONFLICT',
+                        message: 'Duplicate export request — generation already in progress',
+                    });
+                }
+
+                // ────────────────────────────────────────────────
+                // 1b. CREATE EXPORT RECORD (only after claim succeeded)
+                // ────────────────────────────────────────────────
                 exportId = await convex.mutation(api.generatedDocumentsExport.createExportRun, {
                     caseId: body.caseId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
                     runId: body.runId,
@@ -499,7 +556,6 @@ export async function POST(request: NextRequest) {
                 const exportProfile = resolveExportJurisdictionProfile(jurisdictionSettings);
 
                 // 4b. Build caption for court documents
-                const exportPath = (body.exportRequest?.path ?? 'court_document') as ExportPath;
                 const caption = exportPath === 'court_document'
                     ? buildExportCaption({
                         style: exportProfile.court.captionStyle,
@@ -566,79 +622,6 @@ export async function POST(request: NextRequest) {
                         : null,
                 };
 
-                // ────────────────────────────────────────────────
-                // 4d. IDEMPOTENCY CHECK
-                // ────────────────────────────────────────────────
-                // Hash only stable, pre-generation request data.
-                // Exclude draftedSections (AI-generated output that varies per request)
-                // so identical requests always produce the same fingerprint.
-                const stablePayload = {
-                    jurisdictionSettings,
-                    caseType,
-                    exportPath,
-                    caseId: body.caseId,
-                    petitionerName,
-                    respondentName,
-                    causeNumber,
-                    courtState,
-                    courtCounty,
-                };
-                const payloadHash = hashPayload(stablePayload);
-                runFingerprint = generateRunFingerprint({
-                    userId,
-                    caseId: body.caseId,
-                    exportPath,
-                    payloadHash,
-                });
-
-                const claimResult = await convex.mutation(api.exportRuns.claimExportRun, {
-                    fingerprint: runFingerprint,
-                    caseId: body.caseId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-                    exportPath,
-                });
-
-                claimedExportRun = claimResult.status === 'claimed';
-
-                if (claimResult.status === 'already_completed') {
-                    // Duplicate request — clean up orphaned export record and return existing
-                    if (exportId) {
-                        try {
-                            await convex.mutation(api.generatedDocumentsExport.failExportRun, {
-                                exportId: exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-                                errorCode: 'EXPORT_IDEMPOTENCY_CONFLICT',
-                                errorMessage: 'Duplicate detected — returning cached result',
-                            });
-                        } catch (cleanupErr) {
-                            console.warn('[ExportStream] Failed to clean up orphaned export record:', cleanupErr);
-                        }
-                    }
-                    send({
-                        type: 'complete',
-                        exportId: claimResult.exportId,
-                        reused: true,
-                        message: 'Export already completed — returning cached result.',
-                    });
-                    return;
-                }
-
-                if (claimResult.status === 'in_progress') {
-                    // Clean up orphaned export record before throwing
-                    if (exportId) {
-                        try {
-                            await convex.mutation(api.generatedDocumentsExport.failExportRun, {
-                                exportId: exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-                                errorCode: 'EXPORT_IDEMPOTENCY_CONFLICT',
-                                errorMessage: 'Duplicate in-progress — export record cleaned up',
-                            });
-                        } catch (cleanupErr) {
-                            console.warn('[ExportStream] Failed to clean up orphaned export record:', cleanupErr);
-                        }
-                    }
-                    throw new ExportDocumentGenerationError({
-                        code: 'EXPORT_IDEMPOTENCY_CONFLICT',
-                        message: 'Duplicate export request — generation already in progress',
-                    });
-                }
 
                 send({
                     type: 'milestone',
@@ -765,13 +748,26 @@ export async function POST(request: NextRequest) {
                 // ────────────────────────────────────────────────
                 // Mark idempotency run as completed (only if this request claimed it)
                 if (runFingerprint && claimedExportRun) {
-                    try {
-                        await convex.mutation(api.exportRuns.completeExportRun, {
-                            fingerprint: runFingerprint,
-                            exportId: exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-                        });
-                    } catch (idempErr) {
-                        console.warn('[ExportStream] Failed to complete idempotency run:', idempErr);
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        try {
+                            await convex.mutation(api.exportRuns.completeExportRun, {
+                                fingerprint: runFingerprint,
+                                exportId: exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                            });
+                            break;
+                        } catch (idempErr) {
+                            if (attempt === 3) {
+                                console.error(
+                                    `[ExportStream] CRITICAL: Failed to complete idempotency run after ${attempt} attempts. ` +
+                                    `Fingerprint ${runFingerprint} may be stuck in in_progress. ` +
+                                    `Manual repair required.`,
+                                    idempErr,
+                                );
+                            } else {
+                                console.warn(`[ExportStream] Retrying completeExportRun (attempt ${attempt}/3):`, idempErr);
+                                await new Promise((r) => setTimeout(r, 200 * attempt));
+                            }
+                        }
                     }
                 }
 
@@ -810,13 +806,26 @@ export async function POST(request: NextRequest) {
 
                 // Mark idempotency run as failed (only if this request claimed it)
                 if (runFingerprint && claimedExportRun) {
-                    try {
-                        await convex.mutation(api.exportRuns.failExportRun, {
-                            fingerprint: runFingerprint,
-                            errorCode,
-                        });
-                    } catch (idempErr) {
-                        console.warn('[ExportStream] Failed to mark idempotency run as failed:', idempErr);
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        try {
+                            await convex.mutation(api.exportRuns.failExportRun, {
+                                fingerprint: runFingerprint,
+                                errorCode,
+                            });
+                            break;
+                        } catch (idempErr) {
+                            if (attempt === 3) {
+                                console.error(
+                                    `[ExportStream] CRITICAL: Failed to fail idempotency run after ${attempt} attempts. ` +
+                                    `Fingerprint ${runFingerprint} may be stuck in in_progress. ` +
+                                    `Manual repair required.`,
+                                    idempErr,
+                                );
+                            } else {
+                                console.warn(`[ExportStream] Retrying failExportRun (attempt ${attempt}/3):`, idempErr);
+                                await new Promise((r) => setTimeout(r, 200 * attempt));
+                            }
+                        }
                     }
                 }
 

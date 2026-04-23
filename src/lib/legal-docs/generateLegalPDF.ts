@@ -175,7 +175,16 @@ export async function generateLegalPDF(
   }
 
   // ── 5b. Assert QG profile shape ──
-  const qgProfile = assertQuickGenerateProfile(jurisdictionProfile);
+  let qgProfile;
+  try {
+    qgProfile = assertQuickGenerateProfile(jurisdictionProfile);
+  } catch (err) {
+    throw new LegalDocumentGenerationError({
+      code: 'LEGAL_DOCUMENT_PROFILE_RESOLUTION_FAILED',
+      message: `Quick Generate profile assertion failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      details: err,
+    });
+  }
 
   // ── 6. Resolve document-type profile ──
   const documentTypeProfile = DOCUMENT_TYPE_PROFILES[documentType];

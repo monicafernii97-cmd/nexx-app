@@ -50,6 +50,7 @@ export const upsert = mutation({
             defaultFont: v.optional(v.string()),
             defaultFontSizePt: v.optional(v.number()),
             lineSpacing: v.optional(v.number()),
+            // Must match FormattingOverridesV2.exhibitLabelStyle in src/lib/jurisdiction/overrides.ts
             exhibitLabelStyle: v.optional(v.union(
                 v.literal('alpha'),
                 v.literal('numeric'),

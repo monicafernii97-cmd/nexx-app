@@ -174,7 +174,8 @@ export type ProfileResolutionSource =
   | 'court_exact_match'
   | 'state_fallback_unmatched_county'
   | 'state_default'
-  | 'global_default';
+  | 'global_default'
+  | 'pre_resolved';
 
 export type ProfileResolutionMeta = {
   profileKey: string;

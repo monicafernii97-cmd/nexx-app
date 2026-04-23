@@ -580,6 +580,7 @@ export async function POST(request: NextRequest) {
                 const pipelineResult = await generateExportPDF({
                     adaptParams,
                     jurisdictionSettings,
+                    resolvedProfile: exportProfile,
                     causeNumber,
                     metadata: { caseType, exportPath, runId: body.runId },
                 });

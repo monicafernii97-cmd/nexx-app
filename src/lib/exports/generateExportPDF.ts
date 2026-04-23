@@ -52,6 +52,13 @@ export type GenerateExportPDFInput = {
   adaptParams: AdaptToCanonicalParams;
   /** Court/jurisdiction settings for profile resolution. */
   jurisdictionSettings: ExportSettingsInput;
+  /**
+   * Optional pre-resolved profile. When provided, the orchestrator
+   * skips internal resolution and uses this profile directly.
+   * Prevents double-resolution when the route already resolved for
+   * caption/exhibit setup.
+   */
+  resolvedProfile?: ExportJurisdictionProfile;
   /** Optional cause number for PDF footer. */
   causeNumber?: string;
   /** Metadata for filename generation. */
@@ -102,8 +109,10 @@ export async function generateExportPDF(
   const startTime = Date.now();
 
   try {
-    // 1. Resolve jurisdiction profile
-    const { profile, meta: profileMeta } = resolveProfileStage(input.jurisdictionSettings);
+    // 1. Resolve jurisdiction profile (skip if pre-resolved)
+    const { profile, meta: profileMeta } = input.resolvedProfile
+      ? { profile: input.resolvedProfile, meta: { profileKey: input.resolvedProfile.key, source: 'pre_resolved' as const } }
+      : resolveProfileStage(input.jurisdictionSettings);
 
     // 2. Build canonical export document
     const document = adaptDocumentStage(input.adaptParams);
@@ -123,8 +132,18 @@ export async function generateExportPDF(
     // 7. Validate PDF buffer
     const pdfMeta = validatePDFStage(pdfBuffer);
 
-    // 8. Generate deterministic filename
-    const filename = generateFilenameStage(input.metadata);
+    // 7b. Assert metadata consistency — prevent caller/document identity drift
+    if (input.metadata.exportPath !== document.path) {
+      console.warn(
+        `[ExportPDF] Metadata drift: metadata.exportPath="${input.metadata.exportPath}" vs document.path="${document.path}". Using document.path for filename.`,
+      );
+    }
+
+    // 8. Generate deterministic filename (prefer document.path as authoritative)
+    const filename = generateFilenameStage({
+      ...input.metadata,
+      exportPath: document.path,
+    });
 
     const durationMs = Date.now() - startTime;
 

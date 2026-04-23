@@ -32,8 +32,7 @@ export function assertRenderedExportStructure(
 ): void {
   const checks = PATH_STRUCTURE_CHECKS[path];
   if (!checks) {
-    // Unknown path — skip structural checks (validation handles this)
-    return;
+    throw new Error(`Unsupported export path for structure assertion: "${path}"`);
   }
 
   // Parse HTML into DOM for reliable structural queries.

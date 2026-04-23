@@ -243,12 +243,13 @@ describe('multi-layer merge', () => {
 
 describe('default value preservation', () => {
   it('thin state profiles preserve all US default blocks', () => {
-    const ohProfile = STATE_PROFILE_MAP['OH'];
-    expect(ohProfile.page).toEqual(US_DEFAULT_PROFILE.page);
-    expect(ohProfile.typography).toEqual(US_DEFAULT_PROFILE.typography);
-    expect(ohProfile.pdf).toEqual(US_DEFAULT_PROFILE.pdf);
-    expect(ohProfile.caption).toEqual(US_DEFAULT_PROFILE.caption);
-    expect(ohProfile.exhibit).toEqual(US_DEFAULT_PROFILE.exhibit);
+    // AL is a thin_default state — inherits everything from US_DEFAULT_PROFILE
+    const alProfile = STATE_PROFILE_MAP['AL'];
+    expect(alProfile.page).toEqual(US_DEFAULT_PROFILE.page);
+    expect(alProfile.typography).toEqual(US_DEFAULT_PROFILE.typography);
+    expect(alProfile.pdf).toEqual(US_DEFAULT_PROFILE.pdf);
+    expect(alProfile.caption).toEqual(US_DEFAULT_PROFILE.caption);
+    expect(alProfile.exhibit).toEqual(US_DEFAULT_PROFILE.exhibit);
   });
 
   it('TX overrides only what differs', () => {

@@ -187,6 +187,24 @@ export type JurisdictionProfile = {
   incident?: {
     layout?: 'narrative' | 'timeline';
   };
+
+  // ── Accuracy tracking ──────────────────────────────────────
+
+  /**
+   * Profile enrichment status. Determines whether a profile is:
+   * - `thin_default` — Inherits all formatting from US default. No state-specific research.
+   * - `enriched_pending_review` — State-specific formatting added but not yet verified.
+   * - `enriched_verified` — Formatting verified against source documentation.
+   */
+  accuracyStatus?: 'thin_default' | 'enriched_pending_review' | 'enriched_verified';
+
+  /** Source documentation for enriched profiles. Required when accuracyStatus !== 'thin_default'. */
+  sourceNotes?: Array<{
+    label: string;
+    url?: string;
+    reviewedAt?: string;
+    reviewedBy?: string;
+  }>;
 };
 
 // ═══════════════════════════════════════════════════════════════

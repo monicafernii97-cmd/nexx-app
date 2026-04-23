@@ -35,15 +35,12 @@ import { generateExhibitCoverDrafts } from '@/lib/exports/exhibits/generateExhib
 import { applyExhibitCoverDrafts } from '@/lib/exports/exhibits/applyExhibitCoverDrafts';
 import type { ExhibitMappedSections } from '@/lib/export-assembly/types/exports';
 import { adaptDraftedToCanonicalExport } from '@/lib/exports/adaptDraftedToCanonicalExport';
-import { renderExportHTML } from '@/lib/exports/renderExportHTML';
 import { validateExportDocument } from '@/lib/exports/validateExportDocument';
 import { buildExportCaption } from '@/lib/exports/buildExportCaption';
 import {
   resolveExportJurisdictionProfile,
-  toExportFormattingRules,
 } from '@/lib/exports/jurisdiction/resolveExportJurisdictionProfile';
-import { renderHTMLToPDF } from '@/lib/legal/pdfRenderer';
-import { validatePdfBuffer } from '@/lib/pdf/validatePdf';
+import { generateExportPDF } from '@/lib/exports/generateExportPDF';
 import type { ExportPath } from '@/lib/exports/types';
 
 export const maxDuration = 120; // Extended for GPT + PDF rendering
@@ -475,9 +472,6 @@ export async function POST(request: NextRequest) {
                     complianceStatus,
                 });
 
-                // ────────────────────────────────────────────────
-                // 4. CANONICAL EXPORT: BUILD + VALIDATE + RENDER HTML
-                // ────────────────────────────────────────────────
                 send({
                     type: 'milestone',
                     stage: 'rendering_html',
@@ -487,11 +481,18 @@ export async function POST(request: NextRequest) {
 
                 checkAborted();
 
-                // 4a. Resolve jurisdiction profile
-                const exportProfile = resolveExportJurisdictionProfile({
+                // Build full jurisdiction settings object — shared between
+                // pre-adaptation profile resolve and the orchestrator.
+                // Includes profileKey and overrides so both get the same profile.
+                const profileKey = ('profileKey' in exportConfig ? String(exportConfig.profileKey) : undefined) ?? undefined;
+                const jurisdictionSettings = {
                     state: courtState,
                     county: courtCounty,
-                });
+                    profileKey,
+                };
+
+                // 4a. Resolve jurisdiction profile (for caption/exhibit setup)
+                const exportProfile = resolveExportJurisdictionProfile(jurisdictionSettings);
 
                 // 4b. Build caption for court documents
                 const exportPath = (body.exportRequest?.path ?? 'court_document') as ExportPath;
@@ -507,11 +508,11 @@ export async function POST(request: NextRequest) {
                     })
                     : null;
 
-                // 4c. Build canonical export document
+                // 4c. Build adapt params
                 const mappedSections = body.assemblyResult?.assembly
                     ?.mappedSections as ExhibitMappedSections | undefined;
 
-                const canonicalDoc = adaptDraftedToCanonicalExport({
+                const adaptParams: import('@/lib/exports/adaptDraftedToCanonicalExport').AdaptToCanonicalParams = {
                     path: exportPath,
                     title: getTemplateName(body.exportRequest?.path ?? 'general').toUpperCase(),
                     draftedSections: draftedSections.map((s) => ({
@@ -559,20 +560,7 @@ export async function POST(request: NextRequest) {
                             labelStyle: exportProfile.exhibit.labelStyleDefault,
                         }
                         : null,
-                });
-
-                // 4d. Validate canonical document
-                const exportValidation = validateExportDocument(canonicalDoc);
-                if (!exportValidation.canProceed) {
-                    const blockerMsg = exportValidation.issues
-                        .filter((i) => i.severity === 'blocker')
-                        .map((i) => i.message)
-                        .join('; ');
-                    throw Object.assign(
-                        new Error(`Export validation failed: ${blockerMsg}`),
-                        { code: 'render_html_failed' },
-                    );
-                }
+                };
 
                 send({
                     type: 'milestone',
@@ -581,12 +569,7 @@ export async function POST(request: NextRequest) {
                     message: 'Rendering document HTML...',
                 });
 
-                // 4e. Render HTML via path dispatcher
-                const html = renderExportHTML(canonicalDoc, exportProfile);
-
-                // ────────────────────────────────────────────────
-                // 5. RENDER PDF + VALIDATE BUFFER
-                // ────────────────────────────────────────────────
+                // 4d-5. Delegate rendering pipeline to orchestrator
                 send({
                     type: 'milestone',
                     stage: 'rendering_pdf',
@@ -594,11 +577,15 @@ export async function POST(request: NextRequest) {
                     message: 'Generating PDF...',
                 });
 
-                const rules = toExportFormattingRules(exportProfile);
-                const pdfBuffer = await renderHTMLToPDF(html, rules, causeNumber);
+                const pipelineResult = await generateExportPDF({
+                    adaptParams,
+                    jurisdictionSettings,
+                    resolvedProfile: exportProfile,
+                    causeNumber,
+                    metadata: { caseType, exportPath, runId: body.runId },
+                });
 
-                // Validate PDF buffer before upload
-                validatePdfBuffer(pdfBuffer);
+                const pdfBuffer = pipelineResult.pdfBuffer;
 
                 // Checkpoint: rendering complete
                 await convex.mutation(api.generatedDocumentsExport.updateExportRun, {
@@ -619,7 +606,7 @@ export async function POST(request: NextRequest) {
                     message: 'Uploading to storage...',
                 });
 
-                const filename = generateFilename(caseType, body.exportRequest?.path ?? 'general', body.runId);
+                const filename = pipelineResult.filename;
 
                 // Get upload URL from Convex
                 const uploadUrl = await convex.mutation(api.generatedDocumentsExport.generateExportUploadUrl, {});

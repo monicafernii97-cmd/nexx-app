@@ -285,6 +285,35 @@ export default defineSchema({
         }))),
         /** User-verified formatting overrides (merged on top of state/county defaults) */
         formattingOverrides: v.optional(v.any()),
+        /** Explicit jurisdiction profile key (e.g. "tx-fort-bend-387th"). When set, wins over inferred match. */
+        profileKey: v.optional(v.string()),
+        /** Profile version for audit trail */
+        profileVersion: v.optional(v.string()),
+        /** Typed formatting overrides (preferred over legacy formattingOverrides) */
+        formattingOverridesV2: v.optional(v.object({
+            pageSize: v.optional(v.union(
+                v.literal('LETTER'),
+                v.literal('A4'),
+                v.literal('LEGAL'),
+            )),
+            pageMarginsPt: v.optional(v.object({
+                top: v.number(),
+                right: v.number(),
+                bottom: v.number(),
+                left: v.number(),
+            })),
+            defaultFont: v.optional(v.string()),
+            defaultFontSizePt: v.optional(v.number()),
+            lineSpacing: v.optional(v.number()),
+            exhibitLabelStyle: v.optional(v.union(
+                v.literal('alpha'),
+                v.literal('numeric'),
+                v.literal('party_numeric'),
+            )),
+            batesEnabled: v.optional(v.boolean()),
+            certificateSeparatePage: v.optional(v.boolean()),
+            timelineAsTable: v.optional(v.boolean()),
+        })),
         /** Whether the user has verified these settings via AI lookup */
         aiVerified: v.optional(v.boolean()),
         aiVerifiedAt: v.optional(v.number()),

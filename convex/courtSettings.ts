@@ -33,6 +33,33 @@ export const upsert = mutation({
         childrenNames: v.optional(v.array(v.string())),
         childrenAges: v.optional(v.array(v.number())),
         formattingOverrides: v.optional(v.any()),
+        profileKey: v.optional(v.string()),
+        profileVersion: v.optional(v.string()),
+        formattingOverridesV2: v.optional(v.object({
+            pageSize: v.optional(v.union(
+                v.literal('LETTER'),
+                v.literal('A4'),
+                v.literal('LEGAL'),
+            )),
+            pageMarginsPt: v.optional(v.object({
+                top: v.number(),
+                right: v.number(),
+                bottom: v.number(),
+                left: v.number(),
+            })),
+            defaultFont: v.optional(v.string()),
+            defaultFontSizePt: v.optional(v.number()),
+            lineSpacing: v.optional(v.number()),
+            // Must match FormattingOverridesV2.exhibitLabelStyle in src/lib/jurisdiction/overrides.ts
+            exhibitLabelStyle: v.optional(v.union(
+                v.literal('alpha'),
+                v.literal('numeric'),
+                v.literal('party_numeric'),
+            )),
+            batesEnabled: v.optional(v.boolean()),
+            certificateSeparatePage: v.optional(v.boolean()),
+            timelineAsTable: v.optional(v.boolean()),
+        })),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
@@ -53,8 +80,26 @@ export const upsert = mutation({
         const childrenCount = children?.length;
         const derivedChildName = childrenNames?.filter(Boolean).join(', ') || args.childName?.trim() || undefined;
 
+        // Validate profileKey against known registry keys.
+        // This whitelist mirrors src/lib/jurisdiction/profiles/registry.ts.
+        // When adding a new profile to the shared registry, add the key here too.
+        const VALID_PROFILE_KEYS = new Set([
+            'us-default', 'tx-default', 'tx-fort-bend-387th',
+            'fl-default', 'ca-default', 'federal-default',
+        ]);
+
+        if (args.profileKey && !VALID_PROFILE_KEYS.has(args.profileKey)) {
+            throw new Error(`Invalid profileKey: "${args.profileKey}". Must be one of: ${[...VALID_PROFILE_KEYS].join(', ')}`);
+        }
+
+        // Never trust client-supplied profileVersion — derive from profile key.
+        // The version is always "1.0" for the current profile schema.
+        const derivedProfileVersion = args.profileKey ? '1.0' : undefined;
+
         const normalizedArgs = {
             ...args,
+            // Overwrite client profileVersion with server-derived value
+            profileVersion: derivedProfileVersion,
             children,
             childrenNames,
             childrenAges,

@@ -22,7 +22,7 @@
  */
 
 import type { LegalDocument, LegalBlock } from './types';
-import type { JurisdictionProfile } from './jurisdiction/types';
+import type { QuickGenerateProfile as JurisdictionProfile } from './jurisdiction/types';
 import type { DocumentTypeProfile } from './document-type/profiles';
 
 // ═══════════════════════════════════════════════════════════════

@@ -5,10 +5,10 @@
  * Inherits all defaults from BASE_EXPORT_PROFILE.
  */
 
-import type { ExportJurisdictionProfile } from '../types';
+import type { JurisdictionProfile } from '../types';
 import { BASE_EXPORT_PROFILE } from './base';
 
-export const US_DEFAULT_EXPORT_PROFILE: ExportJurisdictionProfile = {
+export const US_DEFAULT_EXPORT_PROFILE: JurisdictionProfile = {
   ...BASE_EXPORT_PROFILE,
   key: 'us-default',
   name: 'US Default',

@@ -11,6 +11,7 @@ import { parseLegalDocument } from '../parseLegalDocument';
 import { renderLegalDocumentHTML } from '../renderLegalDocumentHTML';
 import { resolveJurisdictionProfile } from '../jurisdiction/resolveJurisdictionProfile';
 import type { SavedCourtSettings } from '../jurisdiction/resolveJurisdictionProfile';
+import { assertQuickGenerateProfile } from '@/lib/jurisdiction/assertProfileForPipeline';
 
 import { texasPleadingFixture } from './fixtures/texas-pleading';
 import { floridaPleadingFixture } from './fixtures/florida-pleading';
@@ -24,7 +25,8 @@ import { federalPleadingFixture } from './fixtures/federal-pleading';
 function renderFixture(fixture: string, settings: SavedCourtSettings) {
   const doc = parseLegalDocument(fixture);
   const profile = resolveJurisdictionProfile(settings);
-  const html = renderLegalDocumentHTML(doc, profile);
+  const qgProfile = assertQuickGenerateProfile(profile);
+  const html = renderLegalDocumentHTML(doc, qgProfile);
   return { doc, profile, html };
 }
 
@@ -90,7 +92,7 @@ describe('renderer regression — multi-state pleadings', () => {
       county: 'Miami-Dade',
     });
 
-    expect(profile.caption.useThreeColumnTable).toBe(false);
+    expect(profile.caption!.useThreeColumnTable).toBe(false);
     // No three-column table element should be present
     expect(html).not.toContain('<table class="caption-table"');
   });
@@ -101,7 +103,7 @@ describe('renderer regression — multi-state pleadings', () => {
       county: 'Los Angeles',
     });
 
-    expect(profile.caption.style).not.toBe('texas_pleading');
+    expect(profile.caption!.style).not.toBe('texas_pleading');
     // No three-column table element should be present
     expect(html).not.toContain('<table class="caption-table"');
   });

@@ -4,10 +4,10 @@
  * Inherits from shared base, overrides FL-specific settings.
  */
 
-import type { ExportJurisdictionProfile } from '../types';
+import type { JurisdictionProfile } from '../types';
 import { BASE_EXPORT_PROFILE } from './base';
 
-export const FL_DEFAULT_EXPORT_PROFILE: ExportJurisdictionProfile = {
+export const FL_DEFAULT_EXPORT_PROFILE: JurisdictionProfile = {
   ...BASE_EXPORT_PROFILE,
   key: 'fl-default',
   name: 'Florida Default',
@@ -18,7 +18,7 @@ export const FL_DEFAULT_EXPORT_PROFILE: ExportJurisdictionProfile = {
     uppercaseCaption: false,
   },
   exhibit: {
-    ...BASE_EXPORT_PROFILE.exhibit,
+    ...BASE_EXPORT_PROFILE.exhibit!,
     labelStyleDefault: 'numeric',
   },
 };

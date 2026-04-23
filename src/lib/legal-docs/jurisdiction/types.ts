@@ -1,17 +1,16 @@
 /**
- * Jurisdiction-Aware Formatting Types
+ * Jurisdiction-Aware Formatting Types (Quick Generate)
  *
- * JurisdictionProfile drives how rendered HTML looks — page geometry,
- * typography, caption layout, section rules, and PDF settings.
- *
- * CourtSettings is the clean, external-facing domain contract for
- * court configuration. SavedCourtSettings (in the resolver) is the
- * Convex-native storage shape — the two are bridged by
- * mapSavedToCourtSettings().
+ * JurisdictionProfile is now a re-export from the shared
+ * jurisdiction module. This file retains the QG-specific
+ * CourtSettings domain contract.
  *
  * Profiles are resolved per state/county/court and can be extended
  * over time without changing the parser.
  */
+
+// Re-export the shared JurisdictionProfile
+export type { JurisdictionProfile, QuickGenerateProfile } from '@/lib/jurisdiction/types';
 
 // ═══════════════════════════════════════════════════════════════
 // External-Facing Court Settings (Domain Contract)
@@ -50,73 +49,5 @@ export type CourtSettings = {
       bottom: number;
       left: number;
     };
-  };
-};
-
-// ═══════════════════════════════════════════════════════════════
-// Jurisdiction Profile
-// ═══════════════════════════════════════════════════════════════
-
-export type JurisdictionProfile = {
-  key: string;
-  name: string;
-  state?: string;
-  county?: string;
-  courtType?: string;
-
-  page: {
-    size: 'Letter' | 'A4' | 'Legal';
-    widthIn: number;
-    heightIn: number;
-    marginsPt: { top: number; right: number; bottom: number; left: number };
-  };
-
-  typography: {
-    fontFamily: string;
-    fontSizePt: number;
-    lineHeightPt: number;
-    bodyAlign: 'justify' | 'left';
-    headingBold: boolean;
-    uppercaseHeadings: boolean;
-    /** Whether the document title should be rendered in uppercase. */
-    uppercaseTitle: boolean;
-    /** Whether caption text should be rendered in uppercase. */
-    uppercaseCaption: boolean;
-  };
-
-  caption: {
-    style: 'texas_pleading' | 'federal_caption' | 'generic_state_caption' | 'in_re_caption';
-    causeLabel: string;
-    useThreeColumnTable: boolean;
-    leftWidthIn?: number;
-    centerWidthIn?: number;
-    rightWidthIn?: number;
-    centerSymbol?: string;
-  };
-
-  sections: {
-    prayerHeadingRequired: boolean;
-    certificateSeparatePage: boolean;
-    signatureKeepTogether: boolean;
-    /** Whether verification block should avoid page breaks inside. */
-    verificationKeepTogether: boolean;
-  };
-
-  filename: {
-    uppercase: boolean;
-    underscoresOnly: boolean;
-    includeCauseNumber: boolean;
-  };
-
-  pageNumbering: {
-    enabled: boolean;
-    position: 'bottom-center' | 'bottom-right' | 'footer-split';
-    format: 'simple' | 'x-of-y';
-  };
-
-  pdf: {
-    preferCSSPageSize: boolean;
-    printBackground: boolean;
-    waitUntil: 'networkidle0' | 'networkidle2';
   };
 };

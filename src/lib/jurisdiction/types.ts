@@ -195,6 +195,11 @@ export type JurisdictionProfile = {
    * - `thin_default` — Inherits all formatting from US default. No state-specific research.
    * - `enriched_pending_review` — State-specific formatting added but not yet verified.
    * - `enriched_verified` — Formatting verified against source documentation.
+   *
+   * **Enforcement:** enriched_pending_review and enriched_verified profiles
+   * MUST have at least one sourceNotes entry. This is enforced at build time
+   * by {@link validateProfileAccuracy} and at test time by the
+   * enrichedProfiles regression test suite.
    */
   accuracyStatus?: 'thin_default' | 'enriched_pending_review' | 'enriched_verified';
 
@@ -206,6 +211,29 @@ export type JurisdictionProfile = {
     reviewedBy?: string;
   }>;
 };
+
+/**
+ * Validates that a profile's accuracy metadata is consistent.
+ * - Enriched profiles must have at least one sourceNotes entry.
+ * - Throws at registry-build time to prevent silent violations.
+ *
+ * @param profile - The profile to validate
+ * @returns The profile (passthrough for chaining)
+ * @throws Error if an enriched profile is missing sourceNotes
+ */
+export function validateProfileAccuracy(profile: JurisdictionProfile): JurisdictionProfile {
+  const status = profile.accuracyStatus;
+  if (
+    (status === 'enriched_pending_review' || status === 'enriched_verified') &&
+    (!profile.sourceNotes || profile.sourceNotes.length === 0)
+  ) {
+    throw new Error(
+      `Profile "${profile.key}" has accuracyStatus="${status}" but no sourceNotes. ` +
+      `Enriched profiles must document their formatting sources.`,
+    );
+  }
+  return profile;
+}
 
 // ═══════════════════════════════════════════════════════════════
 // Narrowed Pipeline-Specific Types

@@ -38,7 +38,7 @@ export type DraftedSectionInput = {
   heading?: string;
   body?: string;
   numberedItems?: string[];
-  source?: 'ai_drafted' | 'user_locked' | 'user_edited';
+  source?: 'ai_drafted' | 'user_locked' | 'user_edited' | 'raw_fallback_no_ai';
 };
 
 /** Full context for building the canonical export document. */

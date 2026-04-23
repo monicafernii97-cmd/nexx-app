@@ -8,13 +8,12 @@
 
 import { describe, expect, it } from 'vitest';
 import { renderCourtExportHTML } from '../renderers/renderCourtExportHTML';
-import type { CanonicalExportDocument, CourtSection, ExportCaption } from '../types';
+import type { CanonicalExportDocument, ExportCaption } from '../types';
 import { PROFILE_REGISTRY } from '@/lib/jurisdiction/profiles/registry';
 import { assertExportProfile } from '@/lib/jurisdiction/assertProfileForPipeline';
 
 // ── Profiles ──
 const txProfile = assertExportProfile(PROFILE_REGISTRY.get('tx-default')!);
-const flProfile = assertExportProfile(PROFILE_REGISTRY.get('fl-default')!);
 const usProfile = assertExportProfile(PROFILE_REGISTRY.get('us-default')!);
 const fedProfile = assertExportProfile(PROFILE_REGISTRY.get('federal-default')!);
 

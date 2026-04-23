@@ -23,6 +23,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ═══════════════════════════════════════════════════════════════
 // Configuration — Add states here for batch scaffolding
@@ -46,8 +47,11 @@ const BATCH_STATES: StateDef[] = [
 // Generator
 // ═══════════════════════════════════════════════════════════════
 
+const __filename = fileURLToPath(import.meta.url);
+const __scriptDir = path.dirname(__filename);
+
 const PROFILE_DIR = path.resolve(
-  __dirname,
+  __scriptDir,
   '../src/lib/jurisdiction/profiles/states',
 );
 
@@ -127,7 +131,7 @@ function generateRegistryImport(state: StateDef): string {
 
 function generateRegistryEntry(state: StateDef): string {
   const constName = `${state.code.toUpperCase()}_DEFAULT_PROFILE`;
-  return `  ['${state.code.toUpperCase()}', ${constName}],`;
+  return `  ${state.code.toUpperCase()}: ${constName},`;
 }
 
 function generateTestEntry(state: StateDef): string {

@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { renderSummaryExportHTML } from '../renderers/renderSummaryExportHTML';
-import type { CanonicalExportDocument, SummarySection } from '../types';
+import type { CanonicalExportDocument } from '../types';
 import { PROFILE_REGISTRY } from '@/lib/jurisdiction/profiles/registry';
 import { assertExportProfile } from '@/lib/jurisdiction/assertProfileForPipeline';
 

@@ -60,7 +60,7 @@ describe('enriched state profiles — identity', () => {
 // ═══════════════════════════════════════════════════════════════
 
 describe('enriched state profiles — accuracy metadata', () => {
-  for (const { code: _code, name, expectedKey } of ENRICHED_STATES) {
+  for (const { name, expectedKey } of ENRICHED_STATES) {
     describe(name, () => {
       const profile = PROFILE_REGISTRY.get(expectedKey);
 
@@ -117,14 +117,18 @@ describe('enriched state profiles — resolver integration', () => {
       expect(result.meta.profileKey).toBe(expectedKey);
     });
 
-    it(`resolves ${name} + family court with correct profile source`, () => {
-      const result = resolveSharedJurisdictionProfile({
+    it(`resolves ${name} + family court with same state profile`, () => {
+      const defaultResult = resolveSharedJurisdictionProfile({
+        state: code,
+      });
+      const familyResult = resolveSharedJurisdictionProfile({
         state: code,
         courtType: 'family_court',
       });
-      // Court type override should be applied; profile key may contain family court info
-      expect(result.profile.scope?.state).toBe(code);
-      expect(result.meta.profileKey).toBeDefined();
+      // Family court should resolve through the same state profile
+      expect(familyResult.profile.scope?.state).toBe(code);
+      // Profile key should match the default state (no family-specific profile exists)
+      expect(familyResult.meta.profileKey).toBe(defaultResult.meta.profileKey);
     });
   }
 });

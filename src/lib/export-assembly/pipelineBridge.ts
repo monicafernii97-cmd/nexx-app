@@ -314,14 +314,18 @@ async function generateDraftContentWithRetry(
             const drafted = await generateDraftContent(params);
 
             // Guard: treat empty or partial AI output as failure
-            const draftedIds = new Set(drafted.map(s => s.sectionId));
-            if (
-                drafted.length === 0 ||
-                expectedSectionIds.some(id => !draftedIds.has(id))
-            ) {
-                const missing = expectedSectionIds.filter(id => !draftedIds.has(id));
+            const draftedMap = new Map(drafted.map(s => [s.sectionId, s]));
+            const missing = expectedSectionIds.filter(id => {
+                const section = draftedMap.get(id);
+                if (!section) return true;
+                // Treat blank body + no numbered items as effectively missing
+                const hasBody = section.body?.trim();
+                const hasItems = section.numberedItems && section.numberedItems.length > 0;
+                return !hasBody && !hasItems;
+            });
+            if (drafted.length === 0 || missing.length > 0) {
                 throw new Error(
-                    `AI drafter returned incomplete output: missing sections [${missing.join(', ')}]`,
+                    `AI drafter returned incomplete output: missing/empty sections [${missing.join(', ')}]`,
                 );
             }
 

@@ -55,7 +55,8 @@ export function createStateDefaultProfile(
       state: stateCode.toUpperCase(),
     },
 
-    accuracyStatus: enrichment?.accuracyStatus ?? 'thin_default',
+    accuracyStatus: enrichment?.accuracyStatus
+      ?? (enrichment?.sourceNotes || enrichment?.overrides ? undefined : 'thin_default'),
     sourceNotes: enrichment?.sourceNotes,
   };
 }

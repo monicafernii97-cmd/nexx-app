@@ -307,7 +307,7 @@ function findSpecificCourt(
 
     const stateMatch = !pState || pState === stateCode;
     const countyMatch = !pCounty || pCounty === county;
-    const courtMatch = !pCourtName || courtName.includes(pCourtName) || pCourtName.includes(courtName);
+    const courtMatch = !pCourtName || courtName.includes(pCourtName);
 
     return stateMatch && countyMatch && courtMatch;
   }) ?? null;

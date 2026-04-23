@@ -1,18 +1,30 @@
 /**
  * Registry Sync Test
  *
- * Validates that the Convex VALID_PROFILE_KEYS whitelist stays
- * in sync with the shared PROFILE_REGISTRY. Catches drift when
- * a new profile is added to one but not the other.
+ * Validates that the Convex VALID_PROFILE_KEYS whitelist (convex/courtSettings.ts)
+ * stays in sync with the shared PROFILE_REGISTRY (src/lib/jurisdiction/profiles/registry.ts).
+ *
+ * This is the safety net that catches drift when a new profile is added to one
+ * location but not the other. Both sides must be updated together.
+ *
+ * Note: Convex files cannot be directly imported in Vitest (they use the Convex
+ * runtime), so the whitelist is mirrored here as a sync assertion target.
+ * The Convex source file is also read at test time to verify the mirror is current.
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { PROFILE_REGISTRY, STATE_PROFILE_MAP } from '@/lib/jurisdiction/profiles/registry';
 
 /**
  * Mirror of the VALID_PROFILE_KEYS set from convex/courtSettings.ts.
  * This is intentionally duplicated here as a sync assertion target.
- * If the Convex whitelist changes, this test must be updated too.
+ *
+ * ⚠️  When adding a new profile:
+ *   1. Add the key to src/lib/jurisdiction/profiles/registry.ts
+ *   2. Add the key to convex/courtSettings.ts (VALID_PROFILE_KEYS)
+ *   3. Add the key here — this test will fail if any location drifts.
  */
 const CONVEX_VALID_PROFILE_KEYS = new Set([
   // National + Federal
@@ -65,6 +77,20 @@ describe('registry sync — Convex vs PROFILE_REGISTRY', () => {
   it('every state profile key follows xx-default pattern', () => {
     for (const [code, profile] of Object.entries(STATE_PROFILE_MAP)) {
       expect(profile.key).toBe(`${code.toLowerCase()}-default`);
+    }
+  });
+
+  it('convex/courtSettings.ts VALID_PROFILE_KEYS contains every registry key', () => {
+    // Read the actual Convex file to verify the source whitelist is in sync.
+    // This catches the case where the test mirror is updated but the Convex file is not.
+    const convexPath = resolve(__dirname, '../../../../convex/courtSettings.ts');
+    const source = readFileSync(convexPath, 'utf-8');
+
+    for (const key of PROFILE_REGISTRY.keys()) {
+      expect(
+        source.includes(`'${key}'`),
+        `Registry key "${key}" missing from convex/courtSettings.ts VALID_PROFILE_KEYS`,
+      ).toBe(true);
     }
   });
 });

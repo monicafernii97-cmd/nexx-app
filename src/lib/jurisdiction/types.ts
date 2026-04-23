@@ -9,11 +9,13 @@
  *
  * ┌──────────────────────────────────┐
  * │ JurisdictionProfile (shared)     │
+ * │  ├─ scope? (layered resolution)  │
  * │  ├─ page (required)              │
  * │  ├─ typography (required)        │
  * │  ├─ pdf (required)               │
  * │  ├─ caption? (QG-specific)       │
  * │  ├─ sections? (QG-specific)      │
+ * │  ├─ courtDocument? (alias)       │
  * │  ├─ filename? (QG-specific)      │
  * │  ├─ pageNumbering? (QG-specific) │
  * │  ├─ court? (Export-specific)     │
@@ -23,6 +25,26 @@
  * │  └─ incident? (Export-specific)  │
  * └──────────────────────────────────┘
  */
+
+// ═══════════════════════════════════════════════════════════════
+// Canonical Type Aliases
+// ═══════════════════════════════════════════════════════════════
+
+export type CaptionStyle =
+  | 'texas_pleading'
+  | 'federal_caption'
+  | 'generic_state_caption'
+  | 'in_re_caption';
+
+export type CourtType =
+  | 'district_court'
+  | 'county_court'
+  | 'family_court'
+  | 'circuit_court'
+  | 'superior_court'
+  | 'probate_court'
+  | 'federal_district'
+  | 'other';
 
 // ═══════════════════════════════════════════════════════════════
 // Shared Jurisdiction Profile
@@ -41,6 +63,21 @@ export type JurisdictionProfile = {
   county?: string;
   /** Court type (e.g. "Federal", "District"). */
   courtType?: string;
+
+  // ── Structured scope (layered resolution) ───────────────────
+
+  /**
+   * Structured scope metadata for layered resolution.
+   * Used by the resolver to match profiles in the hierarchy:
+   *   US default → state → court type → specific court
+   */
+  scope?: {
+    country?: string;
+    state?: string;
+    county?: string;
+    courtName?: string;
+    courtType?: CourtType;
+  };
 
   // ── Shared (required) ──────────────────────────────────────
 
@@ -73,7 +110,7 @@ export type JurisdictionProfile = {
   // ── QG-specific (optional) ─────────────────────────────────
 
   caption?: {
-    style: 'texas_pleading' | 'federal_caption' | 'generic_state_caption' | 'in_re_caption';
+    style: CaptionStyle;
     causeLabel: string;
     useThreeColumnTable: boolean;
     leftWidthIn?: number;
@@ -82,11 +119,28 @@ export type JurisdictionProfile = {
     centerSymbol?: string;
   };
 
+  /**
+   * Court document structure rules (QG-specific).
+   * Internal field: `sections`. The `courtDocument` alias is
+   * provided for new layered APIs.
+   */
   sections?: {
     prayerHeadingRequired: boolean;
     certificateSeparatePage: boolean;
     signatureKeepTogether: boolean;
     /** Whether verification block should avoid page breaks inside. */
+    verificationKeepTogether: boolean;
+  };
+
+  /**
+   * Alias for `sections` — identical shape, used by new layered
+   * profile APIs. During the transition period, the resolver
+   * normalizes both into a single canonical shape.
+   */
+  courtDocument?: {
+    prayerHeadingRequired: boolean;
+    certificateSeparatePage: boolean;
+    signatureKeepTogether: boolean;
     verificationKeepTogether: boolean;
   };
 
@@ -105,11 +159,7 @@ export type JurisdictionProfile = {
   // ── Export-specific (optional) ─────────────────────────────
 
   court?: {
-    captionStyle:
-      | 'texas_pleading'
-      | 'federal_caption'
-      | 'generic_state_caption'
-      | 'in_re_caption';
+    captionStyle: CaptionStyle;
     certificateSeparatePage: boolean;
     signatureKeepTogether: boolean;
     verificationKeepTogether: boolean;
@@ -195,3 +245,33 @@ export type ResolverSettingsInput = {
   courtType?: string;
   district?: string;
 } | null | undefined;
+
+// ═══════════════════════════════════════════════════════════════
+// courtDocument ↔ sections Normalization
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Normalize courtDocument / sections aliases on a profile.
+ *
+ * Rules:
+ *   - If courtDocument exists and sections does not → copy courtDocument to sections
+ *   - If sections exists and courtDocument does not → copy sections to courtDocument
+ *   - If both exist → sections wins (canonical), courtDocument mirrors it
+ *   - If neither exists → no-op
+ *
+ * Returns a new profile object — never mutates the input.
+ */
+export function normalizeCourtDocumentSections(
+  profile: JurisdictionProfile,
+): JurisdictionProfile {
+  const { sections, courtDocument } = profile;
+
+  if (!sections && !courtDocument) return profile;
+
+  const canonical = sections ?? courtDocument;
+  return {
+    ...profile,
+    sections: canonical,
+    courtDocument: canonical,
+  };
+}

@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { PROFILE_REGISTRY } from '@/lib/jurisdiction/profiles/registry';
+import { PROFILE_REGISTRY, STATE_PROFILE_MAP } from '@/lib/jurisdiction/profiles/registry';
 
 /**
  * Mirror of the VALID_PROFILE_KEYS set from convex/courtSettings.ts.
@@ -15,8 +15,24 @@ import { PROFILE_REGISTRY } from '@/lib/jurisdiction/profiles/registry';
  * If the Convex whitelist changes, this test must be updated too.
  */
 const CONVEX_VALID_PROFILE_KEYS = new Set([
-  'us-default', 'tx-default', 'tx-fort-bend-387th',
-  'fl-default', 'ca-default', 'federal-default',
+  // National + Federal
+  'us-default', 'federal-default',
+  // State defaults (all 50)
+  'al-default', 'ak-default', 'az-default', 'ar-default',
+  'ca-default', 'co-default', 'ct-default', 'de-default',
+  'fl-default', 'ga-default', 'hi-default', 'id-default',
+  'il-default', 'in-default', 'ia-default', 'ks-default',
+  'ky-default', 'la-default', 'me-default', 'md-default',
+  'ma-default', 'mi-default', 'mn-default', 'ms-default',
+  'mo-default', 'mt-default', 'ne-default', 'nv-default',
+  'nh-default', 'nj-default', 'nm-default', 'ny-default',
+  'nc-default', 'nd-default', 'oh-default', 'ok-default',
+  'or-default', 'pa-default', 'ri-default', 'sc-default',
+  'sd-default', 'tn-default', 'tx-default', 'ut-default',
+  'vt-default', 'va-default', 'wa-default', 'wv-default',
+  'wi-default', 'wy-default',
+  // Specific courts
+  'tx-fort-bend-387th', 'ca-los-angeles-superior', 'fl-miami-dade-family',
 ]);
 
 describe('registry sync — Convex vs PROFILE_REGISTRY', () => {
@@ -40,5 +56,15 @@ describe('registry sync — Convex vs PROFILE_REGISTRY', () => {
 
   it('key counts match exactly', () => {
     expect(PROFILE_REGISTRY.size).toBe(CONVEX_VALID_PROFILE_KEYS.size);
+  });
+
+  it('STATE_PROFILE_MAP has exactly 50 entries', () => {
+    expect(Object.keys(STATE_PROFILE_MAP).length).toBe(50);
+  });
+
+  it('every state profile key follows xx-default pattern', () => {
+    for (const [code, profile] of Object.entries(STATE_PROFILE_MAP)) {
+      expect(profile.key).toBe(`${code.toLowerCase()}-default`);
+    }
   });
 });

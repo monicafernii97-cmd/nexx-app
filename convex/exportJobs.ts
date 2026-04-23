@@ -16,14 +16,14 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { getAuthenticatedUser } from './lib/auth';
+import {
+    MAX_CONCURRENT_EXPORTS_PER_USER,
+    JOB_TIMEOUT_MS,
+    STALE_RUN_TTL_MS,
+} from './lib/exportConfig';
 
-// ── Config (mirrored from src/lib/exports/exportConfig.ts) ──
-// Convex server code can't import from src/, so we duplicate the values.
-// SYNC: src/lib/exports/exportConfig.ts — MAX_CONCURRENT_EXPORTS_PER_USER, JOB_TIMEOUT_MS, STALE_RUN_TTL_MS
-// Update both files if changing these values.
-export const MAX_CONCURRENT_EXPORTS_PER_USER = 2;
-export const JOB_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes (Vercel maxDuration constraint)
-export const STALE_RUN_TTL_MS = 10 * 60 * 1000; // 10 minutes (reaper boundary)
+// Re-export for test sync verification
+export { MAX_CONCURRENT_EXPORTS_PER_USER, JOB_TIMEOUT_MS, STALE_RUN_TTL_MS };
 
 // ---------------------------------------------------------------------------
 // 1. Enqueue Export Job (admission control)
@@ -47,7 +47,9 @@ export const enqueueExportJob = mutation({
         const user = await getAuthenticatedUser(ctx);
         const now = Date.now();
 
-        // Count active jobs (queued + running) for this user
+        // Count active jobs (queued + running) for this user,
+        // excluding expired jobs (timeoutAt < now) that the cron
+        // hasn't reaped yet.
         const activeJobs = await ctx.db
             .query('exportJobs')
             .withIndex('by_userId_status', (q) => q.eq('userId', user._id).eq('status', 'queued'))
@@ -58,7 +60,22 @@ export const enqueueExportJob = mutation({
             .withIndex('by_userId_status', (q) => q.eq('userId', user._id).eq('status', 'running'))
             .collect();
 
-        const activeCount = activeJobs.length + runningJobs.length;
+        // Opportunistically reap expired jobs to free capacity immediately
+        // instead of waiting for the next cron cycle.
+        const allJobs = [...activeJobs, ...runningJobs];
+        let reaped = 0;
+        for (const job of allJobs) {
+            if (job.timeoutAt < now) {
+                await ctx.db.patch(job._id, {
+                    status: 'timeout',
+                    completedAt: now,
+                    errorCode: 'EXPORT_JOB_TIMEOUT',
+                });
+                reaped++;
+            }
+        }
+
+        const activeCount = allJobs.length - reaped;
 
         if (activeCount >= MAX_CONCURRENT_EXPORTS_PER_USER) {
             return {
@@ -190,15 +207,18 @@ export const failExportJob = mutation({
 export const getActiveJobCount = query({
     handler: async (ctx) => {
         const user = await getAuthenticatedUser(ctx);
+        const now = Date.now();
 
         const queued = await ctx.db
             .query('exportJobs')
             .withIndex('by_userId_status', (q) => q.eq('userId', user._id).eq('status', 'queued'))
+            .filter((q) => q.gt(q.field('timeoutAt'), now))
             .collect();
 
         const running = await ctx.db
             .query('exportJobs')
             .withIndex('by_userId_status', (q) => q.eq('userId', user._id).eq('status', 'running'))
+            .filter((q) => q.gt(q.field('timeoutAt'), now))
             .collect();
 
         return {

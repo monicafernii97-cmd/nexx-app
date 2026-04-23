@@ -28,6 +28,7 @@ import type * as generatedDocuments from "../generatedDocuments.js";
 import type * as generatedDocumentsExport from "../generatedDocumentsExport.js";
 import type * as incidents from "../incidents.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_exportConfig from "../lib/exportConfig.js";
 import type * as messages from "../messages.js";
 import type * as nexProfiles from "../nexProfiles.js";
 import type * as quickGenerateArtifacts from "../quickGenerateArtifacts.js";
@@ -67,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   generatedDocumentsExport: typeof generatedDocumentsExport;
   incidents: typeof incidents;
   "lib/auth": typeof lib_auth;
+  "lib/exportConfig": typeof lib_exportConfig;
   messages: typeof messages;
   nexProfiles: typeof nexProfiles;
   quickGenerateArtifacts: typeof quickGenerateArtifacts;

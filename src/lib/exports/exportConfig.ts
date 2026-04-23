@@ -1,49 +1,27 @@
 /**
  * Export Pipeline Configuration
  *
- * Centralized configuration for queue admission, concurrency control,
- * retention policies, and retry behavior. All export subsystems
- * reference this module instead of using inline magic numbers.
+ * Re-exports shared constants from the single source of truth at
+ * convex/lib/exportConfig.ts, plus route-specific retry config
+ * that only src/ code uses.
+ *
+ * All export subsystems reference this module (or the shared module
+ * directly for Convex server code) instead of using inline magic numbers.
  */
 
 // ═══════════════════════════════════════════════════════════════
-// Queue & Concurrency
+// Shared constants (single source of truth: convex/lib/exportConfig.ts)
 // ═══════════════════════════════════════════════════════════════
 
-/** Max concurrent exports (queued + running) per user. */
-export const MAX_CONCURRENT_EXPORTS_PER_USER = 2;
-
-/**
- * Job timeout in milliseconds.
- * Must exceed Vercel's maxDuration (120s) to avoid racing the
- * platform timeout, but short enough to catch genuinely stuck jobs.
- */
-export const JOB_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+export {
+    MAX_CONCURRENT_EXPORTS_PER_USER,
+    JOB_TIMEOUT_MS,
+    STALE_RUN_TTL_MS,
+    COMPLETED_RUN_RETENTION_MS,
+} from '../../../convex/lib/exportConfig';
 
 // ═══════════════════════════════════════════════════════════════
-// Stale Run Reaper
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Stale run TTL in milliseconds.
- * Any exportRun still `in_progress` after this duration is
- * considered stuck and will be reaped by the maintenance cron.
- */
-export const STALE_RUN_TTL_MS = 10 * 60 * 1000; // 10 minutes
-
-// ═══════════════════════════════════════════════════════════════
-// Retention
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Completed/failed run retention in milliseconds.
- * Records older than this are purged by the daily maintenance cron.
- * Matches the existing toolRuns 30-day retention policy.
- */
-export const COMPLETED_RUN_RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-
-// ═══════════════════════════════════════════════════════════════
-// Terminal Mutation Retry
+// Terminal Mutation Retry (route-only — not needed by Convex)
 // ═══════════════════════════════════════════════════════════════
 
 /** Max retry attempts for completeExportRun / failExportRun. */

@@ -13,8 +13,10 @@ import { internalMutation } from './_generated/server';
 
 // ── Config (mirrored from src/lib/exports/exportConfig.ts) ──
 // Convex server code can't import from src/, so we duplicate.
-const STALE_RUN_TTL_MS = 10 * 60 * 1000;              // 10 minutes
-const COMPLETED_RUN_RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+// SYNC: src/lib/exports/exportConfig.ts — STALE_RUN_TTL_MS, COMPLETED_RUN_RETENTION_MS
+// Update both files if changing these values.
+export const STALE_RUN_TTL_MS = 10 * 60 * 1000;              // 10 minutes
+export const COMPLETED_RUN_RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 /** Max records to process per cron invocation to avoid timeout. */
 const BATCH_LIMIT = 100;

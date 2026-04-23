@@ -11,8 +11,19 @@ import {
     STALE_RUN_TTL_MS,
     COMPLETED_RUN_RETENTION_MS,
     JOB_TIMEOUT_MS,
+    MAX_CONCURRENT_EXPORTS_PER_USER,
 } from '../exportConfig';
 import { ExportDocumentGenerationError } from '../errors';
+
+// Import duplicated constants from Convex modules for sync verification
+import {
+    STALE_RUN_TTL_MS as CONVEX_STALE_RUN_TTL_MS,
+    COMPLETED_RUN_RETENTION_MS as CONVEX_COMPLETED_RUN_RETENTION_MS,
+} from '../../../../convex/exportRunsMaintenance';
+import {
+    MAX_CONCURRENT_EXPORTS_PER_USER as CONVEX_MAX_CONCURRENT_EXPORTS_PER_USER,
+    JOB_TIMEOUT_MS as CONVEX_JOB_TIMEOUT_MS,
+} from '../../../../convex/exportJobs';
 
 describe('Stale Run Reaper — Configuration', () => {
     it('stale TTL is exactly 10 minutes', () => {
@@ -56,5 +67,29 @@ describe('Stale Run Reaper — Error Code Contract', () => {
         });
         expect(err.code).toBe('EXPORT_JOB_TIMEOUT');
         expect(err.code).not.toBe('EXPORT_IDEMPOTENCY_CONFLICT');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-module sync verification
+// Convex server code can't import from src/, so constants are duplicated.
+// These tests catch drift between the canonical config and Convex copies.
+// ---------------------------------------------------------------------------
+
+describe('Stale Run Reaper — Config Sync (Convex ↔ src)', () => {
+    it('STALE_RUN_TTL_MS matches between exportConfig and exportRunsMaintenance', () => {
+        expect(CONVEX_STALE_RUN_TTL_MS).toBe(STALE_RUN_TTL_MS);
+    });
+
+    it('COMPLETED_RUN_RETENTION_MS matches between exportConfig and exportRunsMaintenance', () => {
+        expect(CONVEX_COMPLETED_RUN_RETENTION_MS).toBe(COMPLETED_RUN_RETENTION_MS);
+    });
+
+    it('MAX_CONCURRENT_EXPORTS_PER_USER matches between exportConfig and exportJobs', () => {
+        expect(CONVEX_MAX_CONCURRENT_EXPORTS_PER_USER).toBe(MAX_CONCURRENT_EXPORTS_PER_USER);
+    });
+
+    it('JOB_TIMEOUT_MS matches between exportConfig and exportJobs', () => {
+        expect(CONVEX_JOB_TIMEOUT_MS).toBe(JOB_TIMEOUT_MS);
     });
 });

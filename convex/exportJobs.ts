@@ -19,9 +19,10 @@ import { getAuthenticatedUser } from './lib/auth';
 
 // ── Config (mirrored from src/lib/exports/exportConfig.ts) ──
 // Convex server code can't import from src/, so we duplicate the values.
-// Keep in sync with the source-of-truth config module.
-const MAX_CONCURRENT_EXPORTS_PER_USER = 2;
-const JOB_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+// SYNC: src/lib/exports/exportConfig.ts — MAX_CONCURRENT_EXPORTS_PER_USER, JOB_TIMEOUT_MS
+// Update both files if changing these values.
+export const MAX_CONCURRENT_EXPORTS_PER_USER = 2;
+export const JOB_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 
 // ---------------------------------------------------------------------------
 // 1. Enqueue Export Job (admission control)

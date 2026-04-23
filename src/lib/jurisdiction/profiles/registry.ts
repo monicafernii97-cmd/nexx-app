@@ -25,15 +25,24 @@ import { FEDERAL_DEFAULT_PROFILE } from './federal-default';
 // Registry
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * All registered profiles in insertion order.
+ * Add new profiles here — keys are derived from profile.key
+ * so the registry can never drift from profile metadata.
+ */
+const ALL_PROFILES: readonly JurisdictionProfile[] = [
+  US_DEFAULT_PROFILE,
+  TX_DEFAULT_PROFILE,
+  TX_FORT_BEND_387TH_PROFILE,
+  FL_DEFAULT_PROFILE,
+  CA_DEFAULT_PROFILE,
+  FEDERAL_DEFAULT_PROFILE,
+];
+
 /** Map of profileKey → JurisdictionProfile for explicit lookups. */
-export const PROFILE_REGISTRY: ReadonlyMap<string, JurisdictionProfile> = new Map([
-  ['us-default', US_DEFAULT_PROFILE],
-  ['tx-default', TX_DEFAULT_PROFILE],
-  ['tx-fort-bend-387th', TX_FORT_BEND_387TH_PROFILE],
-  ['fl-default', FL_DEFAULT_PROFILE],
-  ['ca-default', CA_DEFAULT_PROFILE],
-  ['federal-default', FEDERAL_DEFAULT_PROFILE],
-]);
+export const PROFILE_REGISTRY: ReadonlyMap<string, JurisdictionProfile> = new Map(
+  ALL_PROFILES.map((p) => [p.key, p]),
+);
 
 // ═══════════════════════════════════════════════════════════════
 // Re-exports for convenience

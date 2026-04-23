@@ -159,6 +159,7 @@ export async function generateExportPDF(
 // Stage Helpers
 // ═══════════════════════════════════════════════════════════════
 
+/** Stage 1: Resolve export jurisdiction profile from settings. */
 function resolveProfileStage(settings: ExportSettingsInput) {
   try {
     return resolveExportProfileWithMeta(settings);
@@ -171,6 +172,7 @@ function resolveProfileStage(settings: ExportSettingsInput) {
   }
 }
 
+/** Stage 2: Build canonical export document from adapt params. */
 function adaptDocumentStage(params: AdaptToCanonicalParams): CanonicalExportDocument {
   try {
     return adaptDraftedToCanonicalExport(params);
@@ -183,6 +185,7 @@ function adaptDocumentStage(params: AdaptToCanonicalParams): CanonicalExportDocu
   }
 }
 
+/** Stage 3: Validate document structure — blocker issues throw. */
 function validateDocumentStage(document: CanonicalExportDocument): void {
   const validation = validateExportDocument(document);
   if (!validation.canProceed) {
@@ -198,6 +201,7 @@ function validateDocumentStage(document: CanonicalExportDocument): void {
   }
 }
 
+/** Stage 4: Render HTML via path-specific dispatcher. */
 function renderHTMLStage(
   document: CanonicalExportDocument,
   profile: ExportJurisdictionProfile,
@@ -214,6 +218,7 @@ function renderHTMLStage(
   return html;
 }
 
+/** Stage 5: Assert HTML contains expected structural markers. */
 function assertStructureStage(html: string, path: ExportPath): void {
   try {
     assertRenderedExportStructure(html, path);
@@ -226,6 +231,7 @@ function assertStructureStage(html: string, path: ExportPath): void {
   }
 }
 
+/** Stage 6: Render HTML to PDF via Puppeteer. */
 async function renderPDFStage(
   html: string,
   profile: ExportJurisdictionProfile,
@@ -243,6 +249,7 @@ async function renderPDFStage(
   }
 }
 
+/** Stage 7: Validate the PDF buffer integrity (header, size). */
 function validatePDFStage(pdfBuffer: Buffer): ValidatedPdf {
   try {
     return validatePdfBuffer(pdfBuffer);
@@ -259,6 +266,7 @@ function validatePDFStage(pdfBuffer: Buffer): ValidatedPdf {
 // Filename Generation
 // ═══════════════════════════════════════════════════════════════
 
+/** Stage 8: Generate a deterministic PDF filename from metadata. */
 function generateFilenameStage(metadata: {
   caseType: string;
   exportPath: string;
@@ -277,6 +285,7 @@ function generateFilenameStage(metadata: {
   }
 }
 
+/** Sanitize a string for use in filenames: lowercase, alphanumeric + underscores. */
 function sanitize(str: string): string {
   return str
     .toLowerCase()

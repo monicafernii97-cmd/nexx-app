@@ -14,7 +14,7 @@
  * Profile definitions live in src/lib/jurisdiction/profiles/.
  */
 
-import type { JurisdictionProfile } from '@/lib/jurisdiction/types';
+import type { JurisdictionProfile, ProfileResolutionMeta } from '@/lib/jurisdiction/types';
 import type { CourtSettings } from './types';
 import type { CourtFormattingRules } from '@/lib/legal/types';
 import { resolveSharedJurisdictionProfile } from '@/lib/jurisdiction/resolveSharedJurisdictionProfile';
@@ -63,12 +63,24 @@ export type SavedCourtSettings = {
 export function resolveJurisdictionProfile(
   settings: SavedCourtSettings | CourtSettings | null | undefined,
 ): JurisdictionProfile {
-  const input = normalizeSettingsInput(settings);
-  const { profile } = resolveSharedJurisdictionProfile(input);
+  const { profile } = resolveJurisdictionProfileWithMeta(settings);
+  return profile;
+}
 
-  // Apply formatting overrides from settings
+/**
+ * Resolve the best-matching jurisdiction profile AND return resolution
+ * metadata in a single call. Prevents duplicate resolver invocations.
+ *
+ * Used by the QG orchestrator to get both the profile (for rendering)
+ * and the metadata (for observability) from one resolution pass.
+ */
+export function resolveJurisdictionProfileWithMeta(
+  settings: SavedCourtSettings | CourtSettings | null | undefined,
+): { profile: JurisdictionProfile; meta: ProfileResolutionMeta } {
+  const input = normalizeSettingsInput(settings);
+  const { profile, meta } = resolveSharedJurisdictionProfile(input);
   const overrides = extractOverrides(settings);
-  return applyFormattingOverrides(profile, overrides);
+  return { profile: applyFormattingOverrides(profile, overrides), meta };
 }
 
 /**

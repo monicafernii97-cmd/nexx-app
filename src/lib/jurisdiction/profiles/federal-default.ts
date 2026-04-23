@@ -8,7 +8,7 @@
 import type { JurisdictionProfile } from '../types';
 import { US_DEFAULT_PROFILE } from './us-default';
 
-export const FEDERAL_DEFAULT_PROFILE: JurisdictionProfile = {
+/** Federal Default jurisdiction profile — federal caption style. */export const FEDERAL_DEFAULT_PROFILE: JurisdictionProfile = {
   ...US_DEFAULT_PROFILE,
   key: 'federal-default',
   version: '1.0',

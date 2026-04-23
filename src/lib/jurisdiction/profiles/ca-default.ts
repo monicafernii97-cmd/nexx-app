@@ -8,7 +8,7 @@
 import type { JurisdictionProfile } from '../types';
 import { US_DEFAULT_PROFILE } from './us-default';
 
-export const CA_DEFAULT_PROFILE: JurisdictionProfile = {
+/** California Default jurisdiction profile — generic state caption. */export const CA_DEFAULT_PROFILE: JurisdictionProfile = {
   ...US_DEFAULT_PROFILE,
   key: 'ca-default',
   version: '1.0',

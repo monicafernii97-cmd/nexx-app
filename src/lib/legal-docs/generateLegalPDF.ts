@@ -32,7 +32,7 @@ import { generateLegalFilename } from './generateLegalFilename';
 import { checkRenderedLegalStructure } from './assertRenderedLegalStructure';
 import { LegalDocumentGenerationError } from './errors';
 import {
-  resolveJurisdictionProfile,
+  resolveJurisdictionProfileWithMeta,
   toCourtFormattingRules,
   type SavedCourtSettings,
 } from './jurisdiction/resolveJurisdictionProfile';
@@ -42,7 +42,6 @@ import { validatePdfBuffer, type ValidatedPdf } from '@/lib/pdf/validatePdf';
 import type { CourtSettings } from './jurisdiction/types';
 import type { JurisdictionProfile, ProfileResolutionMeta } from '@/lib/jurisdiction/types';
 import { assertQuickGenerateProfile } from '@/lib/jurisdiction/assertProfileForPipeline';
-import { resolveSharedJurisdictionProfile } from '@/lib/jurisdiction/resolveSharedJurisdictionProfile';
 import type { LegalDocument } from './types';
 
 /** Minimum acceptable HTML output length — anything shorter indicates a rendering failure. */
@@ -164,15 +163,8 @@ export async function generateLegalPDF(
   let jurisdictionProfile: JurisdictionProfile;
   let profileResolutionMeta: ProfileResolutionMeta;
   try {
-    jurisdictionProfile = resolveJurisdictionProfile(courtSettings);
-    // Use shared resolver for metadata (since resolveJurisdictionProfile applies overrides)
-    const { meta } = resolveSharedJurisdictionProfile({
-      state: courtSettings.jurisdiction?.state,
-      county: courtSettings.jurisdiction?.county,
-      courtName: courtSettings.jurisdiction?.courtName,
-      courtType: courtSettings.jurisdiction?.courtType,
-      district: courtSettings.jurisdiction?.district,
-    });
+    const { profile, meta } = resolveJurisdictionProfileWithMeta(courtSettings);
+    jurisdictionProfile = profile;
     profileResolutionMeta = meta;
   } catch (err) {
     throw new LegalDocumentGenerationError({

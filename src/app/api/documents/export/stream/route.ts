@@ -481,11 +481,18 @@ export async function POST(request: NextRequest) {
 
                 checkAborted();
 
-                // 4a. Resolve jurisdiction profile (for caption/exhibit setup)
-                const exportProfile = resolveExportJurisdictionProfile({
+                // Build full jurisdiction settings object — shared between
+                // pre-adaptation profile resolve and the orchestrator.
+                // Includes profileKey and overrides so both get the same profile.
+                const profileKey = ('profileKey' in exportConfig ? String(exportConfig.profileKey) : undefined) ?? undefined;
+                const jurisdictionSettings = {
                     state: courtState,
                     county: courtCounty,
-                });
+                    profileKey,
+                };
+
+                // 4a. Resolve jurisdiction profile (for caption/exhibit setup)
+                const exportProfile = resolveExportJurisdictionProfile(jurisdictionSettings);
 
                 // 4b. Build caption for court documents
                 const exportPath = (body.exportRequest?.path ?? 'court_document') as ExportPath;
@@ -572,7 +579,7 @@ export async function POST(request: NextRequest) {
 
                 const pipelineResult = await generateExportPDF({
                     adaptParams,
-                    jurisdictionSettings: { state: courtState, county: courtCounty },
+                    jurisdictionSettings,
                     causeNumber,
                     metadata: { caseType, exportPath, runId: body.runId },
                 });

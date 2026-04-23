@@ -8,7 +8,7 @@
 import type { JurisdictionProfile } from '../types';
 import { US_DEFAULT_PROFILE } from './us-default';
 
-export const TX_DEFAULT_PROFILE: JurisdictionProfile = {
+/** Texas Default jurisdiction profile — Texas pleading format. */export const TX_DEFAULT_PROFILE: JurisdictionProfile = {
   ...US_DEFAULT_PROFILE,
   key: 'tx-default',
   version: '1.0',

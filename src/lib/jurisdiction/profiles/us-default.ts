@@ -7,7 +7,7 @@
 
 import type { JurisdictionProfile } from '../types';
 
-export const US_DEFAULT_PROFILE: JurisdictionProfile = {
+/** US Default jurisdiction profile — generic federal/state fallback. */export const US_DEFAULT_PROFILE: JurisdictionProfile = {
   key: 'us-default',
   version: '1.0',
   name: 'US General Pleading',

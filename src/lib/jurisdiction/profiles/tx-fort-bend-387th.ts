@@ -7,7 +7,7 @@
 import type { JurisdictionProfile } from '../types';
 import { TX_DEFAULT_PROFILE } from './tx-default';
 
-export const TX_FORT_BEND_387TH_PROFILE: JurisdictionProfile = {
+/** Fort Bend County 387th Judicial District — county-specific Texas profile. */export const TX_FORT_BEND_387TH_PROFILE: JurisdictionProfile = {
   ...TX_DEFAULT_PROFILE,
   key: 'tx-fort-bend-387th',
   version: '1.0',

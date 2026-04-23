@@ -117,10 +117,12 @@ export function resolveSharedJurisdictionProfile(
 // Helpers
 // ═══════════════════════════════════════════════════════════════
 
+/** Normalize a string value for case-insensitive matching. */
 function norm(value?: string): string {
   return (value || '').trim().toLowerCase();
 }
 
+/** Build a ResolvedProfileResult from a profile and resolution source. */
 function result(
   profile: JurisdictionProfile,
   source: ProfileResolutionSource,

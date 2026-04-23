@@ -79,8 +79,26 @@ export const upsert = mutation({
         const childrenCount = children?.length;
         const derivedChildName = childrenNames?.filter(Boolean).join(', ') || args.childName?.trim() || undefined;
 
+        // Validate profileKey against known registry keys.
+        // This whitelist mirrors src/lib/jurisdiction/profiles/registry.ts.
+        // When adding a new profile to the shared registry, add the key here too.
+        const VALID_PROFILE_KEYS = new Set([
+            'us-default', 'tx-default', 'tx-fort-bend-387th',
+            'fl-default', 'ca-default', 'federal-default',
+        ]);
+
+        if (args.profileKey && !VALID_PROFILE_KEYS.has(args.profileKey)) {
+            throw new Error(`Invalid profileKey: "${args.profileKey}". Must be one of: ${[...VALID_PROFILE_KEYS].join(', ')}`);
+        }
+
+        // Never trust client-supplied profileVersion — derive from profile key.
+        // The version is always "1.0" for the current profile schema.
+        const derivedProfileVersion = args.profileKey ? '1.0' : undefined;
+
         const normalizedArgs = {
             ...args,
+            // Overwrite client profileVersion with server-derived value
+            profileVersion: derivedProfileVersion,
             children,
             childrenNames,
             childrenAges,

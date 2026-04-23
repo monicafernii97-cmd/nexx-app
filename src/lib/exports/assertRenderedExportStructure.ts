@@ -32,10 +32,16 @@ export function assertRenderedExportStructure(
     return;
   }
 
+  // Strip <style> and <script> blocks to prevent false positives
+  // from CSS class names or script text matching structural markers.
+  const bodyHtml = html
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '');
+
   const missing: string[] = [];
 
   for (const check of checks.required) {
-    if (!html.includes(check.marker)) {
+    if (!bodyHtml.includes(check.marker)) {
       missing.push(check.label);
     }
   }
@@ -47,7 +53,7 @@ export function assertRenderedExportStructure(
   }
 
   // Substantive content check — strip tags and check remaining text length
-  const textContent = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const textContent = bodyHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
   if (textContent.length < MIN_SUBSTANTIVE_CONTENT_LENGTH) {
     throw new Error(
       `Export HTML for "${path}" has only ${textContent.length} chars of text content (minimum ${MIN_SUBSTANTIVE_CONTENT_LENGTH}) — possible empty shell`,

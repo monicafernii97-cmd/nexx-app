@@ -7,7 +7,7 @@
  */
 
 import type { CanonicalExportDocument } from './types';
-import type { ExportJurisdictionProfile } from './jurisdiction/types';
+import type { ExportJurisdictionProfile } from '@/lib/jurisdiction/types';
 import { renderCourtExportHTML } from './renderers/renderCourtExportHTML';
 import { renderSummaryExportHTML } from './renderers/renderSummaryExportHTML';
 import { renderExhibitPacketHTML } from './renderers/renderExhibitPacketHTML';

@@ -43,6 +43,7 @@ import type { CourtSettings } from './jurisdiction/types';
 import type { JurisdictionProfile, ProfileResolutionMeta } from '@/lib/jurisdiction/types';
 import { assertQuickGenerateProfile } from '@/lib/jurisdiction/assertProfileForPipeline';
 import type { LegalDocument } from './types';
+import { logLegalGeneration } from './observability';
 
 /** Minimum acceptable HTML output length — anything shorter indicates a rendering failure. */
 const MIN_RENDERED_HTML_LENGTH = 200;
@@ -262,10 +263,17 @@ export async function generateLegalPDF(
 
   // ── Observability ──
   const durationMs = Date.now() - startTime;
-  console.log(
-    `[LegalPDF] Generated: type=${documentType}, profile=${profileResolutionMeta.profileKey} (${profileResolutionMeta.source}), ` +
-    `sections=${parsed.sections.length}, pdf=${pdfMeta.byteLength}b, duration=${durationMs}ms`,
-  );
+  logLegalGeneration({
+    orchestrator: 'quick_generate',
+    documentType,
+    profileKey: profileResolutionMeta.profileKey,
+    profileSource: profileResolutionMeta.source,
+    sectionCount: parsed.sections.length,
+    htmlLength: html.length,
+    pdfByteLength: pdfMeta.byteLength,
+    durationMs,
+    success: true,
+  });
   if (validation.warnings.length > 0) {
     console.warn(`[LegalPDF] Warnings: ${validation.warnings.join('; ')}`);
   }

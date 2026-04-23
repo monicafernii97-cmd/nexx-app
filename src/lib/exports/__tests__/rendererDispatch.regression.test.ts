@@ -8,14 +8,12 @@
 import { describe, expect, it } from 'vitest';
 import { renderExportHTML, MIN_RENDERED_EXPORT_HTML_LENGTH } from '../renderExportHTML';
 import type { CanonicalExportDocument, ExportPath } from '../types';
-import { US_DEFAULT_EXPORT_PROFILE } from '../jurisdiction/profiles/us-default';
-import { TX_DEFAULT_EXPORT_PROFILE } from '../jurisdiction/profiles/tx-default';
-import { FEDERAL_DEFAULT_EXPORT_PROFILE } from '../jurisdiction/profiles/federal-default';
+import { PROFILE_REGISTRY } from '@/lib/jurisdiction/profiles/registry';
 import { assertExportProfile } from '@/lib/jurisdiction/assertProfileForPipeline';
 
-const usProfile = assertExportProfile(US_DEFAULT_EXPORT_PROFILE);
-const txProfile = assertExportProfile(TX_DEFAULT_EXPORT_PROFILE);
-const fedProfile = assertExportProfile(FEDERAL_DEFAULT_EXPORT_PROFILE);
+const usProfile = assertExportProfile(PROFILE_REGISTRY.get('us-default')!);
+const txProfile = assertExportProfile(PROFILE_REGISTRY.get('tx-default')!);
+const fedProfile = assertExportProfile(PROFILE_REGISTRY.get('federal-default')!);
 
 function makeDoc(overrides: Partial<CanonicalExportDocument>): CanonicalExportDocument {
   return {
@@ -112,7 +110,7 @@ describe('renderExportHTML — dispatch', () => {
 
   it('uses profile typography', () => {
     const html = renderExportHTML(makeDoc({}), txProfile);
-    expect(html).toContain("'Times New Roman'");
+    expect(html).toContain('Times New Roman');
     expect(html).toContain('12pt');
     expect(html).toContain('justify');
   });

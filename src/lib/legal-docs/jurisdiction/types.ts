@@ -1,16 +1,11 @@
 /**
  * Jurisdiction-Aware Formatting Types (Quick Generate)
  *
- * JurisdictionProfile is now a re-export from the shared
- * jurisdiction module. This file retains the QG-specific
- * CourtSettings domain contract.
+ * This file defines the QG-specific CourtSettings domain contract.
  *
- * Profiles are resolved per state/county/court and can be extended
- * over time without changing the parser.
+ * Shared profile types (JurisdictionProfile, QuickGenerateProfile)
+ * are imported directly from @/lib/jurisdiction/types.
  */
-
-// Re-export the shared JurisdictionProfile
-export type { JurisdictionProfile, QuickGenerateProfile } from '@/lib/jurisdiction/types';
 
 // ═══════════════════════════════════════════════════════════════
 // External-Facing Court Settings (Domain Contract)

@@ -286,4 +286,78 @@ describe('isFormattingOverridesV2', () => {
   it('returns false for objects without V2 keys', () => {
     expect(isFormattingOverridesV2({ fontSize: 14 })).toBe(false);
   });
+
+  it('returns false for empty objects', () => {
+    expect(isFormattingOverridesV2({})).toBe(false);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Override Matrix (Expanded Edge Cases)
+// ═══════════════════════════════════════════════════════════════
+
+describe('override matrix — edge cases', () => {
+  it('no overrides leaves profile untouched', () => {
+    const { profile: base } = resolveSharedJurisdictionProfile(null);
+    const result = applyFormattingOverrides(base, undefined);
+    expect(result).toBe(base);
+  });
+
+  it('valid V2 applies cleanly', () => {
+    const { profile: base } = resolveSharedJurisdictionProfile(null);
+    const result = applyFormattingOverrides(base, {
+      defaultFontSizePt: 14,
+      defaultFont: 'Courier New',
+      lineSpacing: 2,
+    });
+    expect(result.typography.fontSizePt).toBe(14);
+    expect(result.typography.fontFamily).toContain('Courier New');
+  });
+
+  it('malformed V2 is safely dropped', () => {
+    const result = normalizeFormattingOverrides({
+      defaultFontSizePt: -1,
+      pageSize: 'TABLOID',
+    });
+    // All fields invalid, should return undefined
+    expect(result).toBeUndefined();
+  });
+
+  it('legacy only coerces cleanly', () => {
+    const { overrides, source } = resolveEffectiveOverrides(
+      null,
+      { fontSize: 12, fontFamily: 'Georgia' },
+    );
+    expect(source).toBe('legacy_coerced');
+    expect(overrides?.defaultFontSizePt).toBe(12);
+    expect(overrides?.defaultFont).toBe('Georgia');
+  });
+
+  it('V2 overrides legacy when both present', () => {
+    const { overrides, source } = resolveEffectiveOverrides(
+      { defaultFontSizePt: 16, defaultFont: 'Arial' },
+      { fontSize: 12, fontFamily: 'Courier' },
+    );
+    expect(source).toBe('v2');
+    expect(overrides?.defaultFontSizePt).toBe(16);
+    expect(overrides?.defaultFont).toBe('Arial');
+  });
+
+  it('unknown keys are silently ignored', () => {
+    const result = normalizeFormattingOverrides({
+      fakeKey: 'value',
+      anotherFake: 42,
+      defaultFont: 'Times New Roman',
+    });
+    expect(result).toEqual({ defaultFont: 'Times New Roman' });
+    expect((result as Record<string, unknown>)?.fakeKey).toBeUndefined();
+  });
+
+  it('out-of-range values are rejected', () => {
+    const resultFontTooLarge = normalizeFormattingOverrides({ defaultFontSizePt: 100 });
+    expect(resultFontTooLarge).toBeUndefined();
+
+    const resultFontTooSmall = normalizeFormattingOverrides({ defaultFontSizePt: 3 });
+    expect(resultFontTooSmall).toBeUndefined();
+  });
 });

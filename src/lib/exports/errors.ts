@@ -24,7 +24,8 @@ export type ExportGenerationErrorCode =
   | 'EXPORT_FILENAME_FAILED'
   | 'EXPORT_UPLOAD_FAILED'
   | 'EXPORT_FINALIZE_FAILED'
-  | 'EXPORT_OVERRIDE_NORMALIZATION_FAILED';
+  | 'EXPORT_OVERRIDE_NORMALIZATION_FAILED'
+  | 'EXPORT_IDEMPOTENCY_CONFLICT';
 
 // ═══════════════════════════════════════════════════════════════
 // Error Class

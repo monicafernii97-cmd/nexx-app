@@ -9,7 +9,7 @@
  * existing renderHTMLToPDF() interface.
  */
 
-import type { ExportJurisdictionProfile } from './types';
+import type { ExportJurisdictionProfile } from '@/lib/jurisdiction/types';
 import type { CourtFormattingRules } from '@/lib/legal/types';
 import {
   resolveSharedJurisdictionProfile,

@@ -21,7 +21,7 @@ import type {
   ExhibitImageSection,
   ExhibitIndexSection,
 } from '../types';
-import type { ExportJurisdictionProfile } from '../jurisdiction/types';
+import type { ExportJurisdictionProfile } from '@/lib/jurisdiction/types';
 import { formatBatesNumber } from '../bates/applyBatesNumbering';
 import { getImageExhibitCSS, renderImageExhibitPages } from './renderImageExhibitPages';
 import { escapeHtml, renderPageShell } from './shared';

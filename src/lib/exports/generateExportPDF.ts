@@ -39,8 +39,9 @@ import {
   mapToExportGenerationError,
 } from './errors';
 import type { CanonicalExportDocument, ExportPath } from './types';
-import type { ExportJurisdictionProfile } from './jurisdiction/types';
+import type { ExportJurisdictionProfile } from '@/lib/jurisdiction/types';
 import type { ProfileResolutionMeta } from '@/lib/jurisdiction/types';
+import { logExportGeneration } from './observability';
 
 // ═══════════════════════════════════════════════════════════════
 // Public Types
@@ -148,10 +149,18 @@ export async function generateExportPDF(
     const durationMs = Date.now() - startTime;
 
     // ── Observability ──
-    console.log(
-      `[ExportPDF] Generated: path=${document.path}, profile=${profileMeta.profileKey} (${profileMeta.source}), ` +
-      `pdf=${pdfMeta.byteLength}b, duration=${durationMs}ms`,
-    );
+    logExportGeneration({
+      orchestrator: 'create_export',
+      runId: input.metadata.runId,
+      exportPath: document.path,
+      caseType: input.metadata.caseType,
+      profileKey: profileMeta.profileKey,
+      profileSource: profileMeta.source,
+      htmlLength: html.length,
+      pdfByteLength: pdfMeta.byteLength,
+      durationMs,
+      success: true,
+    });
 
     return {
       pdfBuffer,
@@ -166,10 +175,17 @@ export async function generateExportPDF(
   } catch (error) {
     const durationMs = Date.now() - startTime;
     const mapped = mapToExportGenerationError(error);
-    console.error(
-      `[ExportPDF] Failed: path=${input.metadata.exportPath}, ` +
-      `code=${mapped.code}, duration=${durationMs}ms, message=${mapped.message}`,
-    );
+    logExportGeneration({
+      orchestrator: 'create_export',
+      runId: input.metadata.runId,
+      exportPath: input.metadata.exportPath,
+      caseType: input.metadata.caseType,
+      profileKey: 'unknown',
+      profileSource: 'global_default',
+      durationMs,
+      success: false,
+      errorCode: mapped.code,
+    });
     throw mapped;
   }
 }

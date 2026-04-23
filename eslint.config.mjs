@@ -40,6 +40,37 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // Ban direct pipeline imports from Create Export routes.
+  // All render/validation/PDF logic MUST go through generateExportPDF().
+  {
+    name: "nexx/no-legacy-export-imports",
+    files: ["**/src/app/api/documents/export/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/lib/exports/renderExportHTML",
+              message: "Use generateExportPDF() orchestrator instead of direct HTML rendering.",
+            },
+            {
+              name: "@/lib/exports/validateExportDocument",
+              message: "Use generateExportPDF() orchestrator instead of direct validation.",
+            },
+            {
+              name: "@/lib/pdf/renderHTMLToPDF",
+              message: "Use generateExportPDF() orchestrator instead of direct PDF rendering.",
+            },
+            {
+              name: "@/lib/pdf/validatePdf",
+              message: "Use generateExportPDF() orchestrator instead of direct PDF validation.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

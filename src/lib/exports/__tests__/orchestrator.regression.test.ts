@@ -156,6 +156,9 @@ describe('generateExportPDF — orchestrator', () => {
       },
     });
 
-    await expect(generateExportPDF(input)).rejects.toBeInstanceOf(ExportDocumentGenerationError);
+    await expect(generateExportPDF(input)).rejects.toMatchObject({
+      name: 'ExportDocumentGenerationError',
+      code: 'EXPORT_RENDER_STRUCTURE_INVALID',
+    });
   });
 });

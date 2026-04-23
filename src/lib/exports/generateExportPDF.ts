@@ -109,6 +109,7 @@ export async function generateExportPDF(
 ): Promise<GenerateExportPDFResult> {
   const startTime = Date.now();
   let resolvedProfileMeta: ProfileResolutionMeta | null = null;
+  let resolvedExportPath = input.metadata.exportPath;
 
   try {
     // 1. Resolve jurisdiction profile (skip if pre-resolved)
@@ -120,6 +121,7 @@ export async function generateExportPDF(
 
     // 2. Build canonical export document
     const document = adaptDocumentStage(input.adaptParams);
+    resolvedExportPath = document.path;
 
     // 3. Validate document structure
     validateDocumentStage(document);
@@ -144,7 +146,7 @@ export async function generateExportPDF(
     }
 
     // 8. Generate deterministic filename (prefer document.path as authoritative)
-    const filename = generateFilenameStage({
+    const filename = generateExportFilename({
       ...input.metadata,
       exportPath: document.path,
     });
@@ -181,7 +183,7 @@ export async function generateExportPDF(
     logExportGeneration({
       orchestrator: 'create_export',
       runId: input.metadata.runId,
-      exportPath: input.metadata.exportPath,
+      exportPath: resolvedExportPath,
       caseType: input.metadata.caseType,
       profileKey: resolvedProfileMeta?.profileKey ?? 'unknown',
       profileSource: resolvedProfileMeta?.source ?? 'global_default',
@@ -305,7 +307,7 @@ function validatePDFStage(pdfBuffer: Buffer): ValidatedPdf {
 // ═══════════════════════════════════════════════════════════════
 
 /** Stage 8: Generate a deterministic PDF filename from metadata. */
-function generateFilenameStage(metadata: {
+export function generateExportFilename(metadata: {
   caseType: string;
   exportPath: string;
   runId: string;

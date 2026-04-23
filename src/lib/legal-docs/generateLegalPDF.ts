@@ -310,8 +310,8 @@ export async function generateLegalPDF(
     const generationError = err instanceof LegalDocumentGenerationError
       ? err
       : new LegalDocumentGenerationError({
-          code: 'LEGAL_DOCUMENT_PDF_RENDER_FAILED',
-          message: err instanceof Error ? err.message : String(err),
+          code: 'LEGAL_DOCUMENT_PIPELINE_FAILED',
+          message: `Unexpected legal PDF pipeline failure: ${err instanceof Error ? err.message : String(err)}`,
           details: err,
         });
 

@@ -11,6 +11,7 @@ import { assertRenderedExportStructure } from '../assertRenderedExportStructure'
 import type { CanonicalExportDocument, ExportPath } from '../types';
 import { PROFILE_REGISTRY } from '@/lib/jurisdiction/profiles/registry';
 import { assertExportProfile } from '@/lib/jurisdiction/assertProfileForPipeline';
+import { generateExportFilename } from '../generateExportPDF';
 
 const profile = assertExportProfile(PROFILE_REGISTRY.get('us-default')!);
 
@@ -85,13 +86,15 @@ describe('export path matrix — all 5 paths', () => {
         expect(() => assertRenderedExportStructure(html, path)).not.toThrow();
       });
 
-      it('generates a valid filename', () => {
-        const date = new Date().toISOString().slice(0, 10);
-        const runId = 'abc123xyz';
-        const shortId = runId.slice(-6);
-        const sanitize = (s: string) => s.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_');
-        const filename = `${sanitize('personal_injury')}_${sanitize(path)}_${date}_${shortId}.pdf`;
+      it('generates a valid filename via production helper', () => {
+        const filename = generateExportFilename({
+          caseType: 'personal_injury',
+          exportPath: path,
+          runId: 'abc123xyz',
+        });
         expect(filename).toMatch(/\.pdf$/);
+        expect(filename).toContain('personal_injury');
+        expect(filename).toContain(path);
         expect(filename.length).toBeGreaterThan(10);
       });
     });

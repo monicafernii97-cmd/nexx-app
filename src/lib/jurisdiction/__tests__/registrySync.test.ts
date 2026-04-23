@@ -81,17 +81,27 @@ describe('registry sync — Convex vs PROFILE_REGISTRY', () => {
   });
 
   it('convex/courtSettings.ts VALID_PROFILE_KEYS contains every registry key', () => {
-    // Read the actual Convex file to verify the source whitelist is in sync.
-    // This catches the case where the test mirror is updated but the Convex file is not.
+    // Read the actual Convex file and extract just the VALID_PROFILE_KEYS
+    // initializer block — avoids false positives from comments or unrelated constants.
     const convexPath = resolve(__dirname, '../../../../convex/courtSettings.ts');
     const source = readFileSync(convexPath, 'utf-8');
 
+    const validKeysBlock = source.match(
+      /const\s+VALID_PROFILE_KEYS\s*=\s*new\s+Set\(\s*\[([\s\S]*?)\]\s*\)/,
+    )?.[1];
+
+    expect(
+      validKeysBlock,
+      'Could not locate VALID_PROFILE_KEYS in convex/courtSettings.ts',
+    ).toBeTruthy();
+
+    const convexKeys = new Set(
+      [...validKeysBlock!.matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1]),
+    );
+
     for (const key of PROFILE_REGISTRY.keys()) {
-      // Use quote-agnostic regex to handle both single and double quotes.
-      const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const pattern = new RegExp(`['"]${escaped}['"]`);
       expect(
-        pattern.test(source),
+        convexKeys.has(key),
         `Registry key "${key}" missing from convex/courtSettings.ts VALID_PROFILE_KEYS`,
       ).toBe(true);
     }

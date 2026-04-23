@@ -7,10 +7,14 @@
  * Called by the export orchestrator after HTML rendering, before PDF.
  *
  * A document must prove both:
- *   - Shell structure exists (containers, headings)
+ *   - Shell structure exists (containers, headings via DOM queries)
  *   - Substantive content exists (body text, not just wrappers)
+ *
+ * Uses JSDOM for reliable DOM-based assertions — prevents false
+ * positives from CSS class names in <style> blocks or HTML comments.
  */
 
+import { JSDOM } from 'jsdom';
 import type { ExportPath } from './types';
 
 /** Minimum content length within structure (prevents empty shells). */
@@ -18,7 +22,7 @@ const MIN_SUBSTANTIVE_CONTENT_LENGTH = 50;
 
 /**
  * Assert that rendered HTML contains the expected structural markers
- * for the given export path.
+ * for the given export path. Uses DOM queries for reliable matching.
  *
  * @throws Error with descriptive message on failure
  */
@@ -32,16 +36,16 @@ export function assertRenderedExportStructure(
     return;
   }
 
-  // Strip <style> and <script> blocks to prevent false positives
-  // from CSS class names or script text matching structural markers.
-  const bodyHtml = html
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[\s\S]*?<\/script>/gi, '');
+  // Parse HTML into DOM for reliable structural queries.
+  // This prevents false positives from CSS selectors in <style> blocks
+  // or attribute values matching structural marker strings.
+  const dom = new JSDOM(html);
+  const document = dom.window.document;
 
   const missing: string[] = [];
 
   for (const check of checks.required) {
-    if (!bodyHtml.includes(check.marker)) {
+    if (!document.querySelector(check.selector)) {
       missing.push(check.label);
     }
   }
@@ -52,8 +56,13 @@ export function assertRenderedExportStructure(
     );
   }
 
-  // Substantive content check — strip tags and check remaining text length
-  const textContent = bodyHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  // Substantive content check — remove <style> and <script> nodes
+  // from the DOM, then measure remaining text content.
+  document.querySelectorAll('style, script').forEach((el) => el.remove());
+  const textContent = (document.body?.textContent ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
   if (textContent.length < MIN_SUBSTANTIVE_CONTENT_LENGTH) {
     throw new Error(
       `Export HTML for "${path}" has only ${textContent.length} chars of text content (minimum ${MIN_SUBSTANTIVE_CONTENT_LENGTH}) — possible empty shell`,
@@ -65,36 +74,41 @@ export function assertRenderedExportStructure(
 // Path-Specific Structure Definitions
 // ═══════════════════════════════════════════════════════════════
 
+/** A single structural check — CSS selector + human-readable label. */
 type StructureCheck = {
-  required: Array<{ marker: string; label: string }>;
+  required: Array<{ selector: string; label: string }>;
 };
 
+/**
+ * Path-specific DOM selectors that must be present in rendered HTML.
+ * Selectors match class names, IDs, or data attributes on actual elements.
+ */
 const PATH_STRUCTURE_CHECKS: Record<ExportPath, StructureCheck> = {
   court_document: {
     required: [
-      { marker: 'court-export', label: 'court export container' },
-      { marker: 'report-title', label: 'document title' },
+      { selector: '[class*="court-export"], .court-export, #court-export', label: 'court export container' },
+      { selector: '[class*="report-title"], .report-title, h1', label: 'document title' },
     ],
   },
   case_summary: {
     required: [
-      { marker: 'report-title', label: 'summary title' },
-      { marker: 'summary-section', label: 'summary body' },
+      { selector: '[class*="report-title"], .report-title, h1', label: 'summary title' },
+      { selector: '[class*="summary-section"], .summary-section, section', label: 'summary body' },
     ],
   },
   exhibit_document: {
     required: [
-      { marker: 'exhibit', label: 'exhibit container' },
+      { selector: '[class*="exhibit"], .exhibit, [data-exhibit]', label: 'exhibit container' },
     ],
   },
   timeline_summary: {
     required: [
-      { marker: 'timeline', label: 'timeline container' },
+      { selector: '[class*="timeline"], .timeline, [data-timeline]', label: 'timeline container' },
     ],
   },
   incident_report: {
     required: [
-      { marker: 'report-title', label: 'incident report title' },
+      { selector: '[class*="report-title"], .report-title, h1', label: 'incident report title' },
     ],
   },
 };

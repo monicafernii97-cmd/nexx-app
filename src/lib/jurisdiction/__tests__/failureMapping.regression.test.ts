@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ExportDocumentGenerationError,
   mapToExportGenerationError,
+  type ExportGenerationErrorCode,
 } from '@/lib/exports/errors';
 
 describe('failure mapping — error code taxonomy', () => {
@@ -42,23 +43,27 @@ describe('failure mapping — error code taxonomy', () => {
   });
 
   describe('all error codes are constructable', () => {
-    const allCodes = [
-      'EXPORT_ADAPTATION_FAILED',
-      'EXPORT_PROFILE_RESOLUTION_FAILED',
-      'EXPORT_PROFILE_INVALID_FOR_PATH',
-      'EXPORT_DOCUMENT_VALIDATION_FAILED',
-      'EXPORT_RENDER_TOO_SHORT',
-      'EXPORT_RENDER_STRUCTURE_INVALID',
-      'EXPORT_PDF_RENDER_FAILED',
-      'EXPORT_PDF_INVALID',
-      'EXPORT_FILENAME_FAILED',
-      'EXPORT_UPLOAD_FAILED',
-      'EXPORT_FINALIZE_FAILED',
-      'EXPORT_OVERRIDE_NORMALIZATION_FAILED',
-      'EXPORT_IDEMPOTENCY_CONFLICT',
-    ] as const;
+    /**
+     * Exhaustive map — any new ExportGenerationErrorCode member
+     * that is not added here will cause a TypeScript compile error.
+     */
+    const allCodes: Record<ExportGenerationErrorCode, true> = {
+      EXPORT_ADAPTATION_FAILED: true,
+      EXPORT_PROFILE_RESOLUTION_FAILED: true,
+      EXPORT_PROFILE_INVALID_FOR_PATH: true,
+      EXPORT_DOCUMENT_VALIDATION_FAILED: true,
+      EXPORT_RENDER_TOO_SHORT: true,
+      EXPORT_RENDER_STRUCTURE_INVALID: true,
+      EXPORT_PDF_RENDER_FAILED: true,
+      EXPORT_PDF_INVALID: true,
+      EXPORT_FILENAME_FAILED: true,
+      EXPORT_UPLOAD_FAILED: true,
+      EXPORT_FINALIZE_FAILED: true,
+      EXPORT_OVERRIDE_NORMALIZATION_FAILED: true,
+      EXPORT_IDEMPOTENCY_CONFLICT: true,
+    };
 
-    for (const code of allCodes) {
+    for (const code of Object.keys(allCodes) as ExportGenerationErrorCode[]) {
       it(`can construct error with code ${code}`, () => {
         const err = new ExportDocumentGenerationError({
           code,

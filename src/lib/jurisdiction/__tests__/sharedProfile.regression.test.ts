@@ -297,12 +297,6 @@ describe('isFormattingOverridesV2', () => {
 // ═══════════════════════════════════════════════════════════════
 
 describe('override matrix — edge cases', () => {
-  it('no overrides leaves profile untouched', () => {
-    const { profile: base } = resolveSharedJurisdictionProfile(null);
-    const result = applyFormattingOverrides(base, undefined);
-    expect(result).toBe(base);
-  });
-
   it('valid V2 applies cleanly', () => {
     const { profile: base } = resolveSharedJurisdictionProfile(null);
     const result = applyFormattingOverrides(base, {

@@ -8,10 +8,8 @@
  * Covers:
  *   - Valid input → full result contract
  *   - Invalid canonical doc → EXPORT_DOCUMENT_VALIDATION_FAILED
- *   - Short HTML → EXPORT_RENDER_TOO_SHORT
- *   - Structure invalid → EXPORT_RENDER_STRUCTURE_INVALID
- *   - PDF validation failure → EXPORT_PDF_INVALID
- *   - Profile metadata correctness
+ *   - Missing title → error thrown
+ *   - Profile metadata correctness (state, court, pre-resolved)
  *   - Deterministic filename
  */
 
@@ -140,15 +138,13 @@ describe('generateExportPDF — orchestrator', () => {
       },
     });
 
-    await expect(generateExportPDF(input)).rejects.toThrow(ExportDocumentGenerationError);
-    try {
-      await generateExportPDF(input);
-    } catch (err) {
-      expect((err as ExportDocumentGenerationError).code).toBe('EXPORT_DOCUMENT_VALIDATION_FAILED');
-    }
+    await expect(generateExportPDF(input)).rejects.toMatchObject({
+      name: 'ExportDocumentGenerationError',
+      code: 'EXPORT_DOCUMENT_VALIDATION_FAILED',
+    });
   });
 
-  it('throws for missing title', async () => {
+  it('throws ExportDocumentGenerationError for missing title', async () => {
     const { generateExportPDF } = await import('../generateExportPDF');
     const input = makeValidInput({
       adaptParams: {
@@ -160,6 +156,6 @@ describe('generateExportPDF — orchestrator', () => {
       },
     });
 
-    await expect(generateExportPDF(input)).rejects.toThrow();
+    await expect(generateExportPDF(input)).rejects.toBeInstanceOf(ExportDocumentGenerationError);
   });
 });

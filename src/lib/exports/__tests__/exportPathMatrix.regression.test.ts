@@ -97,3 +97,28 @@ describe('export path matrix — all 5 paths', () => {
     });
   }
 });
+
+// ═══════════════════════════════════════════════════════════════
+// Federal profile variant (table-mode timeline)
+// ═══════════════════════════════════════════════════════════════
+
+const federalProfile = assertExportProfile(PROFILE_REGISTRY.get('federal-default')!);
+const TIMELINE_PATHS: ExportPath[] = ['timeline_summary', 'incident_report'];
+
+describe('export path matrix — federal profile (table-mode)', () => {
+  for (const path of TIMELINE_PATHS) {
+    describe(`path: ${path} (federal)`, () => {
+      const doc = makeDocForPath(path);
+
+      it('renders non-empty HTML with federal profile', () => {
+        const html = renderExportHTML(doc, federalProfile);
+        expect(html.length).toBeGreaterThan(MIN_RENDERED_EXPORT_HTML_LENGTH);
+      });
+
+      it('passes structure assertion with federal profile', () => {
+        const html = renderExportHTML(doc, federalProfile);
+        expect(() => assertRenderedExportStructure(html, path)).not.toThrow();
+      });
+    });
+  }
+});

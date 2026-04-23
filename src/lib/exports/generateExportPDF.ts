@@ -108,12 +108,15 @@ export async function generateExportPDF(
   input: GenerateExportPDFInput,
 ): Promise<GenerateExportPDFResult> {
   const startTime = Date.now();
+  let resolvedProfileMeta: ProfileResolutionMeta | null = null;
 
   try {
     // 1. Resolve jurisdiction profile (skip if pre-resolved)
     const { profile, meta: profileMeta } = input.resolvedProfile
       ? { profile: input.resolvedProfile, meta: { profileKey: input.resolvedProfile.key, source: 'pre_resolved' as const } }
       : resolveProfileStage(input.jurisdictionSettings);
+
+    resolvedProfileMeta = profileMeta;
 
     // 2. Build canonical export document
     const document = adaptDocumentStage(input.adaptParams);
@@ -180,8 +183,8 @@ export async function generateExportPDF(
       runId: input.metadata.runId,
       exportPath: input.metadata.exportPath,
       caseType: input.metadata.caseType,
-      profileKey: 'unknown',
-      profileSource: 'global_default',
+      profileKey: resolvedProfileMeta?.profileKey ?? 'unknown',
+      profileSource: resolvedProfileMeta?.source ?? 'global_default',
       durationMs,
       success: false,
       errorCode: mapped.code,

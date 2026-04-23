@@ -85,7 +85,7 @@ type StructureCheck = {
 const PATH_STRUCTURE_CHECKS: Record<ExportPath, StructureCheck> = {
   court_document: {
     required: [
-      { selector: '.caption-block, .caption-table, .title', label: 'court export container' },
+      { selector: '.caption-block, .caption-table, .rule', label: 'court export container' },
       { selector: '.title, h1, [class~="report-title"]', label: 'document title' },
     ],
   },
@@ -102,7 +102,7 @@ const PATH_STRUCTURE_CHECKS: Record<ExportPath, StructureCheck> = {
   },
   timeline_summary: {
     required: [
-      { selector: '.timeline-wrapper, .timeline-event, [data-timeline]', label: 'timeline container' },
+      { selector: '.timeline-wrapper, .timeline-event, .timeline-table, [data-timeline]', label: 'timeline container' },
     ],
   },
   incident_report: {

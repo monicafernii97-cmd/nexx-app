@@ -35,14 +35,18 @@ export const reapStaleRuns = internalMutation({
         const staleCutoff = now - STALE_RUN_TTL_MS;
 
         // ── Reap stale exportRuns ──
-        const staleRuns = await ctx.db
+        // Query by createdAt (oldest first) to ensure we always reach the
+        // oldest stuck records, even if many recent in_progress rows exist.
+        const candidateRuns = await ctx.db
             .query('exportRuns')
-            .withIndex('by_status', (q) => q.eq('status', 'in_progress'))
+            .withIndex('by_createdAt')
+            .filter((q) => q.lt(q.field('createdAt'), staleCutoff))
             .take(BATCH_LIMIT);
 
         let reapedRuns = 0;
-        for (const run of staleRuns) {
-            if (run.createdAt < staleCutoff) {
+        for (const run of candidateRuns) {
+            // Only reap runs that are still in_progress
+            if (run.status === 'in_progress') {
                 await ctx.db.patch(run._id, {
                     status: 'failed',
                     errorCode: 'EXPORT_JOB_TIMEOUT',
@@ -115,7 +119,7 @@ export const purgeExpiredRuns = internalMutation({
         // ── Purge expired exportJobs ──
         const expiredJobs = await ctx.db
             .query('exportJobs')
-            .withIndex('by_status_createdAt')
+            .withIndex('by_createdAt')
             .filter((q) => q.lt(q.field('createdAt'), cutoff))
             .take(BATCH_LIMIT);
 

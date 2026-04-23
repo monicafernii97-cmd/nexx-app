@@ -898,5 +898,6 @@ export default defineSchema({
     })
         .index('by_userId_status', ['userId', 'status'])
         .index('by_status_createdAt', ['status', 'createdAt'])
+        .index('by_createdAt', ['createdAt'])
         .index('by_fingerprint', ['fingerprint']),
 });

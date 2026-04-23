@@ -46,17 +46,15 @@ describe('Stale Run Reaper — Error Code Contract', () => {
         expect(err).toBeInstanceOf(ExportDocumentGenerationError);
     });
 
-    it('timed-out runs must allow retry (EXPORT_JOB_TIMEOUT is not a permanent block)', () => {
-        // This test documents the contract: when the reaper marks a run as
-        // failed with EXPORT_JOB_TIMEOUT, the idempotency system treats it
-        // as a failed run and allows a new claim on the same fingerprint.
-        // We verify the error code is valid and can be used in failExportRun.
+    it('EXPORT_JOB_TIMEOUT code is distinct from EXPORT_IDEMPOTENCY_CONFLICT', () => {
+        // Verifies the timeout error code is not the same as the conflict code.
+        // This distinction matters because failed runs (including timeouts) allow
+        // re-claim on the same fingerprint, while conflict codes do not.
         const err = new ExportDocumentGenerationError({
             code: 'EXPORT_JOB_TIMEOUT',
             message: 'Reaped by maintenance cron',
         });
         expect(err.code).toBe('EXPORT_JOB_TIMEOUT');
-        // The error should NOT be EXPORT_IDEMPOTENCY_CONFLICT (which blocks retries)
         expect(err.code).not.toBe('EXPORT_IDEMPOTENCY_CONFLICT');
     });
 });

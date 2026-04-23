@@ -861,5 +861,6 @@ export default defineSchema({
     })
         .index('by_fingerprint', ['fingerprint'])
         .index('by_userId', ['userId'])
-        .index('by_status', ['status']),
+        .index('by_status', ['status'])
+        .index('by_createdAt', ['createdAt']),
 });

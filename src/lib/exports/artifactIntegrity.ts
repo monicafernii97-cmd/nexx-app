@@ -63,6 +63,14 @@ export function computeArtifactChecksum(buffer: Buffer): string {
  * expensive in a serverless context). Instead, it validates
  * the metadata returned by the upload response + finalization.
  *
+ * **Note on byte-length check:**
+ * The `reportedByteLength` should ideally come from the storage
+ * system's upload response (e.g., Content-Length header). If the
+ * storage API does not expose uploaded byte count (e.g., Convex
+ * storage returns only `storageId`), the caller must pass the
+ * original buffer length, making the byte-length comparison a
+ * no-op that validates only `storageId` format.
+ *
  * @param params - Verification inputs
  * @returns Verification result with pass/fail details
  */

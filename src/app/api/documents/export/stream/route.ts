@@ -43,6 +43,7 @@ import { generateExportPDF } from '@/lib/exports/generateExportPDF';
 import type { ExportPath } from '@/lib/exports/types';
 import { hashPayload, generateRunFingerprint } from '@/lib/exports/idempotency';
 import { computeArtifactChecksum, verifyUploadedArtifact } from '@/lib/exports/artifactIntegrity';
+import { ExportDocumentGenerationError } from '@/lib/exports/errors';
 
 export const maxDuration = 120; // Extended for GPT + PDF rendering
 
@@ -586,7 +587,18 @@ export async function POST(request: NextRequest) {
                 });
 
                 if (claimResult.status === 'already_completed') {
-                    // Duplicate request — return existing export
+                    // Duplicate request — clean up orphaned export record and return existing
+                    if (exportId) {
+                        try {
+                            await convex.mutation(api.generatedDocumentsExport.failExportRun, {
+                                exportId: exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                                errorCode: 'EXPORT_IDEMPOTENCY_CONFLICT',
+                                errorMessage: 'Duplicate detected — returning cached result',
+                            });
+                        } catch (cleanupErr) {
+                            console.warn('[ExportStream] Failed to clean up orphaned export record:', cleanupErr);
+                        }
+                    }
                     send({
                         type: 'complete',
                         exportId: claimResult.exportId,
@@ -597,10 +609,22 @@ export async function POST(request: NextRequest) {
                 }
 
                 if (claimResult.status === 'in_progress') {
-                    throw Object.assign(
-                        new Error('Duplicate export request — generation already in progress'),
-                        { code: 'EXPORT_IDEMPOTENCY_CONFLICT' },
-                    );
+                    // Clean up orphaned export record before throwing
+                    if (exportId) {
+                        try {
+                            await convex.mutation(api.generatedDocumentsExport.failExportRun, {
+                                exportId: exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                                errorCode: 'EXPORT_IDEMPOTENCY_CONFLICT',
+                                errorMessage: 'Duplicate in-progress — export record cleaned up',
+                            });
+                        } catch (cleanupErr) {
+                            console.warn('[ExportStream] Failed to clean up orphaned export record:', cleanupErr);
+                        }
+                    }
+                    throw new ExportDocumentGenerationError({
+                        code: 'EXPORT_IDEMPOTENCY_CONFLICT',
+                        message: 'Duplicate export request — generation already in progress',
+                    });
                 }
 
                 send({
@@ -678,19 +702,30 @@ export async function POST(request: NextRequest) {
                 // 6b. ARTIFACT INTEGRITY VERIFICATION
                 // ────────────────────────────────────────────────
                 const preUploadChecksum = computeArtifactChecksum(pdfBuffer);
+
+                // Convex storage upload returns only storageId — no byte-length metadata.
+                // Use the upload response Content-Length header when available;
+                // otherwise fall back to the original buffer length (effectively
+                // validates storageId only — byte-length check is a no-op).
+                const uploadedContentLength = uploadResponse.headers.get('content-length');
+                const reportedByteLength = uploadedContentLength
+                    ? parseInt(uploadedContentLength, 10)
+                    : pdfBuffer.length;
+
                 const verification = verifyUploadedArtifact({
                     storageId,
-                    reportedByteLength: pdfBuffer.length,
+                    reportedByteLength,
                     expectedByteLength: pdfBuffer.length,
                     checksum: preUploadChecksum,
                 });
 
                 if (!verification.verified) {
                     console.error('[ExportStream] Artifact integrity check failed:', verification);
-                    throw Object.assign(
-                        new Error(`Artifact integrity verification failed: byteLengthMatch=${verification.byteLengthMatch}, storageIdValid=${verification.storageIdValid}`),
-                        { code: 'EXPORT_ARTIFACT_INTEGRITY_FAILED' },
-                    );
+                    throw new ExportDocumentGenerationError({
+                        code: 'EXPORT_ARTIFACT_INTEGRITY_FAILED',
+                        message: `Artifact integrity verification failed: byteLengthMatch=${verification.byteLengthMatch}, storageIdValid=${verification.storageIdValid}`,
+                        details: verification,
+                    });
                 }
 
                 // ────────────────────────────────────────────────

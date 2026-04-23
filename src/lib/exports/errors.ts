@@ -56,8 +56,37 @@ export class ExportDocumentGenerationError extends Error {
 }
 
 /**
+ * All valid export error codes as a Set for runtime validation.
+ * Used by mapToExportGenerationError to preserve typed codes
+ * from plain Error objects (e.g., thrown via Object.assign).
+ */
+const EXPORT_ERROR_CODES: ReadonlySet<string> = new Set<ExportGenerationErrorCode>([
+  'EXPORT_ADAPTATION_FAILED',
+  'EXPORT_PROFILE_RESOLUTION_FAILED',
+  'EXPORT_PROFILE_INVALID_FOR_PATH',
+  'EXPORT_DOCUMENT_VALIDATION_FAILED',
+  'EXPORT_RENDER_TOO_SHORT',
+  'EXPORT_RENDER_STRUCTURE_INVALID',
+  'EXPORT_PDF_RENDER_FAILED',
+  'EXPORT_PDF_INVALID',
+  'EXPORT_FILENAME_FAILED',
+  'EXPORT_UPLOAD_FAILED',
+  'EXPORT_FINALIZE_FAILED',
+  'EXPORT_OVERRIDE_NORMALIZATION_FAILED',
+  'EXPORT_IDEMPOTENCY_CONFLICT',
+  'EXPORT_ARTIFACT_INTEGRITY_FAILED',
+]);
+
+/** Runtime type guard for ExportGenerationErrorCode. */
+function isExportGenerationErrorCode(code: string): code is ExportGenerationErrorCode {
+  return EXPORT_ERROR_CODES.has(code);
+}
+
+/**
  * Map an unknown error to an ExportDocumentGenerationError.
  * Preserves existing ExportDocumentGenerationError instances.
+ * Also inspects `.code` on plain Error objects (e.g., from Object.assign)
+ * and preserves recognized export error codes.
  */
 export function mapToExportGenerationError(
   error: unknown,
@@ -66,8 +95,15 @@ export function mapToExportGenerationError(
   if (error instanceof ExportDocumentGenerationError) return error;
 
   const message = error instanceof Error ? error.message : String(error);
+
+  // Preserve typed code from plain Error objects (e.g., Object.assign(new Error(...), { code }))
+  const rawCode = (error as { code?: string })?.code;
+  const code = typeof rawCode === 'string' && isExportGenerationErrorCode(rawCode)
+    ? rawCode
+    : fallbackCode;
+
   return new ExportDocumentGenerationError({
-    code: fallbackCode,
+    code,
     message,
     details: error,
   });

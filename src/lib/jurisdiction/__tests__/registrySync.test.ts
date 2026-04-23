@@ -105,5 +105,14 @@ describe('registry sync — Convex vs PROFILE_REGISTRY', () => {
         `Registry key "${key}" missing from convex/courtSettings.ts VALID_PROFILE_KEYS`,
       ).toBe(true);
     }
+
+    // Reciprocal: catch stale extra keys in Convex that were removed from registry
+    expect(convexKeys.size).toBe(PROFILE_REGISTRY.size);
+    for (const key of convexKeys) {
+      expect(
+        PROFILE_REGISTRY.has(key),
+        `convex/courtSettings.ts VALID_PROFILE_KEYS contains stale key "${key}"`,
+      ).toBe(true);
+    }
   });
 });

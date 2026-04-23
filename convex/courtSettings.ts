@@ -3,6 +3,36 @@ import { internal } from './_generated/api';
 import { v } from 'convex/values';
 import { getAuthenticatedUser } from './lib/auth';
 
+// ═══════════════════════════════════════════════════════════════
+// Module-Scope Constants
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Valid profile keys — mirrors src/lib/jurisdiction/profiles/registry.ts.
+ * Module-scoped to avoid per-request rebuilds.
+ * When adding a new profile to the shared registry, add the key here too.
+ */
+const VALID_PROFILE_KEYS = new Set([
+    // National + Federal
+    'us-default', 'federal-default',
+    // State defaults (all 50)
+    'al-default', 'ak-default', 'az-default', 'ar-default',
+    'ca-default', 'co-default', 'ct-default', 'de-default',
+    'fl-default', 'ga-default', 'hi-default', 'id-default',
+    'il-default', 'in-default', 'ia-default', 'ks-default',
+    'ky-default', 'la-default', 'me-default', 'md-default',
+    'ma-default', 'mi-default', 'mn-default', 'ms-default',
+    'mo-default', 'mt-default', 'ne-default', 'nv-default',
+    'nh-default', 'nj-default', 'nm-default', 'ny-default',
+    'nc-default', 'nd-default', 'oh-default', 'ok-default',
+    'or-default', 'pa-default', 'ri-default', 'sc-default',
+    'sd-default', 'tn-default', 'tx-default', 'ut-default',
+    'vt-default', 'va-default', 'wa-default', 'wv-default',
+    'wi-default', 'wy-default',
+    // Specific courts
+    'tx-fort-bend-387th', 'ca-los-angeles-superior', 'fl-miami-dade-family',
+]);
+
 // ── Mutations ──
 
 /** Create or update court settings for the authenticated user. */
@@ -80,13 +110,7 @@ export const upsert = mutation({
         const childrenCount = children?.length;
         const derivedChildName = childrenNames?.filter(Boolean).join(', ') || args.childName?.trim() || undefined;
 
-        // Validate profileKey against known registry keys.
-        // This whitelist mirrors src/lib/jurisdiction/profiles/registry.ts.
-        // When adding a new profile to the shared registry, add the key here too.
-        const VALID_PROFILE_KEYS = new Set([
-            'us-default', 'tx-default', 'tx-fort-bend-387th',
-            'fl-default', 'ca-default', 'federal-default',
-        ]);
+        // Validate profileKey against module-scope VALID_PROFILE_KEYS.
 
         if (args.profileKey && !VALID_PROFILE_KEYS.has(args.profileKey)) {
             throw new Error(`Invalid profileKey: "${args.profileKey}". Must be one of: ${[...VALID_PROFILE_KEYS].join(', ')}`);

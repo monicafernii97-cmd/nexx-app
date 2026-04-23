@@ -1,0 +1,11 @@
+/**
+ * Montana Default Jurisdiction Profile
+ *
+ * Inherits US default via factory. Override specific fields as state
+ * formatting research is completed.
+ */
+
+import { createStateDefaultProfile } from './createStateDefaultProfile';
+
+/** Montana Default jurisdiction profile. */
+export const MT_DEFAULT_PROFILE = createStateDefaultProfile('MT', 'Montana');

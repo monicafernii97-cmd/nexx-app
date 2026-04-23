@@ -206,6 +206,19 @@ export async function POST(request: NextRequest) {
                 // Excludes AI-generated content (draftedSections) so identical
                 // requests always produce the same fingerprint.
                 const exportPath = (body.exportRequest?.path ?? 'court_document') as ExportPath;
+                const normalizedExportRequest = {
+                    ...body.exportRequest,
+                    path: exportPath,
+                    config: {
+                        ...(body.exportRequest?.config ?? {}),
+                        courtState,
+                        courtCounty,
+                        petitionerName,
+                        respondentName,
+                        causeNumber,
+                        caseType,
+                    },
+                };
                 const stablePreGenPayload = {
                     caseId: body.caseId,
                     exportPath,
@@ -215,7 +228,7 @@ export async function POST(request: NextRequest) {
                     petitionerName,
                     respondentName,
                     causeNumber,
-                    exportRequest: body.exportRequest,
+                    exportRequest: normalizedExportRequest,
                     assemblyResult: body.assemblyResult,
                     reviewItems: (body as unknown as Record<string, unknown>).reviewItems ?? null,
                     overrides: (body as unknown as Record<string, unknown>).overrides ?? null,
@@ -237,11 +250,27 @@ export async function POST(request: NextRequest) {
                 claimedExportRun = claimResult.status === 'claimed';
 
                 if (claimResult.status === 'already_completed') {
+                    // Fetch cached export metadata for a consistent SSE shape
+                    let cachedExport: Record<string, unknown> | null = null;
+                    try {
+                        cachedExport = await convex.query(api.generatedDocumentsExport.getExportById, {
+                            exportId: claimResult.exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                        }) as Record<string, unknown> | null;
+                    } catch {
+                        // Non-critical — fall back to minimal shape
+                    }
                     send({
                         type: 'complete',
                         exportId: claimResult.exportId,
                         reused: true,
                         message: 'Export already completed — returning cached result.',
+                        filename: cachedExport?.filename ?? null,
+                        artifactVerified: true,
+                        sha256: cachedExport?.sha256 ?? null,
+                        sectionCount: null,
+                        aiDraftedCount: null,
+                        lockedCount: null,
+                        preflightSummary: null,
                     });
                     return;
                 }
@@ -757,12 +786,21 @@ export async function POST(request: NextRequest) {
                             break;
                         } catch (idempErr) {
                             if (attempt === 3) {
-                                console.error(
-                                    `[ExportStream] CRITICAL: Failed to complete idempotency run after ${attempt} attempts. ` +
-                                    `Fingerprint ${runFingerprint} may be stuck in in_progress. ` +
-                                    `Manual repair required.`,
-                                    idempErr,
-                                );
+                                // Compensating mutation: force the run to 'failed' so it
+                                // doesn't remain stuck in 'in_progress' forever.
+                                try {
+                                    await convex.mutation(api.exportRuns.failExportRun, {
+                                        fingerprint: runFingerprint,
+                                        errorCode: 'EXPORT_IDEMPOTENCY_COMPLETION_FAILED',
+                                    });
+                                } catch (compensateErr) {
+                                    console.error(
+                                        `[ExportStream] CRITICAL: Compensating failExportRun also failed. ` +
+                                        `Fingerprint ${runFingerprint} is stuck in in_progress. ` +
+                                        `Manual repair required.`,
+                                        compensateErr,
+                                    );
+                                }
                             } else {
                                 console.warn(`[ExportStream] Retrying completeExportRun (attempt ${attempt}/3):`, idempErr);
                                 await new Promise((r) => setTimeout(r, 200 * attempt));
@@ -815,10 +853,12 @@ export async function POST(request: NextRequest) {
                             break;
                         } catch (idempErr) {
                             if (attempt === 3) {
+                                // All retries exhausted — the row will remain in_progress.
+                                // Log with full context for operational repair.
                                 console.error(
                                     `[ExportStream] CRITICAL: Failed to fail idempotency run after ${attempt} attempts. ` +
-                                    `Fingerprint ${runFingerprint} may be stuck in in_progress. ` +
-                                    `Manual repair required.`,
+                                    `Fingerprint ${runFingerprint} is stuck in in_progress. ` +
+                                    `Original errorCode: ${errorCode}. Manual repair required.`,
                                     idempErr,
                                 );
                             } else {

@@ -175,17 +175,24 @@ export const failExportRun = mutation({
 // 4. Query Export Run (for diagnostics / observability)
 // ---------------------------------------------------------------------------
 
-/** Look up an export run by fingerprint. */
+/** Look up an export run by fingerprint (ownership-verified). */
 export const getExportRunByFingerprint = query({
     args: {
         fingerprint: v.string(),
     },
     handler: async (ctx, { fingerprint }) => {
-        await getAuthenticatedUser(ctx);
+        const user = await getAuthenticatedUser(ctx);
 
-        return await ctx.db
+        const run = await ctx.db
             .query('exportRuns')
             .withIndex('by_fingerprint', (q) => q.eq('fingerprint', fingerprint))
             .first();
+
+        // Only return if the caller owns this run
+        if (run && run.userId !== user._id) {
+            return null;
+        }
+
+        return run;
     },
 });

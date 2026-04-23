@@ -178,6 +178,7 @@ export async function POST(request: NextRequest) {
 
             let exportId: string | null = null;
             let runFingerprint: string | null = null;
+            let claimedExportRun = false;
 
             try {
                 // ────────────────────────────────────────────────
@@ -568,12 +569,21 @@ export async function POST(request: NextRequest) {
                 // ────────────────────────────────────────────────
                 // 4d. IDEMPOTENCY CHECK
                 // ────────────────────────────────────────────────
-                const payloadHash = hashPayload({
-                    adaptParams,
+                // Hash only stable, pre-generation request data.
+                // Exclude draftedSections (AI-generated output that varies per request)
+                // so identical requests always produce the same fingerprint.
+                const stablePayload = {
                     jurisdictionSettings,
                     caseType,
                     exportPath,
-                });
+                    caseId: body.caseId,
+                    petitionerName,
+                    respondentName,
+                    causeNumber,
+                    courtState,
+                    courtCounty,
+                };
+                const payloadHash = hashPayload(stablePayload);
                 runFingerprint = generateRunFingerprint({
                     userId,
                     caseId: body.caseId,
@@ -586,6 +596,8 @@ export async function POST(request: NextRequest) {
                     caseId: body.caseId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
                     exportPath,
                 });
+
+                claimedExportRun = claimResult.status === 'claimed';
 
                 if (claimResult.status === 'already_completed') {
                     // Duplicate request — clean up orphaned export record and return existing
@@ -751,8 +763,8 @@ export async function POST(request: NextRequest) {
                 // ────────────────────────────────────────────────
                 // 8. EMIT COMPLETE
                 // ────────────────────────────────────────────────
-                // Mark idempotency run as completed
-                if (runFingerprint) {
+                // Mark idempotency run as completed (only if this request claimed it)
+                if (runFingerprint && claimedExportRun) {
                     try {
                         await convex.mutation(api.exportRuns.completeExportRun, {
                             fingerprint: runFingerprint,
@@ -796,8 +808,8 @@ export async function POST(request: NextRequest) {
                     }
                 }
 
-                // Mark idempotency run as failed (allows retry)
-                if (runFingerprint) {
+                // Mark idempotency run as failed (only if this request claimed it)
+                if (runFingerprint && claimedExportRun) {
                     try {
                         await convex.mutation(api.exportRuns.failExportRun, {
                             fingerprint: runFingerprint,

@@ -149,10 +149,10 @@ export const completeExportJob = mutation({
 });
 
 // ---------------------------------------------------------------------------
-// 4. Fail Export Job (running → failed)
+// 4. Fail Export Job (non-terminal → failed)
 // ---------------------------------------------------------------------------
 
-/** Mark a running job as failed with an error code. */
+/** Mark a non-terminal export job as failed with an optional error code. */
 export const failExportJob = mutation({
     args: {
         jobId: v.id('exportJobs'),
@@ -213,7 +213,7 @@ export const getActiveJobCount = query({
 // 6. Get Job by Fingerprint (for SSE reconnection)
 // ---------------------------------------------------------------------------
 
-/** Look up a job by fingerprint (ownership-verified). */
+/** Look up a job by fingerprint, scoped to the authenticated user. */
 export const getJobByFingerprint = query({
     args: {
         fingerprint: v.string(),
@@ -221,16 +221,15 @@ export const getJobByFingerprint = query({
     handler: async (ctx, { fingerprint }) => {
         const user = await getAuthenticatedUser(ctx);
 
+        // Use composite index to guarantee the result belongs to the caller.
+        // Avoids false negatives when another user has the same fingerprint.
         const job = await ctx.db
             .query('exportJobs')
-            .withIndex('by_fingerprint', (q) => q.eq('fingerprint', fingerprint))
+            .withIndex('by_fingerprint_userId', (q) =>
+                q.eq('fingerprint', fingerprint).eq('userId', user._id),
+            )
             .first();
 
-        // Only return if the caller owns this job
-        if (job && job.userId !== user._id) {
-            return null;
-        }
-
-        return job;
+        return job ?? null;
     },
 });

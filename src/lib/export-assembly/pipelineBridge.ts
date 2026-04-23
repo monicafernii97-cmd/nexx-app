@@ -145,22 +145,13 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
         }
 
         try {
-            const drafted = await generateDraftContent({
+            const drafted = await generateDraftContentWithRetry({
                 templateId: `${request.path}_${Date.now()}`,
                 templateName: getTemplateName(request.path),
                 sections: sectionsToGenerate,
                 caseGraph,
                 courtRules: Object.keys(courtRules).length > 0 ? courtRules : undefined,
-            });
-
-            // Guard: treat empty or partial AI output as failure
-            const draftedIds = new Set(drafted.map(s => s.sectionId));
-            if (
-                drafted.length === 0 ||
-                sectionsToGenerate.some(id => !draftedIds.has(id))
-            ) {
-                throw new Error('AI drafter returned an empty or incomplete section set');
-            }
+            }, sectionsToGenerate);
 
             aiDraftedSections = drafted.map(d => ({
                 sectionId: d.sectionId,
@@ -170,7 +161,15 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
                 source: 'ai_drafted' as const,
             }));
         } catch (error) {
-            console.error('[PipelineBridge] AI drafting failed:', error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error(JSON.stringify({
+                component: 'PipelineBridge',
+                event: 'ai_drafting_failed_with_fallback',
+                exportPath: request.path,
+                failedSections: sectionsToGenerate,
+                error: errorMessage,
+            }));
+
             // Fallback: use raw review item text for failed sections
             aiDraftedSections = sectionsToGenerate.map(sectionId => {
                 const sectionItems = reviewItems.filter(item => {
@@ -189,7 +188,7 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
                         ?? item.transformedCourtSafeText
                         ?? item.originalText
                     ).join('\n\n'),
-                    source: 'user_edited' as const,
+                    source: 'raw_fallback_no_ai' as const,
                 };
             });
         }
@@ -291,4 +290,65 @@ function getTemplateName(exportPath: string): string {
         case 'exhibit_document': return 'Exhibit Packet';
         default: return 'Legal Document';
     }
+}
+
+// ---------------------------------------------------------------------------
+// Retry Logic
+// ---------------------------------------------------------------------------
+
+/** Maximum retries for GPT drafting. */
+const DRAFT_MAX_RETRIES = 1;
+
+/**
+ * Call generateDraftContent with one retry on failure or incomplete output.
+ * Validates that all requested sections are returned.
+ */
+async function generateDraftContentWithRetry(
+    params: Parameters<typeof generateDraftContent>[0],
+    expectedSectionIds: string[],
+): Promise<Awaited<ReturnType<typeof generateDraftContent>>> {
+    let lastError: Error | undefined;
+
+    for (let attempt = 0; attempt <= DRAFT_MAX_RETRIES; attempt++) {
+        try {
+            const drafted = await generateDraftContent(params);
+
+            // Guard: treat empty or partial AI output as failure
+            const draftedIds = new Set(drafted.map(s => s.sectionId));
+            if (
+                drafted.length === 0 ||
+                expectedSectionIds.some(id => !draftedIds.has(id))
+            ) {
+                const missing = expectedSectionIds.filter(id => !draftedIds.has(id));
+                throw new Error(
+                    `AI drafter returned incomplete output: missing sections [${missing.join(', ')}]`,
+                );
+            }
+
+            if (attempt > 0) {
+                console.warn(JSON.stringify({
+                    component: 'PipelineBridge',
+                    event: 'ai_drafting_succeeded_on_retry',
+                    attempt: attempt + 1,
+                    sectionCount: drafted.length,
+                }));
+            }
+
+            return drafted;
+        } catch (error) {
+            lastError = error instanceof Error ? error : new Error(String(error));
+
+            if (attempt < DRAFT_MAX_RETRIES) {
+                console.warn(JSON.stringify({
+                    component: 'PipelineBridge',
+                    event: 'ai_drafting_retry',
+                    attempt: attempt + 1,
+                    maxRetries: DRAFT_MAX_RETRIES + 1,
+                    error: lastError.message,
+                }));
+            }
+        }
+    }
+
+    throw lastError ?? new Error('AI drafting failed after all retry attempts');
 }

@@ -116,8 +116,8 @@ export interface DraftedSection {
     heading: string;
     body: string;
     numberedItems?: string[];
-    /** Whether this section was drafted by GPT or preserved from lock */
-    source: 'ai_drafted' | 'user_locked' | 'user_edited';
+    /** Whether this section was drafted by GPT, preserved from lock, or fell back to raw content */
+    source: 'ai_drafted' | 'user_locked' | 'user_edited' | 'raw_fallback_no_ai';
 }
 
 // ---------------------------------------------------------------------------

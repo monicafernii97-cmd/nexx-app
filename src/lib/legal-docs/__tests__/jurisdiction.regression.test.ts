@@ -19,8 +19,8 @@ describe('jurisdiction profile regression — multi-state pleadings', () => {
     });
 
     expect(profile.key).toBe('tx-default');
-    expect(profile.caption.style).toBe('texas_pleading');
-    expect(profile.caption.useThreeColumnTable).toBe(true);
+    expect(profile.caption!.style).toBe('texas_pleading');
+    expect(profile.caption!.useThreeColumnTable).toBe(true);
   });
 
   it('applies Fort Bend 387th county profile when court matches', () => {
@@ -52,8 +52,8 @@ describe('jurisdiction profile regression — multi-state pleadings', () => {
       courtName: 'Eleventh Judicial Circuit',
     });
 
-    expect(profile.caption.style).not.toBe('texas_pleading');
-    expect(profile.caption.useThreeColumnTable).toBe(false);
+    expect(profile.caption!.style).not.toBe('texas_pleading');
+    expect(profile.caption!.useThreeColumnTable).toBe(false);
   });
 
   it('does not apply Texas pleading rules to California', () => {
@@ -63,8 +63,8 @@ describe('jurisdiction profile regression — multi-state pleadings', () => {
       courtName: 'Superior Court of California',
     });
 
-    expect(profile.caption.style).not.toBe('texas_pleading');
-    expect(profile.caption.useThreeColumnTable).toBe(false);
+    expect(profile.caption!.style).not.toBe('texas_pleading');
+    expect(profile.caption!.useThreeColumnTable).toBe(false);
   });
 
   it('uses us-default profile when no court settings exist', () => {
@@ -120,7 +120,7 @@ describe('jurisdiction profile regression — multi-state pleadings', () => {
     });
 
     // Formatting overrides should NOT change caption style
-    expect(profile.caption.style).toBe('texas_pleading');
-    expect(profile.caption.useThreeColumnTable).toBe(true);
+    expect(profile.caption!.style).toBe('texas_pleading');
+    expect(profile.caption!.useThreeColumnTable).toBe(true);
   });
 });

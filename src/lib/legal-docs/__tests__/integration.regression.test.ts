@@ -16,6 +16,7 @@ import {
   resolveJurisdictionProfile,
   toCourtFormattingRules,
 } from '../jurisdiction/resolveJurisdictionProfile';
+import { assertQuickGenerateProfile } from '@/lib/jurisdiction/assertProfileForPipeline';
 
 import { texasPleadingFixture } from './fixtures/texas-pleading';
 import { floridaPleadingFixture } from './fixtures/florida-pleading';
@@ -55,7 +56,7 @@ describeIfChrome('integration regression — multi-state legal PDF generation', 
       county: 'Fort Bend',
     });
     const rules = toCourtFormattingRules(profile);
-    const html = renderLegalDocumentHTML(doc, profile);
+    const html = renderLegalDocumentHTML(doc, assertQuickGenerateProfile(profile));
     const pdf = await renderHTMLToPDF(html, rules, doc.metadata.causeNumber);
 
     expect(Buffer.isBuffer(pdf)).toBe(true);
@@ -72,7 +73,7 @@ describeIfChrome('integration regression — multi-state legal PDF generation', 
       county: 'Miami-Dade',
     });
     const rules = toCourtFormattingRules(profile);
-    const html = renderLegalDocumentHTML(doc, profile);
+    const html = renderLegalDocumentHTML(doc, assertQuickGenerateProfile(profile));
     const pdf = await renderHTMLToPDF(html, rules);
 
     expect(Buffer.isBuffer(pdf)).toBe(true);
@@ -87,7 +88,7 @@ describeIfChrome('integration regression — multi-state legal PDF generation', 
     // Use us-default profile for federal pleading — not Texas
     const profile = resolveJurisdictionProfile(null);
     const rules = toCourtFormattingRules(profile);
-    const html = renderLegalDocumentHTML(doc, profile);
+    const html = renderLegalDocumentHTML(doc, assertQuickGenerateProfile(profile));
     const pdf = await renderHTMLToPDF(html, rules);
 
     expect(Buffer.isBuffer(pdf)).toBe(true);

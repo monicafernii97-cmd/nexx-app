@@ -15,6 +15,7 @@ import {
   resolveJurisdictionProfile,
   toCourtFormattingRules,
 } from '../jurisdiction/resolveJurisdictionProfile';
+import { assertQuickGenerateProfile } from '@/lib/jurisdiction/assertProfileForPipeline';
 
 // ═══════════════════════════════════════════════════════════════
 // Test Fixtures
@@ -123,7 +124,7 @@ describe('legal document formatter', () => {
     const profile = resolveJurisdictionProfile(
       { state: 'Texas', county: 'Fort Bend' },
     );
-    const html = renderLegalDocumentHTML(doc, profile);
+    const html = renderLegalDocumentHTML(doc, assertQuickGenerateProfile(profile));
     expect(html).toContain('certificate-of-service');
     expect(html).toContain('CERTIFICATE OF SERVICE');
   });
@@ -211,7 +212,7 @@ describe('block type preservation', () => {
     const profile = resolveJurisdictionProfile(
       { state: 'Texas', county: 'Fort Bend' },
     );
-    const html = renderLegalDocumentHTML(doc, profile);
+    const html = renderLegalDocumentHTML(doc, assertQuickGenerateProfile(profile));
     expect(html).toContain('bullet-list');
   });
 
@@ -267,8 +268,8 @@ describe('jurisdiction profile resolution', () => {
       { state: 'Texas', county: 'Harris' },
     );
     expect(profile.key).toBe('tx-default');
-    expect(profile.caption.useThreeColumnTable).toBe(true);
-    expect(profile.caption.centerSymbol).toBe('§');
+    expect(profile.caption!.useThreeColumnTable).toBe(true);
+    expect(profile.caption!.centerSymbol).toBe('§');
   });
 
   it('resolves Fort Bend 387th specific profile', () => {
@@ -291,7 +292,7 @@ describe('jurisdiction profile resolution', () => {
       { state: 'Florida', county: 'Whatever' },
     );
     expect(profile.key).toBe('fl-default');
-    expect(profile.caption.useThreeColumnTable).toBe(false);
+    expect(profile.caption!.useThreeColumnTable).toBe(false);
   });
 
   it('resolves US default for null settings', () => {
@@ -381,7 +382,7 @@ describe('reusability across motion types', () => {
   it('renders federal motion with generic profile', () => {
     const doc = parseLegalDocument(FEDERAL_MOTION);
     const profile = resolveJurisdictionProfile(null);
-    const html = renderLegalDocumentHTML(doc, profile);
+    const html = renderLegalDocumentHTML(doc, assertQuickGenerateProfile(profile));
     expect(html).toContain('MOTION FOR SUMMARY JUDGMENT');
     expect(html).toContain('PRAYER');
     // Generic profile should use generic caption, not 3-column table element

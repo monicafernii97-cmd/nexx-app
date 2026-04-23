@@ -33,6 +33,32 @@ export const upsert = mutation({
         childrenNames: v.optional(v.array(v.string())),
         childrenAges: v.optional(v.array(v.number())),
         formattingOverrides: v.optional(v.any()),
+        profileKey: v.optional(v.string()),
+        profileVersion: v.optional(v.string()),
+        formattingOverridesV2: v.optional(v.object({
+            pageSize: v.optional(v.union(
+                v.literal('LETTER'),
+                v.literal('A4'),
+                v.literal('LEGAL'),
+            )),
+            pageMarginsPt: v.optional(v.object({
+                top: v.number(),
+                right: v.number(),
+                bottom: v.number(),
+                left: v.number(),
+            })),
+            defaultFont: v.optional(v.string()),
+            defaultFontSizePt: v.optional(v.number()),
+            lineSpacing: v.optional(v.number()),
+            exhibitLabelStyle: v.optional(v.union(
+                v.literal('alpha'),
+                v.literal('numeric'),
+                v.literal('party_numeric'),
+            )),
+            batesEnabled: v.optional(v.boolean()),
+            certificateSeparatePage: v.optional(v.boolean()),
+            timelineAsTable: v.optional(v.boolean()),
+        })),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);

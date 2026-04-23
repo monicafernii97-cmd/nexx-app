@@ -6,14 +6,17 @@
  * Reduces drift and ensures consistency.
  */
 
-import type { ExportJurisdictionProfile } from '../types';
+import type { JurisdictionProfile } from '../types';
 
-export const BASE_EXPORT_PROFILE: ExportJurisdictionProfile = {
+export const BASE_EXPORT_PROFILE: JurisdictionProfile = {
   key: 'base',
+  version: '1.0',
   name: 'Base',
 
   page: {
     size: 'Letter',
+    widthIn: 8.5,
+    heightIn: 11,
     marginsPt: { top: 72, right: 72, bottom: 72, left: 72 },
   },
 

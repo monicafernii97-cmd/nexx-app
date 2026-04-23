@@ -39,27 +39,17 @@ import {
 import { loadCourtSettingsForPipeline } from './jurisdiction/loadCourtSettings';
 import { renderHTMLToPDF } from '@/lib/pdf/renderHTMLToPDF';
 import { validatePdfBuffer, type ValidatedPdf } from '@/lib/pdf/validatePdf';
-import type { CourtSettings, JurisdictionProfile } from './jurisdiction/types';
+import type { CourtSettings } from './jurisdiction/types';
+import type { JurisdictionProfile, ProfileResolutionMeta } from '@/lib/jurisdiction/types';
+import { assertQuickGenerateProfile } from '@/lib/jurisdiction/assertProfileForPipeline';
+import { resolveSharedJurisdictionProfile } from '@/lib/jurisdiction/resolveSharedJurisdictionProfile';
 import type { LegalDocument } from './types';
 
 /** Minimum acceptable HTML output length — anything shorter indicates a rendering failure. */
 const MIN_RENDERED_HTML_LENGTH = 200;
 
-// ═══════════════════════════════════════════════════════════════
-// Profile Resolution Metadata
-// ═══════════════════════════════════════════════════════════════
-
-/** How the jurisdiction profile was resolved — for observability and debugging. */
-export type ProfileResolutionSource =
-  | 'court_exact_match'
-  | 'state_fallback_unmatched_county'
-  | 'state_default'
-  | 'global_default';
-
-export type ProfileResolutionMeta = {
-  profileKey: string;
-  source: ProfileResolutionSource;
-};
+// Re-export for consumers
+export type { ProfileResolutionSource, ProfileResolutionMeta } from '@/lib/jurisdiction/types';
 
 // ═══════════════════════════════════════════════════════════════
 // Public Types
@@ -171,11 +161,19 @@ export async function generateLegalPDF(
   });
 
   // ── 5. Resolve jurisdiction profile ──
-  let jurisdictionProfile;
-  let profileResolutionMeta;
+  let jurisdictionProfile: JurisdictionProfile;
+  let profileResolutionMeta: ProfileResolutionMeta;
   try {
     jurisdictionProfile = resolveJurisdictionProfile(courtSettings);
-    profileResolutionMeta = deriveProfileResolutionMeta(jurisdictionProfile, courtSettings);
+    // Use shared resolver for metadata (since resolveJurisdictionProfile applies overrides)
+    const { meta } = resolveSharedJurisdictionProfile({
+      state: courtSettings.jurisdiction?.state,
+      county: courtSettings.jurisdiction?.county,
+      courtName: courtSettings.jurisdiction?.courtName,
+      courtType: courtSettings.jurisdiction?.courtType,
+      district: courtSettings.jurisdiction?.district,
+    });
+    profileResolutionMeta = meta;
   } catch (err) {
     throw new LegalDocumentGenerationError({
       code: 'LEGAL_DOCUMENT_PROFILE_RESOLUTION_FAILED',
@@ -184,11 +182,14 @@ export async function generateLegalPDF(
     });
   }
 
+  // ── 5b. Assert QG profile shape ──
+  const qgProfile = assertQuickGenerateProfile(jurisdictionProfile);
+
   // ── 6. Resolve document-type profile ──
   const documentTypeProfile = DOCUMENT_TYPE_PROFILES[documentType];
 
   // ── 7. Validate (blockers → throw) ──
-  const validation = validateLegalDocument(parsed, jurisdictionProfile, documentTypeProfile);
+  const validation = validateLegalDocument(parsed, qgProfile, documentTypeProfile);
   if (!validation.ok) {
     throw new LegalDocumentGenerationError({
       code: 'LEGAL_DOCUMENT_VALIDATION_FAILED',
@@ -201,7 +202,7 @@ export async function generateLegalPDF(
   const preflight = preflightLegalDocument(parsed);
 
   // ── 9. Render HTML ──
-  const html = renderLegalDocumentHTML(parsed, jurisdictionProfile, documentTypeProfile);
+  const html = renderLegalDocumentHTML(parsed, qgProfile, documentTypeProfile);
 
   // ── 10. HTML minimum length check ──
   if (html.length < MIN_RENDERED_HTML_LENGTH) {
@@ -222,7 +223,7 @@ export async function generateLegalPDF(
   }
 
   // ── 12. Render PDF ──
-  const formattingRules = toCourtFormattingRules(jurisdictionProfile);
+  const formattingRules = toCourtFormattingRules(qgProfile);
   let pdfBuffer: Buffer;
   try {
     pdfBuffer = await renderHTMLToPDF(html, formattingRules, parsed.metadata.causeNumber);
@@ -287,34 +288,6 @@ export async function generateLegalPDF(
   };
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Helpers
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Derive profile resolution metadata from the selected profile
- * and the court settings that were used to select it.
- */
-function deriveProfileResolutionMeta(
-  profile: JurisdictionProfile,
-  settings: CourtSettings,
-): ProfileResolutionMeta {
-  let source: ProfileResolutionSource = 'global_default';
-
-  if (profile.key === 'us-default') {
-    source = 'global_default';
-  } else if (profile.county) {
-    // County-specific profile (e.g. tx-fort-bend-387th)
-    source = 'court_exact_match';
-  } else if (profile.state && settings.jurisdiction?.county) {
-    // County was provided but no county-specific profile exists — fall back to state
-    source = 'state_fallback_unmatched_county';
-  } else if (profile.state) {
-    source = 'state_default';
-  }
-
-  return {
-    profileKey: profile.key,
-    source,
-  };
-}
+// deriveProfileResolutionMeta — REMOVED
+// Resolution metadata is now provided by the shared resolver
+// (resolveSharedJurisdictionProfile) in @/lib/jurisdiction/.

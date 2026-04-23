@@ -1,29 +1,29 @@
 /**
  * Export Jurisdiction Profile Resolver
  *
- * Maps state/county/court → ExportJurisdictionProfile for the export pipeline.
- * Mirrors the Quick Generate resolver pattern but adds exhibit + summary rules.
+ * DELEGATES to the shared resolver for profile selection,
+ * then narrows to ExportJurisdictionProfile via runtime assertion.
  *
- * Also provides toExportFormattingRules() to bridge ExportJurisdictionProfile
- * → CourtFormattingRules for the existing renderHTMLToPDF() interface.
+ * Also provides toExportFormattingRules() to bridge
+ * ExportJurisdictionProfile → CourtFormattingRules for the
+ * existing renderHTMLToPDF() interface.
  */
 
 import type { ExportJurisdictionProfile } from './types';
 import type { CourtFormattingRules } from '@/lib/legal/types';
-
-import { US_DEFAULT_EXPORT_PROFILE } from './profiles/us-default';
-import { TX_DEFAULT_EXPORT_PROFILE } from './profiles/tx-default';
-import { TX_FORT_BEND_387TH_EXPORT_PROFILE } from './profiles/tx-fort-bend-387th';
-import { FL_DEFAULT_EXPORT_PROFILE } from './profiles/fl-default';
-import { CA_DEFAULT_EXPORT_PROFILE } from './profiles/ca-default';
-import { FEDERAL_DEFAULT_EXPORT_PROFILE } from './profiles/federal-default';
+import {
+  resolveSharedJurisdictionProfile,
+  type ResolvedProfileResult,
+} from '@/lib/jurisdiction/resolveSharedJurisdictionProfile';
+import { assertExportProfile } from '@/lib/jurisdiction/assertProfileForPipeline';
 
 // ═══════════════════════════════════════════════════════════════
 // Resolver
 // ═══════════════════════════════════════════════════════════════
 
-/** Minimal settings input for profile resolution. */
+/** Minimal settings input for export profile resolution. */
 export type ExportSettingsInput = {
+  profileKey?: string;
   state?: string;
   county?: string;
   courtName?: string;
@@ -34,51 +34,28 @@ export type ExportSettingsInput = {
 /**
  * Resolve the best-matching export jurisdiction profile.
  *
- * Resolution order:
- *   1. Federal detection (court name / court type)
- *   2. County-specific profiles (e.g. Fort Bend 387th)
- *   3. State-level defaults
- *   4. US neutral fallback
+ * Delegates to the shared resolver, then asserts export blocks.
  *
  * @param settings - Court settings from Convex or export config
- * @returns Matched ExportJurisdictionProfile
+ * @returns Narrowed ExportJurisdictionProfile with court/exhibit/summary guaranteed
+ * @throws If resolved profile is missing required export blocks
  */
 export function resolveExportJurisdictionProfile(
   settings: ExportSettingsInput,
 ): ExportJurisdictionProfile {
-  if (!settings) return US_DEFAULT_EXPORT_PROFILE;
+  const { profile } = resolveSharedJurisdictionProfile(settings);
+  return assertExportProfile(profile);
+}
 
-  const state = (settings.state || '').toLowerCase().trim();
-  const county = (settings.county || '').toLowerCase().trim();
-  const courtName = (settings.courtName || '').toLowerCase().trim();
-  const courtType = (settings.courtType || '').toLowerCase().trim();
-
-  // ── Federal detection ──
-  const isFederal =
-    courtType === 'federal' ||
-    courtName.includes('united states district court') ||
-    courtName.includes('u.s. district court') ||
-    courtName.includes('us district court') ||
-    /\busdc\b/.test(courtName) ||
-    /\bu\.?s\.?d\.?c\.?\b/.test(courtName);
-
-  if (isFederal) return FEDERAL_DEFAULT_EXPORT_PROFILE;
-
-  // ── County-specific ──
-  if (state === 'texas' && county === 'fort bend') {
-    const venue = courtName + ' ' + (settings.district || '');
-    if (/\b387(th)?\b/.test(venue)) {
-      return TX_FORT_BEND_387TH_EXPORT_PROFILE;
-    }
-  }
-
-  // ── State-level ──
-  if (state === 'texas') return TX_DEFAULT_EXPORT_PROFILE;
-  if (state === 'florida') return FL_DEFAULT_EXPORT_PROFILE;
-  if (state === 'california') return CA_DEFAULT_EXPORT_PROFILE;
-
-  // ── Neutral fallback ──
-  return US_DEFAULT_EXPORT_PROFILE;
+/**
+ * Resolve with full metadata (for orchestrator usage).
+ */
+export function resolveExportProfileWithMeta(
+  settings: ExportSettingsInput,
+): ResolvedProfileResult & { profile: ExportJurisdictionProfile } {
+  const result = resolveSharedJurisdictionProfile(settings);
+  const profile = assertExportProfile(result.profile);
+  return { ...result, profile };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -89,7 +66,6 @@ export function resolveExportJurisdictionProfile(
  * Map an ExportJurisdictionProfile to CourtFormattingRules.
  *
  * This adapter keeps renderHTMLToPDF() unchanged (Option A decision).
- * The export pipeline calls this before passing to the PDF renderer.
  */
 export function toExportFormattingRules(
   profile: ExportJurisdictionProfile,

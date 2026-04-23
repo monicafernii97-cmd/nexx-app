@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { parseLegalDocument } from '../parseLegalDocument';
 import { renderLegalDocumentHTML } from '../renderLegalDocumentHTML';
 import { resolveJurisdictionProfile } from '../jurisdiction/resolveJurisdictionProfile';
+import { assertQuickGenerateProfile } from '@/lib/jurisdiction/assertProfileForPipeline';
 
 import { texasPleadingFixture } from './fixtures/texas-pleading';
 
@@ -21,9 +22,11 @@ describe('pagination regression — multi-state pleadings', () => {
       county: 'Fort Bend',
     });
 
-    const html = renderLegalDocumentHTML(doc, profile);
+    const qgProfile = assertQuickGenerateProfile(profile);
 
-    expect(profile.sections.certificateSeparatePage).toBe(true);
+    const html = renderLegalDocumentHTML(doc, qgProfile);
+
+    expect(qgProfile.sections.certificateSeparatePage).toBe(true);
     expect(html).toContain('certificate-of-service');
     expect(html).toContain('page-break-before: always');
   });
@@ -35,9 +38,11 @@ describe('pagination regression — multi-state pleadings', () => {
       county: 'Fort Bend',
     });
 
-    const html = renderLegalDocumentHTML(doc, profile);
+    const qgProfile = assertQuickGenerateProfile(profile);
 
-    expect(profile.sections.signatureKeepTogether).toBe(true);
+    const html = renderLegalDocumentHTML(doc, qgProfile);
+
+    expect(qgProfile.sections.signatureKeepTogether).toBe(true);
     expect(html).toContain('no-break-inside');
   });
 });

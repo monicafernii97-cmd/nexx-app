@@ -22,6 +22,12 @@ export type ExportGenerationLog = {
   success: boolean;
   errorCode?: string;
   stage?: string;
+  /** Phase 5: Idempotency fingerprint for duplicate detection. */
+  fingerprint?: string;
+  /** Phase 5: Whether this run was new, reused, or blocked. */
+  idempotencyStatus?: 'new' | 'reused' | 'blocked';
+  /** Phase 5: Whether the uploaded artifact passed integrity verification. */
+  artifactVerified?: boolean;
 };
 
 /** Emit a structured export generation log. */

@@ -21,6 +21,7 @@ import type * as debugTraces from "../debugTraces.js";
 import type * as detectedPatterns from "../detectedPatterns.js";
 import type * as documents from "../documents.js";
 import type * as exportOverrides from "../exportOverrides.js";
+import type * as exportRuns from "../exportRuns.js";
 import type * as generatedDocuments from "../generatedDocuments.js";
 import type * as generatedDocumentsExport from "../generatedDocumentsExport.js";
 import type * as incidents from "../incidents.js";
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   detectedPatterns: typeof detectedPatterns;
   documents: typeof documents;
   exportOverrides: typeof exportOverrides;
+  exportRuns: typeof exportRuns;
   generatedDocuments: typeof generatedDocuments;
   generatedDocumentsExport: typeof generatedDocumentsExport;
   incidents: typeof incidents;

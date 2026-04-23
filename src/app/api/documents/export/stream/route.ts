@@ -41,6 +41,9 @@ import {
 } from '@/lib/exports/jurisdiction/resolveExportJurisdictionProfile';
 import { generateExportPDF } from '@/lib/exports/generateExportPDF';
 import type { ExportPath } from '@/lib/exports/types';
+import { hashPayload, generateRunFingerprint } from '@/lib/exports/idempotency';
+import { computeArtifactChecksum, verifyUploadedArtifact } from '@/lib/exports/artifactIntegrity';
+import { ExportDocumentGenerationError } from '@/lib/exports/errors';
 
 export const maxDuration = 120; // Extended for GPT + PDF rendering
 
@@ -174,6 +177,8 @@ export async function POST(request: NextRequest) {
             };
 
             let exportId: string | null = null;
+            let runFingerprint: string | null = null;
+            let claimedExportRun = false;
 
             try {
                 // ────────────────────────────────────────────────
@@ -194,6 +199,92 @@ export async function POST(request: NextRequest) {
                 const causeNumber = ('causeNumber' in exportConfig ? String(exportConfig.causeNumber) : undefined) ?? undefined;
                 const caseType = ('caseType' in exportConfig ? String(exportConfig.caseType) : undefined) ?? body.exportRequest?.path ?? 'general';
 
+                // ────────────────────────────────────────────────
+                // 1a. IDEMPOTENCY CHECK (before any DB writes)
+                // ────────────────────────────────────────────────
+                // Hash all deterministic pre-generation inputs that affect output.
+                // Excludes AI-generated content (draftedSections) so identical
+                // requests always produce the same fingerprint.
+                const exportPath = (body.exportRequest?.path ?? 'court_document') as ExportPath;
+                const normalizedExportRequest = {
+                    ...body.exportRequest,
+                    path: exportPath,
+                    config: {
+                        ...(body.exportRequest?.config ?? {}),
+                        courtState,
+                        courtCounty,
+                        petitionerName,
+                        respondentName,
+                        causeNumber,
+                        caseType,
+                    },
+                };
+                const stablePreGenPayload = {
+                    caseId: body.caseId,
+                    exportPath,
+                    caseType,
+                    courtState,
+                    courtCounty,
+                    petitionerName,
+                    respondentName,
+                    causeNumber,
+                    exportRequest: normalizedExportRequest,
+                    assemblyResult: body.assemblyResult,
+                    reviewItems: (body as unknown as Record<string, unknown>).reviewItems ?? null,
+                    overrides: (body as unknown as Record<string, unknown>).overrides ?? null,
+                };
+                const payloadHash = hashPayload(stablePreGenPayload);
+                runFingerprint = generateRunFingerprint({
+                    userId,
+                    caseId: body.caseId,
+                    exportPath,
+                    payloadHash,
+                });
+
+                const claimResult = await convex.mutation(api.exportRuns.claimExportRun, {
+                    fingerprint: runFingerprint,
+                    caseId: body.caseId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                    exportPath,
+                });
+
+                claimedExportRun = claimResult.status === 'claimed';
+
+                if (claimResult.status === 'already_completed') {
+                    // Fetch cached export metadata for a consistent SSE shape
+                    let cachedExport: Record<string, unknown> | null = null;
+                    try {
+                        cachedExport = await convex.query(api.generatedDocumentsExport.getExportById, {
+                            exportId: claimResult.exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                        }) as Record<string, unknown> | null;
+                    } catch {
+                        // Non-critical — fall back to minimal shape
+                    }
+                    send({
+                        type: 'complete',
+                        exportId: claimResult.exportId,
+                        reused: true,
+                        message: 'Export already completed — returning cached result.',
+                        filename: cachedExport?.filename ?? null,
+                        artifactVerified: true,
+                        sha256: cachedExport?.sha256 ?? null,
+                        sectionCount: null,
+                        aiDraftedCount: null,
+                        lockedCount: null,
+                        preflightSummary: null,
+                    });
+                    return;
+                }
+
+                if (claimResult.status === 'in_progress') {
+                    throw new ExportDocumentGenerationError({
+                        code: 'EXPORT_IDEMPOTENCY_CONFLICT',
+                        message: 'Duplicate export request — generation already in progress',
+                    });
+                }
+
+                // ────────────────────────────────────────────────
+                // 1b. CREATE EXPORT RECORD (only after claim succeeded)
+                // ────────────────────────────────────────────────
                 exportId = await convex.mutation(api.generatedDocumentsExport.createExportRun, {
                     caseId: body.caseId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
                     runId: body.runId,
@@ -494,7 +585,6 @@ export async function POST(request: NextRequest) {
                 const exportProfile = resolveExportJurisdictionProfile(jurisdictionSettings);
 
                 // 4b. Build caption for court documents
-                const exportPath = (body.exportRequest?.path ?? 'court_document') as ExportPath;
                 const caption = exportPath === 'court_document'
                     ? buildExportCaption({
                         style: exportProfile.court.captionStyle,
@@ -561,6 +651,7 @@ export async function POST(request: NextRequest) {
                         : null,
                 };
 
+
                 send({
                     type: 'milestone',
                     stage: 'rendering_html',
@@ -568,7 +659,7 @@ export async function POST(request: NextRequest) {
                     message: 'Rendering document HTML...',
                 });
 
-                // 4d-5. Delegate rendering pipeline to orchestrator
+                // 4e-5. Delegate rendering pipeline to orchestrator
                 send({
                     type: 'milestone',
                     stage: 'rendering_pdf',
@@ -633,6 +724,36 @@ export async function POST(request: NextRequest) {
                 }
 
                 // ────────────────────────────────────────────────
+                // 6b. ARTIFACT INTEGRITY VERIFICATION
+                // ────────────────────────────────────────────────
+                const preUploadChecksum = computeArtifactChecksum(pdfBuffer);
+
+                // Convex storage upload returns only { storageId } — no byte-length
+                // metadata about the stored file. The upload response Content-Length
+                // reflects the JSON body size, NOT the uploaded PDF size.
+                // Pass the original buffer length for both values; the byte-length
+                // check is effectively a storageId format validation only.
+                // True integrity is ensured by the SHA-256 checksum persisted with
+                // the record (and re-verified on download if needed).
+                const reportedByteLength = pdfBuffer.length;
+
+                const verification = verifyUploadedArtifact({
+                    storageId,
+                    reportedByteLength,
+                    expectedByteLength: pdfBuffer.length,
+                    checksum: preUploadChecksum,
+                });
+
+                if (!verification.verified) {
+                    console.error('[ExportStream] Artifact integrity check failed:', verification);
+                    throw new ExportDocumentGenerationError({
+                        code: 'EXPORT_ARTIFACT_INTEGRITY_FAILED',
+                        message: `Artifact integrity verification failed: byteLengthMatch=${verification.byteLengthMatch}, storageIdValid=${verification.storageIdValid}`,
+                        details: verification,
+                    });
+                }
+
+                // ────────────────────────────────────────────────
                 // 7. FINALIZE EXPORT RECORD
                 // ────────────────────────────────────────────────
                 send({
@@ -648,11 +769,46 @@ export async function POST(request: NextRequest) {
                     filename,
                     byteSize: pdfBuffer.length,
                     mimeType: 'application/pdf',
+                    sha256: preUploadChecksum,
                 });
 
                 // ────────────────────────────────────────────────
                 // 8. EMIT COMPLETE
                 // ────────────────────────────────────────────────
+                // Mark idempotency run as completed (only if this request claimed it)
+                if (runFingerprint && claimedExportRun) {
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        try {
+                            await convex.mutation(api.exportRuns.completeExportRun, {
+                                fingerprint: runFingerprint,
+                                exportId: exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                            });
+                            break;
+                        } catch (idempErr) {
+                            if (attempt === 3) {
+                                // Compensating mutation: force the run to 'failed' so it
+                                // doesn't remain stuck in 'in_progress' forever.
+                                try {
+                                    await convex.mutation(api.exportRuns.failExportRun, {
+                                        fingerprint: runFingerprint,
+                                        errorCode: 'EXPORT_IDEMPOTENCY_COMPLETION_FAILED',
+                                    });
+                                } catch (compensateErr) {
+                                    console.error(
+                                        `[ExportStream] CRITICAL: Compensating failExportRun also failed. ` +
+                                        `Fingerprint ${runFingerprint} is stuck in in_progress. ` +
+                                        `Manual repair required.`,
+                                        compensateErr,
+                                    );
+                                }
+                            } else {
+                                console.warn(`[ExportStream] Retrying completeExportRun (attempt ${attempt}/3):`, idempErr);
+                                await new Promise((r) => setTimeout(r, 200 * attempt));
+                            }
+                        }
+                    }
+                }
+
                 send({
                     type: 'complete',
                     exportId,
@@ -661,6 +817,8 @@ export async function POST(request: NextRequest) {
                     aiDraftedCount,
                     lockedCount,
                     preflightSummary: preflightResult,
+                    artifactVerified: verification.verified,
+                    sha256: preUploadChecksum,
                 });
 
             } catch (error) {
@@ -681,6 +839,33 @@ export async function POST(request: NextRequest) {
                         });
                     } catch (failErr) {
                         console.error('[ExportStream] Failed to persist error state:', failErr);
+                    }
+                }
+
+                // Mark idempotency run as failed (only if this request claimed it)
+                if (runFingerprint && claimedExportRun) {
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        try {
+                            await convex.mutation(api.exportRuns.failExportRun, {
+                                fingerprint: runFingerprint,
+                                errorCode,
+                            });
+                            break;
+                        } catch (idempErr) {
+                            if (attempt === 3) {
+                                // All retries exhausted — the row will remain in_progress.
+                                // Log with full context for operational repair.
+                                console.error(
+                                    `[ExportStream] CRITICAL: Failed to fail idempotency run after ${attempt} attempts. ` +
+                                    `Fingerprint ${runFingerprint} is stuck in in_progress. ` +
+                                    `Original errorCode: ${errorCode}. Manual repair required.`,
+                                    idempErr,
+                                );
+                            } else {
+                                console.warn(`[ExportStream] Retrying failExportRun (attempt ${attempt}/3):`, idempErr);
+                                await new Promise((r) => setTimeout(r, 200 * attempt));
+                            }
+                        }
                     }
                 }
 

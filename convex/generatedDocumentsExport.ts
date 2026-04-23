@@ -188,6 +188,8 @@ export const finalizeExportRun = mutation({
         filename: v.string(),
         byteSize: v.number(),
         mimeType: v.optional(v.string()),
+        /** SHA-256 checksum of the PDF for integrity verification */
+        sha256: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
@@ -210,6 +212,7 @@ export const finalizeExportRun = mutation({
             filename: args.filename,
             byteSize: args.byteSize,
             mimeType: args.mimeType ?? 'application/pdf',
+            sha256: args.sha256,
             currentStage: 'finalize',
             completedAt: now,
             durationMs: doc.startedAt ? now - doc.startedAt : undefined,

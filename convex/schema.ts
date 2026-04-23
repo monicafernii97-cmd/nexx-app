@@ -833,4 +833,34 @@ export default defineSchema({
     })
         .index('by_userId', ['userId'])
         .index('by_userId_case', ['userId', 'caseId']),
+
+    // ═══ Export Runs (Idempotency + Duplicate Prevention) ═══
+    // Tracks export run fingerprints to prevent duplicate generation.
+    // Fingerprint = caseId:exportPath:payloadHash (SHA-256).
+    exportRuns: defineTable({
+        /** Deterministic fingerprint for duplicate detection. */
+        fingerprint: v.string(),
+        /** User who initiated the run. */
+        userId: v.id('users'),
+        /** Case this run belongs to. */
+        caseId: v.optional(v.id('cases')),
+        /** Export path (court_document, case_summary, etc.). */
+        exportPath: v.string(),
+        /** Run lifecycle status. */
+        status: v.union(
+            v.literal('in_progress'),
+            v.literal('completed'),
+            v.literal('failed'),
+        ),
+        /** Linked export document (set on completion). */
+        exportId: v.optional(v.id('generatedDocuments')),
+        /** Error code (set on failure). */
+        errorCode: v.optional(v.string()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_fingerprint', ['fingerprint'])
+        .index('by_userId', ['userId'])
+        .index('by_status', ['status'])
+        .index('by_createdAt', ['createdAt']),
 });

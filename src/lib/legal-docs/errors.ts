@@ -19,7 +19,8 @@ export type LegalGenerationErrorCode =
   | 'LEGAL_DOCUMENT_RENDER_STRUCTURE_INVALID'
   | 'LEGAL_DOCUMENT_PDF_RENDER_FAILED'
   | 'LEGAL_DOCUMENT_PDF_INVALID'
-  | 'LEGAL_DOCUMENT_FILENAME_FAILED';
+  | 'LEGAL_DOCUMENT_FILENAME_FAILED'
+  | 'LEGAL_DOCUMENT_PIPELINE_FAILED';
 
 // ═══════════════════════════════════════════════════════════════
 // Error Class

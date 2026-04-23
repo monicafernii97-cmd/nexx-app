@@ -9,7 +9,7 @@
  */
 
 import type { CanonicalExportDocument, CourtSection, ExportCaption } from '../types';
-import type { ExportJurisdictionProfile } from '../jurisdiction/types';
+import type { ExportJurisdictionProfile } from '@/lib/jurisdiction/types';
 import { escapeHtml, renderPageShell } from './shared';
 
 // ═══════════════════════════════════════════════════════════════

@@ -34,8 +34,7 @@ import { buildExhibitCoverDraftInputs } from '@/lib/exports/exhibits/buildExhibi
 import { generateExhibitCoverDrafts } from '@/lib/exports/exhibits/generateExhibitCoverDrafts';
 import { applyExhibitCoverDrafts } from '@/lib/exports/exhibits/applyExhibitCoverDrafts';
 import type { ExhibitMappedSections } from '@/lib/export-assembly/types/exports';
-import { adaptDraftedToCanonicalExport } from '@/lib/exports/adaptDraftedToCanonicalExport';
-import { validateExportDocument } from '@/lib/exports/validateExportDocument';
+import type { AdaptToCanonicalParams } from '@/lib/exports/adaptDraftedToCanonicalExport';
 import { buildExportCaption } from '@/lib/exports/buildExportCaption';
 import {
   resolveExportJurisdictionProfile,
@@ -512,7 +511,7 @@ export async function POST(request: NextRequest) {
                 const mappedSections = body.assemblyResult?.assembly
                     ?.mappedSections as ExhibitMappedSections | undefined;
 
-                const adaptParams: import('@/lib/exports/adaptDraftedToCanonicalExport').AdaptToCanonicalParams = {
+                const adaptParams: AdaptToCanonicalParams = {
                     path: exportPath,
                     title: getTemplateName(body.exportRequest?.path ?? 'general').toUpperCase(),
                     draftedSections: draftedSections.map((s) => ({

@@ -5,7 +5,7 @@
  * shared across ALL export renderers. No duplicated layout logic.
  */
 
-import type { ExportJurisdictionProfile } from '../jurisdiction/types';
+import type { ExportJurisdictionProfile } from '@/lib/jurisdiction/types';
 
 // ═══════════════════════════════════════════════════════════════
 // Page Shell

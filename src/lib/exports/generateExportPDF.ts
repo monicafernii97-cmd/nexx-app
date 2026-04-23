@@ -39,8 +39,9 @@ import {
   mapToExportGenerationError,
 } from './errors';
 import type { CanonicalExportDocument, ExportPath } from './types';
-import type { ExportJurisdictionProfile } from './jurisdiction/types';
+import type { ExportJurisdictionProfile } from '@/lib/jurisdiction/types';
 import type { ProfileResolutionMeta } from '@/lib/jurisdiction/types';
+import { logExportGeneration } from './observability';
 
 // ═══════════════════════════════════════════════════════════════
 // Public Types
@@ -107,6 +108,8 @@ export async function generateExportPDF(
   input: GenerateExportPDFInput,
 ): Promise<GenerateExportPDFResult> {
   const startTime = Date.now();
+  let resolvedProfileMeta: ProfileResolutionMeta | null = null;
+  let resolvedExportPath = input.metadata.exportPath;
 
   try {
     // 1. Resolve jurisdiction profile (skip if pre-resolved)
@@ -114,8 +117,11 @@ export async function generateExportPDF(
       ? { profile: input.resolvedProfile, meta: { profileKey: input.resolvedProfile.key, source: 'pre_resolved' as const } }
       : resolveProfileStage(input.jurisdictionSettings);
 
+    resolvedProfileMeta = profileMeta;
+
     // 2. Build canonical export document
     const document = adaptDocumentStage(input.adaptParams);
+    resolvedExportPath = document.path;
 
     // 3. Validate document structure
     validateDocumentStage(document);
@@ -140,7 +146,7 @@ export async function generateExportPDF(
     }
 
     // 8. Generate deterministic filename (prefer document.path as authoritative)
-    const filename = generateFilenameStage({
+    const filename = generateExportFilename({
       ...input.metadata,
       exportPath: document.path,
     });
@@ -148,10 +154,18 @@ export async function generateExportPDF(
     const durationMs = Date.now() - startTime;
 
     // ── Observability ──
-    console.log(
-      `[ExportPDF] Generated: path=${document.path}, profile=${profileMeta.profileKey} (${profileMeta.source}), ` +
-      `pdf=${pdfMeta.byteLength}b, duration=${durationMs}ms`,
-    );
+    logExportGeneration({
+      orchestrator: 'create_export',
+      runId: input.metadata.runId,
+      exportPath: document.path,
+      caseType: input.metadata.caseType,
+      profileKey: profileMeta.profileKey,
+      profileSource: profileMeta.source,
+      htmlLength: html.length,
+      pdfByteLength: pdfMeta.byteLength,
+      durationMs,
+      success: true,
+    });
 
     return {
       pdfBuffer,
@@ -166,10 +180,17 @@ export async function generateExportPDF(
   } catch (error) {
     const durationMs = Date.now() - startTime;
     const mapped = mapToExportGenerationError(error);
-    console.error(
-      `[ExportPDF] Failed: path=${input.metadata.exportPath}, ` +
-      `code=${mapped.code}, duration=${durationMs}ms, message=${mapped.message}`,
-    );
+    logExportGeneration({
+      orchestrator: 'create_export',
+      runId: input.metadata.runId,
+      exportPath: resolvedExportPath,
+      caseType: input.metadata.caseType,
+      profileKey: resolvedProfileMeta?.profileKey ?? 'unknown',
+      profileSource: resolvedProfileMeta?.source ?? 'global_default',
+      durationMs,
+      success: false,
+      errorCode: mapped.code,
+    });
     throw mapped;
   }
 }
@@ -286,7 +307,7 @@ function validatePDFStage(pdfBuffer: Buffer): ValidatedPdf {
 // ═══════════════════════════════════════════════════════════════
 
 /** Stage 8: Generate a deterministic PDF filename from metadata. */
-function generateFilenameStage(metadata: {
+export function generateExportFilename(metadata: {
   caseType: string;
   exportPath: string;
   runId: string;

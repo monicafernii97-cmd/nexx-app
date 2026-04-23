@@ -149,7 +149,7 @@ export async function generateExportPDF(
 
     // ── Observability ──
     console.log(
-      `[ExportPDF] Generated: path=${input.metadata.exportPath}, profile=${profileMeta.profileKey} (${profileMeta.source}), ` +
+      `[ExportPDF] Generated: path=${document.path}, profile=${profileMeta.profileKey} (${profileMeta.source}), ` +
       `pdf=${pdfMeta.byteLength}b, duration=${durationMs}ms`,
     );
 
@@ -293,7 +293,9 @@ function generateFilenameStage(metadata: {
 }): string {
   try {
     const date = new Date().toISOString().slice(0, 10);
-    const shortId = metadata.runId.slice(-6);
+    const shortId = metadata.runId.length >= 6
+      ? metadata.runId.slice(-6)
+      : metadata.runId || 'unknown';
     return `${sanitize(metadata.caseType)}_${sanitize(metadata.exportPath)}_${date}_${shortId}.pdf`;
   } catch (err) {
     throw new ExportDocumentGenerationError({

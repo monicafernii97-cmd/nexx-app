@@ -85,29 +85,29 @@ type StructureCheck = {
 const PATH_STRUCTURE_CHECKS: Record<ExportPath, StructureCheck> = {
   court_document: {
     required: [
-      { selector: '[class*="court-export"], .court-export, #court-export', label: 'court export container' },
-      { selector: '[class*="report-title"], .report-title, h1', label: 'document title' },
+      { selector: '[class~="court-export"], .court-export, #court-export', label: 'court export container' },
+      { selector: '[class~="report-title"], .report-title, h1', label: 'document title' },
     ],
   },
   case_summary: {
     required: [
-      { selector: '[class*="report-title"], .report-title, h1', label: 'summary title' },
-      { selector: '[class*="summary-section"], .summary-section, section', label: 'summary body' },
+      { selector: '[class~="report-title"], .report-title, h1', label: 'summary title' },
+      { selector: '[class~="summary-section"], .summary-section, section', label: 'summary body' },
     ],
   },
   exhibit_document: {
     required: [
-      { selector: '[class*="exhibit"], .exhibit, [data-exhibit]', label: 'exhibit container' },
+      { selector: '[class~="exhibit"], .exhibit, [data-exhibit]', label: 'exhibit container' },
     ],
   },
   timeline_summary: {
     required: [
-      { selector: '[class*="timeline"], .timeline, [data-timeline]', label: 'timeline container' },
+      { selector: '[class~="timeline"], .timeline, [data-timeline]', label: 'timeline container' },
     ],
   },
   incident_report: {
     required: [
-      { selector: '[class*="report-title"], .report-title, h1', label: 'incident report title' },
+      { selector: '[class~="report-title"], .report-title, h1', label: 'incident report title' },
     ],
   },
 };

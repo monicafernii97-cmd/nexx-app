@@ -44,25 +44,28 @@ describe('hashPayload', () => {
 });
 
 describe('generateRunFingerprint', () => {
-  it('produces a deterministic fingerprint from inputs', () => {
+  it('produces a user-scoped deterministic fingerprint', () => {
     const fp = generateRunFingerprint({
+      userId: 'user_abc',
       caseId: 'case_123',
       exportPath: 'court_document',
       payloadHash: 'abc123',
     });
-    expect(fp).toBe('case_123:court_document:abc123');
+    expect(fp).toBe('user_abc:case_123:court_document:abc123');
   });
 
   it('uses "anon" when caseId is undefined', () => {
     const fp = generateRunFingerprint({
+      userId: 'user_abc',
       exportPath: 'case_summary',
       payloadHash: 'xyz789',
     });
-    expect(fp).toBe('anon:case_summary:xyz789');
+    expect(fp).toBe('user_abc:anon:case_summary:xyz789');
   });
 
   it('same inputs produce same fingerprint', () => {
     const input = {
+      userId: 'user_abc',
       caseId: 'case_456',
       exportPath: 'exhibit_document',
       payloadHash: 'def456',
@@ -70,13 +73,31 @@ describe('generateRunFingerprint', () => {
     expect(generateRunFingerprint(input)).toBe(generateRunFingerprint(input));
   });
 
-  it('different inputs produce different fingerprints', () => {
+  it('different users produce different fingerprints', () => {
     const fp1 = generateRunFingerprint({
+      userId: 'user_1',
       caseId: 'case_1',
       exportPath: 'court_document',
       payloadHash: 'hash1',
     });
     const fp2 = generateRunFingerprint({
+      userId: 'user_2',
+      caseId: 'case_1',
+      exportPath: 'court_document',
+      payloadHash: 'hash1',
+    });
+    expect(fp1).not.toBe(fp2);
+  });
+
+  it('different caseIds produce different fingerprints', () => {
+    const fp1 = generateRunFingerprint({
+      userId: 'user_1',
+      caseId: 'case_1',
+      exportPath: 'court_document',
+      payloadHash: 'hash1',
+    });
+    const fp2 = generateRunFingerprint({
+      userId: 'user_1',
       caseId: 'case_2',
       exportPath: 'court_document',
       payloadHash: 'hash1',
@@ -86,11 +107,13 @@ describe('generateRunFingerprint', () => {
 
   it('different export paths produce different fingerprints', () => {
     const fp1 = generateRunFingerprint({
+      userId: 'user_1',
       caseId: 'case_1',
       exportPath: 'court_document',
       payloadHash: 'hash1',
     });
     const fp2 = generateRunFingerprint({
+      userId: 'user_1',
       caseId: 'case_1',
       exportPath: 'case_summary',
       payloadHash: 'hash1',
@@ -100,11 +123,13 @@ describe('generateRunFingerprint', () => {
 
   it('different payload hashes produce different fingerprints', () => {
     const fp1 = generateRunFingerprint({
+      userId: 'user_1',
       caseId: 'case_1',
       exportPath: 'court_document',
       payloadHash: 'hashA',
     });
     const fp2 = generateRunFingerprint({
+      userId: 'user_1',
       caseId: 'case_1',
       exportPath: 'court_document',
       payloadHash: 'hashB',
@@ -115,10 +140,11 @@ describe('generateRunFingerprint', () => {
   it('integrates with hashPayload for end-to-end fingerprinting', () => {
     const hash = hashPayload({ sections: ['body'], exportPath: 'court_document' });
     const fp = generateRunFingerprint({
+      userId: 'user_999',
       caseId: 'case_999',
       exportPath: 'court_document',
       payloadHash: hash,
     });
-    expect(fp).toMatch(/^case_999:court_document:[a-f0-9]{64}$/);
+    expect(fp).toMatch(/^user_999:case_999:court_document:[a-f0-9]{64}$/);
   });
 });

@@ -575,6 +575,7 @@ export async function POST(request: NextRequest) {
                     exportPath,
                 });
                 runFingerprint = generateRunFingerprint({
+                    userId,
                     caseId: body.caseId,
                     exportPath,
                     payloadHash,
@@ -703,14 +704,14 @@ export async function POST(request: NextRequest) {
                 // ────────────────────────────────────────────────
                 const preUploadChecksum = computeArtifactChecksum(pdfBuffer);
 
-                // Convex storage upload returns only storageId — no byte-length metadata.
-                // Use the upload response Content-Length header when available;
-                // otherwise fall back to the original buffer length (effectively
-                // validates storageId only — byte-length check is a no-op).
-                const uploadedContentLength = uploadResponse.headers.get('content-length');
-                const reportedByteLength = uploadedContentLength
-                    ? parseInt(uploadedContentLength, 10)
-                    : pdfBuffer.length;
+                // Convex storage upload returns only { storageId } — no byte-length
+                // metadata about the stored file. The upload response Content-Length
+                // reflects the JSON body size, NOT the uploaded PDF size.
+                // Pass the original buffer length for both values; the byte-length
+                // check is effectively a storageId format validation only.
+                // True integrity is ensured by the SHA-256 checksum persisted with
+                // the record (and re-verified on download if needed).
+                const reportedByteLength = pdfBuffer.length;
 
                 const verification = verifyUploadedArtifact({
                     storageId,

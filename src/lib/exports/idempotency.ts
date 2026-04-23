@@ -39,6 +39,8 @@ export function hashPayload(data: unknown): string {
 
 /** Input for generating a run fingerprint. */
 export type FingerprintInput = {
+  /** Authenticated user ID for user-scoped deduplication. */
+  userId: string;
   /** Case ID (use 'anon' for unauthenticated/test scenarios). */
   caseId?: string;
   /** Export path (e.g. 'court_document', 'case_summary'). */
@@ -50,8 +52,9 @@ export type FingerprintInput = {
 /**
  * Generate a deterministic fingerprint for an export run.
  *
- * Format: `{caseId}:{exportPath}:{payloadHash}`
+ * Format: `{userId}:{caseId}:{exportPath}:{payloadHash}`
  *
+ * Fingerprints are user-scoped to prevent cross-user collisions.
  * Two requests with the same fingerprint represent identical work
  * and should not both execute. The idempotency layer uses this
  * fingerprint to detect and prevent duplicates.
@@ -61,5 +64,5 @@ export type FingerprintInput = {
  */
 export function generateRunFingerprint(input: FingerprintInput): string {
   const caseId = input.caseId ?? 'anon';
-  return `${caseId}:${input.exportPath}:${input.payloadHash}`;
+  return `${input.userId}:${caseId}:${input.exportPath}:${input.payloadHash}`;
 }

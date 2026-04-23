@@ -49,28 +49,28 @@ export const claimExportRun = mutation({
             .first();
 
         if (existing) {
-            // Defense-in-depth: verify ownership before returning existing results
+            // Fingerprints are user-scoped (include userId), so cross-user
+            // collisions are impossible. Verify ownership as defense-in-depth.
             if (existing.userId !== user._id) {
-                // Different user generated same fingerprint — treat as collision, ignore existing
-                console.warn('[claimExportRun] Fingerprint collision across users — ignoring existing record');
-            } else {
-                if (existing.status === 'completed' && existing.exportId) {
-                    return {
-                        status: 'already_completed' as const,
-                        exportId: existing.exportId,
-                        runId: existing._id,
-                    };
-                }
-
-                if (existing.status === 'in_progress') {
-                    return {
-                        status: 'in_progress' as const,
-                        runId: existing._id,
-                    };
-                }
+                throw new Error('Export run fingerprint ownership mismatch — fingerprint should be user-scoped');
             }
 
-            // Status is 'failed' or cross-user collision — allow claim by replacing the record
+            if (existing.status === 'completed' && existing.exportId) {
+                return {
+                    status: 'already_completed' as const,
+                    exportId: existing.exportId,
+                    runId: existing._id,
+                };
+            }
+
+            if (existing.status === 'in_progress') {
+                return {
+                    status: 'in_progress' as const,
+                    runId: existing._id,
+                };
+            }
+
+            // Status is 'failed' — allow retry by replacing the record
             await ctx.db.delete(existing._id);
         }
 

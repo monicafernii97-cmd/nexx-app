@@ -6,22 +6,18 @@
 
 import type { JurisdictionProfile } from '../../types';
 
+const COUNTY_COURT_FLAGS = {
+  prayerHeadingRequired: false,
+  certificateSeparatePage: true,
+  signatureKeepTogether: true,
+  verificationKeepTogether: true,
+} as const;
+
 export const COUNTY_COURT_OVERRIDE: Partial<JurisdictionProfile> = {
   scope: {
     courtType: 'county_court',
   },
 
-  sections: {
-    prayerHeadingRequired: false,
-    certificateSeparatePage: true,
-    signatureKeepTogether: true,
-    verificationKeepTogether: true,
-  },
-
-  courtDocument: {
-    prayerHeadingRequired: false,
-    certificateSeparatePage: true,
-    signatureKeepTogether: true,
-    verificationKeepTogether: true,
-  },
+  sections: { ...COUNTY_COURT_FLAGS },
+  courtDocument: { ...COUNTY_COURT_FLAGS },
 };

@@ -1,23 +1,11 @@
 /**
  * Vermont Default Jurisdiction Profile
  *
- * Inherits US default. Override specific fields as state
+ * Inherits US default via factory. Override specific fields as state
  * formatting research is completed.
  */
 
-import type { JurisdictionProfile } from '../../types';
-import { US_DEFAULT_PROFILE } from '../us-default';
+import { createStateDefaultProfile } from './createStateDefaultProfile';
 
 /** Vermont Default jurisdiction profile. */
-export const VT_DEFAULT_PROFILE: JurisdictionProfile = {
-  ...US_DEFAULT_PROFILE,
-  key: 'vt-default',
-  version: '1.0',
-  name: 'Vermont State Pleading',
-  state: 'Vermont',
-
-  scope: {
-    country: 'US',
-    state: 'VT',
-  },
-};
+export const VT_DEFAULT_PROFILE = createStateDefaultProfile('VT', 'Vermont');

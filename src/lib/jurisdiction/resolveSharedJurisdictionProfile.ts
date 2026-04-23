@@ -180,18 +180,11 @@ export function resolveLayeredProfile(
     /\busdc\b/.test(courtName) ||
     /\bu\.?s\.?d\.?c\.?\b/.test(courtName);
 
-  if (isFederal) {
-    const merged = mergeJurisdictionProfiles(
-      FEDERAL_DEFAULT_PROFILE,
-      params.userOverrides,
-      params.caseOverrides,
-      params.documentOverrides,
-    );
-    return { profile: normalizeCourtDocumentSections(merged), meta: { profileKey: 'federal-default', source: 'court_exact_match' } };
-  }
+  // ── Base profile ──
+  const baseProfile = isFederal ? FEDERAL_DEFAULT_PROFILE : US_DEFAULT_PROFILE;
 
-  // ── State profile ──
-  const stateProfile = stateCode ? (STATE_PROFILE_MAP[stateCode] ?? null) : null;
+  // ── State profile (skipped for federal) ──
+  const stateProfile = (!isFederal && stateCode) ? (STATE_PROFILE_MAP[stateCode] ?? null) : null;
 
   // ── Court-type override ──
   const normalizedCourtType = normalizeCourtType(courtType);
@@ -209,6 +202,9 @@ export function resolveLayeredProfile(
   if (specificCourt) {
     source = 'court_exact_match';
     profileKey = specificCourt.key;
+  } else if (isFederal) {
+    source = 'court_exact_match';
+    profileKey = 'federal-default';
   } else if (stateProfile) {
     source = county ? 'state_fallback_unmatched_county' : 'state_default';
     profileKey = stateProfile.key;
@@ -216,7 +212,7 @@ export function resolveLayeredProfile(
 
   // ── Merge all layers ──
   const merged = mergeJurisdictionProfiles(
-    US_DEFAULT_PROFILE,
+    baseProfile,
     stateProfile,
     courtTypeOverride,
     specificCourt,
@@ -313,7 +309,7 @@ function findSpecificCourt(
     const countyMatch = !pCounty || pCounty === county;
     const courtMatch = !pCourtName || courtName.includes(pCourtName) || pCourtName.includes(courtName);
 
-    return stateMatch && countyMatch && (county ? countyMatch : courtMatch);
+    return stateMatch && countyMatch && courtMatch;
   }) ?? null;
 }
 

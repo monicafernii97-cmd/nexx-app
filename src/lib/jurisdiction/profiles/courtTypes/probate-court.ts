@@ -7,6 +7,13 @@
 
 import type { JurisdictionProfile } from '../../types';
 
+const PROBATE_COURT_FLAGS = {
+  prayerHeadingRequired: true,
+  certificateSeparatePage: true,
+  signatureKeepTogether: true,
+  verificationKeepTogether: true,
+} as const;
+
 export const PROBATE_COURT_OVERRIDE: Partial<JurisdictionProfile> = {
   scope: {
     courtType: 'probate_court',
@@ -18,19 +25,8 @@ export const PROBATE_COURT_OVERRIDE: Partial<JurisdictionProfile> = {
     useThreeColumnTable: false,
   },
 
-  sections: {
-    prayerHeadingRequired: true,
-    certificateSeparatePage: true,
-    signatureKeepTogether: true,
-    verificationKeepTogether: true,
-  },
-
-  courtDocument: {
-    prayerHeadingRequired: true,
-    certificateSeparatePage: true,
-    signatureKeepTogether: true,
-    verificationKeepTogether: true,
-  },
+  sections: { ...PROBATE_COURT_FLAGS },
+  courtDocument: { ...PROBATE_COURT_FLAGS },
 
   court: {
     captionStyle: 'in_re_caption',

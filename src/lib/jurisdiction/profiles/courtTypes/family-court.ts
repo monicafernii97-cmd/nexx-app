@@ -7,24 +7,20 @@
 
 import type { JurisdictionProfile } from '../../types';
 
+const FAMILY_COURT_FLAGS = {
+  prayerHeadingRequired: true,
+  certificateSeparatePage: true,
+  signatureKeepTogether: true,
+  verificationKeepTogether: true,
+} as const;
+
 export const FAMILY_COURT_OVERRIDE: Partial<JurisdictionProfile> = {
   scope: {
     courtType: 'family_court',
   },
 
-  sections: {
-    prayerHeadingRequired: true,
-    certificateSeparatePage: true,
-    signatureKeepTogether: true,
-    verificationKeepTogether: true,
-  },
-
-  courtDocument: {
-    prayerHeadingRequired: true,
-    certificateSeparatePage: true,
-    signatureKeepTogether: true,
-    verificationKeepTogether: true,
-  },
+  sections: { ...FAMILY_COURT_FLAGS },
+  courtDocument: { ...FAMILY_COURT_FLAGS },
 
   court: {
     captionStyle: 'generic_state_caption',

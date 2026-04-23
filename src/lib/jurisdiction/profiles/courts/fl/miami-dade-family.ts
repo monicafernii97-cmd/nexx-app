@@ -25,6 +25,7 @@ export const FL_MIAMI_DADE_FAMILY_PROFILE: JurisdictionProfile = {
   },
 
   sections: {
+    ...(FL_DEFAULT_PROFILE.sections ?? {}),
     prayerHeadingRequired: true,
     certificateSeparatePage: true,
     signatureKeepTogether: true,
@@ -32,6 +33,7 @@ export const FL_MIAMI_DADE_FAMILY_PROFILE: JurisdictionProfile = {
   },
 
   courtDocument: {
+    ...(FL_DEFAULT_PROFILE.courtDocument ?? FL_DEFAULT_PROFILE.sections ?? {}),
     prayerHeadingRequired: true,
     certificateSeparatePage: true,
     signatureKeepTogether: true,

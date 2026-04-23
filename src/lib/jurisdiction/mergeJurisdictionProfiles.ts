@@ -73,7 +73,7 @@ export function mergeJurisdictionProfiles(
       // ── Optional blocks: merge if present on either side ──
 
       caption: override.caption !== undefined
-        ? override.caption
+        ? { ...override.caption }
         : merged.caption
           ? { ...merged.caption }
           : undefined,

@@ -266,7 +266,7 @@ export function normalizeCourtDocumentSections(
 ): JurisdictionProfile {
   const { sections, courtDocument } = profile;
 
-  if (!sections && !courtDocument) return profile;
+  if (!sections && !courtDocument) return { ...profile };
 
   const canonical = sections ?? courtDocument;
   return {

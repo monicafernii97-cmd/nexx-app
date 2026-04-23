@@ -1,23 +1,11 @@
 /**
  * Tennessee Default Jurisdiction Profile
  *
- * Inherits US default. Override specific fields as state
+ * Inherits US default via factory. Override specific fields as state
  * formatting research is completed.
  */
 
-import type { JurisdictionProfile } from '../../types';
-import { US_DEFAULT_PROFILE } from '../us-default';
+import { createStateDefaultProfile } from './createStateDefaultProfile';
 
 /** Tennessee Default jurisdiction profile. */
-export const TN_DEFAULT_PROFILE: JurisdictionProfile = {
-  ...US_DEFAULT_PROFILE,
-  key: 'tn-default',
-  version: '1.0',
-  name: 'Tennessee State Pleading',
-  state: 'Tennessee',
-
-  scope: {
-    country: 'US',
-    state: 'TN',
-  },
-};
+export const TN_DEFAULT_PROFILE = createStateDefaultProfile('TN', 'Tennessee');

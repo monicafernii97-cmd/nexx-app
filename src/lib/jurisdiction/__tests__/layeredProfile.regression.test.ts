@@ -27,12 +27,9 @@ import {
   PROFILE_REGISTRY,
   US_DEFAULT_PROFILE,
   TX_DEFAULT_PROFILE,
-  FL_DEFAULT_PROFILE,
-  CA_DEFAULT_PROFILE,
-  NY_DEFAULT_PROFILE,
-  FEDERAL_DEFAULT_PROFILE,
-  TX_FORT_BEND_387TH_PROFILE,
 } from '@/lib/jurisdiction/profiles/registry';
+
+import type { JurisdictionProfile } from '@/lib/jurisdiction/types';
 
 import { mergeJurisdictionProfiles } from '@/lib/jurisdiction/mergeJurisdictionProfiles';
 import { normalizeCourtDocumentSections } from '@/lib/jurisdiction/types';
@@ -330,8 +327,8 @@ describe('mergeJurisdictionProfiles', () => {
   it('later overrides win over earlier ones', () => {
     const merged = mergeJurisdictionProfiles(
       US_DEFAULT_PROFILE,
-      { key: 'first' } as any,
-      { key: 'second' } as any,
+      { key: 'first' } as Partial<JurisdictionProfile>,
+      { key: 'second' } as Partial<JurisdictionProfile>,
     );
     expect(merged.key).toBe('second');
   });

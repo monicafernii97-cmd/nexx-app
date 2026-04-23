@@ -28,6 +28,14 @@ export type ExportGenerationLog = {
   idempotencyStatus?: 'new' | 'reused' | 'blocked';
   /** Phase 5: Whether the uploaded artifact passed integrity verification. */
   artifactVerified?: boolean;
+  /** Phase 6: Queue admission status. */
+  queueStatus?: 'accepted' | 'rejected' | 'bypassed';
+  /** Phase 6: Export job ID from queue. */
+  jobId?: string;
+  /** Phase 6: Time spent in queue before execution started (ms). */
+  queueWaitMs?: number;
+  /** Phase 6: Per-stage timing breakdown (ms). */
+  stageTiming?: Record<string, number>;
 };
 
 /** Emit a structured export generation log. */

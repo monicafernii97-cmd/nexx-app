@@ -62,6 +62,8 @@ describe('failure mapping — error code taxonomy', () => {
       EXPORT_OVERRIDE_NORMALIZATION_FAILED: true,
       EXPORT_IDEMPOTENCY_CONFLICT: true,
       EXPORT_ARTIFACT_INTEGRITY_FAILED: true,
+      EXPORT_QUEUE_OVERLOADED: true,
+      EXPORT_JOB_TIMEOUT: true,
     };
 
     for (const code of Object.keys(allCodes) as ExportGenerationErrorCode[]) {

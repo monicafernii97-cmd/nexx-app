@@ -26,7 +26,9 @@ export type ExportGenerationErrorCode =
   | 'EXPORT_FINALIZE_FAILED'
   | 'EXPORT_OVERRIDE_NORMALIZATION_FAILED'
   | 'EXPORT_IDEMPOTENCY_CONFLICT'
-  | 'EXPORT_ARTIFACT_INTEGRITY_FAILED';
+  | 'EXPORT_ARTIFACT_INTEGRITY_FAILED'
+  | 'EXPORT_QUEUE_OVERLOADED'
+  | 'EXPORT_JOB_TIMEOUT';
 
 // ═══════════════════════════════════════════════════════════════
 // Error Class
@@ -75,6 +77,8 @@ const EXPORT_ERROR_CODES: ReadonlySet<string> = new Set<ExportGenerationErrorCod
   'EXPORT_OVERRIDE_NORMALIZATION_FAILED',
   'EXPORT_IDEMPOTENCY_CONFLICT',
   'EXPORT_ARTIFACT_INTEGRITY_FAILED',
+  'EXPORT_QUEUE_OVERLOADED',
+  'EXPORT_JOB_TIMEOUT',
 ]);
 
 /** Runtime type guard for ExportGenerationErrorCode. */

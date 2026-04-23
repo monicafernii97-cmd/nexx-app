@@ -863,4 +863,40 @@ export default defineSchema({
         .index('by_userId', ['userId'])
         .index('by_status', ['status'])
         .index('by_createdAt', ['createdAt']),
+
+    // ═══ Export Jobs (Queue Admission Control) ═══
+    // Tracks active export jobs for concurrency gating and lifecycle management.
+    // The SSE route checks this table before starting execution.
+    exportJobs: defineTable({
+        /** User who initiated the export. */
+        userId: v.id('users'),
+        /** Case this job belongs to. */
+        caseId: v.optional(v.id('cases')),
+        /** Export path (court_document, case_summary, etc.). */
+        exportPath: v.string(),
+        /** Links to the exportRuns fingerprint for correlation. */
+        fingerprint: v.string(),
+        /** Job lifecycle status. */
+        status: v.union(
+            v.literal('queued'),
+            v.literal('running'),
+            v.literal('completed'),
+            v.literal('failed'),
+            v.literal('timeout'),
+        ),
+        /** Priority: 0 = normal, 1 = retry. */
+        priority: v.number(),
+        createdAt: v.number(),
+        /** When execution started. */
+        startedAt: v.optional(v.number()),
+        /** When execution finished (completed/failed/timeout). */
+        completedAt: v.optional(v.number()),
+        /** Error code on failure. */
+        errorCode: v.optional(v.string()),
+        /** Auto-expire timestamp — jobs past this are reaped. */
+        timeoutAt: v.number(),
+    })
+        .index('by_userId_status', ['userId', 'status'])
+        .index('by_status_createdAt', ['status', 'createdAt'])
+        .index('by_fingerprint', ['fingerprint']),
 });

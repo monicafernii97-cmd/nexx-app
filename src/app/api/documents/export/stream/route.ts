@@ -41,6 +41,8 @@ import {
 } from '@/lib/exports/jurisdiction/resolveExportJurisdictionProfile';
 import { generateExportPDF } from '@/lib/exports/generateExportPDF';
 import type { ExportPath } from '@/lib/exports/types';
+import { hashPayload, generateRunFingerprint } from '@/lib/exports/idempotency';
+import { computeArtifactChecksum, verifyUploadedArtifact } from '@/lib/exports/artifactIntegrity';
 
 export const maxDuration = 120; // Extended for GPT + PDF rendering
 
@@ -174,6 +176,7 @@ export async function POST(request: NextRequest) {
             };
 
             let exportId: string | null = null;
+            let runFingerprint: string | null = null;
 
             try {
                 // ────────────────────────────────────────────────
@@ -561,6 +564,45 @@ export async function POST(request: NextRequest) {
                         : null,
                 };
 
+                // ────────────────────────────────────────────────
+                // 4d. IDEMPOTENCY CHECK
+                // ────────────────────────────────────────────────
+                const payloadHash = hashPayload({
+                    adaptParams,
+                    jurisdictionSettings,
+                    caseType,
+                    exportPath,
+                });
+                runFingerprint = generateRunFingerprint({
+                    caseId: body.caseId,
+                    exportPath,
+                    payloadHash,
+                });
+
+                const claimResult = await convex.mutation(api.exportRuns.claimExportRun, {
+                    fingerprint: runFingerprint,
+                    caseId: body.caseId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                    exportPath,
+                });
+
+                if (claimResult.status === 'already_completed') {
+                    // Duplicate request — return existing export
+                    send({
+                        type: 'complete',
+                        exportId: claimResult.exportId,
+                        reused: true,
+                        message: 'Export already completed — returning cached result.',
+                    });
+                    return;
+                }
+
+                if (claimResult.status === 'in_progress') {
+                    throw Object.assign(
+                        new Error('Duplicate export request — generation already in progress'),
+                        { code: 'EXPORT_IDEMPOTENCY_CONFLICT' },
+                    );
+                }
+
                 send({
                     type: 'milestone',
                     stage: 'rendering_html',
@@ -568,7 +610,7 @@ export async function POST(request: NextRequest) {
                     message: 'Rendering document HTML...',
                 });
 
-                // 4d-5. Delegate rendering pipeline to orchestrator
+                // 4e-5. Delegate rendering pipeline to orchestrator
                 send({
                     type: 'milestone',
                     stage: 'rendering_pdf',
@@ -633,6 +675,25 @@ export async function POST(request: NextRequest) {
                 }
 
                 // ────────────────────────────────────────────────
+                // 6b. ARTIFACT INTEGRITY VERIFICATION
+                // ────────────────────────────────────────────────
+                const preUploadChecksum = computeArtifactChecksum(pdfBuffer);
+                const verification = verifyUploadedArtifact({
+                    storageId,
+                    reportedByteLength: pdfBuffer.length,
+                    expectedByteLength: pdfBuffer.length,
+                    checksum: preUploadChecksum,
+                });
+
+                if (!verification.verified) {
+                    console.error('[ExportStream] Artifact integrity check failed:', verification);
+                    throw Object.assign(
+                        new Error(`Artifact integrity verification failed: byteLengthMatch=${verification.byteLengthMatch}, storageIdValid=${verification.storageIdValid}`),
+                        { code: 'EXPORT_ARTIFACT_INTEGRITY_FAILED' },
+                    );
+                }
+
+                // ────────────────────────────────────────────────
                 // 7. FINALIZE EXPORT RECORD
                 // ────────────────────────────────────────────────
                 send({
@@ -648,11 +709,24 @@ export async function POST(request: NextRequest) {
                     filename,
                     byteSize: pdfBuffer.length,
                     mimeType: 'application/pdf',
+                    sha256: preUploadChecksum,
                 });
 
                 // ────────────────────────────────────────────────
                 // 8. EMIT COMPLETE
                 // ────────────────────────────────────────────────
+                // Mark idempotency run as completed
+                if (runFingerprint) {
+                    try {
+                        await convex.mutation(api.exportRuns.completeExportRun, {
+                            fingerprint: runFingerprint,
+                            exportId: exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                        });
+                    } catch (idempErr) {
+                        console.warn('[ExportStream] Failed to complete idempotency run:', idempErr);
+                    }
+                }
+
                 send({
                     type: 'complete',
                     exportId,
@@ -661,6 +735,8 @@ export async function POST(request: NextRequest) {
                     aiDraftedCount,
                     lockedCount,
                     preflightSummary: preflightResult,
+                    artifactVerified: verification.verified,
+                    sha256: preUploadChecksum,
                 });
 
             } catch (error) {
@@ -681,6 +757,18 @@ export async function POST(request: NextRequest) {
                         });
                     } catch (failErr) {
                         console.error('[ExportStream] Failed to persist error state:', failErr);
+                    }
+                }
+
+                // Mark idempotency run as failed (allows retry)
+                if (runFingerprint) {
+                    try {
+                        await convex.mutation(api.exportRuns.failExportRun, {
+                            fingerprint: runFingerprint,
+                            errorCode,
+                        });
+                    } catch (idempErr) {
+                        console.warn('[ExportStream] Failed to mark idempotency run as failed:', idempErr);
                     }
                 }
 

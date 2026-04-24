@@ -92,10 +92,10 @@ export async function generateSectionContent(
     if (err instanceof DOMException && err.name === 'AbortError') {
       throw err;
     }
-    console.error('[generateSectionContent] Failed:', err);
+    console.error('[generateSectionContent] Failed:', err instanceof Error ? err.name : 'unknown');
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'AI_GENERATION_FAILED',
+      error: 'AI_GENERATION_FAILED',
     };
   }
 }

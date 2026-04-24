@@ -153,9 +153,9 @@ describe('sectionOperations', () => {
     });
 
     test('does not mutate original state', () => {
-      const original = { ...baseState };
+      const originalContent = baseState.sections[0].content;
       updateSectionContent(baseState, 'caption', 'New content');
-      expect(baseState.sections[0].content).toBe(original.sections[0].content);
+      expect(baseState.sections[0].content).toBe(originalContent);
     });
 
     test('marks state as dirty', () => {

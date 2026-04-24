@@ -17,7 +17,6 @@ import {
 import Link from 'next/link';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
-import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { useWorkspace } from '@/lib/workspace-context';
 
@@ -128,6 +127,7 @@ export default function IncidentReportPage() {
                     <textarea
                         value={narrative}
                         onChange={(e) => setNarrative(e.target.value)}
+                        aria-label="Incident narrative"
                         placeholder="What happened? (e.g. 'At 2pm today, John arrived at the exchange location and started...')"
                         className="w-full bg-transparent border-none text-2xl md:text-3xl font-serif text-white placeholder:text-white/10 min-h-[300px] outline-none resize-none px-4 py-8 selection:bg-indigo-500/30"
                     />

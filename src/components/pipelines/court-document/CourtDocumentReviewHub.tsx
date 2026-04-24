@@ -341,29 +341,36 @@ export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: Revie
     [state, saveSection],
   );
 
-  /** Lock a section — optimistic update, then sync to Convex. */
+  /** Lock a section — optimistic update with Convex rollback on failure. */
   const handleLock = useCallback(
-    (sectionId: string) => {
-      setState(prev => prev ? lockSection(prev, sectionId) : prev);
-      updateSectionStatus({ documentId: docId, sectionId, status: 'locked' });
+    async (sectionId: string) => {
+      const prev = state;
+      setState(p => p ? lockSection(p, sectionId) : p);
+      try {
+        await updateSectionStatus({ documentId: docId, sectionId, status: 'locked' });
+      } catch (err) {
+        console.error('[ReviewHub] Lock failed, reverting:', err);
+        setState(prev);
+      }
     },
-    [docId, updateSectionStatus],
+    [state, docId, updateSectionStatus],
   );
 
-  /** Unlock a section — optimistic update, then sync to Convex. */
+  /** Unlock a section — optimistic update with Convex rollback on failure. */
   const handleUnlock = useCallback(
-    (sectionId: string) => {
-      let resolvedStatus: 'empty' | 'drafted' | 'court_ready' | 'locked' = 'court_ready';
-      setState(prev => {
-        if (!prev) return prev;
-        const newState = unlockSection(prev, sectionId);
-        const section = newState.sections.find(s => s.id === sectionId);
-        if (section) resolvedStatus = section.status;
-        return newState;
-      });
-      updateSectionStatus({ documentId: docId, sectionId, status: resolvedStatus });
+    async (sectionId: string) => {
+      const prev = state;
+      const nextState = state ? unlockSection(state, sectionId) : state;
+      const resolvedStatus = nextState?.sections.find(s => s.id === sectionId)?.status ?? 'court_ready';
+      setState(nextState);
+      try {
+        await updateSectionStatus({ documentId: docId, sectionId, status: resolvedStatus });
+      } catch (err) {
+        console.error('[ReviewHub] Unlock failed, reverting:', err);
+        setState(prev);
+      }
     },
-    [docId, updateSectionStatus],
+    [state, docId, updateSectionStatus],
   );
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

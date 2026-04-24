@@ -197,20 +197,53 @@ export type JurisdictionProfile = {
    * - `enriched_verified` — Formatting verified against source documentation.
    *
    * **Enforcement:** enriched_pending_review and enriched_verified profiles
-   * MUST have at least one sourceNotes entry. This is enforced at build time
-   * by {@link validateProfileAccuracy} and at test time by the
-   * enrichedProfiles regression test suite.
+   * MUST have at least one sourceNotes entry. This is enforced at:
+   * - **Compile time** via {@link ProfileAccuracyMetadata} discriminated union
+   * - **Build time** via {@link validateProfileAccuracy}
+   * - **Test time** via the enrichedProfiles regression test suite
    */
-  accuracyStatus?: 'thin_default' | 'enriched_pending_review' | 'enriched_verified';
+  accuracyStatus?: AccuracyStatus;
 
   /** Source documentation for enriched profiles. Required when accuracyStatus !== 'thin_default'. */
-  sourceNotes?: Array<{
-    label: string;
-    url?: string;
-    reviewedAt?: string;
-    reviewedBy?: string;
-  }>;
+  sourceNotes?: SourceNote[];
 };
+
+// ── Accuracy Metadata Types ─────────────────────────────────
+
+/** All valid accuracy status values. */
+export type AccuracyStatus = 'thin_default' | 'enriched_pending_review' | 'enriched_verified';
+
+/** Source note with optional reviewedAt — used for thin_default profiles. */
+export type ThinSourceNote = {
+  label: string;
+  url?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+};
+
+/** Source note with mandatory reviewedAt — required for enriched profiles. */
+export type EnrichedSourceNote = {
+  label: string;
+  url?: string;
+  /** Date when the source was reviewed. Required for enriched profiles. */
+  reviewedAt: string;
+  reviewedBy?: string;
+};
+
+/** Unified source note type (superset for storage). */
+export type SourceNote = ThinSourceNote;
+
+/**
+ * Discriminated union for profile accuracy metadata.
+ * - thin_default: sourceNotes are optional
+ * - enriched statuses: sourceNotes with reviewedAt are required
+ *
+ * Use this type when constructing new profiles to get compile-time enforcement.
+ */
+export type ProfileAccuracyMetadata =
+  | { accuracyStatus: 'thin_default'; sourceNotes?: ThinSourceNote[] }
+  | { accuracyStatus: 'enriched_pending_review'; sourceNotes: [EnrichedSourceNote, ...EnrichedSourceNote[]] }
+  | { accuracyStatus: 'enriched_verified'; sourceNotes: [EnrichedSourceNote, ...EnrichedSourceNote[]] };
 
 /**
  * Validates that a profile's accuracy metadata is consistent.

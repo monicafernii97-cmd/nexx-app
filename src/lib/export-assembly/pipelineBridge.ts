@@ -292,21 +292,36 @@ function getTemplateName(exportPath: string): string {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Retry Logic
-// ---------------------------------------------------------------------------
+/**
+ * AI Drafting Retry Configuration
+ *
+ * All values are configurable via environment variables. Defaults are
+ * tuned for the OpenAI Responses API with GPT-5.4.
+ *
+ * Effective behavior (with defaults):
+ *   - First attempt: immediate
+ *   - On failure: wait 500ms + 0–250ms jitter, then retry once
+ *   - Each attempt has a 60s timeout via Promise.race
+ *   - Total worst-case wall time: ~121.75s (60s + 0.75s + 60s + throw)
+ *
+ * Environment variables:
+ *   DRAFT_MAX_RETRIES         — Max retry count (default: 1)
+ *   DRAFT_RETRY_BASE_DELAY_MS — Base backoff delay in ms (default: 500)
+ *   DRAFT_RETRY_MAX_JITTER_MS — Max random jitter in ms (default: 250)
+ *   DRAFT_TIMEOUT_MS          — Per-attempt timeout in ms (default: 60000)
+ */
 
 /** Maximum retries for GPT drafting. */
-const DRAFT_MAX_RETRIES = 1;
+const DRAFT_MAX_RETRIES = parseInt(process.env.DRAFT_MAX_RETRIES ?? '1', 10);
 
-/** Base delay between retry attempts (ms). */
-const DRAFT_RETRY_BASE_DELAY_MS = 500;
+/** Base delay between retry attempts (ms). Multiplied by 2^attempt for backoff. */
+const DRAFT_RETRY_BASE_DELAY_MS = parseInt(process.env.DRAFT_RETRY_BASE_DELAY_MS ?? '500', 10);
 
 /** Maximum random jitter added to retry delay (ms). */
-const DRAFT_RETRY_MAX_JITTER_MS = 250;
+const DRAFT_RETRY_MAX_JITTER_MS = parseInt(process.env.DRAFT_RETRY_MAX_JITTER_MS ?? '250', 10);
 
 /** Timeout for a single GPT drafting attempt (ms). */
-const DRAFT_TIMEOUT_MS = 60_000;
+const DRAFT_TIMEOUT_MS = parseInt(process.env.DRAFT_TIMEOUT_MS ?? '60000', 10);
 
 /** Simple async delay utility. */
 function sleep(ms: number): Promise<void> {

@@ -316,9 +316,10 @@ describe('renderCourtExportHTML — profile integration', () => {
 
   it('applies page margins from profile', () => {
     const html = renderCourtExportHTML(makeCourtDoc(), txProfile);
-    // TX default margins should be present in @page rule
+    // Profile-driven page properties should be present in @page rule
     expect(html).toContain('@page');
-    expect(html).toContain('8.5in 11in');
+    expect(html).toContain(`${txProfile.page.widthIn}in`);
+    expect(html).toContain(`${txProfile.page.heightIn}in`);
   });
 
   it('HTML output exceeds minimum length', () => {

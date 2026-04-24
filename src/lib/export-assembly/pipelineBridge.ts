@@ -311,38 +311,38 @@ function getTemplateName(exportPath: string): string {
  *   DRAFT_TIMEOUT_MS          — Per-attempt timeout in ms (default: 60000)
  */
 
+/**
+ * Parse an environment variable as a non-negative integer.
+ * Returns the default if the value is missing, NaN, or negative.
+ */
+function parseNonNegativeInt(envValue: string | undefined, defaultValue: number): number {
+    if (envValue == null) return defaultValue;
+    const parsed = parseInt(envValue, 10);
+    return Number.isNaN(parsed) || parsed < 0 ? defaultValue : parsed;
+}
+
 /** Maximum retries for GPT drafting. */
-const DRAFT_MAX_RETRIES = parseInt(process.env.DRAFT_MAX_RETRIES ?? '1', 10);
+const DRAFT_MAX_RETRIES = parseNonNegativeInt(process.env.DRAFT_MAX_RETRIES, 1);
 
 /** Base delay between retry attempts (ms). Multiplied by 2^attempt for backoff. */
-const DRAFT_RETRY_BASE_DELAY_MS = parseInt(process.env.DRAFT_RETRY_BASE_DELAY_MS ?? '500', 10);
+const DRAFT_RETRY_BASE_DELAY_MS = parseNonNegativeInt(process.env.DRAFT_RETRY_BASE_DELAY_MS, 500);
 
 /** Maximum random jitter added to retry delay (ms). */
-const DRAFT_RETRY_MAX_JITTER_MS = parseInt(process.env.DRAFT_RETRY_MAX_JITTER_MS ?? '250', 10);
+const DRAFT_RETRY_MAX_JITTER_MS = parseNonNegativeInt(process.env.DRAFT_RETRY_MAX_JITTER_MS, 250);
 
 /** Timeout for a single GPT drafting attempt (ms). */
-const DRAFT_TIMEOUT_MS = parseInt(process.env.DRAFT_TIMEOUT_MS ?? '60000', 10);
+const DRAFT_TIMEOUT_MS = parseNonNegativeInt(process.env.DRAFT_TIMEOUT_MS, 60_000);
 
 /** Simple async delay utility. */
 function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/**
- * Wrap a promise with a timeout. Rejects with a descriptive error
- * if the promise does not settle within the specified duration.
- */
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-    let timer: ReturnType<typeof setTimeout>;
-    const timeout = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
-    });
-    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-}
 
 /**
  * Call generateDraftContent with one retry on failure or incomplete output.
- * Validates that all requested sections are returned.
+ * Each attempt is guarded by a timeout via AbortController that cancels
+ * the in-flight OpenAI request if it exceeds DRAFT_TIMEOUT_MS.
  */
 async function generateDraftContentWithRetry(
     params: Parameters<typeof generateDraftContent>[0],
@@ -351,12 +351,14 @@ async function generateDraftContentWithRetry(
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt <= DRAFT_MAX_RETRIES; attempt++) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), DRAFT_TIMEOUT_MS);
+
         try {
-            const drafted = await withTimeout(
-                generateDraftContent(params),
-                DRAFT_TIMEOUT_MS,
-                'generateDraftContent',
-            );
+            const drafted = await generateDraftContent({
+                ...params,
+                signal: controller.signal,
+            });
 
             // Guard: treat empty or partial AI output as failure
             const draftedMap = new Map(drafted.map(s => [s.sectionId, s]));
@@ -400,6 +402,8 @@ async function generateDraftContentWithRetry(
                 const jitter = Math.floor(Math.random() * DRAFT_RETRY_MAX_JITTER_MS);
                 await sleep(backoff + jitter);
             }
+        } finally {
+            clearTimeout(timer);
         }
     }
 

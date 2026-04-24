@@ -76,13 +76,14 @@ export async function generateDraftContent(args: {
   sections: string[];
   caseGraph?: Record<string, unknown>;
   courtRules?: Record<string, unknown>;
+  /** Optional AbortSignal for timeout/cancellation support. */
+  signal?: AbortSignal;
 }): Promise<Array<{ sectionId: string; heading: string; body: string; numberedItems?: string[] }>> {
   const contextParts: string[] = [];
   if (args.caseGraph) contextParts.push(`Case data:\n${JSON.stringify(args.caseGraph, null, 2)}`);
   if (args.courtRules) contextParts.push(`Court rules:\n${JSON.stringify(args.courtRules, null, 2)}`);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const response = await (openai.responses as any).create({
+  const requestOptions: Record<string, unknown> = {
     model: 'gpt-5.4',
     input: [
       {
@@ -106,7 +107,13 @@ ${contextParts.join('\n\n')}`,
       },
     ],
     text: { format: DOCUMENT_DRAFT_SCHEMA },
-  });
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const response = await (openai.responses as any).create(
+    requestOptions,
+    args.signal ? { signal: args.signal } : undefined,
+  );
 
   const text = response.output_text || '';
   try {

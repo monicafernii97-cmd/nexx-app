@@ -204,7 +204,7 @@ export type JurisdictionProfile = {
    */
   accuracyStatus?: AccuracyStatus;
 
-  /** Source documentation for enriched profiles. Required when accuracyStatus !== 'thin_default'. */
+  /** Source documentation for enriched profiles. Required when accuracyStatus is 'enriched_pending_review' or 'enriched_verified'. */
   sourceNotes?: SourceNote[];
 };
 
@@ -267,15 +267,15 @@ export function validateProfileAccuracy(profile: JurisdictionProfile): Jurisdict
 
     for (let i = 0; i < profile.sourceNotes.length; i++) {
       const note = profile.sourceNotes[i];
-      if (!note.label || !note.label.trim()) {
+      if (typeof note.label !== 'string' || !note.label.trim()) {
         throw new Error(
-          `Profile "${profile.key}" sourceNotes[${i}] has an empty label. ` +
+          `Profile "${profile.key}" sourceNotes[${i}] has an empty or non-string label. ` +
           `Each source note must have a descriptive label.`,
         );
       }
-      if (!note.reviewedAt || !note.reviewedAt.trim()) {
+      if (typeof note.reviewedAt !== 'string' || !note.reviewedAt.trim()) {
         throw new Error(
-          `Profile "${profile.key}" sourceNotes[${i}] is missing reviewedAt. ` +
+          `Profile "${profile.key}" sourceNotes[${i}] is missing or has non-string reviewedAt. ` +
           `Each source note must document when it was reviewed.`,
         );
       }

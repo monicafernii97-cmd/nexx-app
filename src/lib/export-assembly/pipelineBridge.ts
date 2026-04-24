@@ -188,6 +188,9 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
                         ?? item.transformedCourtSafeText
                         ?? item.originalText
                     ).join('\n\n'),
+                    // raw_fallback_no_ai: valid DraftedSection.source value indicating
+                    // AI drafting failed and raw text was substituted. Semantically
+                    // treated as 'user_locked' during canonical export adaptation.
                     source: 'raw_fallback_no_ai' as const,
                 };
             });
@@ -334,8 +337,14 @@ const DRAFT_RETRY_MAX_JITTER_MS = parseNonNegativeInt(process.env.DRAFT_RETRY_MA
 /** Ceiling for exponential backoff (ms). Prevents unbounded growth at high retry counts. */
 const DRAFT_RETRY_MAX_BACKOFF_MS = parseNonNegativeInt(process.env.DRAFT_RETRY_MAX_BACKOFF_MS, 10_000);
 
-/** Timeout for a single GPT drafting attempt (ms). */
-const DRAFT_TIMEOUT_MS = parseNonNegativeInt(process.env.DRAFT_TIMEOUT_MS, 60_000);
+/** Minimum allowed timeout to prevent immediate aborts (ms). */
+const MIN_DRAFT_TIMEOUT_MS = 1_000;
+
+/** Timeout for a single GPT drafting attempt (ms). Clamped to at least MIN_DRAFT_TIMEOUT_MS. */
+const DRAFT_TIMEOUT_MS = Math.max(
+    parseNonNegativeInt(process.env.DRAFT_TIMEOUT_MS, 60_000),
+    MIN_DRAFT_TIMEOUT_MS,
+);
 
 /** Simple async delay utility. */
 function sleep(ms: number): Promise<void> {

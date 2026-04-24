@@ -72,12 +72,15 @@ export function setAIDraftContent(
 ): CourtDocumentDraftState {
   return updateSection(state, sectionId, (section) => {
     const before = section.content;
+    if (before === generatedContent) return section;
+
+    const hasContent = generatedContent.trim().length > 0;
     const revision = createRevision(before, generatedContent, 'ai_draft');
 
     return {
       ...section,
       content: generatedContent,
-      status: 'drafted',
+      status: hasContent ? 'drafted' : 'empty',
       source: 'ai_draft',
       revisions: [...section.revisions, revision],
     };
@@ -102,12 +105,15 @@ export function rewriteSectionToCourtReady(
 ): CourtDocumentDraftState {
   return updateSection(state, sectionId, (section) => {
     const before = section.content;
+    if (before === rewrittenContent) return section;
+
+    const hasContent = rewrittenContent.trim().length > 0;
     const revision = createRevision(before, rewrittenContent, 'ai_rewrite');
 
     return {
       ...section,
       content: rewrittenContent,
-      status: 'court_ready',
+      status: hasContent ? 'court_ready' : 'empty',
       source: 'ai_rewrite',
       revisions: [...section.revisions, revision],
     };
@@ -141,7 +147,7 @@ export function unlockSection(
 ): CourtDocumentDraftState {
   return updateSection(state, sectionId, (section) => ({
     ...section,
-    status: (section.content.trim() ? 'court_ready' : 'drafted') as CourtSectionStatus,
+    status: section.content.trim() ? 'court_ready' : 'empty',
   }));
 }
 

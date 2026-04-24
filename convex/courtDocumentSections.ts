@@ -79,6 +79,9 @@ export const createMany = mutation({
 export const listByDocument = query({
   args: { documentId: v.string() },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
     const sections = await ctx.db
       .query('courtDocumentSections')
       .withIndex('by_document', (q) => q.eq('documentId', args.documentId))
@@ -113,6 +116,9 @@ export const updateContent = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Not authenticated');
+
     const section = await ctx.db
       .query('courtDocumentSections')
       .withIndex('by_document_section', (q) =>
@@ -142,6 +148,9 @@ export const updateStatus = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Not authenticated');
+
     const section = await ctx.db
       .query('courtDocumentSections')
       .withIndex('by_document_section', (q) =>
@@ -163,10 +172,19 @@ export const reorder = mutation({
     orderedSectionIds: v.array(v.string()),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Not authenticated');
+
     const sections = await ctx.db
       .query('courtDocumentSections')
       .withIndex('by_document', (q) => q.eq('documentId', args.documentId))
       .collect();
+
+    const existingIds = new Set(sections.map(s => s.sectionId));
+    const unknownIds = args.orderedSectionIds.filter(id => !existingIds.has(id));
+    if (unknownIds.length > 0) {
+      console.warn(`reorder: Unknown sectionIds ignored: ${unknownIds.join(', ')}`);
+    }
 
     for (let i = 0; i < args.orderedSectionIds.length; i++) {
       const sectionId = args.orderedSectionIds[i];

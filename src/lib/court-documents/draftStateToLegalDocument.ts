@@ -159,7 +159,7 @@ function buildCertificateBlock(content: string): CertificateBlock | null {
 
   return {
     heading: 'CERTIFICATE OF SERVICE',
-    bodyLines: lines.slice(0, -1),
+    bodyLines: lines.length > 1 ? lines.slice(0, -1) : lines,
     signerLines: lines.length > 1 ? [lines[lines.length - 1]] : [],
   };
 }
@@ -171,7 +171,7 @@ function buildVerificationBlock(content: string): VerificationBlock | null {
 
   return {
     heading: 'VERIFICATION',
-    bodyLines: lines.slice(0, -1),
+    bodyLines: lines.length > 1 ? lines.slice(0, -1) : lines,
     signerLines: lines.length > 1 ? [lines[lines.length - 1]] : [],
   };
 }

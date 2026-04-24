@@ -72,6 +72,11 @@ export default function CourtDocumentReviewHub({ docId, caseId }: ReviewHubProps
   // ── Convex queries ──
   const convexDraft = useQuery(api.courtDocumentDrafts.get, { documentId: docId });
   const convexSections = useQuery(api.courtDocumentSections.listByDocument, { documentId: docId });
+  const convexRevisions = useQuery(api.courtDocumentRevisions.listByDocument, { documentId: docId });
+
+  // ── Stable ref for current state (used in debounced callbacks) ──
+  const stateRef = useRef<CourtDocumentDraftState | null>(null);
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   // ── Convex mutations ──
   const updateSectionConvex = useMutation(api.courtDocumentSections.updateContent);
@@ -83,12 +88,20 @@ export default function CourtDocumentReviewHub({ docId, caseId }: ReviewHubProps
   // ── Hydration: Convex → localStorage → fresh state ──
   useEffect(() => {
     // Wait for Convex queries to resolve
-    if (convexDraft === undefined || convexSections === undefined) return;
+    if (convexDraft === undefined || convexSections === undefined || convexRevisions === undefined) return;
     // Already hydrated
     if (state) return;
 
     // Try Convex first
     if (convexDraft && convexSections.length > 0) {
+      // Group revisions by sectionId
+      const revisionMap = new Map<string, typeof convexRevisions>();
+      for (const rev of convexRevisions ?? []) {
+        const existing = revisionMap.get(rev.sectionId) || [];
+        existing.push(rev);
+        revisionMap.set(rev.sectionId, existing);
+      }
+
       const assembled: CourtDocumentDraftState = {
         documentId: convexDraft.documentId,
         documentType: convexDraft.documentType as DocumentType,
@@ -99,7 +112,17 @@ export default function CourtDocumentReviewHub({ docId, caseId }: ReviewHubProps
           content: s.content,
           status: s.status as 'empty' | 'drafted' | 'court_ready' | 'locked',
           source: s.source as 'blank_template' | 'parsed_input' | 'user_edit' | 'ai_draft' | 'ai_rewrite',
-          revisions: [],
+          revisions: (revisionMap.get(s.sectionId) || [])
+            .sort((a, b) => a.createdAt - b.createdAt)
+            .map((r, idx) => ({
+              id: `rev_${s.sectionId}_${idx}`,
+              timestamp: new Date(r.createdAt).toISOString(),
+              before: r.before,
+              after: r.after,
+              diff: r.diffJson ? JSON.parse(r.diffJson) : [],
+              source: r.source as 'user_edit' | 'ai_draft' | 'ai_rewrite',
+              note: r.note,
+            })),
           feedbackNotes: s.feedbackNotesJson ? JSON.parse(s.feedbackNotesJson) : [],
         })),
         jurisdiction: convexDraft.jurisdictionJson
@@ -133,7 +156,7 @@ export default function CourtDocumentReviewHub({ docId, caseId }: ReviewHubProps
 
     // Fresh state (shouldn't happen if DraftingHub created it)
     setState(buildCourtDocumentDraftState({ documentType: 'motion' }));
-  }, [convexDraft, convexSections, state, docId, touchDraft]);
+  }, [convexDraft, convexSections, convexRevisions, state, docId, touchDraft]);
 
   // ── Auto-save to localStorage on every state change ──
   useEffect(() => {
@@ -182,8 +205,8 @@ export default function CourtDocumentReviewHub({ docId, caseId }: ReviewHubProps
           }
 
           // Bump draft version
-          if (state) {
-            const preflight = validatePreflight(state);
+          if (stateRef.current) {
+            const preflight = validatePreflight(stateRef.current);
             await bumpVersion({
               documentId: docId,
               completionPct: preflight.completionPct,
@@ -209,7 +232,7 @@ export default function CourtDocumentReviewHub({ docId, caseId }: ReviewHubProps
         }
       }, 1000);
     },
-    [docId, updateSectionConvex, createRevision, bumpVersion, state],
+    [docId, updateSectionConvex, createRevision, bumpVersion],
   );
 
   // ── Section Callbacks ──
@@ -279,11 +302,10 @@ export default function CourtDocumentReviewHub({ docId, caseId }: ReviewHubProps
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            sectionId,
             heading: section.heading,
             documentType: state.documentType,
-            currentContent: section.content,
-            feedbackNote: note,
+            content: section.content,
+            note: note,
           }),
         });
 

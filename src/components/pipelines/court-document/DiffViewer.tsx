@@ -20,7 +20,7 @@ export default function DiffViewer({ segments }: DiffViewerProps) {
   }
 
   return (
-    <div className="diff-viewer-content font-serif leading-relaxed text-[15px] text-white/90">
+    <div className="diff-viewer-content whitespace-pre-wrap break-words font-serif leading-relaxed text-[15px] text-white/90">
       {segments.map((seg, i) => {
         switch (seg.type) {
           case 'added':

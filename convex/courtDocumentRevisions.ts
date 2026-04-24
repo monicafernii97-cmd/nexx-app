@@ -60,6 +60,9 @@ export const listBySection = query({
     sectionId: v.string(),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
     return await ctx.db
       .query('courtDocumentRevisions')
       .withIndex('by_section', (q) =>
@@ -72,6 +75,9 @@ export const listBySection = query({
 export const listByDocument = query({
   args: { documentId: v.string() },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
     return await ctx.db
       .query('courtDocumentRevisions')
       .withIndex('by_document', (q) => q.eq('documentId', args.documentId))

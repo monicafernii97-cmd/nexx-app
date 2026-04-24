@@ -50,7 +50,7 @@ export function computeWordDiff(before: string, after: string): DiffSegment[] {
  * The React DiffViewer component renders segments directly.
  */
 export function renderDiffHTML(segments: DiffSegment[]): string {
-  return segments
+  return `<div style="white-space: pre-wrap;">${segments
     .map((seg) => {
       switch (seg.type) {
         case 'added':
@@ -61,7 +61,7 @@ export function renderDiffHTML(segments: DiffSegment[]): string {
           return escapeHTML(seg.text);
       }
     })
-    .join('');
+    .join('')}</div>`;
 }
 
 /** Escape HTML special characters. */

@@ -94,6 +94,10 @@ export async function rewriteToCourtReady(
 
     return { success: true, rewrittenContent: rewritten };
   } catch (err) {
+    // Rethrow aborts so the route can map them to 504
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw err;
+    }
     console.error('[rewriteToCourtReady] Failed:', err);
     return {
       success: false,

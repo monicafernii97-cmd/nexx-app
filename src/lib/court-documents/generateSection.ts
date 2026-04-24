@@ -58,7 +58,10 @@ export async function generateSectionContent(
       signal: input.signal,
     });
 
-    if (!drafted.length || !drafted[0]?.body?.trim()) {
+    const section = drafted[0];
+    const hasBody = Boolean(section?.body?.trim());
+    const hasItems = Boolean(section?.numberedItems?.some((item: string) => item.trim()));
+    if (!section || (!hasBody && !hasItems)) {
       return {
         success: false,
         error: 'AI_GENERATION_EMPTY',
@@ -66,13 +69,17 @@ export async function generateSectionContent(
     }
 
     // Combine body + numbered items if present
-    let content = drafted[0].body;
-    if (drafted[0].numberedItems?.length) {
-      content += '\n\n' + drafted[0].numberedItems.join('\n');
+    let content = section.body?.trim() ?? '';
+    if (hasItems) {
+      content += `${content ? '\n\n' : ''}${section.numberedItems!.join('\n')}`;
     }
 
     return { success: true, content };
   } catch (err) {
+    // Rethrow aborts so the route can map them to 504
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw err;
+    }
     console.error('[generateSectionContent] Failed:', err);
     return {
       success: false,

@@ -74,6 +74,14 @@ export async function POST(request: Request) {
       signal: controller.signal,
     });
 
+    if (!result.success) {
+      const status =
+        result.error === 'AI_GENERATION_TIMEOUT' ? 504 :
+        result.error === 'AI_GENERATION_EMPTY' ? 502 :
+        500;
+      return NextResponse.json(result, { status });
+    }
+
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {

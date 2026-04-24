@@ -41,6 +41,14 @@ const EXPORT_OPTIONS: { path: ExportPath; label: string; description: string; ic
         shadow: 'shadow-emerald-500/20',
     },
     {
+        path: 'court_document',
+        label: 'Court Document',
+        description: 'Draft a court-ready legal filing',
+        icon: Scales,
+        gradient: 'from-indigo-500 to-indigo-600',
+        shadow: 'shadow-indigo-500/20',
+    },
+    {
         path: 'exhibit_document',
         label: 'Exhibit Document',
         description: 'Build an organized exhibit binder',

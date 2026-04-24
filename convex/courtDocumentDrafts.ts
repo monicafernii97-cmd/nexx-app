@@ -65,6 +65,9 @@ export const create = mutation({
 export const get = query({
   args: { documentId: v.string() },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
     return await ctx.db
       .query('courtDocumentDrafts')
       .withIndex('by_documentId', (q) => q.eq('documentId', args.documentId))
@@ -92,7 +95,7 @@ export const listByUser = query({
       .unique();
     if (!user) return [];
 
-    let q = ctx.db
+    const q = ctx.db
       .query('courtDocumentDrafts')
       .withIndex('by_user', (qb) => qb.eq('userId', user._id));
 
@@ -125,6 +128,9 @@ export const updateStatus = mutation({
     completionPct: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Not authenticated');
+
     const draft = await ctx.db
       .query('courtDocumentDrafts')
       .withIndex('by_documentId', (q) => q.eq('documentId', args.documentId))
@@ -142,6 +148,9 @@ export const updateStatus = mutation({
 export const touch = mutation({
   args: { documentId: v.string() },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Not authenticated');
+
     const draft = await ctx.db
       .query('courtDocumentDrafts')
       .withIndex('by_documentId', (q) => q.eq('documentId', args.documentId))
@@ -162,6 +171,9 @@ export const bumpVersion = mutation({
     title: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Not authenticated');
+
     const draft = await ctx.db
       .query('courtDocumentDrafts')
       .withIndex('by_documentId', (q) => q.eq('documentId', args.documentId))
@@ -184,6 +196,9 @@ export const bumpVersion = mutation({
 export const abandon = mutation({
   args: { documentId: v.string() },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Not authenticated');
+
     const draft = await ctx.db
       .query('courtDocumentDrafts')
       .withIndex('by_documentId', (q) => q.eq('documentId', args.documentId))

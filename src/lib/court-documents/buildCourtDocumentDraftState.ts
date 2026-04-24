@@ -127,9 +127,10 @@ function extractContentForSection(sectionId: string, doc: LegalDocument): string
       return extractSectionsByPattern(doc, /argument/i);
     case 'body':
     case 'notice_body':
-    case 'order_body':
     case 'responses':
       return doc.sections.map(sectionToText).join('\n\n');
+    case 'order_body':
+      return extractSectionsByPattern(doc, /^order\b/i);
     case 'prayer':
       return extractPrayer(doc);
     case 'signature':

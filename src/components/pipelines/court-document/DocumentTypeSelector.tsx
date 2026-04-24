@@ -22,7 +22,7 @@ const DOCUMENT_TYPES = [
 interface DocumentTypeSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (documentType: string) => void;
+  onSelect: (documentType: string) => Promise<void> | void;
 }
 
 /**
@@ -35,10 +35,14 @@ export default function DocumentTypeSelector({ isOpen, onClose, onSelect }: Docu
 
   const selectedSections = selectedType ? deriveRequiredSections(selectedType as DocumentType) : [];
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!selectedType || isCreating) return;
     setIsCreating(true);
-    onSelect(selectedType);
+    try {
+      await onSelect(selectedType);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (

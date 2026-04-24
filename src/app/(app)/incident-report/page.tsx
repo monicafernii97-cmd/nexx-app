@@ -43,7 +43,7 @@ export default function IncidentReportPage() {
     // Live data from Convex
     const incidents = useQuery(
         api.incidents.list,
-        activeCaseId ? { caseId: activeCaseId } : {},
+        activeCaseId ? { caseId: activeCaseId } : 'skip',
     );
     const createIncident = useMutation(api.incidents.create);
     const createCasePin = useMutation(api.casePins.create);
@@ -61,10 +61,15 @@ export default function IncidentReportPage() {
 
         try {
             const now = new Date();
+            const localDate = [
+                now.getFullYear(),
+                String(now.getMonth() + 1).padStart(2, '0'),
+                String(now.getDate()).padStart(2, '0'),
+            ].join('-');
             await createIncident({
                 narrative: narrative.trim(),
                 severity: 1,
-                date: now.toISOString().split('T')[0],
+                date: localDate,
                 time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
                 caseId: activeCaseId,
             });
@@ -217,10 +222,10 @@ export default function IncidentReportPage() {
                                             )}
                                         </div>
                                         <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button className="text-[10px] font-bold text-white/30 hover:text-indigo-400 uppercase tracking-widest transition-colors">
+                                            <button disabled className="text-[10px] font-bold text-white/20 uppercase tracking-widest cursor-not-allowed" title="Coming soon">
                                                 Edit
                                             </button>
-                                            <button className="text-[10px] font-bold text-white/30 hover:text-emerald-400 uppercase tracking-widest transition-colors">
+                                            <button disabled className="text-[10px] font-bold text-white/20 uppercase tracking-widest cursor-not-allowed" title="Coming soon">
                                                 Verify
                                             </button>
                                         </div>
@@ -237,7 +242,7 @@ export default function IncidentReportPage() {
                                         >
                                             + Add to Workspace
                                         </button>
-                                        <button className="px-2 py-1 rounded bg-amber-500/10 text-amber-400 text-[9px] font-bold uppercase tracking-widest border border-amber-500/20 hover:bg-amber-500/20 transition-colors">
+                                        <button disabled className="px-2 py-1 rounded bg-amber-500/10 text-amber-400/40 text-[9px] font-bold uppercase tracking-widest border border-amber-500/10 cursor-not-allowed" title="Coming soon">
                                             + Send to Exhibit
                                         </button>
                                     </div>

@@ -30,6 +30,8 @@ import type { DocumentTemplate } from '@/lib/legal/types';
 import CreateExportModal from './components/CreateExportModal';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useExport } from './context/ExportContext';
+import '@/styles/pipelines.css';
+import DraftingHub from '@/components/pipelines/court-document/DraftingHub';
 
 /** State for the 3-step generation flow */
 type GeneratorView = 'compose' | 'working' | 'result';
@@ -56,10 +58,6 @@ export default function DocuVaultPage() {
         </Suspense>
     );
 }
-
-/** DocuVault document generator page with compose, working, and result views. */
-import '@/styles/pipelines.css';
-import DraftingHub from '@/components/pipelines/court-document/DraftingHub';
 
 /** DocuVault document generator page with intake hub, compose, working, and result views. */
 function DocuVaultPageInner() {

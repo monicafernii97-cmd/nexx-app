@@ -42,30 +42,35 @@ export default function DraftingHub({ onManualIntake }: DraftingHubProps) {
     const documentId = `draft_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const sections = deriveRequiredSections(documentType as DocumentType);
 
-    // Create draft shell
-    await createDraft({
-      documentId,
-      documentType,
-      title: `New ${documentType.charAt(0).toUpperCase() + documentType.slice(1)}`,
-      caseId: activeCaseId ?? undefined,
-      sectionCount: sections.length,
-      source: 'manual_start',
-    });
+    try {
+      // Create draft shell
+      await createDraft({
+        documentId,
+        documentType,
+        title: `New ${documentType.charAt(0).toUpperCase() + documentType.slice(1)}`,
+        caseId: activeCaseId ?? undefined,
+        sectionCount: sections.length,
+        source: 'manual_start',
+      });
 
-    // Create all sections
-    await createSections({
-      documentId,
-      caseId: activeCaseId ?? undefined,
-      sections: sections.map((s, i) => ({
-        sectionId: s.id,
-        heading: s.heading,
-        order: i,
-        content: '',
-        status: 'empty' as const,
-        source: 'blank_template' as const,
-        required: s.required,
-      })),
-    });
+      // Create all sections
+      await createSections({
+        documentId,
+        caseId: activeCaseId ?? undefined,
+        sections: sections.map((s, i) => ({
+          sectionId: s.id,
+          heading: s.heading,
+          order: i,
+          content: '',
+          status: 'empty' as const,
+          source: 'blank_template' as const,
+          required: s.required,
+        })),
+      });
+    } catch (err) {
+      console.error('[DraftingHub] Draft creation failed:', err);
+      throw err;
+    }
 
     // Navigate to Review Hub
     router.push(`/docuvault/review/${documentId}`);
@@ -109,16 +114,17 @@ export default function DraftingHub({ onManualIntake }: DraftingHubProps) {
     }
   };
 
-  // Time ago helper
-  const timeAgo = (timestamp: number) => {
-    const diff = Date.now() - timestamp;
+  // Time ago helper — use stable render-time reference
+  const [renderNow] = useState(() => Date.now());
+  const timeAgo = useCallback((timestamp: number) => {
+    const diff = renderNow - timestamp;
     const mins = Math.floor(diff / 60000);
     if (mins < 60) return `${mins}m ago`;
     const hours = Math.floor(mins / 60);
     if (hours < 24) return `${hours}h ago`;
     const days = Math.floor(hours / 24);
     return `${days}d ago`;
-  };
+  }, [renderNow]);
 
   return (
     <div className="space-y-12">

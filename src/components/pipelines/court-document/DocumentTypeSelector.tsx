@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, FileText, ArrowRight } from '@phosphor-icons/react';
 import { deriveRequiredSections } from '@/lib/court-documents/deriveRequiredSections';
@@ -49,6 +49,46 @@ export default function DocumentTypeSelector({ isOpen, onClose, onSelect }: Docu
     }
   };
 
+  // ── Focus management ──
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  // Save previous focus and auto-focus dialog on open
+  useEffect(() => {
+    if (isOpen) {
+      previousFocusRef.current = document.activeElement as HTMLElement;
+      // Small delay to let framer-motion render
+      const timer = setTimeout(() => dialogRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
+    } else if (previousFocusRef.current) {
+      previousFocusRef.current.focus();
+      previousFocusRef.current = null;
+    }
+  }, [isOpen]);
+
+  // Escape key handler (respects isCreating)
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape' && !isCreating) {
+      onClose();
+    }
+    // Trap focus inside dialog
+    if (e.key === 'Tab' && dialogRef.current) {
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }, [isCreating, onClose]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -57,9 +97,12 @@ export default function DocumentTypeSelector({ isOpen, onClose, onSelect }: Docu
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onClick={onClose}
+          onClick={() => { if (!isCreating) onClose(); }}
         >
           <motion.div
+            ref={dialogRef}
+            tabIndex={-1}
+            onKeyDown={handleKeyDown}
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -76,9 +119,10 @@ export default function DocumentTypeSelector({ isOpen, onClose, onSelect }: Docu
                 <p className="text-xs text-white/40 mt-1">Choose the type of court document to draft</p>
               </div>
               <button
-                onClick={onClose}
+                onClick={() => { if (!isCreating) onClose(); }}
+                disabled={isCreating}
                 aria-label="Close document type dialog"
-                className="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all"
+                className="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <X size={16} weight="bold" />
               </button>

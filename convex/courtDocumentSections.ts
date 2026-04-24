@@ -16,7 +16,6 @@ import { mutation, query } from './_generated/server';
 export const createMany = mutation({
   args: {
     documentId: v.string(),
-    caseId: v.optional(v.id('cases')),
     sections: v.array(v.object({
       sectionId: v.string(),
       heading: v.string(),

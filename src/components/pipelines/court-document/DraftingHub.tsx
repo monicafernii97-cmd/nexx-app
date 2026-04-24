@@ -58,7 +58,6 @@ export default function DraftingHub({ onManualIntake }: DraftingHubProps) {
       try {
         await createSections({
           documentId,
-          caseId: activeCaseId ?? undefined,
           sections: sections.map((s, i) => ({
             sectionId: s.id,
             heading: s.heading,

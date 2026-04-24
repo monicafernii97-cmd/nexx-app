@@ -145,22 +145,13 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
         }
 
         try {
-            const drafted = await generateDraftContent({
+            const drafted = await generateDraftContentWithRetry({
                 templateId: `${request.path}_${Date.now()}`,
                 templateName: getTemplateName(request.path),
                 sections: sectionsToGenerate,
                 caseGraph,
                 courtRules: Object.keys(courtRules).length > 0 ? courtRules : undefined,
-            });
-
-            // Guard: treat empty or partial AI output as failure
-            const draftedIds = new Set(drafted.map(s => s.sectionId));
-            if (
-                drafted.length === 0 ||
-                sectionsToGenerate.some(id => !draftedIds.has(id))
-            ) {
-                throw new Error('AI drafter returned an empty or incomplete section set');
-            }
+            }, sectionsToGenerate);
 
             aiDraftedSections = drafted.map(d => ({
                 sectionId: d.sectionId,
@@ -170,7 +161,15 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
                 source: 'ai_drafted' as const,
             }));
         } catch (error) {
-            console.error('[PipelineBridge] AI drafting failed:', error);
+            const errorType = error instanceof Error ? error.name : typeof error;
+            console.error(JSON.stringify({
+                component: 'PipelineBridge',
+                event: 'ai_drafting_failed_with_fallback',
+                exportPath: request.path,
+                failedSections: sectionsToGenerate,
+                errorType,
+            }));
+
             // Fallback: use raw review item text for failed sections
             aiDraftedSections = sectionsToGenerate.map(sectionId => {
                 const sectionItems = reviewItems.filter(item => {
@@ -189,7 +188,10 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
                         ?? item.transformedCourtSafeText
                         ?? item.originalText
                     ).join('\n\n'),
-                    source: 'user_edited' as const,
+                    // raw_fallback_no_ai: valid DraftedSection.source value indicating
+                    // AI drafting failed and raw text was substituted. Semantically
+                    // treated as 'user_locked' during canonical export adaptation.
+                    source: 'raw_fallback_no_ai' as const,
                 };
             });
         }
@@ -291,4 +293,142 @@ function getTemplateName(exportPath: string): string {
         case 'exhibit_document': return 'Exhibit Packet';
         default: return 'Legal Document';
     }
+}
+
+/**
+ * AI Drafting Retry Configuration
+ *
+ * All values are configurable via environment variables. Defaults are
+ * tuned for the OpenAI Responses API with GPT-5.4.
+ *
+ * Effective behavior (with defaults):
+ *   - First attempt: immediate
+ *   - On failure: exponential backoff (base 500ms × 2^attempt, capped at 10s)
+ *     plus random jitter (0–250ms), then retry up to DRAFT_MAX_RETRIES times
+ *   - Each attempt is guarded by an AbortController timeout (DRAFT_TIMEOUT_MS,
+ *     default 60s, minimum 1s) that cancels the in-flight OpenAI request
+ *   - Total worst-case wall time with defaults:
+ *     ~121.25s (60s attempt + ~0.75s backoff + 60s retry + throw)
+ *
+ * Environment variables:
+ *   DRAFT_MAX_RETRIES          — Max retry count (default: 1)
+ *   DRAFT_RETRY_BASE_DELAY_MS  — Base backoff delay in ms (default: 500)
+ *   DRAFT_RETRY_MAX_JITTER_MS  — Max random jitter in ms (default: 250)
+ *   DRAFT_RETRY_MAX_BACKOFF_MS — Ceiling for exponential backoff in ms (default: 10000)
+ *   DRAFT_TIMEOUT_MS           — Per-attempt abort timeout in ms (default: 60000, min: 1000)
+ */
+
+/** Node.js maximum safe setTimeout delay (2^31 - 1 ms ≈ 24.8 days). */
+const MAX_SAFE_TIMEOUT = 2_147_483_647;
+
+/**
+ * Parse an environment variable as a non-negative integer.
+ * Returns the default if the value is missing, non-numeric (e.g. "10ms"),
+ * NaN, or negative. Result is clamped to Node's max safe timer value.
+ */
+function parseNonNegativeInt(envValue: string | undefined, defaultValue: number): number {
+    if (envValue == null) return defaultValue;
+    const trimmed = envValue.trim();
+    if (!/^\d+$/.test(trimmed)) return defaultValue;
+    const parsed = parseInt(trimmed, 10);
+    if (Number.isNaN(parsed) || parsed < 0) return defaultValue;
+    return Math.min(parsed, MAX_SAFE_TIMEOUT);
+}
+
+/** Maximum retries for GPT drafting. */
+const DRAFT_MAX_RETRIES = parseNonNegativeInt(process.env.DRAFT_MAX_RETRIES, 1);
+
+/** Base delay between retry attempts (ms). Multiplied by 2^attempt for backoff. */
+const DRAFT_RETRY_BASE_DELAY_MS = parseNonNegativeInt(process.env.DRAFT_RETRY_BASE_DELAY_MS, 500);
+
+/** Maximum random jitter added to retry delay (ms). */
+const DRAFT_RETRY_MAX_JITTER_MS = parseNonNegativeInt(process.env.DRAFT_RETRY_MAX_JITTER_MS, 250);
+
+/** Ceiling for exponential backoff (ms). Prevents unbounded growth at high retry counts. */
+const DRAFT_RETRY_MAX_BACKOFF_MS = parseNonNegativeInt(process.env.DRAFT_RETRY_MAX_BACKOFF_MS, 10_000);
+
+/** Minimum allowed timeout to prevent immediate aborts (ms). */
+const MIN_DRAFT_TIMEOUT_MS = 1_000;
+
+/** Timeout for a single GPT drafting attempt (ms). Clamped to at least MIN_DRAFT_TIMEOUT_MS. */
+const DRAFT_TIMEOUT_MS = Math.max(
+    parseNonNegativeInt(process.env.DRAFT_TIMEOUT_MS, 60_000),
+    MIN_DRAFT_TIMEOUT_MS,
+);
+
+/** Simple async delay utility. */
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+
+/**
+ * Call generateDraftContent with one retry on failure or incomplete output.
+ * Each attempt is guarded by a timeout via AbortController that cancels
+ * the in-flight OpenAI request if it exceeds DRAFT_TIMEOUT_MS.
+ */
+async function generateDraftContentWithRetry(
+    params: Parameters<typeof generateDraftContent>[0],
+    expectedSectionIds: string[],
+): Promise<Awaited<ReturnType<typeof generateDraftContent>>> {
+    let lastError: Error | undefined;
+
+    for (let attempt = 0; attempt <= DRAFT_MAX_RETRIES; attempt++) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), DRAFT_TIMEOUT_MS);
+
+        try {
+            const drafted = await generateDraftContent({
+                ...params,
+                signal: controller.signal,
+            });
+
+            // Guard: treat empty or partial AI output as failure
+            const draftedMap = new Map(drafted.map(s => [s.sectionId, s]));
+            const missing = expectedSectionIds.filter(id => {
+                const section = draftedMap.get(id);
+                if (!section) return true;
+                // Treat blank body + no meaningful numbered items as effectively missing
+                const hasBody = section.body?.trim();
+                const hasItems = section.numberedItems
+                    && section.numberedItems.some(item => item?.trim());
+                return !hasBody && !hasItems;
+            });
+            if (drafted.length === 0 || missing.length > 0) {
+                throw new Error(
+                    `AI drafter returned incomplete output: missing/empty sections [${missing.join(', ')}]`,
+                );
+            }
+
+            if (attempt > 0) {
+                console.warn(JSON.stringify({
+                    component: 'PipelineBridge',
+                    event: 'ai_drafting_succeeded_on_retry',
+                    attempt: attempt + 1,
+                    sectionCount: drafted.length,
+                }));
+            }
+
+            return drafted;
+        } catch (error) {
+            lastError = error instanceof Error ? error : new Error(String(error));
+
+            if (attempt < DRAFT_MAX_RETRIES) {
+                console.warn(JSON.stringify({
+                    component: 'PipelineBridge',
+                    event: 'ai_drafting_retry',
+                    attempt: attempt + 1,
+                    totalAttempts: DRAFT_MAX_RETRIES + 1,
+                    errorType: lastError.name,
+                }));
+                const backoff = Math.min(DRAFT_RETRY_BASE_DELAY_MS * 2 ** attempt, DRAFT_RETRY_MAX_BACKOFF_MS);
+                const jitter = Math.floor(Math.random() * DRAFT_RETRY_MAX_JITTER_MS);
+                await sleep(backoff + jitter);
+            }
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    throw lastError ?? new Error('AI drafting failed after all retry attempts');
 }

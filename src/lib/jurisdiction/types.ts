@@ -187,7 +187,102 @@ export type JurisdictionProfile = {
   incident?: {
     layout?: 'narrative' | 'timeline';
   };
+
+  // ── Accuracy tracking ──────────────────────────────────────
+
+  /**
+   * Profile enrichment status. Determines whether a profile is:
+   * - `thin_default` — Inherits all formatting from US default. No state-specific research.
+   * - `enriched_pending_review` — State-specific formatting added but not yet verified.
+   * - `enriched_verified` — Formatting verified against source documentation.
+   *
+   * **Enforcement:** enriched_pending_review and enriched_verified profiles
+   * MUST have at least one sourceNotes entry. This is enforced at:
+   * - **Compile time** via {@link ProfileAccuracyMetadata} discriminated union
+   * - **Build time** via {@link validateProfileAccuracy}
+   * - **Test time** via the enrichedProfiles regression test suite
+   */
+  accuracyStatus?: AccuracyStatus;
+
+  /** Source documentation for enriched profiles. Required when accuracyStatus is 'enriched_pending_review' or 'enriched_verified'. */
+  sourceNotes?: SourceNote[];
 };
+
+// ── Accuracy Metadata Types ─────────────────────────────────
+
+/** All valid accuracy status values. */
+export type AccuracyStatus = 'thin_default' | 'enriched_pending_review' | 'enriched_verified';
+
+/** Source note with optional reviewedAt — used for thin_default profiles. */
+export type ThinSourceNote = {
+  label: string;
+  url?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+};
+
+/** Source note with mandatory reviewedAt — required for enriched profiles. */
+export type EnrichedSourceNote = {
+  label: string;
+  url?: string;
+  /** Date when the source was reviewed. Required for enriched profiles. */
+  reviewedAt: string;
+  reviewedBy?: string;
+};
+
+/** Unified source note type (superset for storage). */
+export type SourceNote = ThinSourceNote;
+
+/**
+ * Discriminated union for profile accuracy metadata.
+ * - thin_default: sourceNotes are optional
+ * - enriched statuses: sourceNotes with reviewedAt are required
+ *
+ * Use this type when constructing new profiles to get compile-time enforcement.
+ */
+export type ProfileAccuracyMetadata =
+  | { accuracyStatus: 'thin_default'; sourceNotes?: ThinSourceNote[] }
+  | { accuracyStatus: 'enriched_pending_review'; sourceNotes: [EnrichedSourceNote, ...EnrichedSourceNote[]] }
+  | { accuracyStatus: 'enriched_verified'; sourceNotes: [EnrichedSourceNote, ...EnrichedSourceNote[]] };
+
+/**
+ * Validates that a profile's accuracy metadata is consistent.
+ * - Enriched profiles must have at least one sourceNotes entry.
+ * - Each sourceNote must have a non-empty label and a defined reviewedAt.
+ * - Throws at registry-build time to prevent silent violations.
+ *
+ * @param profile - The profile to validate
+ * @returns The profile (passthrough for chaining)
+ * @throws Error if an enriched profile has invalid or missing sourceNotes
+ */
+export function validateProfileAccuracy(profile: JurisdictionProfile): JurisdictionProfile {
+  const status = profile.accuracyStatus;
+  if (status === 'enriched_pending_review' || status === 'enriched_verified') {
+    if (!profile.sourceNotes || profile.sourceNotes.length === 0) {
+      throw new Error(
+        `Profile "${profile.key}" has accuracyStatus="${status}" but no sourceNotes. ` +
+        `Enriched profiles must document their formatting sources.`,
+      );
+    }
+
+    for (let i = 0; i < profile.sourceNotes.length; i++) {
+      const note = profile.sourceNotes[i];
+      if (typeof note.label !== 'string' || !note.label.trim()) {
+        throw new Error(
+          `Profile "${profile.key}" sourceNotes[${i}] has an empty or non-string label. ` +
+          `Each source note must have a descriptive label.`,
+        );
+      }
+      if (typeof note.reviewedAt !== 'string' || !note.reviewedAt.trim()) {
+        throw new Error(
+          `Profile "${profile.key}" sourceNotes[${i}] is missing or has non-string reviewedAt. ` +
+          `Each source note must document when it was reviewed.`,
+        );
+      }
+    }
+  }
+  return profile;
+}
 
 // ═══════════════════════════════════════════════════════════════
 // Narrowed Pipeline-Specific Types

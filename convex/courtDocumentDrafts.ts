@@ -12,6 +12,7 @@ import { mutation, query } from './_generated/server';
 // Create
 // ═══════════════════════════════════════════════════════════════
 
+/** Create a new court document draft shell with metadata. */
 export const create = mutation({
   args: {
     documentId: v.string(),
@@ -62,19 +63,31 @@ export const create = mutation({
 // Read
 // ═══════════════════════════════════════════════════════════════
 
+/** Fetch a single draft by documentId (ownership-verified). */
 export const get = query({
   args: { documentId: v.string() },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
 
-    return await ctx.db
+    const draft = await ctx.db
       .query('courtDocumentDrafts')
       .withIndex('by_documentId', (q) => q.eq('documentId', args.documentId))
       .unique();
+    if (!draft) return null;
+
+    // Ownership check
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+    if (!user || draft.userId !== user._id) return null;
+
+    return draft;
   },
 });
 
+/** List all non-abandoned drafts for the authenticated user. */
 export const listByUser = query({
   args: {
     status: v.optional(v.union(
@@ -115,6 +128,7 @@ export const listByUser = query({
 // Update
 // ═══════════════════════════════════════════════════════════════
 
+/** Update the workflow status of a draft (e.g. drafting → preflight → exported). */
 export const updateStatus = mutation({
   args: {
     documentId: v.string(),
@@ -145,6 +159,7 @@ export const updateStatus = mutation({
   },
 });
 
+/** Touch a draft to refresh its lastOpenedAt timestamp. */
 export const touch = mutation({
   args: { documentId: v.string() },
   handler: async (ctx, args) => {
@@ -164,6 +179,7 @@ export const touch = mutation({
   },
 });
 
+/** Increment the draft version number and optionally update completion/title. */
 export const bumpVersion = mutation({
   args: {
     documentId: v.string(),
@@ -193,6 +209,7 @@ export const bumpVersion = mutation({
 // Soft Delete
 // ═══════════════════════════════════════════════════════════════
 
+/** Soft-delete a draft by setting its status to 'abandoned'. */
 export const abandon = mutation({
   args: { documentId: v.string() },
   handler: async (ctx, args) => {

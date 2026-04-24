@@ -12,6 +12,7 @@
 
 import { diffWords } from 'diff';
 import type { DiffSegment } from './types';
+import { escapeHtml } from '@/lib/utils/htmlUtils';
 
 /**
  * Compute a word-level diff between two strings.
@@ -54,21 +55,12 @@ export function renderDiffHTML(segments: DiffSegment[]): string {
     .map((seg) => {
       switch (seg.type) {
         case 'added':
-          return `<span class="section-change-added">${escapeHTML(seg.text)}</span>`;
+          return `<span class="section-change-added">${escapeHtml(seg.text)}</span>`;
         case 'removed':
-          return `<span class="section-change-removed">${escapeHTML(seg.text)}</span>`;
+          return `<span class="section-change-removed">${escapeHtml(seg.text)}</span>`;
         default:
-          return escapeHTML(seg.text);
+          return escapeHtml(seg.text);
       }
     })
     .join('')}</div>`;
-}
-
-/** Escape HTML special characters. */
-function escapeHTML(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }

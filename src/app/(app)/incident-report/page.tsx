@@ -39,6 +39,7 @@ export default function IncidentReportPage() {
     const [narrative, setNarrative] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [processError, setProcessError] = useState<string | null>(null);
+    const [isPinning, setIsPinning] = useState<string | null>(null);
 
     // Live data from Convex
     const incidents = useQuery(
@@ -48,9 +49,13 @@ export default function IncidentReportPage() {
     const createIncident = useMutation(api.incidents.create);
     const createCasePin = useMutation(api.casePins.create);
 
+    /** Process the incident narrative and save to Convex. */
     const handleProcess = useCallback(async () => {
-        if (!narrative.trim() || !activeCaseId) {
-            if (!activeCaseId) {
+        const trimmed = narrative.trim();
+        if (!trimmed || !activeCaseId) {
+            if (!trimmed) {
+                setProcessError('Please enter a narrative.');
+            } else if (!activeCaseId) {
                 setProcessError('Please select or create a case first.');
             }
             return;
@@ -83,8 +88,10 @@ export default function IncidentReportPage() {
         }
     }, [narrative, activeCaseId, createIncident]);
 
+    /** Pin an incident to the case workspace. Prevents duplicate clicks. */
     const handleAddToWorkspace = useCallback(async (incident: { _id: Id<'incidents'>; narrative: string; date: string }) => {
-        if (!activeCaseId) return;
+        if (!activeCaseId || isPinning === incident._id) return;
+        setIsPinning(incident._id);
 
         try {
             await createCasePin({
@@ -95,8 +102,10 @@ export default function IncidentReportPage() {
             });
         } catch (err) {
             console.error('[IncidentIntake] Pin creation failed:', err);
+        } finally {
+            setIsPinning(null);
         }
-    }, [activeCaseId, createCasePin]);
+    }, [activeCaseId, createCasePin, isPinning]);
 
     // Time ago helper
     const formatDate = (dateStr: string, timeStr: string) => {
@@ -129,11 +138,11 @@ export default function IncidentReportPage() {
                 {/* 2. Intake Controls */}
                 <div className="flex items-center justify-between px-4">
                     <div className="flex items-center gap-4">
-                        <button className="flex items-center gap-2 px-6 py-3 rounded-full bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white transition-all text-sm font-bold">
-                            <Microphone size={20} weight="fill" className="text-rose-400" />
+                        <button disabled className="flex items-center gap-2 px-6 py-3 rounded-full bg-white/5 border border-white/10 text-white/20 cursor-not-allowed text-sm font-bold" title="Coming soon">
+                            <Microphone size={20} weight="fill" className="text-rose-400/40" />
                             Voice Input
                         </button>
-                        <button className="flex items-center gap-2 px-4 py-2 text-white/40 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest">
+                        <button disabled className="flex items-center gap-2 px-4 py-2 text-white/20 cursor-not-allowed text-xs font-bold uppercase tracking-widest" title="Coming soon">
                             <PlusCircle size={18} />
                             Add Photo/Video
                         </button>
@@ -141,9 +150,9 @@ export default function IncidentReportPage() {
 
                     <button 
                         onClick={handleProcess}
-                        disabled={!narrative || isProcessing || !activeCaseId}
+                        disabled={!narrative.trim() || isProcessing || !activeCaseId}
                         className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all shadow-xl ${
-                            narrative && !isProcessing && activeCaseId
+                            narrative.trim() && !isProcessing && activeCaseId
                             ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30' 
                             : 'bg-white/5 text-white/20 border border-white/5 cursor-not-allowed'
                         }`}
@@ -188,8 +197,15 @@ export default function IncidentReportPage() {
                     </div>
 
                     <div className="space-y-6">
+                        {/* No case selected state */}
+                        {!activeCaseId && (
+                            <p className="text-center text-white/20 text-xs uppercase tracking-widest font-bold py-6">
+                                Select a case to view incidents
+                            </p>
+                        )}
+
                         {/* Loading state */}
-                        {incidents === undefined && (
+                        {activeCaseId && incidents === undefined && (
                             <div className="flex items-center justify-center py-6">
                                 <div className="w-5 h-5 border-2 border-white/20 border-t-indigo-400 rounded-full animate-spin" />
                             </div>
@@ -269,7 +285,7 @@ export default function IncidentReportPage() {
                             <h5 className="text-[11px] font-black text-white uppercase tracking-widest mb-1">Pattern Detected</h5>
                             <p className="text-[11px] text-white/40 leading-relaxed">
                                 {incidents && incidents.length >= 3
-                                    ? `${incidents.length} incidents recorded this month. Patterns may be tracked for your next motion.`
+                                    ? `${incidents.length} incidents recorded. Patterns may be tracked for your next motion.`
                                     : 'Record 3+ incidents to enable pattern detection for legal filings.'}
                             </p>
                         </div>

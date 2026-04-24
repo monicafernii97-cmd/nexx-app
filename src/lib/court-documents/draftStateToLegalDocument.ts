@@ -42,7 +42,7 @@ export function draftStateToLegalDocument(state: CourtDocumentDraftState): Legal
 
   // ── Caption ──
   const captionSection = sectionMap.get('caption');
-  const caption = buildCaptionBlock(captionSection?.content ?? '', state);
+  const caption = buildCaptionBlock(captionSection?.content ?? '');
 
   // ── Title ──
   const titleSection = sectionMap.get('title');
@@ -56,11 +56,12 @@ export function draftStateToLegalDocument(state: CourtDocumentDraftState): Legal
     ? splitToParagraphs(introSection.content)
     : [];
 
-  // ── Body Sections ──
+  // ── Body Sections (sorted by explicit order) ──
+  const sortedSections = state.sections.slice().sort((a, b) => a.order - b.order);
   const bodySectionIds = new Set(['caption', 'title', 'introduction', 'prayer', 'signature', 'certificate', 'verification']);
-  const sections: LegalSection[] = state.sections
+  const sections: LegalSection[] = sortedSections
     .filter(s => !bodySectionIds.has(s.id) && s.content.trim())
-    .map((s, i) => ({
+    .map((s) => ({
       id: s.id,
       heading: s.heading.toUpperCase(),
       level: 'roman' as const,
@@ -84,7 +85,7 @@ export function draftStateToLegalDocument(state: CourtDocumentDraftState): Legal
   const verification = buildVerificationBlock(verificationSection?.content ?? '');
 
   // ── Reconstruct rawText for parser compatibility ──
-  const rawText = state.sections
+  const rawText = sortedSections
     .map(s => `${s.heading}\n${s.content}`)
     .join('\n\n');
 
@@ -113,7 +114,8 @@ export function draftStateToLegalDocument(state: CourtDocumentDraftState): Legal
 // Block Builders
 // ═══════════════════════════════════════════════════════════════
 
-function buildCaptionBlock(content: string, state: CourtDocumentDraftState): CaptionBlock | null {
+/** Parse caption content into a structured CaptionBlock for PDF rendering. */
+function buildCaptionBlock(content: string): CaptionBlock | null {
   if (!content.trim()) return null;
 
   const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
@@ -127,6 +129,7 @@ function buildCaptionBlock(content: string, state: CourtDocumentDraftState): Cap
   };
 }
 
+/** Parse prayer/relief section into heading, intro, and request items. */
 function buildPrayerBlock(content: string): PrayerBlock | null {
   if (!content.trim()) return null;
 
@@ -140,6 +143,7 @@ function buildPrayerBlock(content: string): PrayerBlock | null {
   };
 }
 
+/** Parse signature block content into intro line and signer lines. */
 function buildSignatureBlock(content: string): SignatureBlock | null {
   if (!content.trim()) return null;
 
@@ -152,6 +156,7 @@ function buildSignatureBlock(content: string): SignatureBlock | null {
   };
 }
 
+/** Parse certificate of service content into body and signer lines. */
 function buildCertificateBlock(content: string): CertificateBlock | null {
   if (!content.trim()) return null;
 
@@ -164,6 +169,7 @@ function buildCertificateBlock(content: string): CertificateBlock | null {
   };
 }
 
+/** Parse verification content into body and signer lines. */
 function buildVerificationBlock(content: string): VerificationBlock | null {
   if (!content.trim()) return null;
 

@@ -383,6 +383,7 @@ function DocuVaultPageInner() {
                     <div className="flex items-center gap-4 mb-4">
                         <button 
                             onClick={() => setView('intake_hub')}
+                            aria-label="Back to intake hub"
                             className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-white/60 hover:text-white transition-all"
                         >
                             <CaretLeft size={20} weight="bold" />

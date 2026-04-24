@@ -12,6 +12,7 @@ import { mutation, query } from './_generated/server';
 // Create
 // ═══════════════════════════════════════════════════════════════
 
+/** Create a revision record for a section change (before/after + diff). */
 export const create = mutation({
   args: {
     documentId: v.string(),
@@ -54,6 +55,7 @@ export const create = mutation({
 // Read
 // ═══════════════════════════════════════════════════════════════
 
+/** List all revisions for a specific section within a document. */
 export const listBySection = query({
   args: {
     documentId: v.string(),
@@ -72,6 +74,7 @@ export const listBySection = query({
   },
 });
 
+/** List all revisions across all sections of a document. */
 export const listByDocument = query({
   args: { documentId: v.string() },
   handler: async (ctx, args) => {

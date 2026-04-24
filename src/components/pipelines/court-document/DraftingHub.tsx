@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -114,17 +114,22 @@ export default function DraftingHub({ onManualIntake }: DraftingHubProps) {
     }
   };
 
-  // Time ago helper — use stable render-time reference
-  const [renderNow] = useState(() => Date.now());
+  // Time ago helper — refreshes every 60s to keep ages accurate
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
   const timeAgo = useCallback((timestamp: number) => {
-    const diff = renderNow - timestamp;
+    const diff = now - timestamp;
+    if (diff < 0) return 'just now';
     const mins = Math.floor(diff / 60000);
     if (mins < 60) return `${mins}m ago`;
     const hours = Math.floor(mins / 60);
     if (hours < 24) return `${hours}h ago`;
     const days = Math.floor(hours / 24);
     return `${days}d ago`;
-  }, [renderNow]);
+  }, [now]);
 
   return (
     <div className="space-y-12">

@@ -62,12 +62,12 @@ interface ReviewHubProps {
  * Save: Section-level to Convex (debounced) + localStorage (immediate)
  * Export: Sends only documentId to server
  */
-export default function CourtDocumentReviewHub({ docId, caseId }: ReviewHubProps) {
+export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: ReviewHubProps) {
   const [state, setState] = useState<CourtDocumentDraftState | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportResult, setExportResult] = useState<{ downloadUrl: string; filename: string } | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveTimerMapRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // ── Convex queries ──
   const convexDraft = useQuery(api.courtDocumentDrafts.get, { documentId: docId });
@@ -176,12 +176,13 @@ export default function CourtDocumentReviewHub({ docId, caseId }: ReviewHubProps
     return () => window.removeEventListener('beforeunload', handler);
   }, [state?.metadata.isDirty]);
 
-  // ── Debounced Convex save for a section ──
+  /** Debounced Convex save for a section (per-section timer). */
   const saveSection = useCallback(
     (sectionId: string, content: string, status: string, source: string, before?: string) => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      const existing = saveTimerMapRef.current.get(sectionId);
+      if (existing) clearTimeout(existing);
 
-      saveTimerRef.current = setTimeout(async () => {
+      const timer = setTimeout(async () => {
         try {
           await updateSectionConvex({
             documentId: docId,
@@ -229,8 +230,11 @@ export default function CourtDocumentReviewHub({ docId, caseId }: ReviewHubProps
           });
         } catch (err) {
           console.error('[ReviewHub] Convex save failed:', err);
+        } finally {
+          saveTimerMapRef.current.delete(sectionId);
         }
       }, 1000);
+      saveTimerMapRef.current.set(sectionId, timer);
     },
     [docId, updateSectionConvex, createRevision, bumpVersion],
   );
@@ -329,33 +333,32 @@ export default function CourtDocumentReviewHub({ docId, caseId }: ReviewHubProps
     [state, saveSection],
   );
 
+  /** Lock a section — optimistic update, then sync to Convex. */
   const handleLock = useCallback(
     (sectionId: string) => {
-      setState(prev => {
-        if (!prev) return prev;
-        const newState = lockSection(prev, sectionId);
-        updateSectionStatus({ documentId: docId, sectionId, status: 'locked' });
-        return newState;
-      });
+      setState(prev => prev ? lockSection(prev, sectionId) : prev);
+      updateSectionStatus({ documentId: docId, sectionId, status: 'locked' });
     },
     [docId, updateSectionStatus],
   );
 
+  /** Unlock a section — optimistic update, then sync to Convex. */
   const handleUnlock = useCallback(
     (sectionId: string) => {
+      let resolvedStatus: 'empty' | 'drafted' | 'court_ready' | 'locked' = 'court_ready';
       setState(prev => {
         if (!prev) return prev;
         const newState = unlockSection(prev, sectionId);
         const section = newState.sections.find(s => s.id === sectionId);
-        if (section) {
-          updateSectionStatus({ documentId: docId, sectionId, status: section.status });
-        }
+        if (section) resolvedStatus = section.status;
         return newState;
       });
+      updateSectionStatus({ documentId: docId, sectionId, status: resolvedStatus });
     },
     [docId, updateSectionStatus],
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleAddNote = useCallback(
     (sectionId: string, note: string) => {
       setState(prev => prev ? addFeedbackNote(prev, sectionId, note) : prev);

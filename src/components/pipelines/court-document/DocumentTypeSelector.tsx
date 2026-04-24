@@ -59,17 +59,21 @@ export default function DocumentTypeSelector({ isOpen, onClose, onSelect }: Docu
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="document-type-dialog-title"
             className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-3xl bg-[#0F172A] border border-white/10 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-center justify-between p-6 pb-4 border-b border-white/5">
               <div>
-                <h2 className="text-lg font-bold text-white tracking-tight">Select Document Type</h2>
+                <h2 id="document-type-dialog-title" className="text-lg font-bold text-white tracking-tight">Select Document Type</h2>
                 <p className="text-xs text-white/40 mt-1">Choose the type of court document to draft</p>
               </div>
               <button
                 onClick={onClose}
+                aria-label="Close document type dialog"
                 className="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all"
               >
                 <X size={16} weight="bold" />

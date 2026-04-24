@@ -12,6 +12,7 @@ import { mutation, query } from './_generated/server';
 // Create
 // ═══════════════════════════════════════════════════════════════
 
+/** Batch-create all sections for a draft document in a single transaction. */
 export const createMany = mutation({
   args: {
     documentId: v.string(),
@@ -76,6 +77,7 @@ export const createMany = mutation({
 // Read
 // ═══════════════════════════════════════════════════════════════
 
+/** List all sections for a document, sorted by order (auth-verified). */
 export const listByDocument = query({
   args: { documentId: v.string() },
   handler: async (ctx, args) => {
@@ -96,6 +98,7 @@ export const listByDocument = query({
 // Update
 // ═══════════════════════════════════════════════════════════════
 
+/** Update the content, status, and source of a specific section. */
 export const updateContent = mutation({
   args: {
     documentId: v.string(),
@@ -136,6 +139,7 @@ export const updateContent = mutation({
   },
 });
 
+/** Update only the status of a section (e.g. lock/unlock). */
 export const updateStatus = mutation({
   args: {
     documentId: v.string(),
@@ -166,6 +170,7 @@ export const updateStatus = mutation({
   },
 });
 
+/** Reorder sections by updating their order field from an ordered ID array. */
 export const reorder = mutation({
   args: {
     documentId: v.string(),

@@ -37,6 +37,13 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return NextResponse.json(
+      { success: false, error: 'INVALID_JSON' },
+      { status: 400 },
+    );
+  }
+
   const { sectionId, heading, documentType, documentContext, courtRules } = body;
 
   if (typeof sectionId !== 'string' || !sectionId.trim()) {

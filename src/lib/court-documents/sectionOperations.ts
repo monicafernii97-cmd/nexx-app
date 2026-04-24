@@ -139,16 +139,22 @@ export function lockSection(
 }
 
 /**
- * Unlock a section — returns it to court_ready.
+ * Unlock a section — restores it to its pre-lock status based on source.
+ * AI-rewritten content stays court_ready; other content reverts to drafted.
  */
 export function unlockSection(
   state: CourtDocumentDraftState,
   sectionId: string,
 ): CourtDocumentDraftState {
-  return updateSection(state, sectionId, (section) => ({
-    ...section,
-    status: section.content.trim() ? 'court_ready' : 'empty',
-  }));
+  return updateSection(state, sectionId, (section) => {
+    if (!section.content.trim()) return { ...section, status: 'empty' as CourtSectionStatus };
+
+    // AI-rewrite means it's already been court-polished
+    const restoredStatus: CourtSectionStatus =
+      section.source === 'ai_rewrite' ? 'court_ready' : 'drafted';
+
+    return { ...section, status: restoredStatus };
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════

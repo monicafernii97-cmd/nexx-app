@@ -144,6 +144,7 @@ function extractContentForSection(sectionId: string, doc: LegalDocument): string
   }
 }
 
+/** Reconstruct caption text from parsed CaptionBlock parts. */
 function extractCaption(doc: LegalDocument): string {
   if (!doc.caption) return '';
   const lines: string[] = [];
@@ -154,6 +155,7 @@ function extractCaption(doc: LegalDocument): string {
   return lines.join('\n');
 }
 
+/** Reconstruct prayer/relief text from parsed PrayerBlock. */
 function extractPrayer(doc: LegalDocument): string {
   if (!doc.prayer) return '';
   const parts: string[] = [];
@@ -162,6 +164,7 @@ function extractPrayer(doc: LegalDocument): string {
   return parts.join('\n');
 }
 
+/** Reconstruct signature text from parsed SignatureBlock. */
 function extractSignature(doc: LegalDocument): string {
   if (!doc.signature) return '';
   const parts: string[] = [];
@@ -170,6 +173,7 @@ function extractSignature(doc: LegalDocument): string {
   return parts.join('\n');
 }
 
+/** Reconstruct certificate of service text from parsed CertificateBlock. */
 function extractCertificate(doc: LegalDocument): string {
   if (!doc.certificate) return '';
   const parts: string[] = [];
@@ -179,6 +183,7 @@ function extractCertificate(doc: LegalDocument): string {
   return parts.join('\n');
 }
 
+/** Reconstruct verification text from parsed VerificationBlock. */
 function extractVerification(doc: LegalDocument): string {
   if (!doc.verification) return '';
   const parts: string[] = [];
@@ -188,6 +193,7 @@ function extractVerification(doc: LegalDocument): string {
   return parts.join('\n');
 }
 
+/** Find and concatenate sections whose headings match the given pattern. */
 function extractSectionsByPattern(doc: LegalDocument, pattern: RegExp): string {
   return doc.sections
     .filter(s => pattern.test(s.heading))
@@ -195,12 +201,14 @@ function extractSectionsByPattern(doc: LegalDocument, pattern: RegExp): string {
     .join('\n\n');
 }
 
+/** Convert a parsed LegalSection into plain text (heading + blocks). */
 function sectionToText(section: { heading: string; blocks: Array<{ type: string; text?: string; items?: string[] }> }): string {
   const heading = section.heading;
   const body = section.blocks.map(blockToText).join('\n');
   return `${heading}\n${body}`;
 }
 
+/** Convert a single block to plain text. */
 function blockToText(block: { type: string; text?: string; items?: string[] }): string {
   if (block.type === 'paragraph' && block.text) return block.text;
   if (block.items) return block.items.join('\n');

@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
@@ -31,6 +31,14 @@ export default function IncidentReportPage() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [processError, setProcessError] = useState<string | null>(null);
     const [isPinning, setIsPinning] = useState<string | null>(null);
+    const [pinError, setPinError] = useState<string | null>(null);
+
+    // Clear case-related error when user selects a case
+    useEffect(() => {
+        if (activeCaseId && processError === 'Please select or create a case first.') {
+            setProcessError(null);
+        }
+    }, [activeCaseId, processError]);
 
     // Live data from Convex
     const incidents = useQuery(
@@ -85,6 +93,7 @@ export default function IncidentReportPage() {
         setIsPinning(incident._id);
 
         try {
+            setPinError(null);
             await createCasePin({
                 caseId: activeCaseId,
                 type: 'key_fact',
@@ -94,6 +103,7 @@ export default function IncidentReportPage() {
             });
         } catch (err) {
             console.error('[IncidentIntake] Pin creation failed:', err);
+            setPinError('Failed to add incident to workspace. Please try again.');
         } finally {
             setIsPinning(null);
         }
@@ -106,7 +116,7 @@ export default function IncidentReportPage() {
             <PageHeader
                 icon={ClipboardText}
                 title={<>Record <span className="text-editorial shimmer">Incident</span></>}
-                description="Turn a chaotic moment into a structured fact. Type or speak your narrative below."
+                description="Turn a chaotic moment into a structured fact. Type your narrative below."
             />
 
             <div className="max-w-4xl mx-auto space-y-12 pb-24">
@@ -115,7 +125,10 @@ export default function IncidentReportPage() {
                 <div className="relative group">
                     <textarea
                         value={narrative}
-                        onChange={(e) => setNarrative(e.target.value)}
+                        onChange={(e) => {
+                            setNarrative(e.target.value);
+                            if (processError) setProcessError(null);
+                        }}
                         aria-label="Incident narrative"
                         placeholder="What happened? (e.g. 'At 2pm today, John arrived at the exchange location and started...')"
                         className="w-full bg-transparent border-none text-2xl md:text-3xl font-serif text-white placeholder:text-white/10 min-h-[300px] outline-none resize-none px-4 py-8 selection:bg-indigo-500/30"
@@ -206,6 +219,13 @@ export default function IncidentReportPage() {
                             <p className="text-center text-white/20 text-xs uppercase tracking-widest font-bold py-6">
                                 No incidents recorded yet
                             </p>
+                        )}
+
+                        {/* Pin error */}
+                        {pinError && (
+                            <div role="alert" aria-live="assertive" className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                                {pinError}
+                            </div>
                         )}
 
                         {/* Live incidents */}

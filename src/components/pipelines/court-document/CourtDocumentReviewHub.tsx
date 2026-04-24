@@ -86,6 +86,16 @@ export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: Revie
   const bumpVersion = useMutation(api.courtDocumentDrafts.bumpVersion);
   const touchDraft = useMutation(api.courtDocumentDrafts.touch);
 
+  // ── Reset state when docId changes (prevents stale hydration) ──
+  useEffect(() => {
+    setState(null);
+    stateRef.current = null;
+    // Cancel any pending saves from the previous document
+    for (const timer of saveTimerMapRef.current.values()) clearTimeout(timer);
+    saveTimerMapRef.current.clear();
+    pendingSavesRef.current.clear();
+  }, [docId]);
+
   // ── Hydration: Convex → localStorage → fresh state ──
   useEffect(() => {
     // Wait for Convex queries to resolve

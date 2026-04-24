@@ -57,6 +57,29 @@ export const createMany = mutation({
       throw new Error('Not authorized');
     }
 
+    // Reject if sections already exist for this document (prevents double-submit)
+    const existing = await ctx.db
+      .query('courtDocumentSections')
+      .withIndex('by_document', (q) => q.eq('documentId', args.documentId))
+      .first();
+    if (existing) {
+      throw new Error('Sections already exist for this document');
+    }
+
+    // Validate payload has no duplicate sectionIds or orders
+    const seenIds = new Set<string>();
+    const seenOrders = new Set<number>();
+    for (const section of args.sections) {
+      if (seenIds.has(section.sectionId)) {
+        throw new Error(`Duplicate sectionId in payload: ${section.sectionId}`);
+      }
+      if (seenOrders.has(section.order)) {
+        throw new Error(`Duplicate order in payload: ${section.order}`);
+      }
+      seenIds.add(section.sectionId);
+      seenOrders.add(section.order);
+    }
+
     const now = Date.now();
     const ids: string[] = [];
 
@@ -64,7 +87,7 @@ export const createMany = mutation({
       const id = await ctx.db.insert('courtDocumentSections', {
         documentId: args.documentId,
         userId: user._id,
-        caseId: args.caseId,
+        caseId: parentDraft.caseId,
         sectionId: section.sectionId,
         heading: section.heading,
         order: section.order,

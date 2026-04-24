@@ -22,7 +22,7 @@ const DOCUMENT_TYPES = [
 interface DocumentTypeSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (documentType: string) => Promise<void> | void;
+  onSelect: (documentType: DocumentType) => Promise<void> | void;
 }
 
 /**
@@ -30,11 +30,11 @@ interface DocumentTypeSelectorProps {
  * Shows required sections preview for each type.
  */
 export default function DocumentTypeSelector({ isOpen, onClose, onSelect }: DocumentTypeSelectorProps) {
-  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<DocumentType | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const selectedSections = selectedType ? deriveRequiredSections(selectedType as DocumentType) : [];
+  const selectedSections = selectedType ? deriveRequiredSections(selectedType) : [];
 
   const handleConfirm = async () => {
     if (!selectedType || isCreating) return;
@@ -119,6 +119,7 @@ export default function DocumentTypeSelector({ isOpen, onClose, onSelect }: Docu
                 <p className="text-xs text-white/40 mt-1">Choose the type of court document to draft</p>
               </div>
               <button
+                type="button"
                 onClick={() => { if (!isCreating) onClose(); }}
                 disabled={isCreating}
                 aria-label="Close document type dialog"
@@ -137,7 +138,8 @@ export default function DocumentTypeSelector({ isOpen, onClose, onSelect }: Docu
                 return (
                   <button
                     key={type.id}
-                    onClick={() => setSelectedType(type.id)}
+                    type="button"
+                    onClick={() => setSelectedType(type.id as DocumentType)}
                     aria-pressed={isSelected}
                     className={`p-4 rounded-2xl text-left transition-all border ${
                       isSelected
@@ -206,6 +208,7 @@ export default function DocumentTypeSelector({ isOpen, onClose, onSelect }: Docu
                 </div>
               )}
               <button
+                type="button"
                 onClick={handleConfirm}
                 disabled={!selectedType || isCreating}
                 className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20"

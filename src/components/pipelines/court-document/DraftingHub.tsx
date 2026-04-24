@@ -39,9 +39,9 @@ export default function DraftingHub({ onManualIntake }: DraftingHubProps) {
   const createSections = useMutation(api.courtDocumentSections.createMany);
   const abandonDraft = useMutation(api.courtDocumentDrafts.abandon);
 
-  const handleCreateDraft = useCallback(async (documentType: string) => {
+  const handleCreateDraft = useCallback(async (documentType: DocumentType) => {
     const documentId = `draft_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const sections = deriveRequiredSections(documentType as DocumentType);
+    const sections = deriveRequiredSections(documentType);
 
     try {
       // Create draft shell

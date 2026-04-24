@@ -73,9 +73,11 @@ const eslintConfig = defineConfig([
   },
   // ── React Compiler rule overrides ──
   // eslint-config-next/core-web-vitals enables the React Compiler plugin which
-  // flags 24+ pre-existing patterns (setState-in-effect, ref-during-render,
-  // preserve-manual-memoization) across 11+ files. Downgrade to warnings so CI
-  // is unblocked while the codebase is incrementally migrated.
+  // flags 24+ pre-existing patterns across 15+ files (setState-in-effect,
+  // ref-during-render, preserve-manual-memoization, immutability). Scoped
+  // globally because the violations span most feature directories; narrowing to
+  // individual file globs would be fragile and require updating on every new
+  // component. TODO: Remove once full React Compiler migration is complete.
   {
     name: "nexx/react-compiler-compat",
     files: ["**/*.ts", "**/*.tsx"],

@@ -7,7 +7,6 @@ import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
 import {
     ClipboardText,
-    Plus,
     ArrowRight,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
@@ -159,7 +158,7 @@ export default function IncidentReportPage() {
 
                 {/* Error */}
                 {processError && (
-                    <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                    <div role="alert" aria-live="assertive" className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                         {processError}
                     </div>
                 )}

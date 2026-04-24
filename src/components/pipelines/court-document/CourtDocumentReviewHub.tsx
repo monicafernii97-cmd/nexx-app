@@ -120,15 +120,16 @@ export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: Revie
               timestamp: new Date(r.createdAt).toISOString(),
               before: r.before,
               after: r.after,
-              diff: r.diffJson ? JSON.parse(r.diffJson) : [],
+              diff: (() => { try { return r.diffJson ? JSON.parse(r.diffJson) : []; } catch { return []; } })(),
               source: r.source as 'user_edit' | 'ai_draft' | 'ai_rewrite',
               note: r.note,
             })),
-          feedbackNotes: s.feedbackNotesJson ? JSON.parse(s.feedbackNotesJson) : [],
+          feedbackNotes: (() => { try { return s.feedbackNotesJson ? JSON.parse(s.feedbackNotesJson) : []; } catch { return []; } })(),
         })),
-        jurisdiction: convexDraft.jurisdictionJson
-          ? JSON.parse(convexDraft.jurisdictionJson)
-          : { state: '', county: '', courtName: '', district: '' },
+        jurisdiction: (() => {
+          try { return convexDraft.jurisdictionJson ? JSON.parse(convexDraft.jurisdictionJson) : { state: '', county: '', courtName: '', district: '' }; }
+          catch { return { state: '', county: '', courtName: '', district: '' }; }
+        })(),
         metadata: {
           createdAt: new Date(convexDraft.createdAt).toISOString(),
           updatedAt: new Date(convexDraft.updatedAt).toISOString(),
@@ -375,25 +376,35 @@ export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: Revie
     [state, saveSection],
   );
 
-  /** Lock a section — optimistic update with Convex rollback on failure. */
+  /** Lock a section — optimistic update, revert only affected section on failure. */
   const handleLock = useCallback(
     async (sectionId: string) => {
-      const prev = state;
+      const prevStatus = state?.sections.find(s => s.id === sectionId)?.status;
       setState(p => p ? lockSection(p, sectionId) : p);
       try {
         await updateSectionStatus({ documentId: docId, sectionId, status: 'locked' });
       } catch (err) {
         console.error('[ReviewHub] Lock failed, reverting:', err);
-        setState(prev);
+        if (prevStatus) {
+          setState(s => {
+            if (!s) return s;
+            return {
+              ...s,
+              sections: s.sections.map(sec =>
+                sec.id === sectionId ? { ...sec, status: prevStatus } : sec,
+              ),
+            };
+          });
+        }
       }
     },
     [state, docId, updateSectionStatus],
   );
 
-  /** Unlock a section — optimistic update with Convex rollback on failure. */
+  /** Unlock a section — optimistic update, revert only affected section on failure. */
   const handleUnlock = useCallback(
     async (sectionId: string) => {
-      const prev = state;
+      const prevStatus = state?.sections.find(s => s.id === sectionId)?.status;
       const nextState = state ? unlockSection(state, sectionId) : state;
       const resolvedStatus = nextState?.sections.find(s => s.id === sectionId)?.status ?? 'court_ready';
       setState(nextState);
@@ -401,7 +412,17 @@ export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: Revie
         await updateSectionStatus({ documentId: docId, sectionId, status: resolvedStatus });
       } catch (err) {
         console.error('[ReviewHub] Unlock failed, reverting:', err);
-        setState(prev);
+        if (prevStatus) {
+          setState(s => {
+            if (!s) return s;
+            return {
+              ...s,
+              sections: s.sections.map(sec =>
+                sec.id === sectionId ? { ...sec, status: prevStatus } : sec,
+              ),
+            };
+          });
+        }
       }
     },
     [state, docId, updateSectionStatus],

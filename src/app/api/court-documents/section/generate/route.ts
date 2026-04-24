@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     if (!result.success) {
       const status =
         result.error === 'AI_GENERATION_TIMEOUT' ? 504 :
-        result.error === 'AI_GENERATION_EMPTY' ? 502 :
+        result.error === 'AI_GENERATION_EMPTY' || result.error === 'AI_GENERATION_WRONG_SECTION' ? 502 :
         500;
       return NextResponse.json(result, { status });
     }

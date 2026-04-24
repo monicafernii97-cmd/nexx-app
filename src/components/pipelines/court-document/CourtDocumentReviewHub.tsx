@@ -68,6 +68,7 @@ export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: Revie
   const [exportResult, setExportResult] = useState<{ downloadUrl: string; filename: string } | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const saveTimerMapRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const pendingSavesRef = useRef<Set<string>>(new Set());
 
   // ── Convex queries ──
   const convexDraft = useQuery(api.courtDocumentDrafts.get, { documentId: docId });
@@ -190,8 +191,12 @@ export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: Revie
       const existing = saveTimerMapRef.current.get(sectionId);
       if (existing) clearTimeout(existing);
 
+      // Track this section as having a pending save
+      pendingSavesRef.current.add(sectionId);
+
       const timer = setTimeout(async () => {
         try {
+          // Persist section content
           await updateSectionConvex({
             documentId: docId,
             sectionId,
@@ -200,44 +205,58 @@ export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: Revie
             source: source as 'blank_template' | 'parsed_input' | 'user_edit' | 'ai_draft' | 'ai_rewrite',
           });
 
-          // Create revision if content changed
+          // Create revision if content changed (best-effort — doesn't block save)
           if (before !== undefined && before !== content) {
-            const diff = computeWordDiff(before, content);
-            await createRevision({
-              documentId: docId,
-              sectionId,
-              before,
-              after: content,
-              diffJson: JSON.stringify(diff),
-              source: source as 'user_edit' | 'ai_draft' | 'ai_rewrite',
-            });
+            try {
+              const diff = computeWordDiff(before, content);
+              await createRevision({
+                documentId: docId,
+                sectionId,
+                before,
+                after: content,
+                diffJson: JSON.stringify(diff),
+                source: source as 'user_edit' | 'ai_draft' | 'ai_rewrite',
+              });
+            } catch (revErr) {
+              console.error('[ReviewHub] Revision creation failed (non-blocking):', revErr);
+            }
           }
 
-          // Bump draft version
+          // Bump draft version (best-effort — doesn't block save)
           if (stateRef.current) {
-            const preflight = validatePreflight(stateRef.current);
-            await bumpVersion({
-              documentId: docId,
-              completionPct: preflight.completionPct,
-            });
+            try {
+              const preflight = validatePreflight(stateRef.current);
+              await bumpVersion({
+                documentId: docId,
+                completionPct: preflight.completionPct,
+              });
+            } catch (versionErr) {
+              console.error('[ReviewHub] Version bump failed (non-blocking):', versionErr);
+            }
           }
 
-          // Mark as synced
-          setState(prev => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              metadata: { ...prev.metadata, isDirty: false },
-              persistence: {
-                ...prev.persistence,
-                storage: 'convex' as const,
-                lastSavedAt: new Date().toISOString(),
-                saveStatus: 'saved' as const,
-              },
-            };
-          });
+          // Clear this section from pending saves
+          pendingSavesRef.current.delete(sectionId);
+
+          // Only mark draft as clean when ALL pending saves are complete
+          if (pendingSavesRef.current.size === 0) {
+            setState(prev => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                metadata: { ...prev.metadata, isDirty: false },
+                persistence: {
+                  ...prev.persistence,
+                  storage: 'convex' as const,
+                  lastSavedAt: new Date().toISOString(),
+                  saveStatus: 'saved' as const,
+                },
+              };
+            });
+          }
         } catch (err) {
           console.error('[ReviewHub] Convex save failed:', err);
+          pendingSavesRef.current.delete(sectionId);
         } finally {
           saveTimerMapRef.current.delete(sectionId);
         }
@@ -248,18 +267,23 @@ export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: Revie
   );
 
   // ── Section Callbacks ──
+
+  /** Handle user content changes — compute old value BEFORE setState, trigger save AFTER. */
   const handleContentChange = useCallback(
     (sectionId: string, content: string) => {
+      // Capture old content before state update
+      const oldContent = state?.sections.find(s => s.id === sectionId)?.content;
+
+      // Pure state update — no side effects
       setState(prev => {
         if (!prev) return prev;
-        const oldSection = prev.sections.find(s => s.id === sectionId);
-        const newState = updateSectionContent(prev, sectionId, content);
-        // Trigger Convex save
-        saveSection(sectionId, content, 'drafted', 'user_edit', oldSection?.content);
-        return newState;
+        return updateSectionContent(prev, sectionId, content);
       });
+
+      // Trigger save outside updater
+      saveSection(sectionId, content, 'drafted', 'user_edit', oldContent);
     },
-    [saveSection],
+    [state, saveSection],
   );
 
   const handleAIGenerate = useCallback(
@@ -288,12 +312,17 @@ export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: Revie
           throw new Error(data.error || 'Generation failed');
         }
 
+        // Capture old content before update
+        const oldContent = section.content;
+
+        // Pure state update
         setState(prev => {
           if (!prev) return prev;
-          const newState = setAIDraftContent(prev, sectionId, data.content);
-          saveSection(sectionId, data.content, 'drafted', 'ai_draft', section.content);
-          return newState;
+          return setAIDraftContent(prev, sectionId, data.content);
         });
+
+        // Trigger save outside updater
+        saveSection(sectionId, data.content, 'drafted', 'ai_draft', oldContent);
 
         return data.content;
       } catch (err) {
@@ -326,12 +355,17 @@ export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: Revie
           throw new Error(data.error || 'Rewrite failed');
         }
 
+        // Capture old content before update
+        const oldContent = section.content;
+
+        // Pure state update
         setState(prev => {
           if (!prev) return prev;
-          const newState = rewriteSectionToCourtReady(prev, sectionId, data.rewrittenContent);
-          saveSection(sectionId, data.rewrittenContent, 'court_ready', 'ai_rewrite', section.content);
-          return newState;
+          return rewriteSectionToCourtReady(prev, sectionId, data.rewrittenContent);
         });
+
+        // Trigger save outside updater
+        saveSection(sectionId, data.rewrittenContent, 'court_ready', 'ai_rewrite', oldContent);
 
         return data.rewrittenContent;
       } catch (err) {

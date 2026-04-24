@@ -236,17 +236,27 @@ export const reorder = mutation({
       .withIndex('by_document', (q) => q.eq('documentId', args.documentId))
       .collect();
 
+    // Validate: orderedSectionIds must be a complete permutation of existing sections
     const existingIds = new Set(sections.map(s => s.sectionId));
-    const unknownIds = args.orderedSectionIds.filter(id => !existingIds.has(id));
-    if (unknownIds.length > 0) {
-      console.warn(`reorder: Unknown sectionIds ignored: ${unknownIds.join(', ')}`);
+    const inputIds = new Set(args.orderedSectionIds);
+
+    if (inputIds.size !== existingIds.size) {
+      throw new Error(
+        `reorder: Expected ${existingIds.size} section IDs but received ${inputIds.size}`,
+      );
+    }
+    for (const id of existingIds) {
+      if (!inputIds.has(id)) {
+        throw new Error(`reorder: Missing section "${id}" in orderedSectionIds`);
+      }
     }
 
+    const now = Date.now();
     for (let i = 0; i < args.orderedSectionIds.length; i++) {
       const sectionId = args.orderedSectionIds[i];
       const section = sections.find(s => s.sectionId === sectionId);
       if (section && section.order !== i) {
-        await ctx.db.patch(section._id, { order: i, updatedAt: Date.now() });
+        await ctx.db.patch(section._id, { order: i, updatedAt: now });
       }
     }
   },

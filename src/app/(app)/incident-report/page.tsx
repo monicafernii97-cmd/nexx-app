@@ -8,23 +8,16 @@ import { Id } from '@convex/_generated/dataModel';
 import {
     ClipboardText,
     Plus,
-    MagnifyingGlass,
-    Trash,
-    Tag,
     ArrowRight,
-    DownloadSimple,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
-import { INCIDENT_CATEGORIES } from '@/lib/constants';
-import { parseLocalDate } from '@/lib/dateUtils';
 import { useWorkspace } from '@/lib/workspace-context';
 
 import '@/styles/pipelines.css';
 import { 
   Microphone, 
   Sparkle, 
-  ClockCounterClockwise, 
   PlusCircle, 
   ArrowClockwise,
   CheckCircle,
@@ -107,10 +100,7 @@ export default function IncidentReportPage() {
         }
     }, [activeCaseId, createCasePin, isPinning]);
 
-    // Time ago helper
-    const formatDate = (dateStr: string, timeStr: string) => {
-        return `${dateStr} · ${timeStr}`;
-    };
+
 
     return (
         <PageContainer>
@@ -255,9 +245,14 @@ export default function IncidentReportPage() {
                                     <div className="flex gap-2 pt-1">
                                         <button
                                             onClick={() => handleAddToWorkspace(incident)}
-                                            className="px-2 py-1 rounded bg-indigo-500/10 text-indigo-400 text-[9px] font-bold uppercase tracking-widest border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors"
+                                            disabled={isPinning === incident._id}
+                                            className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest border transition-colors ${
+                                                isPinning === incident._id
+                                                    ? 'bg-indigo-500/10 text-indigo-400/60 border-indigo-500/20 cursor-not-allowed'
+                                                    : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 hover:bg-indigo-500/20'
+                                            }`}
                                         >
-                                            + Add to Workspace
+                                            {isPinning === incident._id ? 'Adding…' : '+ Add to Workspace'}
                                         </button>
                                         <button disabled className="px-2 py-1 rounded bg-amber-500/10 text-amber-400/40 text-[9px] font-bold uppercase tracking-widest border border-amber-500/10 cursor-not-allowed" title="Coming soon">
                                             + Send to Exhibit

@@ -184,7 +184,16 @@ export default function DraftingHub({ onManualIntake }: DraftingHubProps) {
           if (point.href) {
             return <Link key={point.title} href={point.href} className="no-underline">{Content}</Link>;
           }
-          return <div key={point.title} onClick={point.onClick}>{Content}</div>;
+          return (
+            <button
+              key={point.title}
+              type="button"
+              onClick={point.onClick}
+              className="block w-full text-left"
+            >
+              {Content}
+            </button>
+          );
         })}
       </div>
 

@@ -90,6 +90,7 @@ export default function DocumentTypeSelector({ isOpen, onClose, onSelect }: Docu
                   <button
                     key={type.id}
                     onClick={() => setSelectedType(type.id)}
+                    aria-pressed={isSelected}
                     className={`p-4 rounded-2xl text-left transition-all border ${
                       isSelected
                         ? 'bg-indigo-500/10 border-indigo-500/30 shadow-lg shadow-indigo-500/10'

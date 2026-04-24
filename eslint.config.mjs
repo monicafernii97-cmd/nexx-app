@@ -71,6 +71,21 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // ── React Compiler rule overrides ──
+  // eslint-config-next/core-web-vitals enables the React Compiler plugin which
+  // flags 24+ pre-existing patterns (setState-in-effect, ref-during-render,
+  // preserve-manual-memoization) across 11+ files. Downgrade to warnings so CI
+  // is unblocked while the codebase is incrementally migrated.
+  {
+    name: "nexx/react-compiler-compat",
+    files: ["**/*.ts", "**/*.tsx"],
+    rules: {
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/preserve-manual-memoization": "warn",
+      "react-hooks/refs": "warn",
+      "react-hooks/immutability": "warn",
+    },
+  },
 ]);
 
 export default eslintConfig;

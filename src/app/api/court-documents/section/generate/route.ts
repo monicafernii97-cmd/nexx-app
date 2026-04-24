@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       heading: heading as string,
       documentType: documentType as string,
       documentContext: typeof documentContext === 'string' ? documentContext : undefined,
-      courtRules: courtRules && typeof courtRules === 'object'
+      courtRules: courtRules && typeof courtRules === 'object' && !Array.isArray(courtRules)
         ? courtRules as Record<string, unknown>
         : undefined,
       signal: controller.signal,

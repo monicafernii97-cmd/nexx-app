@@ -308,6 +308,7 @@ function getTemplateName(exportPath: string): string {
  *   DRAFT_MAX_RETRIES         — Max retry count (default: 1)
  *   DRAFT_RETRY_BASE_DELAY_MS — Base backoff delay in ms (default: 500)
  *   DRAFT_RETRY_MAX_JITTER_MS — Max random jitter in ms (default: 250)
+ *   DRAFT_RETRY_MAX_BACKOFF_MS — Ceiling for exponential backoff in ms (default: 10000)
  *   DRAFT_TIMEOUT_MS          — Per-attempt timeout in ms (default: 60000)
  */
 
@@ -329,6 +330,9 @@ const DRAFT_RETRY_BASE_DELAY_MS = parseNonNegativeInt(process.env.DRAFT_RETRY_BA
 
 /** Maximum random jitter added to retry delay (ms). */
 const DRAFT_RETRY_MAX_JITTER_MS = parseNonNegativeInt(process.env.DRAFT_RETRY_MAX_JITTER_MS, 250);
+
+/** Ceiling for exponential backoff (ms). Prevents unbounded growth at high retry counts. */
+const DRAFT_RETRY_MAX_BACKOFF_MS = parseNonNegativeInt(process.env.DRAFT_RETRY_MAX_BACKOFF_MS, 10_000);
 
 /** Timeout for a single GPT drafting attempt (ms). */
 const DRAFT_TIMEOUT_MS = parseNonNegativeInt(process.env.DRAFT_TIMEOUT_MS, 60_000);
@@ -398,7 +402,7 @@ async function generateDraftContentWithRetry(
                     totalAttempts: DRAFT_MAX_RETRIES + 1,
                     errorType: lastError.name,
                 }));
-                const backoff = DRAFT_RETRY_BASE_DELAY_MS * 2 ** attempt;
+                const backoff = Math.min(DRAFT_RETRY_BASE_DELAY_MS * 2 ** attempt, DRAFT_RETRY_MAX_BACKOFF_MS);
                 const jitter = Math.floor(Math.random() * DRAFT_RETRY_MAX_JITTER_MS);
                 await sleep(backoff + jitter);
             }

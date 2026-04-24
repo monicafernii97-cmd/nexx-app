@@ -303,26 +303,36 @@ function getTemplateName(exportPath: string): string {
  *
  * Effective behavior (with defaults):
  *   - First attempt: immediate
- *   - On failure: wait 500ms + 0–250ms jitter, then retry once
- *   - Each attempt has a 60s timeout via Promise.race
- *   - Total worst-case wall time: ~121.75s (60s + 0.75s + 60s + throw)
+ *   - On failure: exponential backoff (base 500ms × 2^attempt, capped at 10s)
+ *     plus random jitter (0–250ms), then retry up to DRAFT_MAX_RETRIES times
+ *   - Each attempt is guarded by an AbortController timeout (DRAFT_TIMEOUT_MS,
+ *     default 60s, minimum 1s) that cancels the in-flight OpenAI request
+ *   - Total worst-case wall time with defaults:
+ *     ~121.25s (60s attempt + ~0.75s backoff + 60s retry + throw)
  *
  * Environment variables:
- *   DRAFT_MAX_RETRIES         — Max retry count (default: 1)
- *   DRAFT_RETRY_BASE_DELAY_MS — Base backoff delay in ms (default: 500)
- *   DRAFT_RETRY_MAX_JITTER_MS — Max random jitter in ms (default: 250)
+ *   DRAFT_MAX_RETRIES          — Max retry count (default: 1)
+ *   DRAFT_RETRY_BASE_DELAY_MS  — Base backoff delay in ms (default: 500)
+ *   DRAFT_RETRY_MAX_JITTER_MS  — Max random jitter in ms (default: 250)
  *   DRAFT_RETRY_MAX_BACKOFF_MS — Ceiling for exponential backoff in ms (default: 10000)
- *   DRAFT_TIMEOUT_MS          — Per-attempt timeout in ms (default: 60000)
+ *   DRAFT_TIMEOUT_MS           — Per-attempt abort timeout in ms (default: 60000, min: 1000)
  */
+
+/** Node.js maximum safe setTimeout delay (2^31 - 1 ms ≈ 24.8 days). */
+const MAX_SAFE_TIMEOUT = 2_147_483_647;
 
 /**
  * Parse an environment variable as a non-negative integer.
- * Returns the default if the value is missing, NaN, or negative.
+ * Returns the default if the value is missing, non-numeric (e.g. "10ms"),
+ * NaN, or negative. Result is clamped to Node's max safe timer value.
  */
 function parseNonNegativeInt(envValue: string | undefined, defaultValue: number): number {
     if (envValue == null) return defaultValue;
-    const parsed = parseInt(envValue, 10);
-    return Number.isNaN(parsed) || parsed < 0 ? defaultValue : parsed;
+    const trimmed = envValue.trim();
+    if (!/^\d+$/.test(trimmed)) return defaultValue;
+    const parsed = parseInt(trimmed, 10);
+    if (Number.isNaN(parsed) || parsed < 0) return defaultValue;
+    return Math.min(parsed, MAX_SAFE_TIMEOUT);
 }
 
 /** Maximum retries for GPT drafting. */

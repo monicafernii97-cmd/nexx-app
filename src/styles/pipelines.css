@@ -1,0 +1,118 @@
+/**
+ * NEXX Pipeline Design System
+ * 
+ * Defines the 'Zen Legal' aesthetic:
+ * - Slate-900 / 800 backgrounds
+ * - Indigo accents for active states
+ * - Emerald accents for locked/success states
+ * - Glassmorphism cards
+ */
+
+:root {
+  --pipeline-bg: #0F172A;
+  --pipeline-surface: #1E293B;
+  --pipeline-border: #334155;
+  --pipeline-accent: #6366F1;
+  --pipeline-success: #10B981;
+  --pipeline-warning: #F59E0B;
+  --pipeline-error: #EF4444;
+  --pipeline-text-main: #F8FAFC;
+  --pipeline-text-muted: #94A3B8;
+}
+
+/* --- Section Box States --- */
+
+.section-box {
+  background: var(--pipeline-surface);
+  border: 1px solid var(--pipeline-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+  transition: all 0.2s ease-in-out;
+  position: relative;
+}
+
+.section-box:hover {
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.section-box.status-empty {
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+.section-box.status-drafted {
+  border-color: var(--pipeline-accent);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+}
+
+.section-box.status-court-ready {
+  border-color: var(--pipeline-accent);
+  background: rgba(99, 102, 241, 0.02);
+}
+
+.section-box.status-locked {
+  border-color: var(--pipeline-success);
+  background: rgba(16, 185, 129, 0.02);
+}
+
+/* --- Diff Highlighting --- */
+
+.section-change-added {
+  background: rgba(16, 185, 129, 0.15);
+  border-bottom: 2px solid var(--pipeline-success);
+  color: #fff;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.section-change-removed {
+  background: rgba(239, 68, 68, 0.1);
+  text-decoration: line-through;
+  color: var(--pipeline-text-muted);
+}
+
+/* --- Practical Preflight --- */
+
+.preflight-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.preflight-check-item.status-complete { color: var(--pipeline-success); }
+.preflight-check-item.status-warning { color: var(--pipeline-warning); }
+.preflight-check-item.status-missing { color: var(--pipeline-error); }
+
+/* --- Pipeline Switcher Cards --- */
+
+.pipeline-card {
+  background: rgba(30, 41, 59, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 2rem;
+  text-align: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.pipeline-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--pipeline-accent);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(99, 102, 241, 0.2);
+}
+
+/* --- Glassmorphic UI Containers --- */
+
+.glass-station {
+  background: rgba(30, 41, 59, 0.4);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+}

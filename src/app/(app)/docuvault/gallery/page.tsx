@@ -4,13 +4,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useMemo } from 'react';
 import {
     FileText,
-    Search,
+    MagnifyingGlass as Search,
     ArrowLeft,
-    Download,
-    Trash2,
+    DownloadSimple as Download,
+    Trash,
     Clock,
     Plus,
-} from 'lucide-react';
+    DotsThreeOutlineVertical,
+    CheckCircle,
+    XCircle,
+    WarningCircle
+} from '@phosphor-icons/react';
 import Link from 'next/link';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
@@ -107,7 +111,7 @@ export default function DocuVaultGalleryPage() {
                         className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all bg-white/10 border border-white/30 hover:bg-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_4px_12px_rgba(0,0,0,0.4)] backdrop-blur-xl shrink-0"
                         aria-label="Back to DocuVault"
                     >
-                        <ArrowLeft size={20} strokeWidth={3} className="text-white drop-shadow-sm" />
+                        <ArrowLeft size={20} weight="bold" className="text-white drop-shadow-sm" />
                     </Link>
                 }
             />
@@ -225,7 +229,7 @@ export default function DocuVaultGalleryPage() {
                             Generate your first legal document to see it here.
                         </p>
                         <Link href="/docuvault" className="text-[15px] font-bold tracking-widest uppercase px-8 py-4 rounded-full inline-flex items-center gap-3 no-underline transition-all bg-[linear-gradient(135deg,#60A5FA,#2563EB)] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_8px_24px_rgba(37,99,235,0.5)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_12px_32px_rgba(37,99,235,0.6)] hover:-translate-y-1">
-                            <Plus size={20} strokeWidth={3} /> Create Document
+                            <Plus size={20} weight="bold" /> Create Document
                         </Link>
                     </div>
                 )}
@@ -298,7 +302,7 @@ export default function DocuVaultGalleryPage() {
                                                     className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors shadow-sm"
                                                     aria-label="Download document"
                                                 >
-                                                    <Download size={16} strokeWidth={2.5} />
+                                                    <Download size={16} weight="bold" />
                                                 </a>
                                             )}
                                         </div>
@@ -358,7 +362,7 @@ export default function DocuVaultGalleryPage() {
                                             className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-[#F87171] hover:bg-red-500/10 hover:border-red-500/30 transition-colors shadow-sm disabled:opacity-40"
                                             aria-label="Delete document"
                                         >
-                                            <Trash2 size={16} strokeWidth={2.5} />
+                                            <Trash size={16} weight="bold" />
                                         </button>
                                     )}
                                 </motion.div>

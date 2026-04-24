@@ -410,6 +410,10 @@ export default defineSchema({
         model: v.optional(v.string()),
         /** Pipeline version identifier */
         pipelineVersion: v.optional(v.string()),
+        /** Links to a courtDocumentDrafts.documentId when exported from the Review Hub */
+        reviewHubDocumentId: v.optional(v.string()),
+        /** Draft version number at time of export (for audit trail) */
+        draftVersion: v.optional(v.number()),
         /** When pipeline execution started */
         startedAt: v.optional(v.number()),
         /** When pipeline execution completed */
@@ -902,4 +906,96 @@ export default defineSchema({
         .index('by_createdAt', ['createdAt'])
         .index('by_fingerprint', ['fingerprint'])
         .index('by_fingerprint_userId', ['fingerprint', 'userId']),
+
+    // ═══ Court Document Drafts (Review Hub — Document Shell) ═══
+    // Stores the document metadata shell. Sections stored separately.
+    courtDocumentDrafts: defineTable({
+        userId: v.id('users'),
+        caseId: v.optional(v.id('cases')),
+        documentId: v.string(),
+        documentType: v.string(),
+        title: v.optional(v.string()),
+        status: v.union(
+            v.literal('drafting'),
+            v.literal('preflight'),
+            v.literal('ready_to_export'),
+            v.literal('exported'),
+            v.literal('abandoned'),
+        ),
+        /** Schema version for forward-compatible migrations */
+        schemaVersion: v.number(),
+        /** Incremented on each save */
+        version: v.number(),
+        completionPct: v.optional(v.number()),
+        sectionCount: v.optional(v.number()),
+        /** Jurisdiction context (serialized) */
+        jurisdictionJson: v.optional(v.string()),
+        /** Source of initial content */
+        source: v.optional(v.union(
+            v.literal('parsed_input'),
+            v.literal('manual_start'),
+            v.literal('ai_generated'),
+        )),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+        lastOpenedAt: v.optional(v.number()),
+    })
+        .index('by_user', ['userId'])
+        .index('by_user_status', ['userId', 'status'])
+        .index('by_case', ['caseId'])
+        .index('by_documentId', ['documentId']),
+
+    // ═══ Court Document Sections (Review Hub — One Row Per Section) ═══
+    // Individual section storage for section-level autosave.
+    courtDocumentSections: defineTable({
+        documentId: v.string(),
+        userId: v.id('users'),
+        caseId: v.optional(v.id('cases')),
+        sectionId: v.string(),
+        heading: v.string(),
+        order: v.number(),
+        content: v.string(),
+        status: v.union(
+            v.literal('empty'),
+            v.literal('drafted'),
+            v.literal('court_ready'),
+            v.literal('locked'),
+        ),
+        source: v.union(
+            v.literal('blank_template'),
+            v.literal('parsed_input'),
+            v.literal('user_edit'),
+            v.literal('ai_draft'),
+            v.literal('ai_rewrite'),
+        ),
+        required: v.boolean(),
+        /** Feedback notes for AI rewrite instructions */
+        feedbackNotesJson: v.optional(v.string()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_document', ['documentId'])
+        .index('by_document_section', ['documentId', 'sectionId'])
+        .index('by_case', ['caseId']),
+
+    // ═══ Court Document Revisions (Review Hub — Audit Trail) ═══
+    // Stores revision history separately so large drafts don't bloat sections.
+    courtDocumentRevisions: defineTable({
+        documentId: v.string(),
+        sectionId: v.string(),
+        userId: v.id('users'),
+        before: v.string(),
+        after: v.string(),
+        /** JSON-encoded DiffSegment[] */
+        diffJson: v.optional(v.string()),
+        source: v.union(
+            v.literal('user_edit'),
+            v.literal('ai_draft'),
+            v.literal('ai_rewrite'),
+        ),
+        note: v.optional(v.string()),
+        createdAt: v.number(),
+    })
+        .index('by_document', ['documentId'])
+        .index('by_section', ['documentId', 'sectionId']),
 });

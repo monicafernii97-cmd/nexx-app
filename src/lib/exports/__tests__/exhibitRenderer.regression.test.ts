@@ -15,6 +15,7 @@ import { assertExportProfile } from '@/lib/jurisdiction/assertProfileForPipeline
 const txProfile = assertExportProfile(PROFILE_REGISTRY.get('tx-default')!);
 const usProfile = assertExportProfile(PROFILE_REGISTRY.get('us-default')!);
 
+/** Build a minimal exhibit document fixture with optional overrides. */
 function makeExhibitDoc(
   overrides: Partial<CanonicalExportDocument> = {},
 ): CanonicalExportDocument {

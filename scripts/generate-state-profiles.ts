@@ -55,30 +55,38 @@ const PROFILE_DIR = path.resolve(
   '../src/lib/jurisdiction/profiles/states',
 );
 
+/** Escape values for safe embedding in single-quoted TypeScript strings. */
+function escapeForSingleQuotedString(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+/** Generate the TypeScript source code for a state profile file. */
 function generateProfileFile(state: StateDef): string {
   const constName = `${state.code.toUpperCase()}_DEFAULT_PROFILE`;
-  const causeLabel = state.causeLabel ?? 'Case No.';
+  const causeLabel = escapeForSingleQuotedString(state.causeLabel ?? 'Case No.');
+  const safeName = escapeForSingleQuotedString(state.name);
+  const safeCode = escapeForSingleQuotedString(state.code);
 
   if (state.enriched) {
     return `/**
- * ${state.name} Default Jurisdiction Profile
+ * ${safeName} Default Jurisdiction Profile
  *
- * Enriched profile with ${state.name}-specific formatting rules.
+ * Enriched profile with ${safeName}-specific formatting rules.
  * Status: enriched_pending_review — awaiting manual verification.
  *
- * TODO: Verify against ${state.name} court rules
+ * TODO: Verify against ${safeName} court rules
  * TODO: Verify county-specific requirements
  * TODO: Confirm caption/cause line format
  */
 
 import { createStateDefaultProfile } from './createStateDefaultProfile';
 
-/** ${state.name} Default jurisdiction profile. */
-export const ${constName} = createStateDefaultProfile('${state.code}', '${state.name}', {
+/** ${safeName} Default jurisdiction profile. */
+export const ${constName} = createStateDefaultProfile('${safeCode}', '${safeName}', {
   accuracyStatus: 'enriched_pending_review',
   sourceNotes: [
     {
-      label: '${state.name} Rules of Civil Procedure',
+      label: '${safeName} Rules of Civil Procedure',
       reviewedAt: '${new Date().toISOString().split('T')[0]}',
       reviewedBy: 'automated_scaffold',
     },
@@ -101,14 +109,14 @@ export const ${constName} = createStateDefaultProfile('${state.code}', '${state.
       signatureKeepTogether: true,
       verificationKeepTogether: true,
     },
-    // TODO: Add verified ${state.name} formatting rules here
+    // TODO: Add verified ${safeName} formatting rules here
   },
 });
 `;
   }
 
   return `/**
- * ${state.name} Default Jurisdiction Profile (Thin Default)
+ * ${safeName} Default Jurisdiction Profile (Thin Default)
  *
  * Inherits all formatting from US_DEFAULT_PROFILE.
  * No state-specific research applied yet.
@@ -119,21 +127,24 @@ export const ${constName} = createStateDefaultProfile('${state.code}', '${state.
 
 import { createStateDefaultProfile } from './createStateDefaultProfile';
 
-/** ${state.name} Default jurisdiction profile (thin default). */
-export const ${constName} = createStateDefaultProfile('${state.code}', '${state.name}');
+/** ${safeName} Default jurisdiction profile (thin default). */
+export const ${constName} = createStateDefaultProfile('${safeCode}', '${safeName}');
 `;
 }
 
+/** Generate the import statement for a state profile to add to registry.ts. */
 function generateRegistryImport(state: StateDef): string {
   const constName = `${state.code.toUpperCase()}_DEFAULT_PROFILE`;
   return `import { ${constName} } from './states/${state.code.toLowerCase()}';`;
 }
 
+/** Generate the STATE_PROFILE_MAP entry for a state. */
 function generateRegistryEntry(state: StateDef): string {
   const constName = `${state.code.toUpperCase()}_DEFAULT_PROFILE`;
   return `  ${state.code.toUpperCase()}: ${constName},`;
 }
 
+/** Generate the test matrix entry for a state. */
 function generateTestEntry(state: StateDef): string {
   return `  { code: '${state.code.toUpperCase()}', name: '${state.name}', expectedKey: '${state.code.toLowerCase()}-default' },`;
 }
@@ -142,6 +153,7 @@ function generateTestEntry(state: StateDef): string {
 // Main
 // ═══════════════════════════════════════════════════════════════
 
+/** Main entry point — generates profile files and prints integration snippets. */
 function main() {
   if (BATCH_STATES.length === 0) {
     console.log('No states to generate. Edit BATCH_STATES in this script.');

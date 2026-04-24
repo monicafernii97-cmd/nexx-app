@@ -15,6 +15,7 @@ import { assertExportProfile } from '@/lib/jurisdiction/assertProfileForPipeline
 const usProfile = assertExportProfile(PROFILE_REGISTRY.get('us-default')!);
 const fedProfile = assertExportProfile(PROFILE_REGISTRY.get('federal-default')!);
 
+/** Build a minimal timeline document fixture with optional overrides. */
 function makeTimelineDoc(
   overrides: Partial<CanonicalExportDocument> = {},
 ): CanonicalExportDocument {

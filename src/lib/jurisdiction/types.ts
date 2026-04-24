@@ -215,22 +215,38 @@ export type JurisdictionProfile = {
 /**
  * Validates that a profile's accuracy metadata is consistent.
  * - Enriched profiles must have at least one sourceNotes entry.
+ * - Each sourceNote must have a non-empty label and a defined reviewedAt.
  * - Throws at registry-build time to prevent silent violations.
  *
  * @param profile - The profile to validate
  * @returns The profile (passthrough for chaining)
- * @throws Error if an enriched profile is missing sourceNotes
+ * @throws Error if an enriched profile has invalid or missing sourceNotes
  */
 export function validateProfileAccuracy(profile: JurisdictionProfile): JurisdictionProfile {
   const status = profile.accuracyStatus;
-  if (
-    (status === 'enriched_pending_review' || status === 'enriched_verified') &&
-    (!profile.sourceNotes || profile.sourceNotes.length === 0)
-  ) {
-    throw new Error(
-      `Profile "${profile.key}" has accuracyStatus="${status}" but no sourceNotes. ` +
-      `Enriched profiles must document their formatting sources.`,
-    );
+  if (status === 'enriched_pending_review' || status === 'enriched_verified') {
+    if (!profile.sourceNotes || profile.sourceNotes.length === 0) {
+      throw new Error(
+        `Profile "${profile.key}" has accuracyStatus="${status}" but no sourceNotes. ` +
+        `Enriched profiles must document their formatting sources.`,
+      );
+    }
+
+    for (let i = 0; i < profile.sourceNotes.length; i++) {
+      const note = profile.sourceNotes[i];
+      if (!note.label || !note.label.trim()) {
+        throw new Error(
+          `Profile "${profile.key}" sourceNotes[${i}] has an empty label. ` +
+          `Each source note must have a descriptive label.`,
+        );
+      }
+      if (!note.reviewedAt) {
+        throw new Error(
+          `Profile "${profile.key}" sourceNotes[${i}] is missing reviewedAt. ` +
+          `Each source note must document when it was reviewed.`,
+        );
+      }
+    }
   }
   return profile;
 }

@@ -299,6 +299,14 @@ function getTemplateName(exportPath: string): string {
 /** Maximum retries for GPT drafting. */
 const DRAFT_MAX_RETRIES = 1;
 
+/** Delay between retry attempts (ms). */
+const DRAFT_RETRY_DELAY_MS = 500;
+
+/** Simple async delay utility. */
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 /**
  * Call generateDraftContent with one retry on failure or incomplete output.
  * Validates that all requested sections are returned.
@@ -318,9 +326,10 @@ async function generateDraftContentWithRetry(
             const missing = expectedSectionIds.filter(id => {
                 const section = draftedMap.get(id);
                 if (!section) return true;
-                // Treat blank body + no numbered items as effectively missing
+                // Treat blank body + no meaningful numbered items as effectively missing
                 const hasBody = section.body?.trim();
-                const hasItems = section.numberedItems && section.numberedItems.length > 0;
+                const hasItems = section.numberedItems
+                    && section.numberedItems.some(item => item?.trim());
                 return !hasBody && !hasItems;
             });
             if (drafted.length === 0 || missing.length > 0) {
@@ -347,9 +356,10 @@ async function generateDraftContentWithRetry(
                     component: 'PipelineBridge',
                     event: 'ai_drafting_retry',
                     attempt: attempt + 1,
-                    maxRetries: DRAFT_MAX_RETRIES + 1,
+                    totalAttempts: DRAFT_MAX_RETRIES + 1,
                     error: lastError.message,
                 }));
+                await sleep(DRAFT_RETRY_DELAY_MS);
             }
         }
     }

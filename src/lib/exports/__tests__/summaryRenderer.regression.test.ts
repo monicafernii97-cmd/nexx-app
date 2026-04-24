@@ -15,6 +15,7 @@ import { assertExportProfile } from '@/lib/jurisdiction/assertProfileForPipeline
 const usProfile = assertExportProfile(PROFILE_REGISTRY.get('us-default')!);
 const txProfile = assertExportProfile(PROFILE_REGISTRY.get('tx-default')!);
 
+/** Build a minimal summary document fixture with optional overrides. */
 function makeSummaryDoc(
   overrides: Partial<CanonicalExportDocument> = {},
 ): CanonicalExportDocument {
@@ -143,9 +144,15 @@ describe('renderSummaryExportHTML — sections', () => {
       ],
     });
     const html = renderSummaryExportHTML(doc, usProfile);
+    expect(html).toContain('Background');
+    expect(html).toContain('Issues');
+    expect(html).toContain('Timeline');
     const idx1 = html.indexOf('Background');
     const idx2 = html.indexOf('Issues');
     const idx3 = html.indexOf('Timeline');
+    expect(idx1).toBeGreaterThan(-1);
+    expect(idx2).toBeGreaterThan(-1);
+    expect(idx3).toBeGreaterThan(-1);
     expect(idx1).toBeLessThan(idx2);
     expect(idx2).toBeLessThan(idx3);
   });

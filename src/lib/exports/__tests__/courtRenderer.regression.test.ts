@@ -19,6 +19,7 @@ const fedProfile = assertExportProfile(PROFILE_REGISTRY.get('federal-default')!)
 
 // ── Helpers ──
 
+/** Build a minimal court document fixture with optional overrides. */
 function makeCourtDoc(
   overrides: Partial<CanonicalExportDocument> = {},
 ): CanonicalExportDocument {
@@ -201,6 +202,8 @@ describe('renderCourtExportHTML — body sections', () => {
       ],
     });
     const html = renderCourtExportHTML(doc, txProfile);
+    expect(html).toContain('SECTION ONE');
+    expect(html).toContain('SECTION TWO');
     const idx1 = html.indexOf('SECTION ONE');
     const idx2 = html.indexOf('SECTION TWO');
     expect(idx1).toBeLessThan(idx2);

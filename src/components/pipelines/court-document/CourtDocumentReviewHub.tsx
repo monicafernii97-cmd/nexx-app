@@ -147,6 +147,14 @@ export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: Revie
       return;
     }
 
+    // Draft shell exists but sections are empty (orphaned shell from failed creation).
+    // Derive sections from the shell's documentType rather than fabricating a motion.
+    if (convexDraft && convexSections.length === 0) {
+      const docType = (convexDraft.documentType as DocumentType) || 'motion';
+      setState(buildCourtDocumentDraftState({ documentType: docType, documentId: docId }));
+      return;
+    }
+
     // Try localStorage fallback
     const local = loadDraftFromStorage(docId);
     if (local) {
@@ -154,8 +162,8 @@ export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: Revie
       return;
     }
 
-    // Fresh state (shouldn't happen if DraftingHub created it)
-    setState(buildCourtDocumentDraftState({ documentType: 'motion' }));
+    // No draft exists anywhere — build fresh (shouldn't happen if DraftingHub created it)
+    setState(buildCourtDocumentDraftState({ documentType: 'motion', documentId: docId }));
   }, [convexDraft, convexSections, convexRevisions, state, docId, touchDraft]);
 
   // ── Auto-save to localStorage on every state change ──

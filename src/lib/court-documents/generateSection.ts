@@ -58,13 +58,25 @@ export async function generateSectionContent(
       signal: input.signal,
     });
 
-    const section = drafted[0];
+    // Find the section matching the requested sectionId (not just [0])
+    const section = drafted.find(s => s.sectionId === input.sectionId) ?? drafted[0];
     const hasBody = Boolean(section?.body?.trim());
     const hasItems = Boolean(section?.numberedItems?.some((item: string) => item.trim()));
     if (!section || (!hasBody && !hasItems)) {
       return {
         success: false,
         error: 'AI_GENERATION_EMPTY',
+      };
+    }
+
+    // Verify the AI actually returned content for the requested section
+    if (section.sectionId !== input.sectionId) {
+      console.warn(
+        `[generateSectionContent] AI returned section "${section.sectionId}" but "${input.sectionId}" was requested`,
+      );
+      return {
+        success: false,
+        error: 'AI_GENERATION_WRONG_SECTION',
       };
     }
 

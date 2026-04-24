@@ -33,6 +33,8 @@ export interface BuildDraftStateInput {
   jurisdiction?: JurisdictionContext;
   /** User ID for metadata */
   createdBy?: string;
+  /** Explicit document ID (used when hydrating from an existing shell) */
+  documentId?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -48,11 +50,11 @@ export interface BuildDraftStateInput {
 export function buildCourtDocumentDraftState(
   input: BuildDraftStateInput,
 ): CourtDocumentDraftState {
-  const { documentType, parsedContent, jurisdiction, createdBy } = input;
+  const { documentType, parsedContent, jurisdiction, createdBy, documentId: explicitId } = input;
   const sectionDefs = deriveRequiredSections(documentType);
 
   const now = new Date().toISOString();
-  const docId = `draft_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const docId = explicitId ?? `draft_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const hasParsed = !!parsedContent;
 
   const sections: CourtDocumentSection[] = sectionDefs.map((def, index) => {

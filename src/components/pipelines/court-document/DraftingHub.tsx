@@ -37,6 +37,7 @@ export default function DraftingHub({ onManualIntake }: DraftingHubProps) {
   const drafts = useQuery(api.courtDocumentDrafts.listByUser, {});
   const createDraft = useMutation(api.courtDocumentDrafts.create);
   const createSections = useMutation(api.courtDocumentSections.createMany);
+  const abandonDraft = useMutation(api.courtDocumentDrafts.abandon);
 
   const handleCreateDraft = useCallback(async (documentType: string) => {
     const documentId = `draft_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -53,20 +54,27 @@ export default function DraftingHub({ onManualIntake }: DraftingHubProps) {
         source: 'manual_start',
       });
 
-      // Create all sections
-      await createSections({
-        documentId,
-        caseId: activeCaseId ?? undefined,
-        sections: sections.map((s, i) => ({
-          sectionId: s.id,
-          heading: s.heading,
-          order: i,
-          content: '',
-          status: 'empty' as const,
-          source: 'blank_template' as const,
-          required: s.required,
-        })),
-      });
+      // Create all sections — rollback draft shell on failure
+      try {
+        await createSections({
+          documentId,
+          caseId: activeCaseId ?? undefined,
+          sections: sections.map((s, i) => ({
+            sectionId: s.id,
+            heading: s.heading,
+            order: i,
+            content: '',
+            status: 'empty' as const,
+            source: 'blank_template' as const,
+            required: s.required,
+          })),
+        });
+      } catch (sectionErr) {
+        // Rollback: abandon the orphaned shell so it doesn't appear in the queue
+        console.error('[DraftingHub] Section creation failed, rolling back draft shell:', sectionErr);
+        await abandonDraft({ documentId }).catch(() => {});
+        throw sectionErr;
+      }
     } catch (err) {
       console.error('[DraftingHub] Draft creation failed:', err);
       throw err;
@@ -74,7 +82,7 @@ export default function DraftingHub({ onManualIntake }: DraftingHubProps) {
 
     // Navigate to Review Hub
     router.push(`/docuvault/review/${documentId}`);
-  }, [createDraft, createSections, activeCaseId, router]);
+  }, [createDraft, createSections, abandonDraft, activeCaseId, router]);
 
   const entryPoints = [
     {

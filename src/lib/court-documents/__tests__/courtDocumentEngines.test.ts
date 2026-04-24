@@ -1,3 +1,4 @@
+import { describe, test, expect, beforeEach } from 'vitest';
 /**
  * Unit Tests — Court Document Core Engines
  *

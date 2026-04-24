@@ -145,11 +145,18 @@ export const updateStatus = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error('Not authenticated');
 
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+    if (!user) throw new Error('User not found');
+
     const draft = await ctx.db
       .query('courtDocumentDrafts')
       .withIndex('by_documentId', (q) => q.eq('documentId', args.documentId))
       .unique();
     if (!draft) throw new Error('Draft not found');
+    if (draft.userId !== user._id) throw new Error('Not authorized');
 
     await ctx.db.patch(draft._id, {
       status: args.status,
@@ -166,11 +173,17 @@ export const touch = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error('Not authenticated');
 
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+    if (!user) return;
+
     const draft = await ctx.db
       .query('courtDocumentDrafts')
       .withIndex('by_documentId', (q) => q.eq('documentId', args.documentId))
       .unique();
-    if (!draft) return;
+    if (!draft || draft.userId !== user._id) return;
 
     await ctx.db.patch(draft._id, {
       lastOpenedAt: Date.now(),
@@ -190,11 +203,17 @@ export const bumpVersion = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error('Not authenticated');
 
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+    if (!user) return;
+
     const draft = await ctx.db
       .query('courtDocumentDrafts')
       .withIndex('by_documentId', (q) => q.eq('documentId', args.documentId))
       .unique();
-    if (!draft) return;
+    if (!draft || draft.userId !== user._id) return;
 
     await ctx.db.patch(draft._id, {
       version: draft.version + 1,
@@ -216,11 +235,17 @@ export const abandon = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error('Not authenticated');
 
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+    if (!user) return;
+
     const draft = await ctx.db
       .query('courtDocumentDrafts')
       .withIndex('by_documentId', (q) => q.eq('documentId', args.documentId))
       .unique();
-    if (!draft) return;
+    if (!draft || draft.userId !== user._id) return;
 
     await ctx.db.patch(draft._id, {
       status: 'abandoned',

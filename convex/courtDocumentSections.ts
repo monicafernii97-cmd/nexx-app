@@ -48,6 +48,15 @@ export const createMany = mutation({
       .unique();
     if (!user) throw new Error('User not found');
 
+    // Verify the parent draft belongs to this user
+    const parentDraft = await ctx.db
+      .query('courtDocumentDrafts')
+      .withIndex('by_documentId', (q) => q.eq('documentId', args.documentId))
+      .unique();
+    if (!parentDraft || parentDraft.userId !== user._id) {
+      throw new Error('Not authorized');
+    }
+
     const now = Date.now();
     const ids: string[] = [];
 
@@ -83,6 +92,19 @@ export const listByDocument = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
+
+    // Verify ownership via parent draft
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+    if (!user) return [];
+
+    const parentDraft = await ctx.db
+      .query('courtDocumentDrafts')
+      .withIndex('by_documentId', (q) => q.eq('documentId', args.documentId))
+      .unique();
+    if (!parentDraft || parentDraft.userId !== user._id) return [];
 
     const sections = await ctx.db
       .query('courtDocumentSections')
@@ -130,6 +152,13 @@ export const updateContent = mutation({
       .unique();
     if (!section) throw new Error(`Section not found: ${args.sectionId}`);
 
+    // Verify ownership via section.userId
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+    if (!user || section.userId !== user._id) throw new Error('Not authorized');
+
     await ctx.db.patch(section._id, {
       content: args.content,
       status: args.status,
@@ -163,6 +192,13 @@ export const updateStatus = mutation({
       .unique();
     if (!section) throw new Error(`Section not found: ${args.sectionId}`);
 
+    // Verify ownership via section.userId
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+    if (!user || section.userId !== user._id) throw new Error('Not authorized');
+
     await ctx.db.patch(section._id, {
       status: args.status,
       updatedAt: Date.now(),
@@ -179,6 +215,21 @@ export const reorder = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error('Not authenticated');
+
+    // Verify ownership via parent draft
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+    if (!user) throw new Error('User not found');
+
+    const parentDraft = await ctx.db
+      .query('courtDocumentDrafts')
+      .withIndex('by_documentId', (q) => q.eq('documentId', args.documentId))
+      .unique();
+    if (!parentDraft || parentDraft.userId !== user._id) {
+      throw new Error('Not authorized');
+    }
 
     const sections = await ctx.db
       .query('courtDocumentSections')

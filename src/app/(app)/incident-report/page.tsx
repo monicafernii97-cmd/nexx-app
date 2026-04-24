@@ -72,7 +72,7 @@ export default function IncidentReportPage() {
                 String(now.getDate()).padStart(2, '0'),
             ].join('-');
             await createIncident({
-                narrative: narrative.trim(),
+                narrative: trimmed,
                 severity: 1,
                 date: localDate,
                 time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
@@ -99,6 +99,7 @@ export default function IncidentReportPage() {
                 type: 'key_fact',
                 title: `Incident — ${incident.date}`,
                 content: incident.narrative,
+                requestId: `incident:${incident._id}:workspace`,
             });
         } catch (err) {
             console.error('[IncidentIntake] Pin creation failed:', err);

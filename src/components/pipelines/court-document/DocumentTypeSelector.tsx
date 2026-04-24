@@ -32,14 +32,18 @@ interface DocumentTypeSelectorProps {
 export default function DocumentTypeSelector({ isOpen, onClose, onSelect }: DocumentTypeSelectorProps) {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const selectedSections = selectedType ? deriveRequiredSections(selectedType as DocumentType) : [];
 
   const handleConfirm = async () => {
     if (!selectedType || isCreating) return;
     setIsCreating(true);
+    setCreateError(null);
     try {
       await onSelect(selectedType);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'Failed to create draft. Please try again.');
     } finally {
       setIsCreating(false);
     }
@@ -151,7 +155,12 @@ export default function DocumentTypeSelector({ isOpen, onClose, onSelect }: Docu
             </AnimatePresence>
 
             {/* Confirm Button */}
-            <div className="p-6 pt-2 border-t border-white/5">
+            <div className="p-6 pt-2 border-t border-white/5 space-y-3">
+              {createError && (
+                <div role="alert" className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                  {createError}
+                </div>
+              )}
               <button
                 onClick={handleConfirm}
                 disabled={!selectedType || isCreating}

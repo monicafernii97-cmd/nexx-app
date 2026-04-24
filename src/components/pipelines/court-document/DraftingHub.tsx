@@ -76,7 +76,7 @@ export default function DraftingHub({ onManualIntake }: DraftingHubProps) {
       }
     } catch (err) {
       console.error('[DraftingHub] Draft creation failed:', err);
-      throw err;
+      throw err; // Surfaced by DocumentTypeSelector's error UI
     }
 
     // Navigate to Review Hub

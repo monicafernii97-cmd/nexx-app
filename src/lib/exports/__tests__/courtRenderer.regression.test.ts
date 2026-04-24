@@ -310,8 +310,8 @@ describe('renderCourtExportHTML — closing blocks', () => {
 describe('renderCourtExportHTML — profile integration', () => {
   it('applies Texas profile typography', () => {
     const html = renderCourtExportHTML(makeCourtDoc(), txProfile);
-    expect(html).toContain('Times New Roman');
-    expect(html).toContain('12pt');
+    expect(html).toContain(txProfile.typography.fontFamily);
+    expect(html).toContain(`${txProfile.typography.fontSizePt}pt`);
   });
 
   it('applies page margins from profile', () => {

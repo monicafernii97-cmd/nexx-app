@@ -240,7 +240,7 @@ export function validateProfileAccuracy(profile: JurisdictionProfile): Jurisdict
           `Each source note must have a descriptive label.`,
         );
       }
-      if (!note.reviewedAt) {
+      if (!note.reviewedAt || !note.reviewedAt.trim()) {
         throw new Error(
           `Profile "${profile.key}" sourceNotes[${i}] is missing reviewedAt. ` +
           `Each source note must document when it was reviewed.`,

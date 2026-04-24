@@ -177,8 +177,9 @@ describe('renderSummaryExportHTML — sections', () => {
 describe('renderSummaryExportHTML — profile integration', () => {
   it('applies profile typography', () => {
     const html = renderSummaryExportHTML(makeSummaryDoc(), txProfile);
-    expect(html).toContain('Times New Roman');
-    expect(html).toContain('12pt');
+    expect(html).toContain(txProfile.typography.fontFamily);
+    expect(html).toContain(`${txProfile.typography.fontSizePt}pt`);
+    expect(html).toContain(`${txProfile.typography.lineHeightPt}pt`);
   });
 
   it('HTML exceeds minimum length', () => {

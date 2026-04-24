@@ -161,13 +161,13 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
                 source: 'ai_drafted' as const,
             }));
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorType = error instanceof Error ? error.name : typeof error;
             console.error(JSON.stringify({
                 component: 'PipelineBridge',
                 event: 'ai_drafting_failed_with_fallback',
                 exportPath: request.path,
                 failedSections: sectionsToGenerate,
-                error: errorMessage,
+                errorType,
             }));
 
             // Fallback: use raw review item text for failed sections
@@ -299,12 +299,30 @@ function getTemplateName(exportPath: string): string {
 /** Maximum retries for GPT drafting. */
 const DRAFT_MAX_RETRIES = 1;
 
-/** Delay between retry attempts (ms). */
-const DRAFT_RETRY_DELAY_MS = 500;
+/** Base delay between retry attempts (ms). */
+const DRAFT_RETRY_BASE_DELAY_MS = 500;
+
+/** Maximum random jitter added to retry delay (ms). */
+const DRAFT_RETRY_MAX_JITTER_MS = 250;
+
+/** Timeout for a single GPT drafting attempt (ms). */
+const DRAFT_TIMEOUT_MS = 60_000;
 
 /** Simple async delay utility. */
 function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Wrap a promise with a timeout. Rejects with a descriptive error
+ * if the promise does not settle within the specified duration.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -319,7 +337,11 @@ async function generateDraftContentWithRetry(
 
     for (let attempt = 0; attempt <= DRAFT_MAX_RETRIES; attempt++) {
         try {
-            const drafted = await generateDraftContent(params);
+            const drafted = await withTimeout(
+                generateDraftContent(params),
+                DRAFT_TIMEOUT_MS,
+                'generateDraftContent',
+            );
 
             // Guard: treat empty or partial AI output as failure
             const draftedMap = new Map(drafted.map(s => [s.sectionId, s]));
@@ -357,9 +379,11 @@ async function generateDraftContentWithRetry(
                     event: 'ai_drafting_retry',
                     attempt: attempt + 1,
                     totalAttempts: DRAFT_MAX_RETRIES + 1,
-                    error: lastError.message,
+                    errorType: lastError.name,
                 }));
-                await sleep(DRAFT_RETRY_DELAY_MS);
+                const backoff = DRAFT_RETRY_BASE_DELAY_MS * 2 ** attempt;
+                const jitter = Math.floor(Math.random() * DRAFT_RETRY_MAX_JITTER_MS);
+                await sleep(backoff + jitter);
             }
         }
     }

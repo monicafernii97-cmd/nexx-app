@@ -146,7 +146,8 @@ function generateRegistryEntry(state: StateDef): string {
 
 /** Generate the test matrix entry for a state. */
 function generateTestEntry(state: StateDef): string {
-  return `  { code: '${state.code.toUpperCase()}', name: '${state.name}', expectedKey: '${state.code.toLowerCase()}-default' },`;
+  const safeName = escapeForSingleQuotedString(state.name);
+  return `  { code: '${state.code.toUpperCase()}', name: '${safeName}', expectedKey: '${state.code.toLowerCase()}-default' },`;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -165,6 +166,16 @@ function main() {
   console.log(`Generating ${BATCH_STATES.length} state profiles...\n`);
 
   for (const state of BATCH_STATES) {
+    // Validate state code to prevent path traversal or invalid TS identifiers
+    if (!/^[A-Z]{2}$/.test(state.code)) {
+      console.error(`  ✗ SKIP: Invalid state code "${state.code}". Expected exactly two uppercase letters (e.g., "WI").`);
+      continue;
+    }
+    if (!state.name.trim()) {
+      console.error(`  ✗ SKIP: Empty state name for code "${state.code}".`);
+      continue;
+    }
+
     const filename = `${state.code.toLowerCase()}.ts`;
     const filepath = path.join(PROFILE_DIR, filename);
 

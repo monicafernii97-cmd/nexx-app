@@ -182,6 +182,9 @@ export const updateContent = mutation({
       .unique();
     if (!user || section.userId !== user._id) throw new Error('Not authorized');
 
+    // Reject writes to locked sections (prevents autosave from overriding lock)
+    if (section.status === 'locked') throw new Error('Section is locked');
+
     await ctx.db.patch(section._id, {
       content: args.content,
       status: args.status,
@@ -260,9 +263,17 @@ export const reorder = mutation({
       .collect();
 
     // Validate: orderedSectionIds must be a complete permutation of existing sections
+    if (args.orderedSectionIds.length !== sections.length) {
+      throw new Error(
+        `reorder: Expected ${sections.length} positions but received ${args.orderedSectionIds.length}`,
+      );
+    }
     const existingIds = new Set(sections.map(s => s.sectionId));
     const inputIds = new Set(args.orderedSectionIds);
 
+    if (inputIds.size !== args.orderedSectionIds.length) {
+      throw new Error('reorder: orderedSectionIds contains duplicates');
+    }
     if (inputIds.size !== existingIds.size) {
       throw new Error(
         `reorder: Expected ${existingIds.size} section IDs but received ${inputIds.size}`,

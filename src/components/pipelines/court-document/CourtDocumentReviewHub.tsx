@@ -207,6 +207,13 @@ export default function CourtDocumentReviewHub({ docId, caseId: _caseId }: Revie
 
       const timer = setTimeout(async () => {
         try {
+          // Skip save if the section is now locked (prevents autosave from overriding lock)
+          const currentSection = stateRef.current?.sections.find(s => s.id === sectionId);
+          if (currentSection?.status === 'locked') {
+            pendingSavesRef.current.delete(sectionId);
+            return;
+          }
+
           // Persist section content
           await updateSectionConvex({
             documentId: docId,

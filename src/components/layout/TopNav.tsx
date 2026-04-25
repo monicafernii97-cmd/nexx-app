@@ -35,6 +35,8 @@ export function TopNav() {
     const [isCreating, setIsCreating] = useState(false);
     const [pendingActions, setPendingActions] = useState<Set<Id<'cases'>>>(new Set());
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const creatingRef = useRef(false);
+    const pendingActionsRef = useRef<Set<Id<'cases'>>>(new Set());
 
     const createCase = useMutation(api.cases.create);
     const archiveCase = useMutation(api.cases.archive);
@@ -56,10 +58,11 @@ export function TopNav() {
 
     /** Create a new case and switch to it. */
     const handleNewCase = useCallback(async () => {
-        if (isCreating) return;
+        if (creatingRef.current || cases === undefined) return;
+        creatingRef.current = true;
         setIsCreating(true);
         try {
-            const nextNum = (cases?.length ?? 0) + 1;
+            const nextNum = cases.length + 1;
             const newCaseId = await createCase({
                 title: `Case ${nextNum}`,
             });
@@ -75,14 +78,17 @@ export function TopNav() {
                 variant: 'error',
             });
         } finally {
+            creatingRef.current = false;
             setIsCreating(false);
         }
-    }, [isCreating, createCase, cases, setActiveCaseId, showToast]);
+    }, [createCase, cases, setActiveCaseId, showToast]);
 
     /** Archive an active case. */
     const handleArchive = useCallback(async (caseId: Id<'cases'>) => {
-        if (pendingActions.has(caseId)) return;
-        setPendingActions(prev => new Set(prev).add(caseId));
+        if (pendingActionsRef.current.has(caseId)) return;
+        const nextPending = new Set(pendingActionsRef.current).add(caseId);
+        pendingActionsRef.current = nextPending;
+        setPendingActions(nextPending);
         try {
             await archiveCase({ caseId });
             setIsSwitcherOpen(false);
@@ -94,18 +100,19 @@ export function TopNav() {
                 variant: 'error',
             });
         } finally {
-            setPendingActions(prev => {
-                const next = new Set(prev);
-                next.delete(caseId);
-                return next;
-            });
+            const cleared = new Set(pendingActionsRef.current);
+            cleared.delete(caseId);
+            pendingActionsRef.current = cleared;
+            setPendingActions(cleared);
         }
-    }, [archiveCase, pendingActions, showToast]);
+    }, [archiveCase, showToast]);
 
     /** Restore an archived case and switch to it. */
     const handleUnarchive = useCallback(async (caseId: Id<'cases'>) => {
-        if (pendingActions.has(caseId)) return;
-        setPendingActions(prev => new Set(prev).add(caseId));
+        if (pendingActionsRef.current.has(caseId)) return;
+        const nextPending = new Set(pendingActionsRef.current).add(caseId);
+        pendingActionsRef.current = nextPending;
+        setPendingActions(nextPending);
         try {
             await unarchiveCase({ caseId });
             setActiveCaseId(caseId);
@@ -118,13 +125,12 @@ export function TopNav() {
                 variant: 'error',
             });
         } finally {
-            setPendingActions(prev => {
-                const next = new Set(prev);
-                next.delete(caseId);
-                return next;
-            });
+            const cleared = new Set(pendingActionsRef.current);
+            cleared.delete(caseId);
+            pendingActionsRef.current = cleared;
+            setPendingActions(cleared);
         }
-    }, [unarchiveCase, pendingActions, setActiveCaseId, showToast]);
+    }, [unarchiveCase, setActiveCaseId, showToast]);
 
     return (
         <div className="h-[72px] flex items-center justify-between px-8 hyper-glass rounded-2xl mb-6 glow-slate">
@@ -206,7 +212,7 @@ export function TopNav() {
                                                         handleArchive(c._id);
                                                     }}
                                                     disabled={pendingActions.has(c._id)}
-                                                    className="p-1 rounded-lg opacity-0 group-hover/item:opacity-100 hover:bg-white/10 text-white/30 hover:text-white/60 transition-all cursor-pointer disabled:opacity-50"
+                                                    className="p-1 rounded-lg opacity-0 group-hover/item:opacity-100 group-focus-within/item:opacity-100 focus-visible:opacity-100 hover:bg-white/10 text-white/30 hover:text-white/60 transition-all cursor-pointer disabled:opacity-50"
                                                     aria-label={`Archive ${c.title}`}
                                                     title={`Archive "${c.title}"`}
                                                 >
@@ -248,12 +254,12 @@ export function TopNav() {
                                 <button
                                     type="button"
                                     onClick={handleNewCase}
-                                    disabled={isCreating}
+                                    disabled={isCreating || cases === undefined}
                                     className="w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-indigo-500/10 text-indigo-400/70 hover:text-indigo-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                 >
                                     <Plus size={18} weight="bold" />
                                     <span className="text-[13px] font-bold uppercase tracking-widest">
-                                        {isCreating ? 'Creating...' : 'New Case'}
+                                        {cases === undefined ? 'Loading cases…' : isCreating ? 'Creating...' : 'New Case'}
                                     </span>
                                 </button>
                             </div>

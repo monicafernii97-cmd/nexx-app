@@ -89,7 +89,7 @@ export default function ChatListPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="glass-ethereal p-8 mb-10 rounded-[2rem] border-white"
+                className="glass-ethereal p-6 mb-8 rounded-[2rem] border-white"
             >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
@@ -101,7 +101,7 @@ export default function ChatListPage() {
                     <button
                         onClick={handleNewChat}
                         disabled={isCreating || !isWorkspaceReady}
-                        className="btn-primary shrink-0 py-4 px-8 text-[13px] uppercase tracking-widest flex items-center gap-2 disabled:scale-100 disabled:opacity-50 shadow-md transition-all self-start md:self-end"
+                        className="btn-primary shrink-0 py-3 px-6 text-[11px] uppercase tracking-widest flex items-center gap-2 disabled:scale-100 disabled:opacity-50 shadow-md transition-all self-start md:self-end"
                     >
                         <Plus size={16} weight="bold" />
                         {isCreating ? 'Initializing...' : 'New Session'}
@@ -135,14 +135,14 @@ export default function ChatListPage() {
                         </div>
                     </div>
                 ) : activeConversations.length === 0 ? (
-                    <div className="card-premium p-12 text-center mb-8 flex flex-col items-center justify-center border-dashed">
+                    <div className="card-premium p-10 text-center mb-8 flex flex-col items-center justify-center border-dashed">
                         <div
-                            className="w-20 h-20 rounded-[2rem] mx-auto mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_25px_rgba(18,61,126,0.4)] border border-[rgba(255,255,255,0.1)] relative overflow-hidden"
+                            className="w-14 h-14 rounded-[1.25rem] mx-auto mb-5 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_25px_rgba(18,61,126,0.4)] border border-[rgba(255,255,255,0.1)] relative overflow-hidden"
                         >
                             <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity" />
-                            <ChatCircleDots size={36} weight="duotone" className="text-white relative z-10" />
+                            <ChatCircleDots size={24} weight="duotone" className="text-white relative z-10" />
                         </div>
-                        <p className="text-[16px] font-bold mb-2 text-sapphire">
+                        <p className="text-[14px] font-bold mb-2 text-sapphire">
                             No conversations yet
                         </p>
                         <p className="text-[14px] font-medium text-sapphire-muted max-w-xs mx-auto">

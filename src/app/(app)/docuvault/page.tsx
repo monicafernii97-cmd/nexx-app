@@ -5,7 +5,6 @@ import { useState, useRef, useCallback, useEffect, Suspense } from 'react';
 import {
     Bank,
     CaretLeft,
-    CaretRight,
     FileText,
     Strategy,
     Plus,
@@ -15,7 +14,6 @@ import {
     CheckCircle,
     DownloadSimple,
     ArrowsClockwise,
-    MagicWand,
     Export,
     Lightning,
     PencilLine,
@@ -77,7 +75,7 @@ function DocuVaultPageInner() {
     // Tab & template state
     const [activeTab, setActiveTab] = useState<UITabCategory>('lead');
     const [selectedTemplate, setSelectedTemplate] = useState<DocumentTemplate | null>(null);
-    const carouselRef = useRef<HTMLDivElement>(null);
+
 
     // Content input state
     const [documentContent, setDocumentContent] = useState('');
@@ -151,13 +149,7 @@ function DocuVaultPageInner() {
         }
     }, [searchParams]);
 
-    /** Scroll the template carousel left or right by a fixed amount. */
-    const scrollCarousel = (dir: 'left' | 'right') => {
-        if (carouselRef.current) {
-            const amount = dir === 'left' ? -280 : 280;
-            carouselRef.current.scrollBy({ left: amount, behavior: 'smooth' });
-        }
-    };
+
 
     /** Handle document generation via the streaming API endpoint. */
     const handleGenerate = useCallback(async () => {
@@ -395,8 +387,8 @@ function DocuVaultPageInner() {
                                 <CaretLeft size={24} weight="bold" className="group-hover:-translate-x-0.5 transition-transform" />
                             </button>
                             <div>
-                                <h1 className="text-3xl font-serif text-white tracking-tight leading-none mb-1">Manual Drafting</h1>
-                                <p className="text-[12px] text-white/30 font-bold uppercase tracking-[0.2em]">Intake Pipeline</p>
+                                <h1 className="text-2xl font-serif text-white tracking-tight leading-none mb-1">Manual Drafting</h1>
+                                <p className="text-[10px] text-white/30 font-bold uppercase tracking-[0.2em]">Intake Pipeline</p>
                             </div>
                         </div>
                         
@@ -470,7 +462,8 @@ function DocuVaultPageInner() {
                                         value={documentContent}
                                         onChange={e => setDocumentContent(e.target.value)}
                                         placeholder="Paste your draft or notes here to begin... NEXX will perfectly structure and format it for court."
-                                        className="w-full h-full bg-white/5 rounded-2xl p-8 text-xl font-medium text-white placeholder:text-white/10 outline-none resize-none transition-all focus:bg-white/[0.07] border border-white/5 focus:border-white/10"
+                                        aria-label="Document content"
+                                        className="w-full h-full bg-white/5 rounded-2xl p-6 text-lg font-medium text-white placeholder:text-white/10 outline-none resize-none transition-all focus:bg-white/[0.07] border border-white/5 focus:border-white/10"
                                     />
                                     
                                     {/* Action Bar Floating Over Textarea */}
@@ -570,9 +563,9 @@ function DocuVaultPageInner() {
                                         <button
                                             onClick={handleGenerate}
                                             disabled={isParsing || (!documentContent.trim() && !selectedTemplate)}
-                                            className="px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[12px] font-bold uppercase tracking-widest shadow-xl shadow-indigo-600/20 transition-all flex items-center gap-2 disabled:opacity-50 disabled:grayscale"
+                                            className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest shadow-xl shadow-indigo-600/20 transition-all flex items-center gap-2 disabled:opacity-50 disabled:grayscale"
                                         >
-                                            <MagicWand size={18} weight="fill" />
+                                            <Lightning size={16} weight="fill" />
                                             Generate PDF
                                         </button>
                                     </div>
@@ -581,7 +574,7 @@ function DocuVaultPageInner() {
                         </div>
 
                         {/* Right: Quick Templates Sidebar */}
-                        <div className="w-full md:w-80 bg-white/[0.02] p-8 flex flex-col space-y-6">
+                        <div className="w-full md:w-72 bg-white/[0.02] p-6 flex flex-col space-y-6">
                             <div>
                                 <h3 className="text-[11px] font-bold text-white/30 uppercase tracking-[0.25em] mb-6">Quick Templates</h3>
                                 <div className="space-y-3">
@@ -597,11 +590,11 @@ function DocuVaultPageInner() {
                                                     : 'bg-white/5 border-white/5 text-white/50 hover:bg-white/10 hover:border-white/10 hover:text-white'
                                                 }`}
                                             >
-                                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isSelected ? 'bg-indigo-500/20' : 'bg-white/5 group-hover:bg-white/10'}`}>
-                                                    <FileText size={20} weight={isSelected ? "fill" : "regular"} />
+                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? 'bg-indigo-500/20' : 'bg-white/5 group-hover:bg-white/10'}`}>
+                                                    <FileText size={18} weight={isSelected ? "fill" : "regular"} />
                                                 </div>
-                                                <span className="text-[13px] font-bold truncate flex-1">{tmpl.title}</span>
-                                                {isSelected && <CheckCircle size={16} weight="fill" className="text-indigo-400" />}
+                                                <span className="text-[12px] font-bold truncate flex-1">{tmpl.title}</span>
+                                                {isSelected && <CheckCircle size={14} weight="fill" className="text-indigo-400" />}
                                             </button>
                                         );
                                     })}
@@ -611,10 +604,11 @@ function DocuVaultPageInner() {
                             <div className="mt-auto pt-8 border-t border-white/5">
                                 <button
                                     onClick={() => setShowCreateExport(true)}
-                                    className="w-full py-4 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 text-white text-[12px] font-bold uppercase tracking-widest hover:border-white/40 transition-all flex items-center justify-center gap-2 group shadow-lg"
+                                    disabled={isParsing}
+                                    className="w-full py-4 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 text-white text-[12px] font-bold uppercase tracking-widest hover:border-white/40 transition-all flex items-center justify-center gap-2 group shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <Export size={20} weight="bold" className="group-hover:translate-x-1 transition-transform" />
-                                    Full Case Export
+                                    <Export size={18} weight="bold" className="group-hover:translate-x-1 transition-transform" />
+                                    {isParsing ? 'Parsing...' : 'Full Case Export'}
                                 </button>
                             </div>
                         </div>
@@ -625,6 +619,7 @@ function DocuVaultPageInner() {
                         isOpen={showCreateExport}
                         onClose={() => setShowCreateExport(false)}
                         onSubmit={async (config) => {
+                            if (isParsing) return;
                             setShowCreateExport(false);
                             try {
                                 await startStructuredExport({
@@ -644,14 +639,14 @@ function DocuVaultPageInner() {
                     <div className="flex items-center justify-center gap-20 py-12 border-t border-white/5">
                         {[
                             { label: 'Manual Intake', icon: PencilLine, color: 'text-indigo-400' },
-                            { label: 'AI Normalization', icon: MagicWand, color: 'text-emerald-400' },
+                            { label: 'AI Normalization', icon: Lightning, color: 'text-emerald-400' },
                             { label: 'Court Ready PDF', icon: CheckCircle, color: 'text-amber-400' },
                         ].map((item, i) => (
                             <div key={i} className="flex flex-col items-center gap-3">
-                                <div className="w-16 h-16 rounded-full flex items-center justify-center bg-white/5 border border-white/10">
-                                    <item.icon size={24} className={item.color} />
+                                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white/5 border border-white/10">
+                                    <item.icon size={20} className={item.color} />
                                 </div>
-                                <span className="text-[12px] font-bold text-white/30 uppercase tracking-widest text-center">{item.label}</span>
+                                <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest text-center">{item.label}</span>
                             </div>
                         ))}
                     </div>
@@ -691,11 +686,11 @@ function DocuVaultPageInner() {
                             className="inline-block mb-6 relative"
                         >
                             <div className="absolute inset-0 rounded-full blur-2xl bg-[#60A5FA]/30 scale-150 pointer-events-none" />
-                            <div className="w-24 h-24 rounded-full flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-[#60A5FA]/50 shadow-[0_8px_32px_rgba(96,165,250,0.3)] relative z-10 box-border">
-                                <Strategy size={44} weight="duotone" className="text-[#60A5FA] drop-shadow-[0_2px_12px_rgba(96,165,250,0.8)]" />
+                            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-[#60A5FA]/50 shadow-[0_8px_32px_rgba(96,165,250,0.3)] relative z-10 box-border">
+                                <Strategy size={32} weight="duotone" className="text-[#60A5FA] drop-shadow-[0_2px_12px_rgba(96,165,250,0.8)]" />
                             </div>
                         </motion.div>
-                        <h3 className="text-3xl font-serif font-bold text-white tracking-tight drop-shadow-sm">
+                        <h3 className="text-2xl font-serif font-bold text-white tracking-tight drop-shadow-sm">
                             DocuVault AI is drafting...
                         </h3>
                         <p className="text-[16px] font-medium text-white/80 mt-3 drop-shadow-sm">
@@ -811,7 +806,7 @@ function DocuVaultPageInner() {
                             <CaretLeft size={20} weight="bold" />
                         </button>
                         <div>
-                            <h1 className="text-3xl font-serif font-bold tracking-tight text-white drop-shadow-sm">
+                            <h1 className="text-2xl font-serif font-bold tracking-tight text-white drop-shadow-sm">
                                 {selectedTemplate?.title || 'Generated Document'}
                             </h1>
                             <div className="flex items-center gap-2 mt-2">
@@ -945,7 +940,7 @@ function DocuVaultPageInner() {
                                         className="btn-outline flex items-center justify-center gap-2 py-3 text-sm disabled:opacity-50"
                                     >
                                         <FileText size={18} weight="bold" />
-                                        Print Document
+                                        Open PDF
                                     </button>
                                     <button
                                         disabled

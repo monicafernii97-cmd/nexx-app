@@ -18,7 +18,7 @@ import { useToast } from '@/components/feedback/ToastProvider';
 import type { Id } from '@convex/_generated/dataModel';
 
 /**
- * TopNav — 72px glassmorphic bar spanning CENTER + RIGHT columns.
+ * TopNav — 64px glassmorphic bar spanning CENTER + RIGHT columns.
  *
  * The left sidebar remains full-height; this bar sits above the
  * main content area and insights rail only.
@@ -40,6 +40,7 @@ export function TopNav() {
 
     const createCase = useMutation(api.cases.create);
     const archiveCase = useMutation(api.cases.archive);
+    const unarchiveCase = useMutation(api.cases.unarchive);
 
     const activeCases = cases?.filter(c => c.status === 'active') ?? [];
     const archivedCases = cases?.filter(c => c.status === 'archived') ?? [];
@@ -107,30 +108,49 @@ export function TopNav() {
     }, [archiveCase, showToast]);
 
     /** Restore an archived case and switch to it. */
-    const handleUnarchive = useCallback((caseId: Id<'cases'>) => {
-        setActiveCaseId(caseId);
-        setIsSwitcherOpen(false);
-    }, [setActiveCaseId]);
+    const handleUnarchive = useCallback(async (caseId: Id<'cases'>) => {
+        if (pendingActionsRef.current.has(caseId)) return;
+        const nextPending = new Set(pendingActionsRef.current).add(caseId);
+        pendingActionsRef.current = nextPending;
+        setPendingActions(nextPending);
+        try {
+            await unarchiveCase({ caseId });
+            setActiveCaseId(caseId);
+            setIsSwitcherOpen(false);
+        } catch (err) {
+            console.error('[TopNav] Failed to restore case:', err);
+            showToast({
+                title: 'Failed to restore case',
+                description: err instanceof Error ? err.message : 'Please try again.',
+                variant: 'error',
+            });
+        } finally {
+            const cleared = new Set(pendingActionsRef.current);
+            cleared.delete(caseId);
+            pendingActionsRef.current = cleared;
+            setPendingActions(cleared);
+        }
+    }, [unarchiveCase, setActiveCaseId, showToast]);
 
     return (
-        <div className="h-[72px] flex items-center justify-between px-8 hyper-glass rounded-2xl mb-6 glow-slate">
+        <div className="h-[64px] flex items-center justify-between px-6 hyper-glass rounded-2xl mb-4 glow-slate">
             {/* ── Left: Case Switcher ── */}
             <div ref={dropdownRef} className="relative">
                 <button
                     type="button"
                     onClick={() => setIsSwitcherOpen(!isSwitcherOpen)}
-                    className="flex items-center gap-4 px-5 py-2.5 rounded-xl border border-white/5 hover:border-white/20 bg-white/[0.02] hover:bg-white/5 transition-all group cursor-pointer"
+                    className="flex items-center gap-3 px-4 py-2 rounded-xl border border-white/5 hover:border-white/20 bg-white/[0.02] hover:bg-white/5 transition-all group cursor-pointer"
                     aria-label="Switch case"
                     aria-expanded={isSwitcherOpen}
                 >
-                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center shadow-lg">
-                        <Briefcase size={18} weight="light" className="text-indigo-400" />
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center shadow-lg">
+                        <Briefcase size={16} weight="light" className="text-indigo-400" />
                     </div>
                     <div className="text-left">
-                        <p className="text-[13px] font-bold text-white tracking-tight leading-tight truncate max-w-[200px]">
+                        <p className="text-[12px] font-bold text-white tracking-tight leading-tight truncate max-w-[180px]">
                             {cases === undefined ? 'Loading...' : activeCase?.title ?? 'No Case Yet'}
                         </p>
-                        <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/20 mt-0.5">
+                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-white/20 mt-0.5">
                             Active Case
                         </p>
                     </div>
@@ -151,7 +171,7 @@ export function TopNav() {
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -8, scale: 0.98 }}
                             transition={{ duration: 0.15 }}
-                            className="absolute top-full left-0 mt-3 w-[310px] p-2 rounded-2xl hyper-glass border border-white/10 shadow-2xl z-50 overflow-hidden"
+                            className="absolute top-full left-0 mt-3 w-[280px] p-1.5 rounded-2xl hyper-glass border border-white/10 shadow-2xl z-50 overflow-hidden"
                         >
                             <p className="px-4 py-3 text-[10px] font-bold tracking-[0.2em] uppercase text-white/30">
                                 Active Cases
@@ -219,8 +239,9 @@ export function TopNav() {
                                                 key={c._id}
                                                 type="button"
                                                 onClick={() => handleUnarchive(c._id)}
+                                                disabled={pendingActions.has(c._id)}
                                                 aria-label={`Restore "${c.title}" to active`}
-                                                className="w-full flex items-center gap-4 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/50 transition-all cursor-pointer"
+                                                className="w-full flex items-center gap-4 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/50 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title={`Restore "${c.title}" to active`}
                                             >
                                                 <Archive size={16} />
@@ -251,24 +272,24 @@ export function TopNav() {
             </div>
 
             {/* ── Right: Actions ── */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
                 <button
                     type="button"
                     disabled
                     aria-label="Search (coming soon)"
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white/20 transition-colors cursor-not-allowed"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-white/20 transition-colors cursor-not-allowed"
                     title="Search — coming soon"
                 >
-                    <MagnifyingGlass size={20} weight="light" />
+                    <MagnifyingGlass size={18} weight="light" />
                 </button>
                 <button
                     type="button"
                     disabled
                     aria-label="Notifications (coming soon)"
-                    className="relative w-10 h-10 rounded-xl flex items-center justify-center text-white/20 transition-colors cursor-not-allowed"
+                    className="relative w-9 h-9 rounded-xl flex items-center justify-center text-white/20 transition-colors cursor-not-allowed"
                     title="Notifications — coming soon"
                 >
-                    <Bell size={20} weight="light" />
+                    <Bell size={18} weight="light" />
                 </button>
             </div>
         </div>

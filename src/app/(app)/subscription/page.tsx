@@ -9,7 +9,6 @@ import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import {
     Crown,
     Lightning,
-    Star,
     Shield,
     ChatCircleText,
     ArrowRight,
@@ -159,7 +158,7 @@ function SubscriptionContent() {
         },
         {
             tier: 'premium',
-            icon: Star,
+            icon: Lightning,
             iconColor: '#E5A84A',
             description: 'Our most popular plan — built for parents actively navigating custody, family law, or high-conflict cases.',
             badge: 'Most Popular',
@@ -215,7 +214,7 @@ function SubscriptionContent() {
                         <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-[var(--champagne)] mb-2">
                             Current Plan
                         </p>
-                        <h2 className="text-3xl font-serif font-bold text-white tracking-tight mb-1">
+                        <h2 className="text-2xl font-serif font-bold text-white tracking-tight mb-1">
                             {currentConfig.label}
                         </h2>
                         <p className="text-sm text-white/50">
@@ -231,7 +230,7 @@ function SubscriptionContent() {
                                 <ChatCircleText size={16} weight="fill" color="#60A5FA" />
                                 <span className="text-[10px] font-bold tracking-wider uppercase text-white/40">Premium AI / Day</span>
                             </div>
-                            <p className="text-xl font-serif font-bold text-white">
+                            <p className="text-lg font-serif font-bold text-white">
                                 {currentConfig.gpt4oDailyLimit === -1 ? '∞' : currentConfig.gpt4oDailyLimit}
                             </p>
                         </div>
@@ -286,7 +285,7 @@ function SubscriptionContent() {
 
                             {/* Price */}
                             <div className="flex items-baseline gap-1 mb-1">
-                                <span className="text-3xl font-serif font-bold text-white tracking-tight">
+                                <span className="text-2xl font-serif font-bold text-white tracking-tight">
                                     {config.priceUsd === 0 ? '$0' : `$${config.priceUsd}`}
                                 </span>
                                 <span className="text-sm text-white/40">
@@ -336,7 +335,7 @@ function SubscriptionContent() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.7, duration: 0.6 }}
-                    className="md:col-span-2 lg:col-span-4 mt-2 rounded-[2rem] p-8 md:p-10 border border-[rgba(255,255,255,0.06)] bg-gradient-to-b from-[#0F1D3D]/60 to-[#0A1128]/80 relative overflow-hidden hover:border-[rgba(255,255,255,0.12)] transition-all shadow-[0_8px_40px_rgba(0,0,0,0.4)]"
+                    className="md:col-span-2 lg:col-span-4 mt-2 rounded-[2rem] p-6 md:p-8 border border-[rgba(255,255,255,0.06)] bg-gradient-to-b from-[#0F1D3D]/60 to-[#0A1128]/80 relative overflow-hidden hover:border-[rgba(255,255,255,0.12)] transition-all shadow-[0_8px_40px_rgba(0,0,0,0.4)]"
                 >
                     <div className="absolute inset-0 pointer-events-none">
                         <div className="absolute bottom-[-20%] left-[-10%] w-[35%] h-[50%] bg-[#E5A84A]/5 rounded-full blur-[80px]" />
@@ -344,12 +343,12 @@ function SubscriptionContent() {
                     <div className="relative z-10 flex flex-col md:flex-row gap-8 items-center md:items-start">
                         <div className="md:w-1/3 text-center md:text-left shrink-0">
                             <div className="flex items-center justify-center md:justify-start gap-2.5 mb-3">
-                                <Star size={16} weight="fill" className="text-[var(--champagne)]" />
+                                <Lightning size={16} weight="fill" className="text-[var(--champagne)]" />
                                 <p className="text-[11px] font-bold tracking-[0.25em] uppercase text-[var(--champagne)]">
                                     On the Horizon
                                 </p>
                             </div>
-                            <h2 className="text-3xl lg:text-4xl font-serif font-bold italic text-white tracking-tight mb-3">
+                            <h2 className="text-2xl lg:text-3xl font-serif font-bold italic text-white tracking-tight mb-3">
                                 Coming Next
                             </h2>
                             <p className="text-[13px] text-white/40 leading-relaxed md:max-w-xs mx-auto md:mx-0">

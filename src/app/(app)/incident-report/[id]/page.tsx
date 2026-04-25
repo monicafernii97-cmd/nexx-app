@@ -230,7 +230,7 @@ export default function IncidentDetailPage() {
                         <ArrowLeft size={20} weight="bold" className="text-white" />
                     </Link>
                     <div>
-                        <h1 className="text-3xl font-serif font-bold text-white mb-1 leading-tight">
+                        <h1 className="text-2xl font-serif font-bold text-white mb-1 leading-tight">
                             Incident Record
                         </h1>
                         <p className="text-[14px] font-medium text-white/70">

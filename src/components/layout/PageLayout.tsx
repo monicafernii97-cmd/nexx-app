@@ -7,7 +7,7 @@ export interface PageHeaderProps {
     /** A Phosphor Icon Component */
     icon: React.ElementType;
     title: ReactNode;
-    description: ReactNode;
+    description?: ReactNode;
     rightElement?: ReactNode;
 }
 
@@ -18,37 +18,27 @@ export function PageHeader({ icon: Icon, title, description, rightElement }: Pag
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 pt-8 px-2"
+            className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 pt-4 px-1"
         >
-            <div>
-                <div className="flex items-center gap-4 mb-3">
-                    <motion.div
-                        animate={{ y: [0, -6, 0] }}
-                        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                        className="w-14 h-14 rounded-[1.1rem] flex items-center justify-center glass-ethereal shadow-[0_12px_40px_rgba(18,61,126,0.8)] relative overflow-hidden flex-shrink-0 group"
-                    >
-                        {/* Shimmer overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent opacity-50" />
-                        
-                        {/* Icon glow */}
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white/20 blur-xl rounded-full" />
-                        
-                        <Icon 
-                            size={28} 
-                            weight="duotone" 
-                            className="text-white relative z-10 drop-shadow-[0_2px_15px_rgba(255,255,255,0.7)] group-hover:scale-110 transition-transform duration-500" 
-                        />
-                    </motion.div>
-                    <h1 className="text-3xl font-serif text-headline text-white m-0 tracking-tight flex items-center gap-2">
+            <div className="flex items-center gap-4">
+                {Icon && (
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center shadow-lg shrink-0">
+                        <Icon size={20} weight="light" className="text-indigo-400" />
+                    </div>
+                )}
+                <div>
+                    <h1 className="text-2xl font-serif text-headline text-white m-0 tracking-tight flex items-center gap-2">
                         {title}
                     </h1>
+                    {description && (
+                        <p className="text-[13px] text-white/40 mt-0.5 max-w-xl leading-relaxed">
+                            {description}
+                        </p>
+                    )}
                 </div>
-                <p className="text-[15px] font-medium text-white/70 max-w-lg">
-                    {description}
-                </p>
             </div>
             {rightElement && (
-                <div className="flex-shrink-0 mb-1">
+                <div className="flex-shrink-0">
                     {rightElement}
                 </div>
             )}

@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
     '/api/incidents/export': ['./src/lib/legal/legalDocStyles.css'],
     '/api/documents/generate': ['./src/lib/legal/legalDocStyles.css'],
   },
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'img.clerk.com' },
+    ],
+  },
 };
 
 export default nextConfig;

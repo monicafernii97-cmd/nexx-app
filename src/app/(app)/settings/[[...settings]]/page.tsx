@@ -4,31 +4,17 @@ import { UserProfile } from '@clerk/nextjs';
 import { settingsClerkAppearance } from '@/lib/clerk-theme';
 import { Gear } from '@phosphor-icons/react';
 import { motion } from 'framer-motion';
+import { PageHeader } from '@/components/layout/PageLayout';
 
 /** Account settings page embedding the Clerk UserProfile component. */
 export default function SettingsPage() {
     return (
         <div className="max-w-4xl mx-auto pb-20">
-            {/* Header */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-start justify-between mb-10"
-            >
-                <div>
-                    <div className="flex items-center gap-4 mb-3">
-                        <div className="w-12 h-12 rounded-2xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-[#60A5FA]/50 shadow-[0_8px_24px_rgba(96,165,250,0.3)] flex items-center justify-center translate-y-[-2px]">
-                            <Gear size={24} className="text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]" weight="fill" />
-                        </div>
-                        <h1 className="text-4xl font-serif font-bold tracking-tight text-white drop-shadow-sm m-0">
-                            Account Settings
-                        </h1>
-                    </div>
-                    <p className="text-[16px] font-medium text-white max-w-2xl mt-2 drop-shadow-sm">
-                        Manage your NEXX profile authentication, security preferences, and subscription details.
-                    </p>
-                </div>
-            </motion.div>
+            <PageHeader
+                icon={Gear}
+                title="Account Settings"
+                description="Manage your NEXX profile authentication, security preferences, and subscription details."
+            />
 
             <motion.div 
                 initial={{ opacity: 0, y: 8 }}
@@ -41,4 +27,3 @@ export default function SettingsPage() {
         </div>
     );
 }
-

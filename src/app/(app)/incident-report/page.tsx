@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
@@ -9,7 +9,6 @@ import {
     ClipboardText,
     ArrowRight,
     Microphone,
-    Sparkle,
     PlusCircle,
     ArrowClockwise,
     CheckCircle,
@@ -22,16 +21,18 @@ import { useWorkspace } from '@/lib/workspace-context';
 
 import '@/styles/pipelines.css';
 
+/** Structured error for stable code-based matching instead of brittle string comparisons. */
+type ProcessError = { code: 'empty_narrative' | 'missing_case' | 'generic'; message: string } | null;
+
 /** Incident Intake Hub - The primary pipeline for event recording. */
 export default function IncidentReportPage() {
     const { activeCaseId } = useWorkspace();
     const [narrative, setNarrative] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
 
-    /** Structured error for stable code-based matching instead of brittle string comparisons. */
-    type ProcessError = { code: 'empty_narrative' | 'missing_case' | 'generic'; message: string } | null;
     const [processError, setProcessError] = useState<ProcessError>(null);
     const [isPinning, setIsPinning] = useState<string | null>(null);
+    const pinningRef = useRef<string | null>(null);
     const [pinError, setPinError] = useState<string | null>(null);
 
     // Derive displayed error — automatically suppresses stale "no case" message once case is selected
@@ -88,7 +89,8 @@ export default function IncidentReportPage() {
 
     /** Pin an incident to the case workspace. Prevents duplicate clicks. */
     const handleAddToWorkspace = useCallback(async (incident: { _id: Id<'incidents'>; narrative: string; date: string }) => {
-        if (!activeCaseId || isPinning) return;
+        if (!activeCaseId || pinningRef.current) return;
+        pinningRef.current = incident._id;
         setIsPinning(incident._id);
 
         try {
@@ -104,9 +106,10 @@ export default function IncidentReportPage() {
             console.error('[IncidentIntake] Pin creation failed:', err);
             setPinError('Failed to add incident to workspace. Please try again.');
         } finally {
+            pinningRef.current = null;
             setIsPinning(null);
         }
-    }, [activeCaseId, createCasePin, isPinning]);
+    }, [activeCaseId, createCasePin]);
 
 
 
@@ -118,10 +121,10 @@ export default function IncidentReportPage() {
                 description="Turn a chaotic moment into a structured fact. Type your narrative below."
             />
 
-            <div className="max-w-4xl mx-auto space-y-12 pb-24">
+            <div className="max-w-4xl mx-auto space-y-8 pb-24">
                 
                 {/* 1. The Focused Intake Area (Luxury Glass) */}
-                <div className="hyper-glass p-12 space-y-8 floating-element glow-slate">
+                <div className="hyper-glass p-8 space-y-6 floating-element glow-slate">
                     <div className="relative group">
                         <textarea
                             value={narrative}
@@ -131,7 +134,7 @@ export default function IncidentReportPage() {
                             }}
                             aria-label="Incident narrative"
                             placeholder="What happened? Record the facts exactly as they occurred..."
-                            className="w-full bg-transparent border-none text-2xl md:text-3xl font-serif text-white placeholder:text-white/5 min-h-[260px] outline-none resize-none px-0 py-4 selection:bg-indigo-500/30 leading-relaxed"
+                            className="w-full bg-transparent border-none text-lg font-serif text-white placeholder:text-white/30 min-h-[160px] outline-none resize-none px-0 py-3 selection:bg-indigo-500/30 leading-relaxed"
                         />
                         
                         {/* Floating Glow Background */}
@@ -139,14 +142,14 @@ export default function IncidentReportPage() {
                     </div>
 
                     {/* 2. Intake Controls */}
-                    <div className="flex items-center justify-between pt-8 border-t border-white/5">
+                    <div className="flex items-center justify-between pt-4 border-t border-white/5">
                         <div className="flex items-center gap-6">
                             <button disabled className="flex items-center gap-2 text-white/20 cursor-not-allowed text-[11px] font-bold uppercase tracking-[0.2em] group transition-all" title="Coming soon">
-                                <Microphone size={22} weight="light" className="group-hover:text-rose-400 transition-colors" />
+                                <Microphone size={18} weight="light" className="group-hover:text-rose-400 transition-colors" />
                                 Voice Entry
                             </button>
                             <button disabled className="flex items-center gap-2 text-white/20 cursor-not-allowed text-[11px] font-bold uppercase tracking-[0.2em] group transition-all" title="Coming soon">
-                                <PlusCircle size={22} weight="light" className="group-hover:text-indigo-400 transition-colors" />
+                                <PlusCircle size={18} weight="light" className="group-hover:text-indigo-400 transition-colors" />
                                 Attach Media
                             </button>
                         </div>
@@ -154,7 +157,9 @@ export default function IncidentReportPage() {
                         <button 
                             onClick={handleProcess}
                             disabled={!narrative.trim() || isProcessing || !activeCaseId}
-                            className={`flex items-center gap-3 px-10 py-4 rounded-xl font-bold uppercase tracking-[0.2em] text-[10px] transition-all shadow-2xl ${
+                            aria-busy={isProcessing}
+                            aria-label={isProcessing ? 'Processing incident' : 'Log incident'}
+                            className={`flex items-center gap-3 px-6 py-2.5 rounded-xl font-bold uppercase tracking-[0.2em] text-[10px] transition-all shadow-2xl ${
                                 narrative.trim() && !isProcessing && activeCaseId
                                 ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30' 
                                 : 'bg-white/5 text-white/10 border border-white/5 cursor-not-allowed'
@@ -163,7 +168,7 @@ export default function IncidentReportPage() {
                             {isProcessing ? (
                                 <ArrowClockwise size={18} className="animate-spin" />
                             ) : (
-                                <Sparkle size={18} weight="fill" />
+                                <ClipboardText size={18} weight="fill" />
                             )}
                             {isProcessing ? 'Processing' : 'Log Incident'}
                         </button>
@@ -177,7 +182,7 @@ export default function IncidentReportPage() {
                             {displayedError}
                         </div>
                     )}
-                    {!activeCaseId && (
+                    {!activeCaseId && !displayedError && (
                         <div className="px-6 py-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-widest text-center">
                             Select an active case to begin recording incidents
                         </div>
@@ -188,15 +193,15 @@ export default function IncidentReportPage() {
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="hyper-glass p-10 space-y-10"
+                    className="hyper-glass p-6 space-y-6"
                 >
-                    <div className="flex items-center justify-between border-b border-white/5 pb-8">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
                         <div className="flex items-center gap-4">
                             <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
                                 <TimelineIcon size={20} className="text-indigo-400" />
                             </div>
                             <div>
-                                <h3 className="font-serif text-xl text-white tracking-tight">Timeline Intake</h3>
+                                <h3 className="font-serif text-lg text-white tracking-tight">Timeline Intake</h3>
                                 <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] mt-1">Chronological Fact Logging</p>
                             </div>
                         </div>
@@ -272,7 +277,7 @@ export default function IncidentReportPage() {
                                                     : 'bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:border-white/20 hover:text-white'
                                             }`}
                                         >
-                                            {isPinning === incident._id ? 'Securing' : 'Case Workspace'}
+                                            {isPinning === incident._id ? 'Securing...' : isPinning ? 'Please wait' : 'Case Workspace'}
                                         </button>
                                         <button disabled className="px-4 py-2 rounded-lg bg-amber-500/5 text-amber-500/30 text-[9px] font-bold uppercase tracking-[0.2em] border border-amber-500/10 cursor-not-allowed" title="Coming soon">
                                             Export to Exhibit

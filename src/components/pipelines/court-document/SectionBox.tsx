@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Lock, 
   LockOpen, 
-  Sparkle, 
+  Lightning, 
   PencilSimple, 
   CheckCircle,
   ClockCounterClockwise,
@@ -91,10 +91,9 @@ export default function SectionBox({
 
   return (
     <div className={`section-box status-${status}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <h4 className="font-bold text-white text-lg tracking-tight">{heading}</h4>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2.5">
+          <h4 className="font-bold text-white text-base tracking-tight">{heading}</h4>
           {isRequired && status === 'empty' && (
             <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 text-[10px] font-bold uppercase tracking-wider border border-red-500/20">
               Required
@@ -208,7 +207,7 @@ export default function SectionBox({
               {isLoading ? (
                 <CircleNotch size={14} className="animate-spin" />
               ) : (
-                <Sparkle size={14} weight="fill" />
+                <Lightning size={14} weight="fill" />
               )}
               {status === 'empty' && !content.trim() ? 'Generate' : 'Rewrite to Court Ready'}
             </button>

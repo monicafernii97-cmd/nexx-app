@@ -134,7 +134,7 @@ export default function IncidentReportPage() {
                             }}
                             aria-label="Incident narrative"
                             placeholder="What happened? Record the facts exactly as they occurred..."
-                            className="w-full bg-transparent border-none text-lg font-serif text-white placeholder:text-white/5 min-h-[160px] outline-none resize-none px-0 py-3 selection:bg-indigo-500/30 leading-relaxed"
+                            className="w-full bg-transparent border-none text-lg font-serif text-white placeholder:text-white/30 min-h-[160px] outline-none resize-none px-0 py-3 selection:bg-indigo-500/30 leading-relaxed"
                         />
                         
                         {/* Floating Glow Background */}
@@ -157,6 +157,8 @@ export default function IncidentReportPage() {
                         <button 
                             onClick={handleProcess}
                             disabled={!narrative.trim() || isProcessing || !activeCaseId}
+                            aria-busy={isProcessing}
+                            aria-label={isProcessing ? 'Processing incident' : 'Log incident'}
                             className={`flex items-center gap-3 px-6 py-2.5 rounded-xl font-bold uppercase tracking-[0.2em] text-[10px] transition-all shadow-2xl ${
                                 narrative.trim() && !isProcessing && activeCaseId
                                 ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30' 

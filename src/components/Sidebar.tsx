@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -297,8 +298,8 @@ export default function Sidebar() {
                     <div className="relative group focus-within:ring-2 focus-within:ring-indigo-500/40 rounded-xl w-full">
                         {/* Visual layer */}
                         <div className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all cursor-pointer bg-white/[0.03] border border-white/5 hover:border-white/20 shadow-2xl ${collapsed ? 'justify-center' : ''}`}>
-                            <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-white/20 shadow-inner">
-                                <img src={user.imageUrl} alt={user.fullName || 'User'} className="w-full h-full object-cover" />
+                            <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-white/20 shadow-inner relative">
+                                <Image src={user.imageUrl} alt={user.fullName || 'User'} fill className="object-cover" sizes="32px" />
                             </div>
                             <AnimatePresence>
                                 {!collapsed && (

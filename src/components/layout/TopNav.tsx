@@ -137,6 +137,7 @@ export function TopNav() {
             {/* ── Left: Case Switcher ── */}
             <div ref={dropdownRef} className="relative">
                 <button
+                    type="button"
                     onClick={() => setIsSwitcherOpen(!isSwitcherOpen)}
                     className="flex items-center gap-4 px-5 py-2.5 rounded-xl border border-white/5 hover:border-white/20 bg-white/[0.02] hover:bg-white/5 transition-all group cursor-pointer"
                     aria-label="Switch case"
@@ -190,7 +191,9 @@ export function TopNav() {
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                setActiveCaseId(c._id);
+                                                if (c._id !== activeCase?._id) {
+                                                    setActiveCaseId(c._id);
+                                                }
                                                 setIsSwitcherOpen(false);
                                             }}
                                             className="flex items-center gap-4 flex-1 min-w-0 bg-transparent border-none p-0 text-inherit cursor-pointer text-left"

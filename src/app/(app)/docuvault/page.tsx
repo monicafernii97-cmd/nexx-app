@@ -18,6 +18,7 @@ import {
     MagicWand,
     Export,
     Lightning,
+    PencilLine,
 } from '@phosphor-icons/react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from 'convex/react';
@@ -160,6 +161,7 @@ function DocuVaultPageInner() {
 
     /** Handle document generation via the streaming API endpoint. */
     const handleGenerate = useCallback(async () => {
+        if (isParsing) return;
         if (!documentContent.trim() && !selectedTemplate) return;
         if (isUserProfileLoading) {
             setGenerationError('Loading your profile. Please try again in a moment.');
@@ -358,8 +360,10 @@ function DocuVaultPageInner() {
             {/* ═══════════════════════════════════════════════════
                 VIEW: INTAKE HUB (Primary Entry)
                ═══════════════════════════════════════════════════ */}
+            <AnimatePresence mode="wait">
             {view === 'intake_hub' && (
                 <motion.div
+                    key="intake_hub"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -374,220 +378,135 @@ function DocuVaultPageInner() {
                ═══════════════════════════════════════════════════ */}
             {view === 'compose' && (
                 <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="space-y-8"
+                    key="compose"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    className="max-w-6xl mx-auto space-y-10 pb-24"
                 >
-                    {/* Header with Back button */}
-                    <div className="flex items-center gap-4 mb-4">
-                        <button 
-                            onClick={() => setView('intake_hub')}
-                            aria-label="Back to intake hub"
-                            className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-white/60 hover:text-white transition-all"
-                        >
-                            <CaretLeft size={20} weight="bold" />
-                        </button>
-                        <div>
-                            <h2 className="text-xl font-bold text-white tracking-tight">Manual Drafting</h2>
-                            <p className="text-xs text-white/40 uppercase tracking-widest font-bold">Direct Entry Pipeline</p>
+                    {/* Header with Navigation */}
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-6">
+                            <button 
+                                onClick={() => setView('intake_hub')}
+                                aria-label="Back to intake hub"
+                                className="w-12 h-12 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all group"
+                            >
+                                <CaretLeft size={24} weight="bold" className="group-hover:-translate-x-0.5 transition-transform" />
+                            </button>
+                            <div>
+                                <h1 className="text-3xl font-serif text-white tracking-tight leading-none mb-1">Manual Drafting</h1>
+                                <p className="text-[12px] text-white/30 font-bold uppercase tracking-[0.2em]">Intake Pipeline</p>
+                            </div>
+                        </div>
+                        
+                        {/* Status Pills */}
+                        <div className="flex items-center gap-3">
+                            <div className="px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-bold uppercase tracking-widest">
+                                Draft Mode
+                            </div>
+                            <div className="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white/40 text-[10px] font-bold uppercase tracking-widest">
+                                Jurisdiction: {resolvedState || 'Not Set'}
+                            </div>
                         </div>
                     </div>
 
-                    {/* ── Magic Moment Banner ── */}
-                    {searchParams.get('prefilled') === 'true' && (
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            className="p-5 rounded-[22px] border border-[var(--accent-emerald)]/30 bg-[var(--accent-emerald)]/10 backdrop-blur-3xl shadow-[0_8px_32px_rgba(16,185,129,0.15)] flex items-center gap-4 relative overflow-hidden group"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                            <div className="w-12 h-12 rounded-2xl bg-[var(--accent-emerald)] flex items-center justify-center shadow-lg shadow-[var(--accent-emerald)]/20">
-                                <MagicWand size={24} weight="fill" className="text-white drop-shadow-sm" />
-                            </div>
-                            <div>
-                                <h3 className="text-[17px] font-bold text-white drop-shadow-sm">Magic Moment: Pre-filled</h3>
-                                <p className="text-[14px] font-medium text-[var(--accent-emerald)] brightness-150">
-                                    Your case data has been organized and pre-filled. Review and edit before exporting.
-                                </p>
-                            </div>
-                            <CheckCircle size={32} weight="fill" className="ml-auto text-[var(--accent-emerald)]/20" />
-                        </motion.div>
-                    )}
-
-
-                    {/* ── Category Tabs ── */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.15 }}
-                        className="flex gap-2 overflow-x-auto pb-2 scrollbar-none snap-x"
-                        style={{ scrollbarWidth: 'none' }}
-                    >
-                        {UI_TABS.map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => {
-                                    setActiveTab(tab.id);
-                                    setSelectedTemplate(null);
-                                }}
-                                className={`px-6 py-2.5 rounded-full text-[14px] font-bold whitespace-nowrap transition-all duration-300 snap-center tracking-wide ${activeTab === tab.id ? 'shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_20px_rgba(0,0,0,0.5)] bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-[rgba(255,255,255,0.25)] text-white drop-shadow-sm scale-105' : 'bg-white/5 backdrop-blur-xl border border-white/10 text-white/70 hover:text-white hover:bg-white/10 hover:border-white/30'}`}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
-                    </motion.div>
-
-                    {/* ── Template Carousel ── */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                    >
-                        <div className="flex items-center justify-between mb-4 mt-2">
-                            <h2 className="text-[13px] font-bold tracking-widest uppercase text-[#60A5FA] drop-shadow-sm">
-                                Templates
-                            </h2>
-                            {templates.length > 3 && (
-                                <div className="flex gap-3">
-                                    <button
-                                        onClick={() => scrollCarousel('left')}
-                                        aria-label="Scroll templates left"
-                                        className="w-10 h-10 rounded-full flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_16px_rgba(0,0,0,0.5)] border border-[rgba(255,255,255,0.25)] hover:scale-105 hover:bg-[linear-gradient(135deg,#1e4a9e,#0A1128)] transition-all text-white drop-shadow-sm"
-                                    >
-                                        <CaretLeft size={18} weight="bold" />
-                                    </button>
-                                    <button
-                                        onClick={() => scrollCarousel('right')}
-                                        aria-label="Scroll templates right"
-                                        className="w-10 h-10 rounded-full flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_16px_rgba(0,0,0,0.5)] border border-[rgba(255,255,255,0.25)] hover:scale-105 hover:bg-[linear-gradient(135deg,#1e4a9e,#0A1128)] transition-all text-white drop-shadow-sm"
-                                    >
-                                        <CaretRight size={18} weight="bold" />
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        {activeTab === 'create_own' ? (
-                            /* Blank template card */
-                            <button
-                                type="button"
-                                className="p-6 cursor-pointer hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_12px_32px_rgba(0,0,0,0.5)] hover:-translate-y-1 transition-all w-full text-left bg-white/5 backdrop-blur-2xl border border-white/20 rounded-3xl group"
-                                onClick={() => setSelectedTemplate(null)}
-                            >
-                                <div className="flex items-center gap-5">
-                                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-white/10 border-2 border-dashed border-white/30 group-hover:bg-[#123D7E] group-hover:border-transparent transition-colors">
-                                        <Plus size={28} className="text-white drop-shadow-sm" weight="bold" />
-                                    </div>
-                                    <div>
-                                        <p className="text-[17px] font-bold text-white mb-1 drop-shadow-sm tracking-tight text-shadow">
-                                            Custom Document
-                                        </p>
-                                        <p className="text-sm font-medium text-white/80">
-                                            Start with a blank template utilizing general court and legal structuring.
-                                        </p>
-                                    </div>
-                                </div>
-                            </button>
-                        ) : (
-                            /* Template cards carousel */
-                            <div
-                                ref={carouselRef}
-                                className="flex gap-4 overflow-x-auto pb-6 pt-2 px-1 snap-x snap-mandatory scrollbar-none"
-                                style={{ scrollbarWidth: 'none' }}
-                            >
-                                {templates.map(tmpl => {
-                                    const isSelected = selectedTemplate?.id === tmpl.id;
-                                    return (
-                                        <motion.button
-                                            key={tmpl.id}
-                                            onClick={() => setSelectedTemplate(isSelected ? null : tmpl)}
-                                            whileHover={{ y: -4 }}
-                                            whileTap={{ scale: 0.98 }}
-                                            className={`flex-shrink-0 w-64 rounded-[2rem] p-5 text-left transition-all cursor-pointer snap-start backdrop-blur-2xl ${isSelected ? 'bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-[rgba(255,255,255,0.35)] shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),0_12px_32px_rgba(0,0,0,0.6)]' : 'bg-white/5 border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.3)] hover:bg-white/10 hover:border-white/30'}`}
-                                        >
-                                            <div className={`w-full h-20 rounded-[1.5rem] mb-4 flex items-center justify-center relative overflow-hidden transition-all ${isSelected ? 'bg-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]' : 'bg-white/5 border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]'}`}>
-                                                {/* Subtle document graphic */}
-                                                <div className={`absolute top-2 left-4 w-12 h-2 rounded ${isSelected ? 'bg-white/30' : 'bg-white/10'}`} />
-                                                <div className={`absolute top-6 left-4 w-20 h-2 rounded ${isSelected ? 'bg-white/30' : 'bg-white/10'}`} />
-                                                <div className={`absolute top-10 left-4 w-16 h-2 rounded ${isSelected ? 'bg-white/30' : 'bg-white/10'}`} />
-                                                <FileText
-                                                    size={32}
-                                                    weight={isSelected ? "duotone" : "regular"}
-                                                    className={`relative z-10 transition-colors ${isSelected ? 'text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.6)]' : 'text-white/60'}`}
-                                                />
-                                            </div>
-                                            <p className={`text-[15px] font-bold leading-snug line-clamp-2 ${isSelected ? 'text-white drop-shadow-sm' : 'text-white/80'}`}>
-                                                {tmpl.title}
-                                            </p>
-                                        </motion.button>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </motion.div>
-
-                    {/* ── Selected Template Info ── */}
+                    {/* Error banner */}
                     <AnimatePresence>
-                        {selectedTemplate && (
+                        {generationError && (
                             <motion.div
-                                initial={{ opacity: 0, height: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, height: 'auto', scale: 1 }}
-                                exit={{ opacity: 0, height: 0, scale: 0.95 }}
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
                                 className="overflow-hidden"
                             >
-                                <div className="p-5 border-l-4 border-l-[#60A5FA] bg-white/5 backdrop-blur-xl border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.3)] rounded-r-2xl">
-                                    <p className="text-[15px] font-bold tracking-wide text-white drop-shadow-sm mb-1">
-                                        {selectedTemplate.title}
-                                    </p>
-                                    <p className="text-[14px] font-medium text-white/80 leading-relaxed">
-                                        {selectedTemplate.description}
-                                    </p>
+                                <div role="alert" aria-live="assertive" className="px-5 py-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
+                                    <X size={20} weight="bold" className="text-red-400 shrink-0" />
+                                    <p className="text-sm font-medium text-red-400">{generationError}</p>
+                                    <button onClick={() => setGenerationError(null)} aria-label="Dismiss generation error" className="ml-auto text-red-400/60 hover:text-red-400 cursor-pointer">
+                                        <X size={16} />
+                                    </button>
                                 </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
 
-                    {/* ── Content Input Area ── */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.25 }}
-                    >
-                        <h2 className="text-[13px] font-bold tracking-widest uppercase text-[#60A5FA] drop-shadow-sm mb-3">
-                            Document Content
-                        </h2>
-                        <div className="relative group">
-                            <textarea
-                                value={documentContent}
-                                onChange={e => setDocumentContent(e.target.value)}
-                                placeholder="Paste your content here or describe the document title, body, and footer verbatim. Nexx will perfectly structure and format it."
-                                rows={8}
-                                className="w-full min-h-[220px] pb-14 p-6 rounded-[2rem] bg-white/5 backdrop-blur-2xl border border-white/20 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#60A5FA]/50 focus:bg-white/10 transition-all resize-none shadow-[inset_0_1px_2px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)]"
-                            />
-
-                            {/* Bottom bar overlay */}
-                            <div className="absolute bottom-3 left-6 right-6 flex items-center justify-between pt-3 border-t border-white/10">
-                                <div className="flex gap-4">
+                    {/* Main Hyperglass Container */}
+                    <div className="hyper-glass overflow-hidden flex flex-col md:flex-row min-h-[640px]">
+                        
+                        {/* Left: Content Area */}
+                        <div className="flex-1 flex flex-col border-r border-white/5">
+                            {/* Inner Tabs */}
+                            <div className="flex items-center gap-8 px-8 pt-8 pb-4 border-b border-white/5">
+                                {UI_TABS.map(tab => (
                                     <button
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="flex items-center gap-2 text-[14px] font-bold cursor-pointer transition-colors text-white/60 hover:text-[#60A5FA] z-10 relative"
+                                        key={tab.id}
+                                        onClick={() => {
+                                            setActiveTab(tab.id);
+                                            setSelectedTemplate(null);
+                                        }}
+                                        className={`group relative pb-4 text-[13px] font-bold uppercase tracking-[0.15em] transition-all ${
+                                            activeTab === tab.id ? 'text-white' : 'text-white/30 hover:text-white/60'
+                                        }`}
                                     >
-                                        <Paperclip size={18} weight="bold" />
-                                        <span>Upload File</span>
+                                        <div className="flex items-center gap-2">
+                                            {tab.id === 'create_own' ? <Plus size={16} /> : <FileText size={16} />}
+                                            {tab.label}
+                                        </div>
+                                        {activeTab === tab.id && (
+                                            <motion.div 
+                                                layoutId="activeTabUnderline"
+                                                className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]" 
+                                            />
+                                        )}
                                     </button>
-                                    <input 
-                                        type="file" 
-                                        ref={fileInputRef} 
-                                        className="hidden" 
-                                        accept=".pdf,.docx,.txt,.md,.csv" 
-                                        onChange={async (e) => {
+                                ))}
+                            </div>
+
+                            {/* Editor Area */}
+                            <div className="flex-1 p-8 flex flex-col">
+                                <div className="flex-1 relative group">
+                                    <textarea
+                                        value={documentContent}
+                                        onChange={e => setDocumentContent(e.target.value)}
+                                        placeholder="Paste your draft or notes here to begin... NEXX will perfectly structure and format it for court."
+                                        className="w-full h-full bg-white/5 rounded-2xl p-8 text-xl font-medium text-white placeholder:text-white/10 outline-none resize-none transition-all focus:bg-white/[0.07] border border-white/5 focus:border-white/10"
+                                    />
+                                    
+                                    {/* Action Bar Floating Over Textarea */}
+                                    <div className="absolute bottom-6 right-6 flex items-center gap-3">
+                                        <button
+                                            onClick={() => fileInputRef.current?.click()}
+                                            disabled={isParsing}
+                                            className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-white text-[12px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {isParsing ? (
+                                                <ArrowsClockwise size={18} className="animate-spin" />
+                                            ) : (
+                                                <Paperclip size={18} />
+                                            )}
+                                            {isParsing ? 'Parsing...' : 'Upload'}
+                                        </button>
+                                        <input type="file" ref={fileInputRef} accept=".pdf,.docx,.txt,.md,.csv,text/*" className="hidden" onChange={async (e) => {
                                             const file = e.target.files?.[0];
                                             if (!file) return;
 
-                                            const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+                                            const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB (matches server limit)
                                             if (file.size > MAX_FILE_SIZE) {
-                                                setGenerationError('File exceeds 25 MB limit. Please use a smaller file.');
+                                                setGenerationError('File exceeds 10 MB limit. Please use a smaller file.');
+                                                e.target.value = '';
+                                                return;
+                                            }
+
+                                            const name = file.name.toLowerCase();
+                                            const isBinary = name.endsWith('.pdf') || name.endsWith('.docx');
+
+                                            // Reject unsupported file types before entering parsing state
+                                            const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.txt', '.md', '.csv'];
+                                            const hasSupported = SUPPORTED_EXTENSIONS.some(ext => name.endsWith(ext));
+                                            const isTextMime = file.type.startsWith('text/');
+                                            if (!hasSupported && !isTextMime) {
+                                                setGenerationError('Unsupported file type. Please upload PDF, DOCX, TXT, MD, or CSV files.');
                                                 e.target.value = '';
                                                 return;
                                             }
@@ -598,9 +517,6 @@ function DocuVaultPageInner() {
                                             parseAbortRef.current = controller;
                                             setIsParsing(true);
                                             setGenerationError(null);
-
-                                            const name = file.name.toLowerCase();
-                                            const isBinary = name.endsWith('.pdf') || name.endsWith('.docx');
 
                                             try {
                                                 let extractedText = '';
@@ -649,73 +565,62 @@ function DocuVaultPageInner() {
                                             }
                                             // Reset input so the same file can be selected again
                                             e.target.value = '';
-                                        }} 
-                                    />
-                                    {documentContent && (
+                                        }} />
+                                        
                                         <button
-                                            onClick={() => {
-                                                parseAbortRef.current?.abort();
-                                                parseAbortRef.current = null;
-                                                setIsParsing(false);
-                                                setDocumentContent('');
-                                            }}
-                                            className="flex items-center gap-2 text-[14px] font-bold cursor-pointer transition-colors text-white/60 hover:text-rose z-10 relative"
+                                            onClick={handleGenerate}
+                                            disabled={isParsing || (!documentContent.trim() && !selectedTemplate)}
+                                            className="px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[12px] font-bold uppercase tracking-widest shadow-xl shadow-indigo-600/20 transition-all flex items-center gap-2 disabled:opacity-50 disabled:grayscale"
                                         >
-                                            <X size={18} weight="bold" /> 
-                                            <span>Clear</span>
+                                            <MagicWand size={18} weight="fill" />
+                                            Generate PDF
                                         </button>
-                                    )}
+                                    </div>
                                 </div>
-                                <p className="text-[13px] font-bold text-white/60">
-                                    {documentContent.length > 0 ? `${documentContent.length.toLocaleString()} characters` : ''}
-                                </p>
                             </div>
                         </div>
-                    </motion.div>
 
-                    {/* ── Dual Action CTAs ── */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 }}
-                        className="space-y-4"
-                    >
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {/* Quick Generate — existing template-based flow */}
-                            <button
-                                id="quick-generate-btn"
-                                onClick={handleGenerate}
-                                disabled={(!documentContent.trim() && !selectedTemplate) || isUserProfileLoading || isParsing}
-                                className="flex items-center justify-center gap-3 py-5 rounded-[2rem] text-[14px] font-bold tracking-[0.15em] uppercase text-white transition-all border border-white/20 bg-white/5 backdrop-blur-3xl shadow-[inset_0_1px_2px_rgba(255,255,255,0.2),0_8px_28px_rgba(0,0,0,0.4)] hover:bg-white/10 hover:border-white/30 hover:shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_12px_36px_rgba(0,0,0,0.5)] disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed group hover:-translate-y-1"
-                            >
-                                <Lightning size={22} weight="fill" className={`text-[#E5A84A] drop-shadow-[0_2px_8px_rgba(229,168,74,0.8)] group-hover:scale-110 transition-transform duration-300 ${isParsing ? 'animate-pulse' : ''}`} />
-                                <span className="drop-shadow-sm">{isParsing ? 'Extracting…' : 'Quick Generate'}</span>
-                            </button>
+                        {/* Right: Quick Templates Sidebar */}
+                        <div className="w-full md:w-80 bg-white/[0.02] p-8 flex flex-col space-y-6">
+                            <div>
+                                <h3 className="text-[11px] font-bold text-white/30 uppercase tracking-[0.25em] mb-6">Quick Templates</h3>
+                                <div className="space-y-3">
+                                    {templates.slice(0, 6).map(tmpl => {
+                                        const isSelected = selectedTemplate?.id === tmpl.id;
+                                        return (
+                                            <button
+                                                key={tmpl.id}
+                                                onClick={() => setSelectedTemplate(isSelected ? null : tmpl)}
+                                                className={`w-full text-left p-4 rounded-xl border transition-all flex items-center gap-4 group ${
+                                                    isSelected 
+                                                    ? 'bg-indigo-500/10 border-indigo-500/40 text-white' 
+                                                    : 'bg-white/5 border-white/5 text-white/50 hover:bg-white/10 hover:border-white/10 hover:text-white'
+                                                }`}
+                                            >
+                                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isSelected ? 'bg-indigo-500/20' : 'bg-white/5 group-hover:bg-white/10'}`}>
+                                                    <FileText size={20} weight={isSelected ? "fill" : "regular"} />
+                                                </div>
+                                                <span className="text-[13px] font-bold truncate flex-1">{tmpl.title}</span>
+                                                {isSelected && <CheckCircle size={16} weight="fill" className="text-indigo-400" />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
 
-                            {/* Create Export — structured reviewed export pipeline */}
-                            <button
-                                id="create-export-btn"
-                                onClick={() => setShowCreateExport(true)}
-                                disabled={isParsing}
-                                className={`flex items-center justify-center gap-3 py-5 rounded-[2rem] text-[14px] font-bold tracking-[0.15em] uppercase text-white transition-all bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_28px_rgba(0,0,0,0.5)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_12px_36px_rgba(0,0,0,0.6)] group hover:-translate-y-1 ${isParsing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                                <Export size={22} weight="bold" className="text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)] group-hover:scale-110 transition-transform duration-300" />
-                                <span className="drop-shadow-sm">{isParsing ? 'Extracting…' : 'Create Export'}</span>
-                            </button>
+                            <div className="mt-auto pt-8 border-t border-white/5">
+                                <button
+                                    onClick={() => setShowCreateExport(true)}
+                                    className="w-full py-4 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 text-white text-[12px] font-bold uppercase tracking-widest hover:border-white/40 transition-all flex items-center justify-center gap-2 group shadow-lg"
+                                >
+                                    <Export size={20} weight="bold" className="group-hover:translate-x-1 transition-transform" />
+                                    Full Case Export
+                                </button>
+                            </div>
                         </div>
+                    </div>
 
-                        {/* Helper text */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-2">
-                            <p className="text-[12px] font-medium text-white/50 text-center">
-                                Fast template-based PDF
-                            </p>
-                            <p className="text-[12px] font-medium text-white/50 text-center">
-                                Structured export with drafting + validation
-                            </p>
-                        </div>
-                    </motion.div>
-
-                    {/* ── Create Export Modal ── */}
+                    {/* Create Export Modal */}
                     <CreateExportModal
                         isOpen={showCreateExport}
                         onClose={() => setShowCreateExport(false)}
@@ -728,57 +633,28 @@ function DocuVaultPageInner() {
                                 });
                             } catch (err) {
                                 console.error('[DocuVault] Export start failed:', err);
-                                setShowCreateExport(true);
+                                setGenerationError(err instanceof Error ? err.message : 'Export failed. Please try again.');
                             }
                         }}
                         defaultCaseId={activeCaseId ?? undefined}
                         lockCaseSelection={!!activeCaseId}
                     />
 
-                    {/* ── Error Message ── */}
-                    <AnimatePresence>
-                        {generationError && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="overflow-hidden"
-                            >
-                                <div role="alert" aria-live="assertive" className="mt-4 px-5 py-4 rounded-xl bg-[var(--error)]/5 border border-[var(--error)]/20 shadow-sm flex items-start gap-3">
-                                    <X size={20} weight="bold" className="text-[var(--error)] shrink-0 mt-0.5" />
-                                    <p className="text-sm font-medium text-[var(--error)]">
-                                        {generationError}
-                                    </p>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    {/* ── Bottom Flow Icons ── */}
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.4 }}
-                        className="flex items-center justify-center gap-14 mt-16 py-10 border-t border-white/10"
-                    >
+                    {/* Bottom Helper Icons */}
+                    <div className="flex items-center justify-center gap-20 py-12 border-t border-white/5">
                         {[
-                            { label: 'Describe\nContext', icon: FileText, color: 'text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]' },
-                            { label: 'Generate or\nAssemble', icon: ArrowsClockwise, color: 'text-[#E5A84A] drop-shadow-[0_2px_8px_rgba(229,168,74,0.8)]' },
-                            { label: 'Review\n& Export', icon: ArrowRight, color: 'text-[#10B981] drop-shadow-[0_2px_8px_rgba(16,185,129,0.8)]' },
-                        ].map((item, i) => {
-                            const Icon = item.icon;
-                            return (
-                                <div key={i} className="flex flex-col items-center gap-4 relative">
-                                    <div className="w-20 h-20 rounded-[2.5rem] flex items-center justify-center bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_8px_24px_rgba(255,255,255,0.02),0_12px_40px_rgba(0,0,0,0.6)]">
-                                        <Icon size={36} weight="duotone" className={item.color} />
-                                    </div>
-                                    <p className="text-[14px] text-center font-bold whitespace-pre-line leading-tight text-white drop-shadow-sm tracking-wide">
-                                        {item.label}
-                                    </p>
+                            { label: 'Manual Intake', icon: PencilLine, color: 'text-indigo-400' },
+                            { label: 'AI Normalization', icon: MagicWand, color: 'text-emerald-400' },
+                            { label: 'Court Ready PDF', icon: CheckCircle, color: 'text-amber-400' },
+                        ].map((item, i) => (
+                            <div key={i} className="flex flex-col items-center gap-3">
+                                <div className="w-16 h-16 rounded-full flex items-center justify-center bg-white/5 border border-white/10">
+                                    <item.icon size={24} className={item.color} />
                                 </div>
-                            );
-                        })}
-                    </motion.div>
+                                <span className="text-[12px] font-bold text-white/30 uppercase tracking-widest text-center">{item.label}</span>
+                            </div>
+                        ))}
+                    </div>
                 </motion.div>
             )}
 
@@ -787,6 +663,7 @@ function DocuVaultPageInner() {
                ═══════════════════════════════════════════════════ */}
             {view === 'working' && (
                 <motion.div
+                    key="working"
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
@@ -901,6 +778,7 @@ function DocuVaultPageInner() {
                ═══════════════════════════════════════════════════ */}
             {view === 'result' && (
                 <motion.div
+                    key="result"
                     initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
                     className="max-w-3xl mx-auto py-6"
@@ -1102,6 +980,7 @@ function DocuVaultPageInner() {
                     </div>
                 </motion.div>
             )}
+            </AnimatePresence>
         </PageContainer>
     );
 }

@@ -20,7 +20,12 @@ html {
   --metallic-dark: #94A3B8;
 
   --pure-white: #FFFFFF;
-  --cream: #F8FAFC;                
+  --cream: #F8FAFC;
+  
+  --slate-950: #020617;
+  --slate-900: #0f172a;
+  --slate-800: #1e293b;
+  --slate-700: #334155;
 
   /* ── Legacy Mappings (to prevent instant breakage before refactor) ── */
   --pearl: var(--universe-dark);
@@ -41,11 +46,11 @@ html {
   --success: var(--emerald);
 
   /* ── Semantic Aliases ── */
-  --base-bg: var(--universe-dark);
-  --surface-bg: var(--universe-blue);
-  --card-bg: rgba(10, 17, 40, 0.6);
-  --border-glass: rgba(255, 255, 255, 0.15);
-  --border-light: rgba(255, 255, 255, 0.1);  
+  --base-bg: var(--slate-950);
+  --surface-bg: var(--slate-900);
+  --card-bg: rgba(15, 23, 42, 0.4);
+  --border-glass: rgba(255, 255, 255, 0.1);
+  --border-light: rgba(255, 255, 255, 0.05);  
 
   /* ── Text ── */
   --text-primary: var(--pure-white);
@@ -372,7 +377,54 @@ body {
   box-shadow: 
     0 25px 40px -10px rgba(0, 0, 0, 0.7),
     0 0 0 1px rgba(255, 255, 255, 0.25) !important;
-  background: linear-gradient(135deg, rgba(18, 61, 126, 0.6), rgba(10, 17, 40, 0.9)) !important;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.6), rgba(15, 23, 42, 0.9)) !important;
+}
+
+/* ═══ Hyperglass & Luxury Utilities ═══ */
+.hyper-glass {
+  background: rgba(15, 23, 42, 0.4) !important;
+  backdrop-filter: blur(32px) !important;
+  -webkit-backdrop-filter: blur(32px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 
+    0 24px 64px -12px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05) !important;
+  border-radius: 24px;
+}
+
+.floating-element {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.glow-slate {
+  box-shadow: 0 0 40px rgba(30, 58, 138, 0.15);
+}
+
+.text-shimmer {
+  background: linear-gradient(to right, #94a3b8 20%, #ffffff 50%, #94a3b8 80%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-text 5s linear infinite;
+}
+
+@keyframes shimmer-text {
+  to { background-position: 200% center; }
+}
+
+/* Accessibility: disable perpetual animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .floating-element,
+  .text-shimmer {
+    animation: none !important;
+  }
 }
 
 /* Shimmer overlay (Enhanced Metallic) */

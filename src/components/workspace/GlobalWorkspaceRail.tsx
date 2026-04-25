@@ -4,8 +4,6 @@ import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
     CheckCircle,
-    WarningCircle,
-    Clock,
     Lightning,
     FileText,
     CalendarCheck,
@@ -33,6 +31,7 @@ interface ReadinessItem {
     icon: typeof CheckCircle;
 }
 
+/** Classifies a count against a threshold into a readiness level (strong, partial, missing). */
 function getReadinessLevel(count: number, threshold: number): ReadinessLevel {
     if (count >= threshold) return 'strong';
     if (count > 0) return 'partial';
@@ -186,66 +185,59 @@ export function GlobalWorkspaceRail() {
     return (
         <motion.aside
             initial={false}
-            animate={{ width: 360 }}
-            className="h-[calc(100dvh-3rem)] sticky top-6 flex flex-col glass-ethereal rounded-[2rem] border border-white/10 overflow-hidden z-30 shadow-2xl"
+            animate={{ width: 310 }}
+            className="h-[calc(100dvh-3rem)] sticky top-6 flex flex-col hyper-glass rounded-[2rem] overflow-hidden z-30 glow-slate"
         >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-6 pb-4">
-                <h2 className="text-sm font-bold tracking-[0.1em] uppercase text-white/50">
-                    Insights
+            <div className="flex items-center justify-between px-8 pt-8 pb-4">
+                <h2 className="text-[10px] font-bold tracking-[0.3em] uppercase text-indigo-400 opacity-60">
+                    Intelligence
                 </h2>
                 <button
                     onClick={() => setIsExpanded(false)}
-                    className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-white transition-all cursor-pointer"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 text-white/30 hover:text-white transition-all cursor-pointer"
                     aria-label="Collapse insights rail"
                 >
-                    <CaretRight size={18} weight="bold" />
+                    <CaretRight size={16} weight="bold" />
                 </button>
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-6 no-scrollbar">
+            <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-8 no-scrollbar">
 
                 {isLoading ? (
                     /* Skeleton placeholders while workspace queries resolve */
                     <div className="space-y-4 pt-2">
                         {[1, 2, 3].map(i => (
-                            <div key={i} className="h-14 rounded-[14px] bg-white/5 animate-pulse" />
+                            <div key={i} className="h-16 rounded-2xl bg-white/5 animate-pulse" />
                         ))}
-                        <div className="h-20 rounded-[14px] bg-white/5 animate-pulse mt-6" />
                     </div>
                 ) : (
                 <>
                 {/* ── Section 1: Report Readiness ── */}
                 <section>
-                    <div className="flex items-center gap-2 mb-3">
-                        <ChartBar size={14} weight="fill" className="text-white/30" />
-                        <h3 className="text-[11px] font-bold tracking-[0.12em] uppercase text-white/40">
-                            Report Readiness
+                    <div className="flex items-center gap-2 mb-4 px-2">
+                        <ChartBar size={14} weight="light" className="text-white/20" />
+                        <h3 className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/30">
+                            Case Readiness
                         </h3>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                         {readiness.map((item) => {
                             const styles = LEVEL_STYLES[item.level];
                             return (
                                 <div
                                     key={item.label}
-                                    className={`flex items-center gap-3 px-3.5 py-3 rounded-[14px] border transition-all ${styles.bg}`}
+                                    className={`flex items-center gap-4 px-5 py-4 rounded-2xl border transition-all hover:bg-white/[0.04] ${styles.bg}`}
                                 >
-                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${styles.dot}`} />
+                                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${styles.dot} shadow-[0_0_8px_rgba(255,255,255,0.2)]`} />
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[13px] font-semibold text-white/80">{item.label}</p>
-                                        <p className={`text-[11px] font-medium mt-0.5 ${styles.text}`}>{item.detail}</p>
+                                        <p className="text-[13px] font-bold text-white tracking-tight">{item.label}</p>
+                                        <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${styles.text}`}>{item.detail}</p>
                                     </div>
                                     {item.level === 'strong' && (
-                                        <CheckCircle size={16} weight="fill" className="text-[var(--accent-emerald)] flex-shrink-0" />
-                                    )}
-                                    {item.level === 'partial' && (
-                                        <WarningCircle size={16} weight="fill" className="text-amber-400 flex-shrink-0" />
-                                    )}
-                                    {item.level === 'missing' && (
-                                        <Clock size={16} weight="regular" className="text-white/20 flex-shrink-0" />
+                                        <CheckCircle size={18} weight="light" className="text-emerald-400 flex-shrink-0" />
                                     )}
                                 </div>
                             );
@@ -255,26 +247,26 @@ export function GlobalWorkspaceRail() {
 
                 {/* ── Section 2: Source Health ── */}
                 <section>
-                    <div className="flex items-center gap-2 mb-3">
-                        <FileText size={14} weight="fill" className="text-white/30" />
-                        <h3 className="text-[11px] font-bold tracking-[0.12em] uppercase text-white/40">
-                            Source Health
+                    <div className="flex items-center gap-2 mb-4 px-2">
+                        <FileText size={14} weight="light" className="text-white/20" />
+                        <h3 className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/30">
+                            Evidence Health
                         </h3>
                     </div>
 
-                    <div className="px-3.5 py-3 rounded-[14px] border border-white/10 bg-white/[0.03]">
-                        <div className="flex items-baseline justify-between mb-2">
-                            <span className="text-[22px] font-bold text-white">{totalSources}</span>
-                            <span className="text-[11px] font-medium text-white/40">linked sources</span>
+                    <div className="px-5 py-5 rounded-2xl border border-white/5 bg-white/[0.02] flex flex-col gap-1">
+                        <div className="flex items-baseline justify-between mb-1">
+                            <span className="text-2xl font-serif text-white">{totalSources}</span>
+                            <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Linked</span>
                         </div>
                         {unlinkedItems > 0 && (
-                            <p className="text-[11px] font-medium text-amber-400/70">
-                                {unlinkedItems} item{unlinkedItems !== 1 ? 's' : ''} without source link
+                            <p className="text-[10px] font-bold text-amber-400/60 uppercase tracking-widest leading-relaxed">
+                                {unlinkedItems} Items Unverified
                             </p>
                         )}
                         {unlinkedItems === 0 && totalItems > 0 && (
-                            <p className="text-[11px] font-medium text-[var(--accent-emerald)]/70">
-                                All items fully source-backed ✓
+                            <p className="text-[10px] font-bold text-emerald-400/60 uppercase tracking-widest">
+                                Full Verification Trace ✓
                             </p>
                         )}
                     </div>
@@ -282,10 +274,10 @@ export function GlobalWorkspaceRail() {
 
                 {/* ── Section 3: Suggested Actions ── */}
                 <section>
-                    <div className="flex items-center gap-2 mb-3">
-                        <Lightning size={14} weight="fill" className="text-white/30" />
-                        <h3 className="text-[11px] font-bold tracking-[0.12em] uppercase text-white/40">
-                            Next Steps
+                    <div className="flex items-center gap-2 mb-4 px-2">
+                        <Lightning size={14} weight="light" className="text-white/20" />
+                        <h3 className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/30">
+                            Strategic Actions
                         </h3>
                     </div>
 
@@ -294,17 +286,17 @@ export function GlobalWorkspaceRail() {
                             <Link
                                 key={i}
                                 href={action.href}
-                                className="flex items-center gap-3 px-3.5 py-3 rounded-[14px] border border-white/5 bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/10 transition-all group no-underline"
+                                className="flex items-center gap-4 px-5 py-4 rounded-2xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.05] hover:border-indigo-500/30 transition-all group no-underline"
                             >
                                 <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                                    action.priority === 'high' ? 'bg-amber-400' :
-                                    action.priority === 'medium' ? 'bg-[var(--accent-icy)]' :
-                                    'bg-white/20'
-                                }`} />
-                                <span className="text-[12px] font-medium text-white/60 group-hover:text-white/80 transition-colors flex-1">
+                                    action.priority === 'high' ? 'bg-indigo-400' :
+                                    action.priority === 'medium' ? 'bg-white/40' :
+                                    'bg-white/10'
+                                } shadow-[0_0_8px_rgba(99,102,241,0.2)]`} />
+                                <span className="text-[12px] font-bold text-white/40 group-hover:text-white/80 transition-colors flex-1 tracking-tight">
                                     {action.label}
                                 </span>
-                                <ArrowRight size={12} className="text-white/20 group-hover:text-white/40 transition-colors" />
+                                <ArrowRight size={14} weight="bold" className="text-white/10 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
                             </Link>
                         ))}
                     </div>
@@ -314,13 +306,13 @@ export function GlobalWorkspaceRail() {
             </div>
 
             {/* Footer CTA */}
-            <div className="px-5 py-4 border-t border-white/5 bg-white/[0.02]">
+            <div className="px-6 py-6 border-t border-white/5 bg-white/[0.02]">
                 <Link
                     href="/chat/overview"
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[var(--accent-emerald)]/20 to-[var(--accent-emerald)]/10 border border-[var(--accent-emerald)]/20 text-[12px] font-bold uppercase tracking-widest text-[var(--accent-emerald)] hover:from-[var(--accent-emerald)]/30 hover:to-[var(--accent-emerald)]/15 transition-all no-underline"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-400 hover:bg-indigo-500/20 transition-all no-underline shadow-lg"
                 >
-                    <FileText size={14} weight="bold" />
-                    Case Overview
+                    <FileText size={16} weight="light" />
+                    Strategic Overview
                 </Link>
             </div>
         </motion.aside>

@@ -1,44 +1,43 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
 import {
     ClipboardText,
     ArrowRight,
+    Microphone,
+    Sparkle,
+    PlusCircle,
+    ArrowClockwise,
+    CheckCircle,
+    MagnifyingGlass as FileSearch,
+    Clock as TimelineIcon,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import { useWorkspace } from '@/lib/workspace-context';
 
 import '@/styles/pipelines.css';
-import { 
-  Microphone, 
-  Sparkle, 
-  PlusCircle, 
-  ArrowClockwise,
-  CheckCircle,
-  MagnifyingGlass as FileSearch,
-  Clock as TimelineIcon
-} from '@phosphor-icons/react';
 
 /** Incident Intake Hub - The primary pipeline for event recording. */
 export default function IncidentReportPage() {
     const { activeCaseId } = useWorkspace();
     const [narrative, setNarrative] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
-    const [processError, setProcessError] = useState<string | null>(null);
+
+    /** Structured error for stable code-based matching instead of brittle string comparisons. */
+    type ProcessError = { code: 'empty_narrative' | 'missing_case' | 'generic'; message: string } | null;
+    const [processError, setProcessError] = useState<ProcessError>(null);
     const [isPinning, setIsPinning] = useState<string | null>(null);
     const [pinError, setPinError] = useState<string | null>(null);
 
-    // Clear case-related error when user selects a case
-    useEffect(() => {
-        if (activeCaseId && processError === 'Please select or create a case first.') {
-            setProcessError(null);
-        }
-    }, [activeCaseId, processError]);
+    // Derive displayed error — automatically suppresses stale "no case" message once case is selected
+    const displayedError = processError?.code === 'missing_case' && activeCaseId
+        ? null
+        : processError?.message ?? null;
 
     // Live data from Convex
     const incidents = useQuery(
@@ -53,9 +52,9 @@ export default function IncidentReportPage() {
         const trimmed = narrative.trim();
         if (!trimmed || !activeCaseId) {
             if (!trimmed) {
-                setProcessError('Please enter a narrative.');
+                setProcessError({ code: 'empty_narrative', message: 'Please enter a narrative.' });
             } else if (!activeCaseId) {
-                setProcessError('Please select or create a case first.');
+                setProcessError({ code: 'missing_case', message: 'Please select or create a case first.' });
             }
             return;
         }
@@ -81,7 +80,7 @@ export default function IncidentReportPage() {
             setNarrative('');
         } catch (err) {
             console.error('[IncidentIntake] Create failed:', err);
-            setProcessError(err instanceof Error ? err.message : 'Failed to save incident');
+            setProcessError({ code: 'generic', message: err instanceof Error ? err.message : 'Failed to save incident' });
         } finally {
             setIsProcessing(false);
         }
@@ -89,7 +88,7 @@ export default function IncidentReportPage() {
 
     /** Pin an incident to the case workspace. Prevents duplicate clicks. */
     const handleAddToWorkspace = useCallback(async (incident: { _id: Id<'incidents'>; narrative: string; date: string }) => {
-        if (!activeCaseId || isPinning === incident._id) return;
+        if (!activeCaseId || isPinning) return;
         setIsPinning(incident._id);
 
         try {
@@ -121,160 +120,162 @@ export default function IncidentReportPage() {
 
             <div className="max-w-4xl mx-auto space-y-12 pb-24">
                 
-                {/* 1. The Focused Intake Area */}
-                <div className="relative group">
-                    <textarea
-                        value={narrative}
-                        onChange={(e) => {
-                            setNarrative(e.target.value);
-                            if (processError) setProcessError(null);
-                        }}
-                        aria-label="Incident narrative"
-                        placeholder="What happened? (e.g. 'At 2pm today, John arrived at the exchange location and started...')"
-                        className="w-full bg-transparent border-none text-2xl md:text-3xl font-serif text-white placeholder:text-white/10 min-h-[300px] outline-none resize-none px-4 py-8 selection:bg-indigo-500/30"
-                    />
-                    
-                    {/* Floating Glow Background */}
-                    <div className="absolute inset-0 bg-indigo-500/5 blur-[100px] rounded-full -z-10 group-focus-within:bg-indigo-500/10 transition-all" />
+                {/* 1. The Focused Intake Area (Luxury Glass) */}
+                <div className="hyper-glass p-12 space-y-8 floating-element glow-slate">
+                    <div className="relative group">
+                        <textarea
+                            value={narrative}
+                            onChange={(e) => {
+                                setNarrative(e.target.value);
+                                if (processError) setProcessError(null);
+                            }}
+                            aria-label="Incident narrative"
+                            placeholder="What happened? Record the facts exactly as they occurred..."
+                            className="w-full bg-transparent border-none text-2xl md:text-3xl font-serif text-white placeholder:text-white/5 min-h-[260px] outline-none resize-none px-0 py-4 selection:bg-indigo-500/30 leading-relaxed"
+                        />
+                        
+                        {/* Floating Glow Background */}
+                        <div className="absolute inset-0 bg-indigo-500/5 blur-[80px] rounded-full -z-10 group-focus-within:bg-indigo-500/10 transition-all pointer-events-none" />
+                    </div>
+
+                    {/* 2. Intake Controls */}
+                    <div className="flex items-center justify-between pt-8 border-t border-white/5">
+                        <div className="flex items-center gap-6">
+                            <button disabled className="flex items-center gap-2 text-white/20 cursor-not-allowed text-[11px] font-bold uppercase tracking-[0.2em] group transition-all" title="Coming soon">
+                                <Microphone size={22} weight="light" className="group-hover:text-rose-400 transition-colors" />
+                                Voice Entry
+                            </button>
+                            <button disabled className="flex items-center gap-2 text-white/20 cursor-not-allowed text-[11px] font-bold uppercase tracking-[0.2em] group transition-all" title="Coming soon">
+                                <PlusCircle size={22} weight="light" className="group-hover:text-indigo-400 transition-colors" />
+                                Attach Media
+                            </button>
+                        </div>
+
+                        <button 
+                            onClick={handleProcess}
+                            disabled={!narrative.trim() || isProcessing || !activeCaseId}
+                            className={`flex items-center gap-3 px-10 py-4 rounded-xl font-bold uppercase tracking-[0.2em] text-[10px] transition-all shadow-2xl ${
+                                narrative.trim() && !isProcessing && activeCaseId
+                                ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30' 
+                                : 'bg-white/5 text-white/10 border border-white/5 cursor-not-allowed'
+                            }`}
+                        >
+                            {isProcessing ? (
+                                <ArrowClockwise size={18} className="animate-spin" />
+                            ) : (
+                                <Sparkle size={18} weight="fill" />
+                            )}
+                            {isProcessing ? 'Processing' : 'Log Incident'}
+                        </button>
+                    </div>
                 </div>
 
-                {/* 2. Intake Controls */}
-                <div className="flex items-center justify-between px-4">
-                    <div className="flex items-center gap-4">
-                        <button disabled className="flex items-center gap-2 px-6 py-3 rounded-full bg-white/5 border border-white/10 text-white/20 cursor-not-allowed text-sm font-bold" title="Coming soon">
-                            <Microphone size={20} weight="fill" className="text-rose-400/40" />
-                            Voice Input
-                        </button>
-                        <button disabled className="flex items-center gap-2 px-4 py-2 text-white/20 cursor-not-allowed text-xs font-bold uppercase tracking-widest" title="Coming soon">
-                            <PlusCircle size={18} />
-                            Add Photo/Video
-                        </button>
-                    </div>
-
-                    <button 
-                        onClick={handleProcess}
-                        disabled={!narrative.trim() || isProcessing || !activeCaseId}
-                        className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all shadow-xl ${
-                            narrative.trim() && !isProcessing && activeCaseId
-                            ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30' 
-                            : 'bg-white/5 text-white/20 border border-white/5 cursor-not-allowed'
-                        }`}
-                    >
-                        {isProcessing ? (
-                            <ArrowClockwise size={18} className="animate-spin" />
-                        ) : (
-                            <Sparkle size={18} weight="fill" />
-                        )}
-                        {isProcessing ? 'Processing...' : 'Process Incident'}
-                    </button>
+                {/* Error & Warnings */}
+                <div className="px-4 space-y-4">
+                    {displayedError && (
+                        <div role="alert" aria-live="assertive" className="px-6 py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold uppercase tracking-widest">
+                            {displayedError}
+                        </div>
+                    )}
+                    {!activeCaseId && (
+                        <div className="px-6 py-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-widest text-center">
+                            Select an active case to begin recording incidents
+                        </div>
+                    )}
                 </div>
 
-                {/* Error */}
-                {processError && (
-                    <div role="alert" aria-live="assertive" className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                        {processError}
-                    </div>
-                )}
-
-                {/* No case selected warning */}
-                {!activeCaseId && (
-                    <div className="px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm text-center">
-                        Select a case from the sidebar to start recording incidents.
-                    </div>
-                )}
-
-                {/* 3. Live Timeline from Convex */}
+                {/* 3. Live Timeline (Luxury Glass) */}
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="glass-station p-8 border-white/5 shadow-2xl space-y-8"
+                    className="hyper-glass p-10 space-y-10"
                 >
-                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                        <div className="flex items-center gap-3">
-                            <TimelineIcon size={20} className="text-indigo-400" />
-                            <h3 className="font-bold text-white uppercase tracking-widest text-xs">Recent Timeline Intake</h3>
+                    <div className="flex items-center justify-between border-b border-white/5 pb-8">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+                                <TimelineIcon size={20} className="text-indigo-400" />
+                            </div>
+                            <div>
+                                <h3 className="font-serif text-xl text-white tracking-tight">Timeline Intake</h3>
+                                <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] mt-1">Chronological Fact Logging</p>
+                            </div>
                         </div>
-                        <Link href="/incident-report/history" className="text-[10px] font-black text-indigo-400 hover:text-indigo-300 uppercase tracking-widest flex items-center gap-2">
-                            View Full History <ArrowRight size={12} />
+                        <Link href="/incident-report/history" className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-[0.2em] flex items-center gap-2 group transition-all">
+                            Historical Archive <ArrowRight size={14} weight="bold" className="group-hover:translate-x-1 transition-transform" />
                         </Link>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-10">
                         {/* No case selected state */}
                         {!activeCaseId && (
-                            <p className="text-center text-white/20 text-xs uppercase tracking-widest font-bold py-6">
-                                Select a case to view incidents
+                            <p className="text-center text-white/20 text-[10px] uppercase tracking-[0.3em] font-bold py-10">
+                                Case isolation active
                             </p>
                         )}
 
                         {/* Loading state */}
                         {activeCaseId && incidents === undefined && (
-                            <div className="flex items-center justify-center py-6">
-                                <div className="w-5 h-5 border-2 border-white/20 border-t-indigo-400 rounded-full animate-spin" />
+                            <div className="flex items-center justify-center py-10">
+                                <div className="w-6 h-6 border-2 border-white/10 border-t-indigo-400 rounded-full animate-spin" />
                             </div>
                         )}
 
                         {/* Empty state */}
                         {incidents && incidents.length === 0 && (
-                            <p className="text-center text-white/20 text-xs uppercase tracking-widest font-bold py-6">
-                                No incidents recorded yet
+                            <p className="text-center text-white/20 text-[10px] uppercase tracking-[0.3em] font-bold py-10">
+                                Queue clear • Awaiting entries
                             </p>
                         )}
 
                         {/* Pin error */}
                         {pinError && (
-                            <div role="alert" aria-live="assertive" className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                            <div role="alert" aria-live="assertive" className="px-6 py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold uppercase tracking-widest">
                                 {pinError}
                             </div>
                         )}
 
                         {/* Live incidents */}
                         {incidents?.slice(0, 5).map((incident, i) => (
-                            <div key={incident._id} className="flex gap-6 relative group">
+                            <div key={incident._id} className="flex gap-8 relative group">
                                 {/* Vertical Timeline Line */}
                                 {i !== Math.min((incidents?.length ?? 0) - 1, 4) && (
-                                    <div className="absolute left-[7px] top-6 bottom-[-1.5rem] w-[2px] bg-indigo-500/20" />
+                                    <div className="absolute left-[7px] top-8 bottom-[-2.5rem] w-[1px] bg-white/5" />
                                 )}
                                 
-                                <div className="mt-1 w-4 h-4 rounded-full border-2 border-indigo-500 bg-[#0F172A] z-10 shrink-0" />
+                                <div className="mt-2 w-4 h-4 rounded-full border border-indigo-500/50 bg-[#020617] z-10 shrink-0 group-hover:scale-125 transition-transform shadow-[0_0_8px_rgba(99,102,241,0.3)]" />
                                 
-                                <div className="flex-1 space-y-2">
+                                <div className="flex-1 space-y-4">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter">{incident.date}</span>
-                                            <span className="text-[10px] font-medium text-white/20">{incident.time}</span>
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-[11px] font-bold text-white tracking-[0.1em] uppercase">{incident.date}</span>
+                                            <span className="text-[11px] font-medium text-white/20 uppercase tracking-widest">{incident.time}</span>
                                             {incident.status === 'confirmed' && (
-                                                <span className="text-[10px] font-bold text-emerald-400/60 uppercase tracking-widest">✓ Confirmed</span>
+                                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-bold text-emerald-400 uppercase tracking-widest">Verified</span>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button disabled className="text-[10px] font-bold text-white/20 uppercase tracking-widest cursor-not-allowed" title="Coming soon">
-                                                Edit
-                                            </button>
-                                            <button disabled className="text-[10px] font-bold text-white/20 uppercase tracking-widest cursor-not-allowed" title="Coming soon">
-                                                Verify
-                                            </button>
+                                        <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button disabled className="text-[10px] font-bold text-white/30 hover:text-white uppercase tracking-widest transition-colors cursor-not-allowed">Edit</button>
                                         </div>
                                     </div>
-                                    <p className="text-sm text-white/80 leading-relaxed max-w-2xl">
-                                        {incident.narrative.length > 200
-                                            ? incident.narrative.slice(0, 200) + '...'
+                                    <p className="text-[15px] text-white/60 leading-relaxed font-serif max-w-2xl group-hover:text-white/80 transition-colors">
+                                        {incident.narrative.length > 250
+                                            ? incident.narrative.slice(0, 250) + '...'
                                             : incident.narrative}
                                     </p>
-                                    <div className="flex gap-2 pt-1">
+                                    <div className="flex gap-3 pt-2">
                                         <button
                                             onClick={() => handleAddToWorkspace(incident)}
-                                            disabled={isPinning === incident._id}
-                                            className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest border transition-colors ${
-                                                isPinning === incident._id
+                                            disabled={Boolean(isPinning)}
+                                            className={`px-4 py-2 rounded-lg text-[9px] font-bold uppercase tracking-[0.2em] border transition-all ${
+                                                isPinning
                                                     ? 'bg-indigo-500/10 text-indigo-400/60 border-indigo-500/20 cursor-not-allowed'
-                                                    : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 hover:bg-indigo-500/20'
+                                                    : 'bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:border-white/20 hover:text-white'
                                             }`}
                                         >
-                                            {isPinning === incident._id ? 'Adding…' : '+ Add to Workspace'}
+                                            {isPinning === incident._id ? 'Securing' : 'Case Workspace'}
                                         </button>
-                                        <button disabled className="px-2 py-1 rounded bg-amber-500/10 text-amber-400/40 text-[9px] font-bold uppercase tracking-widest border border-amber-500/10 cursor-not-allowed" title="Coming soon">
-                                            + Send to Exhibit
+                                        <button disabled className="px-4 py-2 rounded-lg bg-amber-500/5 text-amber-500/30 text-[9px] font-bold uppercase tracking-[0.2em] border border-amber-500/10 cursor-not-allowed" title="Coming soon">
+                                            Export to Exhibit
                                         </button>
                                     </div>
                                 </div>
@@ -284,24 +285,28 @@ export default function IncidentReportPage() {
                 </motion.div>
 
                 {/* 4. Strategic Guidance */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex items-start gap-4">
-                        <CheckCircle size={24} className="text-indigo-400 shrink-0" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="hyper-glass p-8 flex items-start gap-5 group hover:border-indigo-500/30 transition-all">
+                        <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-indigo-500/5 transition-all">
+                            <CheckCircle size={24} weight="light" className="text-indigo-400" />
+                        </div>
                         <div>
-                            <h5 className="text-[11px] font-black text-white uppercase tracking-widest mb-1">Court-Ready Tip</h5>
-                            <p className="text-[11px] text-white/40 leading-relaxed">
-                                Avoid emotional descriptors. Focus on exact times, dates, and direct quotes for higher evidentiary value.
+                            <h5 className="text-[11px] font-bold text-indigo-400 uppercase tracking-[0.25em] mb-2">Court-Ready Protocol</h5>
+                            <p className="text-[12px] text-white/30 leading-relaxed group-hover:text-white/50 transition-colors">
+                                Avoid subjective adjectives. Document exact times and specific dialogue to maximize evidentiary weight in future motions.
                             </p>
                         </div>
                     </div>
-                    <div className="p-6 rounded-2xl bg-rose-500/5 border border-rose-500/10 flex items-start gap-4">
-                        <FileSearch size={24} className="text-rose-400 shrink-0" />
+                    <div className="hyper-glass p-8 flex items-start gap-5 group hover:border-rose-500/30 transition-all">
+                        <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-rose-500/5 transition-all">
+                            <FileSearch size={24} weight="light" className="text-rose-400" />
+                        </div>
                         <div>
-                            <h5 className="text-[11px] font-black text-white uppercase tracking-widest mb-1">Pattern Detected</h5>
-                            <p className="text-[11px] text-white/40 leading-relaxed">
+                            <h5 className="text-[11px] font-bold text-rose-400 uppercase tracking-[0.25em] mb-2">Predictive Analysis</h5>
+                            <p className="text-[12px] text-white/30 leading-relaxed group-hover:text-white/50 transition-colors">
                                 {incidents && incidents.length >= 3
-                                    ? `${incidents.length} incidents recorded. Patterns may be tracked for your next motion.`
-                                    : 'Record 3+ incidents to enable pattern detection for legal filings.'}
+                                    ? `Pattern detected across ${incidents.length} entries. High-probability evidence for pattern-of-conduct claims.`
+                                    : 'Recording 3+ specific incidents enables pattern detection and automated evidence grouping.'}
                             </p>
                         </div>
                     </div>

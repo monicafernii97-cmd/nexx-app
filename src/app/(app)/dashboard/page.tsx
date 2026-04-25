@@ -168,28 +168,33 @@ function DashboardContent() {
                             return (
                                 <Link key={card.label} href={card.href} className="no-underline block h-full">
                                     <motion.div
-                                        initial={{ opacity: 0, y: 20 }}
+                                        initial={{ opacity: 0, y: 30 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.1 * i, duration: 0.5, type: 'spring' }}
-                                        className="pipeline-card h-full flex flex-col items-center justify-center group"
+                                        transition={{ delay: 0.1 * i, duration: 0.6, type: 'spring' }}
+                                        className="h-full"
                                     >
-                                        <div className="mb-4">
+                                      <div className="floating-element hyper-glass h-full min-h-[280px] flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate">
+                                        <div className="mb-8 p-6 rounded-3xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
                                             <Icon 
-                                                size={40} 
-                                                weight="regular" 
+                                                size={48} 
+                                                weight="light" 
                                                 style={{ color: card.accent }} 
-                                                className="transition-transform duration-500 group-hover:scale-110" 
+                                                className="transition-transform duration-700 group-hover:scale-110 group-hover:rotate-3" 
                                             />
                                         </div>
-                                        <h3 className="font-bold text-[18px] text-white mb-1 tracking-tight">
+                                        <h3 className="text-2xl font-serif text-white mb-2 tracking-tight drop-shadow-sm">
                                             {card.label}
                                         </h3>
-                                        <p className="text-[12px] text-white/40 font-medium mb-3 uppercase tracking-widest">
+                                        <p className="text-[13px] text-white/40 font-medium mb-4 uppercase tracking-[0.2em] drop-shadow-sm">
                                             {card.subtitle}
                                         </p>
-                                        <p className="text-[13px] text-white/60 font-medium px-4">
+                                        <p className="text-[14px] text-white/60 font-medium px-8 text-center leading-relaxed">
                                             {card.desc}
                                         </p>
+                                        
+                                        {/* Luxury glint effect */}
+                                        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+                                      </div>
                                     </motion.div>
                                 </Link>
                             );
@@ -216,7 +221,7 @@ function DashboardContent() {
                                                 <Icon size={14} weight="fill" color={stat.color} className="shrink-0 transition-transform group-hover:scale-110" />
                                                 <span className="text-[9px] font-bold text-white/50 uppercase tracking-widest leading-tight">{stat.label}</span>
                                             </div>
-                                            <p className="text-2xl font-serif text-white tracking-tight">
+                                            <p className="text-xl font-serif text-white tracking-tight">
                                                 {stat.value}
                                             </p>
                                         </div>

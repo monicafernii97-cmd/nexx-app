@@ -33,7 +33,7 @@ export function TopNav() {
     const { showToast } = useToast();
     const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
-    const [pendingActions, setPendingActions] = useState<Set<string>>(new Set());
+    const [pendingActions, setPendingActions] = useState<Set<Id<'cases'>>>(new Set());
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     const createCase = useMutation(api.cases.create);
@@ -59,8 +59,9 @@ export function TopNav() {
         if (isCreating) return;
         setIsCreating(true);
         try {
+            const nextNum = (activeCases.length ?? 0) + 1;
             const newCaseId = await createCase({
-                title: `Case ${(cases?.length ?? 0) + 1}`,
+                title: `Case ${nextNum}`,
             });
             if (newCaseId) {
                 setActiveCaseId(newCaseId as Id<'cases'>);

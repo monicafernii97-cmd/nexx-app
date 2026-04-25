@@ -14,10 +14,10 @@ import { motion } from 'framer-motion';
  *
  * 3-column executive layout:
  * ┌───────────┬──────────────────────────────────┬────────────┐
- * │           │         TopNav (72px)             │            │
+ * │           │         TopNav (64px)             │            │
  * │  Sidebar  ├──────────────────────────────────┤  Insights  │
- * │  (280px)  │      Main Content (flex)         │   Rail     │
- * │ full-ht   │                                  │  (360px)   │
+ * │  (240px)  │      Main Content (flex)         │   Rail     │
+ * │ full-ht   │                                  │  (280px)   │
  * └───────────┴──────────────────────────────────┴────────────┘
  */
 export default function AppShellLayout({ children }: { children: ReactNode }) {
@@ -25,12 +25,12 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
         <UserProvider>
             <WorkspaceProvider>
                 <ToastProvider>
-                    <div className="silk-bg min-h-[100dvh] flex p-2 md:p-3 gap-3 overflow-hidden">
+                    <div className="silk-bg min-h-[100dvh] flex p-1.5 md:p-2 gap-2 overflow-hidden">
                         {/* Left: Full-height Sidebar */}
                         <Sidebar />
                         
                         {/* Center + Right: TopNav + Content + Rail */}
-                        <div className="flex-1 min-w-0 flex gap-3">
+                        <div className="flex-1 min-w-0 flex gap-2">
                             {/* Center column: TopNav + Page */}
                             <motion.div
                                 layout

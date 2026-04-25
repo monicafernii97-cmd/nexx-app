@@ -16,15 +16,15 @@ export default function SettingsPage() {
                 className="flex items-start justify-between mb-10"
             >
                 <div>
-                    <div className="flex items-center gap-4 mb-3">
-                        <div className="w-12 h-12 rounded-2xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-[#60A5FA]/50 shadow-[0_8px_24px_rgba(96,165,250,0.3)] flex items-center justify-center translate-y-[-2px]">
-                            <Gear size={24} className="text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]" weight="fill" />
+                    <div className="flex items-center gap-4 mb-2">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center shadow-lg shrink-0">
+                            <Gear size={20} className="text-indigo-400" weight="light" />
                         </div>
-                        <h1 className="text-4xl font-serif font-bold tracking-tight text-white drop-shadow-sm m-0">
+                        <h1 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
                             Account Settings
                         </h1>
                     </div>
-                    <p className="text-[16px] font-medium text-white max-w-2xl mt-2 drop-shadow-sm">
+                    <p className="text-[13px] text-white/40 max-w-2xl mt-1 leading-relaxed">
                         Manage your NEXX profile authentication, security preferences, and subscription details.
                     </p>
                 </div>

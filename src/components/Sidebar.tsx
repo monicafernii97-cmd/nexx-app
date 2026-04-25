@@ -108,23 +108,23 @@ export default function Sidebar() {
         <motion.aside
             layout
             initial={false}
-            animate={{ width: collapsed ? 80 : 280 }}
+            animate={{ width: collapsed ? 64 : 240 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="sticky top-6 h-[calc(100dvh-3rem)] z-40 flex flex-col flex-shrink-0 hyper-glass rounded-[2rem] overflow-visible glow-slate"
+            className="sticky top-4 h-[calc(100dvh-2rem)] z-40 flex flex-col flex-shrink-0 hyper-glass rounded-[1.5rem] overflow-visible glow-slate"
         >
             {/* Logo */}
-            <div className="flex items-center px-8 h-[72px] flex-shrink-0">
-                <Link href="/dashboard" className="flex items-center gap-4 no-underline group">
+            <div className="flex items-center px-6 h-[64px] flex-shrink-0">
+                <Link href="/dashboard" className="flex items-center gap-3 no-underline group">
                         <motion.div
                         layout="position"
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-xl relative overflow-hidden"
+                        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-xl relative overflow-hidden"
                         style={{
                             background: 'linear-gradient(135deg, #FFFFFF 0%, #F1F5F9 100%)',
                             border: '1px solid rgba(255, 255, 255, 0.4)',
                         }}
                     >
                         <span 
-                            className="text-[22px] font-black font-serif italic uppercase tracking-tighter" 
+                            className="text-[18px] font-black font-serif italic uppercase tracking-tighter" 
                             style={{
                                 background: 'linear-gradient(135deg, #0A1128 0%, #1E3A8A 30%, #94A3B8 60%, #0A1128 100%)',
                                 backgroundSize: '200% auto',
@@ -144,7 +144,7 @@ export default function Sidebar() {
                                 animate={{ opacity: 1, filter: 'blur(0px)', x: 0 }}
                                 exit={{ opacity: 0, filter: 'blur(4px)', x: -10 }}
                                 transition={{ duration: 0.2 }}
-                                className="text-xl font-serif font-bold tracking-tight text-white group-hover:text-indigo-200 transition-colors"
+                                className="text-lg font-serif font-bold tracking-tight text-white group-hover:text-indigo-200 transition-colors"
                             >
                                 NEXX
                             </motion.span>
@@ -154,7 +154,7 @@ export default function Sidebar() {
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 py-8 px-5 space-y-2 overflow-y-auto overflow-x-hidden no-scrollbar sidebar-nav">
+            <nav className="flex-1 py-4 px-4 space-y-1.5 overflow-y-auto overflow-x-hidden no-scrollbar sidebar-nav">
                 {navItems.map((item) => {
                     const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
                     const hasChildren = item.children && item.children.length > 0;
@@ -173,7 +173,7 @@ export default function Sidebar() {
                                 >
                                     <motion.div
                                         whileTap={{ scale: 0.98 }}
-                                        className={`group relative flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ${collapsed ? 'justify-center' : ''}`}
+                                        className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 ${collapsed ? 'justify-center' : ''}`}
                                         style={{
                                             background: isActive && !hasChildren
                                                 ? 'rgba(255,255,255,0.08)'
@@ -233,7 +233,7 @@ export default function Sidebar() {
                                         exit={{ opacity: 0, height: 0 }}
                                         className="overflow-hidden"
                                     >
-                                        <div className="ml-9 pl-4 mt-2 mb-3 space-y-1 border-l border-white/5">
+                                        <div className="ml-8 pl-3 mt-1.5 mb-2 space-y-1 border-l border-white/5">
                                             {item.children!.map((child) => {
                                                 const isChildActive = pathname === child.href || pathname?.startsWith(child.href + '/');
                                                 const ChildIcon = child.icon;
@@ -263,7 +263,7 @@ export default function Sidebar() {
             </nav>
 
             {/* Bottom User Section */}
-            <div className="px-6 pb-8 pt-4 mt-auto space-y-6">
+            <div className="px-4 pb-6 pt-2 mt-auto space-y-4">
                 {/* Generate Report CTA */}
                 <button
                     onClick={() => {
@@ -274,7 +274,7 @@ export default function Sidebar() {
                             window.location.href = '/chat/overview?openReportModal=true';
                         }
                     }}
-                    className={`flex items-center gap-4 w-full px-5 py-4 rounded-xl transition-all duration-300 cursor-pointer bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 group ${collapsed ? 'justify-center' : ''}`}
+                    className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-xl transition-all duration-300 cursor-pointer bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 group ${collapsed ? 'justify-center' : ''}`}
                 >
                     <FileText size={18} weight="bold" className="text-indigo-400 flex-shrink-0" />
                     <AnimatePresence mode="popLayout">
@@ -294,17 +294,17 @@ export default function Sidebar() {
                 {isLoaded && user ? (
                     <div className="relative group w-full">
                         {/* Visual layer */}
-                        <div className={`flex items-center gap-4 px-4 py-4 rounded-2xl transition-all cursor-pointer bg-white/[0.03] border border-white/5 hover:border-white/20 shadow-2xl ${collapsed ? 'justify-center' : ''}`}>
-                            <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 border border-white/20 shadow-inner">
+                        <div className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all cursor-pointer bg-white/[0.03] border border-white/5 hover:border-white/20 shadow-2xl ${collapsed ? 'justify-center' : ''}`}>
+                            <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-white/20 shadow-inner">
                                 <img src={user.imageUrl} alt={user.fullName || 'User'} className="w-full h-full object-cover" />
                             </div>
                             <AnimatePresence>
                                 {!collapsed && (
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 min-w-0">
-                                        <p className="text-[14px] font-bold truncate text-white leading-tight">
+                                        <p className="text-[12px] font-bold truncate text-white leading-tight">
                                             {user.firstName || 'Owner'}
                                         </p>
-                                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/20 mt-1">
+                                        <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/20 mt-1">
                                             Premium
                                         </p>
                                     </motion.div>
@@ -327,7 +327,7 @@ export default function Sidebar() {
                             />
                         </div>
                     </div>
-                ) : <div className="h-[72px]" />}
+                ) : <div className="h-[56px]" />}
             </div>
 
             {/* Floating Collapse Toggle */}

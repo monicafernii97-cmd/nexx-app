@@ -295,7 +295,7 @@ export default function NewIncidentPage() {
                     <ArrowLeft size={20} weight="bold" className="text-white" />
                 </Link>
                 <div>
-                    <h1 className="text-3xl font-serif font-bold text-white m-0">
+                    <h1 className="text-2xl font-serif font-bold text-white m-0">
                         Evidence & <span className="text-white shimmer">Pattern Log</span>
                     </h1>
                     <p className="text-[14px] font-medium text-white opacity-90 mt-1">
@@ -350,7 +350,7 @@ export default function NewIncidentPage() {
                                 <>
                                     <button
                                         onClick={toggleListening}
-                                        className={`w-24 h-24 rounded-full mx-auto flex items-center justify-center cursor-pointer transition-all hover:scale-105 shadow-[0_8px_32px_rgba(26,75,155,0.5)] border-[4px] group relative overflow-hidden ${
+                                        className={`w-[72px] h-[72px] rounded-full mx-auto flex items-center justify-center cursor-pointer transition-all hover:scale-105 shadow-[0_8px_32px_rgba(26,75,155,0.5)] border-[3px] group relative overflow-hidden ${
                                             isListening
                                                 ? 'bg-[linear-gradient(135deg,#C75A5A,#8B3A3A)] border-[rgba(199,90,90,0.5)] animate-pulse shadow-[0_0_30px_rgba(199,90,90,0.5)]'
                                                 : 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.3)]'
@@ -359,9 +359,9 @@ export default function NewIncidentPage() {
                                     >
                                         <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                                         {isListening ? (
-                                            <MicrophoneSlash size={36} weight="fill" className="text-white drop-shadow-md" />
+                                            <MicrophoneSlash size={28} weight="fill" className="text-white drop-shadow-md" />
                                         ) : (
-                                            <Microphone size={36} weight="duotone" className="text-white group-hover:scale-110 transition-all drop-shadow-md" />
+                                            <Microphone size={28} weight="duotone" className="text-white group-hover:scale-110 transition-all drop-shadow-md" />
                                         )}
                                     </button>
                                     <p className={`text-[13px] font-bold tracking-widest uppercase mt-4 ${
@@ -372,8 +372,8 @@ export default function NewIncidentPage() {
                                 </>
                             ) : (
                                 <>
-                                    <div className="w-24 h-24 rounded-full mx-auto flex items-center justify-center bg-[rgba(255,255,255,0.05)] border-[4px] border-[rgba(255,255,255,0.08)] opacity-50">
-                                        <MicrophoneSlash size={36} className="text-white/40" />
+                                    <div className="w-[72px] h-[72px] rounded-full mx-auto flex items-center justify-center bg-[rgba(255,255,255,0.05)] border-[3px] border-[rgba(255,255,255,0.08)] opacity-50">
+                                        <MicrophoneSlash size={28} className="text-white/40" />
                                     </div>
                                     <p className="text-[12px] font-medium text-white/40 mt-4">
                                         Voice recording not supported in this browser.
@@ -671,13 +671,13 @@ export default function NewIncidentPage() {
 
                 {/* Step: Confirmed */}
                 {step === 'confirmed' && (
-                    <motion.div key="confirmed" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-ethereal p-12 text-center rounded-[2rem] border-white">
+                    <motion.div key="confirmed" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-ethereal p-8 text-center rounded-[2rem] border-white">
                         <div
-                            className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center bg-emerald shadow-[0_8px_24px_rgba(90,158,111,0.25)]"
+                            className="w-14 h-14 rounded-full mx-auto mb-5 flex items-center justify-center bg-emerald shadow-[0_8px_24px_rgba(90,158,111,0.25)]"
                         >
-                            <Check size={32} weight="bold" className="text-white" />
+                            <Check size={24} weight="bold" className="text-white" />
                         </div>
-                        <h2 className="font-serif text-3xl font-bold mb-3 text-sapphire">
+                        <h2 className="font-serif text-2xl font-bold mb-3 text-sapphire">
                             Incident Documented
                         </h2>
                         <p className="text-[15px] font-medium mb-8 text-sapphire-muted max-w-sm mx-auto leading-relaxed">

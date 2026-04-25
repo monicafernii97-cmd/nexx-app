@@ -153,16 +153,16 @@ export function GlobalWorkspaceRail() {
         return (
             <motion.div
                 initial={false}
-                animate={{ width: 64 }}
-                className="h-[calc(100dvh-3rem)] sticky top-6 flex flex-col items-center py-6 gap-6 glass-ethereal rounded-[2rem] border border-white/10 z-30"
+                animate={{ width: 56 }}
+                className="h-[calc(100dvh-2rem)] sticky top-4 flex flex-col items-center py-4 gap-4 glass-ethereal rounded-[1.5rem] border border-white/10 z-30"
             >
                 <button
                     onClick={() => setIsExpanded(true)}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all group cursor-pointer"
+                    className="w-9 h-9 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all group cursor-pointer"
                     aria-label="Expand insights rail"
                     title="Expand Insights"
                 >
-                    <CaretLeft size={20} weight="bold" className="group-hover:-translate-x-0.5 transition-transform" />
+                    <CaretLeft size={18} weight="bold" className="group-hover:-translate-x-0.5 transition-transform" />
                 </button>
 
                 {/* Readiness summary icons */}
@@ -185,13 +185,13 @@ export function GlobalWorkspaceRail() {
     return (
         <motion.aside
             initial={false}
-            animate={{ width: 310 }}
-            className="h-[calc(100dvh-3rem)] sticky top-6 flex flex-col hyper-glass rounded-[2rem] overflow-hidden z-30 glow-slate"
+            animate={{ width: 280 }}
+            className="h-[calc(100dvh-2rem)] sticky top-4 flex flex-col hyper-glass rounded-[1.5rem] overflow-hidden z-30 glow-slate"
         >
             {/* Header */}
-            <div className="flex items-center justify-between px-8 pt-8 pb-4">
-                <h2 className="text-[10px] font-bold tracking-[0.3em] uppercase text-indigo-400 opacity-60">
-                    Intelligence
+            <div className="flex items-center justify-between px-6 pt-6 pb-2">
+                <h2 className="text-[9px] font-bold tracking-[0.3em] uppercase text-indigo-400 opacity-60">
+                    Insights
                 </h2>
                 <button
                     onClick={() => setIsExpanded(false)}
@@ -203,7 +203,7 @@ export function GlobalWorkspaceRail() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-8 no-scrollbar">
+            <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-6 no-scrollbar">
 
                 {isLoading ? (
                     /* Skeleton placeholders while workspace queries resolve */
@@ -229,7 +229,7 @@ export function GlobalWorkspaceRail() {
                             return (
                                 <div
                                     key={item.label}
-                                    className={`flex items-center gap-4 px-5 py-4 rounded-2xl border transition-all hover:bg-white/[0.04] ${styles.bg}`}
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:bg-white/[0.04] ${styles.bg}`}
                                 >
                                     <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${styles.dot} shadow-[0_0_8px_rgba(255,255,255,0.2)]`} />
                                     <div className="flex-1 min-w-0">
@@ -254,7 +254,7 @@ export function GlobalWorkspaceRail() {
                         </h3>
                     </div>
 
-                    <div className="px-5 py-5 rounded-2xl border border-white/5 bg-white/[0.02] flex flex-col gap-1">
+                    <div className="px-4 py-4 rounded-xl border border-white/5 bg-white/[0.02] flex flex-col gap-1">
                         <div className="flex items-baseline justify-between mb-1">
                             <span className="text-2xl font-serif text-white">{totalSources}</span>
                             <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Linked</span>
@@ -286,14 +286,14 @@ export function GlobalWorkspaceRail() {
                             <Link
                                 key={i}
                                 href={action.href}
-                                className="flex items-center gap-4 px-5 py-4 rounded-2xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.05] hover:border-indigo-500/30 transition-all group no-underline"
+                                className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.05] hover:border-indigo-500/30 transition-all group no-underline"
                             >
                                 <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                                     action.priority === 'high' ? 'bg-indigo-400' :
                                     action.priority === 'medium' ? 'bg-white/40' :
                                     'bg-white/10'
                                 } shadow-[0_0_8px_rgba(99,102,241,0.2)]`} />
-                                <span className="text-[12px] font-bold text-white/40 group-hover:text-white/80 transition-colors flex-1 tracking-tight">
+                                <span className="text-[11px] font-bold text-white/40 group-hover:text-white/80 transition-colors flex-1 tracking-tight leading-snug">
                                     {action.label}
                                 </span>
                                 <ArrowRight size={14} weight="bold" className="text-white/10 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
@@ -306,12 +306,12 @@ export function GlobalWorkspaceRail() {
             </div>
 
             {/* Footer CTA */}
-            <div className="px-6 py-6 border-t border-white/5 bg-white/[0.02]">
+            <div className="px-5 py-5 border-t border-white/5 bg-white/[0.02]">
                 <Link
                     href="/chat/overview"
-                    className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-400 hover:bg-indigo-500/20 transition-all no-underline shadow-lg"
+                    className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[9px] font-bold uppercase tracking-[0.2em] text-indigo-400 hover:bg-indigo-500/20 transition-all no-underline shadow-lg"
                 >
-                    <FileText size={16} weight="light" />
+                    <FileText size={14} weight="light" />
                     Strategic Overview
                 </Link>
             </div>

@@ -173,22 +173,22 @@ function DashboardContent() {
                                         transition={{ delay: 0.1 * i, duration: 0.6, type: 'spring' }}
                                         className="h-full"
                                     >
-                                      <div className="floating-element hyper-glass h-full min-h-[280px] flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate">
-                                        <div className="mb-8 p-6 rounded-3xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
+                                      <div className="floating-element hyper-glass h-full min-h-[180px] flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate py-8">
+                                        <div className="mb-5 p-4 rounded-2xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
                                             <Icon 
-                                                size={48} 
+                                                size={28} 
                                                 weight="light" 
                                                 style={{ color: card.accent }} 
                                                 className="transition-transform duration-700 group-hover:scale-110 group-hover:rotate-3" 
                                             />
                                         </div>
-                                        <h3 className="text-2xl font-serif text-white mb-2 tracking-tight drop-shadow-sm">
+                                        <h3 className="text-lg font-serif text-white mb-1.5 tracking-tight drop-shadow-sm">
                                             {card.label}
                                         </h3>
-                                        <p className="text-[13px] text-white/40 font-medium mb-4 uppercase tracking-[0.2em] drop-shadow-sm">
+                                        <p className="text-[10px] text-white/40 font-medium mb-3 uppercase tracking-[0.2em] drop-shadow-sm">
                                             {card.subtitle}
                                         </p>
-                                        <p className="text-[14px] text-white/60 font-medium px-8 text-center leading-relaxed">
+                                        <p className="text-[12px] text-white/50 font-medium px-6 text-center leading-relaxed">
                                             {card.desc}
                                         </p>
                                         
@@ -208,7 +208,7 @@ function DashboardContent() {
                         transition={{ delay: 0.4, duration: 0.6 }}
                         className="glass-ethereal rounded-3xl p-6"
                     >
-                        <h2 className="text-xs font-bold tracking-[0.2em] uppercase text-sapphire-muted mb-6 px-2">
+                        <h2 className="text-[10px] font-bold tracking-[0.2em] uppercase text-sapphire-muted mb-4 px-2">
                             Overview Metrics
                         </h2>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -217,11 +217,11 @@ function DashboardContent() {
                                 return (
                                     <Link key={stat.label} href={stat.href} className="no-underline block h-full">
                                         <div className="p-4 flex flex-col justify-between h-full rounded-[2rem] bg-[#0A1128] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.2)] hover:bg-[#121A3A] transition-colors shadow-sm cursor-pointer group">
-                                            <div className="flex items-center gap-2 mb-3 shrink-0">
-                                                <Icon size={14} weight="fill" color={stat.color} className="shrink-0 transition-transform group-hover:scale-110" />
+                                            <div className="flex items-center gap-2 mb-2 shrink-0">
+                                                <Icon size={12} weight="fill" color={stat.color} className="shrink-0 transition-transform group-hover:scale-110" />
                                                 <span className="text-[9px] font-bold text-white/50 uppercase tracking-widest leading-tight">{stat.label}</span>
                                             </div>
-                                            <p className="text-xl font-serif text-white tracking-tight">
+                                            <p className="text-lg font-serif text-white tracking-tight">
                                                 {stat.value}
                                             </p>
                                         </div>
@@ -260,10 +260,10 @@ function DashboardContent() {
                             </div>
                         ) : incidents.length === 0 ? (
                             <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-[rgba(10,17,40,0.5)] rounded-[2rem] border border-[rgba(255,255,255,0.08)]">
-                                <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_15px_rgba(18,61,126,0.3)]">
-                                    <Clock size={28} weight="fill" className="text-white" />
+                                <div className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_15px_rgba(18,61,126,0.3)]">
+                                    <Clock size={20} weight="fill" className="text-white" />
                                 </div>
-                                <p className="text-[16px] font-semibold text-white mb-2">
+                                <p className="text-[14px] font-semibold text-white mb-2">
                                     Pristine Record
                                 </p>
                                 <p className="text-[13px] text-[rgba(255,255,255,0.6)] font-medium mb-6 max-w-[200px] leading-relaxed">

@@ -139,18 +139,17 @@ export default function DraftingHub({ onManualIntake }: DraftingHubProps) {
   }, [now]);
 
   return (
-    <div className="space-y-12">
-      {/* 1. Header Section */}
-      <div className="text-center max-w-2xl mx-auto space-y-4">
-        <h2 className="text-xs font-bold text-indigo-400 uppercase tracking-[0.3em]">Court Document Pipeline</h2>
-        <h1 className="text-4xl font-bold text-white tracking-tight">Drafting Hub</h1>
+    <div className="space-y-8">
+      <div className="text-center max-w-xl mx-auto space-y-3">
+        <h2 className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.3em]">Court Document Pipeline</h2>
+        <h1 className="text-2xl font-serif font-bold text-white tracking-tight">Drafting Hub</h1>
         <p className="text-white/40 text-sm leading-relaxed">
           Select your starting point. NEXX will handle the structural integrity, formatting, and legal normalization.
         </p>
       </div>
 
       {/* 2. Entry Point Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {entryPoints.map((point, i) => {
           const Icon = point.icon;
           const Content = (
@@ -158,18 +157,18 @@ export default function DraftingHub({ onManualIntake }: DraftingHubProps) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
-              className="hyper-glass floating-element group h-full flex flex-col p-10 items-center text-center cursor-pointer hover:border-indigo-500/30 transition-all glow-slate"
+              className="hyper-glass floating-element group h-full flex flex-col p-6 items-center text-center cursor-pointer hover:border-indigo-500/30 transition-all glow-slate"
             >
-              <div className="w-20 h-20 rounded-[2.5rem] bg-white/5 flex items-center justify-center border border-white/10 group-hover:border-indigo-500/40 group-hover:bg-indigo-500/5 transition-all mb-8 shadow-inner">
-                <Icon size={40} weight="light" className="text-white/60 group-hover:text-indigo-400 transition-colors" />
+              <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:border-indigo-500/40 group-hover:bg-indigo-500/5 transition-all mb-5 shadow-inner">
+                <Icon size={24} weight="light" className="text-white/60 group-hover:text-indigo-400 transition-colors" />
               </div>
               
-              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.3em] mb-4 opacity-60 group-hover:opacity-100 transition-opacity">{point.tag}</span>
+              <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-[0.3em] mb-3 opacity-60 group-hover:opacity-100 transition-opacity">{point.tag}</span>
               
-              <h3 className="text-2xl font-serif text-white mb-4 group-hover:text-indigo-200 transition-colors tracking-tight">
+              <h3 className="text-base font-serif text-white mb-2 group-hover:text-indigo-200 transition-colors tracking-tight">
                 {point.title}
               </h3>
-              <p className="text-sm text-white/30 leading-relaxed mb-8 flex-1 group-hover:text-white/50 transition-colors">
+              <p className="text-[12px] text-white/30 leading-relaxed mb-4 flex-1 group-hover:text-white/50 transition-colors">
                 {point.desc}
               </p>
               

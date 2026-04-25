@@ -59,7 +59,7 @@ export function TopNav() {
         if (isCreating) return;
         setIsCreating(true);
         try {
-            const nextNum = (activeCases.length ?? 0) + 1;
+            const nextNum = activeCases.length + 1;
             const newCaseId = await createCase({
                 title: `Case ${nextNum}`,
             });

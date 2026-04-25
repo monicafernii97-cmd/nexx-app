@@ -107,28 +107,10 @@ export function TopNav() {
     }, [archiveCase, showToast]);
 
     /** Restore an archived case and switch to it. */
-    const handleUnarchive = useCallback(async (caseId: Id<'cases'>) => {
-        if (pendingActionsRef.current.has(caseId)) return;
-        const nextPending = new Set(pendingActionsRef.current).add(caseId);
-        pendingActionsRef.current = nextPending;
-        setPendingActions(nextPending);
-        try {
-            setActiveCaseId(caseId);
-            setIsSwitcherOpen(false);
-        } catch (err) {
-            console.error('[TopNav] Failed to restore case:', err);
-            showToast({
-                title: 'Failed to restore case',
-                description: err instanceof Error ? err.message : 'Please try again.',
-                variant: 'error',
-            });
-        } finally {
-            const cleared = new Set(pendingActionsRef.current);
-            cleared.delete(caseId);
-            pendingActionsRef.current = cleared;
-            setPendingActions(cleared);
-        }
-    }, [setActiveCaseId, showToast]);
+    const handleUnarchive = useCallback((caseId: Id<'cases'>) => {
+        setActiveCaseId(caseId);
+        setIsSwitcherOpen(false);
+    }, [setActiveCaseId]);
 
     return (
         <div className="h-[72px] flex items-center justify-between px-8 hyper-glass rounded-2xl mb-6 glow-slate">

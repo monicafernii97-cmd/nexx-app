@@ -161,6 +161,7 @@ function DocuVaultPageInner() {
 
     /** Handle document generation via the streaming API endpoint. */
     const handleGenerate = useCallback(async () => {
+        if (isParsing) return;
         if (!documentContent.trim() && !selectedTemplate) return;
         if (isUserProfileLoading) {
             setGenerationError('Loading your profile. Please try again in a moment.');
@@ -388,6 +389,7 @@ function DocuVaultPageInner() {
                         <div className="flex items-center gap-6">
                             <button 
                                 onClick={() => setView('intake_hub')}
+                                aria-label="Back to intake hub"
                                 className="w-12 h-12 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all group"
                             >
                                 <CaretLeft size={24} weight="bold" className="group-hover:-translate-x-0.5 transition-transform" />
@@ -421,7 +423,7 @@ function DocuVaultPageInner() {
                                 <div role="alert" aria-live="assertive" className="px-5 py-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
                                     <X size={20} weight="bold" className="text-red-400 shrink-0" />
                                     <p className="text-sm font-medium text-red-400">{generationError}</p>
-                                    <button onClick={() => setGenerationError(null)} className="ml-auto text-red-400/60 hover:text-red-400 cursor-pointer">
+                                    <button onClick={() => setGenerationError(null)} aria-label="Dismiss generation error" className="ml-auto text-red-400/60 hover:text-red-400 cursor-pointer">
                                         <X size={16} />
                                     </button>
                                 </div>
@@ -485,7 +487,7 @@ function DocuVaultPageInner() {
                                             )}
                                             {isParsing ? 'Parsing...' : 'Upload'}
                                         </button>
-                                        <input type="file" ref={fileInputRef} className="hidden" onChange={async (e) => {
+                                        <input type="file" ref={fileInputRef} accept=".pdf,.docx,.txt,.md,.csv,text/*" className="hidden" onChange={async (e) => {
                                             const file = e.target.files?.[0];
                                             if (!file) return;
 
@@ -505,6 +507,16 @@ function DocuVaultPageInner() {
 
                                             const name = file.name.toLowerCase();
                                             const isBinary = name.endsWith('.pdf') || name.endsWith('.docx');
+
+                                            // Reject unsupported file types
+                                            const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.txt', '.md', '.csv', '.rtf'];
+                                            const hasSupported = SUPPORTED_EXTENSIONS.some(ext => name.endsWith(ext));
+                                            const isTextMime = file.type.startsWith('text/');
+                                            if (!hasSupported && !isTextMime) {
+                                                setGenerationError('Unsupported file type. Please upload PDF, DOCX, TXT, MD, or CSV files.');
+                                                e.target.value = '';
+                                                return;
+                                            }
 
                                             try {
                                                 let extractedText = '';
@@ -557,7 +569,7 @@ function DocuVaultPageInner() {
                                         
                                         <button
                                             onClick={handleGenerate}
-                                            disabled={!documentContent.trim() && !selectedTemplate}
+                                            disabled={isParsing || (!documentContent.trim() && !selectedTemplate)}
                                             className="px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[12px] font-bold uppercase tracking-widest shadow-xl shadow-indigo-600/20 transition-all flex items-center gap-2 disabled:opacity-50 disabled:grayscale"
                                         >
                                             <MagicWand size={18} weight="fill" />
@@ -622,7 +634,6 @@ function DocuVaultPageInner() {
                             } catch (err) {
                                 console.error('[DocuVault] Export start failed:', err);
                                 setGenerationError(err instanceof Error ? err.message : 'Export failed. Please try again.');
-                                setShowCreateExport(true);
                             }
                         }}
                         defaultCaseId={activeCaseId ?? undefined}

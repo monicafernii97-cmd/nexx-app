@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
     CheckCircle,
+    WarningCircle,
+    Clock,
     Lightning,
     FileText,
     CalendarCheck,
@@ -237,7 +239,13 @@ export function GlobalWorkspaceRail() {
                                         <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${styles.text}`}>{item.detail}</p>
                                     </div>
                                     {item.level === 'strong' && (
-                                        <CheckCircle size={18} weight="light" className="text-emerald-400 flex-shrink-0" />
+                                        <CheckCircle size={16} weight="light" className="text-emerald-400 flex-shrink-0" />
+                                    )}
+                                    {item.level === 'partial' && (
+                                        <WarningCircle size={16} weight="light" className="text-amber-400/50 flex-shrink-0" />
+                                    )}
+                                    {item.level === 'missing' && (
+                                        <Clock size={16} weight="light" className="text-white/20 flex-shrink-0" />
                                     )}
                                 </div>
                             );

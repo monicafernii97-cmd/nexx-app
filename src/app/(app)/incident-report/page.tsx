@@ -271,7 +271,7 @@ export default function IncidentReportPage() {
                                                     : 'bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:border-white/20 hover:text-white'
                                             }`}
                                         >
-                                            {isPinning === incident._id ? 'Securing' : 'Case Workspace'}
+                                            {isPinning === incident._id ? 'Securing...' : isPinning ? 'Please wait' : 'Case Workspace'}
                                         </button>
                                         <button disabled className="px-4 py-2 rounded-lg bg-amber-500/5 text-amber-500/30 text-[9px] font-bold uppercase tracking-[0.2em] border border-amber-500/10 cursor-not-allowed" title="Coming soon">
                                             Export to Exhibit

@@ -219,8 +219,10 @@ export function TopNav() {
                                                 key={c._id}
                                                 type="button"
                                                 onClick={() => handleUnarchive(c._id)}
+                                                disabled={pendingActions.has(c._id)}
                                                 aria-label={`Restore "${c.title}" to active`}
-                                                className="w-full flex items-center gap-4 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/50 transition-all cursor-pointer"
+                                                aria-busy={pendingActions.has(c._id)}
+                                                className="w-full flex items-center gap-4 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/50 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title={`Restore "${c.title}" to active`}
                                             >
                                                 <Archive size={16} />

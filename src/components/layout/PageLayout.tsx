@@ -7,7 +7,7 @@ export interface PageHeaderProps {
     /** A Phosphor Icon Component */
     icon: React.ElementType;
     title: ReactNode;
-    description: ReactNode;
+    description?: ReactNode;
     rightElement?: ReactNode;
 }
 

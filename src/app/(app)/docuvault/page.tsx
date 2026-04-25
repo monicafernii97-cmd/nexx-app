@@ -610,10 +610,11 @@ function DocuVaultPageInner() {
                             <div className="mt-auto pt-8 border-t border-white/5">
                                 <button
                                     onClick={() => setShowCreateExport(true)}
-                                    className="w-full py-4 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 text-white text-[12px] font-bold uppercase tracking-widest hover:border-white/40 transition-all flex items-center justify-center gap-2 group shadow-lg"
+                                    disabled={isParsing}
+                                    className="w-full py-4 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 text-white text-[12px] font-bold uppercase tracking-widest hover:border-white/40 transition-all flex items-center justify-center gap-2 group shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Export size={18} weight="bold" className="group-hover:translate-x-1 transition-transform" />
-                                    Full Case Export
+                                    {isParsing ? 'Parsing...' : 'Full Case Export'}
                                 </button>
                             </div>
                         </div>
@@ -624,6 +625,7 @@ function DocuVaultPageInner() {
                         isOpen={showCreateExport}
                         onClose={() => setShowCreateExport(false)}
                         onSubmit={async (config) => {
+                            if (isParsing) return;
                             setShowCreateExport(false);
                             try {
                                 await startStructuredExport({
@@ -944,7 +946,7 @@ function DocuVaultPageInner() {
                                         className="btn-outline flex items-center justify-center gap-2 py-3 text-sm disabled:opacity-50"
                                     >
                                         <FileText size={18} weight="bold" />
-                                        Print Document
+                                        Open PDF
                                     </button>
                                     <button
                                         disabled

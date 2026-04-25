@@ -274,6 +274,8 @@ export default function Sidebar() {
                             window.location.href = '/chat/overview?openReportModal=true';
                         }
                     }}
+                    aria-label="Generate report"
+                    title={collapsed ? 'Generate report' : undefined}
                     className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-xl transition-all duration-300 cursor-pointer bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 group ${collapsed ? 'justify-center' : ''}`}
                 >
                     <FileText size={18} weight="bold" className="text-indigo-400 flex-shrink-0" />
@@ -292,7 +294,7 @@ export default function Sidebar() {
                 </button>
 
                 {isLoaded && user ? (
-                    <div className="relative group w-full">
+                    <div className="relative group focus-within:ring-2 focus-within:ring-indigo-500/40 rounded-xl w-full">
                         {/* Visual layer */}
                         <div className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all cursor-pointer bg-white/[0.03] border border-white/5 hover:border-white/20 shadow-2xl ${collapsed ? 'justify-center' : ''}`}>
                             <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-white/20 shadow-inner">
@@ -312,8 +314,8 @@ export default function Sidebar() {
                             </AnimatePresence>
                         </div>
                         
-                        {/* Functional Click Layer */}
-                        <div className="absolute inset-0 z-10 opacity-0 cursor-pointer">
+                        {/* Functional Click Layer — focus-visible makes it perceivable to keyboard users */}
+                        <div className="absolute inset-0 z-10 opacity-0 focus-within:opacity-100 cursor-pointer" aria-label="User profile menu">
                             <UserButton 
                                 appearance={{
                                     ...nexxClerkAppearance,

@@ -89,7 +89,8 @@ export function GlobalWorkspaceRail() {
 
     // True when at least one data query is still loading.
     // Prevents showing "missing" readiness for data that simply hasn't arrived yet.
-    const isLoading = pins === undefined || memory === undefined || timeline === undefined;
+    const isPatternsLoading = !!activeCaseId && detectedPatterns === undefined;
+    const isLoading = pins === undefined || memory === undefined || timeline === undefined || isPatternsLoading;
 
     // ── Readiness scoring ──
     const readiness: ReadinessItem[] = useMemo(() => [

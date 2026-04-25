@@ -5,7 +5,6 @@ import { useState, useRef, useCallback, useEffect, Suspense } from 'react';
 import {
     Bank,
     CaretLeft,
-    CaretRight,
     FileText,
     Strategy,
     Plus,
@@ -76,7 +75,7 @@ function DocuVaultPageInner() {
     // Tab & template state
     const [activeTab, setActiveTab] = useState<UITabCategory>('lead');
     const [selectedTemplate, setSelectedTemplate] = useState<DocumentTemplate | null>(null);
-    const carouselRef = useRef<HTMLDivElement>(null);
+
 
     // Content input state
     const [documentContent, setDocumentContent] = useState('');
@@ -150,13 +149,7 @@ function DocuVaultPageInner() {
         }
     }, [searchParams]);
 
-    /** Scroll the template carousel left or right by a fixed amount. */
-    const scrollCarousel = (dir: 'left' | 'right') => {
-        if (carouselRef.current) {
-            const amount = dir === 'left' ? -280 : 280;
-            carouselRef.current.scrollBy({ left: amount, behavior: 'smooth' });
-        }
-    };
+
 
     /** Handle document generation via the streaming API endpoint. */
     const handleGenerate = useCallback(async () => {
@@ -469,6 +462,7 @@ function DocuVaultPageInner() {
                                         value={documentContent}
                                         onChange={e => setDocumentContent(e.target.value)}
                                         placeholder="Paste your draft or notes here to begin... NEXX will perfectly structure and format it for court."
+                                        aria-label="Document content"
                                         className="w-full h-full bg-white/5 rounded-2xl p-6 text-lg font-medium text-white placeholder:text-white/10 outline-none resize-none transition-all focus:bg-white/[0.07] border border-white/5 focus:border-white/10"
                                     />
                                     

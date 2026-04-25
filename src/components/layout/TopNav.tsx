@@ -40,6 +40,7 @@ export function TopNav() {
 
     const createCase = useMutation(api.cases.create);
     const archiveCase = useMutation(api.cases.archive);
+    const unarchiveCase = useMutation(api.cases.unarchive);
 
     const activeCases = cases?.filter(c => c.status === 'active') ?? [];
     const archivedCases = cases?.filter(c => c.status === 'archived') ?? [];
@@ -107,10 +108,29 @@ export function TopNav() {
     }, [archiveCase, showToast]);
 
     /** Restore an archived case and switch to it. */
-    const handleUnarchive = useCallback((caseId: Id<'cases'>) => {
-        setActiveCaseId(caseId);
-        setIsSwitcherOpen(false);
-    }, [setActiveCaseId]);
+    const handleUnarchive = useCallback(async (caseId: Id<'cases'>) => {
+        if (pendingActionsRef.current.has(caseId)) return;
+        const nextPending = new Set(pendingActionsRef.current).add(caseId);
+        pendingActionsRef.current = nextPending;
+        setPendingActions(nextPending);
+        try {
+            await unarchiveCase({ caseId });
+            setActiveCaseId(caseId);
+            setIsSwitcherOpen(false);
+        } catch (err) {
+            console.error('[TopNav] Failed to restore case:', err);
+            showToast({
+                title: 'Failed to restore case',
+                description: err instanceof Error ? err.message : 'Please try again.',
+                variant: 'error',
+            });
+        } finally {
+            const cleared = new Set(pendingActionsRef.current);
+            cleared.delete(caseId);
+            pendingActionsRef.current = cleared;
+            setPendingActions(cleared);
+        }
+    }, [unarchiveCase, setActiveCaseId, showToast]);
 
     return (
         <div className="h-[64px] flex items-center justify-between px-6 hyper-glass rounded-2xl mb-4 glow-slate">
@@ -221,7 +241,6 @@ export function TopNav() {
                                                 onClick={() => handleUnarchive(c._id)}
                                                 disabled={pendingActions.has(c._id)}
                                                 aria-label={`Restore "${c.title}" to active`}
-                                                aria-busy={pendingActions.has(c._id)}
                                                 className="w-full flex items-center gap-4 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/50 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title={`Restore "${c.title}" to active`}
                                             >

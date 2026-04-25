@@ -315,7 +315,7 @@ export default function Sidebar() {
                         </div>
                         
                         {/* Functional Click Layer — focus-visible makes it perceivable to keyboard users */}
-                        <div className="absolute inset-0 z-10 opacity-0 focus-within:opacity-100 cursor-pointer" aria-label="User profile menu">
+                        <div className="absolute inset-0 z-10 opacity-0 focus-within:opacity-100 cursor-pointer">
                             <UserButton 
                                 appearance={{
                                     ...nexxClerkAppearance,

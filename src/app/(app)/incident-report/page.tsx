@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
@@ -21,16 +21,18 @@ import { useWorkspace } from '@/lib/workspace-context';
 
 import '@/styles/pipelines.css';
 
+/** Structured error for stable code-based matching instead of brittle string comparisons. */
+type ProcessError = { code: 'empty_narrative' | 'missing_case' | 'generic'; message: string } | null;
+
 /** Incident Intake Hub - The primary pipeline for event recording. */
 export default function IncidentReportPage() {
     const { activeCaseId } = useWorkspace();
     const [narrative, setNarrative] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
 
-    /** Structured error for stable code-based matching instead of brittle string comparisons. */
-    type ProcessError = { code: 'empty_narrative' | 'missing_case' | 'generic'; message: string } | null;
     const [processError, setProcessError] = useState<ProcessError>(null);
     const [isPinning, setIsPinning] = useState<string | null>(null);
+    const pinningRef = useRef<string | null>(null);
     const [pinError, setPinError] = useState<string | null>(null);
 
     // Derive displayed error — automatically suppresses stale "no case" message once case is selected
@@ -87,7 +89,8 @@ export default function IncidentReportPage() {
 
     /** Pin an incident to the case workspace. Prevents duplicate clicks. */
     const handleAddToWorkspace = useCallback(async (incident: { _id: Id<'incidents'>; narrative: string; date: string }) => {
-        if (!activeCaseId || isPinning) return;
+        if (!activeCaseId || pinningRef.current) return;
+        pinningRef.current = incident._id;
         setIsPinning(incident._id);
 
         try {
@@ -103,9 +106,10 @@ export default function IncidentReportPage() {
             console.error('[IncidentIntake] Pin creation failed:', err);
             setPinError('Failed to add incident to workspace. Please try again.');
         } finally {
+            pinningRef.current = null;
             setIsPinning(null);
         }
-    }, [activeCaseId, createCasePin, isPinning]);
+    }, [activeCaseId, createCasePin]);
 
 
 
@@ -176,7 +180,7 @@ export default function IncidentReportPage() {
                             {displayedError}
                         </div>
                     )}
-                    {!activeCaseId && (
+                    {!activeCaseId && !displayedError && (
                         <div className="px-6 py-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-widest text-center">
                             Select an active case to begin recording incidents
                         </div>

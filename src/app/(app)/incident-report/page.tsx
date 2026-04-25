@@ -8,21 +8,19 @@ import { Id } from '@convex/_generated/dataModel';
 import {
     ClipboardText,
     ArrowRight,
+    Microphone,
+    Sparkle,
+    PlusCircle,
+    ArrowClockwise,
+    CheckCircle,
+    MagnifyingGlass as FileSearch,
+    Clock as TimelineIcon,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import { useWorkspace } from '@/lib/workspace-context';
 
 import '@/styles/pipelines.css';
-import { 
-  Microphone, 
-  Sparkle, 
-  PlusCircle, 
-  ArrowClockwise,
-  CheckCircle,
-  MagnifyingGlass as FileSearch,
-  Clock as TimelineIcon
-} from '@phosphor-icons/react';
 
 /** Incident Intake Hub - The primary pipeline for event recording. */
 export default function IncidentReportPage() {
@@ -87,7 +85,7 @@ export default function IncidentReportPage() {
 
     /** Pin an incident to the case workspace. Prevents duplicate clicks. */
     const handleAddToWorkspace = useCallback(async (incident: { _id: Id<'incidents'>; narrative: string; date: string }) => {
-        if (!activeCaseId || isPinning === incident._id) return;
+        if (!activeCaseId || isPinning) return;
         setIsPinning(incident._id);
 
         try {

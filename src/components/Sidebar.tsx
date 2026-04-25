@@ -168,6 +168,8 @@ export default function Sidebar() {
                                     href={item.href}
                                     id={navIdSelector(item.href).slice(1)}
                                     className="no-underline flex-1 min-w-0"
+                                    aria-label={collapsed ? item.label : undefined}
+                                    title={collapsed ? item.label : undefined}
                                 >
                                     <motion.div
                                         whileTap={{ scale: 0.98 }}

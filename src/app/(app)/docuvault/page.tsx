@@ -18,6 +18,7 @@ import {
     MagicWand,
     Export,
     Lightning,
+    PencilLine,
 } from '@phosphor-icons/react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from 'convex/react';
@@ -358,8 +359,10 @@ function DocuVaultPageInner() {
             {/* ═══════════════════════════════════════════════════
                 VIEW: INTAKE HUB (Primary Entry)
                ═══════════════════════════════════════════════════ */}
+            <AnimatePresence mode="wait">
             {view === 'intake_hub' && (
                 <motion.div
+                    key="intake_hub"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -374,6 +377,7 @@ function DocuVaultPageInner() {
                ═══════════════════════════════════════════════════ */}
             {view === 'compose' && (
                 <motion.div
+                    key="compose"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 20 }}
@@ -622,32 +626,7 @@ function DocuVaultPageInner() {
                ═══════════════════════════════════════════════════ */}
             {view === 'working' && (
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="max-w-xl mx-auto py-8"
-                >
-                    {/* Close / Step indicator */}
-                    <div className="flex items-center justify-between mb-10">
-                        <button
-                            onClick={handleNewDocument}
-                            aria-label="Cancel generation"
-                            className="w-12 h-12 rounded-full flex items-center justify-center bg-white/5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border border-white/10 hover:bg-white/10 hover:border-white/30 text-white/80 hover:text-white transition-all backdrop-blur-xl"
-                        >
-                            <X size={20} weight="bold" />
-                        </button>
-                        <span className="text-sm font-bold px-4 py-2 rounded-full bg-[#60A5FA]/10 border border-[#60A5FA]/20 text-[#60A5FA] drop-shadow-sm backdrop-blur-xl">
-                            Step {Math.min(progressSteps.filter(s => s.status === 'complete').length + 1, progressSteps.length)} of {progressSteps.length}
-                        </span>
-                    </div>
-                </motion.div>
-            )}
-
-            {/* ═══════════════════════════════════════════════════
-                VIEW: WORKING STATE
-               ═══════════════════════════════════════════════════ */}
-            {view === 'working' && (
-                <motion.div
+                    key="working"
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
@@ -762,6 +741,7 @@ function DocuVaultPageInner() {
                ═══════════════════════════════════════════════════ */}
             {view === 'result' && (
                 <motion.div
+                    key="result"
                     initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
                     className="max-w-3xl mx-auto py-6"
@@ -963,6 +943,7 @@ function DocuVaultPageInner() {
                     </div>
                 </motion.div>
             )}
+            </AnimatePresence>
         </PageContainer>
     );
 }

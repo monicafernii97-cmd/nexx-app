@@ -6,6 +6,7 @@ import {
     CheckCircle,
     Lightning,
     FileText,
+    CalendarCheck,
     ChartBar,
     ArrowRight,
     CaretRight,

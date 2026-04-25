@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
@@ -33,12 +33,10 @@ export default function IncidentReportPage() {
     const [isPinning, setIsPinning] = useState<string | null>(null);
     const [pinError, setPinError] = useState<string | null>(null);
 
-    // Clear case-related error when user selects a case
-    useEffect(() => {
-        if (activeCaseId && processError === 'Please select or create a case first.') {
-            setProcessError(null);
-        }
-    }, [activeCaseId, processError]);
+    // Derive displayed error — automatically suppresses stale "no case" message once case is selected
+    const displayedError = processError === 'Please select or create a case first.' && activeCaseId
+        ? null
+        : processError;
 
     // Live data from Convex
     const incidents = useQuery(
@@ -173,9 +171,9 @@ export default function IncidentReportPage() {
 
                 {/* Error & Warnings */}
                 <div className="px-4 space-y-4">
-                    {processError && (
+                    {displayedError && (
                         <div role="alert" aria-live="assertive" className="px-6 py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold uppercase tracking-widest">
-                            {processError}
+                            {displayedError}
                         </div>
                     )}
                     {!activeCaseId && (

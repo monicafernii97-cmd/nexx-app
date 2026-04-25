@@ -419,6 +419,14 @@ body {
   to { background-position: 200% center; }
 }
 
+/* Accessibility: disable perpetual animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .floating-element,
+  .text-shimmer {
+    animation: none !important;
+  }
+}
+
 /* Shimmer overlay (Enhanced Metallic) */
 .glass-ethereal::after, .card-premium::after, .btn-primary::after {
   content: '';

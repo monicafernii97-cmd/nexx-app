@@ -40,7 +40,6 @@ export function TopNav() {
     }, [isSwitcherOpen]);
 
     return (
-    return (
         <div className="h-[72px] flex items-center justify-between px-8 hyper-glass rounded-2xl mb-6 glow-slate">
             {/* ── Left: Case Switcher ── */}
             <div ref={dropdownRef} className="relative">
@@ -85,17 +84,20 @@ export function TopNav() {
                             </p>
 
                             <div className="space-y-1">
-                                {cases?.filter(c => c.status === 'active').map((c) => (
+                                {cases?.map((c) => (
                                     <button
                                         key={c._id}
                                         onClick={() => {
                                             setActiveCaseId(c._id);
                                             setIsSwitcherOpen(false);
                                         }}
-                                        className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all cursor-pointer ${
-                                            c._id === activeCase?._id
-                                                ? 'bg-white/10 border border-white/10'
-                                                : 'hover:bg-white/5 border border-transparent'
+                                        disabled={c.status === 'archived'}
+                                        className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${
+                                            c.status === 'archived'
+                                                ? 'opacity-40 cursor-not-allowed border border-transparent'
+                                                : c._id === activeCase?._id
+                                                    ? 'bg-white/10 border border-white/10 cursor-pointer'
+                                                    : 'hover:bg-white/5 border border-transparent cursor-pointer'
                                         }`}
                                     >
                                         <Briefcase size={18} weight={c._id === activeCase?._id ? 'fill' : 'light'} className={c._id === activeCase?._id ? 'text-indigo-400' : 'text-white/30'} />
@@ -139,7 +141,6 @@ export function TopNav() {
                     {/* Badge potential */}
                 </button>
             </div>
-        </div>
         </div>
     );
 }

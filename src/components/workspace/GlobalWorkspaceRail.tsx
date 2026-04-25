@@ -4,11 +4,8 @@ import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
     CheckCircle,
-    WarningCircle,
-    Clock,
     Lightning,
     FileText,
-    CalendarCheck,
     ChartBar,
     ArrowRight,
     CaretRight,
@@ -33,6 +30,7 @@ interface ReadinessItem {
     icon: typeof CheckCircle;
 }
 
+/** Classifies a count against a threshold into a readiness level (strong, partial, missing). */
 function getReadinessLevel(count: number, threshold: number): ReadinessLevel {
     if (count >= threshold) return 'strong';
     if (count > 0) return 'partial';

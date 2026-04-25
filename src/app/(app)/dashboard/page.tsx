@@ -171,8 +171,9 @@ function DashboardContent() {
                                         initial={{ opacity: 0, y: 30 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: 0.1 * i, duration: 0.6, type: 'spring' }}
-                                        className="hyper-glass floating-element h-full min-h-[280px] flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate"
+                                        className="h-full"
                                     >
+                                      <div className="floating-element hyper-glass h-full min-h-[280px] flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate">
                                         <div className="mb-8 p-6 rounded-3xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
                                             <Icon 
                                                 size={48} 
@@ -193,6 +194,7 @@ function DashboardContent() {
                                         
                                         {/* Luxury glint effect */}
                                         <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+                                      </div>
                                     </motion.div>
                                 </Link>
                             );

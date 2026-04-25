@@ -11,6 +11,7 @@ export interface PageHeaderProps {
     rightElement?: ReactNode;
 }
 
+/** Renders the page-level header with an icon, title, optional description and right-aligned element. */
 export function PageHeader({ icon: Icon, title, description, rightElement }: PageHeaderProps) {
     return (
         <motion.div
@@ -55,6 +56,7 @@ export function PageHeader({ icon: Icon, title, description, rightElement }: Pag
     );
 }
 
+/** Full-width page wrapper with consistent padding for all application routes. */
 export function PageContainer({ children }: { children: ReactNode }) {
     return (
         <div className="max-w-[85rem] mx-auto pb-20 w-full px-4 lg:px-8 mt-2">

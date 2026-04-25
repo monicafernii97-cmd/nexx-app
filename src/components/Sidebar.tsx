@@ -15,12 +15,10 @@ import {
     Gear,
     CaretLeft,
     CaretDown,
-    SignIn,
     GridFour,
     FolderOpen,
     FileArrowUp,
     Crown,
-    Question,
     PushPin,
     Notebook,
     CalendarCheck,
@@ -30,9 +28,7 @@ import {
 import { useState, useMemo, useCallback, type ComponentType, type CSSProperties } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
-import { restartTour, navIdSelector } from '@/lib/tourUtils';
-import { CaseSwitcher } from '@/components/workspace/CaseSwitcher';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { navIdSelector } from '@/lib/tourUtils';
 
 /** Child navigation item definition for sidebar sub-menus. */
 interface NavChild {

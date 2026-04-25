@@ -29,7 +29,7 @@ import type { Id } from '@convex/_generated/dataModel';
  * - Notification bell stub (disabled)
  */
 export function TopNav() {
-    const { activeCase, cases, activeCaseId, setActiveCaseId } = useWorkspace();
+    const { activeCase, cases, setActiveCaseId } = useWorkspace();
     const { showToast } = useToast();
     const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
@@ -59,7 +59,7 @@ export function TopNav() {
         if (isCreating) return;
         setIsCreating(true);
         try {
-            const nextNum = activeCases.length + 1;
+            const nextNum = (cases?.length ?? 0) + 1;
             const newCaseId = await createCase({
                 title: `Case ${nextNum}`,
             });

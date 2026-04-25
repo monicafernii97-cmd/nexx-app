@@ -150,7 +150,7 @@ export default function DraftingHub({ onManualIntake }: DraftingHubProps) {
       </div>
 
       {/* 2. Entry Point Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {entryPoints.map((point, i) => {
           const Icon = point.icon;
           const Content = (
@@ -158,37 +158,36 @@ export default function DraftingHub({ onManualIntake }: DraftingHubProps) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
-              className="pipeline-card group h-full flex flex-col p-8 items-start text-left cursor-pointer"
+              className="hyper-glass floating-element group h-full flex flex-col p-10 items-center text-center cursor-pointer hover:border-indigo-500/30 transition-all glow-slate"
             >
-              <div className="flex items-center justify-between w-full mb-8">
-                <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:border-indigo-500/30 transition-all">
-                  <Icon size={28} weight="fill" style={{ color: point.accent }} />
-                </div>
-                <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">{point.tag}</span>
+              <div className="w-20 h-20 rounded-[2.5rem] bg-white/5 flex items-center justify-center border border-white/10 group-hover:border-indigo-500/40 group-hover:bg-indigo-500/5 transition-all mb-8 shadow-inner">
+                <Icon size={40} weight="light" className="text-white/60 group-hover:text-indigo-400 transition-colors" />
               </div>
               
-              <h3 className="text-xl font-bold text-white mb-2 group-hover:text-indigo-400 transition-colors">
+              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.3em] mb-4 opacity-60 group-hover:opacity-100 transition-opacity">{point.tag}</span>
+              
+              <h3 className="text-2xl font-serif text-white mb-4 group-hover:text-indigo-200 transition-colors tracking-tight">
                 {point.title}
               </h3>
-              <p className="text-sm text-white/40 leading-relaxed mb-8 flex-1">
+              <p className="text-sm text-white/30 leading-relaxed mb-8 flex-1 group-hover:text-white/50 transition-colors">
                 {point.desc}
               </p>
               
-              <div className="flex items-center gap-2 text-[10px] font-black text-white/20 group-hover:text-white transition-all uppercase tracking-widest">
-                Get Started <ArrowRight size={14} />
+              <div className="flex items-center gap-2 text-[10px] font-bold text-white/20 group-hover:text-white transition-all uppercase tracking-[0.2em]">
+                Enter Pipeline <ArrowRight size={14} weight="bold" className="group-hover:translate-x-1 transition-transform" />
               </div>
             </motion.div>
           );
 
           if (point.href) {
-            return <Link key={point.title} href={point.href} className="no-underline">{Content}</Link>;
+            return <Link key={point.title} href={point.href} className="no-underline h-full">{Content}</Link>;
           }
           return (
             <button
               key={point.title}
               type="button"
               onClick={point.onClick}
-              className="block w-full text-left"
+              className="block w-full text-left h-full"
             >
               {Content}
             </button>

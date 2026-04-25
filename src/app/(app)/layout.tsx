@@ -25,12 +25,12 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
         <UserProvider>
             <WorkspaceProvider>
                 <ToastProvider>
-                    <div className="silk-bg min-h-[100dvh] flex p-4 md:p-6 gap-6 overflow-hidden">
+                    <div className="silk-bg min-h-[100dvh] flex p-2 md:p-3 gap-3 overflow-hidden">
                         {/* Left: Full-height Sidebar */}
                         <Sidebar />
                         
                         {/* Center + Right: TopNav + Content + Rail */}
-                        <div className="flex-1 min-w-0 flex gap-6">
+                        <div className="flex-1 min-w-0 flex gap-3">
                             {/* Center column: TopNav + Page */}
                             <motion.div
                                 layout

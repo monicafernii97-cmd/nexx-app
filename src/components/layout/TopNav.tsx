@@ -223,7 +223,8 @@ export function TopNav() {
                                     <p className="px-4 py-2 text-[10px] font-bold tracking-[0.2em] uppercase text-white/20">
                                         Archived
                                     </p>
-                                    {archivedCases.slice(0, 3).map((c) => (
+                                <div className="max-h-[180px] overflow-y-auto">
+                                    {archivedCases.map((c) => (
                                         <button
                                             key={c._id}
                                             type="button"
@@ -236,6 +237,7 @@ export function TopNav() {
                                             <span className="text-[12px] font-bold truncate">{c.title}</span>
                                         </button>
                                     ))}
+                                </div>
                                 </div>
                             )}
 

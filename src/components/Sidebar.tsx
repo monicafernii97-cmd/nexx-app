@@ -209,10 +209,13 @@ export default function Sidebar() {
 
                                 {hasChildren && !collapsed && (
                                     <button
+                                        type="button"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             toggleExpand(item.href);
                                         }}
+                                        aria-label={isExpanded ? `Collapse ${item.label}` : `Expand ${item.label}`}
+                                        aria-expanded={isExpanded}
                                         className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-all hover:bg-white/5 flex-shrink-0 ml-1 text-white/20 hover:text-white"
                                     >
                                         <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}>
@@ -329,7 +332,9 @@ export default function Sidebar() {
 
             {/* Floating Collapse Toggle */}
             <button
+                type="button"
                 onClick={() => setCollapsed(!collapsed)}
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 className="absolute -right-4 top-12 w-8 h-8 rounded-full flex items-center justify-center hyper-glass border border-white/10 shadow-xl transition-all hover:scale-110 z-50 text-white/40 hover:text-white cursor-pointer"
             >
                 <motion.div animate={{ rotate: collapsed ? 180 : 0 }} transition={{ type: "spring", stiffness: 300, damping: 20 }}>

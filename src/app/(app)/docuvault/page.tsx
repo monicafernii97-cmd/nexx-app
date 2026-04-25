@@ -409,6 +409,26 @@ function DocuVaultPageInner() {
                         </div>
                     </div>
 
+                    {/* Error banner */}
+                    <AnimatePresence>
+                        {generationError && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="overflow-hidden"
+                            >
+                                <div role="alert" aria-live="assertive" className="px-5 py-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
+                                    <X size={20} weight="bold" className="text-red-400 shrink-0" />
+                                    <p className="text-sm font-medium text-red-400">{generationError}</p>
+                                    <button onClick={() => setGenerationError(null)} className="ml-auto text-red-400/60 hover:text-red-400 cursor-pointer">
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
                     {/* Main Hyperglass Container */}
                     <div className="hyper-glass overflow-hidden flex flex-col md:flex-row min-h-[640px]">
                         
@@ -455,10 +475,15 @@ function DocuVaultPageInner() {
                                     <div className="absolute bottom-6 right-6 flex items-center gap-3">
                                         <button
                                             onClick={() => fileInputRef.current?.click()}
-                                            className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-white text-[12px] font-bold uppercase tracking-widest transition-all flex items-center gap-2"
+                                            disabled={isParsing}
+                                            className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-white text-[12px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            <Paperclip size={18} />
-                                            Upload
+                                            {isParsing ? (
+                                                <ArrowsClockwise size={18} className="animate-spin" />
+                                            ) : (
+                                                <Paperclip size={18} />
+                                            )}
+                                            {isParsing ? 'Parsing...' : 'Upload'}
                                         </button>
                                         <input type="file" ref={fileInputRef} className="hidden" onChange={async (e) => {
                                             const file = e.target.files?.[0];
@@ -596,6 +621,7 @@ function DocuVaultPageInner() {
                                 });
                             } catch (err) {
                                 console.error('[DocuVault] Export start failed:', err);
+                                setGenerationError(err instanceof Error ? err.message : 'Export failed. Please try again.');
                                 setShowCreateExport(true);
                             }
                         }}

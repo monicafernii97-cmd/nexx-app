@@ -27,14 +27,17 @@ export default function IncidentReportPage() {
     const { activeCaseId } = useWorkspace();
     const [narrative, setNarrative] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
-    const [processError, setProcessError] = useState<string | null>(null);
+
+    /** Structured error for stable code-based matching instead of brittle string comparisons. */
+    type ProcessError = { code: 'empty_narrative' | 'missing_case' | 'generic'; message: string } | null;
+    const [processError, setProcessError] = useState<ProcessError>(null);
     const [isPinning, setIsPinning] = useState<string | null>(null);
     const [pinError, setPinError] = useState<string | null>(null);
 
     // Derive displayed error — automatically suppresses stale "no case" message once case is selected
-    const displayedError = processError === 'Please select or create a case first.' && activeCaseId
+    const displayedError = processError?.code === 'missing_case' && activeCaseId
         ? null
-        : processError;
+        : processError?.message ?? null;
 
     // Live data from Convex
     const incidents = useQuery(
@@ -49,9 +52,9 @@ export default function IncidentReportPage() {
         const trimmed = narrative.trim();
         if (!trimmed || !activeCaseId) {
             if (!trimmed) {
-                setProcessError('Please enter a narrative.');
+                setProcessError({ code: 'empty_narrative', message: 'Please enter a narrative.' });
             } else if (!activeCaseId) {
-                setProcessError('Please select or create a case first.');
+                setProcessError({ code: 'missing_case', message: 'Please select or create a case first.' });
             }
             return;
         }
@@ -77,7 +80,7 @@ export default function IncidentReportPage() {
             setNarrative('');
         } catch (err) {
             console.error('[IncidentIntake] Create failed:', err);
-            setProcessError(err instanceof Error ? err.message : 'Failed to save incident');
+            setProcessError({ code: 'generic', message: err instanceof Error ? err.message : 'Failed to save incident' });
         } finally {
             setIsProcessing(false);
         }
@@ -262,9 +265,9 @@ export default function IncidentReportPage() {
                                     <div className="flex gap-3 pt-2">
                                         <button
                                             onClick={() => handleAddToWorkspace(incident)}
-                                            disabled={isPinning === incident._id}
+                                            disabled={Boolean(isPinning)}
                                             className={`px-4 py-2 rounded-lg text-[9px] font-bold uppercase tracking-[0.2em] border transition-all ${
-                                                isPinning === incident._id
+                                                isPinning
                                                     ? 'bg-indigo-500/10 text-indigo-400/60 border-indigo-500/20 cursor-not-allowed'
                                                     : 'bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:border-white/20 hover:text-white'
                                             }`}

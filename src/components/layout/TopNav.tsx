@@ -40,7 +40,6 @@ export function TopNav() {
 
     const createCase = useMutation(api.cases.create);
     const archiveCase = useMutation(api.cases.archive);
-    const unarchiveCase = useMutation(api.cases.unarchive);
 
     const activeCases = cases?.filter(c => c.status === 'active') ?? [];
     const archivedCases = cases?.filter(c => c.status === 'archived') ?? [];
@@ -114,7 +113,6 @@ export function TopNav() {
         pendingActionsRef.current = nextPending;
         setPendingActions(nextPending);
         try {
-            await unarchiveCase({ caseId });
             setActiveCaseId(caseId);
             setIsSwitcherOpen(false);
         } catch (err) {
@@ -130,7 +128,7 @@ export function TopNav() {
             pendingActionsRef.current = cleared;
             setPendingActions(cleared);
         }
-    }, [unarchiveCase, setActiveCaseId, showToast]);
+    }, [setActiveCaseId, showToast]);
 
     return (
         <div className="h-[72px] flex items-center justify-between px-8 hyper-glass rounded-2xl mb-6 glow-slate">
@@ -148,7 +146,7 @@ export function TopNav() {
                     </div>
                     <div className="text-left">
                         <p className="text-[13px] font-bold text-white tracking-tight leading-tight truncate max-w-[200px]">
-                            {activeCase?.title ?? 'Loading...'}
+                            {cases === undefined ? 'Loading...' : activeCase?.title ?? 'No Case Yet'}
                         </p>
                         <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/20 mt-0.5">
                             Active Case

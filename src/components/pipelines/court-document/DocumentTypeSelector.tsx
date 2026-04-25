@@ -56,9 +56,15 @@ export default function DocumentTypeSelector({ isOpen, onClose, onSelect }: Docu
   // Save previous focus and auto-focus dialog on open
   useEffect(() => {
     if (isOpen) {
+      setCreateError(null);
       previousFocusRef.current = document.activeElement as HTMLElement;
-      // Small delay to let framer-motion render
-      const timer = setTimeout(() => dialogRef.current?.focus(), 50);
+      // Focus the first focusable element inside the dialog
+      const timer = setTimeout(() => {
+        const firstFocusable = dialogRef.current?.querySelector<HTMLElement>(
+          'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        (firstFocusable ?? dialogRef.current)?.focus();
+      }, 50);
       return () => clearTimeout(timer);
     } else if (previousFocusRef.current) {
       previousFocusRef.current.focus();
@@ -79,7 +85,7 @@ export default function DocumentTypeSelector({ isOpen, onClose, onSelect }: Docu
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
         e.preventDefault();
         last.focus();
       } else if (!e.shiftKey && document.activeElement === last) {

@@ -498,18 +498,11 @@ function DocuVaultPageInner() {
                                                 return;
                                             }
 
-                                            // Abort any in-flight parse before starting a new one
-                                            parseAbortRef.current?.abort();
-                                            const controller = new AbortController();
-                                            parseAbortRef.current = controller;
-                                            setIsParsing(true);
-                                            setGenerationError(null);
-
                                             const name = file.name.toLowerCase();
                                             const isBinary = name.endsWith('.pdf') || name.endsWith('.docx');
 
-                                            // Reject unsupported file types
-                                            const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.txt', '.md', '.csv', '.rtf'];
+                                            // Reject unsupported file types before entering parsing state
+                                            const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.txt', '.md', '.csv'];
                                             const hasSupported = SUPPORTED_EXTENSIONS.some(ext => name.endsWith(ext));
                                             const isTextMime = file.type.startsWith('text/');
                                             if (!hasSupported && !isTextMime) {
@@ -517,6 +510,13 @@ function DocuVaultPageInner() {
                                                 e.target.value = '';
                                                 return;
                                             }
+
+                                            // Abort any in-flight parse before starting a new one
+                                            parseAbortRef.current?.abort();
+                                            const controller = new AbortController();
+                                            parseAbortRef.current = controller;
+                                            setIsParsing(true);
+                                            setGenerationError(null);
 
                                             try {
                                                 let extractedText = '';

@@ -223,22 +223,22 @@ export function TopNav() {
                                     <p className="px-4 py-2 text-[10px] font-bold tracking-[0.2em] uppercase text-white/20">
                                         Archived
                                     </p>
-                                <div className="max-h-[180px] overflow-y-auto">
-                                    {archivedCases.map((c) => (
-                                        <button
-                                            key={c._id}
-                                            type="button"
-                                            onClick={() => handleUnarchive(c._id)}
-                                            disabled={pendingActions.has(c._id)}
-                                            aria-label={`Restore "${c.title}" to active`}
-                                            className="w-full flex items-center gap-4 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                            title={`Restore "${c.title}" to active`}
-                                        >
-                                            <Archive size={16} />
-                                            <span className="text-[12px] font-bold truncate">{c.title}</span>
-                                        </button>
-                                    ))}
-                                </div>
+                                    <div className="max-h-[180px] overflow-y-auto">
+                                        {archivedCases.map((c) => (
+                                            <button
+                                                key={c._id}
+                                                type="button"
+                                                onClick={() => handleUnarchive(c._id)}
+                                                disabled={pendingActions.has(c._id)}
+                                                aria-label={`Restore "${c.title}" to active`}
+                                                className="w-full flex items-center gap-4 px-4 py-2.5 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title={`Restore "${c.title}" to active`}
+                                            >
+                                                <Archive size={16} />
+                                                <span className="text-[12px] font-bold truncate">{c.title}</span>
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
 

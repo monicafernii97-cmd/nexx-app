@@ -1,379 +1,312 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
 import {
     ClipboardText,
-    Plus,
-    MagnifyingGlass,
-    Trash,
-    Tag,
     ArrowRight,
-    DownloadSimple,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
-import { INCIDENT_CATEGORIES } from '@/lib/constants';
-import { ConfirmDeleteModal } from '@/components/ConfirmDeleteModal';
-import { parseLocalDate } from '@/lib/dateUtils';
 import { useWorkspace } from '@/lib/workspace-context';
 
-/** Incident Report listing page with search, category filters, and delete functionality. */
+import '@/styles/pipelines.css';
+import { 
+  Microphone, 
+  Sparkle, 
+  PlusCircle, 
+  ArrowClockwise,
+  CheckCircle,
+  MagnifyingGlass as FileSearch,
+  Clock as TimelineIcon
+} from '@phosphor-icons/react';
+
+/** Incident Intake Hub - The primary pipeline for event recording. */
 export default function IncidentReportPage() {
     const { activeCaseId } = useWorkspace();
+    const [narrative, setNarrative] = useState('');
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [processError, setProcessError] = useState<string | null>(null);
+    const [isPinning, setIsPinning] = useState<string | null>(null);
+    const [pinError, setPinError] = useState<string | null>(null);
+
+    // Clear case-related error when user selects a case
+    useEffect(() => {
+        if (activeCaseId && processError === 'Please select or create a case first.') {
+            setProcessError(null);
+        }
+    }, [activeCaseId, processError]);
+
+    // Live data from Convex
     const incidents = useQuery(
         api.incidents.list,
-        activeCaseId ? { caseId: activeCaseId } : 'skip'
+        activeCaseId ? { caseId: activeCaseId } : 'skip',
     );
-    const removeIncident = useMutation(api.incidents.remove);
-    const [activeFilter, setActiveFilter] = useState<string | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [deleteId, setDeleteId] = useState<Id<'incidents'> | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [deleteError, setDeleteError] = useState<string | null>(null);
+    const createIncident = useMutation(api.incidents.create);
+    const createCasePin = useMutation(api.casePins.create);
 
-    const isLoading = incidents === undefined;
-
-    const filteredIncidents = (incidents ?? []).filter((incident) => {
-        if (activeFilter && incident.category !== activeFilter) return false;
-        if (searchQuery && !incident.narrative.toLowerCase().includes(searchQuery.toLowerCase())
-            && !(incident.courtSummary || '').toLowerCase().includes(searchQuery.toLowerCase())) return false;
-        return true;
-    });
-
-    // Group incidents by tag for Pattern Detected section (driven by filtered set)
-    const patternsMap = new Map<string, Array<{ id: Id<'incidents'>, date: Date, narrative: string }>>();
-    filteredIncidents.forEach(incident => {
-        if (incident.tags && incident.tags.length > 0) {
-            const date = parseLocalDate(incident.date);
-            const narrative = incident.courtSummary || incident.narrative;
-            incident.tags.forEach(tag => {
-                if (!patternsMap.has(tag)) patternsMap.set(tag, []);
-                patternsMap.get(tag)!.push({ id: incident._id, date, narrative });
-            });
+    /** Process the incident narrative and save to Convex. */
+    const handleProcess = useCallback(async () => {
+        const trimmed = narrative.trim();
+        if (!trimmed || !activeCaseId) {
+            if (!trimmed) {
+                setProcessError('Please enter a narrative.');
+            } else if (!activeCaseId) {
+                setProcessError('Please select or create a case first.');
+            }
+            return;
         }
-    });
 
-    const handleDelete = async () => {
-        if (!deleteId) return;
-        setIsDeleting(true);
-        setDeleteError(null);
+        setIsProcessing(true);
+        setProcessError(null);
+
         try {
-            await removeIncident({ id: deleteId });
-            setDeleteId(null);
-        } catch (error) {
-            console.error('Delete error:', error);
-            setDeleteError('Failed to delete incident. Please try again.');
+            const now = new Date();
+            const localDate = [
+                now.getFullYear(),
+                String(now.getMonth() + 1).padStart(2, '0'),
+                String(now.getDate()).padStart(2, '0'),
+            ].join('-');
+            await createIncident({
+                narrative: trimmed,
+                severity: 1,
+                date: localDate,
+                time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                caseId: activeCaseId,
+            });
+
+            setNarrative('');
+        } catch (err) {
+            console.error('[IncidentIntake] Create failed:', err);
+            setProcessError(err instanceof Error ? err.message : 'Failed to save incident');
         } finally {
-            setIsDeleting(false);
+            setIsProcessing(false);
         }
-    };
+    }, [narrative, activeCaseId, createIncident]);
+
+    /** Pin an incident to the case workspace. Prevents duplicate clicks. */
+    const handleAddToWorkspace = useCallback(async (incident: { _id: Id<'incidents'>; narrative: string; date: string }) => {
+        if (!activeCaseId || isPinning === incident._id) return;
+        setIsPinning(incident._id);
+
+        try {
+            setPinError(null);
+            await createCasePin({
+                caseId: activeCaseId,
+                type: 'key_fact',
+                title: `Incident — ${incident.date}`,
+                content: incident.narrative,
+                requestId: `incident:${incident._id}:workspace`,
+            });
+        } catch (err) {
+            console.error('[IncidentIntake] Pin creation failed:', err);
+            setPinError('Failed to add incident to workspace. Please try again.');
+        } finally {
+            setIsPinning(null);
+        }
+    }, [activeCaseId, createCasePin, isPinning]);
+
+
 
     return (
         <PageContainer>
-            {/* Header */}
             <PageHeader
                 icon={ClipboardText}
-                title={
-                    <>Incident <span className="text-editorial shimmer">Report</span></>
-                }
-                description="Transform chaos into undeniable proof. Log, analyze, and bulletproof your timeline for court."
-                rightElement={
-                    <div className="flex items-center gap-3">
-                        {incidents && incidents.length > 0 && (
-                            <a 
-                                href={`/api/incidents/export${activeCaseId ? `?caseId=${activeCaseId}` : ''}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-[12px] font-bold uppercase tracking-wider bg-[rgba(255,255,255,0.05)] text-white hover:bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.3)] transition-all no-underline shrink-0"
-                            >
-                                <DownloadSimple size={16} weight="bold" /> Export Report
-                            </a>
-                        )}
-                        <Link href="/incident-report/new" className="btn-primary inline-flex items-center justify-center gap-2 no-underline shadow-[0_8px_20px_rgba(18,61,126,0.4)] flex-shrink-0 px-6 py-3 rounded-xl">
-                            <Plus size={16} weight="bold" /> Log Incident
-                        </Link>
-                    </div>
-                }
+                title={<>Record <span className="text-editorial shimmer">Incident</span></>}
+                description="Turn a chaotic moment into a structured fact. Type your narrative below."
             />
 
-            {/* Search & Filters */}
-            <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
-                className="mb-8 space-y-4"
-            >
-                <div className="relative max-w-md w-full">
-                    <MagnifyingGlass size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70" />
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search incidents..."
-                        className="w-full h-12 bg-[#0A1128] border border-[rgba(255,255,255,0.15)] rounded-xl text-white placeholder:text-white/40 pl-11 pr-4 focus:outline-none focus:border-[rgba(255,255,255,0.4)] focus:shadow-[0_4px_20px_rgba(18,61,126,0.3)] transition-all"
-                        aria-label="Search incidents"
+            <div className="max-w-4xl mx-auto space-y-12 pb-24">
+                
+                {/* 1. The Focused Intake Area */}
+                <div className="relative group">
+                    <textarea
+                        value={narrative}
+                        onChange={(e) => {
+                            setNarrative(e.target.value);
+                            if (processError) setProcessError(null);
+                        }}
+                        aria-label="Incident narrative"
+                        placeholder="What happened? (e.g. 'At 2pm today, John arrived at the exchange location and started...')"
+                        className="w-full bg-transparent border-none text-2xl md:text-3xl font-serif text-white placeholder:text-white/10 min-h-[300px] outline-none resize-none px-4 py-8 selection:bg-indigo-500/30"
                     />
+                    
+                    {/* Floating Glow Background */}
+                    <div className="absolute inset-0 bg-indigo-500/5 blur-[100px] rounded-full -z-10 group-focus-within:bg-indigo-500/10 transition-all" />
                 </div>
-                <div className="flex flex-wrap gap-2.5 mt-4">
-                    <button
-                        onClick={() => setActiveFilter(null)}
-                        aria-pressed={!activeFilter}
-                        className={`px-4 py-2.5 rounded-xl text-[11px] font-bold tracking-wider uppercase transition-all duration-300 border shadow-sm ${
-                            !activeFilter 
-                                ? 'bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border-[rgba(255,255,255,0.3)] text-white shadow-[0_4px_20px_rgba(46,92,154,0.4)] scale-105 relative overflow-hidden z-10' 
-                                : 'bg-[rgba(255,255,255,0.05)] backdrop-blur-md border-[rgba(255,255,255,0.15)] text-white hover:border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.1)] hover:-translate-y-0.5'
+
+                {/* 2. Intake Controls */}
+                <div className="flex items-center justify-between px-4">
+                    <div className="flex items-center gap-4">
+                        <button disabled className="flex items-center gap-2 px-6 py-3 rounded-full bg-white/5 border border-white/10 text-white/20 cursor-not-allowed text-sm font-bold" title="Coming soon">
+                            <Microphone size={20} weight="fill" className="text-rose-400/40" />
+                            Voice Input
+                        </button>
+                        <button disabled className="flex items-center gap-2 px-4 py-2 text-white/20 cursor-not-allowed text-xs font-bold uppercase tracking-widest" title="Coming soon">
+                            <PlusCircle size={18} />
+                            Add Photo/Video
+                        </button>
+                    </div>
+
+                    <button 
+                        onClick={handleProcess}
+                        disabled={!narrative.trim() || isProcessing || !activeCaseId}
+                        className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all shadow-xl ${
+                            narrative.trim() && !isProcessing && activeCaseId
+                            ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30' 
+                            : 'bg-white/5 text-white/20 border border-white/5 cursor-not-allowed'
                         }`}
                     >
-                        {!activeFilter && <span className="absolute inset-0 bg-white/10" />}
-                        <span className="relative z-10">All Records</span>
+                        {isProcessing ? (
+                            <ArrowClockwise size={18} className="animate-spin" />
+                        ) : (
+                            <Sparkle size={18} weight="fill" />
+                        )}
+                        {isProcessing ? 'Processing...' : 'Process Incident'}
                     </button>
-                    {INCIDENT_CATEGORIES.map((cat) => (
-                        <button
-                            key={cat.value}
-                            onClick={() => setActiveFilter(activeFilter === cat.value ? null : cat.value)}
-                            aria-pressed={activeFilter === cat.value}
-                            className={`px-4 py-2.5 rounded-xl text-[11px] font-bold tracking-wider uppercase transition-all duration-300 border shadow-sm ${
-                                activeFilter === cat.value 
-                                    ? 'bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] border-[rgba(255,255,255,0.3)] text-white shadow-[0_4px_20px_rgba(46,92,154,0.4)] scale-105 relative overflow-hidden z-10' 
-                                    : 'bg-[rgba(255,255,255,0.05)] backdrop-blur-md border-[rgba(255,255,255,0.15)] text-white hover:border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.1)] hover:-translate-y-0.5'
-                            }`}
-                        >
-                            {activeFilter === cat.value && <span className="absolute inset-0 bg-white/10" />}
-                            <span className="relative z-10">{cat.label}</span>
-                        </button>
-                    ))}
                 </div>
-            </motion.div>
 
-            {/* Incident Count & List */}
-            <div className="space-y-4">
-                {incidents && incidents.length > 0 && (
-                    <p className="text-xs font-bold tracking-widest uppercase text-sapphire-muted px-2 pb-2">
-                        {filteredIncidents.length} of {incidents.length} Records
-                        {activeFilter || searchQuery ? ' (filtered)' : ''}
-                    </p>
+                {/* Error */}
+                {processError && (
+                    <div role="alert" aria-live="assertive" className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                        {processError}
+                    </div>
                 )}
 
-                {isLoading ? (
-                    <div className="space-y-4">
-                        {[0, 1, 2].map((j) => (
-                            <div key={j} className="card-premium p-6 animate-pulse border-white flex gap-4">
-                                <div className="w-12 h-16 rounded-xl bg-white/10" />
-                                <div className="flex-1 space-y-3 pt-2">
-                                    <div className="h-4 w-1/4 rounded bg-white/10" />
-                                    <div className="h-4 w-3/4 rounded bg-white/5" />
+                {/* No case selected warning */}
+                {!activeCaseId && (
+                    <div className="px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm text-center">
+                        Select a case from the sidebar to start recording incidents.
+                    </div>
+                )}
+
+                {/* 3. Live Timeline from Convex */}
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="glass-station p-8 border-white/5 shadow-2xl space-y-8"
+                >
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                        <div className="flex items-center gap-3">
+                            <TimelineIcon size={20} className="text-indigo-400" />
+                            <h3 className="font-bold text-white uppercase tracking-widest text-xs">Recent Timeline Intake</h3>
+                        </div>
+                        <Link href="/incident-report/history" className="text-[10px] font-black text-indigo-400 hover:text-indigo-300 uppercase tracking-widest flex items-center gap-2">
+                            View Full History <ArrowRight size={12} />
+                        </Link>
+                    </div>
+
+                    <div className="space-y-6">
+                        {/* No case selected state */}
+                        {!activeCaseId && (
+                            <p className="text-center text-white/20 text-xs uppercase tracking-widest font-bold py-6">
+                                Select a case to view incidents
+                            </p>
+                        )}
+
+                        {/* Loading state */}
+                        {activeCaseId && incidents === undefined && (
+                            <div className="flex items-center justify-center py-6">
+                                <div className="w-5 h-5 border-2 border-white/20 border-t-indigo-400 rounded-full animate-spin" />
+                            </div>
+                        )}
+
+                        {/* Empty state */}
+                        {incidents && incidents.length === 0 && (
+                            <p className="text-center text-white/20 text-xs uppercase tracking-widest font-bold py-6">
+                                No incidents recorded yet
+                            </p>
+                        )}
+
+                        {/* Pin error */}
+                        {pinError && (
+                            <div role="alert" aria-live="assertive" className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                                {pinError}
+                            </div>
+                        )}
+
+                        {/* Live incidents */}
+                        {incidents?.slice(0, 5).map((incident, i) => (
+                            <div key={incident._id} className="flex gap-6 relative group">
+                                {/* Vertical Timeline Line */}
+                                {i !== Math.min((incidents?.length ?? 0) - 1, 4) && (
+                                    <div className="absolute left-[7px] top-6 bottom-[-1.5rem] w-[2px] bg-indigo-500/20" />
+                                )}
+                                
+                                <div className="mt-1 w-4 h-4 rounded-full border-2 border-indigo-500 bg-[#0F172A] z-10 shrink-0" />
+                                
+                                <div className="flex-1 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter">{incident.date}</span>
+                                            <span className="text-[10px] font-medium text-white/20">{incident.time}</span>
+                                            {incident.status === 'confirmed' && (
+                                                <span className="text-[10px] font-bold text-emerald-400/60 uppercase tracking-widest">✓ Confirmed</span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button disabled className="text-[10px] font-bold text-white/20 uppercase tracking-widest cursor-not-allowed" title="Coming soon">
+                                                Edit
+                                            </button>
+                                            <button disabled className="text-[10px] font-bold text-white/20 uppercase tracking-widest cursor-not-allowed" title="Coming soon">
+                                                Verify
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-white/80 leading-relaxed max-w-2xl">
+                                        {incident.narrative.length > 200
+                                            ? incident.narrative.slice(0, 200) + '...'
+                                            : incident.narrative}
+                                    </p>
+                                    <div className="flex gap-2 pt-1">
+                                        <button
+                                            onClick={() => handleAddToWorkspace(incident)}
+                                            disabled={isPinning === incident._id}
+                                            className={`px-2 py-1 rounded text-[9px] font-bold uppercase tracking-widest border transition-colors ${
+                                                isPinning === incident._id
+                                                    ? 'bg-indigo-500/10 text-indigo-400/60 border-indigo-500/20 cursor-not-allowed'
+                                                    : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 hover:bg-indigo-500/20'
+                                            }`}
+                                        >
+                                            {isPinning === incident._id ? 'Adding…' : '+ Add to Workspace'}
+                                        </button>
+                                        <button disabled className="px-2 py-1 rounded bg-amber-500/10 text-amber-400/40 text-[9px] font-bold uppercase tracking-widest border border-amber-500/10 cursor-not-allowed" title="Coming soon">
+                                            + Send to Exhibit
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))}
                     </div>
-                ) : filteredIncidents.length === 0 ? (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.98 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="glass-ethereal p-12 text-center rounded-[2rem] border-white"
-                    >
-                        <div className="w-20 h-20 rounded-3xl mx-auto mb-6 flex items-center justify-center bg-white shadow-sm border border-[rgba(10,22,41,0.05)]">
-                            <ClipboardText size={32} weight="duotone" className="text-[#0A1128]" />
-                        </div>
-                        <h2 className="text-xl font-serif font-bold text-white mb-2">
-                            {incidents && incidents.length > 0 ? 'No exact matches found.' : 'Your record is pristine.'}
-                        </h2>
-                        <p className="text-sm font-medium text-sapphire-muted max-w-md mx-auto mb-8">
-                            {incidents && incidents.length > 0
-                                ? 'Adjust your search or filters to locate specific events.'
-                                : 'Start documenting incidents to build your court-ready evidence portfolio securely.'}
-                        </p>
-                        {(!incidents || incidents.length === 0) && (
-                            <Link href="/incident-report/new" className="btn-primary inline-flex no-underline">
-                                Log Your First Incident
-                            </Link>
-                        )}
-                    </motion.div>
-                ) : (
-                    <div className="flex flex-col gap-3">
-                        {filteredIncidents.map((incident, i) => {
-                            const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
-                            const date = parseLocalDate(incident.date);
+                </motion.div>
 
-                            return (
-                                <motion.div
-                                    key={incident._id}
-                                    initial={{ opacity: 0, y: 16 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: Math.min(0.05 * i, 0.4), type: 'spring' }}
-                                    className="group relative flex items-stretch"
-                                >
-                                    <Link href={`/incident-report/${incident._id}`} className="flex-1 min-w-0 no-underline outline-none">
-                                        <div className="card-premium p-5 pr-[4.5rem] hover:border-[rgba(255,255,255,0.4)] hover:shadow-[0_8px_32px_rgba(26,75,155,0.3)] transition-all duration-300 flex items-start gap-5">
-                                            {/* Date Column */}
-                                            <div className="flex flex-col items-center justify-center min-w-[56px] py-2 bg-[rgba(255,255,255,0.05)] rounded-xl px-2 shrink-0 border border-[rgba(255,255,255,0.1)]">
-                                                <p className="text-[11px] font-bold uppercase tracking-wider text-white/60">
-                                                    {date.toLocaleDateString('en-US', { month: 'short' })}
-                                                </p>
-                                                <p className="text-2xl font-bold text-white leading-none mt-1 mb-0.5">
-                                                    {date.getDate()}
-                                                </p>
-                                                <p className="text-[10px] font-semibold text-white/50">
-                                                    {incident.time}
-                                                </p>
-                                            </div>
-
-                                            {/* Content */}
-                                            <div className="flex-1 min-w-0 py-1">
-                                                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                                    {incident.tags && incident.tags.map(tag => {
-                                                        const ct = INCIDENT_CATEGORIES.find((c) => c.value === tag);
-                                                        return (
-                                                            <span
-                                                                key={tag}
-                                                                className="px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase border shadow-sm"
-                                                                style={{ 
-                                                                    background: ct?.color ? `color-mix(in srgb, ${ct.color} 15%, transparent)` : 'rgba(255,255,255,0.05)', 
-                                                                    color: ct?.color || 'rgba(255,255,255,0.7)',
-                                                                    borderColor: ct?.color ? `color-mix(in srgb, ${ct.color} 30%, transparent)` : 'rgba(255,255,255,0.1)'
-                                                                }}
-                                                            >
-                                                                {ct?.label || tag.replace(/_/g, ' ')}
-                                                            </span>
-                                                        );
-                                                    })}
-                                                    {(!incident.tags || incident.tags.length === 0) && incident.category && (
-                                                        <span
-                                                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase"
-                                                            style={{ 
-                                                                background: cat?.color ? `color-mix(in srgb, ${cat.color} 12%, transparent)` : 'var(--cloud)', 
-                                                                color: cat?.color || 'var(--sapphire-muted)' 
-                                                            }}
-                                                        >
-                                                            {cat?.label || incident.category}
-                                                        </span>
-                                                    )}
-                                                    {incident.status === 'draft' && (
-                                                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase bg-warning/10 text-warning">Draft</span>
-                                                    )}
-                                                    {incident.status === 'confirmed' && (
-                                                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase bg-emerald/10 text-emerald">Confirmed</span>
-                                                    )}
-                                                    {incident.childrenInvolved && (
-                                                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide uppercase bg-warning/10 text-warning">Children</span>
-                                                    )}
-                                                    
-                                                    {/* Severity Indicator */}
-                                                    {(() => {
-                                                        const sev = Math.max(1, Math.min(3, incident.severity ?? 2));
-                                                        return (
-                                                            <div className="flex gap-1 ml-auto">
-                                                                {[1, 2, 3].map((level) => (
-                                                                    <div
-                                                                        key={level}
-                                                                        className="w-1.5 h-4 rounded-sm"
-                                                                        style={{
-                                                                            background: level <= sev
-                                                                                ? (cat?.color || 'var(--sapphire)')
-                                                                                : 'rgba(10,22,41,0.06)',
-                                                                        }}
-                                                                    />
-                                                                ))}
-                                                            </div>
-                                                        );
-                                                    })()}
-                                                </div>
-                                                <p className="text-[14px] leading-relaxed text-white/80 font-medium line-clamp-2 mt-2">
-                                                    {incident.courtSummary || incident.narrative}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </Link>
-
-                                    {/* Reveal Delete Button on hover */}
-                                    <button
-                                        onClick={() => setDeleteId(incident._id)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 rounded-full bg-rose/10 text-rose hover:bg-rose hover:text-white transition-all duration-300 shadow-sm cursor-pointer border border-rose/20 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose/60"
-                                        title="Delete incident"
-                                        aria-label="Delete incident"
-                                    >
-                                        <Trash size={18} weight="duotone" />
-                                    </button>
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                )}
-
-                {/* Pattern Detected Section */}
-                {filteredIncidents.length > 0 && patternsMap.size > 0 && (
-                    <div className="mt-16 mb-8">
-                        <h2 className="text-[13px] font-bold tracking-[0.2em] uppercase text-rose flex items-center gap-2 mb-6">
-                            <Tag size={18} weight="duotone" /> Pattern Detected
-                        </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            {Array.from(patternsMap.entries())
-                                .sort((a, b) => b[1].length - a[1].length) // Sort by number of occurrences
-                                .map(([tag, occurrences]) => {
-                                const catTheme = INCIDENT_CATEGORIES.find(c => c.value === tag);
-                                const color = catTheme ? catTheme.color : 'var(--sapphire)';
-                                const label = catTheme ? catTheme.label : tag.replace(/_/g, ' ');
-                                
-                                return (
-                                    <div key={tag} className="card-premium p-6 border-[rgba(10,22,41,0.05)]">
-                                        <div className="flex items-center justify-between mb-5">
-                                            <span 
-                                                className="px-3 py-1.5 rounded-md text-[11px] font-bold tracking-wider uppercase shadow-sm border"
-                                                style={{ 
-                                                    background: `color-mix(in srgb, ${color} 15%, transparent)`,
-                                                    color: color,
-                                                    borderColor: `color-mix(in srgb, ${color} 30%, transparent)`
-                                                }}
-                                            >
-                                                {label}
-                                            </span>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-white/70 bg-[rgba(255,255,255,0.1)] px-2.5 py-1 rounded-md">
-                                                {occurrences.length} {occurrences.length === 1 ? 'Event' : 'Events'}
-                                            </span>
-                                        </div>
-                                        <div className="space-y-3">
-                                            {occurrences.sort((a,b) => b.date.getTime() - a.date.getTime()).slice(0, 3).map(occ => (
-                                                <Link 
-                                                    key={occ.id} 
-                                                    href={`/incident-report/${occ.id}`}
-                                                    className="block p-4 rounded-[1.2rem] bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.05)] hover:border-[rgba(255,255,255,0.2)] hover:shadow-[0_4px_20px_rgba(26,75,155,0.2)] transition-all no-underline group"
-                                                >
-                                                    <div className="flex items-center justify-between mb-1.5">
-                                                        <span className="text-[11px] font-bold text-white/90">
-                                                            {occ.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                                                        </span>
-                                                        <ArrowRight size={14} weight="bold" className="text-white/60 opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-4px] group-hover:translate-x-0" />
-                                                    </div>
-                                                    <p className="text-[13px] font-medium text-white/60 line-clamp-2 leading-relaxed">
-                                                        {occ.narrative}
-                                                    </p>
-                                                </Link>
-                                            ))}
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                {/* 4. Strategic Guidance */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex items-start gap-4">
+                        <CheckCircle size={24} className="text-indigo-400 shrink-0" />
+                        <div>
+                            <h5 className="text-[11px] font-black text-white uppercase tracking-widest mb-1">Court-Ready Tip</h5>
+                            <p className="text-[11px] text-white/40 leading-relaxed">
+                                Avoid emotional descriptors. Focus on exact times, dates, and direct quotes for higher evidentiary value.
+                            </p>
                         </div>
                     </div>
-                )}
+                    <div className="p-6 rounded-2xl bg-rose-500/5 border border-rose-500/10 flex items-start gap-4">
+                        <FileSearch size={24} className="text-rose-400 shrink-0" />
+                        <div>
+                            <h5 className="text-[11px] font-black text-white uppercase tracking-widest mb-1">Pattern Detected</h5>
+                            <p className="text-[11px] text-white/40 leading-relaxed">
+                                {incidents && incidents.length >= 3
+                                    ? `${incidents.length} incidents recorded. Patterns may be tracked for your next motion.`
+                                    : 'Record 3+ incidents to enable pattern detection for legal filings.'}
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </div>
-
-            {/* Delete Confirmation Modal */}
-            <ConfirmDeleteModal
-                isOpen={!!deleteId}
-                isDeleting={isDeleting}
-                deleteError={deleteError}
-                onClose={() => { if (!isDeleting) { setDeleteId(null); setDeleteError(null); } }}
-                onDelete={handleDelete}
-                description="Are you sure you want to permanently delete this record? All associated analysis and court summaries will be unrecoverable."
-                confirmLabel="Delete Permanently"
-                showCloseButton
-                dialogTitleId="list-delete-dialog-title"
-            />
         </PageContainer>
     );
 }

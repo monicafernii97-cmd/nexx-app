@@ -30,6 +30,8 @@ import type { DocumentTemplate } from '@/lib/legal/types';
 import CreateExportModal from './components/CreateExportModal';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useExport } from './context/ExportContext';
+import '@/styles/pipelines.css';
+import DraftingHub from '@/components/pipelines/court-document/DraftingHub';
 
 /** State for the 3-step generation flow */
 type GeneratorView = 'compose' | 'working' | 'result';
@@ -57,7 +59,7 @@ export default function DocuVaultPage() {
     );
 }
 
-/** DocuVault document generator page with compose, working, and result views. */
+/** DocuVault document generator page with intake hub, compose, working, and result views. */
 function DocuVaultPageInner() {
     const searchParams = useSearchParams();
     const { userId } = useUser();
@@ -81,7 +83,7 @@ function DocuVaultPageInner() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Flow state
-    const [view, setView] = useState<GeneratorView>('compose');
+    const [view, setView] = useState<'intake_hub' | 'compose' | 'working' | 'result'>('intake_hub');
     const [progress, setProgress] = useState(0);
     const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
     /** Metadata returned from the Quick Generate stream (no binary). */
@@ -140,6 +142,7 @@ function DocuVaultPageInner() {
                     matched = true;
                     setActiveTab(tab.id);
                     setSelectedTemplate(found);
+                    setView('compose');
                     break;
                 }
             }
@@ -340,7 +343,7 @@ function DocuVaultPageInner() {
         generationAbortRef.current?.abort();
         generationAbortRef.current = null;
 
-        setView('compose');
+        setView('intake_hub');
         setSelectedTemplate(null);
         setDocumentContent('');
         setProgress(0);
@@ -353,7 +356,21 @@ function DocuVaultPageInner() {
     return (
         <PageContainer>
             {/* ═══════════════════════════════════════════════════
-                VIEW: COMPOSE (Main Generator)
+                VIEW: INTAKE HUB (Primary Entry)
+               ═══════════════════════════════════════════════════ */}
+            {view === 'intake_hub' && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="py-4"
+                >
+                    <DraftingHub onManualIntake={() => setView('compose')} />
+                </motion.div>
+            )}
+
+            {/* ═══════════════════════════════════════════════════
+                VIEW: COMPOSE (Manual Intake & Templates)
                ═══════════════════════════════════════════════════ */}
             {view === 'compose' && (
                 <motion.div
@@ -362,6 +379,21 @@ function DocuVaultPageInner() {
                     exit={{ opacity: 0 }}
                     className="space-y-8"
                 >
+                    {/* Header with Back button */}
+                    <div className="flex items-center gap-4 mb-4">
+                        <button 
+                            onClick={() => setView('intake_hub')}
+                            aria-label="Back to intake hub"
+                            className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-white/60 hover:text-white transition-all"
+                        >
+                            <CaretLeft size={20} weight="bold" />
+                        </button>
+                        <div>
+                            <h2 className="text-xl font-bold text-white tracking-tight">Manual Drafting</h2>
+                            <p className="text-xs text-white/40 uppercase tracking-widest font-bold">Direct Entry Pipeline</p>
+                        </div>
+                    </div>
+
                     {/* ── Magic Moment Banner ── */}
                     {searchParams.get('prefilled') === 'true' && (
                         <motion.div
@@ -383,12 +415,6 @@ function DocuVaultPageInner() {
                         </motion.div>
                     )}
 
-                    {/* Header */}
-                    <PageHeader
-                        icon={Bank}
-                        title="DocuVault"
-                        description="Turn your reality into bulletproof legal strategy. Generate court-ready documents in seconds with powerful precision."
-                    />
 
                     {/* ── Category Tabs ── */}
                     <motion.div

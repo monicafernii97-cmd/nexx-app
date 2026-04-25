@@ -34,7 +34,7 @@ interface ExportDropdownProps {
 const EXPORT_OPTIONS: { path: ExportPath; label: string; description: string; icon: typeof FileText; gradient: string; shadow: string }[] = [
     {
         path: 'case_summary',
-        label: 'Case Summary',
+        label: 'Summary Report',
         description: 'Generate a structured summary report',
         icon: FileText,
         gradient: 'from-emerald-500 to-emerald-600',
@@ -43,14 +43,14 @@ const EXPORT_OPTIONS: { path: ExportPath; label: string; description: string; ic
     {
         path: 'court_document',
         label: 'Court Document',
-        description: 'Assemble a court-ready filing',
+        description: 'Draft a court-ready legal filing',
         icon: Scales,
-        gradient: 'from-[#1A4B9B] to-[#123D7E]',
-        shadow: 'shadow-[#1A4B9B]/20',
+        gradient: 'from-indigo-500 to-indigo-600',
+        shadow: 'shadow-indigo-500/20',
     },
     {
         path: 'exhibit_document',
-        label: 'Exhibit Packet',
+        label: 'Exhibit Document',
         description: 'Build an organized exhibit binder',
         icon: FolderOpen,
         gradient: 'from-violet-500 to-violet-600',

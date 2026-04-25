@@ -25,14 +25,45 @@ import { INCIDENT_CATEGORIES } from '@/lib/constants';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { useWorkspace } from '@/lib/workspace-context';
 
-/** Quick-action cards linking to primary user flows (new chat, log incident, draft document). */
-const quickActions = [
-    { label: 'New Chat', desc: 'Secure session with NEXX', href: '/chat', icon: Microphone, accent: 'var(--champagne)' },
-    { label: 'Log Incident', desc: 'Document an event', href: '/incident-report/new', icon: Plus, accent: 'var(--emerald)' },
-    { label: 'Draft Document', desc: 'Generate court docs', href: '/docuvault', icon: FileText, accent: 'var(--info)' },
+import '@/styles/pipelines.css';
+
+/** 4-Pipeline Switcher Cards - The primary intent routes for NEXX. */
+const pipelineCards = [
+    { 
+        label: 'Draft Court Document', 
+        desc: 'Motion, Petition, Response, Declaration', 
+        href: '/docuvault', 
+        icon: FileText, 
+        accent: '#6366F1',
+        subtitle: 'Court-ready legal filings'
+    },
+    { 
+        label: 'Export Workspace', 
+        desc: 'Summary Report or Exhibit Document', 
+        href: '/chat/overview', 
+        icon: Note, 
+        accent: '#10B981',
+        subtitle: 'Evidence & summary reports'
+    },
+    { 
+        label: 'Build Exhibit Packet', 
+        desc: 'Single Exhibit or Full Packet with Bates', 
+        href: '/docuvault/exhibits', 
+        icon: Plus, 
+        accent: '#F59E0B',
+        subtitle: 'Evidence assembly'
+    },
+    { 
+        label: 'Record Incident', 
+        desc: 'Voice or text intake to structured timeline', 
+        href: '/incident-report', 
+        icon: Microphone, 
+        accent: '#EF4444',
+        subtitle: 'Source event intake'
+    },
 ];
 
-/** Ethereal Luxury Dashboard showing quick actions, recent incidents, and activity overview in Bento 2.0 layout. */
+/** Ethereal Luxury Dashboard showing 4-Pipeline Switcher, recent incidents, and activity overview in Bento 2.0 layout. */
 export default function DashboardPage() {
     return (
         <Suspense fallback={
@@ -64,8 +95,6 @@ function DashboardContent() {
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
 
     // ── Checkout success toast ──
-    // Derive visibility from the URL param + a dismissal flag to avoid
-    // setting state synchronously inside an effect (react-hooks/set-state-in-effect).
     const isCheckoutSuccess = searchParams.get('checkout') === 'success';
     const [dismissedCheckoutToast, setDismissedCheckoutToast] = useState(false);
     const showCheckoutToast = isCheckoutSuccess && !dismissedCheckoutToast;
@@ -85,25 +114,23 @@ function DashboardContent() {
 
     /** Summary statistics displayed in the dashboard header bento grid. */
     const stats = [
-        { label: 'Documented Incidents', value: incidentCount === null ? '—' : String(incidentCount), icon: Note, color: '#F59E0B', href: '/incident-report' },
-        { label: 'Active Sessions', value: conversationCount === null ? '—' : String(conversationCount), icon: ChatCircleText, color: 'var(--champagne)', href: '/chat' },
-        { label: 'Court-Ready Records', value: confirmedCount === null ? '—' : String(confirmedCount), icon: FileText, color: '#60A5FA', href: '/docuvault/gallery' },
-        { label: 'Pattern Alerts', value: '—' /* TODO: wire to real pattern count */, icon: WarningCircle, color: 'var(--warning)', href: '/nex-profile' },
+        { label: 'Incidents', value: incidentCount === null ? '—' : String(incidentCount), icon: Note, color: '#F59E0B', href: '/incident-report' },
+        { label: 'Sessions', value: conversationCount === null ? '—' : String(conversationCount), icon: ChatCircleText, color: 'var(--champagne)', href: '/chat' },
+        { label: 'Records', value: confirmedCount === null ? '—' : String(confirmedCount), icon: FileText, color: '#60A5FA', href: '/docuvault/gallery' },
+        { label: 'Alerts', value: '—', icon: WarningCircle, color: 'var(--warning)', href: '/nex-profile' },
     ];
 
-    /** Time-of-day greeting, set client-side only to avoid hydration mismatch. */
+    /** Time-of-day greeting. */
     const [greetingText] = useState(() => {
         if (typeof window === 'undefined') return '';
         const hour = new Date().getHours();
         return hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
     });
 
-    /** Formatted display name for the greeting header (empty if unavailable). */
     const userName = user?.name ? `, ${user.name}` : '';
 
     return (
         <PageContainer>
-            {/* Checkout success toast */}
             <AnimatePresence>
                 {showCheckoutToast && (
                     <motion.div
@@ -112,16 +139,13 @@ function DashboardContent() {
                         exit={{ opacity: 0, y: -20 }}
                         role="status"
                         aria-live="polite"
-                        aria-atomic="true"
                         className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-gradient-to-r from-[#10b981] to-[#059669] text-white text-sm font-bold tracking-wide shadow-[0_8px_30px_rgba(16,185,129,0.3)] flex items-center gap-2"
                     >
-                        <span className="text-lg">✓</span>
-                        Welcome! Your subscription is now active.
+                        ✓ Welcome! Your subscription is now active.
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* First-time user onboarding tour */}
             <OnboardingTour />
 
             <PageHeader
@@ -131,51 +155,41 @@ function DashboardContent() {
                         {greetingText}<span className="text-editorial shimmer capitalize">{userName}</span>
                     </span>
                 }
-                description="Your secure command center. Turn high-conflict chaos into calculated, court-ready strategy."
-                rightElement={
-                    <div className="hidden md:block">
-                        <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-[11px] uppercase tracking-wider text-white bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-transparent shadow-[0_4px_12px_rgba(18,61,126,0.3)]">
-                            <div className="w-2 h-2 rounded-full bg-[#10b981] shadow-[0_0_8px_#10b981] animate-pulse" />
-                            System Secure
-                        </div>
-                    </div>
-                }
+                description="What would you like to do?"
             />
 
-            {/* Bento Grid layout */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full relative z-10">
                 
-                {/* Left Column: Quick Actions & Stats (Cols 1-8) */}
+                {/* 4-Pipeline Switcher Grid (Cols 1-8) */}
                 <div className="lg:col-span-8 space-y-6">
-                    {/* Quick Actions Array - Horizontal Bento Row */}
-                    <div id="quick-actions" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        {quickActions.map((action, i) => {
-                            const Icon = action.icon;
+                    <div id="pipeline-switcher" className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {pipelineCards.map((card, i) => {
+                            const Icon = card.icon;
                             return (
-                                <Link key={action.label} href={action.href} className="no-underline block h-full">
+                                <Link key={card.label} href={card.href} className="no-underline block h-full">
                                     <motion.div
                                         initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: 0.1 * i, duration: 0.5, type: 'spring' }}
-                                        className="card-premium h-full p-6 flex flex-col justify-between group cursor-pointer"
+                                        className="pipeline-card h-full flex flex-col items-center justify-center group"
                                     >
-                                        <div className="flex justify-between items-start mb-6">
+                                        <div className="mb-4">
                                             <Icon 
-                                                size={32} 
+                                                size={40} 
                                                 weight="regular" 
-                                                style={{ color: action.accent }} 
-                                                className="transition-transform duration-400 group-hover:scale-110" 
+                                                style={{ color: card.accent }} 
+                                                className="transition-transform duration-500 group-hover:scale-110" 
                                             />
-                                            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#0A1128] border border-[rgba(255,255,255,0.2)] opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0 duration-300 shadow-sm">
-                                                <ArrowRight size={14} weight="bold" className="text-white" />
-                                            </div>
                                         </div>
-                                            <h3 className="font-semibold text-lg text-white mb-1 tracking-tight">
-                                                {action.label}
-                                            </h3>
-                                            <p className="text-sm text-[rgba(255,255,255,0.6)] font-medium">
-                                                {action.desc}
-                                            </p>
+                                        <h3 className="font-bold text-[18px] text-white mb-1 tracking-tight">
+                                            {card.label}
+                                        </h3>
+                                        <p className="text-[12px] text-white/40 font-medium mb-3 uppercase tracking-widest">
+                                            {card.subtitle}
+                                        </p>
+                                        <p className="text-[13px] text-white/60 font-medium px-4">
+                                            {card.desc}
+                                        </p>
                                     </motion.div>
                                 </Link>
                             );

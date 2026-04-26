@@ -121,11 +121,11 @@ export default function IncidentReportPage() {
                 description="Turn a chaotic moment into a structured fact. Type your narrative below."
             />
 
-            <div className="max-w-4xl mx-auto space-y-8 pb-24">
+            <div className="max-w-4xl mx-auto flex-1 min-h-0 flex flex-col w-full gap-6 pb-4">
                 
                 {/* 1. The Focused Intake Area (Luxury Glass) */}
-                <div className="hyper-glass p-8 space-y-6 floating-element glow-slate">
-                    <div className="relative group">
+                <div className="flex-[0.5] min-h-0 hyper-glass p-6 flex flex-col floating-element glow-slate">
+                    <div className="relative group flex-1 min-h-0">
                         <textarea
                             value={narrative}
                             onChange={(e) => {
@@ -134,7 +134,7 @@ export default function IncidentReportPage() {
                             }}
                             aria-label="Incident narrative"
                             placeholder="What happened? Record the facts exactly as they occurred..."
-                            className="w-full bg-transparent border-none text-lg font-serif text-white placeholder:text-white/30 min-h-[160px] outline-none resize-none px-0 py-3 selection:bg-indigo-500/30 leading-relaxed"
+                            className="w-full h-full bg-transparent border-none text-lg font-serif text-white placeholder:text-white/30 outline-none resize-none px-0 py-3 selection:bg-indigo-500/30 leading-relaxed"
                         />
                         
                         {/* Floating Glow Background */}
@@ -176,7 +176,7 @@ export default function IncidentReportPage() {
                 </div>
 
                 {/* Error & Warnings */}
-                <div className="px-4 space-y-4">
+                <div className="px-4 space-y-4 shrink-0">
                     {displayedError && (
                         <div role="alert" aria-live="assertive" className="px-6 py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold uppercase tracking-widest">
                             {displayedError}
@@ -193,9 +193,9 @@ export default function IncidentReportPage() {
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="hyper-glass p-6 space-y-6"
+                    className="flex-[0.5] min-h-0 hyper-glass p-6 flex flex-col"
                 >
-                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4 shrink-0">
                         <div className="flex items-center gap-4">
                             <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
                                 <TimelineIcon size={20} className="text-indigo-400" />
@@ -210,7 +210,7 @@ export default function IncidentReportPage() {
                         </Link>
                     </div>
 
-                    <div className="space-y-10">
+                    <div className="flex-1 min-h-0 overflow-hidden space-y-6 pt-4">
                         {/* No case selected state */}
                         {!activeCaseId && (
                             <p className="text-center text-white/20 text-[10px] uppercase tracking-[0.3em] font-bold py-10">
@@ -240,10 +240,10 @@ export default function IncidentReportPage() {
                         )}
 
                         {/* Live incidents */}
-                        {incidents?.slice(0, 5).map((incident, i) => (
+                        {incidents?.slice(0, 3).map((incident, i) => (
                             <div key={incident._id} className="flex gap-8 relative group">
                                 {/* Vertical Timeline Line */}
-                                {i !== Math.min((incidents?.length ?? 0) - 1, 4) && (
+                                {i !== Math.min((incidents?.length ?? 0) - 1, 2) && (
                                     <div className="absolute left-[7px] top-8 bottom-[-2.5rem] w-[1px] bg-white/5" />
                                 )}
                                 
@@ -288,34 +288,6 @@ export default function IncidentReportPage() {
                         ))}
                     </div>
                 </motion.div>
-
-                {/* 4. Strategic Guidance */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="hyper-glass p-8 flex items-start gap-5 group hover:border-indigo-500/30 transition-all">
-                        <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-indigo-500/5 transition-all">
-                            <CheckCircle size={24} weight="light" className="text-indigo-400" />
-                        </div>
-                        <div>
-                            <h5 className="text-[11px] font-bold text-indigo-400 uppercase tracking-[0.25em] mb-2">Court-Ready Protocol</h5>
-                            <p className="text-[12px] text-white/30 leading-relaxed group-hover:text-white/50 transition-colors">
-                                Avoid subjective adjectives. Document exact times and specific dialogue to maximize evidentiary weight in future motions.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="hyper-glass p-8 flex items-start gap-5 group hover:border-rose-500/30 transition-all">
-                        <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-rose-500/5 transition-all">
-                            <FileSearch size={24} weight="light" className="text-rose-400" />
-                        </div>
-                        <div>
-                            <h5 className="text-[11px] font-bold text-rose-400 uppercase tracking-[0.25em] mb-2">Predictive Analysis</h5>
-                            <p className="text-[12px] text-white/30 leading-relaxed group-hover:text-white/50 transition-colors">
-                                {incidents && incidents.length >= 3
-                                    ? `Pattern detected across ${incidents.length} entries. High-probability evidence for pattern-of-conduct claims.`
-                                    : 'Recording 3+ specific incidents enables pattern detection and automated evidence grouping.'}
-                            </p>
-                        </div>
-                    </div>
-                </div>
             </div>
         </PageContainer>
     );

@@ -109,23 +109,23 @@ export default function Sidebar() {
         <motion.aside
             layout
             initial={false}
-            animate={{ width: collapsed ? 64 : 240 }}
+            animate={{ width: collapsed ? 64 : 220 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="sticky top-4 h-[calc(100dvh-2rem)] z-40 flex flex-col flex-shrink-0 hyper-glass rounded-[1.5rem] overflow-visible glow-slate"
         >
             {/* Logo */}
-            <div className="flex items-center px-6 h-[64px] flex-shrink-0">
-                <Link href="/dashboard" className="flex items-center gap-3 no-underline group">
-                        <motion.div
+            <div className="flex items-center px-5 h-[60px] flex-shrink-0">
+                <Link href="/dashboard" className="flex items-center gap-2.5 no-underline group">
+                    <motion.div
                         layout="position"
-                        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-xl relative overflow-hidden"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-xl relative overflow-hidden"
                         style={{
                             background: 'linear-gradient(135deg, #FFFFFF 0%, #F1F5F9 100%)',
                             border: '1px solid rgba(255, 255, 255, 0.4)',
                         }}
                     >
                         <span 
-                            className="text-[18px] font-black font-serif italic uppercase tracking-tighter" 
+                            className="text-[16px] font-black font-serif italic uppercase tracking-tighter" 
                             style={{
                                 background: 'linear-gradient(135deg, #0A1128 0%, #1E3A8A 30%, #94A3B8 60%, #0A1128 100%)',
                                 backgroundSize: '200% auto',
@@ -145,7 +145,7 @@ export default function Sidebar() {
                                 animate={{ opacity: 1, filter: 'blur(0px)', x: 0 }}
                                 exit={{ opacity: 0, filter: 'blur(4px)', x: -10 }}
                                 transition={{ duration: 0.2 }}
-                                className="text-lg font-serif font-bold tracking-tight text-white group-hover:text-indigo-200 transition-colors"
+                                className="text-base font-serif font-bold tracking-tight text-white group-hover:text-indigo-200 transition-colors"
                             >
                                 NEXX
                             </motion.span>
@@ -174,7 +174,7 @@ export default function Sidebar() {
                                 >
                                     <motion.div
                                         whileTap={{ scale: 0.98 }}
-                                        className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 ${collapsed ? 'justify-center' : ''}`}
+                                        className={`group relative flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-300 ${collapsed ? 'justify-center' : ''}`}
                                         style={{
                                             background: isActive && !hasChildren
                                                 ? 'rgba(255,255,255,0.08)'
@@ -183,7 +183,7 @@ export default function Sidebar() {
                                         }}
                                     >
                                         <div className={`transition-colors duration-300 flex items-center justify-center ${isActive ? 'text-indigo-400' : 'text-white/20 group-hover:text-white'}`}>
-                                            <Icon size={20} weight={isActive ? "fill" : "light"} />
+                                            <Icon size={18} weight={isActive ? "fill" : "light"} />
                                         </div>
                                         <AnimatePresence mode="popLayout">
                                             {!collapsed && (
@@ -191,7 +191,7 @@ export default function Sidebar() {
                                                     initial={{ opacity: 0, width: 0 }}
                                                     animate={{ opacity: 1, width: 'auto' }}
                                                     exit={{ opacity: 0, width: 0 }}
-                                                    className={`text-[13px] font-bold tracking-tight whitespace-nowrap flex-1 transition-colors duration-300 ${isActive ? 'text-white' : 'text-white/30 group-hover:text-white'}`}
+                                                    className={`text-[12px] font-bold tracking-tight whitespace-nowrap flex-1 transition-colors duration-300 ${isActive ? 'text-white' : 'text-white/30 group-hover:text-white'}`}
                                                 >
                                                     {item.label}
                                                 </motion.span>
@@ -242,12 +242,12 @@ export default function Sidebar() {
                                                     <Link key={child.href} href={child.href} className="no-underline block">
                                                         <motion.div
                                                             whileHover={{ x: 4 }}
-                                                            className="group flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-300 hover:bg-white/5"
+                                                            className="group flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-300 hover:bg-white/5"
                                                         >
                                                             <div className={`transition-colors duration-300 flex items-center justify-center ${isChildActive ? 'text-indigo-400' : 'text-white/20 group-hover:text-white'}`}>
-                                                                <ChildIcon size={16} weight={isChildActive ? "fill" : "light"} />
+                                                                <ChildIcon size={14} weight={isChildActive ? "fill" : "light"} />
                                                             </div>
-                                                            <span className={`text-[12px] font-bold tracking-tight transition-colors duration-300 ${isChildActive ? 'text-white' : 'text-white/30 group-hover:text-white'}`}>
+                                                            <span className={`text-[11px] font-bold tracking-tight transition-colors duration-300 ${isChildActive ? 'text-white' : 'text-white/30 group-hover:text-white'}`}>
                                                                 {child.label}
                                                             </span>
                                                         </motion.div>
@@ -297,17 +297,17 @@ export default function Sidebar() {
                 {isLoaded && user ? (
                     <div className="relative group focus-within:ring-2 focus-within:ring-indigo-500/40 rounded-xl w-full">
                         {/* Visual layer */}
-                        <div className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all cursor-pointer bg-white/[0.03] border border-white/5 hover:border-white/20 shadow-2xl ${collapsed ? 'justify-center' : ''}`}>
-                            <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-white/20 shadow-inner relative">
-                                <Image src={user.imageUrl} alt={user.fullName || 'User'} fill className="object-cover" sizes="32px" />
+                        <div className={`flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl transition-all cursor-pointer bg-white/[0.03] border border-white/5 hover:border-white/20 shadow-2xl ${collapsed ? 'justify-center' : ''}`}>
+                            <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 border border-white/20 shadow-inner relative">
+                                <Image src={user.imageUrl} alt={user.fullName || 'User'} fill className="object-cover" sizes="28px" />
                             </div>
                             <AnimatePresence>
                                 {!collapsed && (
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 min-w-0">
-                                        <p className="text-[12px] font-bold truncate text-white leading-tight">
+                                        <p className="text-[11px] font-bold truncate text-white leading-tight">
                                             {user.firstName || 'Owner'}
                                         </p>
-                                        <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/20 mt-1">
+                                        <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-white/20 mt-0.5">
                                             Premium
                                         </p>
                                     </motion.div>

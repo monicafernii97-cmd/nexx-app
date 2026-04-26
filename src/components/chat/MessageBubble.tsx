@@ -520,7 +520,7 @@ export default function MessageBubble({
             className="flex gap-4 w-full justify-start px-4 sm:px-6 py-4 group"
         >
             <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center mt-1 shadow-sm border ${isLight
-                ? 'bg-gradient-to-br from-indigo-500 to-blue-600 border-indigo-400/20'
+                ? 'bg-gradient-to-br from-indigo-500 to-blue-600 text-white border-indigo-400/20'
                 : 'bg-white text-[#0A1128] border-white/20'
                 }`}>
                 <span className="text-[14px] font-black font-serif italic uppercase">N</span>

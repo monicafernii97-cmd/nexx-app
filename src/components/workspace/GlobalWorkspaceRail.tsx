@@ -170,15 +170,23 @@ export function GlobalWorkspaceRail() {
 
                 {/* Readiness summary icons */}
                 <div className="flex flex-col gap-3 mt-4">
-                    {readiness.map((item) => (
-                        <div
-                            key={item.label}
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center border ${LEVEL_STYLES[item.level].bg}`}
-                            title={`${item.label}: ${item.detail}`}
-                        >
-                            <item.icon size={18} weight="fill" className={LEVEL_STYLES[item.level].text} />
-                        </div>
-                    ))}
+                    {isLoading ? (
+                        <>
+                            {[1, 2, 3].map(i => (
+                                <div key={i} className="w-10 h-10 rounded-xl bg-white/5 animate-pulse" />
+                            ))}
+                        </>
+                    ) : (
+                        readiness.map((item) => (
+                            <div
+                                key={item.label}
+                                className={`w-10 h-10 rounded-xl flex items-center justify-center border ${LEVEL_STYLES[item.level].bg}`}
+                                title={`${item.label}: ${item.detail}`}
+                            >
+                                <item.icon size={18} weight="fill" className={LEVEL_STYLES[item.level].text} />
+                            </div>
+                        ))
+                    )}
                 </div>
             </motion.div>
         );

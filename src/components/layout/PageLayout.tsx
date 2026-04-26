@@ -49,7 +49,7 @@ export function PageHeader({ icon: Icon, title, description, rightElement }: Pag
 /** Full-width page wrapper with consistent padding for all application routes. */
 export function PageContainer({ children }: { children: ReactNode }) {
     return (
-        <div className="max-w-[85rem] mx-auto h-[calc(100vh-64px)] w-full px-4 lg:px-8 mt-2 flex flex-col overflow-hidden">
+        <div className="max-w-[85rem] mx-auto h-[calc(100dvh-76px)] w-full px-4 lg:px-8 mt-2 flex flex-col overflow-hidden">
             {children}
         </div>
     );

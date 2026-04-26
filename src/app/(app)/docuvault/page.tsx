@@ -404,7 +404,7 @@ function DocuVaultPageInner() {
                     </AnimatePresence>
 
                     {/* Main Hyperglass Container */}
-                    <div className="hyper-glass overflow-hidden flex flex-col md:flex-row min-h-[640px]">
+                    <div className="hyper-glass overflow-hidden flex flex-col md:flex-row flex-1 min-h-0">
                         
                         {/* Left: Content Area */}
                         <div className="flex-1 flex flex-col border-r border-white/5">
@@ -639,7 +639,7 @@ function DocuVaultPageInner() {
                                     No drafts yet
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-5 gap-4 h-full">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 h-full">
                                     {drafts.slice(0, 5).map(draft => (
                                         <Link key={draft.documentId} href={`/docuvault/review/${draft.documentId}`} className="no-underline block h-full">
                                             <div className="hyper-glass h-full flex flex-col p-4 relative group hover:glow-slate hover:border-indigo-500/30 cursor-pointer transition-all">

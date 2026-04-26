@@ -46,10 +46,21 @@ export function PageHeader({ icon: Icon, title, description, rightElement }: Pag
     );
 }
 
-/** Full-width page wrapper with consistent padding for all application routes. */
-export function PageContainer({ children }: { children: ReactNode }) {
+/**
+ * Full-width page wrapper with consistent padding for all application routes.
+ *
+ * By default, the container allows vertical scrolling for content-heavy pages
+ * (Settings, Profile, Resources, etc.). Pass `lockHeight` to enforce a strict
+ * single-page, no-scroll layout for command-center views (Dashboard, DocuVault,
+ * Incident Report).
+ */
+export function PageContainer({ children, lockHeight = false }: { children: ReactNode; lockHeight?: boolean }) {
     return (
-        <div className="max-w-[85rem] mx-auto h-[calc(100dvh-76px)] w-full px-4 lg:px-8 mt-2 flex flex-col overflow-hidden">
+        <div className={`max-w-[85rem] mx-auto w-full px-4 lg:px-8 mt-2 flex flex-col ${
+            lockHeight
+                ? 'h-[calc(100dvh-76px)] overflow-hidden'
+                : 'min-h-[calc(100dvh-76px)] overflow-y-auto'
+        }`}>
             {children}
         </div>
     );

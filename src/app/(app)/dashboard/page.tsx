@@ -67,7 +67,7 @@ const pipelineCards = [
 export default function DashboardPage() {
     return (
         <Suspense fallback={
-            <PageContainer>
+            <PageContainer lockHeight>
                 <div className="flex items-center justify-center h-64">
                     <div className="w-10 h-10 rounded-full border-2 border-[#60A5FA] border-t-transparent animate-spin" />
                 </div>
@@ -130,7 +130,7 @@ function DashboardContent() {
     const userName = user?.name ? `, ${user.name}` : '';
 
     return (
-        <PageContainer>
+        <PageContainer lockHeight>
             <AnimatePresence>
                 {showCheckoutToast && (
                     <motion.div

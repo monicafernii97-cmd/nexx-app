@@ -114,7 +114,7 @@ export default function IncidentReportPage() {
 
 
     return (
-        <PageContainer>
+        <PageContainer lockHeight>
             <PageHeader
                 icon={ClipboardText}
                 title={<>Record <span className="text-editorial shimmer">Incident</span></>}

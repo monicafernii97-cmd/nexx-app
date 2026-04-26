@@ -350,7 +350,7 @@ function DocuVaultPageInner() {
     }, []);
 
     return (
-        <PageContainer>
+        <PageContainer lockHeight>
             {/* ═══════════════════════════════════════════════════
                 VIEW: HUB (Intake & Recent Documents)
                ═══════════════════════════════════════════════════ */}

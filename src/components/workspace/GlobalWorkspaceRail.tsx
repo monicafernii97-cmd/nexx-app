@@ -68,8 +68,11 @@ interface SuggestedAction {
     priority: 'high' | 'medium' | 'low';
 }
 
+/** Shared loading skeleton items to prevent style/count drift between collapsed and expanded states. */
+const SKELETON_PLACEHOLDERS = [1, 2, 3] as const;
+
 /**
- * GlobalWorkspaceRail — The "Insights Rail" (360px sticky right panel).
+ * GlobalWorkspaceRail — The "Insights Rail" (280px sticky right panel).
  *
  * Replaces the old Pinned/Points tab switcher with an outcome-oriented
  * audit panel: Report Readiness, Source Health, and Suggested Actions.
@@ -172,7 +175,7 @@ export function GlobalWorkspaceRail() {
                 <div className="flex flex-col gap-3 mt-4">
                     {isLoading ? (
                         <>
-                            {[1, 2, 3].map(i => (
+                            {SKELETON_PLACEHOLDERS.map(i => (
                                 <div key={i} className="w-10 h-10 rounded-xl bg-white/5 animate-pulse" />
                             ))}
                         </>
@@ -219,7 +222,7 @@ export function GlobalWorkspaceRail() {
                 {isLoading ? (
                     /* Skeleton placeholders while workspace queries resolve */
                     <div className="space-y-4 pt-2">
-                        {[1, 2, 3].map(i => (
+                        {SKELETON_PLACEHOLDERS.map(i => (
                             <div key={i} className="h-16 rounded-2xl bg-white/5 animate-pulse" />
                         ))}
                     </div>
@@ -310,10 +313,10 @@ export function GlobalWorkspaceRail() {
                                     action.priority === 'medium' ? 'bg-white/40' :
                                     'bg-white/10'
                                 } shadow-[0_0_8px_rgba(99,102,241,0.2)]`} />
-                                <span className="text-[10px] font-bold text-white/40 group-hover:text-white/80 transition-colors flex-1 tracking-tight leading-snug">
+                                <span className="text-[10px] font-bold text-white/70 group-hover:text-white transition-colors flex-1 tracking-tight leading-snug">
                                     {action.label}
                                 </span>
-                                <ArrowRight size={12} weight="bold" className="text-white/10 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
+                                <ArrowRight size={12} weight="bold" className="text-white/35 group-hover:text-indigo-300 group-hover:translate-x-1 transition-all" />
                             </Link>
                         ))}
                     </div>

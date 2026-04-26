@@ -201,7 +201,7 @@ export function GlobalWorkspaceRail() {
         >
             {/* Header */}
             <div className="flex items-center justify-between px-5 pt-5 pb-1">
-                <h2 className="text-[8px] font-bold tracking-[0.25em] uppercase text-indigo-400/50">
+                <h2 className="text-[10px] font-bold tracking-[0.2em] uppercase text-indigo-300/80">
                     Insights
                 </h2>
                 <button
@@ -229,7 +229,7 @@ export function GlobalWorkspaceRail() {
                 <section>
                     <div className="flex items-center gap-2 mb-3 px-1">
                         <ChartBar size={12} weight="light" className="text-white/20" />
-                        <h3 className="text-[9px] font-bold tracking-[0.15em] uppercase text-white/20">
+                        <h3 className="text-[10px] font-bold tracking-[0.12em] uppercase text-white/55">
                             Case Readiness
                         </h3>
                     </div>
@@ -266,7 +266,7 @@ export function GlobalWorkspaceRail() {
                 <section>
                     <div className="flex items-center gap-2 mb-3 px-1">
                         <FileText size={12} weight="light" className="text-white/20" />
-                        <h3 className="text-[9px] font-bold tracking-[0.15em] uppercase text-white/20">
+                        <h3 className="text-[10px] font-bold tracking-[0.12em] uppercase text-white/55">
                             Evidence Health
                         </h3>
                     </div>
@@ -274,15 +274,15 @@ export function GlobalWorkspaceRail() {
                     <div className="px-3 py-3 rounded-xl border border-white/5 bg-white/[0.02] flex flex-col gap-1">
                         <div className="flex items-baseline justify-between mb-0.5">
                             <span className="text-xl font-serif text-white">{totalSources}</span>
-                            <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Linked</span>
+                            <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">Linked</span>
                         </div>
                         {unlinkedItems > 0 && (
-                            <p className="text-[9px] font-bold text-amber-400/60 uppercase tracking-widest leading-relaxed">
+                            <p className="text-[10px] font-bold text-amber-300/80 uppercase tracking-wider leading-relaxed">
                                 {unlinkedItems} Items Unverified
                             </p>
                         )}
                         {unlinkedItems === 0 && totalItems > 0 && (
-                            <p className="text-[9px] font-bold text-emerald-400/60 uppercase tracking-widest">
+                            <p className="text-[10px] font-bold text-emerald-300/80 uppercase tracking-wider">
                                 Full Verification Trace ✓
                             </p>
                         )}
@@ -293,7 +293,7 @@ export function GlobalWorkspaceRail() {
                 <section>
                     <div className="flex items-center gap-2 mb-3 px-1">
                         <Lightning size={12} weight="light" className="text-white/20" />
-                        <h3 className="text-[9px] font-bold tracking-[0.15em] uppercase text-white/20">
+                        <h3 className="text-[10px] font-bold tracking-[0.12em] uppercase text-white/55">
                             Strategic Actions
                         </h3>
                     </div>
@@ -326,7 +326,7 @@ export function GlobalWorkspaceRail() {
             <div className="px-4 py-4 border-t border-white/5 bg-white/[0.02]">
                 <Link
                     href="/chat/overview"
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[8px] font-bold uppercase tracking-[0.2em] text-indigo-400 hover:bg-indigo-500/20 transition-all no-underline shadow-lg"
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-300 hover:bg-indigo-500/20 transition-all no-underline shadow-lg"
                 >
                     <FileText size={12} weight="light" />
                     Strategic Overview

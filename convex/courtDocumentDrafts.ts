@@ -97,6 +97,7 @@ export const listByUser = query({
       v.literal('exported'),
       v.literal('abandoned'),
     )),
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -120,7 +121,9 @@ export const listByUser = query({
       : drafts.filter(d => d.status !== 'abandoned');
 
     // Sort by updatedAt descending
-    return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
+    const sorted = filtered.sort((a, b) => b.updatedAt - a.updatedAt);
+    const cap = Math.max(1, Math.min(args.limit ?? 50, 50));
+    return sorted.slice(0, cap);
   },
 });
 

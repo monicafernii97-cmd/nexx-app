@@ -66,7 +66,7 @@ function DocuVaultPageInner() {
     const { activeCaseId } = useWorkspace();
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
     const courtSettings = useQuery(api.courtSettings.get);
-    const drafts = useQuery(api.courtDocumentDrafts.listByUser, {});
+    const drafts = useQuery(api.courtDocumentDrafts.listByUser, { limit: 5 });
     /** True while user profile query is in-flight (prevents generation with wrong defaults). */
     const isUserProfileLoading = Boolean(userId) && (user === undefined || courtSettings === undefined);
 
@@ -631,8 +631,9 @@ function DocuVaultPageInner() {
                         {/* 5-Column Grid */}
                         <div className="flex-1 min-h-0">
                             {drafts === undefined ? (
-                                <div className="w-full h-full flex items-center justify-center">
-                                    <div className="w-6 h-6 border-2 border-white/20 border-t-indigo-400 rounded-full animate-spin" />
+                                <div className="w-full h-full flex items-center justify-center" role="status" aria-live="polite">
+                                    <div aria-hidden="true" className="w-6 h-6 border-2 border-white/20 border-t-indigo-400 rounded-full animate-spin" />
+                                    <span className="sr-only">Loading recent documents</span>
                                 </div>
                             ) : drafts.length === 0 ? (
                                 <div className="w-full h-full flex items-center justify-center text-center text-white/20 text-[10px] font-bold uppercase tracking-widest bg-white/5 rounded-2xl border border-white/5">
@@ -640,7 +641,7 @@ function DocuVaultPageInner() {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 h-full">
-                                    {drafts.slice(0, 5).map(draft => (
+                                    {drafts.map(draft => (
                                         <Link key={draft.documentId} href={`/docuvault/review/${draft.documentId}`} className="no-underline block h-full">
                                             <div className="hyper-glass h-full flex flex-col p-4 relative group hover:glow-slate hover:border-indigo-500/30 cursor-pointer transition-all">
                                                 <div className="flex items-center justify-between mb-3">

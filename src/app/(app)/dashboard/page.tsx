@@ -158,11 +158,11 @@ function DashboardContent() {
                 description="What would you like to do?"
             />
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full relative z-10">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full relative z-10 flex-1 min-h-0">
                 
                 {/* 4-Pipeline Switcher Grid (Cols 1-8) */}
-                <div className="lg:col-span-8 space-y-6">
-                    <div id="pipeline-switcher" className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="lg:col-span-8 flex flex-col min-h-0 space-y-6">
+                    <div id="pipeline-switcher" className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 min-h-0">
                         {pipelineCards.map((card, i) => {
                             const Icon = card.icon;
                             return (
@@ -173,10 +173,10 @@ function DashboardContent() {
                                         transition={{ delay: 0.1 * i, duration: 0.6, type: 'spring' }}
                                         className="h-full"
                                     >
-                                      <div className="floating-element hyper-glass h-full min-h-[180px] flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate py-8">
-                                        <div className="mb-5 p-4 rounded-2xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
+                                      <div className="floating-element hyper-glass h-full flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate py-6">
+                                        <div className="mb-4 p-3 rounded-2xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
                                             <Icon 
-                                                size={28} 
+                                                size={24} 
                                                 weight="light" 
                                                 style={{ color: card.accent }} 
                                                 className="transition-transform duration-700 group-hover:scale-110 group-hover:rotate-3" 
@@ -206,7 +206,7 @@ function DashboardContent() {
                         initial={{ opacity: 0, scale: 0.98 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.4, duration: 0.6 }}
-                        className="glass-ethereal rounded-3xl p-6"
+                        className="glass-ethereal rounded-3xl p-5 shrink-0"
                     >
                         <h2 className="text-[10px] font-bold tracking-[0.2em] uppercase text-sapphire-muted mb-4 px-2">
                             Overview Metrics
@@ -274,8 +274,8 @@ function DashboardContent() {
                                 </Link>
                             </div>
                         ) : (
-                            <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar pr-1 -mr-1">
-                                {incidents.slice(0, 6).map((incident, i) => {
+                            <div className="flex-1 space-y-3 overflow-hidden flex flex-col">
+                                {incidents.slice(0, 4).map((incident, i) => {
                                     const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
                                     const date = (() => {
                                         try {

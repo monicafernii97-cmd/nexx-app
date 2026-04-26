@@ -17,7 +17,9 @@ import {
     Export,
     Lightning,
     PencilLine,
+    ClockCounterClockwise,
 } from '@phosphor-icons/react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
@@ -30,7 +32,6 @@ import CreateExportModal from './components/CreateExportModal';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useExport } from './context/ExportContext';
 import '@/styles/pipelines.css';
-import DraftingHub from '@/components/pipelines/court-document/DraftingHub';
 
 /** State for the 3-step generation flow */
 type GeneratorView = 'compose' | 'working' | 'result';
@@ -65,6 +66,7 @@ function DocuVaultPageInner() {
     const { activeCaseId } = useWorkspace();
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
     const courtSettings = useQuery(api.courtSettings.get);
+    const drafts = useQuery(api.courtDocumentDrafts.listByUser, {});
     /** True while user profile query is in-flight (prevents generation with wrong defaults). */
     const isUserProfileLoading = Boolean(userId) && (user === undefined || courtSettings === undefined);
 
@@ -82,7 +84,7 @@ function DocuVaultPageInner() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Flow state
-    const [view, setView] = useState<'intake_hub' | 'compose' | 'working' | 'result'>('intake_hub');
+    const [view, setView] = useState<'hub' | 'working' | 'result'>('hub');
     const [progress, setProgress] = useState(0);
     const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
     /** Metadata returned from the Quick Generate stream (no binary). */
@@ -141,7 +143,7 @@ function DocuVaultPageInner() {
                     matched = true;
                     setActiveTab(tab.id);
                     setSelectedTemplate(found);
-                    setView('compose');
+                    setView('hub');
                     break;
                 }
             }
@@ -281,14 +283,14 @@ function DocuVaultPageInner() {
             // If stream ended without a complete event, treat as incomplete
             if (generationTokenRef.current === currentToken && !completedRef.current) {
                 setGenerationError('Document generation incomplete. Please try again.');
-                setView('compose');
+                setView('hub');
             }
         } catch (error) {
             if (error instanceof DOMException && error.name === 'AbortError') return;
             if (generationTokenRef.current !== currentToken) return;
             console.error('[DocuVault Generation Error]', error);
             setGenerationError(error instanceof Error ? error.message : 'Generation failed');
-            setView('compose');
+            setView('hub');
         }
     }, [documentContent, selectedTemplate, isUserProfileLoading, resolvedState, resolvedCounty, courtSettings?.petitionerLegalName, user?.name]);
 
@@ -337,7 +339,7 @@ function DocuVaultPageInner() {
         generationAbortRef.current?.abort();
         generationAbortRef.current = null;
 
-        setView('intake_hub');
+        setView('hub');
         setSelectedTemplate(null);
         setDocumentContent('');
         setProgress(0);
@@ -350,58 +352,36 @@ function DocuVaultPageInner() {
     return (
         <PageContainer>
             {/* ═══════════════════════════════════════════════════
-                VIEW: INTAKE HUB (Primary Entry)
+                VIEW: HUB (Intake & Recent Documents)
                ═══════════════════════════════════════════════════ */}
             <AnimatePresence mode="wait">
-            {view === 'intake_hub' && (
+            {view === 'hub' && (
                 <motion.div
-                    key="intake_hub"
+                    key="hub"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="py-4"
+                    className="flex-1 min-h-0 flex flex-col w-full pb-4 gap-6"
                 >
-                    <DraftingHub onManualIntake={() => setView('compose')} />
-                </motion.div>
-            )}
-
-            {/* ═══════════════════════════════════════════════════
-                VIEW: COMPOSE (Manual Intake & Templates)
-               ═══════════════════════════════════════════════════ */}
-            {view === 'compose' && (
-                <motion.div
-                    key="compose"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 20 }}
-                    className="max-w-6xl mx-auto space-y-10 pb-24"
-                >
-                    {/* Header with Navigation */}
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-6">
-                            <button 
-                                onClick={() => setView('intake_hub')}
-                                aria-label="Back to intake hub"
-                                className="w-12 h-12 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-all group"
-                            >
-                                <CaretLeft size={24} weight="bold" className="group-hover:-translate-x-0.5 transition-transform" />
-                            </button>
+                    {/* Zone 1: Intake Hub (Top 55%) */}
+                    <div className="flex-[0.55] min-h-0 flex flex-col space-y-3">
+                        {/* Header with Navigation */}
+                        <div className="flex items-center justify-between">
                             <div>
-                                <h1 className="text-2xl font-serif text-white tracking-tight leading-none mb-1">Manual Drafting</h1>
-                                <p className="text-[10px] text-white/30 font-bold uppercase tracking-[0.2em]">Intake Pipeline</p>
+                                <h1 className="text-xl font-serif text-white tracking-tight leading-none mb-1">DocuVault</h1>
+                                <p className="text-[9px] text-white/20 font-bold uppercase tracking-[0.2em]">Intake & Templates</p>
+                            </div>
+                            
+                            {/* Status Pills */}
+                            <div className="flex items-center gap-2.5">
+                                <div className="px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-bold uppercase tracking-widest">
+                                    Draft Mode
+                                </div>
+                                <div className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/40 text-[9px] font-bold uppercase tracking-widest">
+                                    Jurisdiction: {resolvedState || 'Not Set'}
+                                </div>
                             </div>
                         </div>
-                        
-                        {/* Status Pills */}
-                        <div className="flex items-center gap-3">
-                            <div className="px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-bold uppercase tracking-widest">
-                                Draft Mode
-                            </div>
-                            <div className="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white/40 text-[10px] font-bold uppercase tracking-widest">
-                                Jurisdiction: {resolvedState || 'Not Set'}
-                            </div>
-                        </div>
-                    </div>
 
                     {/* Error banner */}
                     <AnimatePresence>
@@ -431,18 +411,18 @@ function DocuVaultPageInner() {
                             {/* Inner Tabs */}
                             <div className="flex items-center gap-8 px-8 pt-8 pb-4 border-b border-white/5">
                                 {UI_TABS.map(tab => (
-                                    <button
+                                        <button
                                         key={tab.id}
                                         onClick={() => {
                                             setActiveTab(tab.id);
                                             setSelectedTemplate(null);
                                         }}
-                                        className={`group relative pb-4 text-[13px] font-bold uppercase tracking-[0.15em] transition-all ${
-                                            activeTab === tab.id ? 'text-white' : 'text-white/30 hover:text-white/60'
+                                        className={`group relative pb-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-all ${
+                                            activeTab === tab.id ? 'text-white' : 'text-white/20 hover:text-white/60'
                                         }`}
                                     >
                                         <div className="flex items-center gap-2">
-                                            {tab.id === 'create_own' ? <Plus size={16} /> : <FileText size={16} />}
+                                            {tab.id === 'create_own' ? <Plus size={14} /> : <FileText size={14} />}
                                             {tab.label}
                                         </div>
                                         {activeTab === tab.id && (
@@ -463,7 +443,7 @@ function DocuVaultPageInner() {
                                         onChange={e => setDocumentContent(e.target.value)}
                                         placeholder="Paste your draft or notes here to begin... NEXX will perfectly structure and format it for court."
                                         aria-label="Document content"
-                                        className="w-full h-full bg-white/5 rounded-2xl p-6 text-lg font-medium text-white placeholder:text-white/10 outline-none resize-none transition-all focus:bg-white/[0.07] border border-white/5 focus:border-white/10"
+                                        className="w-full h-full bg-white/5 rounded-2xl p-6 text-base font-medium text-white placeholder:text-white/10 outline-none resize-none transition-all focus:bg-white/[0.07] border border-white/5 focus:border-white/10"
                                     />
                                     
                                     {/* Action Bar Floating Over Textarea */}
@@ -471,12 +451,12 @@ function DocuVaultPageInner() {
                                         <button
                                             onClick={() => fileInputRef.current?.click()}
                                             disabled={isParsing}
-                                            className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-white text-[12px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-white text-[11px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {isParsing ? (
-                                                <ArrowsClockwise size={18} className="animate-spin" />
+                                                <ArrowsClockwise size={16} className="animate-spin" />
                                             ) : (
-                                                <Paperclip size={18} />
+                                                <Paperclip size={16} />
                                             )}
                                             {isParsing ? 'Parsing...' : 'Upload'}
                                         </button>
@@ -563,9 +543,9 @@ function DocuVaultPageInner() {
                                         <button
                                             onClick={handleGenerate}
                                             disabled={isParsing || (!documentContent.trim() && !selectedTemplate)}
-                                            className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest shadow-xl shadow-indigo-600/20 transition-all flex items-center gap-2 disabled:opacity-50 disabled:grayscale"
+                                            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold uppercase tracking-widest shadow-xl shadow-indigo-600/20 transition-all flex items-center gap-2 disabled:opacity-50 disabled:grayscale"
                                         >
-                                            <Lightning size={16} weight="fill" />
+                                            <Lightning size={14} weight="fill" />
                                             Generate PDF
                                         </button>
                                     </div>
@@ -574,9 +554,9 @@ function DocuVaultPageInner() {
                         </div>
 
                         {/* Right: Quick Templates Sidebar */}
-                        <div className="w-full md:w-72 bg-white/[0.02] p-6 flex flex-col space-y-6">
+                        <div className="w-full md:w-64 bg-white/[0.02] p-5 flex flex-col space-y-5">
                             <div>
-                                <h3 className="text-[11px] font-bold text-white/30 uppercase tracking-[0.25em] mb-6">Quick Templates</h3>
+                                <h3 className="text-[10px] font-bold text-white/20 uppercase tracking-[0.25em] mb-5">Quick Templates</h3>
                                 <div className="space-y-3">
                                     {templates.slice(0, 6).map(tmpl => {
                                         const isSelected = selectedTemplate?.id === tmpl.id;
@@ -584,16 +564,16 @@ function DocuVaultPageInner() {
                                             <button
                                                 key={tmpl.id}
                                                 onClick={() => setSelectedTemplate(isSelected ? null : tmpl)}
-                                                className={`w-full text-left p-4 rounded-xl border transition-all flex items-center gap-4 group ${
+                                                className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 group ${
                                                     isSelected 
                                                     ? 'bg-indigo-500/10 border-indigo-500/40 text-white' 
-                                                    : 'bg-white/5 border-white/5 text-white/50 hover:bg-white/10 hover:border-white/10 hover:text-white'
+                                                    : 'bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:border-white/10 hover:text-white'
                                                 }`}
                                             >
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? 'bg-indigo-500/20' : 'bg-white/5 group-hover:bg-white/10'}`}>
-                                                    <FileText size={18} weight={isSelected ? "fill" : "regular"} />
+                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isSelected ? 'bg-indigo-500/20' : 'bg-white/5 group-hover:bg-white/10'}`}>
+                                                    <FileText size={16} weight={isSelected ? "fill" : "regular"} />
                                                 </div>
-                                                <span className="text-[12px] font-bold truncate flex-1">{tmpl.title}</span>
+                                                <span className="text-[11px] font-bold truncate flex-1">{tmpl.title}</span>
                                                 {isSelected && <CheckCircle size={14} weight="fill" className="text-indigo-400" />}
                                             </button>
                                         );
@@ -605,9 +585,9 @@ function DocuVaultPageInner() {
                                 <button
                                     onClick={() => setShowCreateExport(true)}
                                     disabled={isParsing}
-                                    className="w-full py-4 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 text-white text-[12px] font-bold uppercase tracking-widest hover:border-white/40 transition-all flex items-center justify-center gap-2 group shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full py-3.5 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 text-white text-[11px] font-bold uppercase tracking-widest hover:border-white/40 transition-all flex items-center justify-center gap-2 group shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <Export size={18} weight="bold" className="group-hover:translate-x-1 transition-transform" />
+                                    <Export size={16} weight="bold" className="group-hover:translate-x-1 transition-transform" />
                                     {isParsing ? 'Parsing...' : 'Full Case Export'}
                                 </button>
                             </div>
@@ -635,20 +615,53 @@ function DocuVaultPageInner() {
                         lockCaseSelection={!!activeCaseId}
                     />
 
-                    {/* Bottom Helper Icons */}
-                    <div className="flex items-center justify-center gap-20 py-12 border-t border-white/5">
-                        {[
-                            { label: 'Manual Intake', icon: PencilLine, color: 'text-indigo-400' },
-                            { label: 'AI Normalization', icon: Lightning, color: 'text-emerald-400' },
-                            { label: 'Court Ready PDF', icon: CheckCircle, color: 'text-amber-400' },
-                        ].map((item, i) => (
-                            <div key={i} className="flex flex-col items-center gap-3">
-                                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white/5 border border-white/10">
-                                    <item.icon size={20} className={item.color} />
+                    </div>
+
+                    {/* Zone 2: Recent Documents Grid (Bottom 45%) */}
+                    <div className="flex-[0.45] min-h-0 flex flex-col space-y-3 pt-2">
+                        <div className="flex items-center justify-between px-2">
+                            <h3 className="text-[10px] font-bold text-white/60 uppercase tracking-[0.15em] flex items-center gap-2">
+                                <ClockCounterClockwise size={16} /> Recent Documents
+                            </h3>
+                            <Link href="/docuvault/gallery" className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-widest transition-colors">
+                                View All
+                            </Link>
+                        </div>
+                        
+                        {/* 5-Column Grid */}
+                        <div className="flex-1 min-h-0">
+                            {drafts === undefined ? (
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <div className="w-6 h-6 border-2 border-white/20 border-t-indigo-400 rounded-full animate-spin" />
                                 </div>
-                                <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest text-center">{item.label}</span>
-                            </div>
-                        ))}
+                            ) : drafts.length === 0 ? (
+                                <div className="w-full h-full flex items-center justify-center text-center text-white/20 text-[10px] font-bold uppercase tracking-widest bg-white/5 rounded-2xl border border-white/5">
+                                    No drafts yet
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-5 gap-4 h-full">
+                                    {drafts.slice(0, 5).map(draft => (
+                                        <Link key={draft.documentId} href={`/docuvault/review/${draft.documentId}`} className="no-underline block h-full">
+                                            <div className="hyper-glass h-full flex flex-col p-4 relative group hover:glow-slate hover:border-indigo-500/30 cursor-pointer transition-all">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[9px] font-bold uppercase tracking-widest text-indigo-400">
+                                                        {draft.status === 'drafting' ? 'Draft' : draft.status === 'ready_to_export' ? 'Ready' : draft.status}
+                                                    </div>
+                                                </div>
+                                                <h4 className="text-[13px] font-bold text-white truncate mb-4 group-hover:text-indigo-200 transition-colors">{draft.title || 'Untitled'}</h4>
+                                                
+                                                {/* Skeleton lines */}
+                                                <div className="space-y-2 mt-auto opacity-50 group-hover:opacity-100 transition-opacity">
+                                                    <div className="h-[2px] bg-white/20 rounded w-full"></div>
+                                                    <div className="h-[2px] bg-white/20 rounded w-4/5"></div>
+                                                    <div className="h-[2px] bg-white/20 rounded w-[90%]"></div>
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </motion.div>
             )}

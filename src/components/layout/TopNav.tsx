@@ -133,24 +133,24 @@ export function TopNav() {
     }, [unarchiveCase, setActiveCaseId, showToast]);
 
     return (
-        <div className="h-[64px] flex items-center justify-between px-6 hyper-glass rounded-2xl mb-4 glow-slate">
+        <div className="h-[56px] flex items-center justify-between px-5 hyper-glass rounded-xl mb-3 glow-slate">
             {/* ── Left: Case Switcher ── */}
             <div ref={dropdownRef} className="relative">
                 <button
                     type="button"
                     onClick={() => setIsSwitcherOpen(!isSwitcherOpen)}
-                    className="flex items-center gap-3 px-4 py-2 rounded-xl border border-white/5 hover:border-white/20 bg-white/[0.02] hover:bg-white/5 transition-all group cursor-pointer"
+                    className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-white/5 hover:border-white/20 bg-white/[0.02] hover:bg-white/5 transition-all group cursor-pointer"
                     aria-label="Switch case"
                     aria-expanded={isSwitcherOpen}
                 >
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center shadow-lg">
-                        <Briefcase size={16} weight="light" className="text-indigo-400" />
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center shadow-lg">
+                        <Briefcase size={14} weight="light" className="text-indigo-400" />
                     </div>
                     <div className="text-left">
-                        <p className="text-[12px] font-bold text-white tracking-tight leading-tight truncate max-w-[180px]">
+                        <p className="text-[11px] font-bold text-white tracking-tight leading-tight truncate max-w-[150px]">
                             {cases === undefined ? 'Loading...' : activeCase?.title ?? 'No Case Yet'}
                         </p>
-                        <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-white/20 mt-0.5">
+                        <p className="text-[8px] font-bold tracking-[0.2em] uppercase text-white/20 mt-0.5">
                             Active Case
                         </p>
                     </div>
@@ -277,19 +277,19 @@ export function TopNav() {
                     type="button"
                     disabled
                     aria-label="Search (coming soon)"
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-white/20 transition-colors cursor-not-allowed"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-white/20 transition-colors cursor-not-allowed"
                     title="Search — coming soon"
                 >
-                    <MagnifyingGlass size={18} weight="light" />
+                    <MagnifyingGlass size={16} weight="light" />
                 </button>
                 <button
                     type="button"
                     disabled
                     aria-label="Notifications (coming soon)"
-                    className="relative w-9 h-9 rounded-xl flex items-center justify-center text-white/20 transition-colors cursor-not-allowed"
+                    className="relative w-8 h-8 rounded-lg flex items-center justify-center text-white/20 transition-colors cursor-not-allowed"
                     title="Notifications — coming soon"
                 >
-                    <Bell size={18} weight="light" />
+                    <Bell size={16} weight="light" />
                 </button>
             </div>
         </div>

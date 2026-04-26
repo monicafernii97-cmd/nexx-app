@@ -57,9 +57,9 @@ html {
   --text-secondary: var(--metallic-dark);
 
   /* ── Layout ── */
-  --sidebar-width: 280px;
-  --sidebar-collapsed: 80px;
-  --topbar-height: 72px;
+  --sidebar-width: 220px;
+  --sidebar-collapsed: 64px;
+  --topbar-height: 56px;
 
   /* ── Transitions & Physics ── */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -226,7 +226,7 @@ body {
 }
 
 .text-meta {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
 }
 
@@ -366,10 +366,10 @@ body {
     0 20px 40px -15px rgba(0, 0, 0, 0.6),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.15) !important;
   color: var(--pure-white) !important;
-  border-radius: 20px;
+  border-radius: 16px;
   position: relative;
   overflow: hidden;
-  transition: all 0.4s var(--ease-spring);
+  transition: all 0.4s var(--ease-smooth);
 }
 
 .glass-ethereal:hover, .card-premium:hover {
@@ -390,7 +390,7 @@ body {
   box-shadow: 
     0 24px 64px -12px rgba(0, 0, 0, 0.6),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.05) !important;
-  border-radius: 24px;
+  border-radius: 20px;
 }
 
 .floating-element {
@@ -449,10 +449,10 @@ body {
   color: var(--pure-white) !important;
   font-family: var(--font-sans), sans-serif;
   font-weight: 600;
-  font-size: 14px;
-  letter-spacing: 0.04em;
-  padding: 12px 28px;
-  border-radius: 12px !important;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  padding: 10px 24px;
+  border-radius: 10px !important;
   border: 1px solid rgba(255, 255, 255, 0.25) !important;
   border-top: 1px solid rgba(255, 255, 255, 0.4) !important;
   box-shadow: 0 8px 20px rgba(18, 61, 126, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important;
@@ -489,9 +489,9 @@ body {
   color: var(--pure-white) !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
   font-weight: 600;
-  font-size: 14px;
-  padding: 12px 28px;
-  border-radius: 12px !important;
+  font-size: 12px;
+  padding: 10px 24px;
+  border-radius: 10px !important;
   cursor: pointer;
   transition: all 0.3s var(--ease-smooth);
   text-transform: uppercase;
@@ -510,9 +510,9 @@ body {
   color: #0A1128 !important; /* Dark text for contrast */
   font-family: var(--font-sans), sans-serif;
   font-weight: 500;
-  font-size: 14px;
-  padding: 14px 18px;
-  border-radius: 12px !important;
+  font-size: 13px;
+  padding: 12px 16px;
+  border-radius: 10px !important;
   transition: all 0.3s var(--ease-smooth);
   width: 100%;
 }

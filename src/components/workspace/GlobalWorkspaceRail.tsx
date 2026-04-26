@@ -188,25 +188,25 @@ export function GlobalWorkspaceRail() {
     return (
         <motion.aside
             initial={false}
-            animate={{ width: 280 }}
+            animate={{ width: 260 }}
             className="h-[calc(100dvh-2rem)] sticky top-4 flex flex-col hyper-glass rounded-[1.5rem] overflow-hidden z-30 glow-slate"
         >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-6 pb-2">
-                <h2 className="text-[9px] font-bold tracking-[0.3em] uppercase text-indigo-400 opacity-60">
+            <div className="flex items-center justify-between px-5 pt-5 pb-1">
+                <h2 className="text-[8px] font-bold tracking-[0.25em] uppercase text-indigo-400/50">
                     Insights
                 </h2>
                 <button
                     onClick={() => setIsExpanded(false)}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 text-white/30 hover:text-white transition-all cursor-pointer"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 text-white/30 hover:text-white transition-all cursor-pointer"
                     aria-label="Collapse insights rail"
                 >
-                    <CaretRight size={16} weight="bold" />
+                    <CaretRight size={14} weight="bold" />
                 </button>
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-6 no-scrollbar">
+            <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-5 no-scrollbar">
 
                 {isLoading ? (
                     /* Skeleton placeholders while workspace queries resolve */
@@ -219,9 +219,9 @@ export function GlobalWorkspaceRail() {
                 <>
                 {/* ── Section 1: Report Readiness ── */}
                 <section>
-                    <div className="flex items-center gap-2 mb-4 px-2">
-                        <ChartBar size={14} weight="light" className="text-white/20" />
-                        <h3 className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/30">
+                    <div className="flex items-center gap-2 mb-3 px-1">
+                        <ChartBar size={12} weight="light" className="text-white/20" />
+                        <h3 className="text-[9px] font-bold tracking-[0.15em] uppercase text-white/20">
                             Case Readiness
                         </h3>
                     </div>
@@ -232,12 +232,12 @@ export function GlobalWorkspaceRail() {
                             return (
                                 <div
                                     key={item.label}
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:bg-white/[0.04] ${styles.bg}`}
+                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all hover:bg-white/[0.04] ${styles.bg}`}
                                 >
                                     <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${styles.dot} shadow-[0_0_8px_rgba(255,255,255,0.2)]`} />
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[13px] font-bold text-white tracking-tight">{item.label}</p>
-                                        <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${styles.text}`}>{item.detail}</p>
+                                        <p className="text-[12px] font-bold text-white tracking-tight leading-tight">{item.label}</p>
+                                        <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${styles.text}`}>{item.detail}</p>
                                     </div>
                                     {item.level === 'strong' && (
                                         <CheckCircle size={16} weight="light" className="text-emerald-400 flex-shrink-0" />
@@ -256,25 +256,25 @@ export function GlobalWorkspaceRail() {
 
                 {/* ── Section 2: Source Health ── */}
                 <section>
-                    <div className="flex items-center gap-2 mb-4 px-2">
-                        <FileText size={14} weight="light" className="text-white/20" />
-                        <h3 className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/30">
+                    <div className="flex items-center gap-2 mb-3 px-1">
+                        <FileText size={12} weight="light" className="text-white/20" />
+                        <h3 className="text-[9px] font-bold tracking-[0.15em] uppercase text-white/20">
                             Evidence Health
                         </h3>
                     </div>
 
-                    <div className="px-4 py-4 rounded-xl border border-white/5 bg-white/[0.02] flex flex-col gap-1">
-                        <div className="flex items-baseline justify-between mb-1">
-                            <span className="text-2xl font-serif text-white">{totalSources}</span>
-                            <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Linked</span>
+                    <div className="px-3 py-3 rounded-xl border border-white/5 bg-white/[0.02] flex flex-col gap-1">
+                        <div className="flex items-baseline justify-between mb-0.5">
+                            <span className="text-xl font-serif text-white">{totalSources}</span>
+                            <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Linked</span>
                         </div>
                         {unlinkedItems > 0 && (
-                            <p className="text-[10px] font-bold text-amber-400/60 uppercase tracking-widest leading-relaxed">
+                            <p className="text-[9px] font-bold text-amber-400/60 uppercase tracking-widest leading-relaxed">
                                 {unlinkedItems} Items Unverified
                             </p>
                         )}
                         {unlinkedItems === 0 && totalItems > 0 && (
-                            <p className="text-[10px] font-bold text-emerald-400/60 uppercase tracking-widest">
+                            <p className="text-[9px] font-bold text-emerald-400/60 uppercase tracking-widest">
                                 Full Verification Trace ✓
                             </p>
                         )}
@@ -283,9 +283,9 @@ export function GlobalWorkspaceRail() {
 
                 {/* ── Section 3: Suggested Actions ── */}
                 <section>
-                    <div className="flex items-center gap-2 mb-4 px-2">
-                        <Lightning size={14} weight="light" className="text-white/20" />
-                        <h3 className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/30">
+                    <div className="flex items-center gap-2 mb-3 px-1">
+                        <Lightning size={12} weight="light" className="text-white/20" />
+                        <h3 className="text-[9px] font-bold tracking-[0.15em] uppercase text-white/20">
                             Strategic Actions
                         </h3>
                     </div>
@@ -295,17 +295,17 @@ export function GlobalWorkspaceRail() {
                             <Link
                                 key={i}
                                 href={action.href}
-                                className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.05] hover:border-indigo-500/30 transition-all group no-underline"
+                                className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.05] hover:border-indigo-500/30 transition-all group no-underline"
                             >
                                 <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                                     action.priority === 'high' ? 'bg-indigo-400' :
                                     action.priority === 'medium' ? 'bg-white/40' :
                                     'bg-white/10'
                                 } shadow-[0_0_8px_rgba(99,102,241,0.2)]`} />
-                                <span className="text-[11px] font-bold text-white/40 group-hover:text-white/80 transition-colors flex-1 tracking-tight leading-snug">
+                                <span className="text-[10px] font-bold text-white/40 group-hover:text-white/80 transition-colors flex-1 tracking-tight leading-snug">
                                     {action.label}
                                 </span>
-                                <ArrowRight size={14} weight="bold" className="text-white/10 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
+                                <ArrowRight size={12} weight="bold" className="text-white/10 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
                             </Link>
                         ))}
                     </div>
@@ -315,12 +315,12 @@ export function GlobalWorkspaceRail() {
             </div>
 
             {/* Footer CTA */}
-            <div className="px-5 py-5 border-t border-white/5 bg-white/[0.02]">
+            <div className="px-4 py-4 border-t border-white/5 bg-white/[0.02]">
                 <Link
                     href="/chat/overview"
-                    className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[9px] font-bold uppercase tracking-[0.2em] text-indigo-400 hover:bg-indigo-500/20 transition-all no-underline shadow-lg"
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[8px] font-bold uppercase tracking-[0.2em] text-indigo-400 hover:bg-indigo-500/20 transition-all no-underline shadow-lg"
                 >
-                    <FileText size={14} weight="light" />
+                    <FileText size={12} weight="light" />
                     Strategic Overview
                 </Link>
             </div>

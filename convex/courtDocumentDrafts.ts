@@ -109,21 +109,30 @@ export const listByUser = query({
       .unique();
     if (!user) return [];
 
-    const q = ctx.db
-      .query('courtDocumentDrafts')
-      .withIndex('by_user', (qb) => qb.eq('userId', user._id));
-
-    const drafts = await q.collect();
-
-    // Filter by status if provided, exclude abandoned by default
-    const filtered = args.status
-      ? drafts.filter(d => d.status === args.status)
-      : drafts.filter(d => d.status !== 'abandoned');
-
-    // Sort by updatedAt descending
-    const sorted = filtered.sort((a, b) => b.updatedAt - a.updatedAt);
     const cap = Math.max(1, Math.min(args.limit ?? 50, 50));
-    return sorted.slice(0, cap);
+
+    // Use the by_user_status compound index when a specific status is requested,
+    // otherwise filter abandoned at the DB query level to reduce rows loaded.
+    let drafts;
+    if (args.status) {
+      drafts = await ctx.db
+        .query('courtDocumentDrafts')
+        .withIndex('by_user_status', (qb) =>
+          qb.eq('userId', user._id).eq('status', args.status!)
+        )
+        .collect();
+    } else {
+      drafts = await ctx.db
+        .query('courtDocumentDrafts')
+        .withIndex('by_user', (qb) => qb.eq('userId', user._id))
+        .filter((q) => q.neq(q.field('status'), 'abandoned'))
+        .collect();
+    }
+
+    // Sort by updatedAt descending and apply limit
+    return drafts
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, cap);
   },
 });
 

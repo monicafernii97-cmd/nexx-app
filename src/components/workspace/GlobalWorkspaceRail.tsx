@@ -196,7 +196,7 @@ export function GlobalWorkspaceRail() {
     return (
         <motion.aside
             initial={false}
-            animate={{ width: 260 }}
+            animate={{ width: 280 }}
             className="h-[calc(100dvh-2rem)] sticky top-4 flex flex-col hyper-glass rounded-[1.5rem] overflow-hidden z-30 glow-slate"
         >
             {/* Header */}

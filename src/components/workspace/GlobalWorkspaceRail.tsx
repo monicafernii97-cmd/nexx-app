@@ -214,7 +214,7 @@ export function GlobalWorkspaceRail() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-5 no-scrollbar">
+            <div className="flex-1 overflow-hidden px-4 pb-4 space-y-5">
 
                 {isLoading ? (
                     /* Skeleton placeholders while workspace queries resolve */

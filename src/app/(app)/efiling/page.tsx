@@ -269,6 +269,7 @@ export default function EFilingPage() {
 
     return (
         <PageContainer>
+            <div className="max-w-5xl mx-auto w-full px-4 sm:px-8 pb-16">
             <PageHeader
                 icon={FileArrowUp}
                 title="eFiling Hub"
@@ -734,6 +735,7 @@ export default function EFilingPage() {
                             </div>
                         </motion.div>
                     )}
+                </div>
                 </div>
             </div>
         </PageContainer>

@@ -199,23 +199,23 @@ function SectionHeader({
     }
 
     return (
-        <div className="mb-6">
-            <div className="flex items-center gap-4 mb-2">
-                <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm backdrop-blur-xl border border-white/15 shrink-0"
-                    style={{ background: iconBg }}
-                >
-                    <Icon size={16} weight={weight} color={iconColor} />
-                </div>
-                <h2 className="text-[11px] font-bold tracking-[0.15em] uppercase text-white">
+        <div className="mb-8 flex items-start gap-5">
+            <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm backdrop-blur-xl border border-white/15 shrink-0"
+                style={{ background: iconBg }}
+            >
+                <Icon size={24} weight={weight} color={iconColor} />
+            </div>
+            <div className="flex flex-col pt-0.5">
+                <h2 className="text-[12px] font-bold tracking-[0.15em] uppercase text-white mb-1">
                     {label}
                 </h2>
+                {subtitle && (
+                    <p className="text-[14px] font-medium text-white/80 drop-shadow-sm leading-snug">
+                        {subtitle}
+                    </p>
+                )}
             </div>
-            {subtitle && (
-                <p className="text-[14px] font-medium text-white drop-shadow-sm ml-[64px]">
-                    {subtitle}
-                </p>
-            )}
         </div>
     );
 }
@@ -552,6 +552,7 @@ export default function ResourcesPage() {
 
     return (
         <PageContainer>
+            <div className="max-w-5xl mx-auto w-full px-4 sm:px-8 pb-16">
             <PageHeader
                 icon={BookOpenText}
                 title="Resources Hub"
@@ -723,7 +724,7 @@ export default function ResourcesPage() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.5 }}
-                className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8"
+                className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-16"
             >
                 <FinderHeroCard
                     icon={Scales}
@@ -942,7 +943,8 @@ export default function ResourcesPage() {
                     Resources are secured and verified continuously. External resources should be verified independently.
                     Full attorney and therapist integration arriving in future capabilities.
                 </p>
-            </motion.div>
+                </motion.div>
+            </div>
         </PageContainer>
     );
 }

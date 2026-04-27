@@ -180,7 +180,7 @@ export default function CreateExportModal({
                             onClick={e => e.stopPropagation()}
                         >
                             {/* ── Header ── */}
-                            <div className="flex items-center justify-between p-8 pb-0">
+                            <div className="flex items-center justify-between p-4 pb-0">
                                 <div>
                                     <h2 className="text-2xl font-serif font-bold text-white drop-shadow-sm tracking-tight">
                                         Create Export
@@ -199,7 +199,7 @@ export default function CreateExportModal({
                             </div>
 
                             {/* ── Body: Two Columns ── */}
-                            <div className="p-8 grid grid-cols-1 md:grid-cols-[1fr_1.2fr] gap-8">
+                            <div className="p-4 grid grid-cols-1 md:grid-cols-[1fr_1.2fr] gap-8">
                                 {/* Left — Export Path Cards */}
                                 <div className="space-y-3">
                                     <p className="text-[11px] font-bold tracking-widest uppercase text-[#60A5FA] mb-2">
@@ -385,7 +385,7 @@ export default function CreateExportModal({
                             </div>
 
                             {/* ── Footer ── */}
-                            <div className="flex items-center justify-between p-8 pt-4 border-t border-white/10">
+                            <div className="flex items-center justify-between p-4 border-t border-white/10">
                                 <button
                                     onClick={onClose}
                                     disabled={isSubmitting}

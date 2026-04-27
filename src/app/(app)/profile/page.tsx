@@ -212,7 +212,7 @@ export default function ProfilePage() {
                         <button
                             onClick={handleSave}
                             disabled={saving}
-                            className={`flex items-center gap-2.5 px-6 py-3 rounded-xl text-[14px] font-semibold cursor-pointer transition-all duration-300 shadow-md border ${
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-semibold cursor-pointer transition-all duration-300 shadow-sm border ${
                                 saved 
                                 ? 'bg-emerald text-white border-transparent' 
                                 : 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] hover:shadow-[0_12px_25px_rgba(26,75,155,0.6)] hover:-translate-y-0.5'
@@ -228,7 +228,7 @@ export default function ProfilePage() {
                 }
             />
 
-                <div className="grid grid-cols-1 gap-6">
+                <div className="grid grid-cols-1 gap-5">
                     {/* ── Personal Info ── */}
                     <Section icon={<User size={20} weight="duotone" />} title="Personal Information">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -278,7 +278,7 @@ export default function ProfilePage() {
                     </Section>
 
                     {/* ── Legal & Support (Bento Row) ── */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 w-full">
                         <Section icon={<Scales size={20} weight="duotone" />} title="Legal Overview">
                             <div className="space-y-5">
                                 <Field label="Custody Arrangement">
@@ -324,7 +324,7 @@ export default function ProfilePage() {
 
                         <Section icon={<Briefcase size={20} weight="duotone" />} title="Support Infrastructure">
                             <div className="space-y-4">
-                                <label className="flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-300 bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] shadow-sm hover:shadow-md">
+                                <label className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-300 bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.3)] shadow-sm">
                                     <div className="flex-shrink-0 relative">
                                         <input
                                             type="checkbox"
@@ -342,7 +342,7 @@ export default function ProfilePage() {
                                     </div>
                                 </label>
                                 
-                                <label className="flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-300 bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] shadow-sm hover:shadow-md">
+                                <label className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-300 bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.3)] shadow-sm">
                                     <div className="flex-shrink-0 relative">
                                         <input
                                             type="checkbox"
@@ -416,7 +416,7 @@ export default function ProfilePage() {
                         <div className="mb-6 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-[13px] font-medium text-white/80 leading-relaxed shadow-sm">
                             <span className="font-bold text-white">Note:</span> These preferences only dictate how information is relayed to you. All facts, case details, and strategic advice from NEXX remain strictly direct and objective regardless of the chosen communication tone.
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
                             <div>
                                 <Field label="Communication Preference">
                                     <p className="text-[13px] font-medium text-white/70 mb-4 leading-relaxed">
@@ -427,7 +427,7 @@ export default function ProfilePage() {
                                             <button
                                                 key={opt.value}
                                                 onClick={() => setForm({ ...form, tonePreference: opt.value })}
-                                                className={`text-left p-4 rounded-2xl transition-all duration-300 cursor-pointer border ${
+                                                className={`text-left p-3 rounded-xl transition-all duration-300 cursor-pointer border ${
                                                     form.tonePreference === opt.value
                                                     ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white shadow-[0_8px_20px_rgba(18,61,126,0.5)] border-[rgba(255,255,255,0.3)] scale-[1.02]'
                                                     : 'bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.1)] shadow-sm hover:shadow-md text-white'
@@ -453,7 +453,7 @@ export default function ProfilePage() {
                                             <button
                                                 key={s.value}
                                                 onClick={() => setForm({ ...form, emotionalState: s.value })}
-                                                className={`flex items-center gap-3 p-3 rounded-2xl transition-all duration-300 cursor-pointer border ${
+                                                className={`flex items-center gap-2 p-2.5 rounded-xl transition-all duration-300 cursor-pointer border ${
                                                     form.emotionalState === s.value
                                                     ? 'bg-white border-champagne shadow-[0_4px_16px_rgba(212,175,55,0.15)] ring-1 ring-champagne scale-[1.02]'
                                                     : 'bg-cloud/50 border-[rgba(10,22,41,0.04)] hover:bg-white hover:shadow-sm'
@@ -509,12 +509,12 @@ export default function ProfilePage() {
 
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
     return (
-        <div className="glass-ethereal rounded-[2rem] p-6 md:p-8 bg-white/70 border-white shadow-sm">
-            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[rgba(10,22,41,0.04)]">
-                <div className="w-10 h-10 rounded-xl bg-cloud flex items-center justify-center shadow-inner text-sapphire">
+        <div className="glass-ethereal rounded-xl p-4 bg-white/70 border-white shadow-sm">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-[rgba(10,22,41,0.04)]">
+                <div className="w-7 h-7 rounded-lg bg-cloud flex items-center justify-center shadow-inner text-sapphire">
                     {icon}
                 </div>
-                <h2 className="text-xl font-bold text-sapphire tracking-tight">{title}</h2>
+                <h2 className="text-sm font-bold text-sapphire tracking-tight">{title}</h2>
             </div>
             <div>{children}</div>
         </div>

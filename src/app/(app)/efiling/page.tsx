@@ -101,11 +101,11 @@ function CollapsibleSection({
 
     return (
         <div
-            className="rounded-2xl overflow-hidden bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-300"
+            className="rounded-xl overflow-hidden bg-white/5 backdrop-blur-xl border border-white/15 shadow-sm transition-all duration-300"
         >
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between px-6 py-4 cursor-pointer text-left focus:outline-none hover:bg-white/5 transition-colors"
+                className="w-full flex items-center justify-between px-4 py-3 cursor-pointer text-left focus:outline-none hover:bg-white/5 transition-colors"
                 aria-expanded={isOpen}
             >
                 <span className="text-sm font-bold text-white tracking-wide">{title}</span>
@@ -122,7 +122,7 @@ function CollapsibleSection({
                         transition={{ duration: 0.3, ease: 'easeInOut' }}
                         className="overflow-hidden bg-[rgba(0,0,0,0.2)]"
                     >
-                        <div className="px-6 pb-5 text-[15px] leading-relaxed text-white font-medium m-0">
+                        <div className="px-4 pb-4 text-[13px] leading-relaxed text-white font-medium m-0">
                             {children}
                         </div>
                     </motion.div>
@@ -146,7 +146,7 @@ function ReadinessItem({
 }) {
     const content = (
         <div
-            className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 ${href && !isReady ? 'cursor-pointer hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-0.5 hover:bg-white/10' : 'shadow-[0_8px_32px_rgba(0,0,0,0.2)]'} bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]`}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${href && !isReady ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5 hover:bg-white/10' : 'shadow-sm'} bg-white/5 backdrop-blur-xl border border-white/15`}
         >
             {isReady ? (
                 <div className="bg-white/10 p-2 rounded-xl border border-[#10B981]/40 shadow-[inset_0_1px_2px_rgba(16,185,129,0.3)] backdrop-blur-md">
@@ -158,7 +158,7 @@ function ReadinessItem({
                 </div>
             )}
             <div className="flex-1 min-w-0">
-                <p className={`text-[15px] tracking-wide font-bold m-0 ${isReady ? 'text-[#10B981] drop-shadow-sm' : 'text-[#E5A84A] drop-shadow-sm'}`}>
+                <p className={`text-[13px] tracking-wide font-bold m-0 ${isReady ? 'text-[#10B981]' : 'text-[#E5A84A]'}`}>
                     {label}
                 </p>
                 {detail && (
@@ -289,7 +289,7 @@ export default function EFilingPage() {
                     initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.1 }}
-                    className="p-8 border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.05)] backdrop-blur-xl rounded-3xl"
+                    className="p-4 border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.05)] backdrop-blur-xl rounded-xl"
                 >
                     <div className="flex items-start gap-5">
                         <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#B38644,#E5A84A)] text-white shadow-[0_4px_15px_rgba(229,168,74,0.3)] shrink-0">
@@ -328,17 +328,17 @@ export default function EFilingPage() {
                         </div>
                     </div>
                 ) : eFilingPortal && portalUrl ? (
-                    <div className="relative overflow-hidden rounded-3xl p-8 glass-ethereal shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:shadow-[0_15px_45px_rgba(18,61,126,0.6)] transition-all duration-500 border border-white/20 group">
+                    <div className="relative overflow-hidden rounded-xl p-4 glass-ethereal shadow-sm hover:shadow-md transition-all duration-500 border border-white/15 group">
                         {/* Decorative background elements */}
                         <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
                         
-                        <div className="relative z-10 flex items-start sm:items-center gap-6 flex-col sm:flex-row">
+                        <div className="relative z-10 flex items-start sm:items-center gap-4 flex-col sm:flex-row">
                             <div className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 bg-[linear-gradient(135deg,#2E5C9A,#123D7E)] shadow-[0_8px_30px_rgba(0,0,0,0.5)] border border-white/30 group-hover:scale-110 transition-transform duration-500 text-white relative overflow-hidden">
                                 <div className="absolute inset-0 bg-white/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
                                 <FileArrowUp size={36} className="text-white relative z-10 drop-shadow-md" weight="duotone" />
                             </div>
                             <div className="flex-1 space-y-2">
-                                <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
+                                <h2 className="text-lg font-serif font-bold tracking-tight text-white m-0">
                                     {eFilingPortal.name}
                                 </h2>
                                 {eFilingPortal.provider && (
@@ -366,7 +366,7 @@ export default function EFilingPage() {
                         </div>
                     </div>
                 ) : hasCourtSettings ? (
-                    <div className="card-premium p-8 border border-[var(--cloud-light)] relative overflow-hidden">
+                    <div className="card-premium p-4 border border-[var(--cloud-light)] relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--champagne)]/5 rounded-full blur-2xl pointer-events-none" />
                         <div className="flex flex-col md:flex-row items-start gap-8 relative z-10">
                             <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br from-white to-[var(--pearl)] shadow-sm border border-[var(--cloud-light)] shrink-0">
@@ -426,9 +426,9 @@ export default function EFilingPage() {
                 ) : null}
             </motion.div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
                 {/* ─── Left Column (Main Content) ─── */}
-                <div className="lg:col-span-8 space-y-8">
+                <div className="lg:col-span-8 space-y-6">
                     {/* ─── Filing Readiness Checklist ─── */}
                     <motion.div
                         initial={{ opacity: 0, y: 12 }}
@@ -439,7 +439,7 @@ export default function EFilingPage() {
                             <div className="w-12 h-12 rounded-2xl bg-white/5 backdrop-blur-2xl border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-center relative overflow-hidden shrink-0">
                                 <ShieldCheck size={24} className="text-[#60A5FA] relative z-10 drop-shadow-[0_2px_10px_rgba(96,165,250,0.6)]" weight="duotone" />
                             </div>
-                            <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
+                            <h2 className="text-lg font-serif font-bold tracking-tight text-white m-0">
                                 Filing Readiness
                             </h2>
                         </div>
@@ -483,7 +483,7 @@ export default function EFilingPage() {
                                     <div className="w-12 h-12 rounded-2xl bg-white/5 backdrop-blur-2xl border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-center relative overflow-hidden shrink-0">
                                         <FileText size={24} className="text-[#E5A84A] relative z-10 drop-shadow-[0_2px_10px_rgba(229,168,74,0.6)]" weight="duotone" />
                                     </div>
-                                    <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
+                                    <h2 className="text-lg font-serif font-bold tracking-tight text-white m-0">
                                         Ready to File
                                     </h2>
                                 </div>
@@ -563,7 +563,7 @@ export default function EFilingPage() {
                 </div>
 
                 {/* ─── Right Column (Sidebar) ─── */}
-                <div className="lg:col-span-4 space-y-8">
+                <div className="lg:col-span-4 space-y-6">
                     {/* ─── Filing Guide ─── */}
                     <motion.div
                         initial={{ opacity: 0, x: 12 }}
@@ -574,7 +574,7 @@ export default function EFilingPage() {
                             <div className="w-12 h-12 rounded-2xl bg-white/5 backdrop-blur-2xl border border-[rgba(255,255,255,0.25)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-center relative overflow-hidden shrink-0">
                                 <Info size={24} className="text-[#10B981] relative z-10 drop-shadow-[0_2px_10px_rgba(16,185,129,0.6)]" weight="duotone" />
                             </div>
-                            <h2 className="text-2xl font-serif font-bold tracking-tight text-white m-0">
+                            <h2 className="text-lg font-serif font-bold tracking-tight text-white m-0">
                                 Filing Guide
                             </h2>
                         </div>

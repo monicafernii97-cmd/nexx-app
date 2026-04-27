@@ -363,8 +363,8 @@ function DocuVaultPageInner() {
                     exit={{ opacity: 0 }}
                     className="flex-1 min-h-0 flex flex-col w-full pb-4 gap-6"
                 >
-                    {/* Zone 1: Intake Hub */}
-                    <div className="lg:flex-[0.60] min-h-0 flex flex-col space-y-3">
+                    {/* Zone 1: Intake Hub — compact */}
+                    <div className="lg:flex-[0.35] min-h-0 lg:min-h-[420px] flex flex-col space-y-3">
                         {/* Header with Navigation */}
                         <div className="flex items-center justify-between">
                             <div>
@@ -617,8 +617,8 @@ function DocuVaultPageInner() {
 
                     </div>
 
-                    {/* Zone 2: Recent Documents Grid */}
-                    <div className="lg:flex-[0.40] min-h-0 flex flex-col space-y-3 pt-2">
+                    {/* Zone 2: Recent Documents Grid — expanded */}
+                    <div className="lg:flex-[0.65] min-h-0 lg:min-h-[320px] flex flex-col space-y-3 pt-2">
                         <div className="flex items-center justify-between px-2">
                             <h3 className="text-[10px] font-bold text-white/60 uppercase tracking-[0.15em] flex items-center gap-2">
                                 <ClockCounterClockwise size={16} /> Recent Documents

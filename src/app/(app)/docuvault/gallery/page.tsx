@@ -108,10 +108,10 @@ export default function DocuVaultGalleryPage() {
                 rightElement={
                     <Link
                         href="/docuvault"
-                        className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all bg-white/10 border border-white/30 hover:bg-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_4px_12px_rgba(0,0,0,0.4)] backdrop-blur-xl shrink-0"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-all bg-white/10 border border-white/20 hover:bg-white/20 shadow-sm backdrop-blur-xl shrink-0"
                         aria-label="Back to DocuVault"
                     >
-                        <ArrowLeft size={20} weight="bold" className="text-white drop-shadow-sm" />
+                        <ArrowLeft size={14} weight="bold" className="text-white" />
                     </Link>
                 }
             />
@@ -121,16 +121,16 @@ export default function DocuVaultGalleryPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="mb-6"
+                className="mb-4"
             >
                 <div className="relative group">
-                    <Search size={22} className="absolute left-6 top-1/2 -translate-y-1/2 text-white/70 group-focus-within:text-[#60A5FA] transition-colors" />
+                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 group-focus-within:text-[#60A5FA] transition-colors" />
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         placeholder="Search documents..."
-                        className="w-full h-16 pl-16 pr-6 rounded-[2rem] bg-white/5 backdrop-blur-2xl border border-white/20 text-[16px] text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-[#60A5FA]/50 focus:bg-white/10 transition-all shadow-[inset_0_1px_2px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)] font-medium"
+                        className="w-full h-10 pl-10 pr-4 rounded-xl bg-white/5 backdrop-blur-2xl border border-white/15 text-[12px] text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-[#60A5FA]/40 transition-all shadow-sm font-medium"
                         aria-label="Search documents"
                     />
                 </div>
@@ -143,16 +143,16 @@ export default function DocuVaultGalleryPage() {
                 transition={{ delay: 0.15 }}
                 className="mb-6 w-full"
             >
-                <div className="flex gap-3 overflow-x-auto pb-2 min-w-0" style={{ scrollbarWidth: 'none' }}>
+                <div className="flex gap-1.5 overflow-x-auto pb-1 min-w-0" style={{ scrollbarWidth: 'none' }}>
                     {filterTabs.map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveFilter(tab.id)}
                             aria-pressed={activeFilter === tab.id}
-                            className={`px-6 py-3 rounded-full text-[13px] font-bold tracking-widest uppercase whitespace-nowrap cursor-pointer transition-all shadow-sm ${
+                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-widest uppercase whitespace-nowrap cursor-pointer transition-all ${
                                 activeFilter === tab.id
-                                    ? 'bg-[linear-gradient(135deg,#E5A84A,#B47B04)] text-white border border-white/30 shadow-[inset_0_1px_2px_rgba(255,255,255,0.5),0_8px_24px_rgba(229,168,74,0.6)] drop-shadow-sm'
-                                    : 'bg-white/5 backdrop-blur-xl text-white border border-white/10 hover:bg-white/10 hover:border-white/30 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)]'
+                                    ? 'bg-[linear-gradient(135deg,#E5A84A,#B47B04)] text-white border border-white/20 shadow-sm'
+                                    : 'bg-white/5 text-white/60 border border-white/8 hover:bg-white/10 hover:text-white'
                             }`}
                         >
                             {tab.label}
@@ -250,7 +250,7 @@ export default function DocuVaultGalleryPage() {
                 {/* Completed Documents Grid */}
                 <AnimatePresence>
                     {completeDocs.length > 0 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                             {completeDocs.map((doc, i) => (
                                 <motion.div
                                     key={doc.id}
@@ -258,17 +258,17 @@ export default function DocuVaultGalleryPage() {
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, scale: 0.95 }}
                                     transition={{ delay: 0.05 * i }}
-                                    className="p-6 rounded-[2rem] group transition-all border border-white/10 bg-white/5 backdrop-blur-2xl hover:bg-white/10 hover:border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-1"
+                                    className="p-3 rounded-xl group transition-all border border-white/8 bg-white/[0.03] backdrop-blur-xl hover:bg-white/[0.06] hover:border-white/15 shadow-sm hover:-translate-y-0.5"
                                 >
-                                    <div className="flex items-start gap-5">
+                                    <div className="flex items-start gap-3">
                                         {/* Preview thumbnail */}
                                         <div
-                                            className="w-20 h-24 rounded-xl flex items-center justify-center flex-shrink-0 bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-white/20 shadow-[0_4px_16px_rgba(0,0,0,0.5)]"
+                                            className="w-12 h-14 rounded-lg flex items-center justify-center shrink-0 bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/15"
                                         >
-                                            <FileText size={28} className="text-white drop-shadow-sm" />
+                                            <FileText size={18} className="text-white/80" />
                                         </div>
-                                        <div className="flex-1 min-w-0 py-1">
-                                            <p className="text-[17px] font-bold truncate mb-2 text-white drop-shadow-sm">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[13px] font-bold truncate mb-1 text-white/90">
                                                 {doc.title}
                                             </p>
                                             <div className="flex items-center gap-3 mb-3 flex-wrap">

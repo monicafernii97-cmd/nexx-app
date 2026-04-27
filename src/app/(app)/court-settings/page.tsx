@@ -282,7 +282,7 @@ export default function CourtSettingsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="card-premium p-6 mb-8 border border-[var(--cloud-light)] bg-white/60"
+                className="card-premium p-4 mb-5 border border-[var(--cloud-light)] bg-white/60"
             >
                 <div className="flex items-center gap-3 mb-6">
                     <div className="w-8 h-8 rounded-full bg-[var(--cloud)] flex items-center justify-center">
@@ -433,7 +433,7 @@ export default function CourtSettingsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="card-premium p-6 mb-8 border border-[var(--cloud-light)] bg-white/60"
+                className="card-premium p-4 mb-5 border border-[var(--cloud-light)] bg-white/60"
             >
                 <div className="flex items-center gap-3 mb-6">
                     <div className="w-8 h-8 rounded-full bg-[var(--cloud)] flex items-center justify-center">
@@ -506,7 +506,7 @@ export default function CourtSettingsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.25 }}
-                className="card-premium p-6 mb-8 border border-[var(--champagne)]/30 bg-gradient-to-br from-white to-[var(--pearl)] shadow-sm"
+                className="card-premium p-4 mb-5 border border-[var(--champagne)]/30 bg-gradient-to-br from-white to-[var(--pearl)] shadow-sm"
             >
                 <div className="flex items-center gap-3 mb-4">
                     <div className="w-8 h-8 rounded-full bg-[var(--champagne)]/10 flex items-center justify-center">
@@ -785,7 +785,7 @@ export default function CourtSettingsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="card-premium p-6 mb-8 border border-[var(--champagne)]/30 bg-gradient-to-br from-white to-[var(--pearl)] shadow-sm"
+                className="card-premium p-4 mb-5 border border-[var(--champagne)]/30 bg-gradient-to-br from-white to-[var(--pearl)] shadow-sm"
             >
                 <div className="flex items-center gap-3 mb-4">
                     <div className="w-8 h-8 rounded-full bg-[var(--champagne)]/10 flex items-center justify-center">
@@ -852,7 +852,7 @@ export default function CourtSettingsPage() {
                             exit={{ opacity: 0, height: 0 }}
                             className="overflow-hidden"
                         >
-                            <div className="mt-6 rounded-[1.5rem] p-5 border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
+                            <div className="mt-6 rounded-xl p-3 border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
                                 <div className="flex items-center gap-2 mb-3">
                                     {verifyResult.confidence > 0.5 ? (
                                         <Check size={18} className="text-[var(--success)]" weight="bold" />

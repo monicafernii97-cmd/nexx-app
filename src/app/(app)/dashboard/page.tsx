@@ -146,33 +146,30 @@ function DashboardContent() {
 
             {/* Pipeline Launcher Cards */}
             <div className="space-y-6 pb-6">
-                <div id="pipeline-switcher" className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div id="pipeline-switcher" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     {pipelineCards.map((card, i) => {
                         const Icon = card.icon;
                         return (
                             <Link key={card.label} href={card.href} className="no-underline block">
                                 <motion.div
-                                    initial={{ opacity: 0, y: 30 }}
+                                    initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.1 * i, duration: 0.6, type: 'spring' }}
+                                    transition={{ delay: 0.08 * i, duration: 0.5, type: 'spring' }}
                                 >
-                                  <div className="floating-element hyper-glass flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate py-8 sm:py-10">
-                                    <div className="mb-4 p-3 rounded-2xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
+                                  <div className="floating-element hyper-glass flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate py-4 sm:py-5">
+                                    <div className="mb-2 p-2 rounded-xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
                                         <Icon 
-                                            size={24} 
+                                            size={18} 
                                             weight="light" 
                                             style={{ color: card.accent }} 
                                             className="transition-transform duration-700 group-hover:scale-110 group-hover:rotate-3" 
                                         />
                                     </div>
-                                    <h3 className="text-lg font-serif text-white mb-1.5 tracking-tight drop-shadow-sm">
+                                    <h3 className="text-[13px] font-serif text-white mb-0.5 tracking-tight drop-shadow-sm">
                                         {card.label}
                                     </h3>
-                                    <p className="text-[10px] text-white/40 font-medium mb-3 uppercase tracking-[0.2em] drop-shadow-sm">
+                                    <p className="text-[11px] text-white/40 font-medium uppercase tracking-[0.12em] drop-shadow-sm">
                                         {card.subtitle}
-                                    </p>
-                                    <p className="text-[12px] text-white/50 font-medium px-6 text-center leading-relaxed">
-                                        {card.desc}
                                     </p>
                                     
                                     {/* Luxury glint effect */}
@@ -190,42 +187,37 @@ function DashboardContent() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5, duration: 0.6, type: 'spring' }}
                 >
-                    <div className="glass-ethereal rounded-3xl p-5">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-[10px] font-bold tracking-[0.2em] uppercase text-sapphire-muted">
+                    <div className="glass-ethereal rounded-2xl p-3">
+                        <div className="flex justify-between items-center mb-2">
+                            <h2 className="text-[11px] font-bold tracking-[0.16em] uppercase text-sapphire-muted">
                                 Recent Activity
                             </h2>
-                            <Link href="/incident-report" className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-widest transition-colors no-underline">
+                            <Link href="/incident-report" className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-[0.12em] transition-colors no-underline">
                                 View all
                             </Link>
                         </div>
 
                         {incidents === undefined ? (
                             <div
-                                className="flex items-center justify-center py-8 opacity-60 animate-pulse"
+                                className="flex items-center justify-center py-4 opacity-60 animate-pulse"
                                 role="status"
                                 aria-live="polite"
                             >
-                                <div className="w-8 h-8 rounded-full border-2 border-champagne border-t-transparent animate-spin" aria-hidden="true" />
+                                <div className="w-5 h-5 rounded-full border-2 border-champagne border-t-transparent animate-spin" aria-hidden="true" />
                                 <span className="sr-only">Loading recent activity</span>
                             </div>
                         ) : incidents.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center text-center py-8 bg-[rgba(10,17,40,0.5)] rounded-[2rem] border border-[rgba(255,255,255,0.08)]">
-                                <div className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_15px_rgba(18,61,126,0.3)]">
-                                    <Clock size={20} weight="fill" className="text-white" />
+                            <div className="flex items-center gap-3 py-3 px-4 bg-[rgba(10,17,40,0.4)] rounded-xl border border-[rgba(255,255,255,0.06)]">
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-sm shrink-0">
+                                    <Clock size={14} weight="fill" className="text-white" />
                                 </div>
-                                <p className="text-[14px] font-semibold text-white mb-2">
-                                    Pristine Record
-                                </p>
-                                <p className="text-[13px] text-[rgba(255,255,255,0.6)] font-medium mb-6 max-w-[200px] leading-relaxed">
-                                    Your activity feed is empty. Start a session to build your court-ready profile.
-                                </p>
-                                <Link href="/chat" className="btn-primary text-xs shadow-md rounded-xl py-3 px-6 uppercase font-bold tracking-widest text-[#FFFFFF]">
-                                    Begin Session
-                                </Link>
+                                <div>
+                                    <p className="text-[11px] font-semibold text-white/70">No activity yet</p>
+                                    <p className="text-[10px] text-white/40">Start a session to build your timeline.</p>
+                                </div>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div className="space-y-1.5">
                                 {incidents.slice(0, 4).map((incident, i) => {
                                     const cat = INCIDENT_CATEGORIES.find((c) => c.value === incident.category);
                                     const date = (() => {
@@ -239,33 +231,31 @@ function DashboardContent() {
                                     return (
                                         <motion.div
                                             key={incident._id}
-                                            initial={{ opacity: 0, y: 10 }}
+                                            initial={{ opacity: 0, y: 6 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: 0.6 + i * 0.1 }}
+                                            transition={{ delay: 0.5 + i * 0.08 }}
                                         >
-                                            <Link href={`/incident-report/${incident._id}`} className="no-underline block rounded-2xl">
-                                                <div className="group relative bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(212,175,55,0.3)] p-4 rounded-2xl cursor-pointer transition-all duration-300">
-                                                    <div className="flex items-center gap-3 mb-2">
-                                                        <div className="text-center flex-shrink-0 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-xl px-2 py-1">
-                                                            <p className="text-[9px] font-bold uppercase tracking-wider text-white/50">
-                                                                {date ? date.toLocaleDateString('en-US', { month: 'short' }) : '—'}
-                                                            </p>
-                                                            <p className="text-sm font-bold text-white/90 leading-none">
-                                                                {date ? date.getDate() : '—'}
-                                                            </p>
-                                                        </div>
-                                                        <span
-                                                            className="px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wide uppercase border"
-                                                            style={{ 
-                                                                background: cat?.color ? `color-mix(in srgb, ${cat.color} 15%, transparent)` : 'rgba(255,255,255,0.05)', 
-                                                                color: cat?.color || 'rgba(255,255,255,0.8)',
-                                                                borderColor: cat?.color ? `color-mix(in srgb, ${cat.color} 30%, transparent)` : 'rgba(255,255,255,0.1)'
-                                                            }}
-                                                        >
-                                                            {cat?.label || incident.category}
-                                                        </span>
+                                            <Link href={`/incident-report/${incident._id}`} className="no-underline block">
+                                                <div className="group flex items-center gap-3 px-3 py-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] hover:border-white/[0.12] transition-all duration-200">
+                                                    <div className="text-center shrink-0 w-8">
+                                                        <p className="text-[10px] font-bold uppercase text-white/40 leading-none">
+                                                            {date ? date.toLocaleDateString('en-US', { month: 'short' }) : '—'}
+                                                        </p>
+                                                        <p className="text-[11px] font-bold text-white/80 leading-none mt-0.5">
+                                                            {date ? date.getDate() : '—'}
+                                                        </p>
                                                     </div>
-                                                    <p className="text-[12px] font-medium text-white/60 line-clamp-2 leading-relaxed">
+                                                    <span
+                                                        className="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-[0.08em] uppercase border shrink-0"
+                                                        style={{ 
+                                                            background: cat?.color ? `color-mix(in srgb, ${cat.color} 12%, transparent)` : 'rgba(255,255,255,0.04)', 
+                                                            color: cat?.color || 'rgba(255,255,255,0.7)',
+                                                            borderColor: cat?.color ? `color-mix(in srgb, ${cat.color} 25%, transparent)` : 'rgba(255,255,255,0.08)'
+                                                        }}
+                                                    >
+                                                        {cat?.label || incident.category}
+                                                    </span>
+                                                    <p className="min-w-0 flex-1 truncate text-[11px] text-white/50">
                                                         {incident.courtSummary || incident.narrative || 'Draft incident report...'}
                                                     </p>
                                                 </div>

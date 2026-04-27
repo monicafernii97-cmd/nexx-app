@@ -163,7 +163,7 @@ export default function NexProfilePage() {
     };
 
     return (
-        <PageContainer>
+        <PageContainer noHorizontalPadding>
             <div className="max-w-3xl mx-auto w-full px-4 sm:px-8 pb-16">
             <PageHeader
                 icon={Siren}

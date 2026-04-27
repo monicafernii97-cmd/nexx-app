@@ -551,7 +551,7 @@ export default function ResourcesPage() {
     const showMyCaseCard = courtSettings?.causeNumber && myCasePortalUrl;
 
     return (
-        <PageContainer>
+        <PageContainer noHorizontalPadding>
             <div className="max-w-5xl mx-auto w-full px-4 sm:px-8 pb-16">
             <PageHeader
                 icon={BookOpenText}

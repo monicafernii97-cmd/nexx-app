@@ -191,7 +191,7 @@ function SubscriptionContent() {
     const tierOrder: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
 
     return (
-        <PageContainer>
+        <PageContainer noHorizontalPadding>
             <div className="max-w-5xl mx-auto w-full px-4 sm:px-8 pb-20">
             <PageHeader
                 icon={Crown}

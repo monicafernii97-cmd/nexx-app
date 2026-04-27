@@ -116,7 +116,7 @@ function DashboardContent() {
     const userName = user?.name ? `, ${user.name}` : '';
 
     return (
-        <PageContainer>
+        <PageContainer noHorizontalPadding>
             <AnimatePresence>
                 {showCheckoutToast && (
                     <motion.div

@@ -53,9 +53,19 @@ export function PageHeader({ icon: Icon, title, description, rightElement }: Pag
  * Pass `lockHeight` to enforce a no-scroll layout — but only on desktop (lg+).
  * On mobile, all pages are always scrollable since viewport space is limited.
  */
-export function PageContainer({ children, lockHeight = false }: { children: ReactNode; lockHeight?: boolean }) {
+export function PageContainer({
+    children,
+    lockHeight = false,
+    noHorizontalPadding = false,
+}: {
+    children: ReactNode;
+    lockHeight?: boolean;
+    noHorizontalPadding?: boolean;
+}) {
     return (
         <div className={`max-w-[72rem] mx-auto w-full py-4 lg:py-6 flex flex-col ${
+            noHorizontalPadding ? '' : 'px-4 lg:px-6'
+        } ${
             lockHeight
                 ? 'min-h-[calc(100dvh-60px)] lg:h-[calc(100dvh-76px)] lg:overflow-hidden'
                 : 'min-h-[calc(100dvh-60px)]'

@@ -255,7 +255,7 @@ function DashboardContent() {
                                                     >
                                                         {cat?.label || incident.category}
                                                     </span>
-                                                    <p className="text-[11px] text-white/50 truncate flex-1">
+                                                    <p className="min-w-0 flex-1 truncate text-[11px] text-white/50">
                                                         {incident.courtSummary || incident.narrative || 'Draft incident report...'}
                                                     </p>
                                                 </div>

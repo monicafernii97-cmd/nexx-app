@@ -361,7 +361,7 @@ function DocuVaultPageInner() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="flex-1 min-h-0 flex flex-col w-full pb-4 gap-6"
+                    className="flex-1 min-h-0 flex flex-col w-full max-w-5xl mx-auto pb-4 gap-6"
                 >
                     {/* Zone 1: Intake Hub — compact */}
                     <div className="lg:flex-[0.35] min-h-0 lg:min-h-[420px] flex flex-col space-y-3">
@@ -409,7 +409,7 @@ function DocuVaultPageInner() {
                         {/* Left: Content Area */}
                         <div className="flex-1 flex flex-col border-r border-white/5">
                             {/* Inner Tabs */}
-                            <div className="flex items-center gap-8 px-8 pt-8 pb-4 border-b border-white/5">
+                            <div className="flex items-center gap-6 px-6 pt-6 pb-4 border-b border-white/5">
                                 {UI_TABS.map(tab => (
                                         <button
                                         key={tab.id}
@@ -417,7 +417,7 @@ function DocuVaultPageInner() {
                                             setActiveTab(tab.id);
                                             setSelectedTemplate(null);
                                         }}
-                                        className={`group relative pb-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-all ${
+                                        className={`group relative pb-4 text-[9px] font-bold uppercase tracking-[0.2em] transition-all ${
                                             activeTab === tab.id ? 'text-white' : 'text-white/20 hover:text-white/60'
                                         }`}
                                     >
@@ -436,7 +436,7 @@ function DocuVaultPageInner() {
                             </div>
 
                             {/* Editor Area */}
-                            <div className="flex-1 p-8 flex flex-col">
+                            <div className="flex-1 p-6 flex flex-col">
                                 <div className="flex-1 relative group">
                                     <textarea
                                         value={documentContent}
@@ -554,7 +554,7 @@ function DocuVaultPageInner() {
                         </div>
 
                         {/* Right: Quick Templates Sidebar */}
-                        <div className="w-full md:w-64 bg-white/[0.02] p-5 flex flex-col space-y-5">
+                        <div className="w-full md:w-56 bg-white/[0.02] p-4 flex flex-col space-y-4">
                             <div>
                                 <h3 className="text-[10px] font-bold text-white/20 uppercase tracking-[0.25em] mb-5">Quick Templates</h3>
                                 <div className="space-y-3">
@@ -564,7 +564,7 @@ function DocuVaultPageInner() {
                                             <button
                                                 key={tmpl.id}
                                                 onClick={() => setSelectedTemplate(isSelected ? null : tmpl)}
-                                                className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 group ${
+                                                className={`w-full text-left p-2.5 rounded-xl border transition-all flex items-center gap-3 group ${
                                                     isSelected 
                                                     ? 'bg-indigo-500/10 border-indigo-500/40 text-white' 
                                                     : 'bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:border-white/10 hover:text-white'
@@ -585,7 +585,7 @@ function DocuVaultPageInner() {
                                 <button
                                     onClick={() => setShowCreateExport(true)}
                                     disabled={isParsing}
-                                    className="w-full py-3.5 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 text-white text-[11px] font-bold uppercase tracking-widest hover:border-white/40 transition-all flex items-center justify-center gap-2 group shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full py-2.5 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 text-white text-[10px] font-bold uppercase tracking-widest hover:border-white/40 transition-all flex items-center justify-center gap-2 group shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Export size={16} weight="bold" className="group-hover:translate-x-1 transition-transform" />
                                     {isParsing ? 'Parsing...' : 'Full Case Export'}
@@ -636,7 +636,7 @@ function DocuVaultPageInner() {
                                     <span className="sr-only">Loading recent documents</span>
                                 </div>
                             ) : drafts.length === 0 ? (
-                                <div className="w-full h-full flex items-center justify-center text-center text-white/20 text-[10px] font-bold uppercase tracking-widest bg-white/5 rounded-2xl border border-white/5">
+                                <div className="w-full min-h-[160px] flex items-center justify-center text-center text-white/30 text-[11px] font-bold uppercase tracking-widest bg-white/5 rounded-2xl border border-white/10 shadow-sm">
                                     No drafts yet
                                 </div>
                             ) : (

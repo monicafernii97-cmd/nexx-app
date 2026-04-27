@@ -164,7 +164,7 @@ export default function TemplateGalleryPage() {
                         <button
                             key={tab.id}
                             onClick={() => setActiveFilter(tab.id)}
-                            className={`px-3 py-1.5 rounded-lg text-[9px] font-bold tracking-widest uppercase whitespace-nowrap cursor-pointer transition-all ${
+                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-widest uppercase whitespace-nowrap cursor-pointer transition-all ${
                                 activeFilter === tab.id
                                     ? 'bg-[linear-gradient(135deg,#E5A84A,#B47B04)] text-white border border-white/20 shadow-sm'
                                     : 'bg-white/5 text-white/60 border border-white/8 hover:bg-white/10 hover:text-white'
@@ -185,7 +185,7 @@ export default function TemplateGalleryPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
             >
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 mb-6">
                     {filteredTemplates.map(({ template, tabLabel }, i) => (
                         <motion.button
                             type="button"
@@ -205,7 +205,7 @@ export default function TemplateGalleryPage() {
 
                             {/* Category badge */}
                             <div className="flex items-center gap-1.5 mb-2">
-                                <span className="text-[8px] font-bold tracking-widest uppercase bg-white/8 text-white/70 border border-white/10 px-2 py-0.5 rounded">
+                                <span className="text-[10px] font-bold tracking-widest uppercase bg-white/8 text-white/70 border border-white/10 px-2 py-0.5 rounded">
                                     {tabLabel}
                                 </span>
                             </div>
@@ -225,19 +225,19 @@ export default function TemplateGalleryPage() {
                                 {template.requiresDeclaration && (
                                     <div className="flex items-center gap-1" title="Requires Declaration">
                                         <Shield size={10} className="text-white/50" />
-                                        <span className="text-[8px] font-bold tracking-wide uppercase text-white/50">Decl.</span>
+                                        <span className="text-[10px] font-bold tracking-wide uppercase text-white/50">Decl.</span>
                                     </div>
                                 )}
                                 {template.requiresProposedOrder && (
                                     <div className="flex items-center gap-1" title="Requires Proposed Order">
                                         <Scale size={10} className="text-white/50" />
-                                        <span className="text-[8px] font-bold tracking-wide uppercase text-white/50">Order</span>
+                                        <span className="text-[10px] font-bold tracking-wide uppercase text-white/50">Order</span>
                                     </div>
                                 )}
                                 {template.supportsExhibits && (
                                     <div className="flex items-center gap-1" title="Supports Exhibits">
                                         <Paperclip size={10} className="text-white/50" />
-                                        <span className="text-[8px] font-bold tracking-wide uppercase text-white/50">Exhibits</span>
+                                        <span className="text-[10px] font-bold tracking-wide uppercase text-white/50">Exhibits</span>
                                     </div>
                                 )}
                             </div>
@@ -256,7 +256,7 @@ export default function TemplateGalleryPage() {
                                     <Plus size={18} className="text-white/60" strokeWidth={2.5} />
                                 </div>
                                 <p className="text-[11px] font-bold mb-0.5 text-white/70">Create Your Own</p>
-                                <p className="text-[9px] text-white/40 text-center">Start with a blank template</p>
+                                <p className="text-[10px] text-white/40 text-center">Start with a blank template</p>
                             </div>
                         </Link>
                     </motion.div>

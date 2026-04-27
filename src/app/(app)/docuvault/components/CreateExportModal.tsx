@@ -385,7 +385,7 @@ export default function CreateExportModal({
                             </div>
 
                             {/* ── Footer ── */}
-                            <div className="flex items-center justify-between p-4 pt-4 border-t border-white/10">
+                            <div className="flex items-center justify-between p-4 border-t border-white/10">
                                 <button
                                     onClick={onClose}
                                     disabled={isSubmitting}

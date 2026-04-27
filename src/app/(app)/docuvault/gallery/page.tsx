@@ -149,7 +149,7 @@ export default function DocuVaultGalleryPage() {
                             key={tab.id}
                             onClick={() => setActiveFilter(tab.id)}
                             aria-pressed={activeFilter === tab.id}
-                            className={`px-3 py-1.5 rounded-lg text-[9px] font-bold tracking-widest uppercase whitespace-nowrap cursor-pointer transition-all ${
+                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold tracking-widest uppercase whitespace-nowrap cursor-pointer transition-all ${
                                 activeFilter === tab.id
                                     ? 'bg-[linear-gradient(135deg,#E5A84A,#B47B04)] text-white border border-white/20 shadow-sm'
                                     : 'bg-white/5 text-white/60 border border-white/8 hover:bg-white/10 hover:text-white'
@@ -250,7 +250,7 @@ export default function DocuVaultGalleryPage() {
                 {/* Completed Documents Grid */}
                 <AnimatePresence>
                     {completeDocs.length > 0 && (
-                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                             {completeDocs.map((doc, i) => (
                                 <motion.div
                                     key={doc.id}
@@ -268,7 +268,7 @@ export default function DocuVaultGalleryPage() {
                                             <FileText size={18} className="text-white/80" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-[12px] font-bold truncate mb-1 text-white/90">
+                                            <p className="text-[13px] font-bold truncate mb-1 text-white/90">
                                                 {doc.title}
                                             </p>
                                             <div className="flex items-center gap-3 mb-3 flex-wrap">

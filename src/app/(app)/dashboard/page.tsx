@@ -168,7 +168,7 @@ function DashboardContent() {
                                     <h3 className="text-[13px] font-serif text-white mb-0.5 tracking-tight drop-shadow-sm">
                                         {card.label}
                                     </h3>
-                                    <p className="text-[8px] text-white/40 font-medium uppercase tracking-[0.15em] drop-shadow-sm">
+                                    <p className="text-[11px] text-white/40 font-medium uppercase tracking-[0.12em] drop-shadow-sm">
                                         {card.subtitle}
                                     </p>
                                     
@@ -189,10 +189,10 @@ function DashboardContent() {
                 >
                     <div className="glass-ethereal rounded-2xl p-3">
                         <div className="flex justify-between items-center mb-2">
-                            <h2 className="text-[9px] font-bold tracking-[0.2em] uppercase text-sapphire-muted">
+                            <h2 className="text-[11px] font-bold tracking-[0.16em] uppercase text-sapphire-muted">
                                 Recent Activity
                             </h2>
-                            <Link href="/incident-report" className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-widest transition-colors no-underline">
+                            <Link href="/incident-report" className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-[0.12em] transition-colors no-underline">
                                 View all
                             </Link>
                         </div>
@@ -238,7 +238,7 @@ function DashboardContent() {
                                             <Link href={`/incident-report/${incident._id}`} className="no-underline block">
                                                 <div className="group flex items-center gap-3 px-3 py-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] hover:border-white/[0.12] transition-all duration-200">
                                                     <div className="text-center shrink-0 w-8">
-                                                        <p className="text-[8px] font-bold uppercase text-white/40 leading-none">
+                                                        <p className="text-[10px] font-bold uppercase text-white/40 leading-none">
                                                             {date ? date.toLocaleDateString('en-US', { month: 'short' }) : '—'}
                                                         </p>
                                                         <p className="text-[11px] font-bold text-white/80 leading-none mt-0.5">
@@ -246,7 +246,7 @@ function DashboardContent() {
                                                         </p>
                                                     </div>
                                                     <span
-                                                        className="px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wide uppercase border shrink-0"
+                                                        className="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-[0.08em] uppercase border shrink-0"
                                                         style={{ 
                                                             background: cat?.color ? `color-mix(in srgb, ${cat.color} 12%, transparent)` : 'rgba(255,255,255,0.04)', 
                                                             color: cat?.color || 'rgba(255,255,255,0.7)',

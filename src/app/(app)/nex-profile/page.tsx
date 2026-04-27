@@ -164,6 +164,7 @@ export default function NexProfilePage() {
 
     return (
         <PageContainer>
+            <div className="max-w-3xl mx-auto w-full px-4 sm:px-8 pb-16">
             <PageHeader
                 icon={Siren}
                 title="NEX Profile"
@@ -495,6 +496,7 @@ export default function NexProfilePage() {
                         </Section>
                     )}
                 </div>
+            </div>
         </PageContainer>
     );
 }

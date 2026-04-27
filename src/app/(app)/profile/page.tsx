@@ -199,6 +199,7 @@ export default function ProfilePage() {
 
     return (
         <PageContainer>
+            <div className="max-w-3xl mx-auto w-full px-4 sm:px-8 pb-16">
             <PageHeader
                 icon={User}
                 title={
@@ -501,6 +502,7 @@ export default function ProfilePage() {
                         </div>
                     </Section>
                 </div>
+            </div>
         </PageContainer>
     );
 }

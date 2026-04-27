@@ -64,7 +64,7 @@ export function PageContainer({
 }) {
     return (
         <div className={`max-w-[72rem] mx-auto w-full py-4 lg:py-6 flex flex-col ${
-            noHorizontalPadding ? '' : 'px-4 lg:px-6'
+            noHorizontalPadding ? '' : 'px-6 lg:px-12'
         } ${
             lockHeight
                 ? 'min-h-[calc(100dvh-60px)] lg:h-[calc(100dvh-76px)] lg:overflow-hidden'

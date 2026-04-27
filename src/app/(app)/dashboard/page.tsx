@@ -144,48 +144,92 @@ function DashboardContent() {
                 description="What would you like to do?"
             />
 
-            {/* Pipeline Launcher Cards */}
-            <div className="space-y-6 pb-6">
-                <div id="pipeline-switcher" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    {pipelineCards.map((card, i) => {
-                        const Icon = card.icon;
-                        return (
-                            <Link key={card.label} href={card.href} className="no-underline block">
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.08 * i, duration: 0.5, type: 'spring' }}
-                                >
-                                  <div className="floating-element hyper-glass flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate py-4 sm:py-5">
-                                    <div className="mb-2 p-2 rounded-xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
-                                        <Icon 
-                                            size={18} 
-                                            weight="light" 
-                                            style={{ color: card.accent }} 
-                                            className="transition-transform duration-700 group-hover:scale-110 group-hover:rotate-3" 
-                                        />
-                                    </div>
-                                    <h3 className="text-[13px] font-serif text-white mb-0.5 tracking-tight drop-shadow-sm">
-                                        {card.label}
-                                    </h3>
-                                    <p className="text-[11px] text-white/40 font-medium uppercase tracking-[0.12em] drop-shadow-sm">
-                                        {card.subtitle}
-                                    </p>
-                                    
-                                    {/* Luxury glint effect */}
-                                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
-                                  </div>
-                                </motion.div>
-                            </Link>
-                        );
-                    })}
+            {/* Centered Dashboard Layout */}
+            <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 space-y-16 pb-16 pt-6">
+                
+                {/* Asymmetrical Pipeline Launcher */}
+                <div id="pipeline-switcher" className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 items-start">
+                    {/* Left Column (Even index cards) */}
+                    <div className="space-y-4 sm:space-y-8">
+                        {pipelineCards.map((card, i) => {
+                            if (i % 2 !== 0) return null;
+                            const Icon = card.icon;
+                            return (
+                                <Link key={card.label} href={card.href} className="no-underline block">
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.08 * i, duration: 0.5, type: 'spring' }}
+                                    >
+                                      <div className="floating-element hyper-glass flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate py-8 sm:py-10">
+                                        <div className="mb-3 p-3 rounded-2xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
+                                            <Icon 
+                                                size={24} 
+                                                weight="light" 
+                                                style={{ color: card.accent }} 
+                                                className="transition-transform duration-700 group-hover:scale-110 group-hover:rotate-3" 
+                                            />
+                                        </div>
+                                        <h3 className="text-[15px] font-serif text-white mb-1 tracking-tight drop-shadow-sm">
+                                            {card.label}
+                                        </h3>
+                                        <p className="text-[12px] text-white/40 font-medium uppercase tracking-[0.12em] drop-shadow-sm">
+                                            {card.subtitle}
+                                        </p>
+                                        
+                                        {/* Luxury glint effect */}
+                                        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+                                      </div>
+                                    </motion.div>
+                                </Link>
+                            );
+                        })}
+                    </div>
+
+                    {/* Right Column (Odd index cards) - Staggered down */}
+                    <div className="space-y-4 sm:space-y-8 sm:mt-16">
+                        {pipelineCards.map((card, i) => {
+                            if (i % 2 === 0) return null;
+                            const Icon = card.icon;
+                            return (
+                                <Link key={card.label} href={card.href} className="no-underline block">
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.08 * i, duration: 0.5, type: 'spring' }}
+                                    >
+                                      <div className="floating-element hyper-glass flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate py-8 sm:py-10">
+                                        <div className="mb-3 p-3 rounded-2xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
+                                            <Icon 
+                                                size={24} 
+                                                weight="light" 
+                                                style={{ color: card.accent }} 
+                                                className="transition-transform duration-700 group-hover:scale-110 group-hover:rotate-3" 
+                                            />
+                                        </div>
+                                        <h3 className="text-[15px] font-serif text-white mb-1 tracking-tight drop-shadow-sm">
+                                            {card.label}
+                                        </h3>
+                                        <p className="text-[12px] text-white/40 font-medium uppercase tracking-[0.12em] drop-shadow-sm">
+                                            {card.subtitle}
+                                        </p>
+                                        
+                                        {/* Luxury glint effect */}
+                                        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+                                      </div>
+                                    </motion.div>
+                                </Link>
+                            );
+                        })}
+                    </div>
                 </div>
 
-                {/* Recent Activity — compact inline list */}
+                {/* Recent Activity — compact centered list */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5, duration: 0.6, type: 'spring' }}
+                    className="max-w-2xl mx-auto w-full"
                 >
                     <div className="glass-ethereal rounded-2xl p-3">
                         <div className="flex justify-between items-center mb-2">

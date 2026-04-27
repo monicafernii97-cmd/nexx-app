@@ -199,7 +199,7 @@ export function GlobalWorkspaceRail() {
     return (
         <motion.aside
             initial={false}
-            animate={{ width: 280 }}
+            animate={{ width: 240 }}
             className="h-[calc(100dvh-2rem)] sticky top-4 flex flex-col hyper-glass rounded-[1.5rem] overflow-hidden z-30 glow-slate"
         >
             {/* Header */}
@@ -323,17 +323,6 @@ export function GlobalWorkspaceRail() {
                 </section>
                 </>
                 )}
-            </div>
-
-            {/* Footer CTA */}
-            <div className="px-4 py-4 border-t border-white/5 bg-white/[0.02]">
-                <Link
-                    href="/chat/overview"
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-300 hover:bg-indigo-500/20 transition-all no-underline shadow-lg"
-                >
-                    <FileText size={12} weight="light" />
-                    Strategic Overview
-                </Link>
             </div>
         </motion.aside>
     );

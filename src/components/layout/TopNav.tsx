@@ -4,8 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     CaretDown,
-    MagnifyingGlass,
-    Bell,
+    List,
     Plus,
     Briefcase,
     Check,
@@ -15,6 +14,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { useToast } from '@/components/feedback/ToastProvider';
+import { useSidebar } from '@/lib/sidebar-context';
 import type { Id } from '@convex/_generated/dataModel';
 
 /**
@@ -132,9 +132,22 @@ export function TopNav() {
         }
     }, [unarchiveCase, setActiveCaseId, showToast]);
 
+    const { toggleDrawer } = useSidebar();
+
     return (
-        <div className="h-[56px] flex items-center justify-between px-5 hyper-glass rounded-xl mb-3 glow-slate">
-            {/* ── Left: Case Switcher ── */}
+        <div className="h-[48px] lg:h-[56px] flex items-center justify-between px-3 lg:px-5 hyper-glass rounded-xl mb-2 lg:mb-3 glow-slate">
+            {/* ── Left: Hamburger (mobile) + Case Switcher ── */}
+            <div className="flex items-center gap-2">
+                {/* Hamburger — mobile only */}
+                <button
+                    type="button"
+                    onClick={toggleDrawer}
+                    className="lg:hidden w-9 h-9 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+                    aria-label="Open navigation menu"
+                >
+                    <List size={20} weight="bold" />
+                </button>
+
             <div ref={dropdownRef} className="relative">
                 <button
                     type="button"
@@ -270,27 +283,6 @@ export function TopNav() {
                     )}
                 </AnimatePresence>
             </div>
-
-            {/* ── Right: Actions ── */}
-            <div className="flex items-center gap-2">
-                <button
-                    type="button"
-                    disabled
-                    aria-label="Search (coming soon)"
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-white/20 transition-colors cursor-not-allowed"
-                    title="Search — coming soon"
-                >
-                    <MagnifyingGlass size={16} weight="light" />
-                </button>
-                <button
-                    type="button"
-                    disabled
-                    aria-label="Notifications (coming soon)"
-                    className="relative w-8 h-8 rounded-lg flex items-center justify-center text-white/20 transition-colors cursor-not-allowed"
-                    title="Notifications — coming soon"
-                >
-                    <Bell size={16} weight="light" />
-                </button>
             </div>
         </div>
     );

@@ -55,7 +55,7 @@ export function PageHeader({ icon: Icon, title, description, rightElement }: Pag
  */
 export function PageContainer({ children, lockHeight = false }: { children: ReactNode; lockHeight?: boolean }) {
     return (
-        <div className={`max-w-[72rem] mx-auto w-full px-6 lg:px-12 py-4 lg:py-6 flex flex-col ${
+        <div className={`max-w-[72rem] mx-auto w-full py-4 lg:py-6 flex flex-col ${
             lockHeight
                 ? 'min-h-[calc(100dvh-60px)] lg:h-[calc(100dvh-76px)] lg:overflow-hidden'
                 : 'min-h-[calc(100dvh-60px)]'

@@ -295,7 +295,7 @@ export default function NexProfilePage() {
                                             }}
                                             type="button"
                                             aria-pressed={selected}
-                                            className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-all border ${
+                                            className={`min-h-10 px-3 py-1.5 sm:px-4 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all border ${
                                                 selected
                                                     ? 'bg-[#123D7E] text-white border-transparent'
                                                     : 'bg-transparent border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.8)] hover:bg-[#123D7E]/20 hover:text-white'
@@ -323,7 +323,7 @@ export default function NexProfilePage() {
                                         onClick={() => toggleItem('behaviors', behavior)}
                                         type="button"
                                         aria-pressed={selected}
-                                        className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-all border ${
+                                        className={`min-h-10 px-3 py-1.5 sm:px-4 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all border ${
                                             selected 
                                                 ? 'bg-[#123D7E] text-white border-transparent' 
                                                 : 'bg-transparent border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.8)] hover:bg-[#123D7E]/20 hover:text-white'
@@ -379,7 +379,7 @@ export default function NexProfilePage() {
                                         onClick={() => toggleItem('manipulationTactics', tactic)}
                                         type="button"
                                         aria-pressed={selected}
-                                        className={`px-4 py-2 rounded-md text-[13px] font-medium transition-all border ${
+                                        className={`min-h-10 px-3 py-1.5 sm:px-4 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all border ${
                                             selected 
                                                 ? 'bg-[#123D7E] text-white border-transparent' 
                                                 : 'bg-transparent border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.8)] hover:bg-[#123D7E]/20 hover:text-white'

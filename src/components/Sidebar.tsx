@@ -379,10 +379,12 @@ export default function Sidebar() {
 
     return (
         <>
-            {/* Desktop: inline sidebar */}
-            <div className="hidden lg:block sticky top-4 h-[calc(100dvh-2rem)] z-40">
-                {sidebarContent}
-            </div>
+            {/* Desktop: inline sidebar — unmount when mobile drawer is open to prevent duplicate DOM IDs */}
+            {!isDrawerOpen && (
+                <div className="hidden lg:block sticky top-4 h-[calc(100dvh-2rem)] z-40">
+                    {sidebarContent}
+                </div>
+            )}
 
             {/* Mobile: drawer overlay */}
             <AnimatePresence>

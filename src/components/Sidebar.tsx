@@ -26,7 +26,7 @@ import {
     FileText,
     IconWeight,
 } from '@phosphor-icons/react';
-import { useState, useMemo, useCallback, useEffect, type ComponentType, type CSSProperties } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, type ComponentType, type CSSProperties } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 import { navIdSelector } from '@/lib/tourUtils';
@@ -83,6 +83,7 @@ const navItems: NavItem[] = [
 
 /** Floating ethereal glass sidebar component with mobile drawer support. */
 export default function Sidebar() {
+    const drawerPanelRef = useRef<HTMLDivElement>(null);
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
     const { user, isLoaded } = useUser();
@@ -93,6 +94,27 @@ export default function Sidebar() {
     useEffect(() => {
         closeDrawer();
     }, [pathname, closeDrawer]);
+
+    // Force expanded state when mobile drawer opens (icon-only is unusable on phones)
+    useEffect(() => {
+        if (isDrawerOpen) setCollapsed(false);
+    }, [isDrawerOpen]);
+
+    // Keyboard dismissal (Escape) + focus management for mobile drawer
+    useEffect(() => {
+        if (!isDrawerOpen) return;
+        const previous = document.activeElement as HTMLElement | null;
+        drawerPanelRef.current?.focus();
+
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') closeDrawer();
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => {
+            document.removeEventListener('keydown', onKeyDown);
+            previous?.focus?.();
+        };
+    }, [isDrawerOpen, closeDrawer]);
 
     /** Compute which nav groups are expanded. */
     const expandedItems = useMemo(() => {
@@ -372,15 +394,21 @@ export default function Sidebar() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={closeDrawer}
+                            aria-hidden="true"
                             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] lg:hidden"
                         />
                         {/* Drawer panel */}
                         <motion.div
+                            ref={drawerPanelRef}
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label="Sidebar navigation"
+                            tabIndex={-1}
                             initial={{ x: -280 }}
                             animate={{ x: 0 }}
                             exit={{ x: -280 }}
                             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                            className="fixed top-0 left-0 bottom-0 z-[70] w-[260px] p-2 lg:hidden"
+                            className="fixed top-0 left-0 bottom-0 z-[70] w-[260px] p-2 lg:hidden outline-none"
                         >
                             <div className="h-full">
                                 {sidebarContent}

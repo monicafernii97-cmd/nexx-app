@@ -30,12 +30,23 @@ import { motion } from 'framer-motion';
  * └──────────┴───────────────────────────────┘
  */
 
-/** Routes where the Insights Rail is relevant */
+/** Routes where the Insights Rail is relevant — segment-aware to avoid false positives (e.g. '/chatbot'). */
 function useShowInsightsRail() {
     const pathname = usePathname();
-    return pathname?.startsWith('/chat') || pathname?.startsWith('/incident-report');
+    return (
+        pathname === '/chat' ||
+        pathname?.startsWith('/chat/') ||
+        pathname === '/incident-report' ||
+        pathname?.startsWith('/incident-report/')
+    );
 }
 
+/**
+ * Authenticated app shell — mobile-first responsive layout.
+ *
+ * Renders sidebar (drawer on mobile, inline on lg+), TopNav, main content area,
+ * and the Insights Rail (only on workspace routes, only on xl+).
+ */
 export default function AppShellLayout({ children }: { children: ReactNode }) {
     const showRail = useShowInsightsRail();
 

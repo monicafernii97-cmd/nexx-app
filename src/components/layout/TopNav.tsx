@@ -132,7 +132,7 @@ export function TopNav() {
         }
     }, [unarchiveCase, setActiveCaseId, showToast]);
 
-    const { toggleDrawer } = useSidebar();
+    const { toggleDrawer, isDrawerOpen } = useSidebar();
 
     return (
         <div className="h-[48px] lg:h-[56px] flex items-center justify-between px-3 lg:px-5 hyper-glass rounded-xl mb-2 lg:mb-3 glow-slate">
@@ -143,7 +143,8 @@ export function TopNav() {
                     type="button"
                     onClick={toggleDrawer}
                     className="lg:hidden w-9 h-9 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
-                    aria-label="Open navigation menu"
+                    aria-label={isDrawerOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                    aria-expanded={isDrawerOpen}
                 >
                     <List size={20} weight="bold" />
                 </button>

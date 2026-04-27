@@ -13,6 +13,7 @@ interface SidebarContextValue {
 
 const SidebarContext = createContext<SidebarContextValue | null>(null);
 
+/** Provides sidebar drawer state (open/close) to child components via React context. */
 export function SidebarProvider({ children }: { children: ReactNode }) {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -26,6 +27,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     );
 }
 
+/** Returns the sidebar drawer state and controls. Must be used within a SidebarProvider. */
 export function useSidebar() {
     const ctx = useContext(SidebarContext);
     if (!ctx) throw new Error('useSidebar must be used within a SidebarProvider');

@@ -117,15 +117,15 @@ function ResourceCard({ resource }: { resource: ResourceEntry }) {
     return (
         <motion.div
             whileHover={{ scale: 1.02, y: -4 }}
-            className={`p-5 group flex flex-col justify-between h-full bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_16px_48px_rgba(0,0,0,0.5)] transition-all duration-300 rounded-2xl relative overflow-hidden ${safeUrl ? 'hover:border-white/40 cursor-pointer' : ''}`}
+            className={`p-3 group flex flex-col justify-between h-full bg-white/5 backdrop-blur-xl border border-white/15 shadow-sm hover:shadow-md transition-all duration-300 rounded-xl relative overflow-hidden ${safeUrl ? 'hover:border-white/30 cursor-pointer' : ''}`}
         >
             <div className="flex items-start justify-between gap-3 mb-4">
                 <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-[15px] text-white mb-1 truncate group-hover:text-[#60A5FA] transition-colors drop-shadow-sm relative z-10 pointer-events-none">
+                    <h4 className="font-bold text-[12px] text-white mb-0.5 truncate group-hover:text-[#60A5FA] transition-colors relative z-10 pointer-events-none">
                         {resource.name}
                     </h4>
                     {resource.description && (
-                        <p className="text-[13px] text-white/80 line-clamp-2 leading-relaxed font-medium relative z-10 pointer-events-none">
+                        <p className="text-[11px] text-white/70 line-clamp-2 leading-relaxed font-medium relative z-10 pointer-events-none">
                             {resource.description}
                         </p>
                     )}
@@ -202,12 +202,12 @@ function SectionHeader({
         <div className="mb-6">
             <div className="flex items-center gap-4 mb-2">
                 <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_8px_32px_rgba(0,0,0,0.4)] backdrop-blur-xl border border-white/20 shrink-0"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm backdrop-blur-xl border border-white/15 shrink-0"
                     style={{ background: iconBg }}
                 >
-                    <Icon size={24} weight={weight} color={iconColor} className="drop-shadow-md" />
+                    <Icon size={16} weight={weight} color={iconColor} />
                 </div>
-                <h2 className="text-[15px] font-bold tracking-[0.2em] uppercase text-white drop-shadow-sm">
+                <h2 className="text-[11px] font-bold tracking-[0.15em] uppercase text-white">
                     {label}
                 </h2>
             </div>
@@ -242,7 +242,7 @@ function FinderHeroCard({
     return (
         <motion.div
             whileHover={{ y: -4 }}
-            className="p-6 md:p-8 h-full rounded-[2rem] bg-white/5 backdrop-blur-3xl border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_12px_40px_rgba(0,0,0,0.4)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_20px_60px_rgba(0,0,0,0.6)] transition-all duration-300 relative overflow-hidden group"
+            className="p-4 h-full rounded-xl bg-white/5 backdrop-blur-xl border border-white/15 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group"
         >
             <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-[100px] pointer-events-none opacity-20 transition-opacity duration-500 group-hover:opacity-40 ${title.includes('Attorney') ? 'bg-[#60A5FA]' : 'bg-[#10B981]'}`} />
             
@@ -254,7 +254,7 @@ function FinderHeroCard({
                     <Icon size={28} weight="duotone" className={title.includes('Attorney') ? 'text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]' : 'text-[#10B981] drop-shadow-[0_2px_8px_rgba(16,185,129,0.8)]'} />
                 </div>
                 <div>
-                    <h3 className="font-serif font-bold text-2xl text-white mb-1 tracking-tight">
+                    <h3 className="font-serif font-bold text-lg text-white mb-0.5 tracking-tight">
                         {title}
                     </h3>
                     <p className="text-[14px] font-medium text-white/80">
@@ -568,7 +568,7 @@ export default function ResourcesPage() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
-                    className="p-6 md:p-8 mb-8 rounded-[2rem] border border-[#E5A84A]/30 bg-white/5 backdrop-blur-3xl shadow-[0_8px_32px_rgba(0,0,0,0.3)]"
+                    className="p-4 mb-6 rounded-xl border border-[#E5A84A]/20 bg-white/5 backdrop-blur-xl shadow-sm"
                 >
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                         <div
@@ -668,7 +668,7 @@ export default function ResourcesPage() {
                         <motion.div
                             whileHover={{ y: -4 }}
                             transition={{ duration: 0.5, ease: "easeOut" }}
-                            className="glass-ethereal rounded-[2rem] p-6 md:p-8 cursor-pointer group shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:shadow-[0_15px_45px_rgba(18,61,126,0.8)] transition-all border border-white/20 overflow-hidden relative"
+                            className="glass-ethereal rounded-xl p-4 cursor-pointer group shadow-sm hover:shadow-md transition-all border border-white/15 overflow-hidden relative"
                         >
                             {/* Hover Glow Background Map */}
                             <div className="absolute inset-0 bg-gradient-to-r from-[#123D7E]/0 via-[#123D7E]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
@@ -682,7 +682,7 @@ export default function ResourcesPage() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-3 mb-2">
-                                        <h3 className="font-serif font-bold text-2xl text-white">
+                                        <h3 className="font-serif font-bold text-lg text-white">
                                             My Case
                                         </h3>
                                         <span
@@ -723,7 +723,7 @@ export default function ResourcesPage() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.5 }}
-                className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12"
+                className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8"
             >
                 <FinderHeroCard
                     icon={Scales}

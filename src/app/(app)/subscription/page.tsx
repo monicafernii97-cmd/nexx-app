@@ -203,7 +203,7 @@ function SubscriptionContent() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.6 }}
-                className="glass-ethereal rounded-3xl p-6 md:p-8 mb-8 relative overflow-hidden"
+                className="glass-ethereal rounded-xl p-4 mb-6 relative overflow-hidden"
             >
                 <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute top-[-20%] right-[-10%] w-[40%] h-[60%] bg-[#1A4B9B]/15 rounded-full blur-[80px]" />
@@ -214,7 +214,7 @@ function SubscriptionContent() {
                         <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-[var(--champagne)] mb-2">
                             Current Plan
                         </p>
-                        <h2 className="text-2xl font-serif font-bold text-white tracking-tight mb-1">
+                        <h2 className="text-lg font-serif font-bold text-white tracking-tight mb-0.5">
                             {currentConfig.label}
                         </h2>
                         <p className="text-sm text-white/50">
@@ -225,12 +225,12 @@ function SubscriptionContent() {
                     </div>
 
                     <div className="flex flex-wrap gap-4">
-                        <div className="rounded-2xl bg-[#0A1128] border border-[rgba(255,255,255,0.08)] px-5 py-3 text-center min-w-[120px]">
+                        <div className="rounded-xl bg-[#0A1128] border border-[rgba(255,255,255,0.08)] px-4 py-2 text-center min-w-[100px]">
                             <div className="flex items-center justify-center gap-2 mb-1">
                                 <ChatCircleText size={16} weight="fill" color="#60A5FA" />
                                 <span className="text-[10px] font-bold tracking-wider uppercase text-white/40">Premium AI / Day</span>
                             </div>
-                            <p className="text-lg font-serif font-bold text-white">
+                            <p className="text-base font-serif font-bold text-white">
                                 {currentConfig.gpt4oDailyLimit === -1 ? '∞' : currentConfig.gpt4oDailyLimit}
                             </p>
                         </div>
@@ -254,7 +254,7 @@ function SubscriptionContent() {
                             initial={{ opacity: 0, y: 30 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.3 + i * 0.1, duration: 0.6 }}
-                            className={`relative rounded-[2rem] p-6 flex flex-col border transition-all ${
+                            className={`relative rounded-xl p-4 flex flex-col border transition-all ${
                                 isCurrent
                                     ? 'bg-gradient-to-b from-[#0F1D3D] to-[#0A1128] border-[var(--champagne)] shadow-[0_4px_30px_rgba(229,168,74,0.15)]'
                                     : plan.highlight
@@ -265,7 +265,7 @@ function SubscriptionContent() {
                             {/* Badge */}
                             {(plan.badge || isCurrent) && (
                                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                                    <span className={`whitespace-nowrap px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm ${
+                                    <span className={`whitespace-nowrap px-3 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest shadow-sm ${
                                         isCurrent
                                             ? 'bg-gradient-to-r from-[#E5A84A] to-[#C88B2E] text-[#0A1128]'
                                             : 'bg-[#1A4B9B] text-white/80'
@@ -285,7 +285,7 @@ function SubscriptionContent() {
 
                             {/* Price */}
                             <div className="flex items-baseline gap-1 mb-1">
-                                <span className="text-2xl font-serif font-bold text-white tracking-tight">
+                                <span className="text-xl font-serif font-bold text-white tracking-tight">
                                     {config.priceUsd === 0 ? '$0' : `$${config.priceUsd}`}
                                 </span>
                                 <span className="text-sm text-white/40">
@@ -294,16 +294,16 @@ function SubscriptionContent() {
                             </div>
 
                             {/* Description */}
-                            <p className="text-[13px] text-white/50 leading-relaxed mb-5">
+                            <p className="text-[11px] text-white/50 leading-relaxed mb-4">
                                 {plan.description}
                             </p>
 
                             {/* Features */}
-                            <ul className="flex-1 space-y-2.5 mb-6">
+                            <ul className="flex-1 space-y-2 mb-4">
                                 {plan.features.map((feature) => (
                                     <li key={feature} className="flex items-start gap-2">
                                         <Check size={14} weight="bold" className="mt-0.5 shrink-0 text-[var(--champagne)]" />
-                                        <span className="text-[13px] text-white/70 leading-snug">{feature}</span>
+                                        <span className="text-[11px] text-white/70 leading-snug">{feature}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -335,7 +335,7 @@ function SubscriptionContent() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.7, duration: 0.6 }}
-                    className="md:col-span-2 lg:col-span-4 mt-2 rounded-[2rem] p-6 md:p-8 border border-[rgba(255,255,255,0.06)] bg-gradient-to-b from-[#0F1D3D]/60 to-[#0A1128]/80 relative overflow-hidden hover:border-[rgba(255,255,255,0.12)] transition-all shadow-[0_8px_40px_rgba(0,0,0,0.4)]"
+                    className="md:col-span-2 lg:col-span-4 mt-2 rounded-xl p-4 border border-[rgba(255,255,255,0.06)] bg-gradient-to-b from-[#0F1D3D]/60 to-[#0A1128]/80 relative overflow-hidden hover:border-[rgba(255,255,255,0.10)] transition-all shadow-sm"
                 >
                     <div className="absolute inset-0 pointer-events-none">
                         <div className="absolute bottom-[-20%] left-[-10%] w-[35%] h-[50%] bg-[#E5A84A]/5 rounded-full blur-[80px]" />

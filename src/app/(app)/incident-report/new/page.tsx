@@ -342,7 +342,7 @@ export default function NewIncidentPage() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                         transition={{ duration: 0.4 }}
-                        className="glass-ethereal rounded-[2rem] p-6 md:p-8 space-y-8"
+                        className="glass-ethereal rounded-xl p-6 md:p-8 space-y-8"
                     >
                         {/* Voice Record Button */}
                         <div className="text-center">
@@ -530,7 +530,7 @@ export default function NewIncidentPage() {
                             <button
                                 onClick={handleAnalyze}
                                 disabled={!narrative.trim() || isAnalyzing || !activeCaseId}
-                                className="w-full flex items-center justify-center gap-2.5 rounded-[2rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,255,255,0.02))] border border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.5)] hover:-translate-y-1 transition-all disabled:scale-100 disabled:opacity-50 py-5 text-[15px] text-white font-bold tracking-wide backdrop-blur-md cursor-pointer group"
+                                className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-[linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,255,255,0.02))] border border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)] shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.5)] hover:-translate-y-1 transition-all disabled:scale-100 disabled:opacity-50 py-5 text-[15px] text-white font-bold tracking-wide backdrop-blur-md cursor-pointer group"
                             >
                                 {isAnalyzing ? (
                                     <>
@@ -546,7 +546,7 @@ export default function NewIncidentPage() {
                             <button
                                 onClick={handleSaveDraft}
                                 disabled={!narrative.trim() || isAnalyzing || isSaving || !activeCaseId}
-                                className="w-full flex items-center justify-center gap-2.5 rounded-[2rem] bg-transparent border border-[rgba(255,255,255,0.12)] hover:border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.04)] transition-all disabled:opacity-40 py-4 text-[13px] text-white/70 hover:text-white font-bold tracking-widest uppercase backdrop-blur-md cursor-pointer"
+                                className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-transparent border border-[rgba(255,255,255,0.12)] hover:border-[rgba(255,255,255,0.3)] hover:bg-[rgba(255,255,255,0.04)] transition-all disabled:opacity-40 py-4 text-[13px] text-white/70 hover:text-white font-bold tracking-widest uppercase backdrop-blur-md cursor-pointer"
                             >
                                 <FloppyDisk size={16} weight="duotone" /> {isSaving ? 'Saving...' : 'Save as Draft'}
                             </button>
@@ -671,7 +671,7 @@ export default function NewIncidentPage() {
 
                 {/* Step: Confirmed */}
                 {step === 'confirmed' && (
-                    <motion.div key="confirmed" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-ethereal p-8 text-center rounded-[2rem] border-white">
+                    <motion.div key="confirmed" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-ethereal p-4 text-center rounded-xl border-white">
                         <div
                             className="w-14 h-14 rounded-full mx-auto mb-5 flex items-center justify-center bg-emerald shadow-[0_8px_24px_rgba(90,158,111,0.25)]"
                         >

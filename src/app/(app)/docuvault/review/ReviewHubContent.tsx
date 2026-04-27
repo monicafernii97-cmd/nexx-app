@@ -590,7 +590,7 @@ function DraftingPhaseUI({
 
     return (
         <div className="flex items-center justify-center h-full">
-            <div className="w-full max-w-md p-8 rounded-2xl bg-[rgba(10,17,40,0.8)] border border-white/10 backdrop-blur-xl">
+            <div className="w-full max-w-md p-4 rounded-2xl bg-[rgba(10,17,40,0.8)] border border-white/10 backdrop-blur-xl">
                 <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-[#1A4B9B]/20 border border-[#1A4B9B]/40 flex items-center justify-center">
                         <SpinnerGap size={20} className="text-[#60A5FA] animate-spin" />
@@ -675,7 +675,7 @@ function CompletedPhaseUI({
 
     return (
         <div className="flex items-center justify-center h-full">
-            <div className="w-full max-w-lg p-8 rounded-2xl bg-[rgba(10,17,40,0.8)] border border-white/10 backdrop-blur-xl">
+            <div className="w-full max-w-lg p-4 rounded-2xl bg-[rgba(10,17,40,0.8)] border border-white/10 backdrop-blur-xl">
                 {/* Success header */}
                 <div className="flex items-center gap-4 mb-6">
                     <div className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
@@ -781,7 +781,7 @@ function ErrorPhaseUI({
 
     return (
         <div className="flex items-center justify-center h-full">
-            <div className="w-full max-w-md p-8 rounded-2xl bg-[rgba(10,17,40,0.8)] border border-red-500/20 backdrop-blur-xl">
+            <div className="w-full max-w-md p-4 rounded-2xl bg-[rgba(10,17,40,0.8)] border border-red-500/20 backdrop-blur-xl">
                 <div className="flex items-center gap-4 mb-4">
                     <div className="w-12 h-12 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center">
                         <XCircle size={28} weight="fill" className="text-red-400" />

@@ -173,7 +173,7 @@ export default function NexProfilePage() {
                         <button
                             onClick={handleSave}
                             disabled={saving}
-                            className="bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white rounded-xl px-6 py-2.5 text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 transition-all font-medium"
+                            className="bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white rounded-lg px-4 py-2 text-xs flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md disabled:opacity-50 transition-all font-medium"
                         >
                             {saved ? <Check size={18} weight="bold" /> : <FloppyDisk size={18} weight="bold" />}
                             {saving ? 'Saving...' : saved ? 'Saved Successfully' : 'Save Profile'}
@@ -192,16 +192,16 @@ export default function NexProfilePage() {
                 }
             />
 
-                <div className="space-y-6">
+                <div className="space-y-5">
                     {/* ── NEX Overview ── */}
-                    <Section icon={<Siren size={20} className="text-rose" weight="duotone" />} title="NEX Overview">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <Section icon={<Siren size={16} className="text-rose" weight="duotone" />} title="NEX Overview">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
                                 <label className="text-sm text-white mb-2 block">
                                     Nickname for your NEX
                                 </label>
                                 <input
-                                    className="w-full text-base p-3 rounded-xl bg-white text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
+                                    className="w-full text-sm p-2 rounded-lg bg-white text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
                                     value={form.nickname}
                                     onChange={(e) => setForm({ ...form, nickname: e.target.value })}
                                     placeholder='e.g. "The NEX", a codename'
@@ -213,7 +213,7 @@ export default function NexProfilePage() {
                                     Relationship
                                 </label>
                                 <select
-                                    className="w-full text-base p-3 rounded-xl bg-white text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
+                                    className="w-full text-sm p-2 rounded-lg bg-white text-[#0A1128] focus:outline-none focus:ring-2 focus:ring-[#1A4B9B]"
                                     value={form.relationship}
                                     onChange={(e) => setForm({ ...form, relationship: e.target.value })}
                                 >
@@ -242,7 +242,7 @@ export default function NexProfilePage() {
                     </Section>
 
                     {/* ── Legal Identity ── */}
-                    <Section icon={<Scales size={20} className="text-[#60A5FA]" weight="duotone" />} title="Legal Identity">
+                    <Section icon={<Scales size={16} className="text-[#60A5FA]" weight="duotone" />} title="Legal Identity">
                         <p className="text-[13px] text-white/90 mb-4">
                             These details ensure NEXX refers to the opposing party appropriately in court documents, incident reports, and generated filings.
                         </p>
@@ -294,7 +294,7 @@ export default function NexProfilePage() {
                                             }}
                                             type="button"
                                             aria-pressed={selected}
-                                            className={`px-4 py-2 rounded-md text-[13px] font-medium transition-all border ${
+                                            className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-all border ${
                                                 selected
                                                     ? 'bg-[#123D7E] text-white border-transparent'
                                                     : 'bg-transparent border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.8)] hover:bg-[#123D7E]/20 hover:text-white'
@@ -309,7 +309,7 @@ export default function NexProfilePage() {
                     </Section>
 
                     {/* ── Behavioral Patterns ── */}
-                    <Section icon={<Brain size={20} className="text-purple-400" weight="duotone" />} title="Behavioral Patterns">
+                    <Section icon={<Brain size={16} className="text-purple-400" weight="duotone" />} title="Behavioral Patterns">
                         <p className="text-[13px] text-white/90 mb-4">
                             Select all behaviors you&apos;ve observed. NEXX will flag these proactively in conversations.
                         </p>
@@ -322,7 +322,7 @@ export default function NexProfilePage() {
                                         onClick={() => toggleItem('behaviors', behavior)}
                                         type="button"
                                         aria-pressed={selected}
-                                        className={`px-4 py-2 rounded-md text-[13px] font-medium transition-all border ${
+                                        className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-all border ${
                                             selected 
                                                 ? 'bg-[#123D7E] text-white border-transparent' 
                                                 : 'bg-transparent border-[rgba(255,255,255,0.15)] text-[rgba(255,255,255,0.8)] hover:bg-[#123D7E]/20 hover:text-white'
@@ -336,7 +336,7 @@ export default function NexProfilePage() {
                     </Section>
 
                     {/* ── Communication Style ── */}
-                    <Section icon={<ChatTeardropText size={20} className="text-emerald" weight="duotone" />} title="Communication Style">
+                    <Section icon={<ChatTeardropText size={16} className="text-emerald" weight="duotone" />} title="Communication Style">
                         <p className="text-[13px] text-white/90 mb-4">
                             How does your NEX typically communicate?
                         </p>
@@ -365,7 +365,7 @@ export default function NexProfilePage() {
                     </Section>
 
                     {/* ── Manipulation Tactics ── */}
-                    <Section icon={<Warning size={20} color="#F59E0B" weight="duotone" />} title="Known Manipulation Tactics">
+                    <Section icon={<Warning size={16} color="#F59E0B" weight="duotone" />} title="Known Manipulation Tactics">
                         <p className="text-[13px] text-white/90 mb-4">
                             Select tactics your NEX uses. NEXX will watch for these in your descriptions.
                         </p>
@@ -392,7 +392,7 @@ export default function NexProfilePage() {
                     </Section>
 
                     {/* ── Trigger Patterns ── */}
-                    <Section icon={<Strategy size={20} className="text-[#60A5FA]" weight="duotone" />} title="Trigger Patterns">
+                    <Section icon={<Strategy size={16} className="text-[#60A5FA]" weight="duotone" />} title="Trigger Patterns">
                         <p className="text-[13px] text-white/90 mb-4">
                             What sets your NEX off? Add specific patterns you&apos;ve noticed.
                         </p>
@@ -506,13 +506,13 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
         <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-7 border border-[rgba(255,255,255,0.1)] rounded-[1.5rem] bg-[#0A1128]/80 relative overflow-hidden"
+            className="p-4 border border-[rgba(255,255,255,0.08)] rounded-xl bg-[#0A1128]/80 relative overflow-hidden"
         >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 mb-3">
                 {icon}
-                <h2 className="text-lg font-bold tracking-tight text-white">{title}</h2>
+                <h2 className="text-sm font-bold tracking-tight text-white">{title}</h2>
             </div>
-            <div className="space-y-4 relative z-10">{children}</div>
+            <div className="space-y-3 relative z-10">{children}</div>
         </motion.div>
     );
 }

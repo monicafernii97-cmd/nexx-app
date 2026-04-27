@@ -89,7 +89,7 @@ export default function ChatListPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="glass-ethereal p-6 mb-8 rounded-[2rem] border-white"
+                className="glass-ethereal p-6 mb-8 rounded-xl border-white"
             >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>

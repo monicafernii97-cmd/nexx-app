@@ -121,10 +121,10 @@ export default function TemplateGalleryPage() {
                 rightElement={
                     <Link
                         href="/docuvault"
-                        className="w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all bg-white/10 border border-white/30 hover:bg-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_4px_12px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-all bg-white/10 border border-white/20 hover:bg-white/20 shadow-sm backdrop-blur-xl"
                         aria-label="Back to DocuVault"
                     >
-                        <ArrowLeft size={20} strokeWidth={3} className="text-white drop-shadow-sm" />
+                        <ArrowLeft size={14} strokeWidth={3} className="text-white drop-shadow-sm" />
                     </Link>
                 }
             />
@@ -134,12 +134,12 @@ export default function TemplateGalleryPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="mb-8"
+                className="mb-5"
             >
                 <div className="relative group">
                     <Search
-                        size={22}
-                        className="absolute left-6 top-1/2 -translate-y-1/2 text-white/70 group-focus-within:text-[#60A5FA] transition-colors"
+                        size={16}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 group-focus-within:text-[#60A5FA] transition-colors"
                     />
                     <input
                         type="text"
@@ -147,7 +147,7 @@ export default function TemplateGalleryPage() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search templates..."
                         aria-label="Search templates"
-                        className="w-full h-16 pl-16 pr-6 rounded-[2rem] bg-white/5 backdrop-blur-2xl border border-white/20 text-[16px] text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-[#60A5FA]/50 focus:bg-white/10 transition-all shadow-[inset_0_1px_2px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)] font-medium"
+                        className="w-full h-10 pl-10 pr-4 rounded-xl bg-white/5 backdrop-blur-2xl border border-white/15 text-[12px] text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-[#60A5FA]/40 focus:bg-white/8 transition-all shadow-sm font-medium"
                     />
                 </div>
             </motion.div>
@@ -157,24 +157,24 @@ export default function TemplateGalleryPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 }}
-                className="flex items-center justify-between mb-10"
+                className="flex items-center justify-between mb-6"
             >
-                <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+                <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
                     {filterTabs.map((tab) => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveFilter(tab.id)}
-                            className={`px-6 py-3 rounded-full text-[13px] font-bold tracking-widest uppercase whitespace-nowrap cursor-pointer transition-all shadow-sm ${
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-bold tracking-widest uppercase whitespace-nowrap cursor-pointer transition-all ${
                                 activeFilter === tab.id
-                                    ? 'bg-[linear-gradient(135deg,#E5A84A,#B47B04)] text-white border border-white/30 shadow-[inset_0_1px_2px_rgba(255,255,255,0.5),0_8px_24px_rgba(229,168,74,0.6)] drop-shadow-sm'
-                                    : 'bg-white/5 backdrop-blur-xl text-white border border-white/10 hover:bg-white/10 hover:border-white/30 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)]'
+                                    ? 'bg-[linear-gradient(135deg,#E5A84A,#B47B04)] text-white border border-white/20 shadow-sm'
+                                    : 'bg-white/5 text-white/60 border border-white/8 hover:bg-white/10 hover:text-white'
                             }`}
                         >
                             {tab.label}
                         </button>
                     ))}
                 </div>
-                <p className="text-[14px] font-bold tracking-wide text-white drop-shadow-sm flex-shrink-0 ml-4">
+                <p className="text-[10px] font-bold tracking-wide text-white/50 shrink-0 ml-3">
                     {filteredTemplates.length} template{filteredTemplates.length !== 1 ? 's' : ''}
                 </p>
             </motion.div>
@@ -185,77 +185,59 @@ export default function TemplateGalleryPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
             >
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 mb-6">
                     {filteredTemplates.map(({ template, tabLabel }, i) => (
                         <motion.button
                             type="button"
                             key={template.id}
-                            initial={{ opacity: 0, y: 12 }}
+                            initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.03 * Math.min(i, 15) }}
+                            transition={{ delay: 0.02 * Math.min(i, 15) }}
                             onClick={() => setPreviewTemplate(template)}
-                            className="p-5 rounded-[1.5rem] group transition-all border border-white/10 bg-white/5 backdrop-blur-2xl hover:bg-white/10 hover:border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-1 text-left flex flex-col h-full"
+                            className="p-3 rounded-xl group transition-all border border-white/8 bg-white/[0.03] backdrop-blur-xl hover:bg-white/[0.07] hover:border-white/15 shadow-sm hover:-translate-y-0.5 text-left flex flex-col h-full"
                         >
                             {/* Document preview icon */}
                             <div
-                                className="w-full h-20 rounded-2xl mb-4 flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-white/20 shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),0_8px_24px_rgba(0,0,0,0.4)] transition-all group-hover:border-white/40"
+                                className="w-full h-12 rounded-lg mb-2.5 flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/15 transition-all group-hover:border-white/25"
                             >
-                                <FileText size={32} className="text-white drop-shadow-sm opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-transform duration-300" />
+                                <FileText size={18} className="text-white/80 group-hover:text-white group-hover:scale-105 transition-all duration-200" />
                             </div>
 
                             {/* Category badge */}
-                            <div className="flex items-center gap-2 mb-3">
-                                <span
-                                    className="text-[11px] font-bold tracking-widest uppercase bg-white/10 text-white border border-white/20 shadow-sm px-3 py-1.5 rounded-full"
-                                >
+                            <div className="flex items-center gap-1.5 mb-2">
+                                <span className="text-[8px] font-bold tracking-widest uppercase bg-white/8 text-white/70 border border-white/10 px-2 py-0.5 rounded">
                                     {tabLabel}
                                 </span>
                             </div>
 
                             {/* Title */}
-                            <p
-                                className="text-[18px] font-bold leading-snug mb-2 line-clamp-2 text-white drop-shadow-sm flex-1"
-                            >
+                            <p className="text-[12px] font-bold leading-snug mb-1 line-clamp-2 text-white/90 flex-1">
                                 {template.title}
                             </p>
 
                             {/* Description */}
-                            <p
-                                className="text-[14px] leading-relaxed line-clamp-2 text-white font-medium mb-4"
-                            >
+                            <p className="text-[10px] leading-relaxed line-clamp-2 text-white/40 mb-2">
                                 {template.description}
                             </p>
 
                             {/* Requirement indicators */}
-                            <div className="flex items-center flex-wrap gap-x-3 gap-y-2 mt-auto pt-4 border-t border-white/10">
+                            <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-auto pt-2 border-t border-white/6">
                                 {template.requiresDeclaration && (
-                                    <div
-                                        className="flex items-center gap-1.5"
-                                        title="Requires Declaration"
-                                    >
-                                        <Shield size={14} className="text-white drop-shadow-sm" />
-                                        <span className="text-[11px] font-bold tracking-wide uppercase text-white">
-                                            Decl.
-                                        </span>
+                                    <div className="flex items-center gap-1" title="Requires Declaration">
+                                        <Shield size={10} className="text-white/50" />
+                                        <span className="text-[8px] font-bold tracking-wide uppercase text-white/50">Decl.</span>
                                     </div>
                                 )}
                                 {template.requiresProposedOrder && (
-                                    <div
-                                        className="flex items-center gap-1.5"
-                                        title="Requires Proposed Order"
-                                    >
-                                        <Scale size={14} className="text-white drop-shadow-sm" />
-                                        <span className="text-[11px] font-bold tracking-wide uppercase text-white">
-                                            Order
-                                        </span>
+                                    <div className="flex items-center gap-1" title="Requires Proposed Order">
+                                        <Scale size={10} className="text-white/50" />
+                                        <span className="text-[8px] font-bold tracking-wide uppercase text-white/50">Order</span>
                                     </div>
                                 )}
                                 {template.supportsExhibits && (
-                                    <div className="flex items-center gap-1.5" title="Supports Exhibits">
-                                        <Paperclip size={14} className="text-white drop-shadow-sm" />
-                                        <span className="text-[11px] font-bold tracking-wide uppercase text-white">
-                                            Exhibits
-                                        </span>
+                                    <div className="flex items-center gap-1" title="Supports Exhibits">
+                                        <Paperclip size={10} className="text-white/50" />
+                                        <span className="text-[8px] font-bold tracking-wide uppercase text-white/50">Exhibits</span>
                                     </div>
                                 )}
                             </div>
@@ -264,27 +246,17 @@ export default function TemplateGalleryPage() {
 
                     {/* +Create Own card */}
                     <motion.div
-                        initial={{ opacity: 0, y: 12 }}
+                        initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.03 * Math.min(filteredTemplates.length, 15) }}
+                        transition={{ delay: 0.02 * Math.min(filteredTemplates.length, 15) }}
                     >
                         <Link href="/docuvault" className="no-underline">
-                            <div
-                                className="p-8 rounded-[2rem] group transition-all border border-dashed border-white/30 bg-white/5 backdrop-blur-2xl hover:bg-white/10 hover:border-white/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-1 h-full flex flex-col items-center justify-center min-h-[300px]"
-                            >
-                                <div
-                                    className="w-20 h-20 rounded-[1.5rem] flex items-center justify-center mb-6 border-2 border-dashed border-white/40 bg-white/5 group-hover:bg-white/10 group-hover:border-white/60 transition-all group-hover:scale-110 duration-300"
-                                >
-                                    <Plus size={36} className="text-white drop-shadow-sm" strokeWidth={3} />
+                            <div className="p-4 rounded-xl group transition-all border border-dashed border-white/20 bg-white/[0.03] backdrop-blur-xl hover:bg-white/[0.07] hover:border-white/30 hover:-translate-y-0.5 h-full flex flex-col items-center justify-center min-h-[160px]">
+                                <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-3 border border-dashed border-white/25 bg-white/5 group-hover:bg-white/10 group-hover:border-white/40 transition-all group-hover:scale-105 duration-200">
+                                    <Plus size={18} className="text-white/60" strokeWidth={2.5} />
                                 </div>
-                                <p
-                                    className="text-[18px] font-bold mb-2 text-white drop-shadow-sm"
-                                >
-                                    Create Your Own
-                                </p>
-                                <p className="text-[14px] font-medium text-white text-center px-4">
-                                    Start with a blank template
-                                </p>
+                                <p className="text-[11px] font-bold mb-0.5 text-white/70">Create Your Own</p>
+                                <p className="text-[9px] text-white/40 text-center">Start with a blank template</p>
                             </div>
                         </Link>
                     </motion.div>

@@ -160,7 +160,7 @@ export default function TimelineExplorer() {
                                     </div>
 
                                     {/* Content Card */}
-                                    <div className="flex-1 glass-ethereal rounded-[2rem] border border-white/10 p-6 hover:border-white/20 transition-all hover:bg-white/[0.02]">
+                                    <div className="flex-1 glass-ethereal rounded-xl border border-white/10 p-6 hover:border-white/20 transition-all hover:bg-white/[0.02]">
                                         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
                                             <div>
                                                 <div className="flex items-center gap-3 mb-2">

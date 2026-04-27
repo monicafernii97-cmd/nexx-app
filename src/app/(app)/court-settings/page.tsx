@@ -270,7 +270,8 @@ export default function CourtSettingsPage() {
     }, [state, county, courtName, existingSettings]);
 
     return (
-        <PageContainer>
+        <PageContainer noHorizontalPadding>
+            <div className="max-w-3xl mx-auto w-full px-4 sm:px-8 pb-16">
             <PageHeader
                 icon={Gavel}
                 title="Court Settings"
@@ -952,6 +953,7 @@ export default function CourtSettingsPage() {
             >
                 Court settings directly inform NEXX for precision formatting of generated legal filings.
             </motion.p>
+            </div>
         </PageContainer>
     );
 }

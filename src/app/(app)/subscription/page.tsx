@@ -192,51 +192,24 @@ function SubscriptionContent() {
 
     return (
         <PageContainer>
+            <div className="max-w-5xl mx-auto w-full px-4 sm:px-8 pb-20">
             <PageHeader
                 icon={Crown}
                 title="Subscription"
                 description="Manage your plan and unlock the full power of NEXX."
-            />
-
-            {/* Current Plan Banner */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.6 }}
-                className="glass-ethereal rounded-xl p-4 mb-6 relative overflow-hidden"
-            >
-                <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute top-[-20%] right-[-10%] w-[40%] h-[60%] bg-[#1A4B9B]/15 rounded-full blur-[80px]" />
-                </div>
-
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                        <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-[var(--champagne)] mb-2">
+                rightElement={
+                    <div className="flex flex-col items-end gap-1.5 mt-2">
+                        <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-[var(--champagne)]">
                             Current Plan
-                        </p>
-                        <h2 className="text-lg font-serif font-bold text-white tracking-tight mb-0.5">
-                            {currentConfig.label}
-                        </h2>
-                        <p className="text-sm text-white/50">
-                            {currentConfig.priceUsd === 0
-                                ? 'Free forever'
-                                : `$${currentConfig.priceUsd}/month`}
-                        </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-4">
-                        <div className="rounded-xl bg-[#0A1128] border border-[rgba(255,255,255,0.08)] px-4 py-2 text-center min-w-[100px]">
-                            <div className="flex items-center justify-center gap-2 mb-1">
-                                <ChatCircleText size={16} weight="fill" color="#60A5FA" />
-                                <span className="text-[10px] font-bold tracking-wider uppercase text-white/40">Premium AI / Day</span>
-                            </div>
-                            <p className="text-base font-serif font-bold text-white">
-                                {currentConfig.gpt4oDailyLimit === -1 ? '∞' : currentConfig.gpt4oDailyLimit}
-                            </p>
+                        </span>
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 shadow-sm backdrop-blur-xl">
+                            <Crown size={16} weight="fill" color="#E5A84A" />
+                            <span className="text-[13px] font-bold tracking-wide text-white">{currentConfig.label}</span>
                         </div>
                     </div>
-                </div>
-            </motion.div>
+                }
+            />
+
 
             {/* Plan Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -335,7 +308,7 @@ function SubscriptionContent() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.7, duration: 0.6 }}
-                    className="md:col-span-2 lg:col-span-4 mt-2 rounded-xl p-4 border border-[rgba(255,255,255,0.06)] bg-gradient-to-b from-[#0F1D3D]/60 to-[#0A1128]/80 relative overflow-hidden hover:border-[rgba(255,255,255,0.10)] transition-all shadow-sm"
+                    className="md:col-span-2 lg:col-span-4 mt-4 mb-8 rounded-xl p-6 md:p-8 border border-[rgba(255,255,255,0.06)] bg-gradient-to-b from-[#0F1D3D]/60 to-[#0A1128]/80 relative overflow-hidden hover:border-[rgba(255,255,255,0.10)] transition-all shadow-sm"
                 >
                     <div className="absolute inset-0 pointer-events-none">
                         <div className="absolute bottom-[-20%] left-[-10%] w-[35%] h-[50%] bg-[#E5A84A]/5 rounded-full blur-[80px]" />
@@ -402,6 +375,7 @@ function SubscriptionContent() {
                 </motion.div>
             )}
 
+            </div>
         </PageContainer>
     );
 }

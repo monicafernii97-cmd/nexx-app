@@ -18,20 +18,20 @@ export function PageHeader({ icon: Icon, title, description, rightElement }: Pag
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 pt-4 px-1"
+            className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-6 mb-4 lg:mb-8 pt-2 lg:pt-4 px-1"
         >
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 lg:gap-4">
                 {Icon && (
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center shadow-lg shrink-0">
-                        <Icon size={20} weight="light" className="text-indigo-400" />
+                    <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center shadow-lg shrink-0">
+                        <Icon size={18} weight="light" className="text-indigo-400" />
                     </div>
                 )}
                 <div>
-                    <h1 className="text-2xl font-serif text-headline text-white m-0 tracking-tight flex items-center gap-2">
+                    <h1 className="text-xl lg:text-2xl font-serif text-headline text-white m-0 tracking-tight flex items-center gap-2">
                         {title}
                     </h1>
                     {description && (
-                        <p className="text-[13px] text-white/40 mt-0.5 max-w-xl leading-relaxed">
+                        <p className="text-[12px] lg:text-[13px] text-white/40 mt-0.5 max-w-xl leading-relaxed">
                             {description}
                         </p>
                     )}
@@ -49,17 +49,16 @@ export function PageHeader({ icon: Icon, title, description, rightElement }: Pag
 /**
  * Full-width page wrapper with consistent padding for all application routes.
  *
- * By default, the container allows vertical scrolling for content-heavy pages
- * (Settings, Profile, Resources, etc.). Pass `lockHeight` to enforce a strict
- * single-page, no-scroll layout for command-center views (Dashboard, DocuVault,
- * Incident Report).
+ * By default, the container allows vertical scrolling for content-heavy pages.
+ * Pass `lockHeight` to enforce a no-scroll layout — but only on desktop (lg+).
+ * On mobile, all pages are always scrollable since viewport space is limited.
  */
 export function PageContainer({ children, lockHeight = false }: { children: ReactNode; lockHeight?: boolean }) {
     return (
-        <div className={`max-w-[85rem] mx-auto w-full px-4 lg:px-8 mt-2 flex flex-col ${
+        <div className={`max-w-[85rem] mx-auto w-full px-3 lg:px-8 mt-1 lg:mt-2 flex flex-col ${
             lockHeight
-                ? 'h-[calc(100dvh-76px)] overflow-hidden'
-                : 'min-h-[calc(100dvh-76px)] overflow-y-auto'
+                ? 'min-h-[calc(100dvh-60px)] lg:h-[calc(100dvh-76px)] lg:overflow-hidden'
+                : 'min-h-[calc(100dvh-60px)]'
         }`}>
             {children}
         </div>

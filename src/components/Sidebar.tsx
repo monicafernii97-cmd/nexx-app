@@ -26,10 +26,11 @@ import {
     FileText,
     IconWeight,
 } from '@phosphor-icons/react';
-import { useState, useMemo, useCallback, type ComponentType, type CSSProperties } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, type ComponentType, type CSSProperties } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
 import { navIdSelector } from '@/lib/tourUtils';
+import { useSidebar } from '@/lib/sidebar-context';
 
 /** Child navigation item definition for sidebar sub-menus. */
 interface NavChild {
@@ -80,12 +81,40 @@ const navItems: NavItem[] = [
     { label: 'Settings', href: '/settings', icon: Gear },
 ];
 
-/** Floating ethereal glass sidebar component. */
+/** Floating ethereal glass sidebar component with mobile drawer support. */
 export default function Sidebar() {
+    const drawerPanelRef = useRef<HTMLDivElement>(null);
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
     const { user, isLoaded } = useUser();
     const [manualExpanded, setManualExpanded] = useState<Record<string, boolean>>({});
+    const { isDrawerOpen, closeDrawer } = useSidebar();
+
+    // Auto-close mobile drawer on route change
+    useEffect(() => {
+        closeDrawer();
+    }, [pathname, closeDrawer]);
+
+    // Force expanded state when mobile drawer opens (icon-only is unusable on phones)
+    useEffect(() => {
+        if (isDrawerOpen) setCollapsed(false);
+    }, [isDrawerOpen]);
+
+    // Keyboard dismissal (Escape) + focus management for mobile drawer
+    useEffect(() => {
+        if (!isDrawerOpen) return;
+        const previous = document.activeElement as HTMLElement | null;
+        drawerPanelRef.current?.focus();
+
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') closeDrawer();
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => {
+            document.removeEventListener('keydown', onKeyDown);
+            previous?.focus?.();
+        };
+    }, [isDrawerOpen, closeDrawer]);
 
     /** Compute which nav groups are expanded. */
     const expandedItems = useMemo(() => {
@@ -105,13 +134,14 @@ export default function Sidebar() {
         setManualExpanded((prev) => ({ ...prev, [href]: !expandedItems[href] }));
     }, [expandedItems]);
 
-    return (
+    // ── Shared sidebar content (used in both desktop inline and mobile drawer) ──
+    const sidebarContent = (
         <motion.aside
             layout
             initial={false}
-            animate={{ width: collapsed ? 64 : 220 }}
+            animate={{ width: collapsed ? 64 : 200 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="sticky top-4 h-[calc(100dvh-2rem)] z-40 flex flex-col flex-shrink-0 hyper-glass rounded-[1.5rem] overflow-visible glow-slate"
+            className="h-full flex flex-col flex-shrink-0 hyper-glass rounded-[1.5rem] overflow-visible glow-slate"
         >
             {/* Logo */}
             <div className="flex items-center px-5 h-[60px] flex-shrink-0">
@@ -345,5 +375,50 @@ export default function Sidebar() {
                 </motion.div>
             </button>
         </motion.aside>
+    );
+
+    return (
+        <>
+            {/* Desktop: inline sidebar — unmount when mobile drawer is open to prevent duplicate DOM IDs */}
+            {!isDrawerOpen && (
+                <div className="hidden lg:block sticky top-4 h-[calc(100dvh-2rem)] z-40">
+                    {sidebarContent}
+                </div>
+            )}
+
+            {/* Mobile: drawer overlay */}
+            <AnimatePresence>
+                {isDrawerOpen && (
+                    <>
+                        {/* Backdrop */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={closeDrawer}
+                            aria-hidden="true"
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] lg:hidden"
+                        />
+                        {/* Drawer panel */}
+                        <motion.div
+                            ref={drawerPanelRef}
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label="Sidebar navigation"
+                            tabIndex={-1}
+                            initial={{ x: -280 }}
+                            animate={{ x: 0 }}
+                            exit={{ x: -280 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                            className="fixed top-0 left-0 bottom-0 z-[70] w-[260px] p-2 lg:hidden outline-none"
+                        >
+                            <div className="h-full">
+                                {sidebarContent}
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+        </>
     );
 }

@@ -154,6 +154,8 @@ function DashboardContent() {
                         {pipelineCards.map((card, i) => {
                             if (i % 2 !== 0) return null;
                             const Icon = card.icon;
+                            // Top left (0) is standard, Bottom left (2) is longer
+                            const isStandard = i === 0;
                             return (
                                 <Link key={card.label} href={card.href} className="no-underline block">
                                     <motion.div
@@ -161,7 +163,7 @@ function DashboardContent() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: 0.08 * i, duration: 0.5, type: 'spring' }}
                                     >
-                                      <div className="floating-element hyper-glass flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate py-8 sm:py-10">
+                                      <div className={`floating-element hyper-glass flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate w-full px-4 ${isStandard ? 'h-48 sm:h-52' : 'h-60 sm:h-72'}`}>
                                         <div className="mb-3 p-3 rounded-2xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
                                             <Icon 
                                                 size={24} 
@@ -170,10 +172,10 @@ function DashboardContent() {
                                                 className="transition-transform duration-700 group-hover:scale-110 group-hover:rotate-3" 
                                             />
                                         </div>
-                                        <h3 className="text-[15px] font-serif text-white mb-1 tracking-tight drop-shadow-sm">
+                                        <h3 className="text-[15px] font-serif text-white mb-1 tracking-tight drop-shadow-sm text-center">
                                             {card.label}
                                         </h3>
-                                        <p className="text-[12px] text-white/40 font-medium uppercase tracking-[0.12em] drop-shadow-sm">
+                                        <p className="text-[12px] text-white/40 font-medium uppercase tracking-[0.12em] drop-shadow-sm text-center px-2">
                                             {card.subtitle}
                                         </p>
                                         
@@ -186,11 +188,13 @@ function DashboardContent() {
                         })}
                     </div>
 
-                    {/* Right Column (Odd index cards) - Staggered down */}
-                    <div className="space-y-4 sm:space-y-8 sm:mt-16">
+                    {/* Right Column (Odd index cards) */}
+                    <div className="space-y-4 sm:space-y-8">
                         {pipelineCards.map((card, i) => {
                             if (i % 2 === 0) return null;
                             const Icon = card.icon;
+                            // Top right (1) is longer, Bottom right (3) is standard
+                            const isStandard = i === 3;
                             return (
                                 <Link key={card.label} href={card.href} className="no-underline block">
                                     <motion.div
@@ -198,7 +202,7 @@ function DashboardContent() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: 0.08 * i, duration: 0.5, type: 'spring' }}
                                     >
-                                      <div className="floating-element hyper-glass flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate py-8 sm:py-10">
+                                      <div className={`floating-element hyper-glass flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate w-full px-4 ${isStandard ? 'h-48 sm:h-52' : 'h-60 sm:h-72'}`}>
                                         <div className="mb-3 p-3 rounded-2xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
                                             <Icon 
                                                 size={24} 
@@ -207,10 +211,10 @@ function DashboardContent() {
                                                 className="transition-transform duration-700 group-hover:scale-110 group-hover:rotate-3" 
                                             />
                                         </div>
-                                        <h3 className="text-[15px] font-serif text-white mb-1 tracking-tight drop-shadow-sm">
+                                        <h3 className="text-[15px] font-serif text-white mb-1 tracking-tight drop-shadow-sm text-center">
                                             {card.label}
                                         </h3>
-                                        <p className="text-[12px] text-white/40 font-medium uppercase tracking-[0.12em] drop-shadow-sm">
+                                        <p className="text-[12px] text-white/40 font-medium uppercase tracking-[0.12em] drop-shadow-sm text-center px-2">
                                             {card.subtitle}
                                         </p>
                                         

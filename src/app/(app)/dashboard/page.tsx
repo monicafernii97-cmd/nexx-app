@@ -145,12 +145,12 @@ function DashboardContent() {
             />
 
             {/* Centered Dashboard Layout */}
-            <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 space-y-16 pb-16 pt-6">
+            <div className="max-w-md mx-auto w-full px-4 sm:px-6 space-y-16 pb-16 pt-6">
                 
                 {/* Asymmetrical Pipeline Launcher */}
-                <div id="pipeline-switcher" className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 items-start">
+                <div id="pipeline-switcher" className="grid grid-cols-2 gap-2.5 items-start">
                     {/* Left Column (Even index cards) */}
-                    <div className="space-y-4 sm:space-y-8">
+                    <div className="space-y-2.5">
                         {pipelineCards.map((card, i) => {
                             if (i % 2 !== 0) return null;
                             const Icon = card.icon;
@@ -163,19 +163,19 @@ function DashboardContent() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: 0.08 * i, duration: 0.5, type: 'spring' }}
                                     >
-                                      <div className={`floating-element hyper-glass flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate w-full px-4 ${isStandard ? 'h-48 sm:h-52' : 'h-60 sm:h-72'}`}>
-                                        <div className="mb-3 p-3 rounded-2xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
+                                      <div className={`floating-element hyper-glass flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate w-full px-3 ${isStandard ? 'h-20' : 'h-28'}`}>
+                                        <div className="mb-1.5 p-1.5 rounded-xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
                                             <Icon 
-                                                size={24} 
+                                                size={18} 
                                                 weight="light" 
                                                 style={{ color: card.accent }} 
                                                 className="transition-transform duration-700 group-hover:scale-110 group-hover:rotate-3" 
                                             />
                                         </div>
-                                        <h3 className="text-[15px] font-serif text-white mb-1 tracking-tight drop-shadow-sm text-center">
+                                        <h3 className="text-[11px] font-serif text-white mb-0.5 tracking-tight drop-shadow-sm text-center leading-tight">
                                             {card.label}
                                         </h3>
-                                        <p className="text-[12px] text-white/40 font-medium uppercase tracking-[0.12em] drop-shadow-sm text-center px-2">
+                                        <p className="text-[9px] text-white/40 font-medium uppercase tracking-[0.1em] drop-shadow-sm text-center px-1 leading-tight">
                                             {card.subtitle}
                                         </p>
                                         
@@ -189,7 +189,7 @@ function DashboardContent() {
                     </div>
 
                     {/* Right Column (Odd index cards) */}
-                    <div className="space-y-4 sm:space-y-8">
+                    <div className="space-y-2.5">
                         {pipelineCards.map((card, i) => {
                             if (i % 2 === 0) return null;
                             const Icon = card.icon;
@@ -202,19 +202,19 @@ function DashboardContent() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: 0.08 * i, duration: 0.5, type: 'spring' }}
                                     >
-                                      <div className={`floating-element hyper-glass flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate w-full px-4 ${isStandard ? 'h-48 sm:h-52' : 'h-60 sm:h-72'}`}>
-                                        <div className="mb-3 p-3 rounded-2xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
+                                      <div className={`floating-element hyper-glass flex flex-col items-center justify-center group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:glow-slate w-full px-3 ${isStandard ? 'h-20' : 'h-28'}`}>
+                                        <div className="mb-1.5 p-1.5 rounded-xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-all duration-500">
                                             <Icon 
-                                                size={24} 
+                                                size={18} 
                                                 weight="light" 
                                                 style={{ color: card.accent }} 
                                                 className="transition-transform duration-700 group-hover:scale-110 group-hover:rotate-3" 
                                             />
                                         </div>
-                                        <h3 className="text-[15px] font-serif text-white mb-1 tracking-tight drop-shadow-sm text-center">
+                                        <h3 className="text-[11px] font-serif text-white mb-0.5 tracking-tight drop-shadow-sm text-center leading-tight">
                                             {card.label}
                                         </h3>
-                                        <p className="text-[12px] text-white/40 font-medium uppercase tracking-[0.12em] drop-shadow-sm text-center px-2">
+                                        <p className="text-[9px] text-white/40 font-medium uppercase tracking-[0.1em] drop-shadow-sm text-center px-1 leading-tight">
                                             {card.subtitle}
                                         </p>
                                         

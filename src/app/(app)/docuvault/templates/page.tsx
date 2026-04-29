@@ -303,9 +303,9 @@ export default function TemplateGalleryPage() {
 
                         {/* Modal */}
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
                             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
                             role="dialog"
@@ -315,25 +315,19 @@ export default function TemplateGalleryPage() {
                             <div
                                 ref={previewDialogRef}
                                 tabIndex={-1}
-                                className="w-full max-w-lg rounded-2xl overflow-hidden pointer-events-auto max-h-[85vh] flex flex-col"
-                                style={{
-                                    background: 'linear-gradient(180deg, #0D2B5E 0%, #0A1E54 100%)',
-                                    border: '1px solid rgba(208, 227, 255, 0.15)',
-                                    boxShadow: '0 24px 80px rgba(0, 0, 0, 0.5)',
-                                    outline: 'none',
-                                }}
+                                className="w-full max-w-[480px] rounded-2xl overflow-hidden pointer-events-auto max-h-[85vh] flex flex-col bg-[#0A0D14] border border-white/10 shadow-2xl focus:outline-none"
                             >
                                 {/* Modal header */}
-                                <div className="flex items-start justify-between p-8 pb-6 border-b border-white/10">
-                                    <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between p-6 pb-5 border-b border-white/5">
+                                    <div className="flex-1 min-w-0 pr-4">
                                         <span
-                                            className="text-[11px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full inline-block mb-4 text-white bg-white/10 border border-white/20 shadow-sm"
+                                            className="text-[9px] font-bold tracking-widest uppercase px-2 py-1 rounded bg-white/5 border border-white/10 inline-block mb-3 text-white/60"
                                         >
                                             {CATEGORY_LABELS[previewTemplate.category] || previewTemplate.category}
                                         </span>
                                         <h2
                                             id="template-preview-title"
-                                            className="text-2xl font-serif font-bold leading-snug text-white drop-shadow-sm"
+                                            className="text-lg font-serif font-bold leading-snug text-white/90"
                                         >
                                             {previewTemplate.title}
                                         </h2>
@@ -341,53 +335,53 @@ export default function TemplateGalleryPage() {
                                     <button
                                         onClick={() => setPreviewTemplate(null)}
                                         aria-label="Close preview"
-                                        className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer flex-shrink-0 ml-4 transition-all bg-white/10 border border-white/20 text-white hover:bg-white/20 hover:scale-105"
+                                        className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer flex-shrink-0 transition-all bg-white/5 border border-white/5 text-white/60 hover:text-white hover:bg-white/10"
                                     >
-                                        <X size={20} strokeWidth={2.5} />
+                                        <X size={16} strokeWidth={2} />
                                     </button>
                                 </div>
 
                                 {/* Modal body (scrollable) */}
-                                <div className="flex-1 overflow-y-auto px-8 py-6" style={{ scrollbarWidth: 'thin' }}>
+                                <div className="flex-1 overflow-y-auto px-6 py-5" style={{ scrollbarWidth: 'thin' }}>
                                     {/* Description */}
                                     <p
-                                        className="text-[15px] leading-relaxed mb-8 text-white font-medium"
+                                        className="text-xs leading-relaxed mb-6 text-white/70 font-medium"
                                     >
                                         {previewTemplate.description}
                                     </p>
 
                                     {/* Requirements badges */}
-                                    <div className="flex flex-wrap gap-3 mb-8">
+                                    <div className="flex flex-wrap gap-2 mb-6">
                                         {previewTemplate.requiresDeclaration && (
                                             <div
-                                                className="flex items-center gap-2 text-[12px] font-bold tracking-wide uppercase px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white"
+                                                className="flex items-center gap-1.5 text-[10px] font-bold tracking-widest uppercase px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/10 text-white/80"
                                             >
-                                                <Shield size={14} className="text-[#E5A84A]" />
-                                                Requires Declaration
+                                                <Shield size={12} className="text-indigo-400" />
+                                                Req. Declaration
                                             </div>
                                         )}
                                         {previewTemplate.requiresProposedOrder && (
                                             <div
-                                                className="flex items-center gap-2 text-[12px] font-bold tracking-wide uppercase px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white"
+                                                className="flex items-center gap-1.5 text-[10px] font-bold tracking-widest uppercase px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/10 text-white/80"
                                             >
-                                                <Scale size={14} className="text-[#60A5FA]" />
-                                                Requires Proposed Order
+                                                <Scale size={12} className="text-indigo-400" />
+                                                Req. Order
                                             </div>
                                         )}
                                         {previewTemplate.supportsExhibits && (
                                             <div
-                                                className="flex items-center gap-2 text-[12px] font-bold tracking-wide uppercase px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white"
+                                                className="flex items-center gap-1.5 text-[10px] font-bold tracking-widest uppercase px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/10 text-white/80"
                                             >
-                                                <Paperclip size={14} className="text-[#10B981]" />
+                                                <Paperclip size={12} className="text-indigo-400" />
                                                 Supports Exhibits
                                             </div>
                                         )}
                                     </div>
 
                                     {/* Case Types */}
-                                    <div className="mb-8 p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
+                                    <div className="mb-6 p-4 rounded-xl bg-white/[0.02] border border-white/5">
                                         <h3
-                                            className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 text-white drop-shadow-sm"
+                                            className="text-[9px] font-bold tracking-widest uppercase mb-3 text-white/40"
                                         >
                                             Applicable Case Types
                                         </h3>
@@ -395,7 +389,7 @@ export default function TemplateGalleryPage() {
                                             {previewTemplate.caseTypes.map((ct) => (
                                                 <span
                                                     key={ct}
-                                                    className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 text-white border border-white/20 shadow-sm"
+                                                    className="text-[10px] font-medium px-2 py-1 rounded border border-white/10 text-white/70 bg-white/5"
                                                 >
                                                     {CASE_TYPE_LABELS[ct] || ct}
                                                 </span>
@@ -404,27 +398,27 @@ export default function TemplateGalleryPage() {
                                     </div>
 
                                     {/* Document Sections */}
-                                    <div className="mb-8 p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
+                                    <div className="mb-6 p-4 rounded-xl bg-white/[0.02] border border-white/5">
                                         <h3
-                                            className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 text-white drop-shadow-sm"
+                                            className="text-[9px] font-bold tracking-widest uppercase mb-3 text-white/40"
                                         >
                                             Document Structure
                                         </h3>
-                                        <div className="space-y-2.5">
+                                        <div className="space-y-1.5">
                                             {previewTemplate.sections.map((section, idx) => (
                                                 <div
                                                     key={`${section.id}-${idx}`}
-                                                    className="flex items-center gap-3 text-[14px] font-medium px-4 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                                                    className="flex items-center gap-3 text-xs font-medium px-3 py-2 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 transition-colors"
                                                 >
                                                     <CheckCircle2
-                                                        size={16}
-                                                        className={section.required ? "text-[#10B981]" : "text-white/40"}
+                                                        size={14}
+                                                        className={section.required ? "text-indigo-400" : "text-white/20"}
                                                     />
-                                                    <span className="text-white drop-shadow-sm">
+                                                    <span className="text-white/80">
                                                         {section.title || section.type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                                     </span>
                                                     {!section.required && (
-                                                        <span className="ml-auto text-[11px] font-bold tracking-wider uppercase text-white/50 bg-white/5 px-2 py-1 rounded-md">
+                                                        <span className="ml-auto text-[9px] font-bold tracking-widest uppercase text-white/30">
                                                             Optional
                                                         </span>
                                                     )}
@@ -435,22 +429,22 @@ export default function TemplateGalleryPage() {
 
                                     {/* State Variants */}
                                     {previewTemplate.stateVariants && Object.keys(previewTemplate.stateVariants).length > 0 && (
-                                        <div className="mb-4 p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
+                                        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
                                             <h3
-                                                className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 text-white drop-shadow-sm"
+                                                className="text-[9px] font-bold tracking-widest uppercase mb-3 text-white/40"
                                             >
                                                 State Variants
                                             </h3>
-                                            <div className="space-y-2">
+                                            <div className="space-y-1.5">
                                                 {Object.entries(previewTemplate.stateVariants).map(([state, name]) => (
                                                     <div
                                                         key={state}
-                                                        className="flex flex-col sm:flex-row sm:items-start sm:gap-3 text-[14px]"
+                                                        className="flex items-start gap-2 text-xs"
                                                     >
-                                                        <span className="font-bold text-white shrink-0 min-w-[120px]">
-                                                            {state}:
+                                                        <span className="font-bold text-white/60 min-w-[40px] uppercase">
+                                                            {state}
                                                         </span>
-                                                        <span className="font-medium text-white/90">{name}</span>
+                                                        <span className="font-medium text-white/80">{name}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -460,20 +454,20 @@ export default function TemplateGalleryPage() {
 
                                 {/* Modal footer */}
                                 <div
-                                    className="p-6 flex items-center gap-4 border-t border-white/10 bg-white/5"
+                                    className="p-5 flex items-center gap-3 border-t border-white/5 bg-[#0A0D14]"
                                 >
                                     <button
                                         onClick={() => setPreviewTemplate(null)}
-                                        className="flex-1 py-4 rounded-[1rem] text-[14px] font-bold tracking-wider uppercase cursor-pointer transition-all bg-white/10 border border-white/20 text-white hover:bg-white/20"
+                                        className="px-4 py-2.5 rounded-lg text-[10px] font-bold tracking-widest uppercase transition-all border border-white/10 text-white/60 hover:text-white hover:bg-white/5"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         onClick={() => handleUseTemplate(previewTemplate.id)}
-                                        className="flex-[2] py-4 rounded-[1rem] text-[15px] font-bold tracking-wider uppercase cursor-pointer transition-all flex items-center justify-center gap-3 bg-[linear-gradient(135deg,#60A5FA,#2563EB)] border-none text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_8px_24px_rgba(37,99,235,0.5)] hover:shadow-[0_12px_32px_rgba(37,99,235,0.6)] hover:-translate-y-1"
+                                        className="flex-1 py-2.5 rounded-lg text-[10px] font-bold tracking-widest uppercase transition-all flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white shadow-xl shadow-indigo-600/20"
                                     >
                                         Use This Template
-                                        <ArrowRight size={18} strokeWidth={2.5} />
+                                        <ArrowRight size={14} strokeWidth={2.5} />
                                     </button>
                                 </div>
                             </div>

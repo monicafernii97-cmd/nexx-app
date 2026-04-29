@@ -903,9 +903,9 @@ function DocuVaultPageInner() {
                                     setPreviewState('split');
                                 }
                             }}
-                            className={`relative flex-1 rounded-2xl overflow-hidden hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-white/10 flex items-center justify-center group ${
+                            className={`relative flex-1 rounded-2xl overflow-hidden hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-white/10 flex items-center justify-center group outline-none ${
                                 previewState === 'compact'
-                                    ? `w-full max-w-md h-[300px] transition-colors ${generatedResult?.downloadUrl ? 'cursor-pointer hover:border-indigo-500/50' : ''}`
+                                    ? `w-full max-w-md h-[300px] transition-colors ${generatedResult?.downloadUrl ? 'cursor-pointer hover:border-indigo-500/50 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1128]' : ''}`
                                     : previewState === 'fullscreen' ? 'h-full w-full' : 'h-[70vh] min-h-[600px]'
                             }`}
                             onClick={() => {

@@ -18,16 +18,16 @@ export function PageHeader({ icon: Icon, title, description, rightElement }: Pag
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 lg:mb-14 pt-4"
+            className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 lg:mb-10 pt-2"
         >
-            <div className="flex flex-col gap-5">
+            <div className="flex items-start gap-4 lg:gap-5">
                 {Icon && (
-                    <div className="w-12 h-12 rounded-2xl hyper-glass flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.2)] shrink-0">
-                        <Icon size={22} weight="regular" className="text-indigo-400" />
+                    <div className="w-12 h-12 rounded-2xl hyper-glass flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.2)] shrink-0 mt-0.5">
+                        <Icon size={24} weight="regular" className="text-indigo-400" />
                     </div>
                 )}
-                <div className="space-y-2">
-                    <h1 className="text-2xl lg:text-4xl font-serif text-white tracking-tight leading-none">
+                <div className="space-y-1.5">
+                    <h1 className="text-2xl lg:text-3xl font-serif text-white tracking-tight leading-tight">
                         {title}
                     </h1>
                     {description && (

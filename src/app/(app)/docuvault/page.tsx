@@ -832,150 +832,59 @@ function DocuVaultPageInner() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
-                        {/* Document Overview & Badges (Left) */}
-                        <div className="md:col-span-2 space-y-4">
-                            {/* PDF Preview Card */}
-                            <div className="p-6 text-center border border-white/5 bg-white/[0.02] backdrop-blur-xl rounded-2xl">
-                                <div className="w-24 h-32 mx-auto rounded-xl flex items-center justify-center bg-white/5 border border-white/10 mb-5 relative overflow-hidden group">
-                                    <FileText size={32} weight="light" className="text-white/40" />
+                    <div className="flex flex-col md:flex-row gap-6">
+                        {/* Interactive PDF Preview (Left/Top) */}
+                        <div className="flex-1 min-h-[500px] h-[70vh] rounded-2xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-xl relative">
+                            {generatedResult?.downloadUrl ? (
+                                <iframe 
+                                    src={`${generatedResult.downloadUrl}#toolbar=0&view=FitH`} 
+                                    className="w-full h-full border-0 rounded-2xl"
+                                    title="Document Preview"
+                                />
+                            ) : (
+                                <div className="absolute inset-0 flex items-center justify-center text-white/40 text-[10px] font-bold uppercase tracking-widest">
+                                    Preview Not Available
                                 </div>
-                                <p className="text-xs font-bold text-white/80 mb-1">
-                                    {selectedTemplate?.title || 'Legal Document'}
+                            )}
+                            
+                            {/* Document Title Overlay inside the preview top edge (optional, but looks good) */}
+                            <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
+                                <p className="text-[11px] font-bold text-white/80 truncate">
+                                    {generatedResult?.filename || selectedTemplate?.title || 'document.pdf'}
                                 </p>
-                                <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest">
-                                    Final Draft • PDF
-                                </p>
-                            </div>
-
-                            {/* Format indicators — describe how the document was generated, not verified outcomes */}
-                            <div className="space-y-3">
-                                <p className="text-[11px] font-medium text-white/40 uppercase tracking-widest">Generation Details</p>
-                                {selectedTemplate ? (
-                                    <>
-                                        <div className="p-4 flex items-start gap-3 border border-white/5 bg-white/[0.02] rounded-xl">
-                                            <div className="mt-0.5">
-                                                <CheckCircle size={16} weight="regular" className="text-white/60" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-bold text-white/80 tracking-wide">
-                                                    Court Format Applied
-                                                </p>
-                                                <p className="text-[10px] font-medium text-white/40 mt-1 leading-snug">
-                                                    Generated using local court formatting rules. Independent verification recommended.
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="p-4 flex items-start gap-3 border border-white/5 bg-white/[0.02] rounded-xl">
-                                            <div className="mt-0.5">
-                                                <CheckCircle size={16} weight="regular" className="text-white/60" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-bold text-white/80 tracking-wide">
-                                                    Page Numbering Included
-                                                </p>
-                                                <p className="text-[10px] font-medium text-white/40 mt-1 leading-snug">
-                                                    Sequential page numbering added per court standards.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="p-4 flex items-start gap-3 border border-white/5 bg-white/[0.02] rounded-xl">
-                                        <div className="mt-0.5">
-                                            <FileText size={16} weight="regular" className="text-white/60" />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-bold text-white/80 tracking-wide">
-                                                General Formatting
-                                            </p>
-                                            <p className="text-[10px] font-medium text-white/40 mt-1 leading-snug">
-                                                Generated with standard document formatting. No template-specific court rules applied.
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
 
                         {/* Actions (Right) */}
-                        <div className="md:col-span-3 space-y-8">
-                            {/* AI Summary */}
-                            <div className="p-6 border border-white/5 bg-white/[0.02] backdrop-blur-xl rounded-2xl">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <Sparkle size={18} weight="regular" className="text-indigo-400" />
-                                    <h3 className="text-[10px] font-bold tracking-widest uppercase text-white/60">
-                                        Intelligence Summary
-                                    </h3>
-                                </div>
-                                <p className="text-xs text-white/60 leading-relaxed font-medium">
-                                    The provided context has been synthesized into a formal <span className="font-bold text-white">{selectedTemplate?.title?.toLowerCase() || 'legal document'}</span>. 
-                                    {selectedTemplate
-                                        ? ' Formatting and legal headings follow local court standards. Please verify all content independently before filing.'
-                                        : ' Standard document formatting has been applied. Please verify all content and formatting independently before use.'}
-                                </p>
-                            </div>
-
-                            {/* Action Menu */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <button
-                                    onClick={() => {
-                                        if (!generatedResult?.downloadUrl) return;
-                                        const a = document.createElement('a');
-                                        a.href = generatedResult.downloadUrl;
-                                        a.download = generatedResult.filename;
-                                        a.rel = 'noopener';
-                                        document.body.appendChild(a);
-                                        a.click();
-                                        document.body.removeChild(a);
-                                    }}
-                                    disabled={!generatedResult?.downloadUrl}
-                                    className="btn-primary flex items-center justify-center gap-3 py-4 text-base shadow-md disabled:opacity-50 h-full"
-                                >
-                                    <DownloadSimple size={20} weight="bold" />
-                                    Download PDF
-                                </button>
-                                
-                                <div className="grid grid-rows-2 gap-3">
-                                    <button
-                                        onClick={() => {
-                                            if (!generatedResult?.downloadUrl) return;
-                                            window.open(generatedResult.downloadUrl, '_blank');
-                                        }}
-                                        disabled={!generatedResult?.downloadUrl}
-                                        className="btn-outline flex items-center justify-center gap-2 py-3 text-sm disabled:opacity-50"
-                                    >
-                                        <FileText size={18} weight="bold" />
-                                        Open PDF
-                                    </button>
-                                    <button
-                                        disabled
-                                        className="card-premium flex items-center justify-center gap-2 py-3 text-sm font-medium border border-[var(--cloud-light)] bg-[var(--cloud)]/30 text-[var(--sapphire-light)] cursor-not-allowed opacity-60"
-                                    >
-                                        <Bank size={18} weight="duotone" />
-                                        Save to Vault
-                                    </button>
-                                </div>
-                            </div>
+                        <div className="w-full md:w-64 space-y-4 shrink-0 flex flex-col">
+                            <button
+                                onClick={() => {
+                                    if (!generatedResult?.downloadUrl) return;
+                                    const a = document.createElement('a');
+                                    a.href = generatedResult.downloadUrl;
+                                    a.download = generatedResult.filename;
+                                    a.rel = 'noopener';
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                }}
+                                disabled={!generatedResult?.downloadUrl}
+                                className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest shadow-xl shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale"
+                            >
+                                <DownloadSimple size={16} weight="bold" />
+                                Download PDF
+                            </button>
                             
-                            {/* Revision Input - To Be Implemented */}
-                            <div className="relative mt-2">
-                                <input
-                                    type="text"
-                                    placeholder="Request an AI revision (e.g., 'Make the tone more aggressive')..."
-                                    className="input-premium w-full pl-12 pr-14 py-4 cursor-not-allowed opacity-60 bg-[var(--cloud)]/30 border-dashed border-[var(--sapphire-light)]"
-                                    disabled
-                                />
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40">
-                                    <Strategy size={20} weight="duotone" className="text-[var(--sapphire-base)]" />
-                                </div>
-                                <button disabled className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-[var(--sapphire-light)]/20 flex items-center justify-center cursor-not-allowed opacity-50">
-                                    <ArrowRight size={16} weight="bold" className="text-[var(--sapphire-dark)]" />
-                                </button>
-                            </div>
+                            <button
+                                disabled
+                                className="w-full py-3.5 rounded-xl bg-white/5 border border-white/10 text-white/40 text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 cursor-not-allowed opacity-60"
+                            >
+                                <Bank size={16} weight="regular" />
+                                Save to Vault
+                            </button>
                             
-                            <p className="text-[11px] font-medium text-center text-[var(--sapphire-light)]">
-                                Verification is recommended. Verify legal citations and personal information independently.
+                            <p className="text-[9px] font-medium text-center text-white/30 mt-auto pt-6 leading-relaxed uppercase tracking-widest">
+                                Verification recommended.
                             </p>
                         </div>
                     </div>

@@ -16,6 +16,9 @@ import {
     Export,
     Lightning,
     ClockCounterClockwise,
+    ArrowsOutSimple,
+    MagnifyingGlassPlus,
+    CornersIn,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -80,6 +83,7 @@ function DocuVaultPageInner() {
 
     // Flow state
     const [view, setView] = useState<'hub' | 'working' | 'result'>('hub');
+    const [previewState, setPreviewState] = useState<'compact' | 'split' | 'fullscreen'>('compact');
     const [progress, setProgress] = useState(0);
     const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
     /** Metadata returned from the Quick Generate stream (no binary). */
@@ -341,6 +345,7 @@ function DocuVaultPageInner() {
         setGeneratedResult(null);
         setGenerationError(null);
         setCaseNumber(null);
+        setPreviewState('compact');
     }, []);
 
     return (
@@ -781,7 +786,10 @@ function DocuVaultPageInner() {
                     key="result"
                     initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="max-w-3xl mx-auto py-6"
+                    className={`mx-auto py-6 transition-all duration-500 ${
+                        previewState === 'fullscreen' ? 'max-w-full px-4 h-[90vh]' : 
+                        previewState === 'split' ? 'max-w-6xl' : 'max-w-3xl'
+                    }`}
                 >
                     {/* Error banner (e.g. popup blocked for print) */}
                     <AnimatePresence>
@@ -801,36 +809,90 @@ function DocuVaultPageInner() {
                             </motion.div>
                         )}
                     </AnimatePresence>
-                    {/* Header */}
-                    <div className="flex items-center gap-4 mb-8">
-                        <button
-                            onClick={handleNewDocument}
-                            aria-label="Back to document composer"
-                            className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all shrink-0"
-                        >
-                            <CaretLeft size={16} weight="regular" />
-                        </button>
-                        <div>
-                            <h1 className="text-lg font-serif font-bold tracking-tight text-white/90">
-                                {selectedTemplate?.title || 'Generated Document'}
-                            </h1>
-                            <div className="flex items-center gap-2 mt-1">
-                                {caseNumber && (
-                                    <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-white/5 border border-white/5 text-white/40 uppercase tracking-widest">
-                                        Ref: {caseNumber}
-                                    </span>
-                                )}
+                    
+                    {/* Header (hidden in fullscreen) */}
+                    {previewState !== 'fullscreen' && (
+                        <div className="flex items-center gap-4 mb-8">
+                            <button
+                                onClick={handleNewDocument}
+                                aria-label="Back to document composer"
+                                className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all shrink-0"
+                            >
+                                <CaretLeft size={16} weight="regular" />
+                            </button>
+                            <div>
+                                <h1 className="text-lg font-serif font-bold tracking-tight text-white/90">
+                                    {selectedTemplate?.title || 'Generated Document'}
+                                </h1>
+                                {/* Removed redundant caseNumber Ref overlay here to reduce visual clutter */}
                             </div>
                         </div>
-                    </div>
+                    )}
 
-                    <div className="flex flex-col md:flex-row gap-6">
-                        {/* Interactive PDF Preview (Left/Top) */}
-                        <div className="flex-1 min-h-[500px] h-[70vh] rounded-2xl overflow-hidden hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.3)] relative">
+                    <div className={`flex gap-6 ${previewState === 'compact' ? 'flex-col items-center' : previewState === 'split' ? 'flex-col md:flex-row' : 'flex-col h-full'}`}>
+                        
+                        {/* Compact view success card / action panel */}
+                        {previewState !== 'fullscreen' && (
+                            <div className={`flex flex-col gap-4 ${previewState === 'compact' ? 'w-full max-w-md' : 'w-full md:w-72 shrink-0'}`}>
+                                {previewState === 'compact' && (
+                                    <div className="text-center mb-4">
+                                        <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+                                            <CheckCircle size={32} weight="fill" className="text-emerald-400" />
+                                        </div>
+                                        <h2 className="text-xl font-serif font-bold text-white mb-2">Success!</h2>
+                                        <p className="text-[13px] text-white/50">Your document has been securely generated and formatted for the court.</p>
+                                    </div>
+                                )}
+                                
+                                <button
+                                    onClick={() => {
+                                        if (!generatedResult?.downloadUrl) return;
+                                        const a = document.createElement('a');
+                                        a.href = generatedResult.downloadUrl;
+                                        a.download = generatedResult.filename;
+                                        a.rel = 'noopener';
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                    }}
+                                    disabled={!generatedResult?.downloadUrl}
+                                    className="w-full py-3.5 rounded-xl bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-white/20 hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:-translate-y-0.5 text-white text-[11px] font-bold uppercase tracking-widest shadow-[0_4px_16px_rgba(26,75,155,0.3)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale"
+                                >
+                                    <DownloadSimple size={16} weight="bold" />
+                                    Download PDF
+                                </button>
+                                
+                                <button
+                                    disabled
+                                    className="w-full py-3.5 rounded-xl bg-white/5 border border-white/10 text-white/40 text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 cursor-not-allowed opacity-60"
+                                >
+                                    <Bank size={16} weight="regular" />
+                                    Save to Vault
+                                </button>
+
+                                <div className="p-4 rounded-xl bg-white/5 border border-white/10 mt-2">
+                                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Document Ref</p>
+                                    <p className="text-[12px] font-medium text-white/80 break-all">{caseNumber || 'document'}</p>
+                                </div>
+                                
+                                <p className="text-[9px] font-medium text-center text-white/30 mt-auto pt-4 leading-relaxed uppercase tracking-widest">
+                                    Verification recommended.
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Interactive PDF Preview */}
+                        <div className={`relative flex-1 rounded-2xl overflow-hidden hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-white/10 flex items-center justify-center group ${
+                            previewState === 'compact' ? 'w-full max-w-md h-[300px] cursor-pointer hover:border-indigo-500/50 transition-colors' : 
+                            previewState === 'fullscreen' ? 'h-full w-full' : 'h-[70vh] min-h-[600px]'
+                        }`}
+                        onClick={() => {
+                            if (previewState === 'compact') setPreviewState('split');
+                        }}>
                             {generatedResult?.downloadUrl ? (
                                 <iframe 
                                     src={`${generatedResult.downloadUrl}#toolbar=0&view=FitH`} 
-                                    className="w-full h-full border-0 rounded-2xl"
+                                    className={`w-full h-full border-0 ${previewState === 'compact' ? 'pointer-events-none scale-[0.85] origin-top opacity-80 group-hover:opacity-100 transition-opacity' : ''}`}
                                     title="Document Preview"
                                 />
                             ) : (
@@ -838,47 +900,69 @@ function DocuVaultPageInner() {
                                     Preview Not Available
                                 </div>
                             )}
-                            
-                            {/* Document Title Overlay inside the preview top edge (optional, but looks good) */}
-                            <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
-                                <p className="text-[11px] font-bold text-white/80 truncate">
-                                    {generatedResult?.filename || selectedTemplate?.title || 'document.pdf'}
-                                </p>
-                            </div>
+
+                            {/* Hover overlay for Compact state */}
+                            {previewState === 'compact' && generatedResult?.downloadUrl && (
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <div className="px-4 py-2 rounded-full bg-indigo-500/80 backdrop-blur-md text-white text-[11px] font-bold uppercase tracking-widest flex items-center gap-2">
+                                        <MagnifyingGlassPlus size={16} />
+                                        Click to Expand
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* View controls for Split/Fullscreen */}
+                            {previewState !== 'compact' && (
+                                <div className="absolute top-4 right-4 flex items-center gap-2">
+                                    {previewState === 'split' ? (
+                                        <>
+                                            <button 
+                                                onClick={() => setPreviewState('compact')}
+                                                className="w-10 h-10 rounded-xl bg-black/60 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/80 transition-all shadow-lg"
+                                                title="Minimize Preview"
+                                            >
+                                                <CornersIn size={18} />
+                                            </button>
+                                            <button 
+                                                onClick={() => setPreviewState('fullscreen')}
+                                                className="w-10 h-10 rounded-xl bg-black/60 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/80 transition-all shadow-lg"
+                                                title="Fullscreen Preview"
+                                            >
+                                                <ArrowsOutSimple size={18} />
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <div className="flex items-center gap-2 bg-black/60 backdrop-blur-xl border border-white/10 p-2 rounded-xl shadow-lg">
+                                            <button
+                                                onClick={() => {
+                                                    if (!generatedResult?.downloadUrl) return;
+                                                    const a = document.createElement('a');
+                                                    a.href = generatedResult.downloadUrl;
+                                                    a.download = generatedResult.filename;
+                                                    a.rel = 'noopener';
+                                                    document.body.appendChild(a);
+                                                    a.click();
+                                                    document.body.removeChild(a);
+                                                }}
+                                                className="px-4 py-2 rounded-lg bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-[0_4px_16px_rgba(26,75,155,0.4)] transition-all flex items-center gap-2"
+                                            >
+                                                <DownloadSimple size={14} weight="bold" />
+                                                Download
+                                            </button>
+                                            <div className="w-px h-6 bg-white/20 mx-1"></div>
+                                            <button 
+                                                onClick={() => setPreviewState('split')}
+                                                className="w-8 h-8 rounded-lg flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all"
+                                                title="Exit Fullscreen"
+                                            >
+                                                <CornersIn size={18} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
-                        {/* Actions (Right) */}
-                        <div className="w-full md:w-64 space-y-4 shrink-0 flex flex-col">
-                            <button
-                                onClick={() => {
-                                    if (!generatedResult?.downloadUrl) return;
-                                    const a = document.createElement('a');
-                                    a.href = generatedResult.downloadUrl;
-                                    a.download = generatedResult.filename;
-                                    a.rel = 'noopener';
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                }}
-                                disabled={!generatedResult?.downloadUrl}
-                                className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest shadow-xl shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale"
-                            >
-                                <DownloadSimple size={16} weight="bold" />
-                                Download PDF
-                            </button>
-                            
-                            <button
-                                disabled
-                                className="w-full py-3.5 rounded-xl bg-white/5 border border-white/10 text-white/40 text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 cursor-not-allowed opacity-60"
-                            >
-                                <Bank size={16} weight="regular" />
-                                Save to Vault
-                            </button>
-                            
-                            <p className="text-[9px] font-medium text-center text-white/30 mt-auto pt-6 leading-relaxed uppercase tracking-widest">
-                                Verification recommended.
-                            </p>
-                        </div>
                     </div>
                 </motion.div>
             )}

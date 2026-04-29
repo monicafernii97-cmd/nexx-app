@@ -361,7 +361,8 @@ function DocuVaultPageInner() {
         const a = document.createElement('a');
         a.href = generatedResult.downloadUrl;
         a.download = generatedResult.filename;
-        a.rel = 'noopener';
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

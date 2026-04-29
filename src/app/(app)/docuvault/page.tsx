@@ -348,6 +348,13 @@ function DocuVaultPageInner() {
         setPreviewState('compact');
     }, []);
 
+    /** Navigate back to composer without wiping draft state — preserves template + content for re-generation. */
+    const handleBackToComposer = useCallback(() => {
+        setView('hub');
+        setPreviewState('compact');
+        setGenerationError(null);
+    }, []);
+
     return (
         <PageContainer>
             {/* ═══════════════════════════════════════════════════
@@ -814,7 +821,7 @@ function DocuVaultPageInner() {
                     {previewState !== 'fullscreen' && (
                         <div className="flex items-center gap-4 mb-8">
                             <button
-                                onClick={handleNewDocument}
+                                onClick={handleBackToComposer}
                                 aria-label="Back to document composer"
                                 className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all shrink-0"
                             >
@@ -882,13 +889,24 @@ function DocuVaultPageInner() {
                         )}
 
                         {/* Interactive PDF Preview */}
-                        <div className={`relative flex-1 rounded-2xl overflow-hidden hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-white/10 flex items-center justify-center group ${
-                            previewState === 'compact' ? 'w-full max-w-md h-[300px] cursor-pointer hover:border-indigo-500/50 transition-colors' : 
-                            previewState === 'fullscreen' ? 'h-full w-full' : 'h-[70vh] min-h-[600px]'
-                        }`}
-                        onClick={() => {
-                            if (previewState === 'compact') setPreviewState('split');
-                        }}>
+                        <div
+                            role={previewState === 'compact' ? 'button' : undefined}
+                            tabIndex={previewState === 'compact' ? 0 : undefined}
+                            aria-label={previewState === 'compact' ? 'Expand document preview' : undefined}
+                            onKeyDown={(e) => {
+                                if (previewState === 'compact' && (e.key === 'Enter' || e.key === ' ')) {
+                                    e.preventDefault();
+                                    setPreviewState('split');
+                                }
+                            }}
+                            className={`relative flex-1 rounded-2xl overflow-hidden hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-white/10 flex items-center justify-center group ${
+                                previewState === 'compact' ? 'w-full max-w-md h-[300px] cursor-pointer hover:border-indigo-500/50 transition-colors' : 
+                                previewState === 'fullscreen' ? 'h-full w-full' : 'h-[70vh] min-h-[600px]'
+                            }`}
+                            onClick={() => {
+                                if (previewState === 'compact') setPreviewState('split');
+                            }}
+                        >
                             {generatedResult?.downloadUrl ? (
                                 <iframe 
                                     src={`${generatedResult.downloadUrl}#toolbar=0&view=FitH`} 
@@ -920,6 +938,7 @@ function DocuVaultPageInner() {
                                                 onClick={() => setPreviewState('compact')}
                                                 className="w-10 h-10 rounded-xl bg-black/60 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/80 transition-all shadow-lg"
                                                 title="Minimize Preview"
+                                                aria-label="Minimize preview"
                                             >
                                                 <CornersIn size={18} />
                                             </button>
@@ -927,6 +946,7 @@ function DocuVaultPageInner() {
                                                 onClick={() => setPreviewState('fullscreen')}
                                                 className="w-10 h-10 rounded-xl bg-black/60 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/80 transition-all shadow-lg"
                                                 title="Fullscreen Preview"
+                                                aria-label="Open fullscreen preview"
                                             >
                                                 <ArrowsOutSimple size={18} />
                                             </button>
@@ -944,6 +964,7 @@ function DocuVaultPageInner() {
                                                     a.click();
                                                     document.body.removeChild(a);
                                                 }}
+                                                aria-label="Download PDF document"
                                                 className="px-4 py-2 rounded-lg bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-[0_4px_16px_rgba(26,75,155,0.4)] transition-all flex items-center gap-2"
                                             >
                                                 <DownloadSimple size={14} weight="bold" />
@@ -954,6 +975,7 @@ function DocuVaultPageInner() {
                                                 onClick={() => setPreviewState('split')}
                                                 className="w-8 h-8 rounded-lg flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all"
                                                 title="Exit Fullscreen"
+                                                aria-label="Exit fullscreen preview"
                                             >
                                                 <CornersIn size={18} />
                                             </button>

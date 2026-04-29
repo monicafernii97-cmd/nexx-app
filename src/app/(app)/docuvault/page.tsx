@@ -893,11 +893,11 @@ function DocuVaultPageInner() {
 
                         {/* Interactive PDF Preview */}
                         <div
-                            role={previewState === 'compact' ? 'button' : undefined}
-                            tabIndex={previewState === 'compact' ? 0 : undefined}
-                            aria-label={previewState === 'compact' ? 'Expand document preview' : undefined}
+                            role={previewState === 'compact' && generatedResult?.downloadUrl ? 'button' : undefined}
+                            tabIndex={previewState === 'compact' && generatedResult?.downloadUrl ? 0 : undefined}
+                            aria-label={previewState === 'compact' && generatedResult?.downloadUrl ? 'Expand document preview' : undefined}
                             onKeyDown={(e) => {
-                                if (previewState === 'compact' && (e.key === 'Enter' || e.key === ' ')) {
+                                if (previewState === 'compact' && generatedResult?.downloadUrl && (e.key === 'Enter' || e.key === ' ')) {
                                     e.preventDefault();
                                     setPreviewState('split');
                                 }
@@ -907,7 +907,7 @@ function DocuVaultPageInner() {
                                 previewState === 'fullscreen' ? 'h-full w-full' : 'h-[70vh] min-h-[600px]'
                             }`}
                             onClick={() => {
-                                if (previewState === 'compact') setPreviewState('split');
+                                if (previewState === 'compact' && generatedResult?.downloadUrl) setPreviewState('split');
                             }}
                         >
                             {generatedResult?.downloadUrl ? (
@@ -958,8 +958,9 @@ function DocuVaultPageInner() {
                                         <div className="flex items-center gap-2 bg-black/60 backdrop-blur-xl border border-white/10 p-2 rounded-xl shadow-lg">
                                             <button
                                                 onClick={handleDownload}
+                                                disabled={!generatedResult?.downloadUrl}
                                                 aria-label="Download PDF document"
-                                                className="px-4 py-2 rounded-lg bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-[0_4px_16px_rgba(26,75,155,0.4)] transition-all flex items-center gap-2"
+                                                className="px-4 py-2 rounded-lg bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-[0_4px_16px_rgba(26,75,155,0.4)] transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 <DownloadSimple size={14} weight="bold" />
                                                 Download

@@ -37,20 +37,11 @@ export function renderPageShell(params: {
   html, body {
     margin: 0;
     padding: 0;
-    font-family: "Times New Roman", Times, Georgia, serif;
+    font-family: ${profile.typography.fontFamily};
     font-size: ${profile.typography.fontSizePt}pt;
-    line-height: ${profile.typography.lineHeightPt ?? 18}pt;
+    line-height: ${profile.typography.lineHeightPt}pt;
     color: #000;
     text-align: ${profile.typography.bodyAlign};
-  }
-
-  p {
-    text-indent: 0.5in;
-    margin: 0 0 ${profile.typography.fontSizePt ?? 12}pt;
-  }
-
-  p.no-indent {
-    text-indent: 0;
   }
 
   body {

@@ -94,13 +94,14 @@ export const nexxClerkAppearance = {
             color: '#FFFFFF',
         },
         formButtonPrimary: {
-            background: 'linear-gradient(135deg, #60A5FA, #2563EB)',
+            background: '#4F46E5', /* indigo-600 */
             color: '#FFFFFF',
             fontWeight: '700',
-            letterSpacing: '0.04em',
+            letterSpacing: '0.05em',
             textTransform: 'uppercase' as const,
-            boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 8px 16px rgba(37, 99, 235, 0.4)',
-            border: 'none',
+            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '8px',
         },
         footerActionLink: {
             color: '#60A5FA',
@@ -191,8 +192,8 @@ export const settingsClerkAppearance = {
         card: { ...nexxClerkAppearance.elements.card, background: 'transparent' },
         scrollBox: { background: 'transparent' },
         navbar: {
-            borderRight: '1px solid rgba(255,255,255,0.1)',
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.05))',
+            borderRight: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255, 255, 255, 0.02)',
         },
         // Extra elements that the shared theme doesn't need (UserProfile-specific)
         page: { color: '#FFFFFF' },

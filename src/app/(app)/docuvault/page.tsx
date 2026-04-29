@@ -92,7 +92,7 @@ function DocuVaultPageInner() {
       filename: string;
       byteLength: number;
       sha256: string;
-      downloadUrl: string;
+      downloadUrl?: string;
     };
     const [generatedResult, setGeneratedResult] = useState<QuickGenResult | null>(null);
     const [generationError, setGenerationError] = useState<string | null>(null);
@@ -297,7 +297,7 @@ function DocuVaultPageInner() {
                             filename: data.filename,
                             byteLength: data.byteLength,
                             sha256: data.sha256,
-                            downloadUrl: data.downloadUrl,
+                            downloadUrl: typeof data.downloadUrl === 'string' ? data.downloadUrl : undefined,
                         });
                         setCaseNumber(data.filename?.replace('.pdf', '') ?? 'document');
                         setView('result');
@@ -903,8 +903,9 @@ function DocuVaultPageInner() {
                                 }
                             }}
                             className={`relative flex-1 rounded-2xl overflow-hidden hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-white/10 flex items-center justify-center group ${
-                                previewState === 'compact' ? 'w-full max-w-md h-[300px] cursor-pointer hover:border-indigo-500/50 transition-colors' : 
-                                previewState === 'fullscreen' ? 'h-full w-full' : 'h-[70vh] min-h-[600px]'
+                                previewState === 'compact'
+                                    ? `w-full max-w-md h-[300px] transition-colors ${generatedResult?.downloadUrl ? 'cursor-pointer hover:border-indigo-500/50' : ''}`
+                                    : previewState === 'fullscreen' ? 'h-full w-full' : 'h-[70vh] min-h-[600px]'
                             }`}
                             onClick={() => {
                                 if (previewState === 'compact' && generatedResult?.downloadUrl) setPreviewState('split');

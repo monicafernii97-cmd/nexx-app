@@ -404,34 +404,34 @@ export default function ConversationPage() {
 
     return (
         <div className={`flex flex-col h-[calc(100vh-80px)] max-w-5xl mx-auto px-2 md:px-4 pt-4 transition-colors duration-300 ${isLight ? 'bg-white' : ''}`}>
-            {/* Header (Glass Morphism Pill) */}
+            {/* Header */}
             <motion.div
                 initial={{ opacity: 0, y: -12 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`rounded-2xl p-4 flex items-center gap-4 mb-6 shadow-sm shrink-0 transition-colors duration-300 ${isLight
-                    ? 'bg-white border border-gray-200 shadow-md'
-                    : 'glass-ethereal border-white'
+                className={`rounded-xl p-3 flex items-center gap-4 mb-6 shadow-sm shrink-0 transition-colors duration-300 ${isLight
+                    ? 'bg-white border border-gray-200'
+                    : 'bg-[#0A0D14] border border-white/10'
                     }`}
             >
                 <button
                     onClick={() => router.push('/chat')}
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all hover:scale-105 shadow-sm border ${isLight
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-all border ${isLight
                         ? 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                        : 'bg-white border-[rgba(10,22,41,0.05)] text-[#1E3A8A] hover:shadow'
+                        : 'bg-white/5 border-white/5 text-white/60 hover:text-white hover:bg-white/10'
                         }`}
                     aria-label="Back to conversations"
                 >
-                    <ArrowLeft size={18} weight="bold" />
+                    <ArrowLeft size={16} weight="regular" />
                 </button>
                 
                 <div className="flex-1 min-w-0 pl-1">
-                    <h1 className={`text-[17px] font-bold truncate ${isLight ? 'text-gray-900' : 'text-sapphire'}`}>
+                    <h1 className={`text-sm font-bold truncate ${isLight ? 'text-gray-900' : 'text-white/90'}`}>
                         {conversation?.title || 'NEXX Executive Intelligence'}
                     </h1>
-                    <div className="flex items-center gap-3 mt-1">
-                        <div className={`flex items-center gap-1 ${isLight ? 'text-gray-400' : 'text-[rgba(10,22,41,0.4)]'}`}>
-                            <Lock size={12} weight="fill" />
-                            <p className="text-[11px] font-bold tracking-widest uppercase truncate">
+                    <div className="flex items-center gap-3 mt-0.5">
+                        <div className={`flex items-center gap-1 ${isLight ? 'text-gray-400' : 'text-white/40'}`}>
+                            <Lock size={10} weight="fill" />
+                            <p className="text-[9px] font-bold tracking-widest uppercase truncate">
                                 Encrypted
                             </p>
                         </div>
@@ -441,26 +441,26 @@ export default function ConversationPage() {
                 {/* Theme toggle */}
                 <button
                     onClick={toggleTheme}
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all hover:scale-105 border ${isLight
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-all border ${isLight
                         ? 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
-                        : 'bg-white/10 border-white/15 text-white/70 hover:bg-white/20'
+                        : 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:text-white'
                         }`}
                     title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
                     aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
                 >
-                    {isLight ? <Moon size={18} weight="duotone" /> : <Sun size={18} weight="duotone" />}
+                    {isLight ? <Moon size={16} weight="regular" /> : <Sun size={16} weight="regular" />}
                 </button>
 
                 <button
                     onClick={handleArchive}
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all border ${isLight
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-all border ${isLight
                         ? 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700'
-                        : 'bg-white hover:bg-cloud border-transparent hover:border-[rgba(10,22,41,0.05)] text-sapphire-muted hover:text-sapphire'
+                        : 'bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white'
                         }`}
                     title="Archive Conversation"
                     aria-label="Archive Conversation"
                 >
-                    <Archive size={18} weight="duotone" />
+                    <Archive size={16} weight="regular" />
                 </button>
             </motion.div>
 
@@ -486,24 +486,24 @@ export default function ConversationPage() {
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.3 }}
-                        className={`flex flex-col items-center justify-center m-auto text-center px-6 py-12 max-w-md w-full rounded-2xl ${isLight
+                        className={`flex flex-col items-center justify-center m-auto text-center px-6 py-10 max-w-sm w-full rounded-2xl ${isLight
                             ? 'bg-gray-50 border border-gray-200'
-                            : 'card-premium'
+                            : 'bg-white/[0.02] border border-white/5'
                             }`}
                     >
                         <div
-                            className="w-20 h-20 rounded-[24px] mb-6 flex items-center justify-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_8px_32px_rgba(18,61,126,0.3)] border border-white/10"
+                            className="w-12 h-12 rounded-xl mb-5 flex items-center justify-center bg-white/5 border border-white/10"
                         >
-                            <span className="text-white font-serif font-bold text-[40px] drop-shadow-sm pb-2"><i>N</i></span>
+                            <span className="text-white/60 font-serif font-bold text-xl pb-1"><i>N</i></span>
                         </div>
-                        <h2 className={`font-serif text-2xl font-bold mb-3 ${isLight ? 'text-gray-900' : 'text-sapphire'}`}>
+                        <h2 className={`text-sm font-bold mb-2 ${isLight ? 'text-gray-900' : 'text-white/90'}`}>
                             Secure Counsel Authorized
                         </h2>
-                        <p className={`text-[15px] max-w-sm font-medium mb-6 leading-relaxed ${isLight ? 'text-gray-500' : 'text-sapphire-muted'}`}>
-                            Share what&apos;s on your mind — an incident, a message from your NEX,
+                        <p className={`text-xs font-medium mb-6 leading-relaxed ${isLight ? 'text-gray-500' : 'text-white/40'}`}>
+                            Share what's on your mind — an incident, a message from your NEX,
                             a legal concern, or your emotional state.
                         </p>
-                        <div className="flex items-center justify-center text-[12px] font-bold tracking-[0.2em] uppercase text-white bg-[linear-gradient(135deg,#60A5FA,#2563EB)] px-5 py-2.5 rounded-full shadow-md">
+                        <div className="flex items-center justify-center text-[10px] font-bold tracking-widest uppercase text-white/40 bg-white/5 border border-white/5 px-4 py-2 rounded-lg">
                             Ready to Analyze
                         </div>
                     </motion.div>
@@ -610,20 +610,20 @@ export default function ConversationPage() {
                 <div ref={messagesEndRef} className="h-4" />
             </div>
 
-            {/* Input Area (Floating Pill) */}
+            {/* Input Area */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
                 className="pt-2 pb-6 px-1 lg:px-6 shrink-0 relative z-20"
             >
-                <div className={`rounded-[2rem] p-2 shadow-lg transition-colors duration-300 ${isLight
-                    ? 'bg-white border border-gray-200 shadow-md'
-                    : 'glass-ethereal border-white'
+                <div className={`rounded-xl p-1.5 transition-colors duration-300 ${isLight
+                    ? 'bg-white border border-gray-200 shadow-sm'
+                    : 'bg-[#0A0D14] border border-white/10 shadow-2xl'
                     }`}>
                     <ChatInput onSend={handleSend} disabled={isStreaming || isPending || !isThreadReady || !!unsavedReply} />
                 </div>
-                <p className={`text-center text-[10px] font-bold tracking-[0.15em] uppercase mt-4 flex items-center justify-center ${isLight ? 'text-gray-400' : 'text-[#0A1128]/50'}`}>
+                <p className={`text-center text-[9px] font-bold tracking-widest uppercase mt-3 flex items-center justify-center ${isLight ? 'text-gray-400' : 'text-white/30'}`}>
                     NEXX provides strategic guidance, not formal legal advice.
                 </p>
             </motion.div>

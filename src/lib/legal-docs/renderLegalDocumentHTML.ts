@@ -57,7 +57,7 @@ export function renderLegalDocumentHTML(
   html, body {
     margin: 0;
     padding: 0;
-    font-family: ${profile.typography.fontFamily};
+    font-family: "Times New Roman", Times, Georgia, serif;
     font-size: ${profile.typography.fontSizePt}pt;
     line-height: ${profile.typography.lineHeightPt}pt;
     color: #000;
@@ -138,6 +138,7 @@ export function renderLegalDocumentHTML(
   /* ── Body ── */
   .body-paragraph {
     text-align: ${profile.typography.bodyAlign};
+    text-indent: 0.5in;
     margin: 0 0 12pt;
   }
 
@@ -195,11 +196,19 @@ export function renderLegalDocumentHTML(
 
   /* ── Signature ── */
   .signature-block {
-    margin-top: 18pt;
+    margin-top: 36pt;
   }
 
   .signature-line {
     margin: 0;
+    text-indent: 0;
+  }
+
+  .signature-rule {
+    display: inline-block;
+    width: 3in;
+    border-bottom: 1px solid #000;
+    margin-bottom: 4pt;
   }
 
   /* ── Certificate page break ── */
@@ -396,7 +405,10 @@ function renderSignature(doc: LegalDocument, profile: JurisdictionProfile): stri
 
   return `
     <div class="signature-block${keepClass}">
-      ${doc.signature.intro ? `<p class="body-paragraph">${esc(doc.signature.intro)}</p>` : ''}
+      ${doc.signature.intro ? `<p class="body-paragraph" style="text-indent:0">${esc(doc.signature.intro)}</p>` : ''}
+      <div style="margin-top: 24pt;">
+        <span class="signature-rule"></span>
+      </div>
       ${doc.signature.signerLines.map((line) => `<p class="signature-line">${esc(line)}</p>`).join('')}
     </div>`;
 }
@@ -408,13 +420,14 @@ function renderSignature(doc: LegalDocument, profile: JurisdictionProfile): stri
 function renderCertificate(doc: LegalDocument, profile: JurisdictionProfile): string {
   if (!doc.certificate) return '';
 
-  const pageClass = profile.sections.certificateSeparatePage ? 'certificate-of-service' : '';
-
   return `
-    <div class="${pageClass}">
+    <div class="certificate-of-service" style="page-break-before: always; break-before: page;">
       <div class="certificate-heading">${esc(doc.certificate.heading)}</div>
-      ${doc.certificate.bodyLines.map((line) => `<p class="body-paragraph">${esc(line)}</p>`).join('')}
+      ${doc.certificate.bodyLines.map((line) => `<p class="body-paragraph" style="text-indent:0">${esc(line)}</p>`).join('')}
       <div class="signature-block">
+        <div style="margin-top: 24pt;">
+          <span class="signature-rule"></span>
+        </div>
         ${doc.certificate.signerLines.map((line) => `<p class="signature-line">${esc(line)}</p>`).join('')}
       </div>
     </div>`;

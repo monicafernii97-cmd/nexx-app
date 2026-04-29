@@ -355,6 +355,18 @@ function DocuVaultPageInner() {
         setGenerationError(null);
     }, []);
 
+    /** Programmatic download — shared by compact action panel and fullscreen toolbar. */
+    const handleDownload = useCallback(() => {
+        if (!generatedResult?.downloadUrl) return;
+        const a = document.createElement('a');
+        a.href = generatedResult.downloadUrl;
+        a.download = generatedResult.filename;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }, [generatedResult?.downloadUrl, generatedResult?.filename]);
+
     return (
         <PageContainer>
             {/* ═══════════════════════════════════════════════════
@@ -852,16 +864,7 @@ function DocuVaultPageInner() {
                                 )}
                                 
                                 <button
-                                    onClick={() => {
-                                        if (!generatedResult?.downloadUrl) return;
-                                        const a = document.createElement('a');
-                                        a.href = generatedResult.downloadUrl;
-                                        a.download = generatedResult.filename;
-                                        a.rel = 'noopener';
-                                        document.body.appendChild(a);
-                                        a.click();
-                                        document.body.removeChild(a);
-                                    }}
+                                    onClick={handleDownload}
                                     disabled={!generatedResult?.downloadUrl}
                                     className="w-full py-3.5 rounded-xl bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-white/20 hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:-translate-y-0.5 text-white text-[11px] font-bold uppercase tracking-widest shadow-[0_4px_16px_rgba(26,75,155,0.3)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale"
                                 >
@@ -954,16 +957,7 @@ function DocuVaultPageInner() {
                                     ) : (
                                         <div className="flex items-center gap-2 bg-black/60 backdrop-blur-xl border border-white/10 p-2 rounded-xl shadow-lg">
                                             <button
-                                                onClick={() => {
-                                                    if (!generatedResult?.downloadUrl) return;
-                                                    const a = document.createElement('a');
-                                                    a.href = generatedResult.downloadUrl;
-                                                    a.download = generatedResult.filename;
-                                                    a.rel = 'noopener';
-                                                    document.body.appendChild(a);
-                                                    a.click();
-                                                    document.body.removeChild(a);
-                                                }}
+                                                onClick={handleDownload}
                                                 aria-label="Download PDF document"
                                                 className="px-4 py-2 rounded-lg bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-[0_4px_16px_rgba(26,75,155,0.4)] transition-all flex items-center gap-2"
                                             >

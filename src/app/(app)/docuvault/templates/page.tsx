@@ -315,7 +315,7 @@ export default function TemplateGalleryPage() {
                             <div
                                 ref={previewDialogRef}
                                 tabIndex={-1}
-                                className="w-full max-w-[480px] rounded-2xl overflow-hidden pointer-events-auto max-h-[85vh] flex flex-col bg-[#0A0D14] border border-white/10 shadow-2xl focus:outline-none"
+                                className="w-full max-w-[480px] rounded-2xl overflow-hidden pointer-events-auto max-h-[85vh] flex flex-col hyper-glass shadow-[0_16px_64px_rgba(0,0,0,0.5)] focus:outline-none"
                             >
                                 {/* Modal header */}
                                 <div className="flex items-start justify-between p-6 pb-5 border-b border-white/5">
@@ -454,7 +454,7 @@ export default function TemplateGalleryPage() {
 
                                 {/* Modal footer */}
                                 <div
-                                    className="p-5 flex items-center gap-3 border-t border-white/5 bg-[#0A0D14]"
+                                    className="p-5 flex items-center gap-3 border-t border-white/5 bg-transparent"
                                 >
                                     <button
                                         onClick={() => setPreviewTemplate(null)}

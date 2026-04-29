@@ -89,7 +89,7 @@ export default function ChatListPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="p-6 mb-8 rounded-2xl bg-white/[0.02] border border-white/5"
+                className="p-6 mb-8 rounded-2xl hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.2)]"
             >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
@@ -128,7 +128,7 @@ export default function ChatListPage() {
                 </div>
 
                 {isLoadingConversations ? (
-                    <div className="p-12 text-center mb-8 rounded-2xl bg-white/[0.02] border border-white/5 border-dashed">
+                    <div className="p-12 text-center mb-8 rounded-2xl hyper-glass border-dashed border-white/10">
                         <div className="flex flex-col items-center justify-center gap-4">
                             <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white/60 animate-spin" />
                             <p className="text-[9px] font-bold uppercase tracking-widest text-white/40 mt-2">
@@ -137,7 +137,7 @@ export default function ChatListPage() {
                         </div>
                     </div>
                 ) : activeConversations.length === 0 ? (
-                    <div className="p-10 text-center mb-8 flex flex-col items-center justify-center rounded-2xl bg-white/[0.02] border border-white/5 border-dashed">
+                    <div className="p-10 text-center mb-8 flex flex-col items-center justify-center rounded-2xl hyper-glass border-dashed border-white/10">
                         <div
                             className="w-10 h-10 rounded-xl mx-auto mb-4 flex items-center justify-center bg-white/5 border border-white/10"
                         >
@@ -162,7 +162,7 @@ export default function ChatListPage() {
                                     transition={{ delay: 0.05 * i }}
                                     className="relative group"
                                 >
-                                    <Link href={`/chat/${conv._id}`} className="p-4 rounded-xl block border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/10 transition-all">
+                                    <Link href={`/chat/${conv._id}`} className="p-4 rounded-xl block hyper-glass hover:shadow-[0_8px_24px_rgba(0,0,0,0.2)] transition-all">
                                         <div className="flex items-start gap-4">
                                             <div
                                                 className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 border border-white/10 bg-white/5"
@@ -245,7 +245,7 @@ export default function ChatListPage() {
                                         <div key={conv._id} className="relative group/archived">
                                             <Link
                                                 href={`/chat/${conv._id}`}
-                                                className="p-3 rounded-xl block border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-colors"
+                                                className="p-3 rounded-xl block hyper-glass hover:shadow-lg transition-all"
                                             >
                                                 <div className="flex items-center gap-3 pr-10">
                                                     <div

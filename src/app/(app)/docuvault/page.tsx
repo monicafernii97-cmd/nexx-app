@@ -714,7 +714,7 @@ function DocuVaultPageInner() {
                     </div>
 
                     {/* Progress bar */}
-                    <div className="p-6 mb-8 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl">
+                    <div className="p-6 mb-8 rounded-2xl hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
                         <div className="flex items-center justify-between mb-3">
                             <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/40">
                                 Synthesis Progress
@@ -834,7 +834,7 @@ function DocuVaultPageInner() {
 
                     <div className="flex flex-col md:flex-row gap-6">
                         {/* Interactive PDF Preview (Left/Top) */}
-                        <div className="flex-1 min-h-[500px] h-[70vh] rounded-2xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-xl relative">
+                        <div className="flex-1 min-h-[500px] h-[70vh] rounded-2xl overflow-hidden hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.3)] relative">
                             {generatedResult?.downloadUrl ? (
                                 <iframe 
                                     src={`${generatedResult.downloadUrl}#toolbar=0&view=FitH`} 

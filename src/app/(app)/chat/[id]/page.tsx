@@ -408,9 +408,9 @@ export default function ConversationPage() {
             <motion.div
                 initial={{ opacity: 0, y: -12 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`rounded-xl p-3 flex items-center gap-4 mb-6 shadow-sm shrink-0 transition-colors duration-300 ${isLight
-                    ? 'bg-white border border-gray-200'
-                    : 'bg-[#0A0D14] border border-white/10'
+                className={`rounded-xl p-3 flex items-center gap-4 mb-6 shrink-0 transition-colors duration-300 ${isLight
+                    ? 'bg-white border border-gray-200 shadow-[0_8px_32px_rgba(0,0,0,0.05)]'
+                    : 'hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.3)]'
                     }`}
             >
                 <button
@@ -487,8 +487,8 @@ export default function ConversationPage() {
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.3 }}
                         className={`flex flex-col items-center justify-center m-auto text-center px-6 py-10 max-w-sm w-full rounded-2xl ${isLight
-                            ? 'bg-gray-50 border border-gray-200'
-                            : 'bg-white/[0.02] border border-white/5'
+                            ? 'bg-white border border-gray-200 shadow-[0_8px_32px_rgba(0,0,0,0.05)]'
+                            : 'hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.3)]'
                             }`}
                     >
                         <div
@@ -617,9 +617,9 @@ export default function ConversationPage() {
                 transition={{ delay: 0.2 }}
                 className="pt-2 pb-6 px-1 lg:px-6 shrink-0 relative z-20"
             >
-                <div className={`rounded-xl p-1.5 transition-colors duration-300 ${isLight
-                    ? 'bg-white border border-gray-200 shadow-sm'
-                    : 'bg-[#0A0D14] border border-white/10 shadow-2xl'
+                <div className={`rounded-2xl p-1.5 transition-colors duration-300 ${isLight
+                    ? 'bg-white border border-gray-200 shadow-[0_8px_32px_rgba(0,0,0,0.05)]'
+                    : 'hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.4)]'
                     }`}>
                     <ChatInput onSend={handleSend} disabled={isStreaming || isPending || !isThreadReady || !!unsavedReply} />
                 </div>

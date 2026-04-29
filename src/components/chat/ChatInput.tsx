@@ -419,8 +419,8 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                 onChange={handleFileChange}
             />
             <div
-                className={`flex items-end gap-3 rounded-[1.5rem] p-3 bg-white shadow-[0_4px_24px_rgba(208,227,255,0.4)] border transition-all focus-within:ring-2 focus-within:ring-champagne/30 ${
-                    isListening ? 'border-red-300 ring-2 ring-red-200/50' : 'border-white'
+                className={`flex items-end gap-3 rounded-xl p-2 transition-all focus-within:ring-1 focus-within:ring-indigo-500/30 ${
+                    isListening ? 'bg-red-500/10 border-red-500/50' : 'bg-transparent border-transparent'
                 }`}
             >
                 <textarea
@@ -448,26 +448,26 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                         type="button"
                         onClick={handleFileSelect}
                         disabled={disabled}
-                        className={`w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer ${
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 cursor-pointer ${
                             selectedFile
-                                ? 'bg-blue-100 text-blue-600'
-                                : 'bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#0A1128]/50 hover:text-[#0A1128]'
+                                ? 'bg-indigo-500/10 text-indigo-400'
+                                : 'bg-[var(--surface-elevated)] hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-body)]'
                         }`}
                         title="Attach a file"
                         aria-label="Attach a file"
                     >
-                        <Paperclip size={18} weight="duotone" />
+                        <Paperclip size={16} weight="regular" />
                     </button>
                     <button
                         type="button"
                         onClick={toggleListening}
                         disabled={disabled}
-                        className={`w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer relative ${
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 cursor-pointer relative ${
                             isListening
                                 ? 'bg-red-500 text-white shadow-md'
                                 : isSpeechSupported
-                                    ? 'bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#0A1128]/50 hover:text-[#0A1128]'
-                                    : 'bg-[#F1F5F9] text-[#0A1128]/20'
+                                    ? 'bg-[var(--surface-elevated)] hover:bg-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-body)]'
+                                    : 'bg-[var(--surface-elevated)] opacity-50 cursor-not-allowed text-[var(--text-muted)]'
                         }`}
                         title={
                             isListening
@@ -486,12 +486,12 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                         aria-describedby={micErrorId}
                     >
                         {isListening && (
-                            <span className="absolute inset-0 rounded-[14px] bg-red-400 animate-ping opacity-30" />
+                            <span className="absolute inset-0 rounded-lg bg-red-400 animate-ping opacity-30" />
                         )}
                         {isListening ? (
-                            <MicrophoneSlash size={18} weight="fill" className="relative z-10" />
+                            <MicrophoneSlash size={16} weight="fill" className="relative z-10" />
                         ) : (
-                            <Microphone size={18} weight="duotone" />
+                            <Microphone size={16} weight="regular" />
                         )}
                     </button>
                     <button

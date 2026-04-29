@@ -18,20 +18,20 @@ export function PageHeader({ icon: Icon, title, description, rightElement }: Pag
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-6 mb-4 lg:mb-8 pt-2 lg:pt-4 px-1"
+            className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 lg:mb-14 pt-4"
         >
-            <div className="flex items-center gap-3 lg:gap-4">
+            <div className="flex flex-col gap-5">
                 {Icon && (
-                    <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center shadow-lg shrink-0">
-                        <Icon size={18} weight="light" className="text-indigo-400" />
+                    <div className="w-12 h-12 rounded-2xl hyper-glass flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.2)] shrink-0">
+                        <Icon size={22} weight="regular" className="text-indigo-400" />
                     </div>
                 )}
-                <div>
-                    <h1 className="text-xl lg:text-2xl font-serif text-headline text-white m-0 tracking-tight flex items-center gap-2">
+                <div className="space-y-2">
+                    <h1 className="text-2xl lg:text-4xl font-serif text-white tracking-tight leading-none">
                         {title}
                     </h1>
                     {description && (
-                        <p className="text-[12px] lg:text-[13px] text-white/40 mt-0.5 max-w-xl leading-relaxed">
+                        <p className="text-[13px] font-medium text-white/40 max-w-2xl leading-relaxed tracking-wide">
                             {description}
                         </p>
                     )}
@@ -63,8 +63,8 @@ export function PageContainer({
     noHorizontalPadding?: boolean;
 }) {
     return (
-        <div className={`max-w-[72rem] mx-auto w-full py-4 lg:py-6 flex flex-col ${
-            noHorizontalPadding ? '' : 'px-6 lg:px-12'
+        <div className={`max-w-[72rem] mx-auto w-full py-8 lg:py-12 flex flex-col ${
+            noHorizontalPadding ? '' : 'px-6 lg:px-16'
         } ${
             lockHeight
                 ? 'min-h-[calc(100dvh-60px)] lg:h-[calc(100dvh-76px)] lg:overflow-hidden'

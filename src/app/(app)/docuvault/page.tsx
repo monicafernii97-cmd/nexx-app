@@ -8,6 +8,8 @@ import {
     FileText,
     Strategy,
     Plus,
+    CircleNotch,
+    Sparkle,
     Paperclip,
     X,
     ArrowRight,
@@ -696,78 +698,75 @@ function DocuVaultPageInner() {
                     <div className="text-center mb-10">
                         <motion.div
                             animate={{ rotate: 360 }}
-                            transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+                            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                             className="inline-block mb-6 relative"
                         >
-                            <div className="absolute inset-0 rounded-full blur-2xl bg-[#60A5FA]/30 scale-150 pointer-events-none" />
-                            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] border-2 border-[#60A5FA]/50 shadow-[0_8px_32px_rgba(96,165,250,0.3)] relative z-10 box-border">
-                                <Strategy size={32} weight="duotone" className="text-[#60A5FA] drop-shadow-[0_2px_12px_rgba(96,165,250,0.8)]" />
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center relative z-10 box-border">
+                                <CircleNotch size={28} weight="regular" className="text-indigo-400" />
                             </div>
                         </motion.div>
-                        <h3 className="text-2xl font-serif font-bold text-white tracking-tight drop-shadow-sm">
-                            DocuVault AI is drafting...
+                        <h3 className="text-sm font-bold text-white tracking-wide uppercase">
+                            DocuVault Drafting...
                         </h3>
-                        <p className="text-[16px] font-medium text-white/80 mt-3 drop-shadow-sm">
-                            Structuring verbatim into local court format
+                        <p className="text-xs font-medium text-white/40 mt-1 uppercase tracking-widest">
+                            Structuring local court format
                         </p>
                     </div>
 
                     {/* Progress bar */}
-                    <div className="p-8 mb-8 rounded-[2rem] border border-white/20 bg-white/5 backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_12px_40px_rgba(0,0,0,0.5)]">
-                        <div className="flex items-center justify-between mb-4">
-                            <p className="text-[13px] font-bold tracking-widest uppercase text-white/60">
+                    <div className="p-6 mb-8 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl">
+                        <div className="flex items-center justify-between mb-3">
+                            <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/40">
                                 Synthesis Progress
                             </p>
-                            <p className="text-[15px] font-bold text-white">
+                            <p className="text-[11px] font-bold text-white/60">
                                 {Math.round(progress)}%
                             </p>
                         </div>
-                        <div className="h-2.5 rounded-full overflow-hidden bg-black/40 shadow-inner border border-white/10">
+                        <div className="h-1 rounded-full overflow-hidden bg-white/5 border border-white/5">
                             <motion.div
-                                className="h-full rounded-full bg-[linear-gradient(90deg,#60A5FA,#E5A84A)] shadow-[0_0_12px_rgba(96,165,250,0.6)] relative"
+                                className="h-full rounded-full bg-indigo-500 relative"
                                 animate={{ width: `${progress}%` }}
                                 transition={{ duration: 0.5, ease: 'easeOut' }}
-                            >
-                                <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]" style={{ transform: 'skewX(-20deg)' }} />
-                            </motion.div>
+                            />
                         </div>
                         
                         {/* Document context */}
-                        <div className="mt-8 pt-6 border-t border-white/10">
-                            <p className="text-[11px] uppercase font-bold text-[#60A5FA] tracking-widest mb-3">
+                        <div className="mt-6 pt-4 border-t border-white/5">
+                            <p className="text-[9px] uppercase font-bold text-white/20 tracking-widest mb-2">
                                 Context
                             </p>
-                            <p className="text-[15px] italic leading-relaxed text-white drop-shadow-sm border-l-2 border-[#60A5FA] pl-4">
-                                &ldquo;{selectedTemplate?.title ?? truncateText(documentContent)}&rdquo;
+                            <p className="text-[11px] leading-relaxed text-white/60 border-l border-white/10 pl-3">
+                                {selectedTemplate?.title ?? truncateText(documentContent)}
                             </p>
                         </div>
                     </div>
 
                     {/* Step-by-step progress */}
-                    <div className="space-y-5 px-3">
+                    <div className="space-y-4 px-2">
                         {progressSteps.map((step, i) => (
                             <motion.div
                                 key={i}
                                 initial={{ opacity: 0, x: -10 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: i * 0.1 }}
-                                className="flex items-center gap-5"
+                                className="flex items-center gap-4"
                             >
-                                <div className="shrink-0 flex items-center justify-center w-8">
+                                <div className="shrink-0 flex items-center justify-center w-6">
                                     {step.status === 'complete' ? (
-                                        <CheckCircle size={28} weight="fill" className="text-[#10B981] drop-shadow-[0_2px_8px_rgba(16,185,129,0.5)]" />
+                                        <CheckCircle size={16} weight="regular" className="text-white/60" />
                                     ) : step.status === 'active' ? (
                                         <motion.div
-                                            animate={{ scale: [1, 1.3, 1] }}
+                                            animate={{ opacity: [0.5, 1, 0.5] }}
                                             transition={{ duration: 1.5, repeat: Infinity }}
-                                            className="w-4 h-4 rounded-full bg-[#60A5FA] shadow-[0_0_12px_rgba(96,165,250,0.8)]"
+                                            className="w-1.5 h-1.5 rounded-full bg-indigo-400"
                                         />
                                     ) : (
-                                        <div className="w-2.5 h-2.5 rounded-full bg-white/20 shadow-inner" />
+                                        <div className="w-1 h-1 rounded-full bg-white/10" />
                                     )}
                                 </div>
                                 <div className="flex-1">
-                                    <p className={`text-[15px] transition-colors ${step.status === 'complete' ? 'text-white font-bold drop-shadow-sm' : step.status === 'active' ? 'text-[#60A5FA] font-bold drop-shadow-sm' : 'text-white/40 font-medium'}`}>
+                                    <p className={`text-[11px] uppercase tracking-widest transition-colors ${step.status === 'complete' ? 'text-white/60 font-bold' : step.status === 'active' ? 'text-indigo-400 font-bold' : 'text-white/20 font-medium'}`}>
                                         {step.label}
                                     </p>
                                 </div>
@@ -811,21 +810,21 @@ function DocuVaultPageInner() {
                         )}
                     </AnimatePresence>
                     {/* Header */}
-                    <div className="flex items-center gap-5 mb-10">
+                    <div className="flex items-center gap-4 mb-8">
                         <button
                             onClick={handleNewDocument}
                             aria-label="Back to document composer"
-                            className="w-12 h-12 rounded-full flex items-center justify-center bg-white/5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border border-white/10 hover:bg-white/10 hover:border-white/30 text-white transition-all backdrop-blur-xl shrink-0 drop-shadow-sm hover:scale-105"
+                            className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all shrink-0"
                         >
-                            <CaretLeft size={20} weight="bold" />
+                            <CaretLeft size={16} weight="regular" />
                         </button>
                         <div>
-                            <h1 className="text-2xl font-serif font-bold tracking-tight text-white drop-shadow-sm">
+                            <h1 className="text-lg font-serif font-bold tracking-tight text-white/90">
                                 {selectedTemplate?.title || 'Generated Document'}
                             </h1>
-                            <div className="flex items-center gap-2 mt-2">
+                            <div className="flex items-center gap-2 mt-1">
                                 {caseNumber && (
-                                    <span className="text-[13px] font-bold px-3 py-1 rounded-md bg-white/10 border border-white/20 text-white uppercase tracking-wider">
+                                    <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-white/5 border border-white/5 text-white/40 uppercase tracking-widest">
                                         Ref: {caseNumber}
                                     </span>
                                 )}
@@ -835,69 +834,62 @@ function DocuVaultPageInner() {
 
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
                         {/* Document Overview & Badges (Left) */}
-                        <div className="md:col-span-2 space-y-5">
+                        <div className="md:col-span-2 space-y-4">
                             {/* PDF Preview Card */}
-                            <div className="p-8 text-center border border-white/20 bg-white/5 backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_12px_40px_rgba(0,0,0,0.5)] rounded-[2rem]">
-                                <div className="w-32 h-44 mx-auto rounded-2xl flex items-center justify-center bg-[linear-gradient(135deg,#123D7E,#0A1128)] shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),0_8px_32px_rgba(0,0,0,0.8)] border-2 border-white/20 mb-6 relative overflow-hidden group">
-                                    {/* Abstract doc lines */}
-                                    <div className="absolute top-6 left-5 right-5 h-2 bg-white/20 rounded-full" />
-                                    <div className="absolute top-11 left-5 right-10 h-2 bg-white/20 rounded-full" />
-                                    <div className="absolute top-16 left-5 right-5 h-2 bg-white/20 rounded-full" />
-                                    <div className="absolute top-21 left-5 right-14 h-2 bg-white/20 rounded-full" />
-                                    <div className="absolute bottom-6 right-5 w-8 h-8 rounded-full border-4 border-[#60A5FA] opacity-50 group-hover:opacity-100 transition-opacity" />
-                                    
-                                    <FileText size={56} weight="duotone" className="text-white z-10 drop-shadow-[0_4px_12px_rgba(255,255,255,0.6)]" />
+                            <div className="p-6 text-center border border-white/5 bg-white/[0.02] backdrop-blur-xl rounded-2xl">
+                                <div className="w-24 h-32 mx-auto rounded-xl flex items-center justify-center bg-white/5 border border-white/10 mb-5 relative overflow-hidden group">
+                                    <FileText size={32} weight="light" className="text-white/40" />
                                 </div>
-                                <p className="text-[16px] font-bold text-white mb-2 drop-shadow-sm">
+                                <p className="text-xs font-bold text-white/80 mb-1">
                                     {selectedTemplate?.title || 'Legal Document'}
                                 </p>
-                                <p className="text-[13px] font-bold text-[#10B981] uppercase tracking-widest drop-shadow-sm">
+                                <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest">
                                     Final Draft • PDF
                                 </p>
                             </div>
 
                             {/* Format indicators — describe how the document was generated, not verified outcomes */}
-                            <div className="space-y-4">
+                            <div className="space-y-3">
                                 <p className="text-[11px] font-medium text-white/40 uppercase tracking-widest">Generation Details</p>
                                 {selectedTemplate ? (
                                     <>
-                                        <div className="p-5 flex items-start gap-4 border border-[#10B981]/40 bg-[#10B981]/10 rounded-[1.5rem] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(16,185,129,0.3),0_8px_24px_rgba(0,0,0,0.3)]">
-                                            <div className="w-10 h-10 rounded-full bg-[#10B981] flex items-center justify-center shrink-0 shadow-sm mt-0.5 border border-[#10B981]/50">
-                                                <CheckCircle size={24} weight="bold" className="text-white" />
+                                        <div className="p-4 flex items-start gap-3 border border-white/5 bg-white/[0.02] rounded-xl">
+                                            <div className="mt-0.5">
+                                                <CheckCircle size={16} weight="regular" className="text-white/60" />
                                             </div>
                                             <div>
-                                                <p className="text-[15px] font-bold text-white tracking-wide drop-shadow-sm">
+                                                <p className="text-xs font-bold text-white/80 tracking-wide">
                                                     Court Format Applied
                                                 </p>
-                                                <p className="text-[13px] font-medium text-white/80 mt-1 leading-snug">
+                                                <p className="text-[10px] font-medium text-white/40 mt-1 leading-snug">
                                                     Generated using local court formatting rules. Independent verification recommended.
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className="p-5 flex items-start gap-4 border border-[#10B981]/40 bg-[#10B981]/10 rounded-[1.5rem] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(16,185,129,0.3),0_8px_24px_rgba(0,0,0,0.3)]">
-                                            <div className="w-10 h-10 rounded-full bg-[#10B981] flex items-center justify-center shrink-0 shadow-sm mt-0.5 border border-[#10B981]/50">
-                                                <CheckCircle size={24} weight="bold" className="text-white" />
+                                        <div className="p-4 flex items-start gap-3 border border-white/5 bg-white/[0.02] rounded-xl">
+                                            <div className="mt-0.5">
+                                                <CheckCircle size={16} weight="regular" className="text-white/60" />
                                             </div>
                                             <div>
-                                                <p className="text-[15px] font-bold text-white tracking-wide drop-shadow-sm">
+                                                <p className="text-xs font-bold text-white/80 tracking-wide">
                                                     Page Numbering Included
                                                 </p>
-                                                <p className="text-[13px] font-medium text-white/80 mt-1 leading-snug">
+                                                <p className="text-[10px] font-medium text-white/40 mt-1 leading-snug">
                                                     Sequential page numbering added per court standards.
                                                 </p>
                                             </div>
                                         </div>
                                     </>
                                 ) : (
-                                    <div className="p-5 flex items-start gap-4 border border-white/20 bg-white/5 rounded-[1.5rem] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.3)]">
-                                        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0 shadow-sm mt-0.5 border border-white/10">
-                                            <FileText size={24} weight="bold" className="text-white/80" />
+                                    <div className="p-4 flex items-start gap-3 border border-white/5 bg-white/[0.02] rounded-xl">
+                                        <div className="mt-0.5">
+                                            <FileText size={16} weight="regular" className="text-white/60" />
                                         </div>
                                         <div>
-                                            <p className="text-[15px] font-bold text-white tracking-wide drop-shadow-sm">
+                                            <p className="text-xs font-bold text-white/80 tracking-wide">
                                                 General Formatting
                                             </p>
-                                            <p className="text-[13px] font-medium text-white/80 mt-1 leading-snug">
+                                            <p className="text-[10px] font-medium text-white/40 mt-1 leading-snug">
                                                 Generated with standard document formatting. No template-specific court rules applied.
                                             </p>
                                         </div>
@@ -909,18 +901,18 @@ function DocuVaultPageInner() {
                         {/* Actions (Right) */}
                         <div className="md:col-span-3 space-y-8">
                             {/* AI Summary */}
-                            <div className="p-8 border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_12px_40px_rgba(0,0,0,0.5)] bg-white/5 backdrop-blur-2xl rounded-[2rem]">
-                                <div className="flex items-center gap-4 mb-5">
-                                    <Strategy size={28} weight="duotone" className="text-[#60A5FA] drop-shadow-[0_2px_8px_rgba(96,165,250,0.8)]" />
-                                    <h3 className="text-[15px] font-bold tracking-widest uppercase text-white drop-shadow-sm">
+                            <div className="p-6 border border-white/5 bg-white/[0.02] backdrop-blur-xl rounded-2xl">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <Sparkle size={18} weight="regular" className="text-indigo-400" />
+                                    <h3 className="text-[10px] font-bold tracking-widest uppercase text-white/60">
                                         Intelligence Summary
                                     </h3>
                                 </div>
-                                <p className="text-[16px] text-white/90 leading-relaxed font-medium">
-                                    The provided context has been synthesized into a formal <span className="font-bold text-white border-b border-white/30 pb-0.5">{selectedTemplate?.title?.toLowerCase() || 'legal document'}</span>. 
+                                <p className="text-xs text-white/60 leading-relaxed font-medium">
+                                    The provided context has been synthesized into a formal <span className="font-bold text-white">{selectedTemplate?.title?.toLowerCase() || 'legal document'}</span>. 
                                     {selectedTemplate
-                                        ? 'Formatting and legal headings follow local court standards. Please verify all content independently before filing.'
-                                        : 'Standard document formatting has been applied. Please verify all content and formatting independently before use.'}
+                                        ? ' Formatting and legal headings follow local court standards. Please verify all content independently before filing.'
+                                        : ' Standard document formatting has been applied. Please verify all content and formatting independently before use.'}
                                 </p>
                             </div>
 

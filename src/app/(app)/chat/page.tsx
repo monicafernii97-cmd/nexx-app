@@ -153,6 +153,7 @@ export default function ChatListPage() {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
                         {activeConversations.map((conv, i) => {
+                            // Mode label is used for text only; uniform hyper-glass styling is intentional per minimalist design direction
                             const modeInfo = MODE_LABELS[conv.mode] || MODE_LABELS.general;
                             return (
                                 <motion.div

@@ -6,19 +6,15 @@ import {
     Bank,
     CaretLeft,
     FileText,
-    Strategy,
     Plus,
     CircleNotch,
-    Sparkle,
     Paperclip,
     X,
-    ArrowRight,
     CheckCircle,
     DownloadSimple,
     ArrowsClockwise,
     Export,
     Lightning,
-    PencilLine,
     ClockCounterClockwise,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
@@ -28,15 +24,12 @@ import { api } from '@convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import { UI_TABS, getTemplatesForTab } from '@/lib/legal/templateCategories';
 import type { UITabCategory } from '@/lib/legal/templateCategories';
-import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
+import { PageContainer } from '@/components/layout/PageLayout';
 import type { DocumentTemplate } from '@/lib/legal/types';
 import CreateExportModal from './components/CreateExportModal';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useExport } from './context/ExportContext';
 import '@/styles/pipelines.css';
-
-/** State for the 3-step generation flow */
-type GeneratorView = 'compose' | 'working' | 'result';
 
 /** Working state progress step */
 interface ProgressStep {
@@ -154,6 +147,32 @@ function DocuVaultPageInner() {
     }, [searchParams]);
 
 
+    /** Parse a raw SSE event block into event name + data. */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function parseSseEvent(rawEvent: string): { event: string; data: Record<string, any> } | null {
+        const lines = rawEvent.split(/\r?\n/);
+        let event = 'message';
+        const dataLines: string[] = [];
+
+        for (const line of lines) {
+            if (!line || line.startsWith(':')) continue;
+            if (line.startsWith('event:')) {
+                event = line.slice('event:'.length).trim();
+                continue;
+            }
+            if (line.startsWith('data:')) {
+                dataLines.push(line.slice('data:'.length).trimStart());
+            }
+        }
+
+        if (dataLines.length === 0) return null;
+        try {
+            return { event, data: JSON.parse(dataLines.join('\n')) };
+        } catch {
+            console.warn('[DocuVault] Malformed SSE data:', dataLines.join('\n'));
+            return null;
+        }
+    }
 
     /** Handle document generation via the streaming API endpoint. */
     const handleGenerate = useCallback(async () => {
@@ -295,33 +314,6 @@ function DocuVaultPageInner() {
             setView('hub');
         }
     }, [documentContent, selectedTemplate, isUserProfileLoading, resolvedState, resolvedCounty, courtSettings?.petitionerLegalName, user?.name]);
-
-    /** Parse a raw SSE event block into event name + data. */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    function parseSseEvent(rawEvent: string): { event: string; data: Record<string, any> } | null {
-        const lines = rawEvent.split(/\r?\n/);
-        let event = 'message';
-        const dataLines: string[] = [];
-
-        for (const line of lines) {
-            if (!line || line.startsWith(':')) continue;
-            if (line.startsWith('event:')) {
-                event = line.slice('event:'.length).trim();
-                continue;
-            }
-            if (line.startsWith('data:')) {
-                dataLines.push(line.slice('data:'.length).trimStart());
-            }
-        }
-
-        if (dataLines.length === 0) return null;
-        try {
-            return { event, data: JSON.parse(dataLines.join('\n')) };
-        } catch {
-            console.warn('[DocuVault] Malformed SSE data:', dataLines.join('\n'));
-            return null;
-        }
-    }
 
     /** Reset all state to begin composing a new document, aborting any in-flight generation. */
     const handleNewDocument = useCallback(() => {

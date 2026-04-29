@@ -14,16 +14,6 @@ import { AnalysisStatusStrip, DEFAULT_ANALYSIS_STEPS, getStepsByElapsed } from '
 import type { NexxAssistantResponse, RouteMode } from '@/lib/types';
 import type { AnalysisStep } from '@/lib/ui-intelligence/types';
 
-const VALID_ROUTE_MODES: readonly RouteMode[] = [
-    'adaptive_chat', 'direct_legal_answer', 'local_procedure',
-    'document_analysis', 'judge_lens_strategy', 'court_ready_drafting',
-    'pattern_analysis', 'support_grounding', 'safety_escalation',
-] as const;
-
-function isValidRouteMode(value: unknown): value is RouteMode {
-    return typeof value === 'string' && VALID_ROUTE_MODES.includes(value as RouteMode);
-}
-
 /** Premium full-screen chat interface for a single NEXX AI conversation. */
 export default function ConversationPage() {
     const params = useParams();
@@ -500,7 +490,7 @@ export default function ConversationPage() {
                             Secure Counsel Authorized
                         </h2>
                         <p className={`text-xs font-medium mb-6 leading-relaxed ${isLight ? 'text-gray-500' : 'text-white/40'}`}>
-                            Share what's on your mind — an incident, a message from your NEX,
+                            Share what&apos;s on your mind — an incident, a message from your NEX,
                             a legal concern, or your emotional state.
                         </p>
                         <div className="flex items-center justify-center text-[10px] font-bold tracking-widest uppercase text-white/40 bg-white/5 border border-white/5 px-4 py-2 rounded-lg">

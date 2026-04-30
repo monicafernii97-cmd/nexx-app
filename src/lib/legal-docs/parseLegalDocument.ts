@@ -42,7 +42,7 @@ const TITLE_CANDIDATE_RE =
   /(MOTION|PETITION|APPLICATION|NOTICE|RESPONSE|REPLY|BRIEF|MEMORANDUM|AFFIDAVIT|DECLARATION|ORDER|SUBPOENA|COMPLAINT|ANSWER)/i;
 
 const TO_HONORABLE_RE = /^TO THE HONORABLE/i;
-const PRAYER_RE = /^PRAYER$/i;
+const PRAYER_RE = /^PRAYER(\s+FOR\s+RELIEF)?$/i;
 const WHEREFORE_RE = /^WHEREFORE/i;
 const CERTIFICATE_RE = /^CERTIFIC(?:ATE|ATION)\s+OF\s+SERVICE\s*$/i;
 const RESPECTFULLY_RE = /^Respectfully submitted,?$/i;
@@ -56,6 +56,154 @@ const NUMBERED_ITEM_RE = /^\d+\.\s+/;
 const BULLET_ITEM_RE = /^[•\-]\s+/;
 
 const SEPARATOR_MARKER = '__RULE__';
+
+// ═══════════════════════════════════════════════════════════════
+// ALL-CAPS Section Heading Detection
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Known legal section heading keywords.
+ * These are the canonical section names found in US legal pleadings,
+ * motions, and court filings. The list covers:
+ *   - Core structural sections (Jurisdiction, Background, Prayer, etc.)
+ *   - Family law-specific sections (Custody, Support, Property, etc.)
+ *   - Procedural sections (Statement of Case, Standard of Review, etc.)
+ *   - Closing/terminal sections (Conclusion, Relief Requested, etc.)
+ *
+ * Each entry is normalized to uppercase for case-insensitive matching.
+ * Multi-word entries enable fuzzy matching (e.g., "FACTUAL BACKGROUND"
+ * matches both the full phrase and the keyword "BACKGROUND").
+ */
+const KNOWN_SECTION_HEADINGS: Set<string> = new Set([
+  // Core structural
+  'JURISDICTION', 'VENUE', 'PARTIES', 'STANDING',
+  'BACKGROUND', 'FACTUAL BACKGROUND', 'STATEMENT OF FACTS',
+  'FACTS', 'RELEVANT FACTS', 'MATERIAL FACTS',
+  'INTRODUCTION', 'PRELIMINARY STATEMENT', 'SUMMARY',
+  'ARGUMENT', 'LEGAL ARGUMENT', 'ARGUMENTS',
+  'ANALYSIS', 'LEGAL ANALYSIS', 'DISCUSSION',
+  'CONCLUSION', 'CONCLUSIONS',
+  'GROUNDS', 'LEGAL GROUNDS', 'GROUNDS FOR RELIEF',
+  'CAUSE OF ACTION', 'CAUSES OF ACTION', 'CLAIMS', 'CLAIM',
+  'RELIEF', 'RELIEF REQUESTED', 'REQUESTED RELIEF',
+  'PRAYER FOR RELIEF',
+  // Family law
+  'PROPERTY', 'COMMUNITY PROPERTY', 'SEPARATE PROPERTY',
+  'DIVISION OF PROPERTY', 'PROPERTY DIVISION',
+  'CHILDREN', 'MINOR CHILDREN', 'CHILD',
+  'CUSTODY', 'CONSERVATORSHIP', 'MANAGING CONSERVATOR',
+  'POSSESSORY CONSERVATOR', 'POSSESSION AND ACCESS',
+  'SUPPORT', 'CHILD SUPPORT', 'SPOUSAL SUPPORT',
+  'ALIMONY', 'SPOUSAL MAINTENANCE', 'MAINTENANCE',
+  'VISITATION', 'PARENTING TIME', 'PARENTING PLAN',
+  // Procedural
+  'STATEMENT OF THE CASE', 'PROCEDURAL HISTORY',
+  'STANDARD OF REVIEW', 'APPLICABLE LAW',
+  'ISSUES PRESENTED', 'QUESTIONS PRESENTED',
+  'STATEMENT OF ISSUES', 'LEGAL STANDARD',
+  'COUNTERCLAIM', 'CROSS-CLAIM', 'THIRD-PARTY CLAIM',
+  'AFFIRMATIVE DEFENSES', 'DEFENSES',
+  'DAMAGES', 'ATTORNEY FEES', "ATTORNEY'S FEES",
+  // Evidence & discovery
+  'EVIDENCE', 'EXHIBITS', 'EXHIBIT LIST',
+  'DISCOVERY', 'INTERROGATORIES',
+  // Miscellaneous
+  'NOTICE', 'DEFINITIONS', 'RECITALS',
+  'TERMS', 'CONDITIONS', 'STIPULATIONS',
+  'FINDINGS OF FACT', 'CONCLUSIONS OF LAW',
+  'ORDERS', 'DECREE', 'INJUNCTIVE RELIEF',
+  'TEMPORARY ORDERS', 'TEMPORARY RESTRAINING ORDER',
+]);
+
+/**
+ * Regex: line is ALL-CAPS (at least 3 alpha chars), may contain
+ * spaces, hyphens, apostrophes, ampersands, or periods.
+ * Excludes lines that are just numbers, separators, or too short.
+ */
+const ALL_CAPS_LINE_RE = /^[A-Z][A-Z\s'\-&.,/()]{2,}$/;
+
+/**
+ * Optional numeric/letter prefix stripped before keyword lookup.
+ * Handles formats like:
+ *   "1. JURISDICTION"  "2. BACKGROUND"  "A. PARTIES"
+ *   "(1) JURISDICTION"  "(a) BACKGROUND"
+ */
+const HEADING_PREFIX_RE = /^(?:\d+[.)]\s*|\([a-z0-9]+\)\s*|[A-Z][.):]\s*)/;
+
+/**
+ * Determine if a line is a standalone legal section heading.
+ *
+ * Strategy (ordered by specificity):
+ *   1. Exact match against KNOWN_SECTION_HEADINGS
+ *   2. Match after stripping numeric/letter prefix ("1. JURISDICTION")
+ *   3. Fuzzy: any KNOWN keyword appears as a whole word in the line
+ *   4. Heuristic: short ALL-CAPS line (≤5 words, ≥4 chars) not matching
+ *      common false positives (e.g., state names, party labels)
+ *
+ * Guard: lines already handled by other regex (PRAYER, CERTIFICATE,
+ * VERIFICATION, WHEREFORE, RESPECTFULLY) are excluded to prevent
+ * double-matching.
+ *
+ * @param allowHeuristic - When false, only tiers 1-3 (keyword-based) are
+ *   used. Set to false for boundary detection (title search, body start)
+ *   where false positives from short ALL-CAPS lines could misclassify
+ *   captions or titles as section headings.
+ */
+function isAllCapsHeading(line: string, opts: { allowHeuristic?: boolean } = {}): boolean {
+  const { allowHeuristic = true } = opts;
+  const trimmed = line.trim();
+
+  // Strip optional prefix ("1. JURISDICTION" → "JURISDICTION") BEFORE
+  // the ALL-CAPS regex check so prefixed headings aren't rejected early.
+  const stripped = trimmed.replace(HEADING_PREFIX_RE, '').trim();
+  const candidate = stripped || trimmed;
+
+  if (!ALL_CAPS_LINE_RE.test(candidate)) return false;
+
+  // Skip lines already handled by dedicated parsers
+  if (PRAYER_RE.test(candidate)) return false;
+  if (CERTIFICATE_RE.test(candidate)) return false;
+  if (VERIFICATION_RE.test(candidate)) return false;
+  if (WHEREFORE_RE.test(candidate)) return false;
+  if (RESPECTFULLY_RE.test(candidate)) return false;
+  if (CAUSE_RE.test(candidate)) return false;
+  if (DOCKET_RE.test(candidate)) return false;
+  if (TITLE_CANDIDATE_RE.test(candidate)) return false;
+
+  // 1. Exact match
+  if (KNOWN_SECTION_HEADINGS.has(candidate)) return true;
+
+  // 2. Match after stripping prefix (already stripped above)
+  if (stripped && KNOWN_SECTION_HEADINGS.has(stripped)) return true;
+
+  // 3. Fuzzy: any known keyword appears as whole word
+  for (const keyword of KNOWN_SECTION_HEADINGS) {
+    // Only try multi-word fuzzy for short keywords (≤2 words)
+    // to avoid false positives like "COURT" matching "COURT DOCUMENT"
+    if (keyword.split(/\s+/).length <= 2) {
+      const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (new RegExp(`\\b${escaped}\\b`).test(candidate)) return true;
+    }
+  }
+
+  // 4. Heuristic: short ALL-CAPS standalone line (≤5 words) is likely a heading
+  //    Disabled for boundary detection to avoid misclassifying captions/titles.
+  const wordCount = candidate.split(/\s+/).length;
+  if (allowHeuristic && wordCount >= 1 && wordCount <= 5 && candidate.length >= 4) {
+    // Exclude common false positives
+    const FALSE_POSITIVES = new Set([
+      'THE STATE OF', 'STATE OF', 'COUNTY OF', 'IN THE',
+      'UNITED STATES', 'PRO SE', 'IN RE', 'ET AL',
+      'VS', 'VERSUS', 'AND', 'OR', 'THE',
+    ]);
+    if (FALSE_POSITIVES.has(candidate)) return false;
+    // Must contain at least one alpha word ≥3 chars
+    const hasSubstantiveWord = candidate.split(/\s+/).some((w) => /^[A-Z]{3,}$/.test(w));
+    return hasSubstantiveWord;
+  }
+
+  return false;
+}
 
 // ═══════════════════════════════════════════════════════════════
 // Main Entry Point
@@ -162,7 +310,11 @@ function extractGeneralCaption(lines: string[]): CaptionBlock | null {
     captionSlice = lines.slice(0, titleIndex);
   } else {
     const headerBound = lines.findIndex(
-      (l) => l !== '' && (TO_HONORABLE_RE.test(l) || ROMAN_HEADING_RE.test(l))
+      (l) =>
+        l !== '' &&
+        (TO_HONORABLE_RE.test(l) ||
+          ROMAN_HEADING_RE.test(l) ||
+          isAllCapsHeading(l, { allowHeuristic: false }))
     );
     const limit = headerBound !== -1 ? headerBound : Math.min(lines.length, 25);
     captionSlice = lines.slice(0, limit);
@@ -372,7 +524,10 @@ function tryMinimalCaption(lines: string[]): CaptionBlock | null {
 function findTitleIndex(lines: string[]): number {
   // Determine header boundary
   const headerBound = lines.findIndex(
-    (l) => TO_HONORABLE_RE.test(l) || ROMAN_HEADING_RE.test(l)
+    (l) =>
+      TO_HONORABLE_RE.test(l) ||
+      ROMAN_HEADING_RE.test(l) ||
+      isAllCapsHeading(l, { allowHeuristic: false })
   );
   const searchLimit = headerBound !== -1 ? headerBound : Math.min(lines.length, 25);
 
@@ -448,15 +603,23 @@ function extractBodyStructure(
 } {
   const titleIndex = lines.findIndex((l) => l === mainTitle);
   const bodyStart = lines.findIndex((l) => TO_HONORABLE_RE.test(l));
+  // If no TO THE HONORABLE, try to find the first section heading as body start
+  const firstHeadingStart = bodyStart === -1
+    ? lines.findIndex(
+        (l) => ROMAN_HEADING_RE.test(l) || isAllCapsHeading(l, { allowHeuristic: false }),
+      )
+    : -1;
   // Skip past subtitle line (parenthetical) to avoid duplicating it as body paragraph
   const hasSubtitle =
     titleIndex !== -1 && lines[titleIndex + 1]?.startsWith('(');
   const startIndex =
     bodyStart !== -1
       ? bodyStart
-      : titleIndex !== -1
-        ? titleIndex + (hasSubtitle ? 2 : 1)
-        : 0;
+      : firstHeadingStart !== -1
+        ? firstHeadingStart
+        : titleIndex !== -1
+          ? titleIndex + (hasSubtitle ? 2 : 1)
+          : 0;
 
   const bodyLines = explodeMergedNumberedParagraphs(lines.slice(startIndex));
 
@@ -549,7 +712,21 @@ function extractBodyStructure(
       continue;
     }
 
-    // ── Ensure we have a section container (only after first Roman heading) ──
+    // ── ALL-CAPS standalone heading (JURISDICTION, BACKGROUND, etc.) ──
+    if (isAllCapsHeading(line)) {
+      if (currentSection) sections.push(currentSection);
+      foundFirstSection = true;
+      currentSection = {
+        id: slugify(line),
+        heading: line.trim(),
+        level: 'plain',
+        blocks: [],
+      };
+      i++;
+      continue;
+    }
+
+    // ── Ensure we have a section container (only after first heading) ──
     if (foundFirstSection && !currentSection) {
       currentSection = { id: 'plain', heading: '', level: 'plain', blocks: [] };
     }
@@ -618,7 +795,8 @@ function extractBodyStructure(
         !RESPECTFULLY_RE.test(bodyLines[i + 1]) &&
         !CLOSING_RE.test(bodyLines[i + 1]) &&
         !VERIFICATION_RE.test(bodyLines[i + 1]) &&
-        !TO_HONORABLE_RE.test(bodyLines[i + 1])
+        !TO_HONORABLE_RE.test(bodyLines[i + 1]) &&
+        !isAllCapsHeading(bodyLines[i + 1])
       ) {
         i++;
         paragraphLines.push(bodyLines[i]);
@@ -788,6 +966,7 @@ function isStructuralLine(line: string): boolean {
     TO_HONORABLE_RE.test(line) ||
     NUMBERED_ITEM_RE.test(line) ||
     BULLET_ITEM_RE.test(line) ||
+    isAllCapsHeading(line) ||
     line === SEPARATOR_MARKER
   );
 }

@@ -38,9 +38,6 @@ export function renderCourtExportHTML(
     '<div class="rule"></div>',
     courtSections.map(renderCourtSection).join('\n'),
     renderSignature(doc),
-    profile.court.certificateSeparatePage && doc.certificate
-      ? '<div class="page-break"></div>'
-      : '',
     renderCertificate(doc),
     renderVerification(doc),
   ]

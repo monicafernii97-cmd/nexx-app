@@ -287,8 +287,7 @@ describe('renderCourtExportHTML — closing blocks', () => {
     expect(html).toContain('penalty of perjury');
   });
 
-  it('inserts certificate page break when profile requires it', () => {
-    // TX profile should require certificate separate page
+  it('inserts certificate page break', () => {
     const html = renderCourtExportHTML(
       makeCourtDoc({
         certificate: {
@@ -299,7 +298,8 @@ describe('renderCourtExportHTML — closing blocks', () => {
       }),
       txProfile,
     );
-    expect(html).toContain('class="page-break"');
+    // Certificate block now renders with inline page-break-before: always
+    expect(html).toContain('page-break-before: always');
   });
 });
 

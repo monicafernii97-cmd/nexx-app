@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import {
     SquaresFour, Notebook, PushPin, CalendarCheck,
@@ -18,7 +18,7 @@ import { PatternsBlock } from '@/components/workspace/PatternsBlock';
 import { NarrativeBlock, type CaseNarrative } from '@/components/workspace/NarrativeBlock';
 import { useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
-import { GenerateReportModal } from '@/components/workspace/GenerateReportModal';
+
 
 
 /**
@@ -33,18 +33,7 @@ import { GenerateReportModal } from '@/components/workspace/GenerateReportModal'
 export default function WorkspaceOverview() {
     const { pins, memory, timeline, counts, removeMemory, activeCaseId } = useWorkspace();
 
-    // ── Generate Report Modal state ──
-    const [isReportModalOpen, setIsReportModalOpen] = useState(() => {
-        if (typeof window === 'undefined') return false;
-        return new URLSearchParams(window.location.search).get('openReportModal') === 'true';
-    });
 
-    // Listen for sidebar "Generate Report" button
-    useEffect(() => {
-        const handler = () => setIsReportModalOpen(true);
-        window.addEventListener('nexx:open-report-modal', handler);
-        return () => window.removeEventListener('nexx:open-report-modal', handler);
-    }, []);
 
     // ── Detected Patterns from Convex ──
     const detectedPatterns = useQuery(
@@ -120,22 +109,7 @@ export default function WorkspaceOverview() {
 
     const router = useRouter();
 
-    const handleGenerateReport = useCallback((options: {
-        outputType: 'summary' | 'court_document' | 'both';
-        tone: 'neutral_concise' | 'detailed_organized' | 'attorney_ready';
-        patternHandling: 'include_supported' | 'exclude';
-    }) => {
-        setIsReportModalOpen(false);
-        // Navigate to DocuVault with report options only.
-        // Does NOT set prefilled=true — that belongs to the AI hydration flow
-        // once the narrative API route generates real body content.
-        const params = new URLSearchParams({
-            outputType: options.outputType,
-            tone: options.tone,
-            patternHandling: options.patternHandling,
-        });
-        router.push(`/docuvault?${params.toString()}`);
-    }, [router]);
+
 
     const handleSendToDocuVault = useCallback(() => {
         if (!narrative) return;
@@ -384,18 +358,7 @@ export default function WorkspaceOverview() {
                 </Link>
             </motion.div>
 
-            {/* ── Generate Report Modal ── */}
-            <GenerateReportModal
-                isOpen={isReportModalOpen}
-                onClose={() => setIsReportModalOpen(false)}
-                onGenerate={handleGenerateReport}
-                itemCounts={{
-                    facts: counts.keyFacts,
-                    timeline: counts.timeline,
-                    patterns: detectedPatterns?.length ?? 0,
-                    pins: counts.pins,
-                }}
-            />
+
         </PageContainer>
     );
 }

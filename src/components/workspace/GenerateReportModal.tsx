@@ -20,15 +20,14 @@ import {
 // Types — imported from shared module & re-exported for consumers
 // ---------------------------------------------------------------------------
 
-import type { OutputType, ToneType, PatternHandling } from '@/lib/workspace-types';
-export type { OutputType, ToneType, PatternHandling } from '@/lib/workspace-types';
+import type { OutputType, PatternHandling } from '@/lib/workspace-types';
+export type { OutputType, PatternHandling } from '@/lib/workspace-types';
 
 interface GenerateReportModalProps {
     isOpen: boolean;
     onClose: () => void;
     onGenerate: (options: {
         outputType: OutputType;
-        tone: ToneType;
         patternHandling: PatternHandling;
     }) => void;
     isGenerating?: boolean;
@@ -51,11 +50,7 @@ const OUTPUT_OPTIONS: { id: OutputType; label: string; description: string; icon
     { id: 'both', label: 'Both', description: 'Summary + court-ready draft', icon: Files },
 ];
 
-const TONE_OPTIONS: { id: ToneType; label: string; description: string }[] = [
-    { id: 'neutral_concise', label: 'Neutral & Concise', description: 'Fact-forward, minimal commentary' },
-    { id: 'detailed_organized', label: 'Detailed & Organized', description: 'Structured sections with context' },
-    { id: 'attorney_ready', label: 'Attorney-Ready', description: 'Formatted for legal review' },
-];
+
 
 const PATTERN_OPTIONS: { id: PatternHandling; label: string; icon: typeof ChartBar }[] = [
     { id: 'include_supported', label: 'Include clearly supported patterns', icon: ChartBar },
@@ -84,7 +79,7 @@ export function GenerateReportModal({
     itemCounts,
 }: GenerateReportModalProps) {
     const [outputType, setOutputType] = useState<OutputType>('summary');
-    const [tone, setTone] = useState<ToneType>('neutral_concise');
+
     const [patternHandling, setPatternHandling] = useState<PatternHandling>('include_supported');
     const modalRef = useRef<HTMLDivElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -107,8 +102,8 @@ export function GenerateReportModal({
     }, [isOpen, onClose]);
 
     const handleGenerate = useCallback(() => {
-        onGenerate({ outputType, tone, patternHandling });
-    }, [onGenerate, outputType, tone, patternHandling]);
+        onGenerate({ outputType, patternHandling });
+    }, [onGenerate, outputType, patternHandling]);
 
     return (
         <AnimatePresence>
@@ -214,45 +209,7 @@ export function GenerateReportModal({
                                 </div>
                             </div>
 
-                            {/* Option Group 2: Tone */}
-                            <div className="mb-5">
-                                <label className="text-[11px] font-bold tracking-[0.12em] uppercase text-white/40 mb-2 block">
-                                    Tone
-                                </label>
-                                <div className="space-y-2">
-                                    {TONE_OPTIONS.map((opt) => {
-                                        const isActive = tone === opt.id;
-                                        return (
-                                            <button
-                                                key={opt.id}
-                                                onClick={() => setTone(opt.id)}
-                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-[12px] border text-left transition-all cursor-pointer ${
-                                                    isActive
-                                                        ? 'bg-white/8 border-white/15'
-                                                        : 'bg-white/[0.02] border-white/5 hover:border-white/10'
-                                                }`}
-                                            >
-                                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                                                    isActive ? 'border-[var(--accent-emerald)]' : 'border-white/20'
-                                                }`}>
-                                                    {isActive && (
-                                                        <motion.div
-                                                            layoutId="tone-dot"
-                                                            className="w-2 h-2 rounded-full bg-[var(--accent-emerald)]"
-                                                        />
-                                                    )}
-                                                </div>
-                                                <div className="flex-1">
-                                                    <p className={`text-[13px] font-semibold ${isActive ? 'text-white' : 'text-white/60'}`}>
-                                                        {opt.label}
-                                                    </p>
-                                                    <p className="text-[11px] text-white/30">{opt.description}</p>
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+
 
                             {/* Option Group 3: Pattern Handling */}
                             <div className="mb-6">

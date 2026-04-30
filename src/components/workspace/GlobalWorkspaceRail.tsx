@@ -217,7 +217,7 @@ export function GlobalWorkspaceRail() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-hidden px-4 pb-4 space-y-5">
+            <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col">
 
                 {isLoading ? (
                     /* Skeleton placeholders while workspace queries resolve */
@@ -227,7 +227,7 @@ export function GlobalWorkspaceRail() {
                         ))}
                     </div>
                 ) : (
-                <>
+                <div className="space-y-5">
                 {/* ── Section 1: Report Readiness ── */}
                 <section>
                     <div className="flex items-center gap-2 mb-3 px-1">
@@ -332,7 +332,7 @@ export function GlobalWorkspaceRail() {
                         Generate Report
                     </Link>
                 </section>
-                </>
+                </div>
                 )}
             </div>
         </motion.aside>

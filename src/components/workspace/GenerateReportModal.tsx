@@ -20,15 +20,14 @@ import {
 // Types — imported from shared module & re-exported for consumers
 // ---------------------------------------------------------------------------
 
-import type { OutputType, ToneType, PatternHandling } from '@/lib/workspace-types';
-export type { OutputType, ToneType, PatternHandling } from '@/lib/workspace-types';
+import type { OutputType, PatternHandling } from '@/lib/workspace-types';
+export type { OutputType, PatternHandling } from '@/lib/workspace-types';
 
 interface GenerateReportModalProps {
     isOpen: boolean;
     onClose: () => void;
     onGenerate: (options: {
         outputType: OutputType;
-        tone: ToneType;
         patternHandling: PatternHandling;
     }) => void;
     isGenerating?: boolean;
@@ -80,7 +79,7 @@ export function GenerateReportModal({
     itemCounts,
 }: GenerateReportModalProps) {
     const [outputType, setOutputType] = useState<OutputType>('summary');
-    const tone: ToneType = 'attorney_ready';
+
     const [patternHandling, setPatternHandling] = useState<PatternHandling>('include_supported');
     const modalRef = useRef<HTMLDivElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -103,7 +102,7 @@ export function GenerateReportModal({
     }, [isOpen, onClose]);
 
     const handleGenerate = useCallback(() => {
-        onGenerate({ outputType, tone, patternHandling });
+        onGenerate({ outputType, patternHandling });
     }, [onGenerate, outputType, patternHandling]);
 
     return (

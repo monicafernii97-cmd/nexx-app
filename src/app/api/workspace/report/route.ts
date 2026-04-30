@@ -35,7 +35,7 @@ function validateConfig(body: Record<string, unknown>): {
     const validPatternHandling: PatternHandling[] = ['include_supported', 'exclude'];
 
     const outputType = (body.outputType as OutputType) ?? 'summary';
-    const tone = (body.tone as ToneType) ?? 'neutral_concise';
+    const tone = (body.tone as ToneType) ?? 'attorney_ready';
     const patternHandling = (body.patternHandling as PatternHandling) ?? 'include_supported';
 
     if (!validOutputTypes.includes(outputType)) {

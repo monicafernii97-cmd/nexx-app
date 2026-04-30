@@ -56,6 +56,7 @@ export function renderCourtExportHTML(
 // Caption
 // ═══════════════════════════════════════════════════════════════
 
+/** Render the caption block (Texas three-column or generic two-column layout). */
 function renderCaption(
   caption: ExportCaption | null | undefined,
   profile: ExportJurisdictionProfile,
@@ -95,6 +96,7 @@ function renderCaption(
 // Court Sections
 // ═══════════════════════════════════════════════════════════════
 
+/** Render a single court body section: heading, paragraphs, numbered items, and bullets. */
 function renderCourtSection(section: CourtSection): string {
   const heading = section.heading
     ? `<div class="section-heading">${escapeHtml(section.heading)}</div>`
@@ -120,6 +122,7 @@ function renderCourtSection(section: CourtSection): string {
 // Closing Blocks
 // ═══════════════════════════════════════════════════════════════
 
+/** Render the signature block with intro line, signature rule placeholder, and signer lines. */
 function renderSignature(doc: CanonicalExportDocument): string {
   if (!doc.signature) return '';
   return `
@@ -132,6 +135,7 @@ function renderSignature(doc: CanonicalExportDocument): string {
   </div>`;
 }
 
+/** Render the Certificate of Service block — always starts on a new page. */
 function renderCertificate(doc: CanonicalExportDocument): string {
   if (!doc.certificate) return '';
   return `
@@ -145,6 +149,7 @@ function renderCertificate(doc: CanonicalExportDocument): string {
   </div>`;
 }
 
+/** Render the verification/declaration block with heading, body, and signer lines. */
 function renderVerification(doc: CanonicalExportDocument): string {
   if (!doc.verification) return '';
   return `

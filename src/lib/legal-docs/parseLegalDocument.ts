@@ -137,33 +137,43 @@ const HEADING_PREFIX_RE = /^(?:\d+[.)]\s*|\([a-z0-9]+\)\s*|[A-Z][.):]\s*)/;
  *   1. Exact match against KNOWN_SECTION_HEADINGS
  *   2. Match after stripping numeric/letter prefix ("1. JURISDICTION")
  *   3. Fuzzy: any KNOWN keyword appears as a whole word in the line
- *   4. Heuristic: short ALL-CAPS line (≤6 words, ≥3 chars) not matching
+ *   4. Heuristic: short ALL-CAPS line (≤5 words, ≥4 chars) not matching
  *      common false positives (e.g., state names, party labels)
  *
  * Guard: lines already handled by other regex (PRAYER, CERTIFICATE,
  * VERIFICATION, WHEREFORE, RESPECTFULLY) are excluded to prevent
  * double-matching.
+ *
+ * @param allowHeuristic - When false, only tiers 1-3 (keyword-based) are
+ *   used. Set to false for boundary detection (title search, body start)
+ *   where false positives from short ALL-CAPS lines could misclassify
+ *   captions or titles as section headings.
  */
-function isAllCapsHeading(line: string): boolean {
-  if (!ALL_CAPS_LINE_RE.test(line)) return false;
-
+function isAllCapsHeading(line: string, opts: { allowHeuristic?: boolean } = {}): boolean {
+  const { allowHeuristic = true } = opts;
   const trimmed = line.trim();
 
+  // Strip optional prefix ("1. JURISDICTION" → "JURISDICTION") BEFORE
+  // the ALL-CAPS regex check so prefixed headings aren't rejected early.
+  const stripped = trimmed.replace(HEADING_PREFIX_RE, '').trim();
+  const candidate = stripped || trimmed;
+
+  if (!ALL_CAPS_LINE_RE.test(candidate)) return false;
+
   // Skip lines already handled by dedicated parsers
-  if (PRAYER_RE.test(trimmed)) return false;
-  if (CERTIFICATE_RE.test(trimmed)) return false;
-  if (VERIFICATION_RE.test(trimmed)) return false;
-  if (WHEREFORE_RE.test(trimmed)) return false;
-  if (RESPECTFULLY_RE.test(trimmed)) return false;
-  if (CAUSE_RE.test(trimmed)) return false;
-  if (DOCKET_RE.test(trimmed)) return false;
-  if (TITLE_CANDIDATE_RE.test(trimmed) && trimmed.split(/\s+/).length > 4) return false;
+  if (PRAYER_RE.test(candidate)) return false;
+  if (CERTIFICATE_RE.test(candidate)) return false;
+  if (VERIFICATION_RE.test(candidate)) return false;
+  if (WHEREFORE_RE.test(candidate)) return false;
+  if (RESPECTFULLY_RE.test(candidate)) return false;
+  if (CAUSE_RE.test(candidate)) return false;
+  if (DOCKET_RE.test(candidate)) return false;
+  if (TITLE_CANDIDATE_RE.test(candidate) && candidate.split(/\s+/).length > 4) return false;
 
   // 1. Exact match
-  if (KNOWN_SECTION_HEADINGS.has(trimmed)) return true;
+  if (KNOWN_SECTION_HEADINGS.has(candidate)) return true;
 
-  // 2. Match after stripping prefix ("1. JURISDICTION" → "JURISDICTION")
-  const stripped = trimmed.replace(HEADING_PREFIX_RE, '').trim();
+  // 2. Match after stripping prefix (already stripped above)
   if (stripped && KNOWN_SECTION_HEADINGS.has(stripped)) return true;
 
   // 3. Fuzzy: any known keyword appears as whole word
@@ -172,22 +182,23 @@ function isAllCapsHeading(line: string): boolean {
     // to avoid false positives like "COURT" matching "COURT DOCUMENT"
     if (keyword.split(/\s+/).length <= 2) {
       const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      if (new RegExp(`\\b${escaped}\\b`).test(trimmed)) return true;
+      if (new RegExp(`\\b${escaped}\\b`).test(candidate)) return true;
     }
   }
 
   // 4. Heuristic: short ALL-CAPS standalone line (≤5 words) is likely a heading
-  const wordCount = trimmed.split(/\s+/).length;
-  if (wordCount >= 1 && wordCount <= 5 && trimmed.length >= 4) {
+  //    Disabled for boundary detection to avoid misclassifying captions/titles.
+  const wordCount = candidate.split(/\s+/).length;
+  if (allowHeuristic && wordCount >= 1 && wordCount <= 5 && candidate.length >= 4) {
     // Exclude common false positives
     const FALSE_POSITIVES = new Set([
       'THE STATE OF', 'STATE OF', 'COUNTY OF', 'IN THE',
       'UNITED STATES', 'PRO SE', 'IN RE', 'ET AL',
       'VS', 'VERSUS', 'AND', 'OR', 'THE',
     ]);
-    if (FALSE_POSITIVES.has(trimmed)) return false;
+    if (FALSE_POSITIVES.has(candidate)) return false;
     // Must contain at least one alpha word ≥3 chars
-    const hasSubstantiveWord = trimmed.split(/\s+/).some(w => /^[A-Z]{3,}$/.test(w));
+    const hasSubstantiveWord = candidate.split(/\s+/).some((w) => /^[A-Z]{3,}$/.test(w));
     return hasSubstantiveWord;
   }
 
@@ -299,7 +310,11 @@ function extractGeneralCaption(lines: string[]): CaptionBlock | null {
     captionSlice = lines.slice(0, titleIndex);
   } else {
     const headerBound = lines.findIndex(
-      (l) => l !== '' && (TO_HONORABLE_RE.test(l) || ROMAN_HEADING_RE.test(l))
+      (l) =>
+        l !== '' &&
+        (TO_HONORABLE_RE.test(l) ||
+          ROMAN_HEADING_RE.test(l) ||
+          isAllCapsHeading(l, { allowHeuristic: false }))
     );
     const limit = headerBound !== -1 ? headerBound : Math.min(lines.length, 25);
     captionSlice = lines.slice(0, limit);
@@ -509,7 +524,10 @@ function tryMinimalCaption(lines: string[]): CaptionBlock | null {
 function findTitleIndex(lines: string[]): number {
   // Determine header boundary
   const headerBound = lines.findIndex(
-    (l) => TO_HONORABLE_RE.test(l) || ROMAN_HEADING_RE.test(l) || isAllCapsHeading(l)
+    (l) =>
+      TO_HONORABLE_RE.test(l) ||
+      ROMAN_HEADING_RE.test(l) ||
+      isAllCapsHeading(l, { allowHeuristic: false })
   );
   const searchLimit = headerBound !== -1 ? headerBound : Math.min(lines.length, 25);
 
@@ -587,7 +605,9 @@ function extractBodyStructure(
   const bodyStart = lines.findIndex((l) => TO_HONORABLE_RE.test(l));
   // If no TO THE HONORABLE, try to find the first section heading as body start
   const firstHeadingStart = bodyStart === -1
-    ? lines.findIndex((l) => ROMAN_HEADING_RE.test(l) || isAllCapsHeading(l))
+    ? lines.findIndex(
+        (l) => ROMAN_HEADING_RE.test(l) || isAllCapsHeading(l, { allowHeuristic: false }),
+      )
     : -1;
   // Skip past subtitle line (parenthetical) to avoid duplicating it as body paragraph
   const hasSubtitle =

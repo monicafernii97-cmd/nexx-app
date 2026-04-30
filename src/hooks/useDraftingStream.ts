@@ -116,7 +116,12 @@ export function useDraftingStream({ dispatch }: ContextDispatchers) {
                     }
                 } catch {
                     const trimmed = errorText.trim();
-                    if (trimmed) errorMessage = trimmed.slice(0, 500);
+                    // Detect HTML error page from Vercel/Next.js runtime crash
+                    if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
+                        errorMessage = `Export service crashed (HTTP ${response.status}). This is usually a server resource limit. Please try again or contact support.`;
+                    } else if (trimmed) {
+                        errorMessage = trimmed.slice(0, 500);
+                    }
                 }
                 console.error('[useDraftingStream] Non-OK response:', response.status, errorMessage);
                 dispatch({

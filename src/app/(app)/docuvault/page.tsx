@@ -351,7 +351,10 @@ function DocuVaultPageInner() {
                         isOpen={showCreateExport}
                         onClose={() => setShowCreateExport(false)}
                         onSubmit={async (config) => {
-                            if (isParsing || isUserProfileLoading) return;
+                            if (isParsing || isUserProfileLoading) {
+                                setGenerationError(isParsing ? 'Please wait — file is still being parsed.' : 'Loading your profile. Please try again in a moment.');
+                                return;
+                            }
                             try {
                                 await startStructuredExport({
                                     ...config,

@@ -387,6 +387,22 @@ export default function ReviewHubContent() {
                                 Preflight
                             </button>
 
+                            {/* Skip Review Toggle */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (window.confirm('Skip review and proceed directly to drafting? All sections will be auto-approved.')) {
+                                        handleApproveAndDraft();
+                                    }
+                                }}
+                                disabled={isDrafting || (state.assemblyValidation?.critical?.length ?? 0) > 0}
+                                className="px-4 py-2 rounded-xl text-[11px] font-bold tracking-wide transition-all flex items-center gap-2 bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Skip manual review and auto-approve all sections"
+                            >
+                                <Lightning size={14} weight="fill" />
+                                Skip Review
+                            </button>
+
                             {/* Approve & Draft — gated by critical validation */}
                             <button
                                 type="button"

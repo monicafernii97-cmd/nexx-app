@@ -42,6 +42,7 @@ import type {
 import { runAssembly } from '@/lib/export-assembly/orchestrator';
 import type { PreflightResult } from '@/lib/export-assembly/validation/preflightValidator';
 import { getAssemblyInputs } from '@/lib/export-assembly/services/getAssemblyInputs';
+import { splitPastedContentAction } from '../actions/splitPastedContentAction';
 import { validateAssemblyOutput } from '@/lib/export-assembly/validation/assemblyIntegrityValidator';
 
 // ---------------------------------------------------------------------------
@@ -596,6 +597,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
 
             if (isFastPath) {
                 // ── FAST PATH: Build synthetic assembly result from pasted text ──
+                // Uses splitPastedContent() to produce structured review items
                 const pastedText = config.pastedContent!.trim();
                 const nodeId = `pasted_${Date.now()}`;
 
@@ -609,17 +611,28 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                     if (captionData.state) courtConfig.courtState = captionData.state;
                     if (captionData.county) courtConfig.courtCounty = captionData.county;
                     if (captionData.causeNumber) courtConfig.causeNumber = captionData.causeNumber;
-                    // Extract petitioner name from partyRoles if available
                     const petitionerRole = captionData.partyRoles?.find(r => r.startsWith('Petitioner:'));
                     if (petitionerRole) courtConfig.petitionerName = petitionerRole.replace('Petitioner: ', '');
                 }
 
                 dispatch({
                     type: 'ASSEMBLY_PROGRESS',
-                    status: { phase: 'collecting', progress: 10, detail: 'Using pasted document content (fast path)' },
+                    status: { phase: 'collecting', progress: 10, detail: 'Parsing document structure…' },
                 });
 
-                // Build a complete assembly result with the pasted text
+                // Split pasted content into structured review items
+                const splitResult = await splitPastedContentAction(pastedText);
+
+                dispatch({
+                    type: 'ASSEMBLY_PROGRESS',
+                    status: {
+                        phase: 'classifying',
+                        progress: 30,
+                        detail: `Found ${splitResult.meta.totalItems} sections (${splitResult.strategy})`,
+                    },
+                });
+
+                // Build mapped sections for the assembly shell
                 const mappedSections = config.path === 'court_document'
                     ? {
                         generatedAt: new Date().toISOString(),
@@ -653,6 +666,8 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                             supportingNodeIds: [nodeId],
                         };
 
+                const itemCount = splitResult.items.length || 1;
+
                 result = {
                     assembly: {
                         path: config.path,
@@ -665,7 +680,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                             scores: { fact: 1, argument: 0, request: 0, emotion: 0, opinion: 0, procedure: 0, evidence_reference: 0, timeline_event: 0, issue: 0, risk: 0, unknown: 0 },
                             dominantType: 'fact' as const,
                             confidence: 1.0,
-                            tags: ['pre_drafted'],
+                            tags: ['pre_drafted', `split_${splitResult.strategy}`],
                             issueTags: [],
                             patternTags: [],
                             extractedEntities: { people: [], dates: [], locations: [], courts: [], filings: [], exhibits: [], statutesOrRules: [] },
@@ -694,26 +709,18 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                             totalNodes: 1,
                             selectedNodes: 1,
                             classifiedNodes: 1,
-                            narrativeSections: 1,
+                            narrativeSections: itemCount,
                             detectedPatterns: 0,
                             reliefConnections: 0,
                             assemblyTimeMs: 0,
                         },
                     },
-                    reviewItems: [{
-                        nodeId,
-                        originalText: pastedText,
-                        dominantType: 'fact' as const,
-                        confidence: 1.0,
-                        suggestedSections: ['document_content'],
-                        transformedCourtSafeText: pastedText,
-                        includedInExport: true,
-                    }],
+                    reviewItems: splitResult.items,
                     meta: {
                         totalNodes: 1,
                         selectedNodes: 1,
                         classifiedNodes: 1,
-                        narrativeSections: 1,
+                        narrativeSections: itemCount,
                         detectedPatterns: 0,
                         reliefConnections: 0,
                         assemblyTimeMs: 0,

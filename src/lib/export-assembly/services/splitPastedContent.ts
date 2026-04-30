@@ -97,7 +97,7 @@ function buildReviewItem(
 function isStrongParse(doc: LegalDocument): boolean {
   const sectionCount = doc.sections.length;
   const hasMultipleSections = sectionCount >= 2;
-  const hasClosingBlock = Boolean(doc.prayer || doc.signature || doc.certificate);
+  const hasClosingBlock = Boolean(doc.prayer || doc.signature || doc.certificate || doc.verification);
   return hasMultipleSections || (sectionCount >= 1 && hasClosingBlock);
 }
 

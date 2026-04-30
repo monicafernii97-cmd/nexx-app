@@ -43,9 +43,11 @@ export interface SplitResult {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Generate a deterministic node ID for a section/block. */
-function makeNodeId(prefix: string, index: number): string {
-  return `pasted_${prefix}_${index}_${Date.now()}`;
+/** Generate a stable node ID from prefix and index. Uses a simple content-based hash to avoid non-determinism. */
+function makeNodeId(prefix: string, index: number, contentLength: number = 0): string {
+  // Simple hash: prefix + index + content length for stability across calls
+  const hash = ((index * 31 + contentLength) >>> 0).toString(36);
+  return `pasted_${prefix}_${index}_${hash}`;
 }
 
 /** Flatten a LegalBlock into its text content. */

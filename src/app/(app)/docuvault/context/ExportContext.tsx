@@ -42,7 +42,7 @@ import type {
 import { runAssembly } from '@/lib/export-assembly/orchestrator';
 import type { PreflightResult } from '@/lib/export-assembly/validation/preflightValidator';
 import { getAssemblyInputs } from '@/lib/export-assembly/services/getAssemblyInputs';
-import { splitPastedContent } from '@/lib/export-assembly/services/splitPastedContent';
+import { splitPastedContentAction } from '../actions/splitPastedContentAction';
 import { validateAssemblyOutput } from '@/lib/export-assembly/validation/assemblyIntegrityValidator';
 
 // ---------------------------------------------------------------------------
@@ -621,7 +621,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                 });
 
                 // Split pasted content into structured review items
-                const splitResult = splitPastedContent(pastedText);
+                const splitResult = await splitPastedContentAction(pastedText);
 
                 dispatch({
                     type: 'ASSEMBLY_PROGRESS',

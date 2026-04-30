@@ -352,12 +352,12 @@ function DocuVaultPageInner() {
                         onClose={() => setShowCreateExport(false)}
                         onSubmit={async (config) => {
                             if (isParsing) return;
-                            setShowCreateExport(false);
                             try {
                                 await startStructuredExport({
                                     ...config,
                                     pastedContent: documentContent || undefined,
                                 });
+                                setShowCreateExport(false);
                             } catch (err) {
                                 console.error('[DocuVault] Export start failed:', err);
                                 setGenerationError(err instanceof Error ? err.message : 'Export failed. Please try again.');

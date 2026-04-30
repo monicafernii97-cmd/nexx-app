@@ -121,7 +121,7 @@ function DocuVaultPageInner() {
                 VIEW: INTAKE HUB
                ═══════════════════════════════════════════════════ */}
             <div
-                    className="flex-1 min-h-0 flex flex-col w-full max-w-5xl mx-auto pb-[calc(5rem+env(safe-area-inset-bottom))] gap-6"
+                    className="flex-1 min-h-0 flex flex-col w-full max-w-5xl mx-auto pb-4 gap-6"
                 >
                     {/* Zone 1: Intake Hub — compact */}
                     <div className="lg:flex-[0.35] min-h-0 lg:min-h-[420px] flex flex-col space-y-3">
@@ -203,11 +203,106 @@ function DocuVaultPageInner() {
                                         onChange={e => setDocumentContent(e.target.value)}
                                         placeholder="Paste your draft or notes here to begin... NEXX will perfectly structure and format it for court."
                                         aria-label="Document content"
-                                        className="w-full h-full bg-white/5 rounded-2xl p-6 text-base font-medium text-white placeholder:text-white/10 outline-none resize-none transition-all focus:bg-white/[0.07] border border-white/5 focus:border-white/10"
+                                        className="w-full h-full bg-white/5 rounded-2xl p-6 pb-16 text-base font-medium text-white placeholder:text-white/10 outline-none resize-none transition-all focus:bg-white/[0.07] border border-white/5 focus:border-white/10"
                                     />
 
-                                </div>
+                                    {/* Upload — sticky inside textarea */}
+                                    <div className="absolute bottom-4 left-4">
+                                        <button
+                                            onClick={() => {
+                                                if (isParsing) {
+                                                    parseAbortRef.current?.abort();
+                                                    parseAbortRef.current = null;
+                                                    setIsParsing(false);
+                                                    return;
+                                                }
+                                                fileInputRef.current?.click();
+                                            }}
+                                            className={`px-5 py-2.5 rounded-xl border text-white text-[11px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${isParsing ? 'bg-red-500/20 hover:bg-red-500/30 border-red-500/30' : 'bg-white/10 hover:bg-white/20 border-white/10'}`}
+                                        >
+                                            {isParsing ? (
+                                                <ArrowsClockwise size={16} className="animate-spin" />
+                                            ) : (
+                                                <Paperclip size={16} />
+                                            )}
+                                            {isParsing ? 'Cancel' : 'Upload'}
+                                        </button>
+                                        <input type="file" ref={fileInputRef} accept=".pdf,.docx,.txt,.md,.csv,text/*" className="hidden" onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+
+                                            const MAX_FILE_SIZE = 10 * 1024 * 1024;
+                                            if (file.size > MAX_FILE_SIZE) {
+                                                setGenerationError('File exceeds 10 MB limit. Please use a smaller file.');
+                                                e.target.value = '';
+                                                return;
+                                            }
+
+                                            const name = file.name.toLowerCase();
+                                            const isBinary = name.endsWith('.pdf') || name.endsWith('.docx');
+
+                                            const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.txt', '.md', '.csv'];
+                                            const hasSupported = SUPPORTED_EXTENSIONS.some(ext => name.endsWith(ext));
+                                            const isTextMime = file.type.startsWith('text/');
+                                            if (!hasSupported && !isTextMime) {
+                                                setGenerationError('Unsupported file type. Please upload PDF, DOCX, TXT, MD, or CSV files.');
+                                                e.target.value = '';
+                                                return;
+                                            }
+
+                                            parseAbortRef.current?.abort();
+                                            const controller = new AbortController();
+                                            parseAbortRef.current = controller;
+                                            setIsParsing(true);
+                                            setGenerationError(null);
+
+                                            try {
+                                                let extractedText = '';
+
+                                                if (isBinary) {
+                                                    const base64 = await new Promise<string>((resolve, reject) => {
+                                                        const reader = new FileReader();
+                                                        reader.onload = () => {
+                                                            const dataUrl = reader.result as string;
+                                                            const commaIdx = dataUrl.indexOf(',');
+                                                            resolve(commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl);
+                                                        };
+                                                        reader.onerror = () => reject(new Error('Failed to read file'));
+                                                        reader.readAsDataURL(file);
+                                                    });
+                                                    if (controller.signal.aborted) return;
+                                                    const res = await fetch('/api/documents/parse', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ filename: file.name, data: base64 }),
+                                                        signal: controller.signal,
+                                                    });
+                                                    const result = await res.json();
+                                                    if (!res.ok) throw new Error(result.error || 'Parse failed');
+                                                    extractedText = result.text;
+                                                } else {
+                                                    extractedText = await file.text();
+                                                }
+
+                                                if (controller.signal.aborted) return;
+                                                if (extractedText.trim()) {
+                                                    setDocumentContent(prev => prev ? prev + '\n\n' + extractedText : extractedText);
+                                                } else {
+                                                    setGenerationError('No text could be extracted from this file.');
+                                                }
+                                            } catch (err) {
+                                                if (err instanceof DOMException && err.name === 'AbortError') return;
+                                                if (controller.signal.aborted) return;
+                                                console.error('[File Upload Error]', err);
+                                                setGenerationError(err instanceof Error ? err.message : 'Failed to read file. Please paste content manually.');
+                                            } finally {
+                                                e.target.value = '';
+                                                if (!controller.signal.aborted) setIsParsing(false);
+                                            }
+                                        }} />
+                                    </div>
                             </div>
+                        </div>
                         </div>
 
                         {/* Right: Quick Templates Sidebar */}
@@ -236,6 +331,18 @@ function DocuVaultPageInner() {
                                         );
                                     })}
                                 </div>
+                            </div>
+
+                            {/* Generate PDF — at bottom of sidebar */}
+                            <div className="mt-auto pt-6 border-t border-white/5">
+                                <button
+                                    onClick={() => setShowCreateExport(true)}
+                                    disabled={isParsing || isUserProfileLoading}
+                                    className="w-full py-3 rounded-xl bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-white/20 text-white text-[10px] font-bold uppercase tracking-widest shadow-[0_4px_16px_rgba(26,75,155,0.3)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:border-white/40 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Export size={16} weight="bold" className="group-hover:translate-x-1 transition-transform" />
+                                    {isParsing ? 'Parsing...' : 'Generate PDF'}
+                                </button>
                             </div>
 
 
@@ -317,116 +424,6 @@ function DocuVaultPageInner() {
                     </div>
                 </div>
 
-                {/* ── Sticky Action Bar ── */}
-                <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[rgba(10,17,40,0.85)] backdrop-blur-xl">
-                    <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
-                        {/* Left: Upload */}
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => {
-                                    if (isParsing) {
-                                        parseAbortRef.current?.abort();
-                                        parseAbortRef.current = null;
-                                        setIsParsing(false);
-                                        return;
-                                    }
-                                    fileInputRef.current?.click();
-                                }}
-                                className={`px-5 py-2.5 rounded-xl border border-white/10 text-white text-[11px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${isParsing ? 'bg-red-500/20 hover:bg-red-500/30 border-red-500/30' : 'bg-white/10 hover:bg-white/20'}`}
-                            >
-                                {isParsing ? (
-                                    <ArrowsClockwise size={16} className="animate-spin" />
-                                ) : (
-                                    <Paperclip size={16} />
-                                )}
-                                {isParsing ? 'Cancel' : 'Upload'}
-                            </button>
-                            <input type="file" ref={fileInputRef} accept=".pdf,.docx,.txt,.md,.csv,text/*" className="hidden" onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-
-                                const MAX_FILE_SIZE = 10 * 1024 * 1024;
-                                if (file.size > MAX_FILE_SIZE) {
-                                    setGenerationError('File exceeds 10 MB limit. Please use a smaller file.');
-                                    e.target.value = '';
-                                    return;
-                                }
-
-                                const name = file.name.toLowerCase();
-                                const isBinary = name.endsWith('.pdf') || name.endsWith('.docx');
-
-                                const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.txt', '.md', '.csv'];
-                                const hasSupported = SUPPORTED_EXTENSIONS.some(ext => name.endsWith(ext));
-                                const isTextMime = file.type.startsWith('text/');
-                                if (!hasSupported && !isTextMime) {
-                                    setGenerationError('Unsupported file type. Please upload PDF, DOCX, TXT, MD, or CSV files.');
-                                    e.target.value = '';
-                                    return;
-                                }
-
-                                parseAbortRef.current?.abort();
-                                const controller = new AbortController();
-                                parseAbortRef.current = controller;
-                                setIsParsing(true);
-                                setGenerationError(null);
-
-                                try {
-                                    let extractedText = '';
-
-                                    if (isBinary) {
-                                        const base64 = await new Promise<string>((resolve, reject) => {
-                                            const reader = new FileReader();
-                                            reader.onload = () => {
-                                                const dataUrl = reader.result as string;
-                                                const commaIdx = dataUrl.indexOf(',');
-                                                resolve(commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl);
-                                            };
-                                            reader.onerror = () => reject(new Error('Failed to read file'));
-                                            reader.readAsDataURL(file);
-                                        });
-                                        if (controller.signal.aborted) return;
-                                        const res = await fetch('/api/documents/parse', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ filename: file.name, data: base64 }),
-                                            signal: controller.signal,
-                                        });
-                                        const result = await res.json();
-                                        if (!res.ok) throw new Error(result.error || 'Parse failed');
-                                        extractedText = result.text;
-                                    } else {
-                                        extractedText = await file.text();
-                                    }
-
-                                    if (controller.signal.aborted) return;
-                                    if (extractedText.trim()) {
-                                        setDocumentContent(prev => prev ? prev + '\n\n' + extractedText : extractedText);
-                                    } else {
-                                        setGenerationError('No text could be extracted from this file.');
-                                    }
-                                } catch (err) {
-                                    if (err instanceof DOMException && err.name === 'AbortError') return;
-                                    if (controller.signal.aborted) return;
-                                    console.error('[File Upload Error]', err);
-                                    setGenerationError(err instanceof Error ? err.message : 'Failed to read file. Please paste content manually.');
-                                } finally {
-                                    if (!controller.signal.aborted) setIsParsing(false);
-                                }
-                                e.target.value = '';
-                            }} />
-                        </div>
-
-                        {/* Right: Generate PDF */}
-                        <button
-                            onClick={() => setShowCreateExport(true)}
-                            disabled={isParsing || isUserProfileLoading}
-                            className="px-6 py-2.5 rounded-xl bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-white/25 text-white text-[11px] font-bold uppercase tracking-widest shadow-[0_4px_16px_rgba(26,75,155,0.3)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:-translate-y-0.5 transition-all flex items-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <Export size={16} weight="bold" className="group-hover:translate-x-1 transition-transform" />
-                            {isParsing ? 'Parsing...' : 'Generate PDF'}
-                        </button>
-                    </div>
-                </div>
         </PageContainer>
     );
 }

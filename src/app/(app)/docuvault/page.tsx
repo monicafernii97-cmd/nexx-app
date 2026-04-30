@@ -296,9 +296,9 @@ function DocuVaultPageInner() {
                                                 console.error('[File Upload Error]', err);
                                                 setGenerationError(err instanceof Error ? err.message : 'Failed to read file. Please paste content manually.');
                                             } finally {
+                                                e.target.value = '';
                                                 if (!controller.signal.aborted) setIsParsing(false);
                                             }
-                                            e.target.value = '';
                                         }} />
                                     </div>
                             </div>

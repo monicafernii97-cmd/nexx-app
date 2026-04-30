@@ -168,7 +168,7 @@ function isAllCapsHeading(line: string, opts: { allowHeuristic?: boolean } = {})
   if (RESPECTFULLY_RE.test(candidate)) return false;
   if (CAUSE_RE.test(candidate)) return false;
   if (DOCKET_RE.test(candidate)) return false;
-  if (TITLE_CANDIDATE_RE.test(candidate) && candidate.split(/\s+/).length > 4) return false;
+  if (TITLE_CANDIDATE_RE.test(candidate)) return false;
 
   // 1. Exact match
   if (KNOWN_SECTION_HEADINGS.has(candidate)) return true;

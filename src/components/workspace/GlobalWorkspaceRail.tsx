@@ -321,6 +321,17 @@ export function GlobalWorkspaceRail() {
                         ))}
                     </div>
                 </section>
+
+                {/* ── Generate Report CTA ── */}
+                <section className="mt-auto pt-4 border-t border-white/5">
+                    <Link
+                        href="/docuvault"
+                        className="flex items-center justify-center gap-2.5 w-full px-4 py-3 rounded-xl bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-white/20 text-white text-[11px] font-bold uppercase tracking-widest shadow-[0_4px_16px_rgba(26,75,155,0.3)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:-translate-y-0.5 transition-all no-underline group"
+                    >
+                        <FileText size={16} weight="bold" className="group-hover:scale-110 transition-transform" />
+                        Generate Report
+                    </Link>
+                </section>
                 </>
                 )}
             </div>

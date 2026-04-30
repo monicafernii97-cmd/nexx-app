@@ -295,35 +295,6 @@ export default function Sidebar() {
 
             {/* Bottom User Section */}
             <div className="px-4 pb-6 pt-2 mt-auto space-y-4">
-                {/* Generate Report CTA */}
-                <button
-                    onClick={() => {
-                        const pathname = window.location.pathname;
-                        if (pathname.includes('/chat/overview')) {
-                            window.dispatchEvent(new CustomEvent('nexx:open-report-modal'));
-                        } else {
-                            window.location.href = '/chat/overview?openReportModal=true';
-                        }
-                    }}
-                    aria-label="Generate report"
-                    title={collapsed ? 'Generate report' : undefined}
-                    className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-xl transition-all duration-300 cursor-pointer bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 group ${collapsed ? 'justify-center' : ''}`}
-                >
-                    <FileText size={18} weight="bold" className="text-indigo-400 flex-shrink-0" />
-                    <AnimatePresence mode="popLayout">
-                        {!collapsed && (
-                            <motion.span
-                                initial={{ opacity: 0, width: 0 }}
-                                animate={{ opacity: 1, width: 'auto' }}
-                                exit={{ opacity: 0, width: 0 }}
-                                className="text-[12px] font-bold uppercase tracking-[0.2em] whitespace-nowrap overflow-hidden text-indigo-400"
-                            >
-                                Generate
-                            </motion.span>
-                        )}
-                    </AnimatePresence>
-                </button>
-
                 {isLoaded && user ? (
                     <div className="relative group focus-within:ring-2 focus-within:ring-indigo-500/40 rounded-xl w-full">
                         {/* Visual layer */}

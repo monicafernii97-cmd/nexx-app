@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import {
     SquaresFour, Notebook, PushPin, CalendarCheck,
@@ -34,17 +34,7 @@ export default function WorkspaceOverview() {
     const { pins, memory, timeline, counts, removeMemory, activeCaseId } = useWorkspace();
 
     // ── Generate Report Modal state ──
-    const [isReportModalOpen, setIsReportModalOpen] = useState(() => {
-        if (typeof window === 'undefined') return false;
-        return new URLSearchParams(window.location.search).get('openReportModal') === 'true';
-    });
-
-    // Listen for sidebar "Generate Report" button
-    useEffect(() => {
-        const handler = () => setIsReportModalOpen(true);
-        window.addEventListener('nexx:open-report-modal', handler);
-        return () => window.removeEventListener('nexx:open-report-modal', handler);
-    }, []);
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
     // ── Detected Patterns from Convex ──
     const detectedPatterns = useQuery(

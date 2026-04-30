@@ -336,7 +336,7 @@ function DocuVaultPageInner() {
                             <div className="mt-auto pt-8 border-t border-white/5">
                                 <button
                                     onClick={() => setShowCreateExport(true)}
-                                    disabled={isParsing}
+                                    disabled={isParsing || isUserProfileLoading}
                                     className="w-full py-2.5 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 text-white text-[10px] font-bold uppercase tracking-widest hover:border-white/40 transition-all flex items-center justify-center gap-2 group shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Export size={16} weight="bold" className="group-hover:translate-x-1 transition-transform" />
@@ -351,7 +351,7 @@ function DocuVaultPageInner() {
                         isOpen={showCreateExport}
                         onClose={() => setShowCreateExport(false)}
                         onSubmit={async (config) => {
-                            if (isParsing) return;
+                            if (isParsing || isUserProfileLoading) return;
                             try {
                                 await startStructuredExport({
                                     ...config,

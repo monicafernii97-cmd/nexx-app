@@ -1,24 +1,16 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useRef, useCallback, useEffect, Suspense } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
 import {
-    Bank,
-    CaretLeft,
     FileText,
     Plus,
-    CircleNotch,
     Paperclip,
     X,
     CheckCircle,
-    DownloadSimple,
     ArrowsClockwise,
     Export,
-    Lightning,
     ClockCounterClockwise,
-    ArrowsOutSimple,
-    MagnifyingGlassPlus,
-    CornersIn,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -34,11 +26,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { useExport } from './context/ExportContext';
 import '@/styles/pipelines.css';
 
-/** Working state progress step */
-interface ProgressStep {
-    label: string;
-    status: 'pending' | 'active' | 'complete';
-}
+
 
 /** Truncate text to maxLen characters, breaking at word boundary when possible. */
 const truncateText = (text: string, maxLen = 100) => {
@@ -57,7 +45,7 @@ export default function DocuVaultPage() {
     );
 }
 
-/** DocuVault document generator page with intake hub, compose, working, and result views. */
+/** DocuVault intake hub — single entry point for all document generation via Review Hub. */
 function DocuVaultPageInner() {
     const searchParams = useSearchParams();
     const { userId } = useUser();
@@ -81,45 +69,20 @@ function DocuVaultPageInner() {
     const [documentContent, setDocumentContent] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Flow state
-    const [view, setView] = useState<'hub' | 'working' | 'result'>('hub');
-    const [previewState, setPreviewState] = useState<'compact' | 'split' | 'fullscreen'>('compact');
-    const [progress, setProgress] = useState(0);
-    const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
-    /** Metadata returned from the Quick Generate stream (no binary). */
-    type QuickGenResult = {
-      artifactId: string;
-      filename: string;
-      byteLength: number;
-      sha256: string;
-      downloadUrl?: string;
-    };
-    const [generatedResult, setGeneratedResult] = useState<QuickGenResult | null>(null);
+    // Error state
     const [generationError, setGenerationError] = useState<string | null>(null);
-    const [caseNumber, setCaseNumber] = useState<string | null>(null);
     const [isParsing, setIsParsing] = useState(false);
     const parseAbortRef = useRef<AbortController | null>(null);
 
-    // Structured export modal state
+    // Structured export modal state (unified export path)
     const [showCreateExport, setShowCreateExport] = useState(false);
     const { startStructuredExport } = useExport();
 
-    // Abort mechanism for generation
-    const generationTokenRef = useRef(0);
-    const completedRef = useRef(false);
-    const generationAbortRef = useRef<AbortController | null>(null);
-    /** Tracks the active timeout for the popup-blocked print warning so rapid clicks don't race. */
-    const printWarningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // Abort streams on unmount
+    // Abort parse stream on unmount
     useEffect(() => {
         return () => {
             parseAbortRef.current?.abort();
             parseAbortRef.current = null;
-            generationAbortRef.current?.abort();
-            if (printWarningTimeoutRef.current) {
-                clearTimeout(printWarningTimeoutRef.current);
-            }
         };
     }, []);
 
@@ -142,7 +105,7 @@ function DocuVaultPageInner() {
                     matched = true;
                     setActiveTab(tab.id);
                     setSelectedTemplate(found);
-                    setView('hub');
+
                     break;
                 }
             }
@@ -151,235 +114,13 @@ function DocuVaultPageInner() {
     }, [searchParams]);
 
 
-    /** Parse a raw SSE event block into event name + data. */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    function parseSseEvent(rawEvent: string): { event: string; data: Record<string, any> } | null {
-        const lines = rawEvent.split(/\r?\n/);
-        let event = 'message';
-        const dataLines: string[] = [];
-
-        for (const line of lines) {
-            if (!line || line.startsWith(':')) continue;
-            if (line.startsWith('event:')) {
-                event = line.slice('event:'.length).trim();
-                continue;
-            }
-            if (line.startsWith('data:')) {
-                dataLines.push(line.slice('data:'.length).trimStart());
-            }
-        }
-
-        if (dataLines.length === 0) return null;
-        try {
-            return { event, data: JSON.parse(dataLines.join('\n')) };
-        } catch {
-            console.warn('[DocuVault] Malformed SSE data:', dataLines.join('\n'));
-            return null;
-        }
-    }
-
-    /** Handle document generation via the streaming API endpoint. */
-    const handleGenerate = useCallback(async () => {
-        if (isParsing) return;
-        if (!documentContent.trim() && !selectedTemplate) return;
-        if (isUserProfileLoading) {
-            setGenerationError('Loading your profile. Please try again in a moment.');
-            return;
-        }
-
-        // Fail fast if required profile data is missing
-        if (!resolvedState || !resolvedCounty) {
-            setGenerationError('Please set your state and county in Court Settings (Legal Suite → Court Settings) before generating documents.');
-            return;
-        }
-
-        // Increment token so stale runs can detect cancellation
-        const currentToken = ++generationTokenRef.current;
-        generationAbortRef.current?.abort();
-        const controller = new AbortController();
-        generationAbortRef.current = controller;
-
-        setView('working');
-        setProgress(0);
-        setGenerationError(null);
-        completedRef.current = false;
-        setGeneratedResult(null);
-
-        const steps: ProgressStep[] = [
-            { label: 'Analyzing Legal Frameworks', status: 'active' },
-            { label: 'Normalizing Document Content', status: 'pending' },
-            { label: 'Applying Court Formatting', status: 'pending' },
-            { label: 'NEXXverification Compliance', status: 'pending' },
-            { label: 'Rendering & Storing PDF', status: 'pending' },
-        ];
-        setProgressSteps(steps);
-
-        try {
-            const res = await fetch('/api/documents/generate/stream', {
-                signal: controller.signal,
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    templateId: selectedTemplate?.id ?? 'general',
-                    courtSettings: {
-                        state: resolvedState,
-                        county: resolvedCounty,
-                    },
-                    petitioner: { name: courtSettings?.petitionerLegalName || user?.name || 'Petitioner' },
-                    caseType: selectedTemplate?.caseTypes?.[0] ?? undefined,
-                    bodyContent: documentContent ? [{ heading: 'Content', paragraphs: [documentContent] }] : [],
-                }),
-            });
-
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({ error: 'Generation failed' }));
-                throw new Error(err.error || 'Generation failed');
-            }
-
-            const reader = res.body?.getReader();
-            if (!reader) throw new Error('No response stream');
-
-            const decoder = new TextDecoder();
-            let buffer = '';
-
-            while (true) {
-                // Check abort token before each read
-                if (generationTokenRef.current !== currentToken) return;
-
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-
-                // Parse SSE events (separated by \n\n)
-                let boundaryIndex: number;
-                while ((boundaryIndex = buffer.indexOf('\n\n')) !== -1) {
-                    const rawEvent = buffer.slice(0, boundaryIndex);
-                    buffer = buffer.slice(boundaryIndex + 2);
-
-                    if (generationTokenRef.current !== currentToken) return;
-
-                    const parsed = parseSseEvent(rawEvent);
-                    if (!parsed) continue;
-
-                    const { event: eventName, data } = parsed;
-
-                    // Handle progress events
-                    if (eventName === 'progress' && data?.progress != null) {
-                        setProgress(data.progress);
-
-                        // Map SSE step names to UI step indices
-                        const stepMap: Record<string, number> = {
-                            analyzing: 0, normalizing: 1, formatting: 2, compliance: 3, pdf: 4, storing: 4,
-                        };
-                        const stepIdx = stepMap[data.step] ?? -1;
-                        if (stepIdx >= 0) {
-                            setProgressSteps(prev => prev.map((s, idx) => ({
-                                ...s,
-                                status: idx < stepIdx ? 'complete' as const
-                                    : idx === stepIdx ? 'active' as const
-                                    : 'pending' as const,
-                            })));
-                        }
-                    }
-
-                    // Handle error events
-                    if (eventName === 'error') {
-                        throw new Error(data?.message ?? 'Generation failed');
-                    }
-
-                    // Handle completion — metadata only, no binary
-                    if (eventName === 'complete' && data?.artifactId) {
-                        if (generationTokenRef.current !== currentToken) return;
-                        completedRef.current = true;
-                        setGeneratedResult({
-                            artifactId: data.artifactId,
-                            filename: data.filename,
-                            byteLength: data.byteLength,
-                            sha256: data.sha256,
-                            downloadUrl: typeof data.downloadUrl === 'string' ? data.downloadUrl : undefined,
-                        });
-                        setCaseNumber(data.filename?.replace('.pdf', '') ?? 'document');
-                        setView('result');
-                    }
-                }
-            }
-
-            // If stream ended without a complete event, treat as incomplete
-            if (generationTokenRef.current === currentToken && !completedRef.current) {
-                setGenerationError('Document generation incomplete. Please try again.');
-                setView('hub');
-            }
-        } catch (error) {
-            if (error instanceof DOMException && error.name === 'AbortError') return;
-            if (generationTokenRef.current !== currentToken) return;
-            console.error('[DocuVault Generation Error]', error);
-            setGenerationError(error instanceof Error ? error.message : 'Generation failed');
-            setView('hub');
-        }
-    }, [documentContent, selectedTemplate, isUserProfileLoading, resolvedState, resolvedCounty, courtSettings?.petitionerLegalName, user?.name]);
-
-    /** Reset all state to begin composing a new document, aborting any in-flight generation. */
-    const handleNewDocument = useCallback(() => {
-        // Clear any pending print-warning timer
-        if (printWarningTimeoutRef.current) {
-            clearTimeout(printWarningTimeoutRef.current);
-            printWarningTimeoutRef.current = null;
-        }
-
-        // Abort any in-flight parse
-        parseAbortRef.current?.abort();
-        parseAbortRef.current = null;
-        setIsParsing(false);
-
-        // Increment token to abort any running generation
-        generationTokenRef.current++;
-        generationAbortRef.current?.abort();
-        generationAbortRef.current = null;
-
-        setView('hub');
-        setSelectedTemplate(null);
-        setDocumentContent('');
-        setProgress(0);
-        setProgressSteps([]);
-        setGeneratedResult(null);
-        setGenerationError(null);
-        setCaseNumber(null);
-        setPreviewState('compact');
-    }, []);
-
-    /** Navigate back to composer without wiping draft state — preserves template + content for re-generation. */
-    const handleBackToComposer = useCallback(() => {
-        setView('hub');
-        setPreviewState('compact');
-        setGenerationError(null);
-    }, []);
-
-    /** Programmatic download — shared by compact action panel and fullscreen toolbar. */
-    const handleDownload = useCallback(() => {
-        if (!generatedResult?.downloadUrl) return;
-        const a = document.createElement('a');
-        a.href = generatedResult.downloadUrl;
-        a.download = generatedResult.filename;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    }, [generatedResult?.downloadUrl, generatedResult?.filename]);
 
     return (
         <PageContainer>
             {/* ═══════════════════════════════════════════════════
-                VIEW: HUB (Intake & Recent Documents)
+                VIEW: INTAKE HUB
                ═══════════════════════════════════════════════════ */}
-            <AnimatePresence mode="wait">
-            {view === 'hub' && (
-                <motion.div
-                    key="hub"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
+            <div
                     className="flex-1 min-h-0 flex flex-col w-full max-w-5xl mx-auto pb-4 gap-6"
                 >
                     {/* Zone 1: Intake Hub — compact */}
@@ -558,15 +299,7 @@ function DocuVaultPageInner() {
                                             // Reset input so the same file can be selected again
                                             e.target.value = '';
                                         }} />
-                                        
-                                        <button
-                                            onClick={handleGenerate}
-                                            disabled={isParsing || (!documentContent.trim() && !selectedTemplate)}
-                                            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold uppercase tracking-widest shadow-xl shadow-indigo-600/20 transition-all flex items-center gap-2 disabled:opacity-50 disabled:grayscale"
-                                        >
-                                            <Lightning size={14} weight="fill" />
-                                            Generate PDF
-                                        </button>
+
                                     </div>
                                 </div>
                             </div>
@@ -607,7 +340,7 @@ function DocuVaultPageInner() {
                                     className="w-full py-2.5 rounded-xl bg-[linear-gradient(135deg,#123D7E,#0A1128)] border border-white/20 text-white text-[10px] font-bold uppercase tracking-widest hover:border-white/40 transition-all flex items-center justify-center gap-2 group shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Export size={16} weight="bold" className="group-hover:translate-x-1 transition-transform" />
-                                    {isParsing ? 'Parsing...' : 'Full Case Export'}
+                                    {isParsing ? 'Parsing...' : 'Generate PDF'}
                                 </button>
                             </div>
                         </div>
@@ -683,309 +416,7 @@ function DocuVaultPageInner() {
                             )}
                         </div>
                     </div>
-                </motion.div>
-            )}
-
-            {/* ═══════════════════════════════════════════════════
-                VIEW: WORKING STATE
-               ═══════════════════════════════════════════════════ */}
-            {view === 'working' && (
-                <motion.div
-                    key="working"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="max-w-xl mx-auto py-8"
-                >
-                    {/* Close / Step indicator */}
-                    <div className="flex items-center justify-between mb-10">
-                        <button
-                            onClick={handleNewDocument}
-                            aria-label="Cancel generation"
-                            className="w-12 h-12 rounded-full flex items-center justify-center bg-white/5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border border-white/10 hover:bg-white/10 hover:border-white/30 text-white/80 hover:text-white transition-all backdrop-blur-xl"
-                        >
-                            <X size={20} weight="bold" />
-                        </button>
-                        <span className="text-sm font-bold px-4 py-2 rounded-full bg-[#60A5FA]/10 border border-[#60A5FA]/20 text-[#60A5FA] drop-shadow-sm backdrop-blur-xl">
-                            Step {Math.min(progressSteps.filter(s => s.status === 'complete').length + 1, progressSteps.length)} of {progressSteps.length}
-                        </span>
-                    </div>
-
-                    {/* Working animation */}
-                    <div className="text-center mb-10">
-                        <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                            className="inline-block mb-6 relative"
-                        >
-                            <div className="w-12 h-12 rounded-full flex items-center justify-center relative z-10 box-border">
-                                <CircleNotch size={28} weight="regular" className="text-indigo-400" />
-                            </div>
-                        </motion.div>
-                        <h3 className="text-sm font-bold text-white tracking-wide uppercase">
-                            DocuVault Drafting...
-                        </h3>
-                        <p className="text-xs font-medium text-white/40 mt-1 uppercase tracking-widest">
-                            Structuring local court format
-                        </p>
-                    </div>
-
-                    {/* Progress bar */}
-                    <div className="p-6 mb-8 rounded-2xl hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
-                        <div className="flex items-center justify-between mb-3">
-                            <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/40">
-                                Synthesis Progress
-                            </p>
-                            <p className="text-[11px] font-bold text-white/60">
-                                {Math.round(progress)}%
-                            </p>
-                        </div>
-                        <div className="h-1 rounded-full overflow-hidden bg-white/5 border border-white/5">
-                            <motion.div
-                                className="h-full rounded-full bg-indigo-500 relative"
-                                animate={{ width: `${progress}%` }}
-                                transition={{ duration: 0.5, ease: 'easeOut' }}
-                            />
-                        </div>
-                        
-                        {/* Document context */}
-                        <div className="mt-6 pt-4 border-t border-white/5">
-                            <p className="text-[9px] uppercase font-bold text-white/20 tracking-widest mb-2">
-                                Context
-                            </p>
-                            <p className="text-[11px] leading-relaxed text-white/60 border-l border-white/10 pl-3">
-                                {selectedTemplate?.title ?? truncateText(documentContent)}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Step-by-step progress */}
-                    <div className="space-y-4 px-2">
-                        {progressSteps.map((step, i) => (
-                            <motion.div
-                                key={i}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: i * 0.1 }}
-                                className="flex items-center gap-4"
-                            >
-                                <div className="shrink-0 flex items-center justify-center w-6">
-                                    {step.status === 'complete' ? (
-                                        <CheckCircle size={16} weight="regular" className="text-white/60" />
-                                    ) : step.status === 'active' ? (
-                                        <motion.div
-                                            animate={{ opacity: [0.5, 1, 0.5] }}
-                                            transition={{ duration: 1.5, repeat: Infinity }}
-                                            className="w-1.5 h-1.5 rounded-full bg-indigo-400"
-                                        />
-                                    ) : (
-                                        <div className="w-1 h-1 rounded-full bg-white/10" />
-                                    )}
-                                </div>
-                                <div className="flex-1">
-                                    <p className={`text-[11px] uppercase tracking-widest transition-colors ${step.status === 'complete' ? 'text-white/60 font-bold' : step.status === 'active' ? 'text-indigo-400 font-bold' : 'text-white/20 font-medium'}`}>
-                                        {step.label}
-                                    </p>
-                                </div>
-                            </motion.div>
-                        ))}
-                    </div>
-
-                    {/* Disclaimer */}
-                    <p className="text-[13px] font-bold text-center mt-12 text-white/50 px-8 leading-relaxed">
-                        Large documents usually take 45-60 seconds to securely generate and process formatting.
-                    </p>
-                </motion.div>
-            )}
-
-            {/* ═══════════════════════════════════════════════════
-                VIEW: RESULT SCREEN
-               ═══════════════════════════════════════════════════ */}
-            {view === 'result' && (
-                <motion.div
-                    key="result"
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className={`mx-auto py-6 transition-all duration-500 ${
-                        previewState === 'fullscreen' ? 'max-w-full px-4 h-[90vh]' : 
-                        previewState === 'split' ? 'max-w-6xl' : 'max-w-3xl'
-                    }`}
-                >
-                    {/* Error banner (e.g. popup blocked for print) */}
-                    <AnimatePresence>
-                        {generationError && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="overflow-hidden mb-6"
-                            >
-                                <div role="alert" aria-live="assertive" className="px-5 py-4 rounded-xl bg-[var(--error)]/5 border border-[var(--error)]/20 shadow-sm flex items-start gap-3">
-                                    <X size={20} weight="bold" className="text-[var(--error)] shrink-0 mt-0.5" />
-                                    <p className="text-sm font-medium text-[var(--error)]">
-                                        {generationError}
-                                    </p>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                    
-                    {/* Header (hidden in fullscreen) */}
-                    {previewState !== 'fullscreen' && (
-                        <div className="flex items-center gap-4 mb-8">
-                            <button
-                                onClick={handleBackToComposer}
-                                aria-label="Back to document composer"
-                                className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all shrink-0"
-                            >
-                                <CaretLeft size={16} weight="regular" />
-                            </button>
-                            <div>
-                                <h1 className="text-lg font-serif font-bold tracking-tight text-white/90">
-                                    {selectedTemplate?.title || 'Generated Document'}
-                                </h1>
-                                {/* Removed redundant caseNumber Ref overlay here to reduce visual clutter */}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className={`flex gap-6 ${previewState === 'compact' ? 'flex-col items-center' : previewState === 'split' ? 'flex-col md:flex-row' : 'flex-col h-full'}`}>
-                        
-                        {/* Compact view success card / action panel */}
-                        {previewState !== 'fullscreen' && (
-                            <div className={`flex flex-col gap-4 ${previewState === 'compact' ? 'w-full max-w-md' : 'w-full md:w-72 shrink-0'}`}>
-                                {previewState === 'compact' && (
-                                    <div className="text-center mb-4">
-                                        <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-                                            <CheckCircle size={32} weight="fill" className="text-emerald-400" />
-                                        </div>
-                                        <h2 className="text-xl font-serif font-bold text-white mb-2">Success!</h2>
-                                        <p className="text-[13px] text-white/50">Your document has been securely generated and formatted for the court.</p>
-                                    </div>
-                                )}
-                                
-                                <button
-                                    onClick={handleDownload}
-                                    disabled={!generatedResult?.downloadUrl}
-                                    className="w-full py-3.5 rounded-xl bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-white/20 hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:-translate-y-0.5 text-white text-[11px] font-bold uppercase tracking-widest shadow-[0_4px_16px_rgba(26,75,155,0.3)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale"
-                                >
-                                    <DownloadSimple size={16} weight="bold" />
-                                    Download PDF
-                                </button>
-                                
-                                <button
-                                    disabled
-                                    className="w-full py-3.5 rounded-xl bg-white/5 border border-white/10 text-white/40 text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 cursor-not-allowed opacity-60"
-                                >
-                                    <Bank size={16} weight="regular" />
-                                    Save to Vault
-                                </button>
-
-                                <div className="p-4 rounded-xl bg-white/5 border border-white/10 mt-2">
-                                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Document Ref</p>
-                                    <p className="text-[12px] font-medium text-white/80 break-all">{caseNumber || 'document'}</p>
-                                </div>
-                                
-                                <p className="text-[9px] font-medium text-center text-white/30 mt-auto pt-4 leading-relaxed uppercase tracking-widest">
-                                    Verification recommended.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Interactive PDF Preview */}
-                        <div
-                            role={previewState === 'compact' && generatedResult?.downloadUrl ? 'button' : undefined}
-                            tabIndex={previewState === 'compact' && generatedResult?.downloadUrl ? 0 : undefined}
-                            aria-label={previewState === 'compact' && generatedResult?.downloadUrl ? 'Expand document preview' : undefined}
-                            onKeyDown={(e) => {
-                                if (previewState === 'compact' && generatedResult?.downloadUrl && (e.key === 'Enter' || e.key === ' ')) {
-                                    e.preventDefault();
-                                    setPreviewState('split');
-                                }
-                            }}
-                            className={`relative flex-1 rounded-2xl overflow-hidden hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-white/10 flex items-center justify-center group outline-none ${
-                                previewState === 'compact'
-                                    ? `w-full max-w-md h-[300px] transition-colors ${generatedResult?.downloadUrl ? 'cursor-pointer hover:border-indigo-500/50 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1128]' : ''}`
-                                    : previewState === 'fullscreen' ? 'h-full w-full' : 'h-[70vh] min-h-[600px]'
-                            }`}
-                            onClick={() => {
-                                if (previewState === 'compact' && generatedResult?.downloadUrl) setPreviewState('split');
-                            }}
-                        >
-                            {generatedResult?.downloadUrl ? (
-                                <iframe 
-                                    src={`${generatedResult.downloadUrl}#toolbar=0&view=FitH`} 
-                                    className={`w-full h-full border-0 ${previewState === 'compact' ? 'pointer-events-none scale-[0.85] origin-top opacity-80 group-hover:opacity-100 transition-opacity' : ''}`}
-                                    title="Document Preview"
-                                />
-                            ) : (
-                                <div className="absolute inset-0 flex items-center justify-center text-white/40 text-[10px] font-bold uppercase tracking-widest">
-                                    Preview Not Available
-                                </div>
-                            )}
-
-                            {/* Hover overlay for Compact state */}
-                            {previewState === 'compact' && generatedResult?.downloadUrl && (
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <div className="px-4 py-2 rounded-full bg-indigo-500/80 backdrop-blur-md text-white text-[11px] font-bold uppercase tracking-widest flex items-center gap-2">
-                                        <MagnifyingGlassPlus size={16} />
-                                        Click to Expand
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* View controls for Split/Fullscreen */}
-                            {previewState !== 'compact' && (
-                                <div className="absolute top-4 right-4 flex items-center gap-2">
-                                    {previewState === 'split' ? (
-                                        <>
-                                            <button 
-                                                onClick={() => setPreviewState('compact')}
-                                                className="w-10 h-10 rounded-xl bg-black/60 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/80 transition-all shadow-lg"
-                                                title="Minimize Preview"
-                                                aria-label="Minimize preview"
-                                            >
-                                                <CornersIn size={18} />
-                                            </button>
-                                            <button 
-                                                onClick={() => setPreviewState('fullscreen')}
-                                                className="w-10 h-10 rounded-xl bg-black/60 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-black/80 transition-all shadow-lg"
-                                                title="Fullscreen Preview"
-                                                aria-label="Open fullscreen preview"
-                                            >
-                                                <ArrowsOutSimple size={18} />
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <div className="flex items-center gap-2 bg-black/60 backdrop-blur-xl border border-white/10 p-2 rounded-xl shadow-lg">
-                                            <button
-                                                onClick={handleDownload}
-                                                disabled={!generatedResult?.downloadUrl}
-                                                aria-label="Download PDF document"
-                                                className="px-4 py-2 rounded-lg bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white text-[11px] font-bold uppercase tracking-widest hover:shadow-[0_4px_16px_rgba(26,75,155,0.4)] transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                <DownloadSimple size={14} weight="bold" />
-                                                Download
-                                            </button>
-                                            <div className="w-px h-6 bg-white/20 mx-1"></div>
-                                            <button 
-                                                onClick={() => setPreviewState('split')}
-                                                className="w-8 h-8 rounded-lg flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all"
-                                                title="Exit Fullscreen"
-                                                aria-label="Exit fullscreen preview"
-                                            >
-                                                <CornersIn size={18} />
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                    </div>
-                </motion.div>
-            )}
-            </AnimatePresence>
+                </div>
         </PageContainer>
     );
 }

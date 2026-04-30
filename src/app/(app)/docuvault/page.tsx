@@ -121,7 +121,7 @@ function DocuVaultPageInner() {
                 VIEW: INTAKE HUB
                ═══════════════════════════════════════════════════ */}
             <div
-                    className="flex-1 min-h-0 flex flex-col w-full max-w-5xl mx-auto pb-20 gap-6"
+                    className="flex-1 min-h-0 flex flex-col w-full max-w-5xl mx-auto pb-[calc(5rem+env(safe-area-inset-bottom))] gap-6"
                 >
                     {/* Zone 1: Intake Hub — compact */}
                     <div className="lg:flex-[0.35] min-h-0 lg:min-h-[420px] flex flex-col space-y-3">
@@ -323,16 +323,23 @@ function DocuVaultPageInner() {
                         {/* Left: Upload */}
                         <div className="flex items-center gap-3">
                             <button
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isParsing}
-                                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-white text-[11px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => {
+                                    if (isParsing) {
+                                        parseAbortRef.current?.abort();
+                                        parseAbortRef.current = null;
+                                        setIsParsing(false);
+                                        return;
+                                    }
+                                    fileInputRef.current?.click();
+                                }}
+                                className={`px-5 py-2.5 rounded-xl border border-white/10 text-white text-[11px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${isParsing ? 'bg-red-500/20 hover:bg-red-500/30 border-red-500/30' : 'bg-white/10 hover:bg-white/20'}`}
                             >
                                 {isParsing ? (
                                     <ArrowsClockwise size={16} className="animate-spin" />
                                 ) : (
                                     <Paperclip size={16} />
                                 )}
-                                {isParsing ? 'Parsing...' : 'Upload'}
+                                {isParsing ? 'Cancel' : 'Upload'}
                             </button>
                             <input type="file" ref={fileInputRef} accept=".pdf,.docx,.txt,.md,.csv,text/*" className="hidden" onChange={async (e) => {
                                 const file = e.target.files?.[0];

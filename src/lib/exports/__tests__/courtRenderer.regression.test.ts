@@ -298,8 +298,8 @@ describe('renderCourtExportHTML — closing blocks', () => {
       }),
       txProfile,
     );
-    // Certificate block now renders with inline page-break-before: always
-    expect(html).toContain('page-break-before: always');
+    // Certificate block renders with inline page-break-before on the element
+    expect(html).toContain('class="certificate-block" style="page-break-before: always');
   });
 });
 

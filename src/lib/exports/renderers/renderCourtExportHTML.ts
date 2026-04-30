@@ -138,7 +138,7 @@ function renderCertificate(doc: CanonicalExportDocument): string {
   <div class="certificate-block" style="page-break-before: always; break-before: page;">
     <div class="certificate-heading">${escapeHtml(doc.certificate.heading)}</div>
     ${doc.certificate.bodyLines.map((l) => `<p class="no-indent">${escapeHtml(l)}</p>`).join('\n')}
-    <div class="certificate-signer" style="margin-top: 24pt;">
+    <div class="certificate-signer">
       <div class="signature-rule"></div>
       ${doc.certificate.signerLines.map((l) => `<div class="no-indent">${escapeHtml(l)}</div>`).join('\n')}
     </div>
@@ -219,7 +219,7 @@ const COURT_CSS = `
     text-indent: 0;
     margin-bottom: 12pt;
   }
-  .certificate-signer { margin-top: 18pt; }
+  .certificate-signer { margin-top: 24pt; }
 
   .verification-block {
     page-break-inside: avoid;

@@ -106,6 +106,43 @@ function mapParsedDocToReviewItems(doc: LegalDocument): MappingReviewItem[] {
   const items: MappingReviewItem[] = [];
   let idx = 0;
 
+  // Caption block (cause number, parties, court name)
+  if (doc.caption) {
+    const captionLines = [
+      doc.caption.causeLine,
+      ...doc.caption.leftLines,
+      ...doc.caption.centerLines,
+      ...doc.caption.rightLines,
+    ].filter(Boolean);
+    const captionText = captionLines.join('\n');
+    if (captionText.trim()) {
+      items.push(buildReviewItem(
+        makeNodeId('caption', idx++, captionText.length),
+        captionText,
+        'caption',
+        0.95,
+      ));
+    }
+  }
+
+  // Document title (e.g. "PETITIONER'S SECOND AMENDED MOTION FOR TEMPORARY ORDERS")
+  if (doc.title?.main) {
+    const titleLines = [
+      doc.title.main,
+      doc.title.subtitle,
+      ...(doc.title.additionalTitleLines ?? []),
+    ].filter(Boolean);
+    const titleText = titleLines.join('\n');
+    if (titleText.trim()) {
+      items.push(buildReviewItem(
+        makeNodeId('title', idx++, titleText.length),
+        titleText,
+        'document_title',
+        0.95,
+      ));
+    }
+  }
+
   // Intro blocks (pre-section content like "TO THE HONORABLE...")
   if (doc.introBlocks.length > 0) {
     const introText = doc.introBlocks.map(blockToText).filter(Boolean).join('\n\n');

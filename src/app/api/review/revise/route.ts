@@ -36,11 +36,24 @@ export async function POST(req: NextRequest) {
         conversationHistory?: { role: string; content: string }[];
     };
 
+    const MAX_ORIGINAL_TEXT_CHARS = 50_000;
+    const MAX_INSTRUCTION_CHARS = 4_000;
+    const MAX_HISTORY_MESSAGES = 20;
+
     if (typeof originalText !== 'string' || originalText.trim().length === 0) {
         return Response.json({ error: 'originalText is required' }, { status: 400 });
     }
     if (typeof instruction !== 'string' || instruction.trim().length === 0) {
         return Response.json({ error: 'instruction is required' }, { status: 400 });
+    }
+    if (originalText.length > MAX_ORIGINAL_TEXT_CHARS) {
+        return Response.json({ error: 'originalText is too large' }, { status: 413 });
+    }
+    if (instruction.length > MAX_INSTRUCTION_CHARS) {
+        return Response.json({ error: 'instruction is too large' }, { status: 413 });
+    }
+    if (conversationHistory && conversationHistory.length > MAX_HISTORY_MESSAGES) {
+        return Response.json({ error: 'conversationHistory is too large' }, { status: 413 });
     }
 
     try {

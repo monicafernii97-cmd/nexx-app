@@ -475,12 +475,12 @@ export default function ReviewHubContent() {
                     setShowClarificationModal(false);
 
                     if (resolvedText && action === 'generate_titles') {
-                        // AI returned structured text — update the first item with the full restructured text
-                        // In a future iteration, this would re-parse through the assembly pipeline
-                        const firstItem = effectiveItems[0];
-                        if (firstItem) {
-                            editItem(firstItem.nodeId, resolvedText);
-                        }
+                        // AI returned restructured text. We do NOT inject it into a single
+                        // review item because resolvedText is the full document and would
+                        // duplicate/misorder content when exported alongside the other items.
+                        // Instead, log it for now — Phase 3 will re-run the assembly pipeline
+                        // to atomically replace the full item set with properly parsed nodes.
+                        console.log('[ReviewHub] Structured text received (%d chars). Awaiting assembly re-parse integration.', resolvedText.length);
                     }
                     // 'go_to_nexchat' is handled inside the modal (router.push)
                 }}

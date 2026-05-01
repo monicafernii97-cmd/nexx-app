@@ -78,17 +78,26 @@ export default function ClarificationModal({ isOpen, onClose, onContinue, rawDoc
                 const decoder = new TextDecoder();
                 let fullText = '';
 
+                let sseBuffer = '';
+                let streamError: string | null = null;
+
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
-                    const chunk = decoder.decode(value, { stream: true });
-                    const lines = chunk.split('\n');
+                    sseBuffer += decoder.decode(value, { stream: true });
+                    const events = sseBuffer.split('\n\n');
+                    sseBuffer = events.pop() ?? '';
 
-                    for (const line of lines) {
+                    for (const event of events) {
+                        const line = event.trim();
                         if (!line.startsWith('data: ')) continue;
                         try {
                             const parsed = JSON.parse(line.slice(6));
+                            if (parsed.error) {
+                                streamError = parsed.error;
+                                break;
+                            }
                             if (parsed.done) {
                                 fullText = parsed.fullText || fullText;
                             } else if (parsed.delta) {
@@ -98,6 +107,11 @@ export default function ClarificationModal({ isOpen, onClose, onContinue, rawDoc
                             // Skip malformed chunks
                         }
                     }
+                    if (streamError) break;
+                }
+
+                if (streamError) {
+                    throw new Error(streamError);
                 }
 
                 onContinue(selectedAction, details, fullText);
@@ -236,9 +250,12 @@ function OptionCard({ title, description, selected, onClick, disabled }: {
     disabled?: boolean;
 }) {
     return (
-        <div
+        <button
+            type="button"
             onClick={disabled ? undefined : onClick}
-            className={`flex items-start gap-3 p-4 rounded-xl border transition-all duration-200 ${
+            disabled={disabled}
+            aria-pressed={selected}
+            className={`w-full flex items-start gap-3 p-4 rounded-xl border transition-all duration-200 text-left ${
                 disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
             } ${
                 selected
@@ -246,7 +263,7 @@ function OptionCard({ title, description, selected, onClick, disabled }: {
                     : 'border-white/10 bg-white/5 hover:bg-white/10'
             }`}
         >
-            <div className={`w-4 h-4 mt-0.5 rounded-full flex shrink-0 items-center justify-center ${
+            <div aria-hidden="true" className={`w-4 h-4 mt-0.5 rounded-full flex shrink-0 items-center justify-center ${
                 selected ? 'border-[4px] border-[#3B82F6] bg-white' : 'border-[1.5px] border-white/30'
             }`} />
             <div>
@@ -257,6 +274,6 @@ function OptionCard({ title, description, selected, onClick, disabled }: {
                     <span className="text-[11px] text-white/40 block mt-0.5">{description}</span>
                 )}
             </div>
-        </div>
+        </button>
     );
 }

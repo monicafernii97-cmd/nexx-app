@@ -93,15 +93,19 @@ export default function AIRevisionSidebar({ item, onClose, onAcceptRevision }: A
 
             const decoder = new TextDecoder();
             let accumulated = '';
+            let sseBuffer = '';
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n');
+                sseBuffer += decoder.decode(value, { stream: true });
+                const events = sseBuffer.split('\n\n');
+                // Keep the last (possibly incomplete) chunk in the buffer
+                sseBuffer = events.pop() ?? '';
 
-                for (const line of lines) {
+                for (const event of events) {
+                    const line = event.trim();
                     if (!line.startsWith('data: ')) continue;
                     const jsonStr = line.slice(6);
                     try {
@@ -125,11 +129,11 @@ export default function AIRevisionSidebar({ item, onClose, onAcceptRevision }: A
                             setStreamingText('');
                         }
                     } catch (parseErr) {
-                        // Silently skip malformed lines (partial chunks)
-                        if (parseErr instanceof Error && parseErr.message !== 'Revision failed') {
-                            continue;
+                        // Re-throw real errors (e.g. error events from API)
+                        if (parseErr instanceof Error && parseErr.message !== jsonStr) {
+                            throw parseErr;
                         }
-                        throw parseErr;
+                        // Skip truly malformed JSON (shouldn't happen with buffer)
                     }
                 }
             }

@@ -35,9 +35,10 @@ import { useExport, type DraftingStage } from '../context/ExportContext';
 import { useDraftingStream, type DraftStreamInput } from '@/hooks/useDraftingStream';
 import { runPreflightChecks } from '@/lib/export-assembly/validation/preflightValidator';
 import MappingCanvas from '@/components/review/MappingCanvas';
-import TraceSidebar from '@/components/review/TraceSidebar';
-import PreflightPanel from '@/components/review/PreflightPanel';
+import AIRevisionSidebar from '@/components/review/AIRevisionSidebar';
+// PreflightPanel removed in Review Hub redesign (Phase 1)
 import DraftStyleToggle from '@/components/review/DraftStyleToggle';
+import ClarificationModal from '@/components/review/ClarificationModal';
 import type { MappingReviewItem } from '@/lib/export-assembly/types/exports';
 
 // ---------------------------------------------------------------------------
@@ -104,6 +105,25 @@ export default function ReviewHubContent() {
     const [showPreflight, setShowPreflight] = useState(false);
     const [textMode, setTextMode] = useState<'original' | 'court_safe'>('original');
     const [validationExpanded, setValidationExpanded] = useState(true);
+
+    // UI redesign shell states
+    const [showClarificationModal, setShowClarificationModal] = useState(false);
+    
+    // Show the clarification modal if there are unclassified items
+    const clarificationShownRef = useRef(false);
+    useEffect(() => {
+        if (state.phase === 'reviewing' && state.reviewItems.length > 0 && !clarificationShownRef.current) {
+            const hasUnclassified = state.reviewItems.some(item =>
+                item.suggestedSections.length === 0
+                || item.suggestedSections[0] === 'unclassified'
+                || item.suggestedSections[0] === 'Unclassified'
+            );
+            if (hasUnclassified) {
+                clarificationShownRef.current = true;
+                setShowClarificationModal(true);
+            }
+        }
+    }, [state.phase, state.reviewItems]);
 
     // Track sidebar edit state to auto-save on selection change
     const pendingEditRef = useRef<{ nodeId: string; text: string } | null>(null);
@@ -373,36 +393,6 @@ export default function ReviewHubContent() {
                                 onChange={setTextMode}
                             />
 
-                            {/* Preflight Button */}
-                            <button
-                                type="button"
-                                onClick={handleRunPreflight}
-                                className={`px-4 py-2 rounded-xl text-[12px] font-bold tracking-wide transition-all flex items-center gap-2 ${
-                                    showPreflight && state.preflight
-                                        ? 'bg-[#60A5FA]/15 border border-[#60A5FA]/40 text-[#60A5FA]'
-                                        : 'bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10'
-                                }`}
-                            >
-                                <Lightning size={14} weight="fill" />
-                                Preflight
-                            </button>
-
-                            {/* Skip Review Toggle */}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (window.confirm('Skip review and proceed directly to drafting? All sections will be auto-approved.')) {
-                                        handleApproveAndDraft();
-                                    }
-                                }}
-                                disabled={isDrafting || (state.assemblyValidation?.critical?.length ?? 0) > 0}
-                                className="px-4 py-2 rounded-xl text-[11px] font-bold tracking-wide transition-all flex items-center gap-2 bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
-                                title="Skip manual review and auto-approve all sections"
-                            >
-                                <Lightning size={14} weight="fill" />
-                                Skip Review
-                            </button>
-
                             {/* Approve & Draft — gated by critical validation */}
                             <button
                                 type="button"
@@ -412,7 +402,7 @@ export default function ReviewHubContent() {
                                 className={`px-5 py-2.5 rounded-xl text-[13px] font-bold tracking-wide text-white border border-white/25 transition-all flex items-center gap-2 ${
                                     isDrafting || (state.assemblyValidation?.critical?.length ?? 0) > 0
                                         ? 'bg-white/10 cursor-not-allowed opacity-60'
-                                        : 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-[0_4px_16px_rgba(26,75,155,0.3),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:-translate-y-0.5'
+                                        : 'btn-primary shadow-[0_4px_16px_rgba(26,75,155,0.3),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:-translate-y-0.5'
                                 }`}
                             >
                                 <Export size={16} weight="bold" />
@@ -447,57 +437,54 @@ export default function ReviewHubContent() {
                             onMoveItem={moveItem}
                         />
                     </div>
-
-                    {/* Preflight Panel (slides in) */}
-                    <AnimatePresence>
-                        {showPreflight && state.preflight && (
-                            <motion.div
-                                key="preflight-panel"
-                                initial={{ width: 0, opacity: 0 }}
-                                animate={{ width: 320, opacity: 1 }}
-                                exit={{ width: 0, opacity: 0 }}
-                                transition={{ type: 'spring', duration: 0.4 }}
-                                className="shrink-0 border-l border-white/10 overflow-hidden"
-                            >
-                                <PreflightPanel
-                                    result={state.preflight}
-                                    onClose={() => setShowPreflight(false)}
-                                />
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
                 </div>
             </div>
 
-            {/* ── Trace Sidebar ── */}
+            {/* ── AI Revision Sidebar ── */}
             <AnimatePresence>
                 {selectedItem && (
                     <motion.div
-                        key={`trace-sidebar-${selectedItem.nodeId}`}
+                        key={`ai-revision-sidebar-${selectedItem.nodeId}`}
                         initial={{ width: 0, opacity: 0 }}
                         animate={{ width: 380, opacity: 1 }}
                         exit={{ width: 0, opacity: 0 }}
                         transition={{ type: 'spring', duration: 0.4 }}
                         className="shrink-0 border-l border-white/10 overflow-hidden"
                     >
-                        <TraceSidebar
+                        <AIRevisionSidebar
                             item={selectedItem}
                             onClose={() => handleSelectItem(null)}
-                            onTextChange={(text) => {
-                                // null = user canceled edit, clear pending draft
-                                pendingEditRef.current = text != null
-                                    ? { nodeId: selectedItem.nodeId, text }
-                                    : null;
-                            }}
-                            onEditText={(text) => {
+                            onAcceptRevision={(text) => {
                                 editItem(selectedItem.nodeId, text);
-                                pendingEditRef.current = null; // Clear after explicit save
+                                handleSelectItem(null); // Close sidebar after acceptance
                             }}
-                            onExclude={(excluded) => excludeItem(selectedItem.nodeId, excluded)}
                         />
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* ── Clarification Modal Overlay ── */}
+            <ClarificationModal
+                isOpen={showClarificationModal}
+                onClose={() => setShowClarificationModal(false)}
+                rawDocumentText={
+                    effectiveItems.map(i => i.originalText).join('\n\n')
+                }
+                onContinue={(action, details, resolvedText) => {
+                    console.log('[ReviewHub] Clarification resolved:', action, details);
+                    setShowClarificationModal(false);
+
+                    if (resolvedText && action === 'generate_titles') {
+                        // AI returned restructured text. We do NOT inject it into a single
+                        // review item because resolvedText is the full document and would
+                        // duplicate/misorder content when exported alongside the other items.
+                        // Instead, log it for now — Phase 3 will re-run the assembly pipeline
+                        // to atomically replace the full item set with properly parsed nodes.
+                        console.log('[ReviewHub] Structured text received (%d chars). Awaiting assembly re-parse integration.', resolvedText.length);
+                    }
+                    // 'go_to_nexchat' is handled inside the modal (router.push)
+                }}
+            />
         </div>
     );
 }

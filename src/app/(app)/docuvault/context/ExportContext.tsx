@@ -571,7 +571,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                 : await getAssemblyInputs(convex, config.caseId);
 
             // 3. Build ExportRequest from config
-            const exportRequest: ExportRequest = {
+            let exportRequest: ExportRequest = {
                 path: config.path,
                 structureSource: config.path === 'court_document'
                     ? 'court_prompt_profile'
@@ -618,7 +618,6 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                             outputFormat: 'pdf' as const,
                         },
             };
-            dispatch({ type: 'SET_REQUEST', request: exportRequest });
 
             let result: import('@/lib/export-assembly/orchestrator').OrchestratorAssemblyResult;
 
@@ -634,14 +633,20 @@ export function ExportProvider({ children }: { children: ReactNode }) {
 
                 // Wire parsed caption into export config so the renderer receives it
                 if (config.path === 'court_document') {
-                    const courtConfig = exportRequest.config as unknown as Record<string, unknown>;
-                    if (captionData.courtName) courtConfig.courtName = captionData.courtName;
-                    if (captionData.state) courtConfig.courtState = captionData.state;
-                    if (captionData.county) courtConfig.courtCounty = captionData.county;
-                    if (captionData.causeNumber) courtConfig.causeNumber = captionData.causeNumber;
+                    const enrichedConfig: Record<string, unknown> = {
+                        ...(exportRequest.config as unknown as Record<string, unknown>),
+                    };
+                    if (captionData.courtName) enrichedConfig.courtName = captionData.courtName;
+                    if (captionData.state) enrichedConfig.courtState = captionData.state;
+                    if (captionData.county) enrichedConfig.courtCounty = captionData.county;
+                    if (captionData.causeNumber) enrichedConfig.causeNumber = captionData.causeNumber;
                     const petitionerRole = captionData.partyRoles?.find(r => r.startsWith('Petitioner:'));
-                    if (petitionerRole) courtConfig.petitionerName = petitionerRole.replace('Petitioner: ', '');
+                    if (petitionerRole) enrichedConfig.petitionerName = petitionerRole.replace('Petitioner: ', '');
+                    exportRequest = { ...exportRequest, config: enrichedConfig as unknown as typeof exportRequest.config };
                 }
+
+                // Dispatch after enrichment so reducer receives the final, complete request
+                dispatch({ type: 'SET_REQUEST', request: exportRequest });
 
                 dispatch({
                     type: 'ASSEMBLY_PROGRESS',
@@ -768,6 +773,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                 });
             } else {
                 // ── NO PASTED CONTENT: Run normal assembly pipeline on workspace data only ──
+                dispatch({ type: 'SET_REQUEST', request: exportRequest });
                 result = runAssembly(
                     exportRequest,
                     inputs!.workspaceNodes,

@@ -240,7 +240,8 @@ type ExportAction =
     | { type: 'DRAFT_PROGRESS'; status: PipelineStatus; stage?: DraftingStage }
     | { type: 'COMPLETE'; exportId: string; filename: string }
     | { type: 'ERROR'; message: string; errorCode?: string }
-    | { type: 'RESET' };
+    | { type: 'RESET' }
+    | { type: 'BACK_TO_REVIEW' };
 
 /** Reducer managing the full export lifecycle state machine. */
 function exportReducer(state: ExportState, action: ExportAction): ExportState {
@@ -374,6 +375,15 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
 
         case 'RESET':
             return initialState;
+
+        case 'BACK_TO_REVIEW':
+            return {
+                ...state,
+                phase: 'reviewing',
+                errorMessage: null,
+                errorCode: null,
+                draftingStage: null,
+            };
 
         default:
             return state;

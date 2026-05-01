@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     CaretDown,
     PencilSimple,
+    ChatCircle,
 } from '@phosphor-icons/react';
 import type { MappingReviewItem } from '@/lib/export-assembly/types/exports';
 import type { ExportOverrides } from '@/lib/export-assembly/orchestrator';
@@ -34,6 +35,7 @@ interface MappingCanvasProps {
     onLockSection: (sectionId: string, locked: boolean) => void;
     onExcludeItem: (nodeId: string, excluded: boolean) => void;
     onEditItem: (nodeId: string, text: string) => void;
+    onReviseItem: (nodeId: string) => void;
     onMoveItem: (nodeId: string, toSection: string) => void;
 }
 
@@ -53,6 +55,7 @@ function SectionTile({
     onLockSection,
     onExcludeItem,
     onEditItem,
+    onReviseItem,
     // Reserved for future drag-to-reorder functionality (Sprint 9B)
     onMoveItem: _onMoveItem,
 }: {
@@ -64,6 +67,7 @@ function SectionTile({
     onLockSection: (sectionId: string, locked: boolean) => void;
     onExcludeItem: (nodeId: string, excluded: boolean) => void;
     onEditItem: (nodeId: string, text: string) => void;
+    onReviseItem: (nodeId: string) => void;
     onMoveItem: (nodeId: string, toSection: string) => void;
 }) {
     const [isCollapsed, setIsCollapsed] = useState(false);
@@ -154,9 +158,18 @@ function SectionTile({
                                         aria-pressed={isSelected}
                                         aria-label={`${item.dominantType} item: ${displayText.slice(0, 60)}`}
                                     >
-                                        {/* Item Header — edit action on hover */}
+                                        {/* Item Header — edit/revise actions on hover */}
                                         <div className="flex items-center justify-end mb-2">
-                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onReviseItem(item.nodeId)}
+                                                    className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-[#3B82F6]/20 text-white/40 hover:text-[#3B82F6] transition-colors"
+                                                    title="Revise section"
+                                                    aria-label="Revise section"
+                                                >
+                                                    <ChatCircle size={14} weight="bold" />
+                                                </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => setEditingItemId(isEditing ? null : item.nodeId)}
@@ -238,6 +251,7 @@ export default function MappingCanvas({
     onLockSection,
     onExcludeItem,
     onEditItem,
+    onReviseItem,
     onMoveItem: _onMoveItem,
 }: MappingCanvasProps) {
     const sectionIds = Array.from(sectionGroups.keys());
@@ -258,6 +272,7 @@ export default function MappingCanvas({
                     onLockSection={onLockSection}
                     onExcludeItem={onExcludeItem}
                     onEditItem={onEditItem}
+                    onReviseItem={onReviseItem}
                     onMoveItem={_onMoveItem}
                 />
             ))}

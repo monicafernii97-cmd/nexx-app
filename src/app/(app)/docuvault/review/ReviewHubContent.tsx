@@ -31,7 +31,7 @@ import { useExport, type DraftingStage } from '../context/ExportContext';
 import { useDraftingStream, type DraftStreamInput } from '@/hooks/useDraftingStream';
 import { runPreflightChecks } from '@/lib/export-assembly/validation/preflightValidator';
 import MappingCanvas from '@/components/review/MappingCanvas';
-import AIRevisionSidebar from '@/components/review/AIRevisionSidebar';
+import RevisionModal from '@/components/review/RevisionModal';
 // DraftStyleToggle removed in Review Hub redesign (Phase 1)
 import ClarificationModal from '@/components/review/ClarificationModal';
 import type { MappingReviewItem } from '@/lib/export-assembly/types/exports';
@@ -96,6 +96,7 @@ export default function ReviewHubContent() {
 
     // Local UI state
     const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+    const [revisingItemId, setRevisingItemId] = useState<string | null>(null);
     const [isDrafting, setIsDrafting] = useState(false);
     const [showPreflight, setShowPreflight] = useState(false);
 
@@ -298,6 +299,17 @@ export default function ReviewHubContent() {
             pendingEditRef.current = null;
         }
         setSelectedItemId(nodeId);
+        if (nodeId === null) {
+            setRevisingItemId(null);
+        }
+    }, [editItem]);
+
+    const handleReviseItem = useCallback((nodeId: string | null) => {
+        if (pendingEditRef.current) {
+            editItem(pendingEditRef.current.nodeId, pendingEditRef.current.text);
+            pendingEditRef.current = null;
+        }
+        setRevisingItemId(nodeId);
     }, [editItem]);
 
     // =========================================================================
@@ -407,34 +419,23 @@ export default function ReviewHubContent() {
                             onLockSection={lockSection}
                             onExcludeItem={excludeItem}
                             onEditItem={editItem}
+                            onReviseItem={handleReviseItem}
                             onMoveItem={moveItem}
                         />
                     </div>
                 </div>
             </div>
 
-            {/* ── AI Revision Sidebar ── */}
-            <AnimatePresence>
-                {selectedItem && (
-                    <motion.div
-                        key={`ai-revision-sidebar-${selectedItem.nodeId}`}
-                        initial={{ width: 0, opacity: 0 }}
-                        animate={{ width: 380, opacity: 1 }}
-                        exit={{ width: 0, opacity: 0 }}
-                        transition={{ type: 'spring', duration: 0.4 }}
-                        className="shrink-0 border-l border-white/10 overflow-hidden"
-                    >
-                        <AIRevisionSidebar
-                            item={selectedItem}
-                            onClose={() => handleSelectItem(null)}
-                            onAcceptRevision={(text) => {
-                                editItem(selectedItem.nodeId, text);
-                                handleSelectItem(null); // Close sidebar after acceptance
-                            }}
-                        />
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {/* ── Revision Modal Overlay ── */}
+            <RevisionModal
+                isOpen={!!revisingItemId}
+                item={effectiveItems.find(i => i.nodeId === revisingItemId) || null}
+                onClose={() => setRevisingItemId(null)}
+                onAcceptRevision={(text) => {
+                    if (revisingItemId) editItem(revisingItemId, text);
+                    setRevisingItemId(null);
+                }}
+            />
 
             {/* ── Clarification Modal Overlay ── */}
             <ClarificationModal

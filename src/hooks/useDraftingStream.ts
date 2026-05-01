@@ -106,13 +106,17 @@ export function useDraftingStream({ dispatch }: ContextDispatchers) {
             if (!response.ok) {
                 const errorText = await response.text().catch(() => '');
                 let errorMessage: string = `Server error ${response.status}`;
+                let errorCode: string = 'unknown_failed';
                 try {
-                    const errorBody = JSON.parse(errorText) as { error?: unknown; message?: unknown };
+                    const errorBody = JSON.parse(errorText) as { error?: unknown; message?: unknown; code?: string };
                     const candidate = errorBody.error ?? errorBody.message;
                     if (typeof candidate === 'string' && candidate.trim()) {
                         errorMessage = candidate.trim().slice(0, 500);
                     } else if (candidate != null) {
                         errorMessage = JSON.stringify(candidate).slice(0, 500);
+                    }
+                    if (errorBody.code) {
+                        errorCode = errorBody.code;
                     }
                 } catch {
                     const trimmed = errorText.trim();
@@ -132,7 +136,7 @@ export function useDraftingStream({ dispatch }: ContextDispatchers) {
                 dispatch({
                     type: 'ERROR',
                     message: errorMessage,
-                    errorCode: 'unknown_failed',
+                    errorCode,
                 });
                 return runId;
             }

@@ -56,7 +56,6 @@ export default function InlineOverrideEditor({
     }, [text]);
 
     const hasChanges = text !== currentText;
-    const charCount = text.length;
 
     return (
         <div className="space-y-2">
@@ -77,10 +76,7 @@ export default function InlineOverrideEditor({
                 className="w-full min-h-[60px] rounded-lg bg-white/[0.06] border border-[#60A5FA]/30 px-3 py-2 text-[13px] text-white/80 placeholder:text-white/30 focus:outline-none focus:border-[#60A5FA]/60 focus:ring-1 focus:ring-[#60A5FA]/20 resize-none leading-relaxed"
                 placeholder="Enter override text..."
             />
-            <div className="flex items-center justify-between">
-                <span className="text-[10px] text-white/25 font-mono">
-                    {charCount} chars · ⌘↵ save · esc cancel
-                </span>
+            <div className="flex items-center justify-end">
                 <div className="flex items-center gap-1.5">
                     <button
                         type="button"

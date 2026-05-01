@@ -6,7 +6,7 @@
  * Each section is a collapsible tile showing:
  * - Section name + item count
  * - Lock toggle (locks section from GPT regeneration)
- * - Review items with confidence indicators, text, and actions
+ * - Review items with type badges, text preview, and inline editing
  *
  * Items can be selected (opens TraceSidebar), excluded, or edited inline.
  */
@@ -264,7 +264,7 @@ function getTypeBadgeClass(type: string): string {
  * MappingCanvas — Renders section tiles with review items for the Review Hub.
  *
  * Each section tile is collapsible and shows the items mapped to that section
- * with confidence scores, type badges, and inline editing. Accepts override
+ * with type badges and inline editing. Accepts override
  * callbacks for locking, excluding, editing, and moving items.
  */
 export default function MappingCanvas({

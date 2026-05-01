@@ -385,6 +385,7 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
                 errorMessage: null,
                 errorCode: null,
                 draftingStage: null,
+                lastCompletedStage: null,
             };
 
         default:

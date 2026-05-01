@@ -212,11 +212,47 @@ function mapParsedDocToReviewItems(doc: LegalDocument): MappingReviewItem[] {
 /** Minimum paragraph length to qualify as a section (skip blank/trivial lines). */
 const MIN_PARAGRAPH_LENGTH = 40;
 
+/**
+ * Regex patterns for detecting section headings in fallback mode.
+ * These match common legal document heading formats:
+ *   - Roman numerals: "I. BACKGROUND", "II. FACTS"
+ *   - Letter subsections: "A. Electronic Communication"
+ *   - Numbered sections: "1. Jurisdiction", "2. Venue"
+ *   - ALL-CAPS headings: "BACKGROUND", "PRAYER"
+ */
+const FALLBACK_ROMAN_RE = /^([IVXLC]+)\.\s+(.+)$/i;
+const FALLBACK_LETTER_RE = /^([A-Z])\.\s+(.+)$/;
+const FALLBACK_NUMBERED_RE = /^(\d+)\.\s+(.+)$/;
+const FALLBACK_ALLCAPS_RE = /^[A-Z][A-Z\s'\-&.,/()]{2,}$/;
+
+/** Extract a section heading from the first line of a paragraph, if present. */
+function extractFallbackHeading(paragraph: string): string | null {
+  const firstLine = paragraph.split('\n')[0].trim();
+  if (!firstLine) return null;
+
+  // Roman numeral heading: "I. BACKGROUND" → "I. BACKGROUND"
+  const roman = firstLine.match(FALLBACK_ROMAN_RE);
+  if (roman) return `${roman[1].toUpperCase()}. ${roman[2]}`;
+
+  // ALL-CAPS heading: "BACKGROUND" → "BACKGROUND"
+  if (FALLBACK_ALLCAPS_RE.test(firstLine) && firstLine.length <= 60) return firstLine;
+
+  // Letter heading: "A. Electronic Communication" → "A. Electronic Communication"
+  const letter = firstLine.match(FALLBACK_LETTER_RE);
+  if (letter) return `${letter[1]}. ${letter[2]}`;
+
+  // Numbered heading: "1. Jurisdiction" (only if short, to avoid matching numbered list items)
+  const numbered = firstLine.match(FALLBACK_NUMBERED_RE);
+  if (numbered && firstLine.length <= 80) return `${numbered[1]}. ${numbered[2]}`;
+
+  return null;
+}
+
 /** Split raw text into paragraph-based review items when parsing is too weak. */
 function paragraphFallback(rawText: string): MappingReviewItem[] {
-  // Split on double newlines
+  // Split on double newlines or em-dash separators
   const paragraphs = rawText
-    .split(/\n{2,}/)
+    .split(/(?:\n{2,}|⸻)/)
     .map(p => p.trim())
     .filter(p => p.length >= MIN_PARAGRAPH_LENGTH);
 
@@ -230,14 +266,19 @@ function paragraphFallback(rawText: string): MappingReviewItem[] {
     )];
   }
 
-  return paragraphs.map((text, i) =>
-    buildReviewItem(
-      makeNodeId('para', i),
+  return paragraphs.map((text, i) => {
+    const heading = extractFallbackHeading(text);
+    const sectionName = heading
+      ? heading.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+      : `paragraph_${i + 1}`;
+
+    return buildReviewItem(
+      makeNodeId('para', i, text.length),
       text,
-      `paragraph_${i + 1}`,
-      0.5,
-    ),
-  );
+      sectionName,
+      heading ? 0.75 : 0.5,
+    );
+  });
 }
 
 // ---------------------------------------------------------------------------

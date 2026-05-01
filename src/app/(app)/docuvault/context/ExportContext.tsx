@@ -539,7 +539,6 @@ export function ExportProvider({ children }: { children: ReactNode }) {
             // drafted — just format and export.
             const hasPastedContent = Boolean(config.pastedContent?.trim());
             const hasWorkspaceData = inputs.workspaceNodes.length > 0;
-            const isFastPath = hasPastedContent;
 
             // 3. Build ExportRequest from config
             const exportRequest: ExportRequest = {
@@ -593,9 +592,10 @@ export function ExportProvider({ children }: { children: ReactNode }) {
 
             let result: import('@/lib/export-assembly/orchestrator').OrchestratorAssemblyResult;
 
-            if (isFastPath) {
-                // ── FAST PATH: Build synthetic assembly result from pasted text ──
-                // Uses splitPastedContent() to produce structured review items
+            if (hasPastedContent) {
+                // ── PASTED CONTENT: Always run document splitter ──
+                // Uses parseLegalDocument() to detect Roman numerals, letter
+                // subsections, ALL-CAPS headings, prayer, signature, etc.
                 const pastedText = config.pastedContent!.trim();
                 const nodeId = `pasted_${Date.now()}`;
 
@@ -629,6 +629,22 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                         detail: `Found ${splitResult.meta.totalItems} sections (${splitResult.strategy})`,
                     },
                 });
+
+                // ── Also classify workspace nodes (if any) and combine ──
+                let workspaceItems: import('@/lib/export-assembly/types/exports').MappingReviewItem[] = [];
+                if (hasWorkspaceData) {
+                    dispatch({
+                        type: 'ASSEMBLY_PROGRESS',
+                        status: { phase: 'classifying', progress: 40, detail: `Classifying ${inputs.workspaceNodes.length} workspace items…` },
+                    });
+                    const wsResult = runAssembly(
+                        exportRequest,
+                        inputs.workspaceNodes,
+                        inputs.timelineEvents,
+                        () => {}, // suppress sub-progress
+                    );
+                    workspaceItems = wsResult.reviewItems;
+                }
 
                 // Build mapped sections for the assembly shell
                 const mappedSections = config.path === 'court_document'
@@ -664,7 +680,9 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                             supportingNodeIds: [nodeId],
                         };
 
-                const itemCount = splitResult.items.length || 1;
+                // Combine split items (pasted doc) + workspace items
+                const combinedItems = [...splitResult.items, ...workspaceItems];
+                const itemCount = combinedItems.length || 1;
 
                 result = {
                     assembly: {
@@ -704,8 +722,8 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                         },
                         mappedSections: mappedSections as any, // eslint-disable-line @typescript-eslint/no-explicit-any
                         meta: {
-                            totalNodes: 1,
-                            selectedNodes: 1,
+                            totalNodes: 1 + inputs.workspaceNodes.length,
+                            selectedNodes: 1 + inputs.workspaceNodes.length,
                             classifiedNodes: 1,
                             narrativeSections: itemCount,
                             detectedPatterns: 0,
@@ -713,10 +731,10 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                             assemblyTimeMs: 0,
                         },
                     },
-                    reviewItems: splitResult.items,
+                    reviewItems: combinedItems,
                     meta: {
-                        totalNodes: 1,
-                        selectedNodes: 1,
+                        totalNodes: 1 + inputs.workspaceNodes.length,
+                        selectedNodes: 1 + inputs.workspaceNodes.length,
                         classifiedNodes: 1,
                         narrativeSections: itemCount,
                         detectedPatterns: 0,
@@ -727,22 +745,10 @@ export function ExportProvider({ children }: { children: ReactNode }) {
 
                 dispatch({
                     type: 'ASSEMBLY_PROGRESS',
-                    status: { phase: 'ready_for_review', progress: 50, detail: 'Document ready for review' },
+                    status: { phase: 'ready_for_review', progress: 50, detail: `${splitResult.meta.totalItems} document sections + ${workspaceItems.length} workspace items ready for review` },
                 });
             } else {
-                // ── FULL PATH: Run normal assembly pipeline ──
-                // Inject pasted content as supplementary node if available
-                if (hasPastedContent) {
-                    inputs.workspaceNodes.unshift({
-                        id: `pasted_${Date.now()}`,
-                        type: 'user_pasted_content',
-                        text: config.pastedContent!.trim(),
-                        title: 'User-Provided Document Content',
-                        createdAt: Date.now(),
-                    });
-                }
-
-                // 4. Run assembly (synchronous — deterministic engine)
+                // ── NO PASTED CONTENT: Run normal assembly pipeline on workspace data only ──
                 result = runAssembly(
                     exportRequest,
                     inputs.workspaceNodes,

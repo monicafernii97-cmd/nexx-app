@@ -173,8 +173,20 @@ export default function AIRevisionSidebar({ item, onClose, onAcceptRevision }: A
                 if (done) break;
             }
 
-            if (!sawDoneEvent && accumulated.length === 0) {
-                throw new Error('Stream ended without a response');
+            if (!sawDoneEvent) {
+                if (accumulated.length > 0) {
+                    // Stream ended without completion signal but has content — save it
+                    const partialMsg: Message = {
+                        id: (Date.now() + 1).toString(),
+                        role: 'ai',
+                        content: accumulated,
+                        isRevisionProposal: true,
+                    };
+                    setMessages(prev => [...prev, partialMsg]);
+                    setStreamingText('');
+                } else {
+                    throw new Error('Stream ended without a response');
+                }
             }
         } catch (err) {
             if ((err as Error).name === 'AbortError') return; // User cancelled

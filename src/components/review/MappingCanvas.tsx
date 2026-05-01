@@ -31,7 +31,6 @@ import InlineOverrideEditor from '@/components/review/InlineOverrideEditor';
 interface MappingCanvasProps {
     sectionGroups: Map<string, MappingReviewItem[]>;
     overrides: ExportOverrides;
-    textMode: 'original' | 'court_safe';
     selectedItemId: string | null;
     onSelectItem: (nodeId: string | null) => void;
     onLockSection: (sectionId: string, locked: boolean) => void;
@@ -40,23 +39,7 @@ interface MappingCanvasProps {
     onMoveItem: (nodeId: string, toSection: string) => void;
 }
 
-// ---------------------------------------------------------------------------
-// Confidence Colors
-// ---------------------------------------------------------------------------
-
-/** Map a confidence value (0-1) to its display color. */
-function getConfidenceColor(confidence: number): string {
-    if (confidence >= 0.8) return '#34D399'; // emerald
-    if (confidence >= 0.5) return '#F59E0B'; // amber
-    return '#F87171'; // rose
-}
-
-/** Map a confidence value (0-1) to a human-readable label. */
-function getConfidenceLabel(confidence: number): string {
-    if (confidence >= 0.8) return 'High';
-    if (confidence >= 0.5) return 'Medium';
-    return 'Low';
-}
+// Confidence helpers removed in Review Hub redesign (Phase 1)
 
 // ---------------------------------------------------------------------------
 // Section Tile
@@ -67,7 +50,6 @@ function SectionTile({
     sectionId,
     items,
     isLocked,
-    textMode,
     selectedItemId,
     onSelectItem,
     onLockSection,
@@ -79,7 +61,6 @@ function SectionTile({
     sectionId: string;
     items: MappingReviewItem[];
     isLocked: boolean;
-    textMode: 'original' | 'court_safe';
     selectedItemId: string | null;
     onSelectItem: (nodeId: string | null) => void;
     onLockSection: (sectionId: string, locked: boolean) => void;
@@ -91,9 +72,6 @@ function SectionTile({
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
     const includedCount = items.filter(i => i.includedInExport && !i.userOverride?.exclude).length;
-    const avgConfidence = items.length > 0
-        ? items.reduce((sum, i) => sum + i.confidence, 0) / items.length
-        : 0;
 
     return (
         <motion.div
@@ -123,17 +101,12 @@ function SectionTile({
                             {formatSectionName(sectionId)}
                         </h3>
                         <p className="text-[11px] text-white/40 mt-0.5">
-                            {includedCount}/{items.length} items · avg confidence {Math.round(avgConfidence * 100)}%
+                            {includedCount}/{items.length} items
                         </p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                    {/* Confidence Indicator */}
-                    <div
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: getConfidenceColor(avgConfidence) }}
-                    />
                     {/* Lock Toggle */}
                     <SectionLockToggle
                         sectionId={sectionId}
@@ -158,9 +131,7 @@ function SectionTile({
                                 const isExcluded = item.userOverride?.exclude ?? !item.includedInExport;
                                 const isSelected = item.nodeId === selectedItemId;
                                 const isEditing = item.nodeId === editingItemId;
-                                const displayText = textMode === 'court_safe'
-                                    ? (item.userOverride?.editedText ?? item.transformedCourtSafeText ?? item.originalText)
-                                    : (item.userOverride?.editedText ?? item.originalText);
+                                const displayText = item.userOverride?.editedText ?? item.originalText;
 
                                 return (
                                     <motion.div
@@ -193,11 +164,6 @@ function SectionTile({
                                                     getTypeBadgeClass(item.dominantType)
                                                 }`}>
                                                     {item.dominantType}
-                                                </span>
-                                                {/* Confidence */}
-                                                <span className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: getConfidenceColor(item.confidence) }}>
-                                                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getConfidenceColor(item.confidence) }} />
-                                                    {getConfidenceLabel(item.confidence)} ({Math.round(item.confidence * 100)}%)
                                                 </span>
                                             </div>
 
@@ -304,7 +270,6 @@ function getTypeBadgeClass(type: string): string {
 export default function MappingCanvas({
     sectionGroups,
     overrides,
-    textMode,
     selectedItemId,
     onSelectItem,
     onLockSection,
@@ -325,7 +290,6 @@ export default function MappingCanvas({
                     sectionId={sectionId}
                     items={sectionGroups.get(sectionId) ?? []}
                     isLocked={lockedSet.has(sectionId)}
-                    textMode={textMode}
                     selectedItemId={selectedItemId}
                     onSelectItem={onSelectItem}
                     onLockSection={onLockSection}

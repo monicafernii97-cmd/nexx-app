@@ -20,24 +20,19 @@ import {
     Lightning,
     Export,
     CheckCircle,
-    WarningCircle,
     Download,
     ArrowSquareOut,
     ArrowClockwise,
     SpinnerGap,
     Circle,
     XCircle,
-    ShieldWarning,
-    CaretDown,
-    CaretUp,
 } from '@phosphor-icons/react';
 import { useExport, type DraftingStage } from '../context/ExportContext';
 import { useDraftingStream, type DraftStreamInput } from '@/hooks/useDraftingStream';
 import { runPreflightChecks } from '@/lib/export-assembly/validation/preflightValidator';
 import MappingCanvas from '@/components/review/MappingCanvas';
 import AIRevisionSidebar from '@/components/review/AIRevisionSidebar';
-// PreflightPanel removed in Review Hub redesign (Phase 1)
-import DraftStyleToggle from '@/components/review/DraftStyleToggle';
+// DraftStyleToggle removed in Review Hub redesign (Phase 1)
 import ClarificationModal from '@/components/review/ClarificationModal';
 import type { MappingReviewItem } from '@/lib/export-assembly/types/exports';
 
@@ -103,8 +98,6 @@ export default function ReviewHubContent() {
     const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
     const [isDrafting, setIsDrafting] = useState(false);
     const [showPreflight, setShowPreflight] = useState(false);
-    const [textMode, setTextMode] = useState<'original' | 'court_safe'>('original');
-    const [validationExpanded, setValidationExpanded] = useState(true);
 
     // UI redesign shell states
     const [showClarificationModal, setShowClarificationModal] = useState(false);
@@ -115,8 +108,7 @@ export default function ReviewHubContent() {
         if (state.phase === 'reviewing' && state.reviewItems.length > 0 && !clarificationShownRef.current) {
             const hasUnclassified = state.reviewItems.some(item =>
                 item.suggestedSections.length === 0
-                || item.suggestedSections[0] === 'unclassified'
-                || item.suggestedSections[0] === 'Unclassified'
+                || item.suggestedSections.some(s => s.toLowerCase() === 'unclassified')
             );
             if (hasUnclassified) {
                 clarificationShownRef.current = true;
@@ -172,19 +164,17 @@ export default function ReviewHubContent() {
     }, [effectiveItems]);
 
     // Compute stats (memoized to avoid redundant filtering)
-    const { totalItems, includedItems, lowConfidenceCount, lockedSections, sectionCount } = useMemo(() => {
+    const { totalItems, includedItems, lockedSections, sectionCount } = useMemo(() => {
         // Respect explicit reviewer overrides (re-include or exclude)
         const isExcluded = (i: MappingReviewItem) =>
             i.userOverride?.exclude ?? !i.includedInExport;
 
         const total = effectiveItems.length;
         const included = effectiveItems.filter(i => !isExcluded(i)).length;
-        const lowConf = effectiveItems.filter(i => i.confidence < 0.5 && !isExcluded(i)).length;
         const locked = state.overrides.sectionOverrides.filter(s => s.isLocked).length;
         return {
             totalItems: total,
             includedItems: included,
-            lowConfidenceCount: lowConf,
             lockedSections: locked,
             sectionCount: sectionGroups.size,
         };
@@ -373,13 +363,6 @@ export default function ReviewHubContent() {
                         </div>
 
                         <div className="flex items-center gap-3">
-                            {/* Stats Badges */}
-                            {lowConfidenceCount > 0 && (
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] font-bold">
-                                    <WarningCircle size={14} weight="fill" />
-                                    {lowConfidenceCount} low confidence
-                                </div>
-                            )}
                             {lockedSections > 0 && (
                                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold">
                                     <CheckCircle size={14} weight="fill" />
@@ -387,20 +370,13 @@ export default function ReviewHubContent() {
                                 </div>
                             )}
 
-                            {/* Text Mode Toggle */}
-                            <DraftStyleToggle
-                                mode={textMode}
-                                onChange={setTextMode}
-                            />
-
-                            {/* Approve & Draft — gated by critical validation */}
+                            {/* Approve & Draft */}
                             <button
                                 type="button"
                                 onClick={handleApproveAndDraft}
-                                disabled={isDrafting || (state.assemblyValidation?.critical?.length ?? 0) > 0}
-                                title={(state.assemblyValidation?.critical?.length ?? 0) > 0 ? 'Resolve critical validation issues first' : undefined}
+                                disabled={isDrafting}
                                 className={`px-5 py-2.5 rounded-xl text-[13px] font-bold tracking-wide text-white border border-white/25 transition-all flex items-center gap-2 ${
-                                    isDrafting || (state.assemblyValidation?.critical?.length ?? 0) > 0
+                                    isDrafting
                                         ? 'bg-white/10 cursor-not-allowed opacity-60'
                                         : 'btn-primary shadow-[0_4px_16px_rgba(26,75,155,0.3),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:-translate-y-0.5'
                                 }`}
@@ -412,23 +388,13 @@ export default function ReviewHubContent() {
                     </div>
                 </div>
 
-                {/* ── Assembly Validation Banner ── */}
-                {state.assemblyValidation && (
-                    <AssemblyValidationBanner
-                        validation={state.assemblyValidation}
-                        expanded={validationExpanded}
-                        onToggle={() => setValidationExpanded(!validationExpanded)}
-                    />
-                )}
-
-                {/* Canvas + Preflight */}
+                {/* Canvas */}
                 <div className="flex-1 flex overflow-hidden">
                     {/* Mapping Canvas */}
                     <div className="flex-1 overflow-y-auto p-6" style={{ scrollbarWidth: 'thin' }}>
                         <MappingCanvas
                             sectionGroups={sectionGroups}
                             overrides={state.overrides}
-                            textMode={textMode}
                             selectedItemId={selectedItemId}
                             onSelectItem={handleSelectItem}
                             onLockSection={lockSection}
@@ -489,93 +455,7 @@ export default function ReviewHubContent() {
     );
 }
 
-// =========================================================================
-// Assembly Validation Banner (extracted for testability)
-// =========================================================================
-
-/** Collapsible banner displaying assembly integrity validation results. */
-function AssemblyValidationBanner({
-    validation,
-    expanded,
-    onToggle,
-}: {
-    validation: { critical: { id: string; label: string; detail: string }[]; errors: { id: string; label: string; detail: string }[]; warnings: { id: string; label: string; detail: string }[] };
-    expanded: boolean;
-    onToggle: () => void;
-}) {
-    const { critical, errors, warnings } = validation;
-    const totalIssues = critical.length + errors.length + warnings.length;
-    if (totalIssues === 0) return null;
-
-    const highestSeverity = critical.length > 0 ? 'critical' : errors.length > 0 ? 'error' : 'warning';
-    const bannerColors = {
-        critical: 'bg-red-500/10 border-red-500/30 text-red-400',
-        error: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-        warning: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
-    };
-
-    return (
-        <div className={`shrink-0 mx-6 mt-4 rounded-xl border ${bannerColors[highestSeverity]} overflow-hidden`}>
-            <button
-                onClick={onToggle}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
-            >
-                <ShieldWarning size={18} weight="fill" />
-                <span className="text-[13px] font-bold">
-                    {critical.length > 0 && `${critical.length} critical`}
-                    {critical.length > 0 && errors.length > 0 && ' · '}
-                    {errors.length > 0 && `${errors.length} error${errors.length > 1 ? 's' : ''}`}
-                    {(critical.length > 0 || errors.length > 0) && warnings.length > 0 && ' · '}
-                    {warnings.length > 0 && `${warnings.length} warning${warnings.length > 1 ? 's' : ''}`}
-                </span>
-                {critical.length > 0 && (
-                    <span className="text-[11px] font-medium ml-auto mr-2 text-red-300">
-                        Blocks drafting
-                    </span>
-                )}
-                {expanded ? <CaretUp size={14} /> : <CaretDown size={14} />}
-            </button>
-            <AnimatePresence>{expanded && (
-                <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
-                >
-                    <div className="px-4 pb-3 space-y-1.5">
-                        {critical.map(item => (
-                            <div key={item.id} className="flex items-start gap-2.5 text-[12px]">
-                                <XCircle size={14} weight="fill" className="text-red-400 mt-0.5 shrink-0" />
-                                <div>
-                                    <span className="font-bold text-red-300">{item.label}</span>
-                                    <span className="text-red-400/80 ml-1">{item.detail}</span>
-                                </div>
-                            </div>
-                        ))}
-                        {errors.map(item => (
-                            <div key={item.id} className="flex items-start gap-2.5 text-[12px]">
-                                <WarningCircle size={14} weight="fill" className="text-amber-400 mt-0.5 shrink-0" />
-                                <div>
-                                    <span className="font-bold text-amber-300">{item.label}</span>
-                                    <span className="text-amber-400/80 ml-1">{item.detail}</span>
-                                </div>
-                            </div>
-                        ))}
-                        {warnings.map(item => (
-                            <div key={item.id} className="flex items-start gap-2.5 text-[12px]">
-                                <WarningCircle size={14} weight="regular" className="text-yellow-400 mt-0.5 shrink-0" />
-                                <div>
-                                    <span className="font-bold text-yellow-300">{item.label}</span>
-                                    <span className="text-yellow-400/80 ml-1">{item.detail}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </motion.div>
-            )}</AnimatePresence>
-        </div>
-    );
-}
+// AssemblyValidationBanner removed in Review Hub redesign (Phase 1)
 
 // =========================================================================
 // Drafting Phase — Step Checklist

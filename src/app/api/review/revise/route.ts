@@ -90,14 +90,23 @@ Rules:
 
         // Add conversation history if available (prior revisions in same session)
         if (conversationHistory && Array.isArray(conversationHistory)) {
+            const MAX_ENTRY_CONTENT_CHARS = 10_000;
             for (const msg of conversationHistory) {
-                if (
-                    (msg.role === 'user' || msg.role === 'assistant') &&
-                    typeof msg.content === 'string' &&
-                    msg.content.trim().length > 0
-                ) {
-                    messages.push({ role: msg.role as 'user' | 'assistant', content: msg.content });
+                if (!msg || typeof msg !== 'object' || Array.isArray(msg)) {
+                    return Response.json({ error: 'Invalid conversationHistory entry' }, { status: 400 });
                 }
+                const { role, content } = msg as Record<string, unknown>;
+                if (role !== 'user' && role !== 'assistant') {
+                    return Response.json({ error: 'Invalid conversationHistory role' }, { status: 400 });
+                }
+                if (typeof content !== 'string' || content.trim().length === 0) {
+                    return Response.json({ error: 'Invalid conversationHistory content' }, { status: 400 });
+                }
+                const normalized = content.trim();
+                if (normalized.length > MAX_ENTRY_CONTENT_CHARS) {
+                    return Response.json({ error: 'conversationHistory message is too large' }, { status: 413 });
+                }
+                messages.push({ role, content: normalized });
             }
         }
 

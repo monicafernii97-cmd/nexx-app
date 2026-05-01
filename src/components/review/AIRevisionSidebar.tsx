@@ -163,11 +163,10 @@ export default function AIRevisionSidebar({ item, onClose, onAcceptRevision }: A
                             setStreamingText('');
                         }
                     } catch (parseErr) {
-                        // Re-throw real errors (e.g. error events from API)
-                        if (parseErr instanceof Error && parseErr.message !== jsonStr) {
-                            throw parseErr;
-                        }
-                        // Skip truly malformed JSON (shouldn't happen with buffer)
+                        // Only rethrow explicit API errors (thrown from parsed.error above).
+                        // Skip JSON SyntaxErrors so truncated streams reach the partial-content path.
+                        if (parseErr instanceof SyntaxError) continue;
+                        throw parseErr;
                     }
                 }
                 if (done) break;

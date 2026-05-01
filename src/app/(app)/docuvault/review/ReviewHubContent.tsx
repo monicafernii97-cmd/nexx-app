@@ -351,7 +351,7 @@ export default function ReviewHubContent() {
                                 <ArrowLeft size={16} weight="bold" />
                             </button>
                             <div>
-                                <h1 className="text-[17px] font-bold text-white tracking-tight">
+                                <h1 className="text-[17px] font-bold text-white tracking-tight font-[family-name:var(--font-playfair)]">
                                     Review Hub
                                 </h1>
                                 <p className="text-[12px] text-white/50">

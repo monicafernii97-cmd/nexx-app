@@ -97,7 +97,7 @@ function SectionTile({
                         className={`text-white/40 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
                     />
                     <div>
-                        <h3 className="text-[14px] font-bold text-white tracking-tight">
+                        <h3 className="text-[14px] font-bold text-white tracking-tight font-[family-name:var(--font-playfair)]">
                             {formatSectionName(sectionId)}
                         </h3>
                         <p className="text-[11px] text-white/40 mt-0.5">
@@ -203,7 +203,7 @@ function SectionTile({
                                                 />
                                             </div>
                                         ) : (
-                                            <p className={`text-[14px] leading-relaxed font-serif ${
+                                            <p className={`text-[14px] leading-relaxed font-[family-name:var(--font-outfit)] ${
                                                 isExcluded ? 'text-white/30 line-through' : 'text-white/80'
                                             }`}>
                                                 {displayText}

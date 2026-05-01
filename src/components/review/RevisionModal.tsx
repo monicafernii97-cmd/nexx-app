@@ -49,6 +49,7 @@ export default function RevisionModal({ isOpen, item, onClose, onAcceptRevision 
     const [streamingText, setStreamingText] = useState('');
     const feedEndRef = useRef<HTMLDivElement>(null);
     const abortRef = useRef<AbortController | null>(null);
+    const isComposingRef = useRef(false);
     const titleId = useId();
     const descriptionId = useId();
 
@@ -369,8 +370,10 @@ export default function RevisionModal({ isOpen, item, onClose, onAcceptRevision 
                             <textarea
                                 value={inputValue}
                                 onChange={e => setInputValue(e.target.value)}
+                                onCompositionStart={() => { isComposingRef.current = true; }}
+                                onCompositionEnd={() => { isComposingRef.current = false; }}
                                 onKeyDown={e => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                    if (e.key === 'Enter' && !e.shiftKey && !isComposingRef.current) {
                                         e.preventDefault();
                                         handleSend();
                                     }

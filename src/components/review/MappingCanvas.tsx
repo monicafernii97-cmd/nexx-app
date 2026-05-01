@@ -160,7 +160,7 @@ function SectionTile({
                                     >
                                         {/* Item Header — edit/revise actions on hover */}
                                         <div className="flex items-center justify-end mb-2">
-                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
                                                 <button
                                                     type="button"
                                                     onClick={() => onReviseItem(item.nodeId)}

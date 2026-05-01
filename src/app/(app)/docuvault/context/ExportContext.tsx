@@ -539,9 +539,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
             // drafted — just format and export.
             const hasPastedContent = Boolean(config.pastedContent?.trim());
             const hasWorkspaceData = inputs.workspaceNodes.length > 0;
-            const isFastPath = config.path === 'court_document'
-                && hasPastedContent
-                && !hasWorkspaceData;
+            const isFastPath = hasPastedContent;
 
             // 3. Build ExportRequest from config
             const exportRequest: ExportRequest = {

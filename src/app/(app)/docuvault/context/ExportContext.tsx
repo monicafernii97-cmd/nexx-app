@@ -538,7 +538,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
             // skip the classifier/assembly engine entirely. The content is already
             // drafted — just format and export.
             const hasPastedContent = Boolean(config.pastedContent?.trim());
-            const hasWorkspaceData = inputs.workspaceNodes.length > 0;
+
 
             // 3. Build ExportRequest from config
             const exportRequest: ExportRequest = {
@@ -630,21 +630,12 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                     },
                 });
 
-                // ── Also classify workspace nodes (if any) and combine ──
-                let workspaceItems: import('@/lib/export-assembly/types/exports').MappingReviewItem[] = [];
-                if (hasWorkspaceData) {
-                    dispatch({
-                        type: 'ASSEMBLY_PROGRESS',
-                        status: { phase: 'classifying', progress: 40, detail: `Classifying ${inputs.workspaceNodes.length} workspace items…` },
-                    });
-                    const wsResult = runAssembly(
-                        exportRequest,
-                        inputs.workspaceNodes,
-                        inputs.timelineEvents,
-                        () => {}, // suppress sub-progress
-                    );
-                    workspaceItems = wsResult.reviewItems;
-                }
+                // NOTE: Workspace nodes (case narrative, timeline reports, etc.) are NOT
+                // auto-included when pasted content exists. The pasted document is the
+                // complete document being exported. Workspace data is supplementary
+                // case context that would appear as noise ("Unclassified" items).
+                // If no content is pasted, the workspace-only path (else branch) handles
+                // workspace node classification.
 
                 // Build mapped sections for the assembly shell
                 const mappedSections = config.path === 'court_document'
@@ -680,9 +671,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                             supportingNodeIds: [nodeId],
                         };
 
-                // Combine split items (pasted doc) + workspace items
-                const combinedItems = [...splitResult.items, ...workspaceItems];
-                const itemCount = combinedItems.length || 1;
+                const itemCount = splitResult.items.length || 1;
 
                 result = {
                     assembly: {
@@ -722,8 +711,8 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                         },
                         mappedSections: mappedSections as any, // eslint-disable-line @typescript-eslint/no-explicit-any
                         meta: {
-                            totalNodes: 1 + inputs.workspaceNodes.length,
-                            selectedNodes: 1 + inputs.workspaceNodes.length,
+                            totalNodes: 1,
+                            selectedNodes: 1,
                             classifiedNodes: 1,
                             narrativeSections: itemCount,
                             detectedPatterns: 0,
@@ -731,10 +720,10 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                             assemblyTimeMs: 0,
                         },
                     },
-                    reviewItems: combinedItems,
+                    reviewItems: splitResult.items,
                     meta: {
-                        totalNodes: 1 + inputs.workspaceNodes.length,
-                        selectedNodes: 1 + inputs.workspaceNodes.length,
+                        totalNodes: 1,
+                        selectedNodes: 1,
                         classifiedNodes: 1,
                         narrativeSections: itemCount,
                         detectedPatterns: 0,
@@ -745,7 +734,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
 
                 dispatch({
                     type: 'ASSEMBLY_PROGRESS',
-                    status: { phase: 'ready_for_review', progress: 50, detail: `${splitResult.meta.totalItems} document sections + ${workspaceItems.length} workspace items ready for review` },
+                    status: { phase: 'ready_for_review', progress: 50, detail: `${splitResult.meta.totalItems} document sections ready for review` },
                 });
             } else {
                 // ── NO PASTED CONTENT: Run normal assembly pipeline on workspace data only ──

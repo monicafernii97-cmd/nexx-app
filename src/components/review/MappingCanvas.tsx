@@ -97,7 +97,7 @@ function SectionTile({
                         className={`text-white/40 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
                     />
                     <div>
-                        <h3 className="text-[14px] font-bold text-white tracking-tight font-[family-name:var(--font-playfair)]">
+                        <h3 className="text-[16px] font-bold text-white tracking-tight font-[family-name:var(--font-playfair)]">
                             {formatSectionName(sectionId)}
                         </h3>
                         <p className="text-[11px] text-white/40 mt-0.5">

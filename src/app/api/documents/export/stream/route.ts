@@ -344,10 +344,9 @@ export async function POST(request: NextRequest) {
                 // 2. DRAFT SECTIONS VIA GPT (or skip for pasted content)
                 // ────────────────────────────────────────────────
 
-                // Detect fast path: court_document + synthetic pre_drafted node from ExportContext
+                // Detect fast path: synthetic pre_drafted node from ExportContext pasted content
                 const classifiedNodes = body.assemblyResult?.assembly?.classifiedNodes ?? [];
-                const isFastPath = body.exportRequest?.path === 'court_document'
-                    && classifiedNodes.length === 1
+                const isFastPath = classifiedNodes.length === 1
                     && classifiedNodes[0].tags?.includes('pre_drafted');
 
                 let draftedSections: DraftedSection[];

@@ -240,7 +240,8 @@ type ExportAction =
     | { type: 'DRAFT_PROGRESS'; status: PipelineStatus; stage?: DraftingStage }
     | { type: 'COMPLETE'; exportId: string; filename: string }
     | { type: 'ERROR'; message: string; errorCode?: string }
-    | { type: 'RESET' };
+    | { type: 'RESET' }
+    | { type: 'BACK_TO_REVIEW' };
 
 /** Reducer managing the full export lifecycle state machine. */
 function exportReducer(state: ExportState, action: ExportAction): ExportState {
@@ -375,6 +376,18 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
         case 'RESET':
             return initialState;
 
+        case 'BACK_TO_REVIEW':
+            return {
+                ...state,
+                phase: 'reviewing',
+                progress: 50,
+                statusDetail: 'Ready for review',
+                errorMessage: null,
+                errorCode: null,
+                draftingStage: null,
+                lastCompletedStage: null,
+            };
+
         default:
             return state;
     }
@@ -419,6 +432,12 @@ const ExportContext = createContext<ExportContextValue | null>(null);
 /** Auto-save interval in milliseconds (30 seconds). */
 const AUTO_SAVE_INTERVAL_MS = 30_000;
 
+/**
+ * ExportProvider — Context provider for the full export lifecycle.
+ *
+ * Manages state for configuration, assembly, review, drafting, and completion
+ * phases. Provides convenience actions and auto-save dirty detection.
+ */
 export function ExportProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(exportReducer, initialState);
     const [isDirty, setIsDirty] = useState(false);
@@ -455,18 +474,22 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'START_CONFIGURE', exportPath: path, caseId });
     }, []);
 
+    /** Store the export request payload for the current pipeline run. */
     const setRequest = useCallback((request: ExportRequest) => {
         dispatch({ type: 'SET_REQUEST', request });
     }, []);
 
+    /** Transition to the assembly phase (fetching + classifying workspace data). */
     const startAssembly = useCallback(() => {
         dispatch({ type: 'START_ASSEMBLY' });
     }, []);
 
+    /** Finalize assembly with the orchestrator result and optional validation. */
     const completeAssembly = useCallback((result: OrchestratorAssemblyResult, validation?: AssemblyValidation) => {
         dispatch({ type: 'ASSEMBLY_COMPLETE', result, validation });
     }, []);
 
+    /** Lock or unlock a section to prevent GPT regeneration during drafting. */
     const lockSection = useCallback((sectionId: string, locked: boolean) => {
         dispatch({
             type: 'UPDATE_SECTION_OVERRIDE',
@@ -474,6 +497,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
+    /** Apply an inline text edit to a review item. */
     const editItem = useCallback((nodeId: string, editedText: string) => {
         dispatch({
             type: 'UPDATE_ITEM_OVERRIDE',
@@ -481,6 +505,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
+    /** Move a review item to a different section. */
     const moveItem = useCallback((nodeId: string, toSection: string) => {
         dispatch({
             type: 'UPDATE_ITEM_OVERRIDE',
@@ -488,6 +513,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
+    /** Include or exclude a review item from the final export. */
     const excludeItem = useCallback((nodeId: string, excluded: boolean) => {
         dispatch({
             type: 'UPDATE_ITEM_OVERRIDE',
@@ -495,22 +521,27 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
+    /** Store the preflight validation result. */
     const setPreflight = useCallback((result: PreflightResult) => {
         dispatch({ type: 'SET_PREFLIGHT', result });
     }, []);
 
+    /** Transition to the drafting phase (GPT section generation). */
     const startDrafting = useCallback(() => {
         dispatch({ type: 'START_DRAFTING' });
     }, []);
 
+    /** Mark the export as successfully completed with its ID and filename. */
     const complete = useCallback((exportId: string, filename: string) => {
         dispatch({ type: 'COMPLETE', exportId, filename });
     }, []);
 
+    /** Transition to the error phase with a user-facing message and optional code. */
     const setError = useCallback((message: string, errorCode?: string) => {
         dispatch({ type: 'ERROR', message, errorCode });
     }, []);
 
+    /** Reset all export state to initial (clears assembly, review, and drafting data). */
     const reset = useCallback(() => {
         dispatch({ type: 'RESET' });
     }, []);
@@ -530,18 +561,18 @@ export function ExportProvider({ children }: { children: ReactNode }) {
             dispatch({ type: 'SET_CONFIG', config });
             dispatch({ type: 'START_ASSEMBLY' });
 
-            // 2. Fetch canonical assembly inputs
-            const inputs = await getAssemblyInputs(convex, config.caseId);
-
             // ── FAST PATH: Pre-drafted pasted content ──
-            // When user pastes a complete document and no workspace data exists,
-            // skip the classifier/assembly engine entirely. The content is already
-            // drafted — just format and export.
+            // When user pastes a complete document, skip workspace loading entirely.
+            // The content is already drafted — just split into sections and export.
             const hasPastedContent = Boolean(config.pastedContent?.trim());
-            const hasWorkspaceData = inputs.workspaceNodes.length > 0;
+
+            // 2. Fetch canonical assembly inputs (only needed for workspace-based exports)
+            const inputs = hasPastedContent
+                ? null
+                : await getAssemblyInputs(convex, config.caseId);
 
             // 3. Build ExportRequest from config
-            const exportRequest: ExportRequest = {
+            let exportRequest: ExportRequest = {
                 path: config.path,
                 structureSource: config.path === 'court_document'
                     ? 'court_prompt_profile'
@@ -588,7 +619,6 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                             outputFormat: 'pdf' as const,
                         },
             };
-            dispatch({ type: 'SET_REQUEST', request: exportRequest });
 
             let result: import('@/lib/export-assembly/orchestrator').OrchestratorAssemblyResult;
 
@@ -604,14 +634,20 @@ export function ExportProvider({ children }: { children: ReactNode }) {
 
                 // Wire parsed caption into export config so the renderer receives it
                 if (config.path === 'court_document') {
-                    const courtConfig = exportRequest.config as unknown as Record<string, unknown>;
-                    if (captionData.courtName) courtConfig.courtName = captionData.courtName;
-                    if (captionData.state) courtConfig.courtState = captionData.state;
-                    if (captionData.county) courtConfig.courtCounty = captionData.county;
-                    if (captionData.causeNumber) courtConfig.causeNumber = captionData.causeNumber;
+                    const enrichedConfig: Record<string, unknown> = {
+                        ...(exportRequest.config as unknown as Record<string, unknown>),
+                    };
+                    if (captionData.courtName) enrichedConfig.courtName = captionData.courtName;
+                    if (captionData.state) enrichedConfig.courtState = captionData.state;
+                    if (captionData.county) enrichedConfig.courtCounty = captionData.county;
+                    if (captionData.causeNumber) enrichedConfig.causeNumber = captionData.causeNumber;
                     const petitionerRole = captionData.partyRoles?.find(r => r.startsWith('Petitioner:'));
-                    if (petitionerRole) courtConfig.petitionerName = petitionerRole.replace('Petitioner: ', '');
+                    if (petitionerRole) enrichedConfig.petitionerName = petitionerRole.replace('Petitioner: ', '');
+                    exportRequest = { ...exportRequest, config: enrichedConfig as unknown as typeof exportRequest.config };
                 }
+
+                // Dispatch after enrichment so reducer receives the final, complete request
+                dispatch({ type: 'SET_REQUEST', request: exportRequest });
 
                 dispatch({
                     type: 'ASSEMBLY_PROGRESS',
@@ -630,21 +666,12 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                     },
                 });
 
-                // ── Also classify workspace nodes (if any) and combine ──
-                let workspaceItems: import('@/lib/export-assembly/types/exports').MappingReviewItem[] = [];
-                if (hasWorkspaceData) {
-                    dispatch({
-                        type: 'ASSEMBLY_PROGRESS',
-                        status: { phase: 'classifying', progress: 40, detail: `Classifying ${inputs.workspaceNodes.length} workspace items…` },
-                    });
-                    const wsResult = runAssembly(
-                        exportRequest,
-                        inputs.workspaceNodes,
-                        inputs.timelineEvents,
-                        () => {}, // suppress sub-progress
-                    );
-                    workspaceItems = wsResult.reviewItems;
-                }
+                // NOTE: Workspace nodes (case narrative, timeline reports, etc.) are NOT
+                // auto-included when pasted content exists. The pasted document is the
+                // complete document being exported. Workspace data is supplementary
+                // case context that would appear as noise ("Unclassified" items).
+                // If no content is pasted, the workspace-only path (else branch) handles
+                // workspace node classification.
 
                 // Build mapped sections for the assembly shell
                 const mappedSections = config.path === 'court_document'
@@ -680,9 +707,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                             supportingNodeIds: [nodeId],
                         };
 
-                // Combine split items (pasted doc) + workspace items
-                const combinedItems = [...splitResult.items, ...workspaceItems];
-                const itemCount = combinedItems.length || 1;
+                const itemCount = splitResult.items.length || 1;
 
                 result = {
                     assembly: {
@@ -722,8 +747,8 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                         },
                         mappedSections: mappedSections as any, // eslint-disable-line @typescript-eslint/no-explicit-any
                         meta: {
-                            totalNodes: 1 + inputs.workspaceNodes.length,
-                            selectedNodes: 1 + inputs.workspaceNodes.length,
+                            totalNodes: 1,
+                            selectedNodes: 1,
                             classifiedNodes: 1,
                             narrativeSections: itemCount,
                             detectedPatterns: 0,
@@ -731,10 +756,10 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                             assemblyTimeMs: 0,
                         },
                     },
-                    reviewItems: combinedItems,
+                    reviewItems: splitResult.items,
                     meta: {
-                        totalNodes: 1 + inputs.workspaceNodes.length,
-                        selectedNodes: 1 + inputs.workspaceNodes.length,
+                        totalNodes: 1,
+                        selectedNodes: 1,
                         classifiedNodes: 1,
                         narrativeSections: itemCount,
                         detectedPatterns: 0,
@@ -745,14 +770,15 @@ export function ExportProvider({ children }: { children: ReactNode }) {
 
                 dispatch({
                     type: 'ASSEMBLY_PROGRESS',
-                    status: { phase: 'ready_for_review', progress: 50, detail: `${splitResult.meta.totalItems} document sections + ${workspaceItems.length} workspace items ready for review` },
+                    status: { phase: 'ready_for_review', progress: 50, detail: `${splitResult.meta.totalItems} document sections ready for review` },
                 });
             } else {
                 // ── NO PASTED CONTENT: Run normal assembly pipeline on workspace data only ──
+                dispatch({ type: 'SET_REQUEST', request: exportRequest });
                 result = runAssembly(
                     exportRequest,
-                    inputs.workspaceNodes,
-                    inputs.timelineEvents,
+                    inputs!.workspaceNodes,
+                    inputs!.timelineEvents,
                     (status) => dispatch({ type: 'ASSEMBLY_PROGRESS', status }),
                 );
             }

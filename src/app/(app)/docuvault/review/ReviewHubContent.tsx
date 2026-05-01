@@ -284,6 +284,13 @@ export default function ReviewHubContent() {
         dispatch({ type: 'RESET' });
     }, [dispatch, state.exportId]);
 
+    /** Return to review canvas without losing work (assembly + edits preserved). */
+    const handleBackToReview = useCallback(() => {
+        draftingGuardRef.current = false;
+        setIsDrafting(false);
+        dispatch({ type: 'BACK_TO_REVIEW' });
+    }, [dispatch]);
+
     /** Auto-save any pending sidebar edit before switching selection. */
     const handleSelectItem = useCallback((nodeId: string | null) => {
         if (pendingEditRef.current) {
@@ -309,7 +316,7 @@ export default function ReviewHubContent() {
 
     // Error phase — error card
     if (state.phase === 'error') {
-        return <ErrorPhaseUI state={state} onRetry={handleRetry} onReset={handleReset} />;
+        return <ErrorPhaseUI state={state} onRetry={handleRetry} onBackToReview={handleBackToReview} onReset={handleReset} />;
     }
 
     // Guard: only render canvas during reviewing phase
@@ -645,10 +652,12 @@ function CompletedPhaseUI({
 function ErrorPhaseUI({
     state,
     onRetry,
+    onBackToReview,
     onReset,
 }: {
     state: ReturnType<typeof useExport>['state'];
     onRetry: () => void;
+    onBackToReview: () => void;
     onReset: () => void;
 }) {
     // Scoped retry label based on last completed stage
@@ -715,10 +724,18 @@ function ErrorPhaseUI({
                     </button>
                     <button
                         type="button"
-                        onClick={onReset}
-                        className="flex-1 py-3 rounded-xl text-[13px] font-bold text-white/60 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white transition-colors"
+                        onClick={onBackToReview}
+                        className="flex-1 py-3 rounded-xl text-[13px] font-bold text-white/80 bg-white/10 border border-white/15 hover:bg-white/15 hover:text-white transition-colors flex items-center justify-center gap-2"
                     >
-                        Back to DocuVault
+                        <ArrowLeft size={16} weight="bold" />
+                        Back to Review
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onReset}
+                        className="py-3 px-4 rounded-xl text-[13px] font-bold text-white/40 bg-transparent border border-white/10 hover:bg-white/5 hover:text-white/60 transition-colors"
+                    >
+                        Exit
                     </button>
                 </div>
             </div>

@@ -98,10 +98,10 @@ function SectionTile({
     return (
         <motion.div
             layout
-            className={`rounded-2xl border overflow-hidden transition-colors ${
+            className={`card-premium mb-4 ${
                 isLocked
-                    ? 'border-emerald-500/30 bg-emerald-500/5'
-                    : 'border-white/10 bg-white/[0.03]'
+                    ? 'border-emerald-500/30'
+                    : 'border-white/10'
             }`}
         >
             {/* Section Header */}
@@ -168,12 +168,12 @@ function SectionTile({
                                         layout
                                         role="button"
                                         tabIndex={0}
-                                        className={`group relative rounded-xl p-3.5 transition-all cursor-pointer ${
+                                        className={`group relative rounded-xl p-4 transition-all cursor-pointer border ${
                                             isExcluded
-                                                ? 'opacity-40 bg-white/[0.02] border border-white/5'
+                                                ? 'opacity-40 border-white/5 bg-transparent'
                                                 : isSelected
-                                                    ? 'bg-[#60A5FA]/10 border border-[#60A5FA]/30 shadow-[0_0_12px_rgba(96,165,250,0.1)]'
-                                                    : 'bg-white/[0.04] border border-white/10 hover:bg-white/[0.07] hover:border-white/15'
+                                                    ? 'bg-[#1A4B9B]/20 border-[#2563EB]/40 shadow-[0_0_15px_rgba(37,99,235,0.15)]'
+                                                    : 'bg-transparent border-transparent hover:bg-white/[0.03] hover:border-white/10'
                                         }`}
                                         onClick={() => onSelectItem(isSelected ? null : item.nodeId)}
                                         onKeyDown={e => {
@@ -237,8 +237,8 @@ function SectionTile({
                                                 />
                                             </div>
                                         ) : (
-                                            <p className={`text-[13px] leading-relaxed line-clamp-3 ${
-                                                isExcluded ? 'text-white/30 line-through' : 'text-white/75'
+                                            <p className={`text-[14px] leading-relaxed font-serif ${
+                                                isExcluded ? 'text-white/30 line-through' : 'text-white/80'
                                             }`}>
                                                 {displayText}
                                             </p>

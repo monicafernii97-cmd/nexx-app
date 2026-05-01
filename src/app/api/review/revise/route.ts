@@ -90,13 +90,18 @@ Rules:
 
         // Add conversation history if available (prior revisions in same session)
         if (conversationHistory && Array.isArray(conversationHistory)) {
+            const MAX_ENTRY_CONTENT_CHARS = 10_000;
             for (const msg of conversationHistory) {
                 if (
+                    msg && typeof msg === 'object' && !Array.isArray(msg) &&
                     (msg.role === 'user' || msg.role === 'assistant') &&
                     typeof msg.content === 'string' &&
                     msg.content.trim().length > 0
                 ) {
-                    messages.push({ role: msg.role as 'user' | 'assistant', content: msg.content });
+                    messages.push({
+                        role: msg.role as 'user' | 'assistant',
+                        content: msg.content.slice(0, MAX_ENTRY_CONTENT_CHARS),
+                    });
                 }
             }
         }

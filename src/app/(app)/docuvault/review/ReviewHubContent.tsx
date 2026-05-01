@@ -108,8 +108,7 @@ export default function ReviewHubContent() {
         if (state.phase === 'reviewing' && state.reviewItems.length > 0 && !clarificationShownRef.current) {
             const hasUnclassified = state.reviewItems.some(item =>
                 item.suggestedSections.length === 0
-                || item.suggestedSections[0] === 'unclassified'
-                || item.suggestedSections[0] === 'Unclassified'
+                || item.suggestedSections.some(s => s.toLowerCase() === 'unclassified')
             );
             if (hasUnclassified) {
                 clarificationShownRef.current = true;

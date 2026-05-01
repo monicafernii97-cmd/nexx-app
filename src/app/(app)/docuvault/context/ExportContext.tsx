@@ -429,6 +429,12 @@ const ExportContext = createContext<ExportContextValue | null>(null);
 /** Auto-save interval in milliseconds (30 seconds). */
 const AUTO_SAVE_INTERVAL_MS = 30_000;
 
+/**
+ * ExportProvider — Context provider for the full export lifecycle.
+ *
+ * Manages state for configuration, assembly, review, drafting, and completion
+ * phases. Provides convenience actions and auto-save dirty detection.
+ */
 export function ExportProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(exportReducer, initialState);
     const [isDirty, setIsDirty] = useState(false);
@@ -465,18 +471,22 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'START_CONFIGURE', exportPath: path, caseId });
     }, []);
 
+    /** Store the export request payload for the current pipeline run. */
     const setRequest = useCallback((request: ExportRequest) => {
         dispatch({ type: 'SET_REQUEST', request });
     }, []);
 
+    /** Transition to the assembly phase (fetching + classifying workspace data). */
     const startAssembly = useCallback(() => {
         dispatch({ type: 'START_ASSEMBLY' });
     }, []);
 
+    /** Finalize assembly with the orchestrator result and optional validation. */
     const completeAssembly = useCallback((result: OrchestratorAssemblyResult, validation?: AssemblyValidation) => {
         dispatch({ type: 'ASSEMBLY_COMPLETE', result, validation });
     }, []);
 
+    /** Lock or unlock a section to prevent GPT regeneration during drafting. */
     const lockSection = useCallback((sectionId: string, locked: boolean) => {
         dispatch({
             type: 'UPDATE_SECTION_OVERRIDE',
@@ -484,6 +494,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
+    /** Apply an inline text edit to a review item. */
     const editItem = useCallback((nodeId: string, editedText: string) => {
         dispatch({
             type: 'UPDATE_ITEM_OVERRIDE',
@@ -491,6 +502,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
+    /** Move a review item to a different section. */
     const moveItem = useCallback((nodeId: string, toSection: string) => {
         dispatch({
             type: 'UPDATE_ITEM_OVERRIDE',
@@ -498,6 +510,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
+    /** Include or exclude a review item from the final export. */
     const excludeItem = useCallback((nodeId: string, excluded: boolean) => {
         dispatch({
             type: 'UPDATE_ITEM_OVERRIDE',
@@ -505,22 +518,27 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
+    /** Store the preflight validation result. */
     const setPreflight = useCallback((result: PreflightResult) => {
         dispatch({ type: 'SET_PREFLIGHT', result });
     }, []);
 
+    /** Transition to the drafting phase (GPT section generation). */
     const startDrafting = useCallback(() => {
         dispatch({ type: 'START_DRAFTING' });
     }, []);
 
+    /** Mark the export as successfully completed with its ID and filename. */
     const complete = useCallback((exportId: string, filename: string) => {
         dispatch({ type: 'COMPLETE', exportId, filename });
     }, []);
 
+    /** Transition to the error phase with a user-facing message and optional code. */
     const setError = useCallback((message: string, errorCode?: string) => {
         dispatch({ type: 'ERROR', message, errorCode });
     }, []);
 
+    /** Reset all export state to initial (clears assembly, review, and drafting data). */
     const reset = useCallback(() => {
         dispatch({ type: 'RESET' });
     }, []);

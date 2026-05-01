@@ -13,15 +13,19 @@
  * - "Other" allows free-form instructions
  */
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { WarningCircle, ArrowRight, CircleNotch, Info } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+/** Possible user-selected actions when the clarification modal is shown. */
 export type ClarificationAction = 'generate_titles' | 'go_to_nexchat' | 'other';
 
+/** Props for the ClarificationModal component. */
 interface ClarificationModalProps {
+    /** Whether the modal is currently visible. */
     isOpen: boolean;
+    /** Called when the user dismisses the modal without choosing an action. */
     onClose: () => void;
     /** Called when the user picks an action. For 'generate_titles', resolvedText contains the AI response. */
     onContinue: (action: ClarificationAction, details: string, resolvedText?: string) => void;
@@ -29,15 +33,22 @@ interface ClarificationModalProps {
     rawDocumentText?: string;
 }
 
+/**
+ * ClarificationModal — GenSpark-style interceptor dialog for unstructured documents.
+ * Provides options to auto-generate titles, redirect to NexChat, or provide custom instructions.
+ */
 export default function ClarificationModal({ isOpen, onClose, onContinue, rawDocumentText }: ClarificationModalProps) {
     const [selectedAction, setSelectedAction] = useState<ClarificationAction>('generate_titles');
     const [details, setDetails] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
+    const titleId = useId();
+    const descriptionId = useId();
 
     if (!isOpen) return null;
 
+    /** Handle the "Continue" button — dispatches the selected clarification action. */
     const handleContinue = async () => {
         setError(null);
 
@@ -80,14 +91,21 @@ export default function ClarificationModal({ isOpen, onClose, onContinue, rawDoc
 
                 let sseBuffer = '';
                 let streamError: string | null = null;
+                let sawDoneEvent = false;
 
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done) break;
+                    if (!done && value) {
+                        sseBuffer += decoder.decode(value, { stream: true });
+                    }
+                    if (done) {
+                        // Flush any remaining decoder buffer at EOF
+                        sseBuffer += decoder.decode();
+                    }
 
-                    sseBuffer += decoder.decode(value, { stream: true });
-                    const events = sseBuffer.split('\n\n');
-                    sseBuffer = events.pop() ?? '';
+                    const parseBuffer = done ? `${sseBuffer}\n\n` : sseBuffer;
+                    const events = parseBuffer.split('\n\n');
+                    sseBuffer = done ? '' : events.pop() ?? '';
 
                     for (const event of events) {
                         const line = event.trim();
@@ -99,6 +117,7 @@ export default function ClarificationModal({ isOpen, onClose, onContinue, rawDoc
                                 break;
                             }
                             if (parsed.done) {
+                                sawDoneEvent = true;
                                 fullText = parsed.fullText || fullText;
                             } else if (parsed.delta) {
                                 fullText += parsed.delta;
@@ -107,11 +126,14 @@ export default function ClarificationModal({ isOpen, onClose, onContinue, rawDoc
                             // Skip malformed chunks
                         }
                     }
-                    if (streamError) break;
+                    if (streamError || done) break;
                 }
 
                 if (streamError) {
                     throw new Error(streamError);
+                }
+                if (!sawDoneEvent) {
+                    throw new Error('Stream ended without completion signal');
                 }
 
                 onContinue(selectedAction, details, fullText);
@@ -143,14 +165,18 @@ export default function ClarificationModal({ isOpen, onClose, onContinue, rawDoc
                     exit={{ opacity: 0, scale: 0.95, y: 10 }}
                     transition={{ type: 'spring', duration: 0.5, bounce: 0.3 }}
                     className="hyper-glass w-full max-w-[500px] flex flex-col relative z-10"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby={titleId}
+                    aria-describedby={descriptionId}
                 >
                     {/* Header */}
                     <div className="p-6 pb-4 border-b border-white/5">
                         <div className="flex items-center gap-3 mb-2">
                             <Info size={20} weight="fill" className="text-[#38BDF8]" />
-                            <h2 className="text-[16px] font-bold text-white tracking-tight">Clarification Needed</h2>
+                            <h2 id={titleId} className="text-[16px] font-bold text-white tracking-tight">Clarification Needed</h2>
                         </div>
-                        <p className="text-[14px] text-white/70 leading-relaxed">
+                        <p id={descriptionId} className="text-[14px] text-white/70 leading-relaxed">
                             This document appears to be missing structured sections or titles. How would you like to proceed?
                         </p>
                     </div>
@@ -242,6 +268,7 @@ export default function ClarificationModal({ isOpen, onClose, onContinue, rawDoc
     );
 }
 
+/** Accessible radio-style option card rendered as a semantic button. */
 function OptionCard({ title, description, selected, onClick, disabled }: {
     title: string;
     description?: string;

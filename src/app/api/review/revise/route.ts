@@ -11,6 +11,13 @@ import { getOpenAIClient } from '@/lib/openaiConversation';
  */
 export const maxDuration = 60;
 
+/**
+ * POST /api/review/revise — Streaming AI section revision endpoint.
+ *
+ * Accepts original section text + a user instruction, streams back a revised
+ * version via SSE using GPT-4.1. Supports multi-turn conversation history
+ * for iterative refinement. Enforces size limits on all inputs.
+ */
 export async function POST(req: NextRequest) {
     const { userId } = await auth();
     if (!userId) {

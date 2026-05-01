@@ -14,19 +14,32 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowRight, CircleNotch, PencilSimple } from '@phosphor-icons/react';
 import type { MappingReviewItem } from '@/lib/export-assembly/types/exports';
 
+/** Props for the AI Revision Sidebar component. */
 interface AIRevisionSidebarProps {
+    /** The review item currently being revised. */
     item: MappingReviewItem;
+    /** Called when the user closes the sidebar. */
     onClose: () => void;
+    /** Called when the user accepts a proposed revision, passing the revised text. */
     onAcceptRevision: (text: string) => void;
 }
 
+/** Chat message in the revision conversation feed. */
 interface Message {
     id: string;
     role: 'user' | 'ai';
     content: string;
+    /** Whether this message contains a revision proposal (enables Accept/Reject buttons). */
     isRevisionProposal?: boolean;
+    /** Marks this message as a synthetic error (excluded from conversation history sent to API). */
+    isError?: boolean;
 }
 
+/**
+ * AI Revision Sidebar — Conversational AI interface for revising individual
+ * review items. Streams revisions from /api/review/revise and supports
+ * multi-turn refinement with Accept/Reject controls.
+ */
 export default function AIRevisionSidebar({ item, onClose, onAcceptRevision }: AIRevisionSidebarProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState('');
@@ -34,6 +47,17 @@ export default function AIRevisionSidebar({ item, onClose, onAcceptRevision }: A
     const [streamingText, setStreamingText] = useState('');
     const feedEndRef = useRef<HTMLDivElement>(null);
     const abortRef = useRef<AbortController | null>(null);
+
+    // Reset chat when the parent swaps to a different review item
+    const prevItemIdRef = useRef(item.nodeId);
+    useEffect(() => {
+        if (item.nodeId !== prevItemIdRef.current) {
+            prevItemIdRef.current = item.nodeId;
+            setMessages([]);
+            setStreamingText('');
+            setInputValue('');
+        }
+    }, [item.nodeId]);
 
     // Auto-scroll to bottom when new messages arrive
     useEffect(() => {
@@ -45,12 +69,14 @@ export default function AIRevisionSidebar({ item, onClose, onAcceptRevision }: A
         return () => { abortRef.current?.abort(); };
     }, []);
 
-    // Build conversation history for multi-turn context
+    /** Build conversation history for multi-turn context, excluding synthetic error messages. */
     const buildConversationHistory = useCallback(() => {
-        return messages.map(m => ({
-            role: m.role === 'user' ? 'user' : 'assistant',
-            content: m.content,
-        }));
+        return messages
+            .filter(m => !m.isError)
+            .map(m => ({
+                role: m.role === 'user' ? 'user' : 'assistant',
+                content: m.content,
+            }));
     }, [messages]);
 
     const handleSend = useCallback(async () => {
@@ -71,11 +97,12 @@ export default function AIRevisionSidebar({ item, onClose, onAcceptRevision }: A
         abortRef.current = abortController;
 
         try {
+            const sourceText = item.userOverride?.editedText ?? item.originalText;
             const res = await fetch('/api/review/revise', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    originalText: item.userOverride?.editedText ?? item.originalText,
+                    originalText: sourceText,
                     instruction,
                     sectionName: item.suggestedSections[0] ?? 'Section',
                     conversationHistory: buildConversationHistory(),
@@ -145,6 +172,7 @@ export default function AIRevisionSidebar({ item, onClose, onAcceptRevision }: A
                 id: (Date.now() + 2).toString(),
                 role: 'ai',
                 content: `I wasn't able to revise this section. ${(err as Error).message || 'Please try again.'}`,
+                isError: true,
             };
             setMessages(prev => [...prev, errorMsg]);
             setStreamingText('');
@@ -154,6 +182,7 @@ export default function AIRevisionSidebar({ item, onClose, onAcceptRevision }: A
         }
     }, [inputValue, isStreaming, item, buildConversationHistory]);
 
+    /** Remove a rejected revision from the chat feed. */
     const handleReject = useCallback((msgId: string) => {
         setMessages(prev => prev.filter(m => m.id !== msgId));
     }, []);
@@ -181,13 +210,13 @@ export default function AIRevisionSidebar({ item, onClose, onAcceptRevision }: A
                 </button>
             </div>
 
-            {/* Source text preview */}
+            {/* Source text preview — shows the text that will be sent to AI */}
             <div className="px-5 py-3 border-b border-white/5 bg-black/10">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-1">
-                    Original
+                    Source
                 </p>
                 <p className="text-[12px] text-white/60 leading-relaxed line-clamp-3">
-                    {item.originalText}
+                    {item.userOverride?.editedText ?? item.originalText}
                 </p>
             </div>
 

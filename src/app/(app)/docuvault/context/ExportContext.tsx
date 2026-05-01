@@ -380,6 +380,8 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
             return {
                 ...state,
                 phase: 'reviewing',
+                progress: 50,
+                statusDetail: 'Ready for review',
                 errorMessage: null,
                 errorCode: null,
                 draftingStage: null,
@@ -558,15 +560,15 @@ export function ExportProvider({ children }: { children: ReactNode }) {
             dispatch({ type: 'SET_CONFIG', config });
             dispatch({ type: 'START_ASSEMBLY' });
 
-            // 2. Fetch canonical assembly inputs
-            const inputs = await getAssemblyInputs(convex, config.caseId);
-
             // ── FAST PATH: Pre-drafted pasted content ──
-            // When user pastes a complete document and no workspace data exists,
-            // skip the classifier/assembly engine entirely. The content is already
-            // drafted — just format and export.
+            // When user pastes a complete document, skip workspace loading entirely.
+            // The content is already drafted — just split into sections and export.
             const hasPastedContent = Boolean(config.pastedContent?.trim());
 
+            // 2. Fetch canonical assembly inputs (only needed for workspace-based exports)
+            const inputs = hasPastedContent
+                ? null
+                : await getAssemblyInputs(convex, config.caseId);
 
             // 3. Build ExportRequest from config
             const exportRequest: ExportRequest = {
@@ -768,8 +770,8 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                 // ── NO PASTED CONTENT: Run normal assembly pipeline on workspace data only ──
                 result = runAssembly(
                     exportRequest,
-                    inputs.workspaceNodes,
-                    inputs.timelineEvents,
+                    inputs!.workspaceNodes,
+                    inputs!.timelineEvents,
                     (status) => dispatch({ type: 'ASSEMBLY_PROGRESS', status }),
                 );
             }

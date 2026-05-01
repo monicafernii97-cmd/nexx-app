@@ -6,17 +6,15 @@
  * Each section is a collapsible tile showing:
  * - Section name + item count
  * - Lock toggle (locks section from GPT regeneration)
- * - Review items with type badges, text preview, and inline editing
+ * - Review items with text preview and inline editing
  *
- * Items can be selected (opens TraceSidebar), excluded, or edited inline.
+ * Items can be selected (opens TraceSidebar) or edited inline.
  */
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     CaretDown,
-    Eye,
-    EyeSlash,
     PencilSimple,
 } from '@phosphor-icons/react';
 import type { MappingReviewItem } from '@/lib/export-assembly/types/exports';
@@ -156,18 +154,8 @@ function SectionTile({
                                         aria-pressed={isSelected}
                                         aria-label={`${item.dominantType} item: ${displayText.slice(0, 60)}`}
                                     >
-                                        {/* Item Header */}
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="flex items-center gap-2">
-                                                {/* Type Badge */}
-                                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                                                    getTypeBadgeClass(item.dominantType)
-                                                }`}>
-                                                    {item.dominantType}
-                                                </span>
-                                            </div>
-
-                                            {/* Action Buttons */}
+                                        {/* Item Header — edit action on hover */}
+                                        <div className="flex items-center justify-end mb-2">
                                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                                                 <button
                                                     type="button"
@@ -177,15 +165,6 @@ function SectionTile({
                                                     aria-label="Edit text"
                                                 >
                                                     <PencilSimple size={13} weight="bold" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => onExcludeItem(item.nodeId, !isExcluded)}
-                                                    className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors"
-                                                    title={isExcluded ? 'Include' : 'Exclude'}
-                                                    aria-label={isExcluded ? 'Include in export' : 'Exclude from export'}
-                                                >
-                                                    {isExcluded ? <Eye size={13} weight="bold" /> : <EyeSlash size={13} weight="bold" />}
                                                 </button>
                                             </div>
                                         </div>
@@ -238,23 +217,7 @@ function formatSectionName(sectionId: string): string {
         .replace(/\b\w/g, c => c.toUpperCase());
 }
 
-/** Map a sentence type to its Tailwind badge class string. */
-function getTypeBadgeClass(type: string): string {
-    switch (type) {
-        case 'fact': return 'bg-blue-500/15 text-blue-400 border border-blue-500/20';
-        case 'argument': return 'bg-violet-500/15 text-violet-400 border border-violet-500/20';
-        case 'evidence_reference': return 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20';
-        case 'timeline_event': return 'bg-amber-500/15 text-amber-400 border border-amber-500/20';
-        case 'emotion': return 'bg-rose-500/15 text-rose-400 border border-rose-500/20';
-        case 'request': return 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/20';
-        case 'issue': return 'bg-orange-500/15 text-orange-400 border border-orange-500/20';
-        case 'risk': return 'bg-red-500/15 text-red-400 border border-red-500/20';
-        case 'procedure': return 'bg-slate-500/15 text-slate-400 border border-slate-500/20';
-        case 'opinion': return 'bg-fuchsia-500/15 text-fuchsia-400 border border-fuchsia-500/20';
-        case 'unknown': return 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20';
-        default: return 'bg-white/10 text-white/50 border border-white/10';
-    }
-}
+
 
 // ---------------------------------------------------------------------------
 // Main Component
@@ -264,8 +227,8 @@ function getTypeBadgeClass(type: string): string {
  * MappingCanvas — Renders section tiles with review items for the Review Hub.
  *
  * Each section tile is collapsible and shows the items mapped to that section
- * with type badges and inline editing. Accepts override
- * callbacks for locking, excluding, editing, and moving items.
+ * with inline editing. Accepts override
+ * callbacks for locking, editing, and moving items.
  */
 export default function MappingCanvas({
     sectionGroups,

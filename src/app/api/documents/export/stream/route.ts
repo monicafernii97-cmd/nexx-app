@@ -113,6 +113,7 @@ function deriveComplianceStatus(preflight: PreflightResult): 'pass' | 'warning' 
  * - **Full path**: Workspace data assembly → GPT drafting → format + render PDF
  */
 export async function POST(request: NextRequest) {
+  try {
     // ── Auth guard ──
     const { userId } = await auth();
     if (!userId) {
@@ -939,6 +940,19 @@ export async function POST(request: NextRequest) {
             'Connection': 'keep-alive',
         },
     });
+  } catch (topLevelError) {
+    // Catch-all: prevent Next.js from returning an HTML 500 error page.
+    // This catches errors in auth(), rate limiting, JSON parsing, or
+    // Convex client creation — anything before the SSE stream starts.
+    console.error('[ExportStream] Top-level route crash:', topLevelError);
+    const message = topLevelError instanceof Error
+        ? topLevelError.message
+        : 'Unknown export route error';
+    return new Response(
+        JSON.stringify({ error: message, code: 'route_crash' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

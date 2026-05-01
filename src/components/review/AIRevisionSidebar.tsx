@@ -121,15 +121,21 @@ export default function AIRevisionSidebar({ item, onClose, onAcceptRevision }: A
             const decoder = new TextDecoder();
             let accumulated = '';
             let sseBuffer = '';
+            let sawDoneEvent = false;
 
             while (true) {
                 const { done, value } = await reader.read();
-                if (done) break;
+                if (!done && value) {
+                    sseBuffer += decoder.decode(value, { stream: true });
+                }
+                if (done) {
+                    // Flush any remaining decoder buffer at EOF
+                    sseBuffer += decoder.decode();
+                }
 
-                sseBuffer += decoder.decode(value, { stream: true });
-                const events = sseBuffer.split('\n\n');
-                // Keep the last (possibly incomplete) chunk in the buffer
-                sseBuffer = events.pop() ?? '';
+                const parseBuffer = done ? `${sseBuffer}\n\n` : sseBuffer;
+                const events = parseBuffer.split('\n\n');
+                sseBuffer = done ? '' : events.pop() ?? '';
 
                 for (const event of events) {
                     const line = event.trim();
@@ -145,6 +151,7 @@ export default function AIRevisionSidebar({ item, onClose, onAcceptRevision }: A
                             setStreamingText(accumulated);
                         }
                         if (parsed.done) {
+                            sawDoneEvent = true;
                             // Stream complete — add the final AI message
                             const aiMsg: Message = {
                                 id: (Date.now() + 1).toString(),
@@ -163,6 +170,11 @@ export default function AIRevisionSidebar({ item, onClose, onAcceptRevision }: A
                         // Skip truly malformed JSON (shouldn't happen with buffer)
                     }
                 }
+                if (done) break;
+            }
+
+            if (!sawDoneEvent && accumulated.length === 0) {
+                throw new Error('Stream ended without a response');
             }
         } catch (err) {
             if ((err as Error).name === 'AbortError') return; // User cancelled

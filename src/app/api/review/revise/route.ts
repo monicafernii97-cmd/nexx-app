@@ -26,7 +26,11 @@ export async function POST(req: NextRequest) {
 
     let body: Record<string, unknown>;
     try {
-        body = await req.json();
+        const parsed = await req.json();
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return Response.json({ error: 'Request body must be a JSON object' }, { status: 400 });
+        }
+        body = parsed as Record<string, unknown>;
     } catch {
         return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
@@ -87,7 +91,11 @@ Rules:
         // Add conversation history if available (prior revisions in same session)
         if (conversationHistory && Array.isArray(conversationHistory)) {
             for (const msg of conversationHistory) {
-                if (msg.role === 'user' || msg.role === 'assistant') {
+                if (
+                    (msg.role === 'user' || msg.role === 'assistant') &&
+                    typeof msg.content === 'string' &&
+                    msg.content.trim().length > 0
+                ) {
                     messages.push({ role: msg.role as 'user' | 'assistant', content: msg.content });
                 }
             }

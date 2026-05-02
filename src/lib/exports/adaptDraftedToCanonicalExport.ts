@@ -197,7 +197,9 @@ function buildCourtSections(
   sections: DraftedSectionInput[],
   params?: AdaptToCanonicalParams,
 ): ExportSection[] {
-  const hasStructuredPrayer = (params?.prayerRequests?.length ?? 0) > 0;
+  const normalizedPrayerRequests =
+    (params?.prayerRequests ?? []).map((r) => r.trim()).filter(Boolean);
+  const hasStructuredPrayer = normalizedPrayerRequests.length > 0;
 
   return sections
     .filter((s) => {

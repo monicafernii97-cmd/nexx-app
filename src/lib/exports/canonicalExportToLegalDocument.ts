@@ -141,11 +141,14 @@ export function canonicalExportToLegalDocument(
   // ── Build intro blocks from court context ─────────────────
   const introBlocks = buildIntroBlocks(ctx, doc.title);
 
-  // ── Build prayer ──────────────────────────────────────────
+  // ── Build prayer ─────────────────────────────────────
   // Prefer structured prayer from context; fallback to parsed section
+  // Normalize: trim and filter blank entries to avoid [''] forcing structured mode
+  const normalizedPrayerRequests =
+    (ctx?.prayerRequests ?? []).map((r) => r.trim()).filter(Boolean);
   const prayer: PrayerBlock | null =
-    (ctx?.prayerRequests?.length ?? 0) > 0
-      ? { heading: 'PRAYER', intro: ctx!.prayerIntro, requests: ctx!.prayerRequests! }
+    normalizedPrayerRequests.length > 0
+      ? { heading: 'PRAYER', intro: ctx!.prayerIntro, requests: normalizedPrayerRequests }
       : prayerSection
         ? convertPrayer(prayerSection)
         : null;
@@ -277,8 +280,12 @@ function normalizeHeading(heading: string): string {
 function detectSectionLevel(heading: string | undefined): 'roman' | 'letter' | 'plain' {
   if (!heading) return 'plain';
   const trimmed = heading.trim();
-  if (/^[IVXLC]+\.\s/i.test(trimmed)) return 'roman';
-  if (/^[A-Z]\.\s/.test(trimmed)) return 'letter';
+  // Multi-char roman numerals (II., III., IV., XII., etc.) — always roman
+  if (/^[IVXLC]{2,}\. /i.test(trimmed)) return 'roman';
+  // Single-char I, V, X — ambiguous but conventionally roman in legal docs
+  if (/^[IVX]\. /i.test(trimmed)) return 'roman';
+  // Single uppercase letter (A., B., C., D., etc.) — letter section
+  if (/^[A-Z]\. /.test(trimmed)) return 'letter';
   return 'plain';
 }
 

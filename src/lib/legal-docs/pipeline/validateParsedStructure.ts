@@ -7,6 +7,7 @@
 
 import type { ParsedLegalDocument } from './parseLegalDocumentStructure';
 
+/** Custom error class for parsed structure validation failures. */
 export class ParseValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -16,7 +17,13 @@ export class ParseValidationError extends Error {
 
 /**
  * Validate parsed legal document structure.
- * Throws ParseValidationError on any structural issue.
+ *
+ * Ensures the parsed output has enough recognizable structure to
+ * build a valid LegalDocument. Catches collapsed headings where
+ * section heading text erroneously contains numbered items.
+ *
+ * @param parsed - The parsed legal document to validate
+ * @throws {ParseValidationError} on any structural issue
  */
 export function validateParsedStructure(parsed: ParsedLegalDocument): void {
   // At least one section must be detected

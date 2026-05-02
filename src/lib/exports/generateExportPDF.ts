@@ -149,7 +149,15 @@ export async function generateExportPDF(
       const legalDoc = canonicalExportToLegalDocument(document);
 
       // Hard integrity validation — throws on any structural failure
-      assertLegalDocumentIntegrity(legalDoc);
+      try {
+        assertLegalDocumentIntegrity(legalDoc);
+      } catch (err) {
+        throw new ExportDocumentGenerationError({
+          code: 'EXPORT_DOCUMENT_INTEGRITY_FAILED',
+          message: `Legal document integrity check failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          details: err,
+        });
+      }
 
       const qgProfile = exportProfileToQuickGenerateProfile(profile);
 

@@ -84,6 +84,17 @@ const P = {
 // Main Parser
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Parse normalized legal text into a structured ParsedLegalDocument.
+ *
+ * Extracts caption, title, intro blocks (salutation, COMES NOW),
+ * body sections (roman/alpha/numbered/bullet), prayer, signature,
+ * certificate, and verification using deterministic regex patterns.
+ *
+ * @param text - Normalized legal document text
+ * @param _options - Optional parsing hints (document family, jurisdiction)
+ * @returns Parsed legal document structure with confidence scores
+ */
 export function parseLegalDocumentStructure(
   text: string,
   _options?: { documentFamily?: string; jurisdictionHint?: string },
@@ -133,6 +144,16 @@ export function parseLegalDocumentStructure(
 // Caption Extraction
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Extract the caption block from the top of a legal document.
+ *
+ * Scans the first ~30 lines for caption signals (§, CAUSE NO., IN THE INTEREST OF,
+ * DISTRICT COURT, etc.) and builds a 3-column caption structure for Texas pleadings.
+ *
+ * @param lines - All lines of the document
+ * @param startIndex - Line index to start scanning from
+ * @returns Caption block (or null), cause number, and next line index
+ */
 function extractCaption(
   lines: string[],
   startIndex: number,
@@ -238,6 +259,16 @@ function extractCaption(
 // Title Extraction
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Extract the title and optional subtitle from the document.
+ *
+ * Looks for centered all-caps lines after the caption zone. Checks for
+ * a subtitle in parentheses or mixed case on the following line.
+ *
+ * @param lines - All lines of the document
+ * @param startIndex - Line index to start scanning from
+ * @returns Title block (or null) and next line index
+ */
 function extractTitle(
   lines: string[],
   startIndex: number,
@@ -290,6 +321,16 @@ function extractTitle(
 // Intro Block Extraction
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Extract introductory blocks before the first body section.
+ *
+ * Captures the salutation ("TO THE HONORABLE JUDGE...") and the COMES NOW
+ * introductory paragraph, including inline bold emphasis on "COMES NOW".
+ *
+ * @param lines - All lines of the document
+ * @param startIndex - Line index to start scanning from
+ * @returns Intro blocks and next line index
+ */
 function extractIntroBlocks(
   lines: string[],
   startIndex: number,
@@ -343,6 +384,18 @@ function extractIntroBlocks(
 // Body Section Parser
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Parse the body of the legal document into sections, prayer, signature,
+ * certificate, and verification blocks.
+ *
+ * Uses a state machine with mode switching to route lines into the
+ * appropriate block type. Roman headings start new sections, alpha
+ * headings nest inside them, and numbered paragraphs are individual blocks.
+ *
+ * @param lines - All lines of the document
+ * @param startIndex - Line index to start parsing from
+ * @returns Body sections, prayer, signature, certificate, and verification
+ */
 function parseBodySections(lines: string[], startIndex: number): {
   sections: LegalSection[];
   prayer: PrayerBlock | null;
@@ -478,6 +531,11 @@ function parseBodySections(lines: string[], startIndex: number): {
 // Body Line Handler
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Handle a single line in body mode — classifies and routes to the
+ * appropriate block type (roman heading, alpha heading, numbered paragraph,
+ * bullet, or regular paragraph).
+ */
 function handleBodyLine(
   line: string,
   _lineIndex: number,
@@ -553,6 +611,7 @@ function handleBodyLine(
   pushToCurrentContainer(block, state);
 }
 
+/** Handle a single line in prayer mode — detects WHEREFORE intro, numbered requests, and body text. */
 function handlePrayerLine(
   line: string,
   blocks: LegalBlock[],
@@ -588,6 +647,7 @@ function handlePrayerLine(
 // Helpers
 // ═══════════════════════════════════════════════════════════════
 
+/** Push a block to the currently active section (alpha subsection or roman section). */
 function pushToCurrentContainer(
   block: LegalBlock,
   state: { currentAlpha: LegalSection | null; currentRoman: LegalSection | null },
@@ -600,6 +660,7 @@ function pushToCurrentContainer(
   // If no section context, block is dropped (pre-section content should be in introBlocks)
 }
 
+/** Get the blocks array from the most specific active section (alpha > roman). */
 function getActiveBlocks(
   state: { currentAlpha: LegalSection | null; currentRoman: LegalSection | null },
 ): LegalBlock[] {
@@ -608,6 +669,7 @@ function getActiveBlocks(
   return [];
 }
 
+/** Finalize and push open roman/alpha sections to the sections array. */
 function finalizeCurrentSections(
   roman: LegalSection | null,
   alpha: LegalSection | null,
@@ -621,6 +683,7 @@ function finalizeCurrentSections(
   }
 }
 
+/** Convert an alpha subsection into blocks — a heading paragraph + its content blocks. */
 function convertAlphaToBlocks(alpha: LegalSection): LegalBlock[] {
   // Alpha subsections are stored as a paragraph heading + their blocks
   const headingBlock: ParagraphBlock = { type: 'paragraph', text: `__ALPHA_HEADING__${alpha.heading}` };
@@ -629,6 +692,7 @@ function convertAlphaToBlocks(alpha: LegalSection): LegalBlock[] {
 
 // ── Inline Emphasis Builders ────────────────────────────────
 
+/** Build InlineRun[] for a COMES NOW paragraph — first two words bold, rest normal. */
 function buildComesNowRuns(text: string): InlineRun[] {
   const match = text.match(/^(COMES NOW)\s+(.+)$/i);
   if (!match) return [{ text }];
@@ -638,6 +702,7 @@ function buildComesNowRuns(text: string): InlineRun[] {
   ];
 }
 
+/** Build InlineRun[] for a WHEREFORE paragraph — first phrase bold, rest normal. */
 function buildWhereforeRuns(text: string): InlineRun[] {
   const match = text.match(/^(WHEREFORE,?\s*PREMISES CONSIDERED,?)\s*(.+)$/i);
   if (!match) return [{ text }];
@@ -649,6 +714,7 @@ function buildWhereforeRuns(text: string): InlineRun[] {
 
 // ── Confidence Scoring ──────────────────────────────────────
 
+/** Score parser confidence based on which structural elements were detected. */
 function scoreConfidence(parts: {
   caption: CaptionBlock | null;
   title: TitleBlock | null;

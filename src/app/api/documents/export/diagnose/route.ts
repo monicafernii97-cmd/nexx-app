@@ -15,6 +15,7 @@ export const maxDuration = 30;
 
 export async function GET(request: NextRequest) {
     const results: Record<string, string> = {};
+    results['0_version'] = 'v2-2026-05-02';
 
     // 1. Auth
     try {

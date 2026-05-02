@@ -457,7 +457,7 @@ function parseBodySections(lines: string[], startIndex: number): {
       continue;
     }
 
-    if (P.respectfully.test(line)) {
+    if (P.respectfully.test(line) && mode !== 'certificate') {
       mode = 'signature';
       continue;
     }
@@ -616,13 +616,23 @@ function handleBodyLine(
   // ── Bullet ────────────────────────────────────────────────
   const bulletMatch = line.match(P.bullet);
   if (bulletMatch) {
-    // Add to existing bullet list or create new one
-    const container = getActiveBlocks(state);
-    const lastBlock = container[container.length - 1];
-    if (lastBlock && lastBlock.type === 'bullet_list') {
-      lastBlock.items.push(bulletMatch[1]);
+    // Ensure a section exists (creates preamble if needed)
+    if (!state.currentRoman && !state.currentAlpha) {
+      pushToCurrentContainer(
+        { type: 'bullet_list', items: [bulletMatch[1]] },
+        state,
+        (s) => { setRoman(s); state.currentRoman = s; },
+        nextId,
+      );
     } else {
-      container.push({ type: 'bullet_list', items: [bulletMatch[1]] });
+      // Add to existing bullet list or create new one
+      const container = getActiveBlocks(state);
+      const lastBlock = container[container.length - 1];
+      if (lastBlock && lastBlock.type === 'bullet_list') {
+        lastBlock.items.push(bulletMatch[1]);
+      } else {
+        container.push({ type: 'bullet_list', items: [bulletMatch[1]] });
+      }
     }
     return;
   }

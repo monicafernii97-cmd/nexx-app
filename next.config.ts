@@ -14,6 +14,8 @@ const nextConfig: NextConfig = {
     '/api/incidents/\\[id\\]/pdf': ['./src/lib/legal/legalDocStyles.css'],
     '/api/incidents/export': ['./src/lib/legal/legalDocStyles.css'],
     '/api/documents/generate': ['./src/lib/legal/legalDocStyles.css'],
+    '/api/documents/export/stream': ['./src/lib/legal/legalDocStyles.css'],
+    '/api/court-documents/export': ['./src/lib/legal/legalDocStyles.css'],
   },
   images: {
     remotePatterns: [

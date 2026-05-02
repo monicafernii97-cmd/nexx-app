@@ -68,8 +68,8 @@ const PRAYER_HEADINGS = new Set([
   'WHEREFORE',
 ]);
 
-/** Test whether a section heading is a prayer heading. */
-function isPrayerHeading(heading: string | undefined): boolean {
+/** Test whether a section heading is a prayer heading. Exported for shared use. */
+export function isPrayerHeading(heading: string | undefined): boolean {
   if (!heading) return false;
   return PRAYER_HEADINGS.has(heading.trim().toUpperCase());
 }

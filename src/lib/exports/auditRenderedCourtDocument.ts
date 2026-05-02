@@ -28,8 +28,9 @@ const BLOCKED_VISIBLE_TEXT = [
 
 /**
  * Patterns that must never appear as standalone words in visible text.
+ * Includes internal values AND leaked metadata keys.
  */
-const BLOCKED_PATTERNS = /\b(undefined|null|NaN)\b/;
+const BLOCKED_PATTERNS = /\b(undefined|null|NaN|nodeId|nodeType|classifiedNodes|sentenceClassifications|exportRelevance)\b/;
 
 /**
  * Structural headings that should appear exactly once.
@@ -77,17 +78,24 @@ export function auditCourtHTML(html: string): AuditResult {
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   if (bodyMatch) bodyContent = bodyMatch[1];
 
-  const visibleText = bodyContent
+  // Build line-preserving text for heading detection
+  // (block-level tags → newlines, inline tags → spaces)
+  const visibleTextWithLines = bodyContent
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')  // remove style blocks
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // remove script blocks
-    .replace(/<[^>]+>/g, ' ')                         // strip tags
+    .replace(/<(?:br|\/p|\/div|\/li|\/tr|\/h[1-6])\b[^>]*>/gi, '\n') // block tags → newlines
+    .replace(/<[^>]+>/g, ' ')                         // inline tags → spaces
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/\s+/g, ' ')
+    .replace(/[^\S\n]+/g, ' ')  // collapse horizontal whitespace only
+    .replace(/\n+/g, '\n')      // collapse blank lines
     .trim();
+
+  // Flattened text for substring/regex checks
+  const visibleText = visibleTextWithLines.replace(/\s+/g, ' ').trim();
 
   // Check blocked visible text
   for (const blocked of BLOCKED_VISIBLE_TEXT) {
@@ -104,18 +112,18 @@ export function auditCourtHTML(html: string): AuditResult {
   if (BLOCKED_PATTERNS.test(visibleText)) {
     violations.push({
       rule: 'internal_value_leak',
-      detail: 'Internal value (undefined/null/NaN) found in rendered HTML.',
+      detail: 'Internal value or metadata key found in rendered HTML.',
       severity: 'blocker',
     });
   }
 
-  // Check structural once-only headings
+  // Check structural once-only headings (use line-preserving text)
   for (const pattern of ONCE_ONLY_HEADINGS) {
-    const matches = visibleText.match(pattern);
+    const matches = visibleTextWithLines.match(pattern);
     if (matches && matches.length > 1) {
       violations.push({
         rule: 'duplicate_structural_heading',
-        detail: `"${matches[0]}" appears ${matches.length} times — should appear exactly once.`,
+        detail: `"${matches[0].trim()}" appears ${matches.length} times — should appear exactly once.`,
         severity: 'blocker',
       });
     }

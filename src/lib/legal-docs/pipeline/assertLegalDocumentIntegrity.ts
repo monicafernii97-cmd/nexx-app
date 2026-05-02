@@ -214,6 +214,9 @@ export function assertLegalDocumentIntegrity(doc: LegalDocument): void {
 function gatherVisibleText(doc: LegalDocument): string {
   const parts: string[] = [doc.title.main];
   if (doc.title.subtitle) parts.push(doc.title.subtitle);
+  if (doc.title.additionalTitleLines?.length) {
+    parts.push(...doc.title.additionalTitleLines);
+  }
 
   // Caption
   if (doc.caption) {
@@ -238,6 +241,9 @@ function gatherVisibleText(doc: LegalDocument): string {
   // Prayer
   if (doc.prayer) {
     if (doc.prayer.intro) parts.push(doc.prayer.intro);
+    if (doc.prayer.introRuns?.length) {
+      parts.push(...doc.prayer.introRuns.map(r => r.text));
+    }
     parts.push(...doc.prayer.requests);
   }
 

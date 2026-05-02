@@ -31,6 +31,7 @@ import type {
   ExhibitIndexEntry,
 } from './types';
 import type { ExhibitMappedSections } from '@/lib/export-assembly/types/exports';
+import { isPrayerHeading } from './canonicalExportToLegalDocument';
 
 // ═══════════════════════════════════════════════════════════════
 // Input Types
@@ -183,16 +184,14 @@ function buildSections(
   }
 }
 
-/** Headings that indicate a Prayer section — must match canonicalExportToLegalDocument. */
-const PRAYER_HEADINGS =
-  /^(PRAYER|PRAYER\s+FOR\s+RELIEF|REQUESTED\s+RELIEF|CONCLUSION\s+(?:AND|&)\s+PRAYER|WHEREFORE)$/i;
-
 /**
  * Map drafted sections to court document sections, preserving structural identity.
  *
  * When structured prayerIntro/prayerRequests exist in params, any drafted section
  * whose heading matches PRAYER is filtered out to prevent double rendering.
  * The structured prayer will be built by canonicalExportToLegalDocument.
+ *
+ * Uses shared isPrayerHeading() from canonicalExportToLegalDocument — single source of truth.
  */
 function buildCourtSections(
   sections: DraftedSectionInput[],
@@ -203,7 +202,7 @@ function buildCourtSections(
   return sections
     .filter((s) => {
       // Filter out prayer sections when structured prayer exists (dedup)
-      if (hasStructuredPrayer && s.heading && PRAYER_HEADINGS.test(s.heading.trim())) {
+      if (hasStructuredPrayer && isPrayerHeading(s.heading)) {
         return false;
       }
       return true;

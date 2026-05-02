@@ -86,40 +86,52 @@ function isSAPCR(input: CaptionBuildInput): boolean {
 export function buildExportCaption(input: CaptionBuildInput): CaptionBuildResult {
   const validationErrors: CaptionValidationError[] = [];
 
-  // Custom caption: validate required legal pieces
-  if (input.customCaption?.trim()) {
-    const custom = input.customCaption.trim();
-    if (!input.causeNumber && !/cause\s*no|case\s*no|civil\s*action/i.test(custom)) {
+  // Normalize inputs upfront — whitespace-only → undefined (Invariant P3)
+  const norm = {
+    ...input,
+    customCaption: input.customCaption?.trim() || undefined,
+    causeNumber: input.causeNumber?.trim() || undefined,
+    courtName: input.courtName?.trim() || undefined,
+    county: input.county?.trim() || undefined,
+    captionPetitionerName: input.captionPetitionerName?.trim() || undefined,
+    captionRespondentName: input.captionRespondentName?.trim() || undefined,
+  };
+
+  // Compute effective style first so validation can be style-aware
+  const forceSAPCR = isSAPCR(norm) &&
+    (norm.style === 'texas_pleading' || norm.style === 'generic_state_caption');
+  const effectiveStyle = forceSAPCR ? 'texas_pleading' : norm.style;
+
+  // Custom caption: validate required legal pieces (style-aware)
+  if (norm.customCaption) {
+    const custom = norm.customCaption;
+    if (!norm.causeNumber && !/cause\s*no|case\s*no|civil\s*action/i.test(custom)) {
       validationErrors.push({ field: 'causeNumber', message: 'Custom caption is missing a cause number.' });
     }
-    if (!input.courtName && !/court/i.test(custom)) {
+    if (!norm.courtName && !/court/i.test(custom)) {
       validationErrors.push({ field: 'courtName', message: 'Custom caption is missing a court designation.' });
     }
-    if (!input.county && !/county/i.test(custom)) {
+    // County is only required for state-level captions (not federal or in_re)
+    const needsCounty = effectiveStyle === 'texas_pleading' || effectiveStyle === 'generic_state_caption';
+    if (needsCounty && !norm.county && !/county/i.test(custom)) {
       validationErrors.push({ field: 'county', message: 'Custom caption is missing county.' });
     }
   }
 
-  // Force SAPCR caption only when the requested style is texas_pleading
-  // or generic — never override an explicit in_re or federal request.
-  const forceSAPCR = isSAPCR(input) &&
-    (input.style === 'texas_pleading' || input.style === 'generic_state_caption');
-  const effectiveStyle = forceSAPCR ? 'texas_pleading' : input.style;
-
   let caption: ExportCaption;
   switch (effectiveStyle) {
     case 'texas_pleading':
-      caption = buildTexasCaption(input, forceSAPCR);
+      caption = buildTexasCaption(norm, forceSAPCR);
       break;
     case 'federal_caption':
-      caption = buildFederalCaption(input);
+      caption = buildFederalCaption(norm);
       break;
     case 'in_re_caption':
-      caption = buildInReCaption(input);
+      caption = buildInReCaption(norm);
       break;
     case 'generic_state_caption':
     default:
-      caption = buildGenericCaption(input);
+      caption = buildGenericCaption(norm);
       break;
   }
 

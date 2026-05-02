@@ -50,6 +50,7 @@ import {
   canonicalExportToLegalDocument,
   exportProfileToQuickGenerateProfile,
 } from './canonicalExportToLegalDocument';
+import { assertLegalDocumentIntegrity } from '@/lib/legal-docs/pipeline/assertLegalDocumentIntegrity';
 import type { CourtFormattingRules } from '@/lib/legal/types';
 
 // ═══════════════════════════════════════════════════════════════
@@ -140,11 +141,16 @@ export async function generateExportPDF(
 
     if (document.path === 'court_document') {
       // ── COURT DOCUMENTS: Route through Quick Generate renderer ──
-      // Converts the export model → LegalDocument, then renders via
-      // the mature QG pipeline (renderLegalDocumentHTML → legalDocStyles.css)
-      // for court-quality formatting.
+      // Converts the export model → LegalDocument via compatibility adapter,
+      // validates structure, then renders via the deterministic legal renderer.
+      // 🔒 canonicalExportToLegalDocument is a COMPATIBILITY ADAPTER only.
+      // The primary path should use prepareLegalDocument() directly.
 
       const legalDoc = canonicalExportToLegalDocument(document);
+
+      // Hard integrity validation — throws on any structural failure
+      assertLegalDocumentIntegrity(legalDoc);
+
       const qgProfile = exportProfileToQuickGenerateProfile(profile);
 
       html = renderLegalDocumentHTML(legalDoc, qgProfile);

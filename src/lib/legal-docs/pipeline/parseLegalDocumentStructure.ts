@@ -208,7 +208,14 @@ function extractCaption(
         cursor = i + 1;
         continue;
       }
-      if (P.captionLeft.test(line) || /A CHILD/i.test(line) || (!P.romanHeading.test(line) && P.allCapsLine.test(line) && rightLines.length === 0 && line.length < 60)) {
+      const isExplicitLeftCaption = P.captionLeft.test(line) || /A CHILD/i.test(line);
+      const isHeuristicLeftCaption =
+        foundCaptionSignal &&
+        !P.romanHeading.test(line) &&
+        P.allCapsLine.test(line) &&
+        rightLines.length === 0 &&
+        line.length < 60;
+      if (isExplicitLeftCaption || isHeuristicLeftCaption) {
         leftLines.push(line);
         cursor = i + 1;
         continue;
@@ -526,11 +533,15 @@ function parseBodySections(lines: string[], startIndex: number): {
     const prayerParagraphs = prayerBlocks
       .filter((b): b is ParagraphBlock => b.type === 'paragraph')
       .map(b => b.text);
+    const introText = prayerIntroText ?? prayerParagraphs[0];
+    // When intro came from WHEREFORE detection, all prayerParagraphs are requests.
+    // When intro is taken from prayerParagraphs[0], skip it in requests.
+    const fallbackRequests = prayerIntroText ? prayerParagraphs : prayerParagraphs.slice(1);
     prayer = {
       heading: 'PRAYER',
-      intro: prayerIntroText ?? prayerParagraphs[0],
+      intro: introText,
       introRuns: prayerIntroRuns,
-      requests: requests.length > 0 ? requests : prayerParagraphs.slice(1),
+      requests: requests.length > 0 ? requests : fallbackRequests,
     };
   }
 

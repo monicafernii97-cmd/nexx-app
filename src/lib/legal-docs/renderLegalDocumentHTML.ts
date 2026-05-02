@@ -21,7 +21,7 @@
  *   - Times New Roman 12pt / 18pt line height (unless profile overrides)
  */
 
-import type { LegalDocument, LegalBlock } from './types';
+import type { LegalDocument, LegalBlock, InlineRun, NumberedParagraphBlock, ParagraphBlock } from './types';
 import type { QuickGenerateProfile as JurisdictionProfile } from '@/lib/jurisdiction/types';
 import type { DocumentTypeProfile } from './document-type/profiles';
 
@@ -51,7 +51,7 @@ export function renderLegalDocumentHTML(
 <style>
   @page {
     size: ${pageSize};
-    margin: ${m.top}pt ${m.right}pt ${m.bottom}pt ${m.left}pt;
+    margin: 0;
   }
 
   html, body {
@@ -69,7 +69,8 @@ export function renderLegalDocumentHTML(
   }
 
   .document {
-    width: 100%;
+    width: 6.333in;
+    margin: 0 auto;
   }
 
   /* ── Caption ── */
@@ -90,7 +91,7 @@ export function renderLegalDocumentHTML(
   .caption-left,
   .caption-right,
   .caption-center {
-    vertical-align: middle;
+    vertical-align: top;
     text-align: center;
     font-weight: 700;
     ${profile.typography.uppercaseCaption ? 'text-transform: uppercase;' : ''}
@@ -131,14 +132,25 @@ export function renderLegalDocumentHTML(
 
   .title-subtitle {
     text-align: center;
-    font-weight: normal;
+    font-weight: 700;
     margin: 0 0 8pt;
   }
 
   /* ── Body ── */
   .body-paragraph {
     text-align: ${profile.typography.bodyAlign};
+    text-indent: 0;
+    margin: 0 0 6pt;
+  }
+
+  .body-paragraph-intro {
+    text-align: ${profile.typography.bodyAlign};
     text-indent: 0.5in;
+    margin: 0 0 6pt;
+  }
+
+  .salutation {
+    font-weight: 700;
     margin: 0 0 12pt;
   }
 
@@ -146,7 +158,7 @@ export function renderLegalDocumentHTML(
     ${profile.typography.headingBold ? 'font-weight: 700;' : ''}
     ${profile.typography.uppercaseHeadings ? 'text-transform: uppercase;' : ''}
     text-align: left;
-    margin: 16pt 0 6pt;
+    margin: 12pt 0 6pt;
   }
 
   .subheading-inline {
@@ -158,14 +170,32 @@ export function renderLegalDocumentHTML(
   .numbered-list {
     list-style: none;
     padding: 0;
-    margin: 0 0 12pt;
+    margin: 0 0 6pt;
   }
 
   .numbered-list li {
     margin: 0 0 6pt;
-    padding-left: 18pt;
-    text-indent: -18pt;
+    padding-left: 0.25in;
+    text-indent: -0.25in;
     text-align: ${profile.typography.bodyAlign};
+  }
+
+  .numbered-paragraph {
+    display: flex;
+    align-items: flex-start;
+    margin: 0 0 6pt;
+    line-height: ${profile.typography.lineHeightPt}pt;
+  }
+
+  .numbered-paragraph-number {
+    width: 0.25in;
+    flex-shrink: 0;
+  }
+
+  .numbered-paragraph-text {
+    flex: 1;
+    text-align: ${profile.typography.bodyAlign};
+    text-transform: none;
   }
 
   .bullet-list {
@@ -350,30 +380,47 @@ function renderSections(doc: LegalDocument): string {
 function renderBlock(block: LegalBlock): string {
   if (block.type === 'paragraph') {
     // Letter subheadings (A. ...) get inline bold treatment
+    if (/^__ALPHA_HEADING__/.test(block.text)) {
+      return `<div class="subheading-inline">${esc(block.text.replace('__ALPHA_HEADING__', ''))}</div>`;
+    }
     if (/^[A-Z]\.\s+/.test(block.text)) {
       return `<div class="subheading-inline">${esc(block.text)}</div>`;
     }
+    // Render with inline runs if available
+    if (block.runs && block.runs.length > 0) {
+      return `<p class="body-paragraph">${renderInlineRuns(block.runs)}</p>`;
+    }
     return `<p class="body-paragraph">${esc(block.text)}</p>`;
+  }
+
+  if (block.type === 'numbered_paragraph') {
+    const content = block.runs && block.runs.length > 0
+      ? renderInlineRuns(block.runs)
+      : esc(block.text);
+    return `<div class="numbered-paragraph">
+      <span class="numbered-paragraph-number">${esc(String(block.number))}.</span>
+      <span class="numbered-paragraph-text">${content}</span>
+    </div>`;
   }
 
   if (block.type === 'numbered_list') {
     return `
       <ol class="numbered-list">
-        ${block.items.map((item, idx) => `<li>${idx + 1}. ${esc(item)}</li>`).join('')}
+        ${block.items.map((item: string, idx: number) => `<li>${idx + 1}. ${esc(item)}</li>`).join('')}
       </ol>`;
   }
 
   if (block.type === 'lettered_list') {
     return `
       <ol class="lettered-list">
-        ${block.items.map((item, idx) => `<li>${indexToLetter(idx)}. ${esc(item)}</li>`).join('')}
+        ${block.items.map((item: string, idx: number) => `<li>${indexToLetter(idx)}. ${esc(item)}</li>`).join('')}
       </ol>`;
   }
 
   // bullet_list
   return `
     <ul class="bullet-list">
-      ${block.items.map((item) => `<li>${esc(item)}</li>`).join('')}
+      ${(block as { items: string[] }).items.map((item: string) => `<li>${esc(item)}</li>`).join('')}
     </ul>`;
 }
 
@@ -384,12 +431,16 @@ function renderBlock(block: LegalBlock): string {
 function renderPrayer(doc: LegalDocument): string {
   if (!doc.prayer) return '';
 
+  const introHtml = doc.prayer.introRuns && doc.prayer.introRuns.length > 0
+    ? `<p class="body-paragraph">${renderInlineRuns(doc.prayer.introRuns)}</p>`
+    : doc.prayer.intro ? `<p class="body-paragraph">${esc(doc.prayer.intro)}</p>` : '';
+
   return `
     <div class="prayer-heading">${esc(doc.prayer.heading)}</div>
-    ${doc.prayer.intro ? `<p class="body-paragraph">${esc(doc.prayer.intro)}</p>` : ''}
+    ${introHtml}
     ${doc.prayer.requests.length
       ? `<ol class="numbered-list">
-          ${doc.prayer.requests.map((item, idx) => `<li>${idx + 1}. ${esc(item)}</li>`).join('')}
+          ${doc.prayer.requests.map((item: string, idx: number) => `<li>${idx + 1}. ${esc(item)}</li>`).join('')}
         </ol>`
       : ''}`;
 }
@@ -474,4 +525,18 @@ function esc(input: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+/**
+ * Render inline formatting runs (bold, italic, underline).
+ * Used for legal emphasis patterns like COMES NOW and WHEREFORE.
+ */
+function renderInlineRuns(runs: InlineRun[]): string {
+  return runs.map(run => {
+    let html = esc(run.text);
+    if (run.bold) html = `<strong>${html}</strong>`;
+    if (run.italic) html = `<em>${html}</em>`;
+    if (run.underline) html = `<u>${html}</u>`;
+    return html;
+  }).join('');
 }

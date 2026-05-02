@@ -353,12 +353,14 @@ export async function POST(request: NextRequest) {
                 let draftedSections: DraftedSection[];
 
                 if (isFastPath) {
-                    // ── FAST PATH: Content is already drafted — skip GPT ──
+                    // ── UNIFIED PIPELINE: Pasted content goes through legal structure parser ──
+                    // No fast path. No blob section. The unified pipeline normalizes,
+                    // classifies, parses, validates, and builds a proper LegalDocument.
                     send({
                         type: 'milestone',
                         stage: 'drafting',
                         percent: 65,
-                        message: 'Using pre-drafted document content...',
+                        message: 'Parsing document structure...',
                     });
 
                     // Respect Review Hub edits and exclusions
@@ -383,12 +385,41 @@ export async function POST(request: NextRequest) {
                         ?? reviewedItem?.originalText
                         ?? classifiedNodes[0].rawText;
 
-                    draftedSections = [{
-                        sectionId: 'document_body',
-                        heading: '',
-                        body: rawText,
+                    // Parse through unified legal document pipeline
+                    const { prepareLegalDocument } = await import('@/lib/legal-docs/pipeline/prepareLegalDocument');
+                    const parsedLegalDoc = prepareLegalDocument({
+                        text: rawText,
+                        metadata: {
+                            causeNumber,
+                            jurisdiction: courtState,
+                            county: courtCounty,
+                        },
+                        jurisdictionHint: courtState,
+                    });
+
+                    // Convert parsed sections into draftedSections format for compatibility
+                    // with the existing adapt pipeline downstream
+                    draftedSections = parsedLegalDoc.sections.map((section) => ({
+                        sectionId: section.id,
+                        heading: section.heading,
+                        body: section.blocks
+                            .map((block) => {
+                                if (block.type === 'paragraph') return block.text;
+                                if (block.type === 'numbered_paragraph') return `${block.number}. ${block.text}`;
+                                if (block.type === 'bullet_list') return block.items.map(i => `• ${i}`).join('\n');
+                                if (block.type === 'numbered_list') return block.items.map((item: string, idx: number) => `${idx + 1}. ${item}`).join('\n');
+                                if (block.type === 'lettered_list') return block.items.join('\n');
+                                return '';
+                            })
+                            .join('\n\n'),
+                        numberedItems: section.blocks
+                            .filter((b): b is import('@/lib/legal-docs/types').NumberedParagraphBlock => b.type === 'numbered_paragraph')
+                            .map(b => b.text),
                         source: 'user_locked' as const,
-                    }];
+                    }));
+
+                    // Store parsed legal document for downstream use
+                    (body as unknown as Record<string, unknown>).__parsedLegalDocument = parsedLegalDoc;
                 } else {
                     // ── FULL PATH: Draft via GPT ──
                     send({

@@ -50,6 +50,10 @@ import {
   canonicalExportToLegalDocument,
   exportProfileToQuickGenerateProfile,
 } from './canonicalExportToLegalDocument';
+import {
+  assertLegalDocumentIntegrity,
+  LegalDocumentIntegrityError,
+} from '@/lib/legal-docs/pipeline/assertLegalDocumentIntegrity';
 import type { CourtFormattingRules } from '@/lib/legal/types';
 
 // ═══════════════════════════════════════════════════════════════
@@ -140,11 +144,32 @@ export async function generateExportPDF(
 
     if (document.path === 'court_document') {
       // ── COURT DOCUMENTS: Route through Quick Generate renderer ──
-      // Converts the export model → LegalDocument, then renders via
-      // the mature QG pipeline (renderLegalDocumentHTML → legalDocStyles.css)
-      // for court-quality formatting.
+      // Converts the export model → LegalDocument via compatibility adapter,
+      // validates structure, then renders via the deterministic legal renderer.
+      // 🔒 canonicalExportToLegalDocument is a COMPATIBILITY ADAPTER only.
+      // The primary path should use prepareLegalDocument() directly.
 
       const legalDoc = canonicalExportToLegalDocument(document);
+
+      // Advisory integrity validation — logs warnings for compatibility adapter output
+      // The adapter may produce documents without proper captions/titles.
+      // Hard integrity enforcement is reserved for the unified pipeline path
+      // (prepareLegalDocument → assertLegalDocumentIntegrity).
+      try {
+        assertLegalDocumentIntegrity(legalDoc);
+      } catch (err) {
+        if (err instanceof LegalDocumentIntegrityError) {
+          console.warn('[ExportPDF] Integrity advisory (compatibility adapter): validation_failed');
+          // Continue rendering — compatibility adapter is best-effort only.
+        } else {
+          throw new ExportDocumentGenerationError({
+            code: 'EXPORT_DOCUMENT_INTEGRITY_FAILED',
+            message: `Unexpected integrity assertion failure: ${err instanceof Error ? err.name : 'Unknown error'}`,
+            details: err,
+          });
+        }
+      }
+
       const qgProfile = exportProfileToQuickGenerateProfile(profile);
 
       html = renderLegalDocumentHTML(legalDoc, qgProfile);

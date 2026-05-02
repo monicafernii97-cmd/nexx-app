@@ -52,6 +52,7 @@ describe('failure mapping — error code taxonomy', () => {
       EXPORT_PROFILE_RESOLUTION_FAILED: true,
       EXPORT_PROFILE_INVALID_FOR_PATH: true,
       EXPORT_DOCUMENT_VALIDATION_FAILED: true,
+      EXPORT_DOCUMENT_INTEGRITY_FAILED: true,
       EXPORT_RENDER_TOO_SHORT: true,
       EXPORT_RENDER_STRUCTURE_INVALID: true,
       EXPORT_PDF_RENDER_FAILED: true,

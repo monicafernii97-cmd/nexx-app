@@ -10,11 +10,12 @@
  *   - Shell structure exists (containers, headings via DOM queries)
  *   - Substantive content exists (body text, not just wrappers)
  *
- * Uses JSDOM for reliable DOM-based assertions — prevents false
- * positives from CSS class names in <style> blocks or HTML comments.
+ * Uses JSDOM for reliable DOM-based assertions — loaded dynamically
+ * to avoid ESM/CJS crashes on Vercel serverless (jsdom's dependency
+ * chain includes ESM-only packages that fail when externalized).
+ * Falls back to regex checks if jsdom is unavailable.
  */
 
-import { JSDOM } from 'jsdom';
 import type { ExportPath } from './types';
 
 /** Minimum content length within structure (prevents empty shells). */
@@ -23,48 +24,96 @@ const MIN_SUBSTANTIVE_CONTENT_LENGTH = 50;
 /**
  * Assert that rendered HTML contains the expected structural markers
  * for the given export path. Uses DOM queries for reliable matching.
+ * Falls back to regex-based checks if jsdom is unavailable.
  *
  * @throws Error with descriptive message on failure
  */
-export function assertRenderedExportStructure(
+export async function assertRenderedExportStructure(
   html: string,
   path: ExportPath,
-): void {
+): Promise<void> {
   const checks = PATH_STRUCTURE_CHECKS[path];
   if (!checks) {
     throw new Error(`Unsupported export path for structure assertion: "${path}"`);
   }
 
-  // Parse HTML into DOM for reliable structural queries.
-  // This prevents false positives from CSS selectors in <style> blocks
-  // or attribute values matching structural marker strings.
-  const dom = new JSDOM(html);
-  const document = dom.window.document;
+  try {
+    // Dynamic import to avoid pulling jsdom into the module graph at load time.
+    const { JSDOM } = await import('jsdom');
 
-  const missing: string[] = [];
+    const dom = new JSDOM(html);
+    const document = dom.window.document;
 
-  for (const check of checks.required) {
-    if (!document.querySelector(check.selector)) {
-      missing.push(check.label);
+    const missing: string[] = [];
+
+    for (const check of checks.required) {
+      if (!document.querySelector(check.selector)) {
+        missing.push(check.label);
+      }
     }
-  }
 
+    if (missing.length > 0) {
+      throw new Error(
+        `Export HTML structure invalid for "${path}": missing ${missing.join(', ')}`,
+      );
+    }
+
+    // Substantive content check — remove <style> and <script> nodes
+    // from the DOM, then measure remaining text content.
+    document.querySelectorAll('style, script').forEach((el) => el.remove());
+    const textContent = (document.body?.textContent ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (textContent.length < MIN_SUBSTANTIVE_CONTENT_LENGTH) {
+      throw new Error(
+        `Export HTML for "${path}" has only ${textContent.length} chars of text content (minimum ${MIN_SUBSTANTIVE_CONTENT_LENGTH}) — possible empty shell`,
+      );
+    }
+  } catch (err) {
+    // If jsdom itself failed to load (ESM compat), fall back to regex checks
+    if (err instanceof Error && err.message.includes('ERR_REQUIRE_ESM')) {
+      console.warn('[assertRenderedExportStructure] jsdom unavailable, using regex fallback');
+      assertWithRegexFallback(html, path, checks);
+      return;
+    }
+    // Re-throw structural assertion errors
+    throw err;
+  }
+}
+
+/** Regex fallback when jsdom is unavailable on Vercel. */
+function assertWithRegexFallback(
+  html: string,
+  path: ExportPath,
+  checks: StructureCheck,
+): void {
+  const missing: string[] = [];
+  for (const check of checks.required) {
+    // Convert CSS selectors to simple class/tag regex patterns
+    const patterns = check.selector.split(',').map(s => s.trim());
+    const found = patterns.some(pat => {
+      const classMatch = pat.match(/\.([a-z0-9_-]+)/i);
+      const tagMatch = pat.match(/^([a-z1-6]+)/i);
+      if (classMatch) return html.includes(`class="${classMatch[1]}"`) || html.includes(`class~="${classMatch[1]}"`);
+      if (tagMatch) return new RegExp(`<${tagMatch[1]}[\\s>]`, 'i').test(html);
+      return false;
+    });
+    if (!found) missing.push(check.label);
+  }
   if (missing.length > 0) {
     throw new Error(
-      `Export HTML structure invalid for "${path}": missing ${missing.join(', ')}`,
+      `Export HTML structure invalid for "${path}" (regex fallback): missing ${missing.join(', ')}`,
     );
   }
-
-  // Substantive content check — remove <style> and <script> nodes
-  // from the DOM, then measure remaining text content.
-  document.querySelectorAll('style, script').forEach((el) => el.remove());
-  const textContent = (document.body?.textContent ?? '')
+  // Substantive content: strip tags, measure text
+  const textOnly = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-
-  if (textContent.length < MIN_SUBSTANTIVE_CONTENT_LENGTH) {
+  if (textOnly.length < MIN_SUBSTANTIVE_CONTENT_LENGTH) {
     throw new Error(
-      `Export HTML for "${path}" has only ${textContent.length} chars of text content (minimum ${MIN_SUBSTANTIVE_CONTENT_LENGTH}) — possible empty shell`,
+      `Export HTML for "${path}" has only ${textOnly.length} chars of text content (minimum ${MIN_SUBSTANTIVE_CONTENT_LENGTH}) — possible empty shell`,
     );
   }
 }

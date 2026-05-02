@@ -130,7 +130,7 @@ export async function generateExportPDF(
     const html = renderHTMLStage(document, profile);
 
     // 5. Assert HTML structural integrity
-    assertStructureStage(html, document.path as ExportPath);
+    await assertStructureStage(html, document.path as ExportPath);
 
     // 6. Render PDF via Puppeteer
     const pdfBuffer = await renderPDFStage(html, profile, input.causeNumber);
@@ -259,9 +259,9 @@ function renderHTMLStage(
 }
 
 /** Stage 5: Assert HTML contains expected structural markers. */
-function assertStructureStage(html: string, path: ExportPath): void {
+async function assertStructureStage(html: string, path: ExportPath): Promise<void> {
   try {
-    assertRenderedExportStructure(html, path);
+    await assertRenderedExportStructure(html, path);
   } catch (err) {
     throw new ExportDocumentGenerationError({
       code: 'EXPORT_RENDER_STRUCTURE_INVALID',

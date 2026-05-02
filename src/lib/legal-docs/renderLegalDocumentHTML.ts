@@ -398,7 +398,7 @@ function renderBlock(block: LegalBlock): string {
       ? renderInlineRuns(block.runs)
       : esc(block.text);
     return `<div class="numbered-paragraph">
-      <span class="numbered-paragraph-number">${block.number}.</span>
+      <span class="numbered-paragraph-number">${esc(String(block.number))}.</span>
       <span class="numbered-paragraph-text">${content}</span>
     </div>`;
   }

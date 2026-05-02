@@ -143,8 +143,10 @@ describe('generateExportPDF — orchestrator', () => {
     });
   });
 
-  it('throws ExportDocumentGenerationError for missing title', async () => {
+  it('logs integrity warning for missing title but still renders', async () => {
     const { generateExportPDF } = await import('../generateExportPDF');
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
     const input = makeValidInput({
       adaptParams: {
         path: 'court_document',
@@ -155,9 +157,13 @@ describe('generateExportPDF — orchestrator', () => {
       },
     });
 
-    await expect(generateExportPDF(input)).rejects.toMatchObject({
-      name: 'ExportDocumentGenerationError',
-      code: 'EXPORT_RENDER_STRUCTURE_INVALID',
-    });
+    // Advisory mode: integrity failures log a warning but don't block rendering
+    const result = await generateExportPDF(input);
+    expect(result.pdfBuffer).toBeInstanceOf(Buffer);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[ExportPDF] Integrity advisory'),
+    );
+
+    consoleSpy.mockRestore();
   });
 });

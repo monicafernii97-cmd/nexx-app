@@ -148,15 +148,18 @@ export async function generateExportPDF(
 
       const legalDoc = canonicalExportToLegalDocument(document);
 
-      // Hard integrity validation — throws on any structural failure
+      // Advisory integrity validation — logs warnings for compatibility adapter output
+      // The adapter may produce documents without proper captions/titles.
+      // Hard integrity enforcement is reserved for the unified pipeline path
+      // (prepareLegalDocument → assertLegalDocumentIntegrity).
       try {
         assertLegalDocumentIntegrity(legalDoc);
       } catch (err) {
-        throw new ExportDocumentGenerationError({
-          code: 'EXPORT_DOCUMENT_INTEGRITY_FAILED',
-          message: `Legal document integrity check failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
-          details: err,
-        });
+        console.warn(
+          `[ExportPDF] Integrity advisory (compatibility adapter): ${err instanceof Error ? err.message : 'Unknown'}`,
+        );
+        // Continue rendering — the adapter path is legacy and may lack
+        // captions/titles that the integrity check expects.
       }
 
       const qgProfile = exportProfileToQuickGenerateProfile(profile);

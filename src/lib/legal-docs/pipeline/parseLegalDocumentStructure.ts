@@ -356,7 +356,17 @@ function extractIntroBlocks(
       let fullText = line;
       for (let j = i + 1; j < lines.length; j++) {
         const nextLine = lines[j].trim();
-        if (!nextLine || P.horizontalRule.test(nextLine) || P.romanHeading.test(nextLine)) break;
+        if (
+          !nextLine ||
+          P.horizontalRule.test(nextLine) ||
+          P.romanHeading.test(nextLine) ||
+          P.numberedParagraph.test(nextLine) ||
+          P.prayer.test(nextLine) ||
+          P.prayerAlt.test(nextLine) ||
+          P.respectfully.test(nextLine) ||
+          P.certificateOfService.test(nextLine) ||
+          P.verification.test(nextLine)
+        ) break;
         fullText += ' ' + nextLine;
         cursor = j + 1;
       }
@@ -367,8 +377,16 @@ function extractIntroBlocks(
       continue;
     }
 
-    // If we hit a roman heading or numbered paragraph, stop intro
-    if (P.romanHeading.test(line) || P.numberedParagraph.test(line)) {
+    // If we hit a structural boundary, stop intro
+    if (
+      P.romanHeading.test(line) ||
+      P.numberedParagraph.test(line) ||
+      P.prayer.test(line) ||
+      P.prayerAlt.test(line) ||
+      P.respectfully.test(line) ||
+      P.certificateOfService.test(line) ||
+      P.verification.test(line)
+    ) {
       break;
     }
 
@@ -413,7 +431,7 @@ function parseBodySections(lines: string[], startIndex: number): {
   let currentAlpha: LegalSection | null = null;
   let sectionCounter = 0;
 
-  type Mode = 'body' | 'prayer' | 'signature' | 'certificate' | 'verification';
+  type Mode = 'body' | 'prayer' | 'signature' | 'certificate' | 'certificate_signature' | 'verification';
   let mode: Mode = 'body';
 
   const prayerBlocks: LegalBlock[] = [];
@@ -464,10 +482,13 @@ function parseBodySections(lines: string[], startIndex: number): {
         break;
       case 'certificate':
         if (P.respectfully.test(line)) {
-          mode = 'signature'; // cert signature
+          mode = 'certificate_signature';
         } else {
           certBodyLines.push(line);
         }
+        break;
+      case 'certificate_signature':
+        certSignerLines.push(line);
         break;
       case 'verification':
         verifyBodyLines.push(line);
@@ -588,7 +609,7 @@ function handleBodyLine(
       number: parseInt(numMatch[1], 10),
       text: numMatch[2],
     };
-    pushToCurrentContainer(block, state);
+    pushToCurrentContainer(block, state, (s) => { setRoman(s); state.currentRoman = s; }, nextId);
     return;
   }
 
@@ -608,7 +629,7 @@ function handleBodyLine(
 
   // ── Regular paragraph ─────────────────────────────────────
   const block: ParagraphBlock = { type: 'paragraph', text: line };
-  pushToCurrentContainer(block, state);
+  pushToCurrentContainer(block, state, (s) => { setRoman(s); state.currentRoman = s; }, nextId);
 }
 
 /** Handle a single line in prayer mode — detects WHEREFORE intro, numbered requests, and body text. */
@@ -647,17 +668,33 @@ function handlePrayerLine(
 // Helpers
 // ═══════════════════════════════════════════════════════════════
 
-/** Push a block to the currently active section (alpha subsection or roman section). */
+/** Push a block to the currently active section (alpha subsection or roman section).
+ * If no section exists yet, creates an implicit preamble section to prevent data loss. */
 function pushToCurrentContainer(
   block: LegalBlock,
-  state: { currentAlpha: LegalSection | null; currentRoman: LegalSection | null },
+  state: {
+    currentAlpha: LegalSection | null;
+    currentRoman: LegalSection | null;
+    sectionCounter: number;
+  },
+  setRoman?: (s: LegalSection) => void,
+  nextId?: () => number,
 ): void {
   if (state.currentAlpha) {
     state.currentAlpha.blocks.push(block);
   } else if (state.currentRoman) {
     state.currentRoman.blocks.push(block);
+  } else {
+    // Create implicit preamble section for pre-heading content
+    const preamble: LegalSection = {
+      id: `section_${nextId ? nextId() : ++state.sectionCounter}`,
+      heading: '',
+      level: 'roman',
+      blocks: [block],
+    };
+    state.currentRoman = preamble;
+    if (setRoman) setRoman(preamble);
   }
-  // If no section context, block is dropped (pre-section content should be in introBlocks)
 }
 
 /** Get the blocks array from the most specific active section (alpha > roman). */

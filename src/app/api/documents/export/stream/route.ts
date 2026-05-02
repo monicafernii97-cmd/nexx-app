@@ -944,12 +944,19 @@ export async function POST(request: NextRequest) {
     // Catch-all: prevent Next.js from returning an HTML 500 error page.
     // This catches errors in auth(), rate limiting, JSON parsing, or
     // Convex client creation — anything before the SSE stream starts.
-    console.error('[ExportStream] Top-level route crash:', topLevelError);
+    const stack = topLevelError instanceof Error ? topLevelError.stack : String(topLevelError);
     const message = topLevelError instanceof Error
         ? topLevelError.message
         : 'Unknown export route error';
+    console.error('[ExportStream] TOP-LEVEL CRASH');
+    console.error('[ExportStream] Message:', message);
+    console.error('[ExportStream] Stack:', stack);
+    console.error('[ExportStream] Type:', typeof topLevelError);
+    if (topLevelError instanceof Error && topLevelError.cause) {
+        console.error('[ExportStream] Cause:', topLevelError.cause);
+    }
     return new Response(
-        JSON.stringify({ error: message, code: 'route_crash' }),
+        JSON.stringify({ error: message, code: 'route_crash', stack: stack?.slice(0, 1000) }),
         { status: 500, headers: { 'Content-Type': 'application/json' } },
     );
   }

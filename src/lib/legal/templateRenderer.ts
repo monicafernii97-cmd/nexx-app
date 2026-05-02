@@ -7,9 +7,8 @@
  * Flow: Template sections → populate with user data → inject court rules as CSS vars → full HTML
  */
 
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import createDOMPurify from 'dompurify';
+import { getLegalCSS } from './pdfHelpers';
 import type {
   CourtFormattingRules,
   CaptionData,
@@ -20,19 +19,7 @@ import type {
   TextExcerptExhibit,
 } from './types';
 
-// ── Load the CSS stylesheet ──────────────────────────────────
-let cachedCSS: string | null = null;
 
-/** Load and cache the legal document CSS stylesheet from disk. */
-function getLegalCSS(): string {
-  if (!cachedCSS) {
-    cachedCSS = readFileSync(
-      join(process.cwd(), 'src/lib/legal/legalDocStyles.css'),
-      'utf-8'
-    );
-  }
-  return cachedCSS;
-}
 
 // ═══════════════════════════════════════════════════════════════
 // CSS Variable Injection

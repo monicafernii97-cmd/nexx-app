@@ -22,6 +22,7 @@ import type {
   LegalSection,
   LegalBlock,
   ParagraphBlock,
+  NumberedParagraphBlock,
   NumberedListBlock,
   BulletListBlock,
   PrayerBlock,
@@ -34,6 +35,21 @@ import type {
   QuickGenerateProfile,
   JurisdictionProfile,
 } from '@/lib/jurisdiction/types';
+
+// ═══════════════════════════════════════════════════════════════
+// Court Document Context (plan step 8)
+// ═══════════════════════════════════════════════════════════════
+
+/** Court-specific context for building intro, prayer, signature. */
+export type CourtDocumentContext = {
+  filingPartyName?: string;
+  filingPartyRole?: string;
+  isProSe?: boolean;
+  documentTitle?: string;
+  documentKind?: string;
+  prayerIntro?: string;
+  prayerRequests?: string[];
+};
 
 // ═══════════════════════════════════════════════════════════════
 // Prayer Heading Detection
@@ -68,9 +84,13 @@ function isPrayerHeading(heading: string | undefined): boolean {
  *
  * Only valid for court_document exports. Throws if called with
  * a non-court document.
+ *
+ * @param doc  - CanonicalExportDocument from the adapter layer
+ * @param ctx  - Optional court-specific context (identity, prayer, signature)
  */
 export function canonicalExportToLegalDocument(
   doc: CanonicalExportDocument,
+  ctx?: CourtDocumentContext,
 ): LegalDocument {
   if (doc.path !== 'court_document') {
     throw new Error(
@@ -83,19 +103,23 @@ export function canonicalExportToLegalDocument(
     (s): s is CourtSection => s.kind === 'court_section',
   );
 
-  // ── Separate prayer from body sections ────────────────────
+  // ── Separate prayer from body sections ────────────────────────
   const bodySections: CourtSection[] = [];
   let prayerSection: CourtSection | null = null;
 
   for (const section of courtSections) {
     if (isPrayerHeading(section.heading)) {
-      prayerSection = section;
+      // Only keep the first prayer section (dedup invariant 12)
+      if (!prayerSection) prayerSection = section;
     } else {
       bodySections.push(section);
     }
   }
 
-  // ── Build LegalDocument ───────────────────────────────────
+  // ── Dedup body sections (invariant 12 / >80 chars) ──────
+  const dedupedSections = deduplicateSections(bodySections);
+
+  // ── Build LegalDocument ───────────────────────────────
   const title: TitleBlock = {
     main: doc.title,
     subtitle: doc.subtitle,
@@ -105,13 +129,24 @@ export function canonicalExportToLegalDocument(
     ? convertCaption(doc.caption)
     : null;
 
-  const sections: LegalSection[] = bodySections.map(convertCourtSection);
+  const sections: LegalSection[] = dedupedSections.map((s, i) =>
+    convertCourtSection(s, i + 1),
+  );
 
-  const prayer: PrayerBlock | null = prayerSection
-    ? convertPrayer(prayerSection)
-    : null;
+  // ── Build intro blocks from court context ─────────────────
+  const introBlocks = buildIntroBlocks(ctx, doc.title);
 
-  const signature: SignatureBlock | null = doc.signature ?? null;
+  // ── Build prayer ──────────────────────────────────────────
+  // Prefer structured prayer from context; fallback to parsed section
+  const prayer: PrayerBlock | null =
+    (ctx?.prayerRequests?.length ?? 0) > 0
+      ? { heading: 'PRAYER', intro: ctx!.prayerIntro, requests: ctx!.prayerRequests! }
+      : prayerSection
+        ? convertPrayer(prayerSection)
+        : null;
+
+  // ── Build signature ───────────────────────────────────────
+  const signature: SignatureBlock | null = buildSignatureBlock(doc, ctx);
   const certificate: CertificateBlock | null = doc.certificate ?? null;
   const verification: VerificationBlock | null = doc.verification ?? null;
 
@@ -123,10 +158,12 @@ export function canonicalExportToLegalDocument(
       county: doc.metadata.jurisdiction?.county,
       jurisdiction: doc.metadata.jurisdiction?.state,
       documentType: doc.metadata.documentType,
+      filingParty: ctx?.filingPartyName,
+      partyRole: ctx?.filingPartyRole,
     },
     caption,
     title,
-    introBlocks: [],
+    introBlocks,
     sections,
     prayer,
     signature,
@@ -165,13 +202,14 @@ function convertCaption(caption: ExportCaption): CaptionBlock {
 /**
  * Convert a CourtSection (export model) to a LegalSection (QG model).
  *
- * CourtSection stores content as flat arrays (paragraphs[], numberedItems[],
- * bulletItems[]). LegalSection stores typed LegalBlock[] in sequence.
- *
- * Ordering: paragraphs first, then numbered items, then bullets.
- * This matches the structural order expected by the QG renderer.
+ * Changes from original:
+ * 1. Heading is normalized: strip leading Roman/letter numerals so the
+ *    renderer can prepend its own via the ordinal field.
+ * 2. Numbered items become individual `numbered_paragraph` blocks
+ *    instead of a single `numbered_list`.
+ * 3. Ordinal is assigned for deterministic rendering.
  */
-function convertCourtSection(section: CourtSection): LegalSection {
+function convertCourtSection(section: CourtSection, ordinal: number): LegalSection {
   const blocks: LegalBlock[] = [];
 
   // Paragraphs → ParagraphBlock[]
@@ -181,12 +219,15 @@ function convertCourtSection(section: CourtSection): LegalSection {
     }
   }
 
-  // Numbered items → NumberedListBlock
+  // Numbered items → individual NumberedParagraphBlock (not numbered_list)
   if (section.numberedItems?.length) {
-    blocks.push({
-      type: 'numbered_list',
-      items: section.numberedItems,
-    } satisfies NumberedListBlock);
+    section.numberedItems.forEach((text, idx) => {
+      blocks.push({
+        type: 'numbered_paragraph',
+        number: idx + 1,
+        text,
+      } satisfies NumberedParagraphBlock);
+    });
   }
 
   // Bullet items → BulletListBlock
@@ -199,10 +240,27 @@ function convertCourtSection(section: CourtSection): LegalSection {
 
   return {
     id: section.id,
-    heading: section.heading ?? '',
+    heading: normalizeHeading(section.heading ?? ''),
     level: detectSectionLevel(section.heading),
+    ordinal,
     blocks,
   };
+}
+
+/**
+ * Strip leading Roman numeral or letter prefix from heading text.
+ * "I. BACKGROUND" → "BACKGROUND"
+ * "A. Overview" → "Overview"
+ * "BACKGROUND" → "BACKGROUND" (unchanged)
+ *
+ * The renderer applies numbering via the ordinal field,
+ * so storing the prefix in the heading causes double numbering.
+ */
+function normalizeHeading(heading: string): string {
+  return heading
+    .replace(/^[IVXLC]+\.\s+/i, '') // strip Roman prefix
+    .replace(/^[A-Z]\.\s+/, '')      // strip letter prefix
+    .trim();
 }
 
 /**
@@ -217,6 +275,135 @@ function detectSectionLevel(heading: string | undefined): 'roman' | 'letter' | '
   if (/^[IVXLC]+\.\s/i.test(trimmed)) return 'roman';
   if (/^[A-Z]\.\s/.test(trimmed)) return 'letter';
   return 'plain';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Intro Block Builder (plan section VII)
+// ═══════════════════════════════════════════════════════════════
+
+/** Document kinds that require a COMES NOW intro block. */
+const INTRO_REQUIRED_KINDS = new Set([
+  'motion', 'amended_motion', 'second_amended_motion',
+  'third_amended_motion', 'response', 'petition',
+]);
+
+/**
+ * Build intro blocks from court context.
+ *
+ * For motions: TO THE HONORABLE JUDGE + COMES NOW intro.
+ * For declarations/affidavits/notices: no auto-generated intro.
+ */
+function buildIntroBlocks(
+  ctx: CourtDocumentContext | undefined,
+  docTitle: string,
+): LegalBlock[] {
+  if (!ctx?.filingPartyName || !ctx.filingPartyRole) return [];
+  if (!INTRO_REQUIRED_KINDS.has(ctx.documentKind ?? '')) return [];
+
+  const blocks: LegalBlock[] = [];
+
+  // TO THE HONORABLE JUDGE
+  blocks.push({
+    type: 'paragraph',
+    text: 'TO THE HONORABLE JUDGE OF SAID COURT:',
+    runs: [{ text: 'TO THE HONORABLE JUDGE OF SAID COURT:', bold: true }],
+  });
+
+  // COMES NOW intro
+  const proSeClause = ctx.isProSe ? ', appearing pro se,' : ',';
+  const roleLabel = ctx.filingPartyRole.charAt(0).toUpperCase() +
+    ctx.filingPartyRole.slice(1).toLowerCase();
+  const title = ctx.documentTitle || docTitle;
+  const comesNow =
+    `COMES NOW ${ctx.filingPartyName}, ${roleLabel}${proSeClause} ` +
+    `and files this ${title}, and respectfully shows the Court as follows:`;
+
+  blocks.push({
+    type: 'paragraph',
+    text: comesNow,
+    runs: [
+      { text: 'COMES NOW ', bold: true },
+      { text: `${ctx.filingPartyName}, ${roleLabel}${proSeClause} ` },
+      { text: `and files this ${title}, and respectfully shows the Court as follows:` },
+    ],
+  });
+
+  return blocks;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Signature Block Builder (plan section VIII)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Build signature block based on representation status.
+ *
+ * Invariant 8:
+ * - isProSe === true → proper pro se signature block
+ * - isProSe === false → existing doc.signature or null
+ *   (ClarificationModal handles missing attorney sig)
+ */
+function buildSignatureBlock(
+  doc: CanonicalExportDocument,
+  ctx: CourtDocumentContext | undefined,
+): SignatureBlock | null {
+  // If doc already has an explicit signature, use it
+  if (doc.signature) return doc.signature;
+
+  // Pro se: generate deterministic signature block
+  if (ctx?.isProSe && ctx.filingPartyName) {
+    return {
+      intro: 'Respectfully submitted,',
+      signerLines: [
+        '_________________________',
+        ctx.filingPartyName,
+        'Pro Se',
+      ],
+    };
+  }
+
+  // Not pro se: do not generate a pro se fallback.
+  // ClarificationModal will handle missing attorney signature.
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Deduplication (invariant 12)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Normalize text for duplicate comparison.
+ * Strips numbers, quotes, dashes, whitespace, and lowercases.
+ */
+function normalizeForDedup(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/^\d+\.\s*/, '')       // strip leading numbers
+    .replace(/[""'']/g, '"')         // normalize quotes
+    .replace(/[–—]/g, '-')           // normalize dashes
+    .replace(/\s+/g, ' ')           // collapse whitespace
+    .trim();
+}
+
+/**
+ * Remove duplicate court sections by comparing normalized content.
+ * Only flags duplicates > 80 chars to avoid false positives on
+ * short common legal phrases.
+ */
+function deduplicateSections(sections: CourtSection[]): CourtSection[] {
+  const seen = new Set<string>();
+  return sections.filter((section) => {
+    const content = [
+      ...(section.paragraphs ?? []),
+      ...(section.numberedItems ?? []),
+    ].join('\n');
+    const normalized = normalizeForDedup(content);
+    if (normalized.length > 80 && seen.has(normalized)) {
+      return false;
+    }
+    if (normalized.length > 80) seen.add(normalized);
+    return true;
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════

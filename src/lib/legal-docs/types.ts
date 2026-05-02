@@ -111,6 +111,8 @@ export type LegalSection = {
   id: string;
   heading: string;
   level: 'roman' | 'letter' | 'plain';
+  /** Ordinal position (1-indexed). Renderer prepends Roman/letter numeral. */
+  ordinal?: number;
   blocks: LegalBlock[];
 };
 

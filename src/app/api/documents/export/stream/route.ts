@@ -651,11 +651,11 @@ export async function POST(request: NextRequest) {
                         style: exportProfile.court.captionStyle,
                         courtName: undefined,
                         causeNumber,
-                        petitionerName,
-                        respondentName,
+                        captionPetitionerName: petitionerName,
+                        captionRespondentName: respondentName,
                         state: courtState,
                         county: courtCounty,
-                    })
+                    }).caption
                     : null;
 
                 // 4c. Build adapt params

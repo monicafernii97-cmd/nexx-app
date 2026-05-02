@@ -50,7 +50,10 @@ import {
   canonicalExportToLegalDocument,
   exportProfileToQuickGenerateProfile,
 } from './canonicalExportToLegalDocument';
-import { assertLegalDocumentIntegrity } from '@/lib/legal-docs/pipeline/assertLegalDocumentIntegrity';
+import {
+  assertLegalDocumentIntegrity,
+  LegalDocumentIntegrityError,
+} from '@/lib/legal-docs/pipeline/assertLegalDocumentIntegrity';
 import type { CourtFormattingRules } from '@/lib/legal/types';
 
 // ═══════════════════════════════════════════════════════════════
@@ -155,11 +158,16 @@ export async function generateExportPDF(
       try {
         assertLegalDocumentIntegrity(legalDoc);
       } catch (err) {
-        console.warn(
-          `[ExportPDF] Integrity advisory (compatibility adapter): ${err instanceof Error ? err.message : 'Unknown'}`,
-        );
-        // Continue rendering — the adapter path is legacy and may lack
-        // captions/titles that the integrity check expects.
+        if (err instanceof LegalDocumentIntegrityError) {
+          console.warn('[ExportPDF] Integrity advisory (compatibility adapter): validation_failed');
+          // Continue rendering — compatibility adapter is best-effort only.
+        } else {
+          throw new ExportDocumentGenerationError({
+            code: 'EXPORT_DOCUMENT_INTEGRITY_FAILED',
+            message: `Unexpected integrity assertion failure: ${err instanceof Error ? err.name : 'Unknown error'}`,
+            details: err,
+          });
+        }
       }
 
       const qgProfile = exportProfileToQuickGenerateProfile(profile);

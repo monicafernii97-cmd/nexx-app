@@ -431,7 +431,14 @@ function parseBodySections(lines: string[], startIndex: number): {
   let currentAlpha: LegalSection | null = null;
   let sectionCounter = 0;
 
-  type Mode = 'body' | 'prayer' | 'signature' | 'certificate' | 'certificate_signature' | 'verification';
+  type Mode =
+    | 'body'
+    | 'prayer'
+    | 'signature'
+    | 'certificate'
+    | 'certificate_signature'
+    | 'verification'
+    | 'verification_signature';
   let mode: Mode = 'body';
 
   const prayerBlocks: LegalBlock[] = [];
@@ -457,8 +464,14 @@ function parseBodySections(lines: string[], startIndex: number): {
       continue;
     }
 
-    if (P.respectfully.test(line) && mode !== 'certificate') {
-      mode = 'signature';
+    if (P.respectfully.test(line)) {
+      if (mode === 'certificate') {
+        mode = 'certificate_signature';
+      } else if (mode === 'verification') {
+        mode = 'verification_signature';
+      } else {
+        mode = 'signature';
+      }
       continue;
     }
 
@@ -481,17 +494,16 @@ function parseBodySections(lines: string[], startIndex: number): {
         signerLines.push(line);
         break;
       case 'certificate':
-        if (P.respectfully.test(line)) {
-          mode = 'certificate_signature';
-        } else {
-          certBodyLines.push(line);
-        }
+        certBodyLines.push(line);
         break;
       case 'certificate_signature':
         certSignerLines.push(line);
         break;
       case 'verification':
         verifyBodyLines.push(line);
+        break;
+      case 'verification_signature':
+        verifySignerLines.push(line);
         break;
       case 'body':
         handleBodyLine(line, i, lines, sections, { currentRoman, currentAlpha, sectionCounter },
@@ -528,7 +540,7 @@ function parseBodySections(lines: string[], startIndex: number): {
   }
 
   // Build certificate
-  if (certBodyLines.length > 0) {
+  if (certBodyLines.length > 0 || certSignerLines.length > 0) {
     certificate = {
       heading: 'CERTIFICATE OF SERVICE',
       bodyLines: certBodyLines,
@@ -537,7 +549,7 @@ function parseBodySections(lines: string[], startIndex: number): {
   }
 
   // Build verification
-  if (verifyBodyLines.length > 0) {
+  if (verifyBodyLines.length > 0 || verifySignerLines.length > 0) {
     verification = {
       heading: 'VERIFICATION',
       bodyLines: verifyBodyLines,

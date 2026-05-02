@@ -43,6 +43,15 @@ import type { ExportJurisdictionProfile } from '@/lib/jurisdiction/types';
 import type { ProfileResolutionMeta } from '@/lib/jurisdiction/types';
 import { logExportGeneration } from './observability';
 
+// ── Quick Generate renderer (court_document path) ──────────────
+import { renderLegalDocumentHTML } from '@/lib/legal-docs/renderLegalDocumentHTML';
+import { toCourtFormattingRules as toQGFormattingRules } from '@/lib/legal-docs/jurisdiction/resolveJurisdictionProfile';
+import {
+  canonicalExportToLegalDocument,
+  exportProfileToQuickGenerateProfile,
+} from './canonicalExportToLegalDocument';
+import type { CourtFormattingRules } from '@/lib/legal/types';
+
 // ═══════════════════════════════════════════════════════════════
 // Public Types
 // ═══════════════════════════════════════════════════════════════
@@ -126,14 +135,36 @@ export async function generateExportPDF(
     // 3. Validate document structure
     validateDocumentStage(document);
 
-    // 4. Render HTML via path dispatcher
-    const html = renderHTMLStage(document, profile);
+    let html: string;
+    let pdfBuffer: Buffer;
 
-    // 5. Assert HTML structural integrity
-    await assertStructureStage(html, document.path as ExportPath);
+    if (document.path === 'court_document') {
+      // ── COURT DOCUMENTS: Route through Quick Generate renderer ──
+      // Converts the export model → LegalDocument, then renders via
+      // the mature QG pipeline (renderLegalDocumentHTML → legalDocStyles.css)
+      // for court-quality formatting.
 
-    // 6. Render PDF via Puppeteer
-    const pdfBuffer = await renderPDFStage(html, profile, input.causeNumber);
+      const legalDoc = canonicalExportToLegalDocument(document);
+      const qgProfile = exportProfileToQuickGenerateProfile(profile);
+
+      html = renderLegalDocumentHTML(legalDoc, qgProfile);
+
+      if (html.length < MIN_RENDERED_EXPORT_HTML_LENGTH) {
+        throw new ExportDocumentGenerationError({
+          code: 'EXPORT_RENDER_TOO_SHORT',
+          message: `Rendered court HTML is ${html.length} chars (minimum ${MIN_RENDERED_EXPORT_HTML_LENGTH}) — possible rendering failure.`,
+        });
+      }
+
+      // Use QG's formatting rules for PDF rendering (page size, margins, footers)
+      const formattingRules = toQGFormattingRules(qgProfile);
+      pdfBuffer = await renderCourtPDFStage(html, formattingRules, input.causeNumber);
+    } else {
+      // ── NON-COURT EXPORTS: Use existing export renderers ──
+      html = renderHTMLStage(document, profile);
+      await assertStructureStage(html, document.path as ExportPath);
+      pdfBuffer = await renderPDFStage(html, profile, input.causeNumber);
+    }
 
     // 7. Validate PDF buffer
     const pdfMeta = validatePDFStage(pdfBuffer);
@@ -271,7 +302,7 @@ async function assertStructureStage(html: string, path: ExportPath): Promise<voi
   }
 }
 
-/** Stage 6: Render HTML to PDF via Puppeteer. */
+/** Stage 6: Render HTML to PDF via Puppeteer (export renderers). */
 async function renderPDFStage(
   html: string,
   profile: ExportJurisdictionProfile,
@@ -284,6 +315,23 @@ async function renderPDFStage(
     throw new ExportDocumentGenerationError({
       code: 'EXPORT_PDF_RENDER_FAILED',
       message: `Export PDF rendering failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      details: err,
+    });
+  }
+}
+
+/** Stage 6 (court path): Render HTML to PDF using QG formatting rules. */
+async function renderCourtPDFStage(
+  html: string,
+  rules: CourtFormattingRules,
+  causeNumber?: string,
+): Promise<Buffer> {
+  try {
+    return await renderHTMLToPDF(html, rules, causeNumber);
+  } catch (err) {
+    throw new ExportDocumentGenerationError({
+      code: 'EXPORT_PDF_RENDER_FAILED',
+      message: `Court PDF rendering failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
       details: err,
     });
   }

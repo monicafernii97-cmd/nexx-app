@@ -129,9 +129,14 @@ export function canonicalExportToLegalDocument(
     ? convertCaption(doc.caption)
     : null;
 
-  const sections: LegalSection[] = dedupedSections.map((s, i) =>
-    convertCourtSection(s, i + 1),
-  );
+  // Assign per-level ordinals so roman sections get I, II, III
+  // and letter sections get A, B, C independently.
+  const levelCounters: Record<string, number> = {};
+  const sections: LegalSection[] = dedupedSections.map((s) => {
+    const level = detectSectionLevel(s.heading);
+    levelCounters[level] = (levelCounters[level] ?? 0) + 1;
+    return convertCourtSection(s, levelCounters[level]);
+  });
 
   // ── Build intro blocks from court context ─────────────────
   const introBlocks = buildIntroBlocks(ctx, doc.title);

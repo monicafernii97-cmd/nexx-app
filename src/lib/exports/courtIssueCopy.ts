@@ -10,6 +10,8 @@
  * @module courtIssueCopy
  */
 
+import type { CourtDocumentIssueId } from './courtDocumentIssues';
+
 type IssueCopyEntry = {
   title: string;
   message: string;
@@ -20,7 +22,7 @@ type IssueCopyEntry = {
  * User-facing copy for each CourtDocumentIssueId.
  * ClarificationModal renders these values directly.
  */
-export const COURT_ISSUE_COPY: Record<string, IssueCopyEntry> = {
+export const COURT_ISSUE_COPY: Record<CourtDocumentIssueId, IssueCopyEntry> = {
   generic_title_detected: {
     title: 'This filing needs a specific court-document title.',
     message:

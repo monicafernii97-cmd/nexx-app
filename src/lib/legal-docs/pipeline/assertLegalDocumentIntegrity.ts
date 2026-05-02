@@ -251,6 +251,14 @@ function gatherVisibleText(doc: LegalDocument): string {
   if (doc.certificate) {
     parts.push(doc.certificate.heading);
     parts.push(...doc.certificate.bodyLines);
+    parts.push(...doc.certificate.signerLines);
+  }
+
+  // Verification
+  if (doc.verification) {
+    if (doc.verification.heading) parts.push(doc.verification.heading);
+    parts.push(...doc.verification.bodyLines);
+    parts.push(...doc.verification.signerLines);
   }
 
   return parts.join('\n');

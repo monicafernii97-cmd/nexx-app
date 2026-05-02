@@ -32,11 +32,13 @@ const BLOCKED_VISIBLE_TEXT = [
 const BLOCKED_PATTERNS = /\b(undefined|null|NaN)\b/;
 
 /**
- * Structural elements that should appear exactly once.
+ * Structural headings that should appear exactly once.
+ * These match line-start positions to avoid counting inline mentions
+ * like "PRAYER FOR RELIEF" as a second occurrence of "PRAYER".
  */
 const ONCE_ONLY_HEADINGS = [
-  /\bPRAYER\b/g,
-  /\bCERTIFICATE\s+OF\s+SERVICE\b/gi,
+  /(?:^|\n)\s*PRAYER\s*(?:\n|$)/gi,
+  /(?:^|\n)\s*CERTIFICATE\s+OF\s+SERVICE\s*(?:\n|$)/gi,
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -69,9 +71,13 @@ export type AuditResult = {
 export function auditCourtHTML(html: string): AuditResult {
   const violations: AuditViolation[] = [];
 
-  // Extract visible text by stripping HTML tags
-  // Only scan text content, not attributes/CSS
-  const visibleText = html
+  // Extract visible text from <body> only, stripping HTML tags
+  // Invariant 7: scope to body to avoid scanning <title>, <head>, etc.
+  let bodyContent = html;
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  if (bodyMatch) bodyContent = bodyMatch[1];
+
+  const visibleText = bodyContent
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')  // remove style blocks
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // remove script blocks
     .replace(/<[^>]+>/g, ' ')                         // strip tags

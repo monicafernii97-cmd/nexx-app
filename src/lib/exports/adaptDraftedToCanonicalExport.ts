@@ -183,8 +183,9 @@ function buildSections(
   }
 }
 
-/** Headings that indicate a Prayer section. */
-const PRAYER_HEADINGS = /^(PRAYER|WHEREFORE|PRAYER\s+FOR\s+RELIEF)$/i;
+/** Headings that indicate a Prayer section — must match canonicalExportToLegalDocument. */
+const PRAYER_HEADINGS =
+  /^(PRAYER|PRAYER\s+FOR\s+RELIEF|REQUESTED\s+RELIEF|CONCLUSION\s+(?:AND|&)\s+PRAYER|WHEREFORE)$/i;
 
 /**
  * Map drafted sections to court document sections, preserving structural identity.

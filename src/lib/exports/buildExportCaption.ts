@@ -100,8 +100,10 @@ export function buildExportCaption(input: CaptionBuildInput): CaptionBuildResult
     }
   }
 
-  // Force SAPCR caption when detected
-  const forceSAPCR = isSAPCR(input);
+  // Force SAPCR caption only when the requested style is texas_pleading
+  // or generic — never override an explicit in_re or federal request.
+  const forceSAPCR = isSAPCR(input) &&
+    (input.style === 'texas_pleading' || input.style === 'generic_state_caption');
   const effectiveStyle = forceSAPCR ? 'texas_pleading' : input.style;
 
   let caption: ExportCaption;
@@ -162,8 +164,14 @@ function buildTexasCaption(input: CaptionBuildInput, forceSAPCR: boolean): Expor
   return {
     style: 'texas_pleading',
     causeLine: `${causeLabel} ${cause}`,
-    leftLines: [(input.captionPetitionerName || 'PETITIONER').toUpperCase()],
-    centerLines: ['§', 'VS.', '§'],
+    leftLines: [
+      (input.captionPetitionerName || 'PETITIONER').toUpperCase(),
+      '',
+      'VS.',
+      '',
+      (input.captionRespondentName || 'RESPONDENT').toUpperCase(),
+    ],
+    centerLines: ['§', '§', '§'],
     rightLines,
   };
 }

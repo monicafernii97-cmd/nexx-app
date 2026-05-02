@@ -41,11 +41,13 @@ describe('buildExportCaption', () => {
       style: 'texas_pleading',
       causeNumber: '2026-CV-001',
       captionPetitionerName: 'Jane Doe',
+      captionRespondentName: 'John Smith',
       county: 'Harris',
     });
 
     expect(caption.leftLines[0]).toBe('JANE DOE');
-    expect(caption.centerLines).toContain('VS.');
+    expect(caption.leftLines).toContain('VS.');
+    expect(caption.leftLines).toContainEqual('JOHN SMITH');
     expect(caption.rightLines).toContainEqual(expect.stringContaining('HARRIS'));
   });
 

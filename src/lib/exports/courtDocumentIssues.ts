@@ -11,6 +11,7 @@
  */
 
 import type { CourtIdentity } from './resolveCourtIdentity';
+import { COURT_ISSUE_COPY } from './courtIssueCopy';
 
 // ═══════════════════════════════════════════════════════════════
 // Issue IDs — Single Canonical List
@@ -185,13 +186,16 @@ const FORBIDDEN_VISIBLE_TEXT = [
   '[CHILD NAME]',
   '[COURT NAME]',
   '[CAUSE NUMBER]',
-  'undefined',
-  'null',
-  'NaN',
   'COURT FILING DOCUMENT',
   'court_document',
   'personal_injury',
 ];
+
+/**
+ * Patterns that indicate internal values leaked into visible text.
+ * Matched with word boundaries to avoid false positives.
+ */
+const FORBIDDEN_WORD_PATTERNS = /\b(undefined|null|NaN)\b/;
 
 /**
  * Document kinds that require a prayer section.
@@ -242,9 +246,7 @@ export function detectCourtDocumentIssues(
   const allText = reviewItemTexts?.join('\n') ?? '';
   const documentKind = (identity.documentKind ?? config.documentType ?? '') as string;
 
-  // Import copy lazily to keep this module dependency-light
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const copy = require('./courtIssueCopy').COURT_ISSUE_COPY;
+  const copy = COURT_ISSUE_COPY;
 
   // ── Title ──────────────────────────────────────────────────
   if (isMissing(identity.resolvedTitle)) {
@@ -374,7 +376,7 @@ export function detectCourtDocumentIssues(
 
   // ── Motion-specific ────────────────────────────────────────
   if (INTRO_REQUIRED_KINDS.has(documentKind)) {
-    const hasIntro = allText.includes('COMES NOW') || allText.includes('comes now');
+    const hasIntro = /comes\s+now/i.test(allText);
     if (!hasIntro) {
       issues.push({
         ...copy.missing_motion_intro,
@@ -514,6 +516,19 @@ export function detectCourtDocumentIssues(
       });
       break; // One issue for all placeholder detections
     }
+  }
+
+  // Check for internal values with word boundaries (avoids false positives)
+  if (FORBIDDEN_WORD_PATTERNS.test(allText)) {
+    issues.push({
+      ...copy.placeholder_text_detected,
+      id: 'placeholder_text_detected',
+      severity: 'blocker',
+      currentValue: allText.match(FORBIDDEN_WORD_PATTERNS)?.[0] ?? 'internal value',
+      canAutoFill: false,
+      requiresUserConfirmation: false,
+      actionType: 'block_until_fixed',
+    });
   }
 
   // Metadata leak: internal JSON/code patterns in visible text

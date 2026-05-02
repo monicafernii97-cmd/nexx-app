@@ -258,19 +258,21 @@ export function resolveCourtIdentity(
     [patch?.captionPetitionerName, 'reviewhub_edit'],
     [cs.petitionerLegalName, 'court_settings'],
   );
-  // Fallback: if user is petitioner, their name is the caption petitioner
+  // Fallback: map filing party to their actual caption role.
+  // If user is petitioner → they are captionPetitioner.
+  // If user is respondent → the opposing party is captionPetitioner.
   const captionPetitionerName = captionPetResult.value ??
-    (filingPartyRole === 'petitioner' ? filingPartyLegalName : '');
+    (filingPartyRole === 'petitioner' ? filingPartyLegalName : opposingResult.value ?? '');
   if (captionPetResult.source) fieldSources['captionPetitionerName'] = captionPetResult.source;
 
   const captionResResult = resolveField(
     [patch?.captionRespondentName, 'reviewhub_edit'],
     [cs.respondentLegalName, 'court_settings'],
   );
-  // Fallback: if user is respondent, their name goes to caption respondent... but opposingParty is petitioner
+  // If user is respondent → they are captionRespondent.
+  // If user is petitioner → the opposing party is captionRespondent.
   const captionRespondentName = captionResResult.value ??
-    (filingPartyRole === 'respondent' ? opposingResult.value : undefined) ??
-    (filingPartyRole === 'petitioner' ? opposingResult.value : undefined);
+    (filingPartyRole === 'respondent' ? filingPartyLegalName : opposingResult.value);
   if (captionResResult.source) fieldSources['captionRespondentName'] = captionResResult.source;
 
   // ── Children ───────────────────────────────────────────────

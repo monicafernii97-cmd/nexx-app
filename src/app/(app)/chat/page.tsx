@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { consumeCourtHandoff, buildHandoffPrompt, HANDOFF_FALLBACK_MESSAGE } from '@/lib/exports/courtHandoff';
 import {
     ChatCircleDots,
     Plus,
@@ -35,6 +36,43 @@ export default function ChatListPage() {
     const [isCreating, setIsCreating] = useState(false);
     const [isArchiveOpen, setIsArchiveOpen] = useState(false);
     const [deletingId, setDeletingId] = useState<Id<'conversations'> | null>(null);
+    const searchParams = useSearchParams();
+    const handoffProcessedRef = useRef(false);
+
+    // ── Court handoff detection ──
+    useEffect(() => {
+        if (handoffProcessedRef.current) return;
+        if (searchParams.get('handoff') !== 'court') return;
+        if (!activeCaseId) return;
+
+        handoffProcessedRef.current = true;
+        const payload = consumeCourtHandoff();
+
+        (async () => {
+            try {
+                const title = payload
+                    ? 'Court Document Issue Resolution'
+                    : 'Court Document Help';
+                const id = await createConversation({
+                    title,
+                    mode: 'legal',
+                    caseId: activeCaseId,
+                });
+
+                // Store the initial message for the conversation page to pick up
+                if (payload) {
+                    const prompt = buildHandoffPrompt(payload);
+                    sessionStorage.setItem(`nexx_handoff_msg_${String(id)}`, prompt);
+                } else {
+                    sessionStorage.setItem(`nexx_handoff_msg_fallback`, HANDOFF_FALLBACK_MESSAGE);
+                }
+
+                router.replace(`/chat/${id}`);
+            } catch (err) {
+                console.error('[ChatList] Failed to create handoff conversation:', err);
+            }
+        })();
+    }, [searchParams, activeCaseId, createConversation, router]);
 
     const handleDelete = async (e: React.MouseEvent, id: Id<'conversations'>) => {
         e.preventDefault();

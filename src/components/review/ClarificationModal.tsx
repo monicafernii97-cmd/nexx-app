@@ -344,9 +344,15 @@ export default function ClarificationModal({
             return;
         }
         // Cert/prayer precondition guard — visible error, never silent no-op
-        if (activeMode === 'court_certificate_repair' && !serviceMethod) {
-            setError('Please select a service method before continuing.');
-            return;
+        if (activeMode === 'court_certificate_repair') {
+            if (!serviceMethod) {
+                setError('Please select a service method before continuing.');
+                return;
+            }
+            if (serviceMethod === 'other' && !customServiceText.trim()) {
+                setError('Please describe the service method before continuing.');
+                return;
+            }
         }
         if (activeMode === 'court_prayer_repair' && !generatedBoilerplate?.trim()) {
             setError('Unable to generate prayer text — court identity may be incomplete.');
@@ -361,12 +367,15 @@ export default function ClarificationModal({
             const patch: Partial<CourtIdentity> = {};
             const textParts: string[] = [];
 
-            for (const [key, value] of Object.entries(fieldValues)) {
-                if (!value.trim()) continue;
-                if (IDENTITY_FIELDS.has(key)) {
-                    (patch as Record<string, unknown>)[key] = value.trim();
-                } else if (TEXT_RESOLUTION_FIELDS.has(key)) {
-                    textParts.push(value.trim());
+            // Iterate config fields (not fieldValues) so chip/default values
+            // are included even when the user hasn't explicitly typed anything.
+            for (const field of (config?.fields ?? [])) {
+                const value = (fieldValues[field.key] ?? getFieldDefault(field.key)).trim();
+                if (!value) continue;
+                if (IDENTITY_FIELDS.has(field.key)) {
+                    (patch as Record<string, unknown>)[field.key] = value;
+                } else if (TEXT_RESOLUTION_FIELDS.has(field.key)) {
+                    textParts.push(value);
                 }
             }
 

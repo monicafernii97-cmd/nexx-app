@@ -22,6 +22,8 @@ import type {
 } from './orchestrator';
 import type { ExportRequest, MappingReviewItem, CourtMappedSections } from './types/exports';
 import type { AssemblyResult } from './index';
+import type { CourtIdentity } from '@/lib/exports/resolveCourtIdentity';
+import { FORBIDDEN_VISIBLE_TEXT } from '@/lib/exports/courtDocumentIssues';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,6 +41,11 @@ export interface PipelineBridgeInput {
     reviewItems: MappingReviewItem[];
     /** Optional status callback for progress updates */
     onStatus?: (status: PipelineStatus) => void;
+    /**
+     * Resolved court identity for court_document exports.
+     * Passed through to the downstream PDF generator as courtContext.
+     */
+    courtIdentity?: CourtIdentity;
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +221,11 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
         }
     }
 
+    // Court-specific: validate drafted content for forbidden patterns
+    if (request.path === 'court_document') {
+        validateCourtDraftedContent(allDrafted);
+    }
+
     // ── Phase: Saving ──
     onStatus?.({ phase: 'saving', progress: 92, detail: 'Preparing output...' });
 
@@ -221,6 +233,7 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
         assembly,
         draftedSections: allDrafted,
         meta,
+        courtIdentity: input.courtIdentity,
     };
 }
 
@@ -283,6 +296,59 @@ function formatSectionHeading(sectionId: string): string {
     return sectionId
         .replace(/_/g, ' ')
         .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/**
+ * Validate AI-drafted content for court documents.
+ *
+ * Checks for forbidden patterns, empty sections, and metadata leaks.
+ * Logs warnings but does not throw — downstream integrity checks are
+ * the final authority. This catches issues early for observability.
+ */
+function validateCourtDraftedContent(sections: DraftedSection[]): void {
+    const FORBIDDEN_PATTERNS = /\b(undefined|null|NaN|nodeId|nodeType|classifiedNodes|sentenceClassifications|exportRelevance)\b/;
+    // Derive placeholder regex from shared constant for consistency
+    const placeholderTokens = FORBIDDEN_VISIBLE_TEXT.filter(t => t.startsWith('['));
+    const PLACEHOLDER_REGEX = new RegExp(placeholderTokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'));
+
+    for (const section of sections) {
+        // Empty body check
+        const hasBody = section.body?.trim();
+        const hasItems = section.numberedItems?.some(item => item?.trim());
+        if (!hasBody && !hasItems) {
+            console.warn(JSON.stringify({
+                component: 'PipelineBridge',
+                event: 'court_draft_empty_section',
+                sectionId: section.sectionId,
+                source: section.source,
+            }));
+        }
+
+        // Check all content for forbidden patterns
+        const allContent = [
+            section.heading ?? '',
+            section.body ?? '',
+            ...(section.numberedItems ?? []),
+        ].join(' ');
+
+        if (FORBIDDEN_PATTERNS.test(allContent)) {
+            console.warn(JSON.stringify({
+                component: 'PipelineBridge',
+                event: 'court_draft_metadata_leak',
+                sectionId: section.sectionId,
+                source: section.source,
+            }));
+        }
+
+        if (PLACEHOLDER_REGEX.test(allContent)) {
+            console.warn(JSON.stringify({
+                component: 'PipelineBridge',
+                event: 'court_draft_placeholder_detected',
+                sectionId: section.sectionId,
+                source: section.source,
+            }));
+        }
+    }
 }
 
 /** Get a human-readable template name for the export path. */

@@ -16,6 +16,7 @@
 
 import type { WorkspaceNode } from './types/workspace';
 import type { ClassifiedNode } from './types/classification';
+import type { CourtIdentity } from '@/lib/exports/resolveCourtIdentity';
 import type { TimelineEventNode, LegalNarrative } from './types/narrative';
 import type {
     ExportRequest,
@@ -108,6 +109,8 @@ export interface OrchestratorPipelineResult {
     draftedSections: DraftedSection[];
     /** Assembly metadata */
     meta: AssemblyMeta;
+    /** Resolved court identity (court_document path only) */
+    courtIdentity?: CourtIdentity;
 }
 
 /** A single drafted section from GPT. */

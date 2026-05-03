@@ -54,7 +54,9 @@ import {
   assertLegalDocumentIntegrity,
   LegalDocumentIntegrityError,
 } from '@/lib/legal-docs/pipeline/assertLegalDocumentIntegrity';
+import { auditCourtHTML } from './auditRenderedCourtDocument';
 import type { CourtFormattingRules } from '@/lib/legal/types';
+import type { CourtDocumentContext } from './canonicalExportToLegalDocument';
 
 // ═══════════════════════════════════════════════════════════════
 // Public Types
@@ -75,6 +77,10 @@ export type GenerateExportPDFInput = {
   resolvedProfile?: ExportJurisdictionProfile;
   /** Optional cause number for PDF footer. */
   causeNumber?: string;
+  /** Optional court document context from resolved identity. */
+  courtContext?: CourtDocumentContext;
+  /** Optional resolved title (from CourtIdentity) for filename generation. */
+  resolvedTitle?: string;
   /** Metadata for filename generation. */
   metadata: {
     caseType: string;
@@ -144,30 +150,27 @@ export async function generateExportPDF(
 
     if (document.path === 'court_document') {
       // ── COURT DOCUMENTS: Route through Quick Generate renderer ──
-      // Converts the export model → LegalDocument via compatibility adapter,
-      // validates structure, then renders via the deterministic legal renderer.
-      // 🔒 canonicalExportToLegalDocument is a COMPATIBILITY ADAPTER only.
-      // The primary path should use prepareLegalDocument() directly.
+      // 🔒 Hard integrity enforcement: fails = export blocked.
 
-      const legalDoc = canonicalExportToLegalDocument(document);
+      const legalDoc = canonicalExportToLegalDocument(document, input.courtContext);
 
-      // Advisory integrity validation — logs warnings for compatibility adapter output
-      // The adapter may produce documents without proper captions/titles.
-      // Hard integrity enforcement is reserved for the unified pipeline path
-      // (prepareLegalDocument → assertLegalDocumentIntegrity).
+      // Hard integrity check — throws on any violation.
+      // No advisory mode — court documents must be structurally correct.
       try {
         assertLegalDocumentIntegrity(legalDoc);
       } catch (err) {
         if (err instanceof LegalDocumentIntegrityError) {
-          console.warn('[ExportPDF] Integrity advisory (compatibility adapter): validation_failed');
-          // Continue rendering — compatibility adapter is best-effort only.
-        } else {
           throw new ExportDocumentGenerationError({
             code: 'EXPORT_DOCUMENT_INTEGRITY_FAILED',
-            message: `Unexpected integrity assertion failure: ${err instanceof Error ? err.name : 'Unknown error'}`,
-            details: err,
+            message: `Court document integrity check failed: ${err.message}`,
+            details: { rule: err.message },
           });
         }
+        throw new ExportDocumentGenerationError({
+          code: 'EXPORT_DOCUMENT_INTEGRITY_FAILED',
+          message: `Unexpected integrity assertion failure: ${err instanceof Error ? err.name : 'Unknown error'}`,
+          details: err,
+        });
       }
 
       const qgProfile = exportProfileToQuickGenerateProfile(profile);
@@ -178,6 +181,20 @@ export async function generateExportPDF(
         throw new ExportDocumentGenerationError({
           code: 'EXPORT_RENDER_TOO_SHORT',
           message: `Rendered court HTML is ${html.length} chars (minimum ${MIN_RENDERED_EXPORT_HTML_LENGTH}) — possible rendering failure.`,
+        });
+      }
+
+      // Post-render HTML audit — checks visible text for blocked patterns,
+      // duplicate headings, signature mismatches, and metadata leaks.
+      const htmlAudit = auditCourtHTML(html);
+      if (!htmlAudit.passed) {
+        const blockers = htmlAudit.violations
+          .filter(v => v.severity === 'blocker')
+          .map(v => `${v.rule}: ${v.detail}`);
+        throw new ExportDocumentGenerationError({
+          code: 'EXPORT_DOCUMENT_INTEGRITY_FAILED',
+          message: `Court HTML audit failed: ${blockers.join('; ')}`,
+          details: { violations: htmlAudit.violations },
         });
       }
 
@@ -201,11 +218,14 @@ export async function generateExportPDF(
       );
     }
 
-    // 8. Generate deterministic filename (prefer document.path as authoritative)
-    const filename = generateExportFilename({
-      ...input.metadata,
-      exportPath: document.path,
-    });
+    // 8. Generate deterministic filename
+    // Court documents use resolvedTitle when available for a professional filename
+    const filename = input.resolvedTitle && document.path === 'court_document'
+      ? generateCourtFilename(input.resolvedTitle, input.metadata.runId)
+      : generateExportFilename({
+          ...input.metadata,
+          exportPath: document.path,
+        });
 
     const durationMs = Date.now() - startTime;
 
@@ -407,4 +427,15 @@ function sanitize(str: string): string {
     .replace(/[^a-z0-9_-]/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '');
+}
+
+/**
+ * Generate a court-specific filename from the resolved title.
+ * Example: "Motion to Modify" → "motion_to_modify_2026-05-02_a1b2c3.pdf"
+ */
+function generateCourtFilename(resolvedTitle: string, runId: string): string {
+  const date = new Date().toISOString().slice(0, 10);
+  const shortId = runId.length >= 6 ? runId.slice(-6) : runId || 'unknown';
+  const titleSlug = sanitize(resolvedTitle) || 'court_document';
+  return `${titleSlug}_${date}_${shortId}.pdf`;
 }

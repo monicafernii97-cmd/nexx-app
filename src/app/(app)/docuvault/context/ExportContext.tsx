@@ -44,6 +44,8 @@ import type { PreflightResult } from '@/lib/export-assembly/validation/preflight
 import { getAssemblyInputs } from '@/lib/export-assembly/services/getAssemblyInputs';
 import { splitPastedContentAction } from '../actions/splitPastedContentAction';
 import { validateAssemblyOutput } from '@/lib/export-assembly/validation/assemblyIntegrityValidator';
+import type { CourtDocumentIssue } from '@/lib/exports/courtDocumentIssues';
+import type { CourtIdentity } from '@/lib/exports/resolveCourtIdentity';
 
 // ---------------------------------------------------------------------------
 // Fast-Path Caption Parser
@@ -191,6 +193,12 @@ export interface ExportState {
     parentExportId: string | null;
     /** Last successfully completed pipeline stage */
     lastCompletedStage: 'draft' | 'preflight' | 'render' | 'upload' | 'finalize' | null;
+    /** Court identity patch (accumulated from ClarificationModal resolutions) */
+    courtIdentityPatch: Partial<CourtIdentity> | null;
+    /** Court document issues detected during validation */
+    courtIssues: CourtDocumentIssue[];
+    /** Whether to show the ClarificationModal for court issues */
+    showCourtClarification: boolean;
 }
 
 const initialState: ExportState = {
@@ -215,6 +223,9 @@ const initialState: ExportState = {
     rootExportId: null,
     parentExportId: null,
     lastCompletedStage: null,
+    courtIdentityPatch: null,
+    courtIssues: [],
+    showCourtClarification: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -241,7 +252,11 @@ type ExportAction =
     | { type: 'COMPLETE'; exportId: string; filename: string }
     | { type: 'ERROR'; message: string; errorCode?: string }
     | { type: 'RESET' }
-    | { type: 'BACK_TO_REVIEW' };
+    | { type: 'BACK_TO_REVIEW' }
+    | { type: 'SET_COURT_ISSUES'; issues: CourtDocumentIssue[] }
+    | { type: 'SET_COURT_IDENTITY_PATCH'; patch: Partial<CourtIdentity> }
+    | { type: 'SHOW_COURT_CLARIFICATION'; show: boolean }
+    | { type: 'APPLY_COURT_RESOLUTION'; patch: Partial<CourtIdentity> };
 
 /** Reducer managing the full export lifecycle state machine. */
 function exportReducer(state: ExportState, action: ExportAction): ExportState {
@@ -386,7 +401,43 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
                 errorCode: null,
                 draftingStage: null,
                 lastCompletedStage: null,
+                // 🔒 Preserve courtIdentityPatch and courtIssues (durable patches)
+                showCourtClarification: state.courtIssues.some(i => i.severity === 'blocker'),
             };
+
+        case 'SET_COURT_ISSUES':
+            return {
+                ...state,
+                courtIssues: action.issues,
+                showCourtClarification: action.issues.some(i => i.severity === 'blocker'),
+            };
+
+        case 'SET_COURT_IDENTITY_PATCH':
+            return {
+                ...state,
+                courtIdentityPatch: action.patch,
+            };
+
+        case 'SHOW_COURT_CLARIFICATION':
+            return {
+                ...state,
+                showCourtClarification: action.show,
+            };
+
+        case 'APPLY_COURT_RESOLUTION': {
+            // 🔒 Idempotent merge — per-field, not per-object (Invariant H3)
+            const existing = state.courtIdentityPatch ?? {};
+            const merged: Partial<CourtIdentity> = { ...existing };
+            for (const [key, value] of Object.entries(action.patch)) {
+                if (value != null && (typeof value !== 'string' || value.trim() !== '')) {
+                    (merged as Record<string, unknown>)[key] = value;
+                }
+            }
+            return {
+                ...state,
+                courtIdentityPatch: merged,
+            };
+        }
 
         default:
             return state;
@@ -453,10 +504,11 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         if (state.phase !== 'reviewing') return;
 
         const interval = setInterval(() => {
-            // Compare full overrides + reviewItems content (not just length)
+            // Compare full overrides + reviewItems + courtIdentityPatch content
             const snapshot = JSON.stringify({
                 overrides: state.overrides,
                 reviewItems: state.reviewItems,
+                courtIdentityPatch: state.courtIdentityPatch,
             });
 
             if (snapshot !== lastCheckedSnapshotRef.current) {
@@ -466,7 +518,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         }, AUTO_SAVE_INTERVAL_MS);
 
         return () => clearInterval(interval);
-    }, [state.phase, state.overrides, state.reviewItems]);
+    }, [state.phase, state.overrides, state.reviewItems, state.courtIdentityPatch]);
 
     // ── Convenience actions ──
     /** Start the configuration phase for a given export path. */

@@ -21,7 +21,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import type { CourtDocumentIssue, ClarificationModalMode, ClarificationResolution } from '@/lib/exports/courtDocumentIssues';
 import { ISSUE_TO_MODE, MODE_PRIORITY } from '@/lib/exports/courtDocumentIssues';
-import type { CourtIdentity } from '@/lib/exports/resolveCourtIdentity';
+import type { CourtIdentity, FieldResolutionSource } from '@/lib/exports/resolveCourtIdentity';
+import { generateCertificateOfService, generatePrayerSection, SERVICE_METHOD_OPTIONS, type ServiceMethodValue } from '@/lib/exports/generateCourtBoilerplate';
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -51,6 +52,8 @@ interface ClarificationModalProps {
     onResolve?: (resolution: ClarificationResolution) => void;
     /** Called when user wants to save fields to Court Settings. Returns success. */
     onSaveToSettings?: (patch: Partial<CourtIdentity>) => Promise<boolean>;
+    /** Source of each resolved field — used to determine smart rendering. */
+    resolvedFieldSources?: Record<string, FieldResolutionSource>;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -94,17 +97,13 @@ const MODE_CONFIGS: Record<ClarificationModalMode, ModeConfig> = {
     },
     court_prayer_repair: {
         title: 'Prayer Section Needed',
-        description: 'This motion needs a Prayer section telling the Court what relief is requested.',
-        fields: [
-            { key: 'prayerText', label: 'Prayer Text', placeholder: 'WHEREFORE, PREMISES CONSIDERED...', multiline: true },
-        ],
+        description: 'This motion needs a Prayer section. NEXX has generated one for you — confirm or edit.',
+        fields: [],
     },
     court_certificate_repair: {
         title: 'Certificate of Service Needed',
-        description: 'This filing needs a Certificate of Service.',
-        fields: [
-            { key: 'certificateText', label: 'Certificate Text', placeholder: 'I certify that a true and correct copy...', multiline: true },
-        ],
+        description: 'This filing needs a Certificate of Service. Choose the service method and NEXX will generate it.',
+        fields: [],
     },
     court_signature_repair: {
         title: 'Signature Block Needed',
@@ -163,6 +162,7 @@ const TEXT_RESOLUTION_FIELDS = new Set(['prayerText', 'certificateText']);
 export default function ClarificationModal({
     isOpen, onClose, onContinue, rawDocumentText,
     courtMode, courtIssues, courtIdentity, onResolve, onSaveToSettings,
+    resolvedFieldSources,
 }: ClarificationModalProps) {
     const titleId = useId();
     const descriptionId = useId();
@@ -178,6 +178,12 @@ export default function ClarificationModal({
     const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
     const [saveToSettings, setSaveToSettings] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+
+    // ── Certificate / Prayer auto-generation state ──
+    const [serviceMethod, setServiceMethod] = useState<ServiceMethodValue | null>(null);
+    const [customServiceText, setCustomServiceText] = useState('');
+    const [isEditingBoilerplate, setIsEditingBoilerplate] = useState(false);
+    const [editedBoilerplate, setEditedBoilerplate] = useState('');
 
     // Determine active mode
     const activeMode = courtMode ?? (courtIssues?.length ? getPriorityMode(courtIssues) : undefined);
@@ -203,6 +209,49 @@ export default function ClarificationModal({
         }
         return '';
     }, [modeIssues, courtIdentity]);
+
+    /** Check if a field value came from court_settings (no need to re-save). */
+    const isFieldFromSettings = useCallback((key: string): boolean => {
+        return resolvedFieldSources?.[key] === 'court_settings';
+    }, [resolvedFieldSources]);
+
+    /** True if ALL config fields already have values from court_settings. */
+    const allFieldsFromSettings = useMemo(() => {
+        if (!config || config.fields.length === 0) return false;
+        return config.fields.every(f => {
+            const hasValue = !!(fieldValues[f.key]?.trim() || getFieldDefault(f.key));
+            return hasValue && isFieldFromSettings(f.key);
+        });
+    }, [config, fieldValues, getFieldDefault, isFieldFromSettings]);
+
+    /** Whether the user has changed any field to a value different from court settings. */
+    const hasNewReusableValues = useMemo(() => {
+        const reusableKeys = new Set(['county', 'state', 'courtName', 'judicialDistrict',
+            'filingPartyLegalName', 'filingPartyRole', 'opposingPartyLegalName']);
+        for (const [key, val] of Object.entries(fieldValues)) {
+            if (!reusableKeys.has(key)) continue;
+            if (!val.trim()) continue;
+            const defaultVal = getFieldDefault(key);
+            if (val.trim() !== defaultVal) return true;
+        }
+        return false;
+    }, [fieldValues, getFieldDefault]);
+
+    /** Auto-generated boilerplate for certificate or prayer modes. */
+    const generatedBoilerplate = useMemo((): string | undefined => {
+        if (!courtIdentity) return undefined;
+        if (activeMode === 'court_certificate_repair' && serviceMethod) {
+            return generateCertificateOfService(
+                courtIdentity,
+                serviceMethod,
+                serviceMethod === 'other' ? customServiceText : undefined,
+            );
+        }
+        if (activeMode === 'court_prayer_repair') {
+            return generatePrayerSection(courtIdentity, courtIdentity.documentKind ?? 'motion');
+        }
+        return undefined;
+    }, [activeMode, courtIdentity, serviceMethod, customServiceText]);
 
     if (!isOpen) return null;
 
@@ -273,7 +322,15 @@ export default function ClarificationModal({
 
     /** Apply court field values as a combined resolution (patch + optional text). */
     const handleCourtApply = async () => {
-        if (!onResolve || !activeMode) return;
+        // Never fail silently — show visible error if preconditions not met
+        if (!onResolve) {
+            setError('Unable to apply — resolution handler is not available. Please try again.');
+            return;
+        }
+        if (!activeMode) {
+            setError('Unable to apply — no active mode detected. Please close and reopen.');
+            return;
+        }
         setError(null);
         setIsProcessing(true);
 
@@ -288,6 +345,14 @@ export default function ClarificationModal({
                     (patch as Record<string, unknown>)[key] = value.trim();
                 } else if (TEXT_RESOLUTION_FIELDS.has(key)) {
                     textParts.push(value.trim());
+                }
+            }
+
+            // Auto-generated boilerplate for cert/prayer modes
+            if (activeMode === 'court_certificate_repair' || activeMode === 'court_prayer_repair') {
+                const boilerplateText = isEditingBoilerplate ? editedBoilerplate : generatedBoilerplate;
+                if (boilerplateText?.trim()) {
+                    textParts.push(boilerplateText.trim());
                 }
             }
 
@@ -312,15 +377,21 @@ export default function ClarificationModal({
             }
         } catch (err) {
             console.error('[ClarificationModal] Court apply error:', err);
-            setError((err as Error).message || 'Something went wrong.');
+            setError((err as Error).message || 'Something went wrong. Please try again.');
         } finally {
             setIsProcessing(false);
         }
     };
 
-    /** Dispatch a send_to_nexchat resolution to hand off unresolved issues. */
+    /** Dispatch a send_to_nexchat resolution — always navigates even if handoff fails. */
     const handleSendToNexchat = () => {
-        onResolve?.({ type: 'send_to_nexchat' });
+        try {
+            onResolve?.({ type: 'send_to_nexchat' });
+        } catch (err) {
+            console.error('[ClarificationModal] NEXchat handoff error:', err);
+            // Best-effort: show warning but still navigate (chat has fallback)
+            setError('Handoff context may be incomplete, but you can still continue in NEXchat.');
+        }
     };
 
     // ═══════════════════════════════════════════════════════════
@@ -391,60 +462,182 @@ export default function ClarificationModal({
                                     </div>
                                 )}
 
-                                {/* Field inputs */}
+                                {/* ── Certificate: service method picker ── */}
+                                {activeMode === 'court_certificate_repair' && (
+                                    <div className="space-y-3">
+                                        <label className="text-[12px] font-semibold text-white/60 block">
+                                            How was this document served?
+                                        </label>
+                                        <div className="space-y-2">
+                                            {SERVICE_METHOD_OPTIONS.map(opt => (
+                                                <OptionCard
+                                                    key={opt.value}
+                                                    title={opt.label}
+                                                    selected={serviceMethod === opt.value}
+                                                    onClick={() => setServiceMethod(opt.value)}
+                                                    disabled={isProcessing}
+                                                />
+                                            ))}
+                                        </div>
+                                        {serviceMethod === 'other' && (
+                                            <input
+                                                type="text"
+                                                value={customServiceText}
+                                                onChange={e => setCustomServiceText(e.target.value)}
+                                                placeholder="Describe the service method..."
+                                                disabled={isProcessing}
+                                                className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2.5 text-[13px] text-white/90 placeholder:text-white/30 focus:outline-none focus:border-[#3B82F6]/50 transition-colors"
+                                            />
+                                        )}
+                                        {serviceMethod && generatedBoilerplate && (
+                                            <div className="space-y-2">
+                                                <label className="text-[12px] font-semibold text-white/60 block">
+                                                    Generated Certificate of Service
+                                                </label>
+                                                {isEditingBoilerplate ? (
+                                                    <textarea
+                                                        value={editedBoilerplate}
+                                                        onChange={e => setEditedBoilerplate(e.target.value)}
+                                                        disabled={isProcessing}
+                                                        className="w-full min-h-[100px] rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-[13px] text-white/90 focus:outline-none focus:border-[#3B82F6]/50 resize-y transition-colors"
+                                                    />
+                                                ) : (
+                                                    <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-[13px] text-white/80 whitespace-pre-wrap">
+                                                        {generatedBoilerplate}
+                                                    </div>
+                                                )}
+                                                <div className="flex gap-2">
+                                                    {!isEditingBoilerplate ? (
+                                                        <button type="button" onClick={() => { setIsEditingBoilerplate(true); setEditedBoilerplate(generatedBoilerplate); }}
+                                                            className="text-[12px] text-[#3B82F6] hover:text-[#60A5FA] font-semibold transition-colors">
+                                                            Edit
+                                                        </button>
+                                                    ) : (
+                                                        <button type="button" onClick={() => setIsEditingBoilerplate(false)}
+                                                            className="text-[12px] text-white/50 hover:text-white font-semibold transition-colors">
+                                                            Use Generated
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* ── Prayer: auto-generated with confirm/edit ── */}
+                                {activeMode === 'court_prayer_repair' && generatedBoilerplate && (
+                                    <div className="space-y-2">
+                                        <label className="text-[12px] font-semibold text-white/60 block">
+                                            Suggested Prayer Section
+                                        </label>
+                                        {isEditingBoilerplate ? (
+                                            <textarea
+                                                value={editedBoilerplate}
+                                                onChange={e => setEditedBoilerplate(e.target.value)}
+                                                disabled={isProcessing}
+                                                className="w-full min-h-[100px] rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-[13px] text-white/90 focus:outline-none focus:border-[#3B82F6]/50 resize-y transition-colors"
+                                            />
+                                        ) : (
+                                            <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-[13px] text-white/80 whitespace-pre-wrap">
+                                                {generatedBoilerplate}
+                                            </div>
+                                        )}
+                                        <div className="flex gap-2">
+                                            {!isEditingBoilerplate ? (
+                                                <>
+                                                    <button type="button" onClick={() => { setIsEditingBoilerplate(true); setEditedBoilerplate(generatedBoilerplate); }}
+                                                        className="text-[12px] text-[#3B82F6] hover:text-[#60A5FA] font-semibold transition-colors">
+                                                        Edit
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <button type="button" onClick={() => setIsEditingBoilerplate(false)}
+                                                    className="text-[12px] text-white/50 hover:text-white font-semibold transition-colors">
+                                                    Use Generated
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ── Smart field inputs (caption, required fields, etc.) ── */}
                                 {config && config.fields.length > 0 && (
                                     <div className="space-y-3">
                                         {config.fields.map(field => {
                                             const defaultVal = getFieldDefault(field.key);
                                             const currentVal = fieldValues[field.key] ?? defaultVal;
+                                            const fromSettings = isFieldFromSettings(field.key);
+
+                                            // Confirmation chip: value exists and came from a known source
+                                            if (fromSettings && defaultVal && !fieldValues[field.key]) {
+                                                return (
+                                                    <div key={field.key}>
+                                                        <label className="text-[12px] font-semibold text-white/60 block mb-1">
+                                                            {field.label}
+                                                        </label>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[13px] text-emerald-300 flex items-center gap-1.5">
+                                                                <CheckCircle size={14} weight="fill" />
+                                                                {defaultVal}
+                                                            </span>
+                                                            <button type="button"
+                                                                onClick={() => setFieldValues(prev => ({ ...prev, [field.key]: defaultVal }))}
+                                                                className="text-[11px] text-white/40 hover:text-white/70 transition-colors">
+                                                                Change
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+
+                                            // Standard input (or unlocked confirmation chip)
                                             return (
                                                 <div key={field.key}>
                                                     <label className="text-[12px] font-semibold text-white/60 block mb-1">
                                                         {field.label}
                                                     </label>
-                                                    {field.multiline ? (
-                                                        <textarea
-                                                            value={currentVal}
-                                                            onChange={e => setFieldValues(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                                            placeholder={field.placeholder}
-                                                            disabled={isProcessing}
-                                                            className="w-full min-h-[80px] rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-[13px] text-white/90 placeholder:text-white/30 focus:outline-none focus:border-[#3B82F6]/50 resize-y transition-colors"
-                                                        />
-                                                    ) : (
-                                                        <input
-                                                            type="text"
-                                                            value={currentVal}
-                                                            onChange={e => setFieldValues(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                                            placeholder={field.placeholder}
-                                                            disabled={isProcessing}
-                                                            className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2.5 text-[13px] text-white/90 placeholder:text-white/30 focus:outline-none focus:border-[#3B82F6]/50 transition-colors"
-                                                        />
-                                                    )}
+                                                    <input
+                                                        type="text"
+                                                        value={currentVal}
+                                                        onChange={e => setFieldValues(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                                        placeholder={field.placeholder}
+                                                        disabled={isProcessing}
+                                                        className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2.5 text-[13px] text-white/90 placeholder:text-white/30 focus:outline-none focus:border-[#3B82F6]/50 transition-colors"
+                                                    />
                                                 </div>
                                             );
                                         })}
                                     </div>
                                 )}
 
-                                {/* Persistence toggle */}
-                                <div className="flex items-center gap-3 pt-1">
-                                    <button
-                                        type="button"
-                                        onClick={() => setSaveToSettings(!saveToSettings)}
-                                        disabled={isProcessing}
-                                        className={`w-4 h-4 rounded border transition-colors flex items-center justify-center ${
-                                            saveToSettings
-                                                ? 'bg-[#3B82F6] border-[#3B82F6]'
-                                                : 'border-white/30 bg-transparent'
-                                        }`}
-                                        aria-label="Save to Court Settings"
-                                    >
-                                        {saveToSettings && <CheckCircle size={10} weight="bold" className="text-white" />}
-                                    </button>
-                                    <span className="text-[12px] text-white/50">
-                                        Save to Court Settings (use for all future documents)
-                                    </span>
-                                </div>
+                                {/* ── Smart persistence toggle ── */}
+                                {allFieldsFromSettings ? (
+                                    <div className="flex items-center gap-2 pt-1">
+                                        <CheckCircle size={14} weight="fill" className="text-emerald-400" />
+                                        <span className="text-[12px] text-emerald-400/80">
+                                            Using your saved Court Settings
+                                        </span>
+                                    </div>
+                                ) : hasNewReusableValues ? (
+                                    <div className="flex items-center gap-3 pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSaveToSettings(!saveToSettings)}
+                                            disabled={isProcessing}
+                                            className={`w-4 h-4 rounded border transition-colors flex items-center justify-center ${
+                                                saveToSettings
+                                                    ? 'bg-[#3B82F6] border-[#3B82F6]'
+                                                    : 'border-white/30 bg-transparent'
+                                            }`}
+                                            aria-label="Save to Court Settings"
+                                        >
+                                            {saveToSettings && <CheckCircle size={10} weight="bold" className="text-white" />}
+                                        </button>
+                                        <span className="text-[12px] text-white/50">
+                                            Save to Court Settings (use for all future documents)
+                                        </span>
+                                    </div>
+                                ) : null}
 
                                 {/* Save status toast */}
                                 {saveStatus === 'saved' && (

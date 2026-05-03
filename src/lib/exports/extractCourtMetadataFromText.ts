@@ -1,0 +1,294 @@
+/**
+ * extractCourtMetadataFromText.ts
+ *
+ * Regex-based extraction of court metadata from pasted document text.
+ * Priority Level 1 in the resolution chain — values extracted here
+ * control the current document over saved settings.
+ *
+ * Each extracted field includes a confidence level so the modal can
+ * decide how to render it:
+ *   - high   → confirmation chip ("Harris County ✓")
+ *   - medium → suggestion radio with alternatives
+ *   - low    → suggestion only, never auto-applied
+ */
+
+// ═══════════════════════════════════════════════════════════════
+// Types
+// ═══════════════════════════════════════════════════════════════
+
+/** A single extracted field value with confidence metadata. */
+export type ExtractedField = {
+  value: string;
+  confidence: 'high' | 'medium' | 'low';
+};
+
+/** All court metadata that can be extracted from pasted text. */
+export type ExtractedCourtMetadata = {
+  causeNumber?: ExtractedField;
+  judicialDistrict?: ExtractedField;
+  county?: ExtractedField;
+  state?: ExtractedField;
+  courtName?: ExtractedField;
+  petitionerName?: ExtractedField;
+  respondentName?: ExtractedField;
+  documentTitle?: ExtractedField;
+  filingPartyRole?: ExtractedField;
+};
+
+// ═══════════════════════════════════════════════════════════════
+// Known values for validation
+// ═══════════════════════════════════════════════════════════════
+
+const US_STATES = new Set([
+  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado',
+  'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho',
+  'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana',
+  'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota',
+  'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada',
+  'New Hampshire', 'New Jersey', 'New Mexico', 'New York',
+  'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon',
+  'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+  'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
+  'West Virginia', 'Wisconsin', 'Wyoming',
+]);
+
+/** Uppercase state name → canonical form. */
+const STATE_LOOKUP = new Map<string, string>();
+for (const s of US_STATES) STATE_LOOKUP.set(s.toUpperCase(), s);
+
+// ═══════════════════════════════════════════════════════════════
+// Extraction patterns
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Extract cause/case number from caption text.
+ * Matches: CAUSE NO. 2024-12345-F, Case No. DC-24-12345, No. 2024-CV-1234
+ */
+function extractCauseNumber(text: string): ExtractedField | undefined {
+  // Pattern: "CAUSE NO." or "Case No." or "No." followed by alphanumeric case ID
+  const match = text.match(
+    /(?:CAUSE\s+NO\.?|Case\s+No\.?|Cause\s+Number|CASE\s+NO\.?)\s*:?\s*([A-Z0-9][\w\-./]+)/i,
+  );
+  if (match?.[1]) {
+    const val = match[1].trim();
+    // High confidence if it looks like a real case number (has digits + separator)
+    const hasStructure = /\d.*[-/.]/.test(val) || /^\d{4,}/.test(val);
+    return { value: val, confidence: hasStructure ? 'high' : 'medium' };
+  }
+  return undefined;
+}
+
+/**
+ * Extract judicial district from caption text.
+ * Matches: 387th Judicial District, 255th District Court, 45th Judicial District Court
+ */
+function extractJudicialDistrict(text: string): ExtractedField | undefined {
+  const match = text.match(
+    /(\d+(?:st|nd|rd|th))\s+(?:JUDICIAL\s+)?DISTRICT(?:\s+COURT)?/i,
+  );
+  if (match?.[1]) {
+    return {
+      value: `${match[1]} Judicial District`,
+      confidence: 'high',
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Extract county name from caption text.
+ * Matches: "IN HARRIS COUNTY", "HARRIS COUNTY, TEXAS", "COUNTY OF HARRIS"
+ */
+function extractCounty(text: string): ExtractedField | undefined {
+  // Process line-by-line to avoid cross-line false matches
+  const lines = text.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Pattern 1: "[NAME] COUNTY" on the same line (e.g., "HARRIS COUNTY, TEXAS")
+    const match1 = trimmed.match(
+      /^(?:IN\s+)?([A-Z][A-Z ]+?)\s+COUNTY\b/i,
+    );
+    if (match1?.[1]) {
+      const county = match1[1].trim().replace(/\s+/g, ' ');
+      // Filter out false positives
+      if (county.length >= 3 && !/^(?:THE|DISTRICT|COURT|JUDICIAL|IN)$/i.test(county)) {
+        return { value: county, confidence: 'high' };
+      }
+    }
+
+    // Pattern 2: "COUNTY OF [NAME]" on the same line
+    const match2 = trimmed.match(/COUNTY\s+OF\s+([A-Z][A-Z ]+?)(?:\s*,|$)/i);
+    if (match2?.[1]) {
+      const county = match2[1].trim();
+      if (county.length >= 3) {
+        return { value: county, confidence: 'high' };
+      }
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Extract state from caption text.
+ * Matches state names following county or "STATE OF" patterns.
+ */
+function extractState(text: string): ExtractedField | undefined {
+  // Pattern 1: "COUNTY, TEXAS" or "COUNTY, STATE"
+  const match1 = text.match(/COUNTY\s*,\s*([A-Z][A-Za-z\s]+?)(?:\s*\n|\s*$)/im);
+  if (match1?.[1]) {
+    const candidate = match1[1].trim();
+    const canonical = STATE_LOOKUP.get(candidate.toUpperCase());
+    if (canonical) return { value: canonical, confidence: 'high' };
+  }
+
+  // Pattern 2: "STATE OF TEXAS"
+  const match2 = text.match(/STATE\s+OF\s+([A-Z][A-Za-z\s]+?)(?:\s*\n|\s*$)/im);
+  if (match2?.[1]) {
+    const candidate = match2[1].trim();
+    const canonical = STATE_LOOKUP.get(candidate.toUpperCase());
+    if (canonical) return { value: canonical, confidence: 'high' };
+  }
+
+  // Pattern 3: Inline mention — just "Texas" or known state name
+  for (const [upper, canonical] of STATE_LOOKUP) {
+    if (text.toUpperCase().includes(upper)) {
+      return { value: canonical, confidence: 'medium' };
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Extract court name from caption text.
+ * Matches: "DISTRICT COURT", "FAMILY COURT", "COUNTY COURT AT LAW NO. 3"
+ */
+function extractCourtName(text: string): ExtractedField | undefined {
+  const match = text.match(
+    /(?:IN\s+THE\s+)?(\d+(?:st|nd|rd|th)\s+)?(?:JUDICIAL\s+)?(DISTRICT\s+COURT|FAMILY\s+COURT|COUNTY\s+COURT(?:\s+AT\s+LAW)?(?:\s+NO\.?\s*\d+)?)/i,
+  );
+  if (match) {
+    // Build full court name including ordinal if present
+    const ordinal = match[1]?.trim() ?? '';
+    const courtType = match[2]?.trim() ?? '';
+    const fullName = ordinal ? `${ordinal} ${courtType}` : courtType;
+    if (fullName.length >= 5) {
+      return { value: fullName, confidence: 'high' };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Extract party names and roles from caption text.
+ * Handles: "JANE DOE, Petitioner" / "v." / "In the Interest of CHILD"
+ */
+function extractParties(text: string): {
+  petitionerName?: ExtractedField;
+  respondentName?: ExtractedField;
+  filingPartyRole?: ExtractedField;
+} {
+  const result: ReturnType<typeof extractParties> = {};
+
+  // Pattern 1: "NAME, Petitioner" ... "v." ... "NAME, Respondent"
+  const petMatch = text.match(
+    /([A-Z][A-Z\s.'-]+?)\s*,\s*(?:Petitioner|PETITIONER)/,
+  );
+  if (petMatch?.[1]) {
+    result.petitionerName = {
+      value: petMatch[1].trim(),
+      confidence: 'high',
+    };
+  }
+
+  const resMatch = text.match(
+    /([A-Z][A-Z\s.'-]+?)\s*,\s*(?:Respondent|RESPONDENT)/,
+  );
+  if (resMatch?.[1]) {
+    result.respondentName = {
+      value: resMatch[1].trim(),
+      confidence: 'high',
+    };
+  }
+
+  // Pattern 2: "appearing pro se" → filing party role detection
+  if (/Petitioner.*(?:pro\s+se|appearing\s+in\s+pro)/i.test(text)) {
+    result.filingPartyRole = { value: 'petitioner', confidence: 'high' };
+  } else if (/Respondent.*(?:pro\s+se|appearing\s+in\s+pro)/i.test(text)) {
+    result.filingPartyRole = { value: 'respondent', confidence: 'high' };
+  } else if (/COMES\s+NOW\s+.+?,\s*Petitioner/i.test(text)) {
+    result.filingPartyRole = { value: 'petitioner', confidence: 'medium' };
+  } else if (/COMES\s+NOW\s+.+?,\s*Respondent/i.test(text)) {
+    result.filingPartyRole = { value: 'respondent', confidence: 'medium' };
+  }
+
+  return result;
+}
+
+/**
+ * Extract document title from header lines.
+ * Looks for capitalized titles before the caption block.
+ */
+function extractDocumentTitle(text: string): ExtractedField | undefined {
+  // Look for lines that are all-caps and look like document titles
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const titlePatterns = [
+    /^(MOTION\s+(?:FOR|TO)\s+.+)$/i,
+    /^(PETITION\s+(?:FOR|TO|IN)\s+.+)$/i,
+    /^(ORDER\s+(?:FOR|ON|GRANTING|DENYING)\s+.+)$/i,
+    /^(AFFIDAVIT\s+(?:OF|IN|FOR)\s+.+)$/i,
+    /^(RESPONSE\s+TO\s+.+)$/i,
+    /^(ORIGINAL\s+.+)$/i,
+    /^(AMENDED\s+.+)$/i,
+    /^(COUNTER-?PETITION\s+.+)$/i,
+    /^(APPLICATION\s+FOR\s+.+)$/i,
+  ];
+
+  for (const line of lines.slice(0, 15)) { // Check first 15 lines
+    for (const pattern of titlePatterns) {
+      const match = line.match(pattern);
+      if (match?.[1] && match[1].length >= 10) {
+        return { value: match[1].trim(), confidence: 'high' };
+      }
+    }
+  }
+
+  return undefined;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Main extractor
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Extract court metadata from pasted document text.
+ *
+ * Returns a structured object with confidence-tagged values.
+ * The resolver uses `.value` for the priority chain, and the
+ * full `{ value, confidence }` object is passed to the modal
+ * for rendering decisions.
+ *
+ * @param text - Combined text from all review items
+ * @returns Extracted metadata with confidence levels
+ */
+export function extractCourtMetadataFromText(
+  text: string,
+): ExtractedCourtMetadata {
+  const result: ExtractedCourtMetadata = {};
+
+  result.causeNumber = extractCauseNumber(text);
+  result.judicialDistrict = extractJudicialDistrict(text);
+  result.county = extractCounty(text);
+  result.state = extractState(text);
+  result.courtName = extractCourtName(text);
+  result.documentTitle = extractDocumentTitle(text);
+
+  const parties = extractParties(text);
+  result.petitionerName = parties.petitionerName;
+  result.respondentName = parties.respondentName;
+  result.filingPartyRole = parties.filingPartyRole;
+
+  return result;
+}

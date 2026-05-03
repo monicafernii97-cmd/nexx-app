@@ -52,8 +52,11 @@ export type NumberingMode =
 
 export type FieldResolutionSource =
   | 'reviewhub_edit'
+  | 'pasted_text'
   | 'court_settings'
+  | 'user_profile'
   | 'nex_profile'
+  | 'inferred'
   | 'personal_profile'
   | 'ai_generated'
   | 'manual_user_input'
@@ -201,9 +204,12 @@ function resolveField(
 
 export type ResolveCourtIdentityInput = {
   patch?: CourtIdentityPatch;
+  /** Level 1: Metadata extracted from pasted document text (confidence-tagged). */
+  extractedFromText?: Record<string, string | undefined>;
   courtSettings?: CourtSettingsData | null;
-  nexProfile?: NexProfileData | null;
+  /** Level 3: User's own profile from api.users.me. */
   userProfile?: UserProfileData | null;
+  nexProfile?: NexProfileData | null;
   draftTitle?: string;
   draftSubtitle?: string;
   draftDocumentKind?: DocumentKind;
@@ -223,26 +229,30 @@ export type ResolveCourtIdentityInput = {
 export function resolveCourtIdentity(
   input: ResolveCourtIdentityInput,
 ): CourtIdentity {
-  const { patch, courtSettings, nexProfile, userProfile } = input;
+  const { patch, extractedFromText: ext, courtSettings, userProfile, nexProfile } = input;
   const cs = courtSettings ?? {};
   const np = nexProfile ?? {};
   const up = userProfile ?? {};
+  const et = ext ?? {};
   const fieldSources: Record<string, FieldResolutionSource> = {};
 
   // ── Filing party ───────────────────────────────────────────
+  // NEX profile is opposing-party data — it must NOT populate the filing
+  // user's own legal name or role (safety invariant).
   const nameResult = resolveField(
     [patch?.filingPartyLegalName, 'reviewhub_edit'],
+    [et.filingPartyLegalName, 'pasted_text'],
     [cs.userLegalName, 'court_settings'],
-    [np.fullName, 'nex_profile'],
-    [up.fullName ?? up.name, 'personal_profile'],
+    [up.fullName ?? up.name, 'user_profile'],
   );
   const filingPartyLegalName = nameResult.value ?? '';
   if (nameResult.source) fieldSources['filingPartyLegalName'] = nameResult.source;
 
-  const roleStr = patch?.filingPartyRole ?? cs.userRole ?? '';
+  const roleStr = patch?.filingPartyRole ?? et.filingPartyRole ?? cs.userRole ?? '';
   const filingPartyRole: 'petitioner' | 'respondent' =
     /respondent/i.test(roleStr) ? 'respondent' : 'petitioner';
   if (patch?.filingPartyRole) fieldSources['filingPartyRole'] = 'reviewhub_edit';
+  else if (et.filingPartyRole) fieldSources['filingPartyRole'] = 'pasted_text';
   else if (cs.userRole) fieldSources['filingPartyRole'] = 'court_settings';
 
   // ── Pro se ─────────────────────────────────────────────────
@@ -254,9 +264,12 @@ export function resolveCourtIdentity(
   else if (up.hasAttorney != null) fieldSources['isProSe'] = 'personal_profile';
 
   // ── Opposing party ─────────────────────────────────────────
+  // NEX profile IS the opposing party — safe to use here.
   const opposingResult = resolveField(
     [patch?.opposingPartyLegalName, 'reviewhub_edit'],
+    [et.opposingPartyLegalName, 'pasted_text'],
     [cs.opposingPartyLegalName, 'court_settings'],
+    [np.fullName, 'nex_profile'],
   );
   if (opposingResult.source) fieldSources['opposingPartyLegalName'] = opposingResult.source;
 
@@ -268,6 +281,7 @@ export function resolveCourtIdentity(
   // ── Caption parties (ALWAYS actual roles) ──────────────────
   const captionPetResult = resolveField(
     [patch?.captionPetitionerName, 'reviewhub_edit'],
+    [et.captionPetitionerName, 'pasted_text'],
     [cs.petitionerLegalName, 'court_settings'],
   );
   // Fallback: map filing party to their actual caption role.
@@ -279,6 +293,7 @@ export function resolveCourtIdentity(
 
   const captionResResult = resolveField(
     [patch?.captionRespondentName, 'reviewhub_edit'],
+    [et.captionRespondentName, 'pasted_text'],
     [cs.respondentLegalName, 'court_settings'],
   );
   // If user is respondent → they are captionRespondent.
@@ -312,34 +327,39 @@ export function resolveCourtIdentity(
   // ── Court ──────────────────────────────────────────────────
   const countyResult = resolveField(
     [patch?.county, 'reviewhub_edit'],
+    [et.county, 'pasted_text'],
     [cs.county, 'court_settings'],
+    [up.county, 'user_profile'],
     [np.county, 'nex_profile'],
-    [up.county, 'personal_profile'],
   );
   if (countyResult.source) fieldSources['county'] = countyResult.source;
 
   const stateResult = resolveField(
     [patch?.state, 'reviewhub_edit'],
+    [et.state, 'pasted_text'],
     [cs.state, 'court_settings'],
+    [up.state, 'user_profile'],
     [np.state, 'nex_profile'],
-    [up.state, 'personal_profile'],
   );
   if (stateResult.source) fieldSources['state'] = stateResult.source;
 
   const courtResult = resolveField(
     [patch?.courtName, 'reviewhub_edit'],
+    [et.courtName, 'pasted_text'],
     [cs.courtName, 'court_settings'],
   );
   if (courtResult.source) fieldSources['courtName'] = courtResult.source;
 
   const districtResult = resolveField(
     [patch?.judicialDistrict, 'reviewhub_edit'],
+    [et.judicialDistrict, 'pasted_text'],
     [cs.judicialDistrict, 'court_settings'],
   );
   if (districtResult.source) fieldSources['judicialDistrict'] = districtResult.source;
 
   const causeResult = resolveField(
     [patch?.causeNumber, 'reviewhub_edit'],
+    [et.causeNumber, 'pasted_text'],
     [cs.causeNumber, 'court_settings'],
   );
   if (causeResult.source) fieldSources['causeNumber'] = causeResult.source;

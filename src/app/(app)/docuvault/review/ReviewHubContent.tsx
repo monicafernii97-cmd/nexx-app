@@ -118,9 +118,13 @@ export default function ReviewHubContent() {
 
     // Determine active court modal mode from highest-priority blocker
     const courtMode: ClarificationModalMode | undefined = useMemo(() => {
-        if (!isCourtDocument || !state.courtIssues.length) return undefined;
-        const modes = new Set(state.courtIssues.map(i => ISSUE_TO_MODE[i.id]));
-        return MODE_PRIORITY.find(m => modes.has(m));
+        if (!isCourtDocument) return undefined;
+        const blockerModes = new Set(
+            state.courtIssues
+                .filter(i => i.severity === 'blocker')
+                .map(i => ISSUE_TO_MODE[i.id]),
+        );
+        return MODE_PRIORITY.find(m => blockerModes.has(m));
     }, [isCourtDocument, state.courtIssues]);
 
 
@@ -607,8 +611,13 @@ export default function ReviewHubContent() {
                             ...(patch.judicialDistrict ? { judicialDistrict: patch.judicialDistrict } : {}),
                             ...(patch.causeNumber ? { causeNumber: patch.causeNumber } : {}),
                             ...(patch.assignedJudge ? { assignedJudge: patch.assignedJudge } : {}),
+                            // Party fields — map CourtIdentity names to courtSettings schema
+                            ...(patch.filingPartyLegalName ? { petitionerLegalName: patch.filingPartyLegalName } : {}),
+                            ...(patch.filingPartyRole ? { petitionerRole: patch.filingPartyRole } : {}),
+                            ...(patch.opposingPartyLegalName ? { respondentLegalName: patch.opposingPartyLegalName } : {}),
                             ...(patch.captionPetitionerName ? { petitionerLegalName: patch.captionPetitionerName } : {}),
                             ...(patch.captionRespondentName ? { respondentLegalName: patch.captionRespondentName } : {}),
+                            // Note: resolvedTitle/resolvedSubtitle are per-document, not court settings
                         });
                         return true;
                     } catch (err) {

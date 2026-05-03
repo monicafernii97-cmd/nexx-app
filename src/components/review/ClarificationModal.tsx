@@ -412,6 +412,9 @@ export default function ClarificationModal({
                 const success = await onSaveToSettings(patch);
                 setSaveStatus(success ? 'saved' : 'failed');
             }
+
+            // Always close the modal after successful apply
+            onClose();
         } catch (err) {
             console.error('[ClarificationModal] Court apply error:', err);
             setError((err as Error).message || 'Something went wrong. Please try again.');
@@ -609,7 +612,9 @@ export default function ClarificationModal({
                                             const fromSettings = isFieldFromSettings(field.key);
 
                                             // Confirmation chip: value exists and came from a known source
-                                            if (fromSettings && defaultVal && !fieldValues[field.key]) {
+                                            // Shows for ANY resolved source (court_settings, pasted_text, user_profile, etc.)
+                                            const fieldSource = resolvedFieldSources?.[field.key];
+                                            if (fieldSource && defaultVal && !fieldValues[field.key]) {
                                                 return (
                                                     <div key={field.key}>
                                                         <label className="text-[12px] font-semibold text-white/60 block mb-1">

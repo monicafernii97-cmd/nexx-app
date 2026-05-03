@@ -206,7 +206,7 @@ export default function ClarificationModal({
 
     if (!isOpen) return null;
 
-    // ── Structure mode handler (original logic) ──
+    /** Handle AI restructure actions (generate titles, section headings, or send to NEXchat). */
     const handleStructureContinue = async () => {
         setError(null);
         if (selectedAction === 'go_to_nexchat') {
@@ -271,7 +271,7 @@ export default function ClarificationModal({
         }
     };
 
-    // ── Court mode: Apply resolution ──
+    /** Apply court field values as a combined resolution (patch + optional text). */
     const handleCourtApply = async () => {
         if (!onResolve || !activeMode) return;
         setError(null);
@@ -318,7 +318,7 @@ export default function ClarificationModal({
         }
     };
 
-    // ── Court mode: Send to NEXchat ──
+    /** Dispatch a send_to_nexchat resolution to hand off unresolved issues. */
     const handleSendToNexchat = () => {
         onResolve?.({ type: 'send_to_nexchat' });
     };

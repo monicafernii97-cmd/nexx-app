@@ -16,6 +16,7 @@ import { storeCourtHandoff, consumeCourtHandoff } from '../courtHandoff';
 // Helpers
 // ═══════════════════════════════════════════════════════════════
 
+/** Build a full CourtIdentity with sensible defaults, applying overrides. */
 function makeIdentity(overrides: Partial<CourtIdentity> = {}): CourtIdentity {
   return resolveCourtIdentity({
     patch: {
@@ -35,6 +36,7 @@ function makeIdentity(overrides: Partial<CourtIdentity> = {}): CourtIdentity {
   });
 }
 
+/** Run detectCourtDocumentIssues with a partial identity and optional review text. */
 function detect(identity: Partial<CourtIdentity>, texts: string[] = ['COMES NOW Jane Doe, Petitioner, appearing pro se']): CourtDocumentIssue[] {
   return detectCourtDocumentIssues(
     identity,
@@ -43,14 +45,17 @@ function detect(identity: Partial<CourtIdentity>, texts: string[] = ['COMES NOW 
   );
 }
 
+/** Check whether any issue in the array has the given ID. */
 function hasIssue(issues: CourtDocumentIssue[], id: string): boolean {
   return issues.some(i => i.id === id);
 }
 
+/** Check whether any blocker-severity issue in the array has the given ID. */
 function hasBlocker(issues: CourtDocumentIssue[], id: string): boolean {
   return issues.some(i => i.id === id && i.severity === 'blocker');
 }
 
+/** Return true if there are no blocker-severity issues (export can proceed). */
 function canProceed(issues: CourtDocumentIssue[]): boolean {
   return !issues.some(i => i.severity === 'blocker');
 }

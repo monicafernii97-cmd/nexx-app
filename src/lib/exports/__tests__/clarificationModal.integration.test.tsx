@@ -33,6 +33,7 @@ if (typeof globalThis.sessionStorage === 'undefined') {
 // Helpers
 // ═══════════════════════════════════════════════════════════════
 
+/** Build a full CourtIdentity with sensible defaults, applying overrides. */
 function makeIdentity(overrides: Partial<CourtIdentity> = {}): CourtIdentity {
   return resolveCourtIdentity({
     patch: {
@@ -52,6 +53,7 @@ function makeIdentity(overrides: Partial<CourtIdentity> = {}): CourtIdentity {
   });
 }
 
+/** Determine the highest-priority court modal mode from a set of issues. */
 function getCourtMode(issues: CourtDocumentIssue[]): ClarificationModalMode | undefined {
   const modes = new Set(issues.map(i => ISSUE_TO_MODE[i.id]));
   return MODE_PRIORITY.find(m => modes.has(m));

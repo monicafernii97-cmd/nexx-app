@@ -321,16 +321,20 @@ export function resolveCourtIdentity(
   const children = patchChildren.length > 0 ? patchChildren :
     csChildren.length > 0 ? csChildren :
     npChildren.length > 0 ? npChildren : [];
+
+  // Priority: patch > pasted_text > court_settings/nex_profile children
   const childrenNames = (patch?.childrenNames?.length ?? 0) > 0
     ? patch!.childrenNames!
-    : children.length > 0
-      ? children.map(c => c.name)
-      : extractedChildNames;
+    : extractedChildNames.length > 0
+      ? extractedChildNames
+      : children.map(c => c.name);
 
-  if (patchChildren.length > 0) fieldSources['children'] = 'reviewhub_edit';
-  else if (csChildren.length > 0) fieldSources['children'] = 'court_settings';
-  else if (npChildren.length > 0) fieldSources['children'] = 'nex_profile';
+  // Track source for all resolution paths
+  if ((patch?.childrenNames?.length ?? 0) > 0) fieldSources['childrenNames'] = 'reviewhub_edit';
   else if (extractedChildNames.length > 0) fieldSources['childrenNames'] = 'pasted_text';
+  else if (patchChildren.length > 0) fieldSources['childrenNames'] = 'reviewhub_edit';
+  else if (csChildren.length > 0) fieldSources['childrenNames'] = 'court_settings';
+  else if (npChildren.length > 0) fieldSources['childrenNames'] = 'nex_profile';
 
   // ── Court ──────────────────────────────────────────────────
   const countyResult = resolveField(
@@ -387,8 +391,16 @@ export function resolveCourtIdentity(
     ? 'sapcr_modification'
     : rawCaseType || 'general';
 
+  const VALID_CASE_TITLE_FORMATS: ReadonlySet<NonNullable<CourtIdentity['caseTitleFormat']>> = new Set([
+    'name_v_name', 'in_interest_of', 'in_matter_of_marriage', 'in_re_marriage', 'custom',
+  ] as const);
+  const extractedFormat = et.caseTitleFormat;
+  const validatedExtractedFormat = extractedFormat && VALID_CASE_TITLE_FORMATS.has(extractedFormat as NonNullable<CourtIdentity['caseTitleFormat']>)
+    ? (extractedFormat as CourtIdentity['caseTitleFormat'])
+    : undefined;
+
   const caseTitleFormat = patch?.caseTitleFormat ??
-    (et.caseTitleFormat as CourtIdentity['caseTitleFormat']) ??
+    validatedExtractedFormat ??
     (cs.caseTitleFormat as CourtIdentity['caseTitleFormat']) ??
     (isSAPCR ? 'in_interest_of' : undefined);
 

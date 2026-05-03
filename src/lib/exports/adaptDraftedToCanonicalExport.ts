@@ -9,6 +9,10 @@
  *
  * This adapter is path-aware: court sections get `kind: 'court_section'`,
  * summary sections get `kind: 'summary_section'`, etc.
+ *
+ * Court-document-specific: supports structured prayer fields and
+ * prayer dedup (filters out drafted PRAYER sections when structured
+ * prayerIntro/prayerRequests exist, preventing double rendering).
  */
 
 import type {
@@ -27,6 +31,7 @@ import type {
   ExhibitIndexEntry,
 } from './types';
 import type { ExhibitMappedSections } from '@/lib/export-assembly/types/exports';
+import { isPrayerHeading } from './canonicalExportToLegalDocument';
 
 // ═══════════════════════════════════════════════════════════════
 // Input Types
@@ -73,6 +78,24 @@ export type AdaptToCanonicalParams = {
    * from the existing exhibit cover drafting flow.
    */
   exhibitMappedSections?: ExhibitMappedSections | null;
+
+  // ── Court-document-specific (plan step 7) ──
+  /** Document kind for court filings (motion, amended_motion, etc.). */
+  documentKind?: string;
+  /** Filing type (temporary_orders_motion, etc.). */
+  filingType?: string;
+  /** Filing party legal name for intro block generation. */
+  filingPartyName?: string;
+  /** Filing party role for intro block generation. */
+  filingPartyRole?: string;
+  /** Whether the filing party is pro se. */
+  isProSe?: boolean;
+  /** Numbering mode for paragraphs. */
+  numberingMode?: string;
+  /** Structured prayer intro text. */
+  prayerIntro?: string;
+  /** Structured prayer requests (individual items). */
+  prayerRequests?: string[];
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -109,7 +132,7 @@ export function adaptDraftedToCanonicalExport(
   } = params;
 
   // Route to path-specific section builder
-  const sections = buildSections(path, draftedSections, exhibitMappedSections);
+  const sections = buildSections(path, draftedSections, exhibitMappedSections, params);
 
   return {
     path,
@@ -144,10 +167,11 @@ function buildSections(
   path: ExportPath,
   draftedSections: DraftedSectionInput[],
   exhibitMappedSections?: ExhibitMappedSections | null,
+  params?: AdaptToCanonicalParams,
 ): ExportSection[] {
   switch (path) {
     case 'court_document':
-      return buildCourtSections(draftedSections);
+      return buildCourtSections(draftedSections, params);
     case 'case_summary':
       return buildSummarySections(draftedSections);
     case 'exhibit_document':
@@ -160,15 +184,38 @@ function buildSections(
   }
 }
 
-/** Map drafted sections to court document sections, preserving structural identity. */
-function buildCourtSections(sections: DraftedSectionInput[]): ExportSection[] {
-  return sections.map((s) => ({
-    kind: 'court_section' as const,
-    id: s.sectionId,
-    heading: s.heading,
-    paragraphs: s.body ? splitParagraphs(s.body) : [],
-    numberedItems: s.numberedItems ?? [],
-  }));
+/**
+ * Map drafted sections to court document sections, preserving structural identity.
+ *
+ * When structured prayerIntro/prayerRequests exist in params, any drafted section
+ * whose heading matches PRAYER is filtered out to prevent double rendering.
+ * The structured prayer will be built by canonicalExportToLegalDocument.
+ *
+ * Uses shared isPrayerHeading() from canonicalExportToLegalDocument — single source of truth.
+ */
+function buildCourtSections(
+  sections: DraftedSectionInput[],
+  params?: AdaptToCanonicalParams,
+): ExportSection[] {
+  const normalizedPrayerRequests =
+    (params?.prayerRequests ?? []).map((r) => r.trim()).filter(Boolean);
+  const hasStructuredPrayer = normalizedPrayerRequests.length > 0;
+
+  return sections
+    .filter((s) => {
+      // Filter out prayer sections when structured prayer exists (dedup)
+      if (hasStructuredPrayer && isPrayerHeading(s.heading)) {
+        return false;
+      }
+      return true;
+    })
+    .map((s) => ({
+      kind: 'court_section' as const,
+      id: s.sectionId,
+      heading: s.heading,
+      paragraphs: s.body ? splitParagraphs(s.body) : [],
+      numberedItems: s.numberedItems ?? [],
+    }));
 }
 
 /** Map drafted sections to summary/report sections. */

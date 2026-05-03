@@ -369,8 +369,18 @@ function renderIntroBlocks(doc: LegalDocument): string {
 
 function renderSections(doc: LegalDocument): string {
   return doc.sections.map((section) => {
-    const heading = section.heading
-      ? `<div class="section-heading">${esc(section.heading)}</div>`
+    // Auto-number from ordinal + level when ordinal is set.
+    // Clean heading text is stored without numerals (e.g. "BACKGROUND");
+    // the renderer prepends the numeral here to prevent "I. I. BACKGROUND".
+    let headingText = section.heading;
+    if (section.ordinal != null && section.level === 'roman') {
+      headingText = `${toRoman(section.ordinal)}. ${headingText}`;
+    } else if (section.ordinal != null && section.level === 'letter') {
+      headingText = `${indexToLetter(section.ordinal - 1)}. ${headingText}`;
+    }
+    // If ordinal is undefined, heading renders as-is (backward compatible).
+    const heading = headingText
+      ? `<div class="section-heading">${esc(headingText)}</div>`
       : '';
 
     return `${heading}${section.blocks.map(renderBlock).join('')}`;
@@ -516,6 +526,24 @@ function indexToLetter(idx: number): string {
     n = Math.floor(n / 26) - 1;
   } while (n >= 0);
   return label;
+}
+
+/** Convert 1-based number to Roman numeral: 1→I, 2→II, 4→IV, etc. */
+function toRoman(num: number): string {
+  const map: [number, string][] = [
+    [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
+    [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
+    [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
+  ];
+  let result = '';
+  let remaining = num;
+  for (const [value, symbol] of map) {
+    while (remaining >= value) {
+      result += symbol;
+      remaining -= value;
+    }
+  }
+  return result;
 }
 
 function esc(input: string): string {

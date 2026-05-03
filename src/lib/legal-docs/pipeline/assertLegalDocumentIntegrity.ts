@@ -88,6 +88,186 @@ export function assertLegalDocumentIntegrity(doc: LegalDocument): void {
 
   // ── Rule 5: No duplicate certificate ──────────────────────
   // (Only one certificate block is allowed in the LegalDocument type, so this is structural)
+
+  // ════════════════════════════════════════════════════════════
+  // Court-document-specific rules (plan step 9)
+  // ════════════════════════════════════════════════════════════
+
+  // ── Rule 8: No generic title ──────────────────────────────
+  const FORBIDDEN_TITLES = [
+    'court document', 'court filing document', 'legal document',
+    'document export', 'untitled document', 'court filing',
+  ];
+  const titleLower = doc.title.main.toLowerCase();
+  if (FORBIDDEN_TITLES.some(f => titleLower.includes(f))) {
+    throw new LegalDocumentIntegrityError(
+      `Generic title detected: "${doc.title.main}". Court documents require a specific legal title.`,
+    );
+  }
+
+  // ── Rule 9: SAPCR caption must have child name ────────────
+  if (doc.caption) {
+    const leftText = doc.caption.leftLines.join(' ');
+    if (/IN THE INTEREST OF/i.test(leftText)) {
+      // Ensure at least one child name is present (not just "A CHILD")
+      const nonLabelLines = doc.caption.leftLines.filter(l =>
+        !/^(IN THE INTEREST OF|A CHILD|CHILDREN)$/i.test(l.trim())
+      );
+      if (nonLabelLines.length === 0) {
+        throw new LegalDocumentIntegrityError(
+          'SAPCR caption is missing child name. "IN THE INTEREST OF" requires at least one named child.',
+        );
+      }
+    }
+  }
+
+  // ── Rule 10: Motion-type documents need intro ─────────────
+  const docType = doc.metadata.documentType?.toLowerCase() ?? '';
+  const isMotionType = /motion|petition|response/i.test(docType);
+  if (isMotionType && doc.introBlocks.length === 0) {
+    // Check if intro text exists in first section instead
+    const firstSectionText = doc.sections[0]?.blocks
+      .map(b => ('text' in b ? b.text : '')).join(' ') ?? '';
+    if (!/COMES NOW/i.test(firstSectionText)) {
+      // Advisory: don't throw for this one — it's a warning in detectCourtDocumentIssues
+    }
+  }
+
+  // ── Rule 11: Placeholder text blocking ────────────────────
+  const FORBIDDEN_VISIBLE = [
+    '[CHILD NAME]', '[COURT NAME]', '[CAUSE NUMBER]',
+    'COURT FILING DOCUMENT',
+  ];
+  const allVisibleText = gatherVisibleText(doc);
+  for (const forbidden of FORBIDDEN_VISIBLE) {
+    if (allVisibleText.includes(forbidden)) {
+      throw new LegalDocumentIntegrityError(
+        `Placeholder text detected in final document: "${forbidden}". Must be replaced before export.`,
+      );
+    }
+  }
+
+  // Check for 'undefined', 'null', 'NaN' as standalone words
+  if (/\b(undefined|null|NaN)\b/.test(allVisibleText)) {
+    throw new LegalDocumentIntegrityError(
+      'Internal value leaked into visible text (undefined/null/NaN).',
+    );
+  }
+
+  // ── Rule 12: Internal metadata leak ───────────────────────
+  if (/\b(nodeId|nodeType|classifiedNodes|sentenceClassifications|exportRelevance)\b/.test(allVisibleText)) {
+    throw new LegalDocumentIntegrityError(
+      'Internal metadata leaked into document visible text.',
+    );
+  }
+
+  // ── Rule 13: Signature / representation cross-contamination ─
+  if (doc.signature) {
+    const sigText = doc.signature.signerLines.join(' ');
+    const introText = doc.introBlocks.map(b => ('text' in b ? b.text : '')).join(' ');
+
+    // Pro se doc with attorney language
+    if (/\bPro\s+Se\b/i.test(sigText) && /Attorney\s+for\b/i.test(sigText)) {
+      throw new LegalDocumentIntegrityError(
+        'Signature contains both "Pro Se" and "Attorney for" — representation status is contradictory.',
+      );
+    }
+
+    // Intro says "appearing pro se" but signature says "Attorney for"
+    if (/appearing\s+pro\s+se/i.test(introText) && /Attorney\s+for\b/i.test(sigText)) {
+      throw new LegalDocumentIntegrityError(
+        'Intro says "appearing pro se" but signature references attorney — representation mismatch.',
+      );
+    }
+  }
+
+  // ── Rule 14: Duplicate PRAYER check ───────────────────────
+  // Prayer should be in doc.prayer, not also in sections
+  if (doc.prayer) {
+    const prayerInSections = doc.sections.some(s =>
+      /^(PRAYER|WHEREFORE|PRAYER\s+FOR\s+RELIEF)$/i.test(s.heading.trim())
+    );
+    if (prayerInSections) {
+      throw new LegalDocumentIntegrityError(
+        'PRAYER appears both in doc.prayer and in body sections — duplicate detected.',
+      );
+    }
+  }
+
+  // ── Rule 15: Duplicate CERTIFICATE check ──────────────────
+  if (doc.certificate) {
+    const certInSections = doc.sections.some(s =>
+      /CERTIFICATE\s+OF\s+SERVICE/i.test(s.heading.trim())
+    );
+    if (certInSections) {
+      throw new LegalDocumentIntegrityError(
+        'CERTIFICATE OF SERVICE appears both in doc.certificate and in body sections — duplicate detected.',
+      );
+    }
+  }
+}
+
+/**
+ * Gather all visible text from the LegalDocument for audit checks.
+ * Scans title, subtitle, intro blocks, sections, prayer, signature, certificate.
+ */
+function gatherVisibleText(doc: LegalDocument): string {
+  const parts: string[] = [doc.title.main];
+  if (doc.title.subtitle) parts.push(doc.title.subtitle);
+  if (doc.title.additionalTitleLines?.length) {
+    parts.push(...doc.title.additionalTitleLines);
+  }
+
+  // Caption
+  if (doc.caption) {
+    parts.push(...doc.caption.leftLines, ...doc.caption.rightLines);
+    if (doc.caption.causeLine) parts.push(doc.caption.causeLine);
+  }
+
+  // Intro
+  for (const block of doc.introBlocks) {
+    if ('text' in block) parts.push(block.text);
+  }
+
+  // Sections
+  for (const section of doc.sections) {
+    parts.push(section.heading);
+    for (const block of section.blocks) {
+      if ('text' in block) parts.push(block.text);
+      if ('items' in block) parts.push(...block.items);
+    }
+  }
+
+  // Prayer
+  if (doc.prayer) {
+    if (doc.prayer.intro) parts.push(doc.prayer.intro);
+    if (doc.prayer.introRuns?.length) {
+      parts.push(...doc.prayer.introRuns.map(r => r.text));
+    }
+    parts.push(...doc.prayer.requests);
+  }
+
+  // Signature
+  if (doc.signature) {
+    if (doc.signature.intro) parts.push(doc.signature.intro);
+    parts.push(...doc.signature.signerLines);
+  }
+
+  // Certificate
+  if (doc.certificate) {
+    parts.push(doc.certificate.heading);
+    parts.push(...doc.certificate.bodyLines);
+    parts.push(...doc.certificate.signerLines);
+  }
+
+  // Verification
+  if (doc.verification) {
+    if (doc.verification.heading) parts.push(doc.verification.heading);
+    parts.push(...doc.verification.bodyLines);
+    parts.push(...doc.verification.signerLines);
+  }
+
+  return parts.join('\n');
 }
 
 /**

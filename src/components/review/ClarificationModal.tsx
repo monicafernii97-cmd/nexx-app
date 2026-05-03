@@ -384,9 +384,13 @@ export default function ClarificationModal({
             // Auto-generated boilerplate for cert/prayer modes
             if (activeMode === 'court_certificate_repair' || activeMode === 'court_prayer_repair') {
                 const boilerplateText = isEditingBoilerplate ? editedBoilerplate : generatedBoilerplate;
-                if (boilerplateText?.trim()) {
-                    textParts.push(boilerplateText.trim());
+                const trimmedBoilerplate = boilerplateText?.trim();
+                if (!trimmedBoilerplate) {
+                    setError('Unable to apply — the generated text is empty. Please try again.');
+                    setIsProcessing(false);
+                    return;
                 }
+                textParts.push(trimmedBoilerplate);
             }
 
             // Dispatch a single combined resolution to the parent
@@ -506,7 +510,11 @@ export default function ClarificationModal({
                                                     key={opt.value}
                                                     title={opt.label}
                                                     selected={serviceMethod === opt.value}
-                                                    onClick={() => setServiceMethod(opt.value)}
+                                                    onClick={() => {
+                                                        setServiceMethod(opt.value);
+                                                        setIsEditingBoilerplate(false);
+                                                        setEditedBoilerplate('');
+                                                    }}
                                                     disabled={isProcessing}
                                                 />
                                             ))}

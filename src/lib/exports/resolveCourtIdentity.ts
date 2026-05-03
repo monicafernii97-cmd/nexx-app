@@ -313,16 +313,24 @@ export function resolveCourtIdentity(
     age: c.age ?? 0,
   })).filter(c => c.name !== '');
 
+  // Extracted child name from "In the Interest of" caption (already flattened to string)
+  const extractedChildNames: string[] = et.childrenNames
+    ? [et.childrenNames]
+    : [];
+
   const children = patchChildren.length > 0 ? patchChildren :
     csChildren.length > 0 ? csChildren :
     npChildren.length > 0 ? npChildren : [];
   const childrenNames = (patch?.childrenNames?.length ?? 0) > 0
     ? patch!.childrenNames!
-    : children.map(c => c.name);
+    : children.length > 0
+      ? children.map(c => c.name)
+      : extractedChildNames;
 
   if (patchChildren.length > 0) fieldSources['children'] = 'reviewhub_edit';
   else if (csChildren.length > 0) fieldSources['children'] = 'court_settings';
   else if (npChildren.length > 0) fieldSources['children'] = 'nex_profile';
+  else if (extractedChildNames.length > 0) fieldSources['children'] = 'pasted_text';
 
   // ── Court ──────────────────────────────────────────────────
   const countyResult = resolveField(
@@ -380,6 +388,7 @@ export function resolveCourtIdentity(
     : rawCaseType || 'general';
 
   const caseTitleFormat = patch?.caseTitleFormat ??
+    (et.caseTitleFormat as CourtIdentity['caseTitleFormat']) ??
     (cs.caseTitleFormat as CourtIdentity['caseTitleFormat']) ??
     (isSAPCR ? 'in_interest_of' : undefined);
 

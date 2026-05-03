@@ -71,6 +71,7 @@ const MODE_CONFIGS: Record<ClarificationModalMode, ModeConfig> = {
         title: 'Caption Details Needed',
         description: 'This filing needs a few caption details so it can be properly docketed.',
         fields: [
+            { key: 'childrenNames', label: 'Child Name(s)', placeholder: 'e.g., Amelia Sofia Fernandez' },
             { key: 'causeNumber', label: 'Cause Number', placeholder: 'e.g., 2024-12345-F' },
             { key: 'county', label: 'County', placeholder: 'e.g., Harris' },
             { key: 'state', label: 'State', placeholder: 'e.g., Texas' },
@@ -138,7 +139,7 @@ function getPriorityMode(issues: CourtDocumentIssue[]): ClarificationModalMode |
 const IDENTITY_FIELDS = new Set([
     'causeNumber', 'county', 'state', 'courtName', 'judicialDistrict',
     'resolvedTitle', 'resolvedSubtitle', 'filingPartyLegalName',
-    'filingPartyRole', 'opposingPartyLegalName',
+    'filingPartyRole', 'opposingPartyLegalName', 'childrenNames',
 ]);
 
 /** Fields that map to text content that should replace document text directly. */
@@ -215,6 +216,8 @@ export default function ClarificationModal({
         if (courtIdentity) {
             const val = (courtIdentity as Record<string, unknown>)[key];
             if (typeof val === 'string' && val.trim()) return val;
+            // Handle array fields (e.g., childrenNames) — join for display
+            if (Array.isArray(val) && val.length > 0) return val.join(', ');
         }
         return '';
     }, [modeIssues, courtIdentity]);
@@ -375,7 +378,12 @@ export default function ClarificationModal({
                 const value = (fieldValues[field.key] ?? getFieldDefault(field.key)).trim();
                 if (!value) continue;
                 if (IDENTITY_FIELDS.has(field.key)) {
-                    (patch as Record<string, unknown>)[field.key] = value;
+                    // childrenNames is stored as string[] on CourtIdentity
+                    if (field.key === 'childrenNames') {
+                        (patch as Record<string, unknown>)[field.key] = value.split(',').map(s => s.trim()).filter(Boolean);
+                    } else {
+                        (patch as Record<string, unknown>)[field.key] = value;
+                    }
                 } else if (TEXT_RESOLUTION_FIELDS.has(field.key)) {
                     textParts.push(value);
                 }

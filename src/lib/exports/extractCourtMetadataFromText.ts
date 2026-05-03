@@ -33,6 +33,10 @@ export type ExtractedCourtMetadata = {
   respondentName?: ExtractedField;
   documentTitle?: ExtractedField;
   filingPartyRole?: ExtractedField;
+  /** Child name(s) extracted from "In the Interest of" captions. */
+  childrenNames?: ExtractedField;
+  /** Caption format: 'in_interest_of' or 'name_v_name'. */
+  caseTitleFormat?: ExtractedField;
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -290,6 +294,21 @@ export function extractCourtMetadataFromText(
   result.petitionerName = parties.petitionerName;
   result.respondentName = parties.respondentName;
   result.filingPartyRole = parties.filingPartyRole;
+
+  // ── SAPCR / "In the Interest of" extraction ──
+  const interestMatch = text.match(
+    /IN\s+THE\s+INTEREST\s+OF\s+(?:§\s*)?([A-Z][A-Za-z\s.'-]+?)(?:\s*,\s*§|\s*§|\s*,\s*(?:A\s+CHILD|A\s+MINOR|CHILDREN|MINOR\s+CHILD))/i,
+  );
+  if (interestMatch?.[1]) {
+    const childName = interestMatch[1].trim();
+    result.childrenNames = { value: childName, confidence: 'high' };
+    result.caseTitleFormat = { value: 'in_interest_of', confidence: 'high' };
+  } else if (/IN\s+THE\s+INTEREST\s+OF/i.test(text)) {
+    // Detected the pattern but couldn't parse the name cleanly
+    result.caseTitleFormat = { value: 'in_interest_of', confidence: 'medium' };
+  } else if (/\bv\.?\s+/i.test(text) && result.petitionerName && result.respondentName) {
+    result.caseTitleFormat = { value: 'name_v_name', confidence: 'medium' };
+  }
 
   return result;
 }

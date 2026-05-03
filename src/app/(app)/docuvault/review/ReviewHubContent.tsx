@@ -584,7 +584,7 @@ export default function ReviewHubContent() {
                     if (resolution.type === 'patch_court_identity') {
                         dispatch({ type: 'APPLY_COURT_RESOLUTION', patch: resolution.patch });
                     } else if (resolution.type === 'send_to_nexchat') {
-                        storeCourtHandoff({
+                        const stored = storeCourtHandoff({
                             source: 'clarification_modal',
                             intent: 'fix_court_issues',
                             caseId: state.caseId ? String(state.caseId) : undefined,
@@ -596,6 +596,9 @@ export default function ReviewHubContent() {
                             timestamp: Date.now(),
                             schemaVersion: 1,
                         });
+                        if (!stored) {
+                            console.warn('[ReviewHub] Court handoff storage failed; context may be unavailable in chat.');
+                        }
                         dispatch({ type: 'SHOW_COURT_CLARIFICATION', show: false });
                         router.push('/chat?handoff=court');
                     }
@@ -611,12 +614,21 @@ export default function ReviewHubContent() {
                             ...(patch.judicialDistrict ? { judicialDistrict: patch.judicialDistrict } : {}),
                             ...(patch.causeNumber ? { causeNumber: patch.causeNumber } : {}),
                             ...(patch.assignedJudge ? { assignedJudge: patch.assignedJudge } : {}),
-                            // Party fields — map CourtIdentity names to courtSettings schema
-                            ...(patch.filingPartyLegalName ? { petitionerLegalName: patch.filingPartyLegalName } : {}),
-                            ...(patch.filingPartyRole ? { petitionerRole: patch.filingPartyRole } : {}),
-                            ...(patch.opposingPartyLegalName ? { respondentLegalName: patch.opposingPartyLegalName } : {}),
+                            // Party fields — role-aware mapping to courtSettings schema.
+                            // Caption names take priority (already role-correct).
                             ...(patch.captionPetitionerName ? { petitionerLegalName: patch.captionPetitionerName } : {}),
                             ...(patch.captionRespondentName ? { respondentLegalName: patch.captionRespondentName } : {}),
+                            // Fallback: map filingParty/opposingParty based on actual role
+                            ...(!patch.captionPetitionerName && !patch.captionRespondentName && patch.filingPartyLegalName
+                                ? (patch.filingPartyRole === 'respondent' || identity?.filingPartyRole === 'respondent'
+                                    ? { respondentLegalName: patch.filingPartyLegalName }
+                                    : { petitionerLegalName: patch.filingPartyLegalName })
+                                : {}),
+                            ...(!patch.captionPetitionerName && !patch.captionRespondentName && patch.opposingPartyLegalName
+                                ? (patch.filingPartyRole === 'respondent' || identity?.filingPartyRole === 'respondent'
+                                    ? { petitionerLegalName: patch.opposingPartyLegalName }
+                                    : { respondentLegalName: patch.opposingPartyLegalName })
+                                : {}),
                             // Note: resolvedTitle/resolvedSubtitle are per-document, not court settings
                         });
                         return true;

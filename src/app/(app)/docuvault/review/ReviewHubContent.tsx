@@ -35,9 +35,10 @@ import RevisionModal from '@/components/review/RevisionModal';
 // DraftStyleToggle removed in Review Hub redesign (Phase 1)
 import ClarificationModal from '@/components/review/ClarificationModal';
 import type { MappingReviewItem } from '@/lib/export-assembly/types/exports';
-import { detectCourtDocumentIssues } from '@/lib/exports/courtDocumentIssues';
-import { resolveCourtIdentity, type CourtSettingsData, type NexProfileData } from '@/lib/exports/resolveCourtIdentity';
-import { useQuery } from 'convex/react';
+import { detectCourtDocumentIssues, ISSUE_TO_MODE, MODE_PRIORITY, type ClarificationModalMode } from '@/lib/exports/courtDocumentIssues';
+import { resolveCourtIdentity, type CourtSettingsData, type NexProfileData, type CourtIdentity } from '@/lib/exports/resolveCourtIdentity';
+import { storeCourtHandoff } from '@/lib/exports/courtHandoff';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 
 // ---------------------------------------------------------------------------
@@ -112,6 +113,21 @@ export default function ReviewHubContent() {
     }, [isCourtDocument, state.courtIssues]);
     const canExportCourtDocument = !isCourtDocument || courtBlockers.length === 0;
 
+    // Court settings save mutation
+    const upsertCourtSettings = useMutation(api.courtSettings.upsert);
+
+    // Determine active court modal mode from highest-priority blocker
+    const courtMode: ClarificationModalMode | undefined = useMemo(() => {
+        if (!isCourtDocument) return undefined;
+        const blockerModes = new Set(
+            state.courtIssues
+                .filter(i => i.severity === 'blocker')
+                .map(i => ISSUE_TO_MODE[i.id]),
+        );
+        return MODE_PRIORITY.find(m => blockerModes.has(m));
+    }, [isCourtDocument, state.courtIssues]);
+
+
     // UI redesign shell states
     const [showClarificationModal, setShowClarificationModal] = useState(false);
     
@@ -152,6 +168,16 @@ export default function ReviewHubContent() {
     const nexProfileData: NexProfileData | undefined = rawNexProfile
         ? { fullName: rawNexProfile.legalName }
         : undefined;
+
+    // Resolved identity for modal auto-fill
+    const resolvedIdentity = useMemo((): CourtIdentity | undefined => {
+        if (!isCourtDocument) return undefined;
+        return resolveCourtIdentity({
+            patch: state.courtIdentityPatch ?? undefined,
+            courtSettings: courtSettingsData,
+            nexProfile: nexProfileData,
+        });
+    }, [isCourtDocument, state.courtIdentityPatch, courtSettingsData, nexProfileData]);
 
     // Detect court document issues on review phase entry and re-check when patch changes
     useEffect(() => {
@@ -547,16 +573,69 @@ export default function ReviewHubContent() {
                     console.log('[ReviewHub] Clarification resolved:', action, details);
                     setShowClarificationModal(false);
                     dispatch({ type: 'SHOW_COURT_CLARIFICATION', show: false });
-
                     if (resolvedText && action === 'generate_titles') {
-                        // AI returned restructured text. We do NOT inject it into a single
-                        // review item because resolvedText is the full document and would
-                        // duplicate/misorder content when exported alongside the other items.
-                        // Instead, log it for now — Phase 3 will re-run the assembly pipeline
-                        // to atomically replace the full item set with properly parsed nodes.
                         console.log('[ReviewHub] Structured text received (%d chars). Awaiting assembly re-parse integration.', resolvedText.length);
                     }
-                    // 'go_to_nexchat' is handled inside the modal (router.push)
+                }}
+                courtMode={courtMode}
+                courtIssues={state.courtIssues}
+                courtIdentity={resolvedIdentity}
+                onResolve={(resolution) => {
+                    if (resolution.type === 'patch_court_identity') {
+                        dispatch({ type: 'APPLY_COURT_RESOLUTION', patch: resolution.patch });
+                    } else if (resolution.type === 'send_to_nexchat') {
+                        const stored = storeCourtHandoff({
+                            source: 'clarification_modal',
+                            intent: 'fix_court_issues',
+                            caseId: state.caseId ? String(state.caseId) : undefined,
+                            exportPath: 'court_document',
+                            courtIdentity: state.courtIdentityPatch ?? {},
+                            issues: (state.courtIssues ?? []).map(i => ({ id: i.id, severity: i.severity })),
+                            draftText: effectiveItems.map(i => i.originalText).join('\n\n').slice(0, 3000),
+                            requestedOutcome: 'Fix court document issues identified during export review.',
+                            timestamp: Date.now(),
+                            schemaVersion: 1,
+                        });
+                        if (!stored) {
+                            console.warn('[ReviewHub] Court handoff storage failed; context may be unavailable in chat.');
+                        }
+                        dispatch({ type: 'SHOW_COURT_CLARIFICATION', show: false });
+                        router.push('/chat?handoff=court');
+                    }
+                    // After resolution, issues will be recomputed by the useEffect above
+                }}
+                onSaveToSettings={async (patch) => {
+                    try {
+                        const identity = resolvedIdentity;
+                        await upsertCourtSettings({
+                            state: patch.state ?? identity?.state ?? '',
+                            county: patch.county ?? identity?.county ?? '',
+                            ...(patch.courtName ? { courtName: patch.courtName } : {}),
+                            ...(patch.judicialDistrict ? { judicialDistrict: patch.judicialDistrict } : {}),
+                            ...(patch.causeNumber ? { causeNumber: patch.causeNumber } : {}),
+                            ...(patch.assignedJudge ? { assignedJudge: patch.assignedJudge } : {}),
+                            // Party fields — role-aware mapping to courtSettings schema.
+                            // Caption names take priority (already role-correct).
+                            ...(patch.captionPetitionerName ? { petitionerLegalName: patch.captionPetitionerName } : {}),
+                            ...(patch.captionRespondentName ? { respondentLegalName: patch.captionRespondentName } : {}),
+                            // Fallback: map filingParty/opposingParty based on actual role
+                            ...(!patch.captionPetitionerName && !patch.captionRespondentName && patch.filingPartyLegalName
+                                ? (patch.filingPartyRole === 'respondent' || identity?.filingPartyRole === 'respondent'
+                                    ? { respondentLegalName: patch.filingPartyLegalName }
+                                    : { petitionerLegalName: patch.filingPartyLegalName })
+                                : {}),
+                            ...(!patch.captionPetitionerName && !patch.captionRespondentName && patch.opposingPartyLegalName
+                                ? (patch.filingPartyRole === 'respondent' || identity?.filingPartyRole === 'respondent'
+                                    ? { petitionerLegalName: patch.opposingPartyLegalName }
+                                    : { respondentLegalName: patch.opposingPartyLegalName })
+                                : {}),
+                            // Note: resolvedTitle/resolvedSubtitle are per-document, not court settings
+                        });
+                        return true;
+                    } catch (err) {
+                        console.error('[ReviewHub] Failed to save to court settings:', err);
+                        return false;
+                    }
                 }}
             />
         </div>

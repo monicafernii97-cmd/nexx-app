@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { consumeCourtHandoff, buildHandoffPrompt, HANDOFF_FALLBACK_MESSAGE } from '@/lib/exports/courtHandoff';
 import {
     ChatCircleDots,
     Plus,
@@ -24,6 +25,15 @@ import { useWorkspace } from '@/lib/workspace-context';
 
 /** Conversation list page with mode picker and new-chat creation. Ethereal theme. */
 export default function ChatListPage() {
+    return (
+        <Suspense fallback={null}>
+            <ChatListContent />
+        </Suspense>
+    );
+}
+
+/** Inner content — separated so useSearchParams is wrapped in Suspense. */
+function ChatListContent() {
     const router = useRouter();
     const { activeCaseId } = useWorkspace();
     const conversations = useQuery(
@@ -35,6 +45,46 @@ export default function ChatListPage() {
     const [isCreating, setIsCreating] = useState(false);
     const [isArchiveOpen, setIsArchiveOpen] = useState(false);
     const [deletingId, setDeletingId] = useState<Id<'conversations'> | null>(null);
+    const searchParams = useSearchParams();
+    const handoffProcessedRef = useRef(false);
+
+    // ── Court handoff detection ──
+    useEffect(() => {
+        if (handoffProcessedRef.current) return;
+        if (searchParams.get('handoff') !== 'court') return;
+        if (!activeCaseId) return;
+
+        const payload = consumeCourtHandoff();
+
+        (async () => {
+            try {
+                const title = payload
+                    ? 'Court Document Issue Resolution'
+                    : 'Court Document Help';
+                const id = await createConversation({
+                    title,
+                    mode: 'legal',
+                    caseId: activeCaseId,
+                });
+
+                // Store the initial message for the conversation page to pick up
+                const msgKey = `nexx_handoff_msg_${String(id)}`;
+                if (payload) {
+                    sessionStorage.setItem(msgKey, buildHandoffPrompt(payload));
+                } else {
+                    sessionStorage.setItem(msgKey, HANDOFF_FALLBACK_MESSAGE);
+                }
+
+                // Mark processed only after successful creation
+                handoffProcessedRef.current = true;
+                router.replace(`/chat/${id}`);
+            } catch (err) {
+                console.error('[ChatList] Failed to create handoff conversation:', err);
+                // Allow retry on next render
+                handoffProcessedRef.current = false;
+            }
+        })();
+    }, [searchParams, activeCaseId, createConversation, router]);
 
     const handleDelete = async (e: React.MouseEvent, id: Id<'conversations'>) => {
         e.preventDefault();

@@ -135,19 +135,31 @@ function getPriorityMode(issues: CourtDocumentIssue[]): ClarificationModalMode |
     return MODE_PRIORITY.find(m => modes.has(m));
 }
 
-/** Check if a field key maps to a CourtIdentity patch field. */
+/** Fields that map to CourtIdentity patch properties (used for patch_court_identity resolution). */
 const IDENTITY_FIELDS = new Set([
     'causeNumber', 'county', 'state', 'courtName', 'judicialDistrict',
     'resolvedTitle', 'resolvedSubtitle', 'filingPartyLegalName',
     'filingPartyRole', 'opposingPartyLegalName',
 ]);
 
+/** Fields that map to text content that should replace document text directly. */
 const TEXT_RESOLUTION_FIELDS = new Set(['prayerText', 'certificateText']);
 
 // ═══════════════════════════════════════════════════════════════
 // Component
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Multi-mode clarification dialog for court document issues.
+ *
+ * Supports two operational modes:
+ * - **Structure mode** (original): unstructured document → AI restructure
+ * - **Court modes** (8 specific): field editing, auto-fill from identity, persistence toggle
+ *
+ * Court modes dispatch a single combined `onResolve` payload containing both identity
+ * patches and text replacements. Persistence to Court Settings is handled separately
+ * via `onSaveToSettings` only when the user explicitly opts in.
+ */
 export default function ClarificationModal({
     isOpen, onClose, onContinue, rawDocumentText,
     courtMode, courtIssues, courtIdentity, onResolve, onSaveToSettings,
@@ -279,16 +291,21 @@ export default function ClarificationModal({
                 }
             }
 
-            // Dispatch resolution based on mode
-            if (Object.keys(patch).length > 0) {
-                onResolve({ type: 'patch_court_identity', patch, saveToProfile: saveToSettings });
-            }
-            if (textParts.length > 0) {
-                onResolve({ type: 'replace_document_text', resolvedText: textParts.join('\n\n') });
+            // Dispatch a single combined resolution to the parent
+            const hasPatch = Object.keys(patch).length > 0;
+            const resolvedText = textParts.length > 0 ? textParts.join('\n\n') : undefined;
+
+            if (hasPatch || resolvedText) {
+                onResolve({
+                    type: 'patch_court_identity',
+                    patch: hasPatch ? patch : {},
+                    resolvedText,
+                    saveToProfile: false, // persistence is handled via onSaveToSettings below
+                });
             }
 
-            // Save to Court Settings if requested
-            if (saveToSettings && Object.keys(patch).length > 0 && onSaveToSettings) {
+            // Save to Court Settings if requested (separate from onResolve)
+            if (saveToSettings && hasPatch && onSaveToSettings) {
                 setSaveStatus('saving');
                 const success = await onSaveToSettings(patch);
                 setSaveStatus(success ? 'saved' : 'failed');

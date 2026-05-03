@@ -98,7 +98,7 @@ export type CourtDocumentIssue = {
 /** Result of resolving issues through ClarificationModal. */
 export type ClarificationResolution =
   | { type: 'replace_document_text'; resolvedText: string }
-  | { type: 'patch_court_identity'; patch: Partial<CourtIdentity>; saveToProfile?: boolean }
+  | { type: 'patch_court_identity'; patch: Partial<CourtIdentity>; resolvedText?: string; saveToProfile?: boolean }
   | { type: 'patch_review_items'; overrides: { nodeId: string; editedText: string }[] }
   | { type: 'send_to_nexchat' };
 

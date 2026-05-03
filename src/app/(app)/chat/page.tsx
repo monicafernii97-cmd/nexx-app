@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { consumeCourtHandoff, buildHandoffPrompt, HANDOFF_FALLBACK_MESSAGE } from '@/lib/exports/courtHandoff';
@@ -25,6 +25,15 @@ import { useWorkspace } from '@/lib/workspace-context';
 
 /** Conversation list page with mode picker and new-chat creation. Ethereal theme. */
 export default function ChatListPage() {
+    return (
+        <Suspense fallback={null}>
+            <ChatListContent />
+        </Suspense>
+    );
+}
+
+/** Inner content — separated so useSearchParams is wrapped in Suspense. */
+function ChatListContent() {
     const router = useRouter();
     const { activeCaseId } = useWorkspace();
     const conversations = useQuery(
@@ -45,7 +54,6 @@ export default function ChatListPage() {
         if (searchParams.get('handoff') !== 'court') return;
         if (!activeCaseId) return;
 
-        handoffProcessedRef.current = true;
         const payload = consumeCourtHandoff();
 
         (async () => {
@@ -60,16 +68,20 @@ export default function ChatListPage() {
                 });
 
                 // Store the initial message for the conversation page to pick up
+                const msgKey = `nexx_handoff_msg_${String(id)}`;
                 if (payload) {
-                    const prompt = buildHandoffPrompt(payload);
-                    sessionStorage.setItem(`nexx_handoff_msg_${String(id)}`, prompt);
+                    sessionStorage.setItem(msgKey, buildHandoffPrompt(payload));
                 } else {
-                    sessionStorage.setItem(`nexx_handoff_msg_fallback`, HANDOFF_FALLBACK_MESSAGE);
+                    sessionStorage.setItem(msgKey, HANDOFF_FALLBACK_MESSAGE);
                 }
 
+                // Mark processed only after successful creation
+                handoffProcessedRef.current = true;
                 router.replace(`/chat/${id}`);
             } catch (err) {
                 console.error('[ChatList] Failed to create handoff conversation:', err);
+                // Allow retry on next render
+                handoffProcessedRef.current = false;
             }
         })();
     }, [searchParams, activeCaseId, createConversation, router]);

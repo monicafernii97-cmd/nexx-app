@@ -601,8 +601,8 @@ export default function ReviewHubContent() {
                     try {
                         const identity = resolvedIdentity;
                         await upsertCourtSettings({
-                            state: (patch as Record<string, string>).state || identity?.state || '',
-                            county: (patch as Record<string, string>).county || identity?.county || '',
+                            state: patch.state ?? identity?.state ?? '',
+                            county: patch.county ?? identity?.county ?? '',
                             ...(patch.courtName ? { courtName: patch.courtName } : {}),
                             ...(patch.judicialDistrict ? { judicialDistrict: patch.judicialDistrict } : {}),
                             ...(patch.causeNumber ? { causeNumber: patch.causeNumber } : {}),

@@ -1,8 +1,11 @@
 /**
- * ClarificationModal Integration Tests (38–43)
+ * ClarificationModal Behavioral Integration Tests (38–43)
  *
- * React-level tests for the court-specific modal flow.
- * Tests rendering, dispatch behavior, persistence, and handoff.
+ * These tests verify the argument-construction logic, resolution dispatch
+ * patterns, and handoff lifecycle that power the court-specific ClarificationModal.
+ * They assert correctness at the data/state level (mode selection, patch merging,
+ * save-to-settings argument shapes, handoff storage/consumption, and blocker
+ * persistence) — not DOM rendering or user interaction.
  */
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';

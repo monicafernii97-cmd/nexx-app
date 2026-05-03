@@ -167,7 +167,7 @@ export function canonicalExportToLegalDocument(
       jurisdiction: doc.metadata.jurisdiction?.state,
       documentType: doc.metadata.documentType,
       filingParty: ctx?.filingPartyName,
-      partyRole: ctx?.filingPartyRole,
+      partyRole: ctx?.filingPartyRole ?? doc.metadata.partyRole,
     },
     caption,
     title,
@@ -362,13 +362,16 @@ function buildSignatureBlock(
   // If doc already has an explicit signature, use it
   if (doc.signature) return doc.signature;
 
-  // Pro se: generate deterministic signature block
-  if (ctx?.isProSe && ctx.filingPartyName) {
+  // Pro se: generate deterministic signature block.
+  // If name is missing, use placeholder — assertLegalDocumentIntegrity
+  // will catch it and ClarificationModal will resolve it.
+  if (ctx?.isProSe) {
+    const filingPartyName = ctx.filingPartyName?.trim() || '[FILING PARTY NAME]';
     return {
       intro: 'Respectfully submitted,',
       signerLines: [
         '_________________________',
-        ctx.filingPartyName,
+        filingPartyName,
         'Pro Se',
       ],
     };

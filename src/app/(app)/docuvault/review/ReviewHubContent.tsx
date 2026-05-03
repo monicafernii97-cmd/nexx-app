@@ -35,6 +35,10 @@ import RevisionModal from '@/components/review/RevisionModal';
 // DraftStyleToggle removed in Review Hub redesign (Phase 1)
 import ClarificationModal from '@/components/review/ClarificationModal';
 import type { MappingReviewItem } from '@/lib/export-assembly/types/exports';
+import { detectCourtDocumentIssues } from '@/lib/exports/courtDocumentIssues';
+import { resolveCourtIdentity, type CourtSettingsData, type NexProfileData } from '@/lib/exports/resolveCourtIdentity';
+import { useQuery } from 'convex/react';
+import { api } from '@convex/_generated/api';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -100,6 +104,14 @@ export default function ReviewHubContent() {
     const [isDrafting, setIsDrafting] = useState(false);
     const [showPreflight, setShowPreflight] = useState(false);
 
+    // Court document: compute whether export is allowed
+    const isCourtDocument = state.exportPath === 'court_document';
+    const courtBlockers = useMemo(() => {
+        if (!isCourtDocument) return [];
+        return state.courtIssues.filter(i => i.severity === 'blocker');
+    }, [isCourtDocument, state.courtIssues]);
+    const canExportCourtDocument = !isCourtDocument || courtBlockers.length === 0;
+
     // UI redesign shell states
     const [showClarificationModal, setShowClarificationModal] = useState(false);
     
@@ -117,6 +129,48 @@ export default function ReviewHubContent() {
             }
         }
     }, [state.phase, state.reviewItems]);
+
+    // Query court settings and nex profile for full identity resolution
+    const rawCourtSettings = useQuery(api.courtSettings.get);
+    const rawNexProfile = useQuery(api.nexProfiles.getByUser);
+
+    // Map Convex objects to the shapes expected by resolveCourtIdentity
+    const courtSettingsData: CourtSettingsData | undefined = rawCourtSettings
+        ? {
+            state: rawCourtSettings.state,
+            county: rawCourtSettings.county,
+            courtName: rawCourtSettings.courtName,
+            causeNumber: rawCourtSettings.causeNumber,
+            assignedJudge: rawCourtSettings.assignedJudge,
+            petitionerLegalName: rawCourtSettings.petitionerLegalName,
+            respondentLegalName: rawCourtSettings.respondentLegalName,
+            children: rawCourtSettings.children,
+        }
+        : undefined;
+
+    // nexProfile is the opposing party profile — map legalName as fullName
+    const nexProfileData: NexProfileData | undefined = rawNexProfile
+        ? { fullName: rawNexProfile.legalName }
+        : undefined;
+
+    // Detect court document issues on review phase entry and re-check when patch changes
+    useEffect(() => {
+        if (state.phase !== 'reviewing' || !isCourtDocument) return;
+        // Full source set: merge patch with courtSettings and nexProfile so the
+        // client-side gate matches the backend resolution in route.ts.
+        const identity = resolveCourtIdentity({
+            patch: state.courtIdentityPatch ?? undefined,
+            courtSettings: courtSettingsData,
+            nexProfile: nexProfileData,
+        });
+        const itemTexts = state.reviewItems.map(i => i.originalText);
+        const issues = detectCourtDocumentIssues(
+            identity,
+            { documentType: identity.documentKind, exportPath: 'court_document' },
+            itemTexts,
+        );
+        dispatch({ type: 'SET_COURT_ISSUES', issues });
+    }, [state.phase, isCourtDocument, state.courtIdentityPatch, state.reviewItems, courtSettingsData, nexProfileData, dispatch]);
 
     // Track sidebar edit state to auto-save on selection change
     const pendingEditRef = useRef<{ nodeId: string; text: string } | null>(null);
@@ -236,6 +290,31 @@ export default function ReviewHubContent() {
             return;
         }
 
+        // 🔒 Race Condition Guard (Invariant H1)
+        // Re-run detectCourtDocumentIssues against latest merged state.
+        // If blockers remain, DO NOT start SSE request.
+        if (state.exportPath === 'court_document') {
+            // Full source set: merge patch with courtSettings and nexProfile
+            // so the client-side gate matches the backend resolution.
+            const identity = resolveCourtIdentity({
+                patch: state.courtIdentityPatch ?? undefined,
+                courtSettings: courtSettingsData,
+                nexProfile: nexProfileData,
+            });
+            const itemTexts = effectiveItems.map(i => i.originalText);
+            const freshIssues = detectCourtDocumentIssues(
+                identity,
+                { documentType: identity.documentKind, exportPath: state.exportPath },
+                itemTexts,
+            );
+            const freshBlockers = freshIssues.filter(i => i.severity === 'blocker');
+            if (freshBlockers.length > 0) {
+                dispatch({ type: 'SET_COURT_ISSUES', issues: freshIssues });
+                dispatch({ type: 'SHOW_COURT_CLARIFICATION', show: true });
+                return;
+            }
+        }
+
         draftingGuardRef.current = true;
         if (pendingEditRef.current) {
             editItem(pendingEditRef.current.nodeId, pendingEditRef.current.text);
@@ -253,6 +332,7 @@ export default function ReviewHubContent() {
             reviewItems: effectiveItems,
             caseId: state.caseId,
             retryOfExportId: retryExportIdRef.current ?? undefined,
+            courtIdentityPatch: state.courtIdentityPatch ?? undefined,
         };
         retryExportIdRef.current = null; // Clear after use
 
@@ -393,7 +473,7 @@ export default function ReviewHubContent() {
                             <button
                                 type="button"
                                 onClick={handleApproveAndDraft}
-                                disabled={isDrafting}
+                                disabled={isDrafting || !canExportCourtDocument}
                                 className={`px-5 py-2.5 rounded-xl text-[13px] font-bold tracking-wide text-white border border-white/25 transition-all flex items-center gap-2 ${
                                     isDrafting
                                         ? 'bg-white/10 cursor-not-allowed opacity-60'
@@ -406,6 +486,22 @@ export default function ReviewHubContent() {
                         </div>
                     </div>
                 </div>
+
+                {/* Court Issues Banner */}
+                {isCourtDocument && courtBlockers.length > 0 && (
+                    <div className="mx-6 mt-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
+                        <p className="text-amber-300 text-[13px] font-medium">
+                            This document needs {courtBlockers.length} court-filing detail{courtBlockers.length > 1 ? 's' : ''} before export.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => dispatch({ type: 'SHOW_COURT_CLARIFICATION', show: true })}
+                            className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 text-[12px] font-bold hover:bg-amber-500/30 transition-colors"
+                        >
+                            Resolve Issues
+                        </button>
+                    </div>
+                )}
 
                 {/* Canvas */}
                 <div className="flex-1 flex overflow-hidden">
@@ -439,14 +535,18 @@ export default function ReviewHubContent() {
 
             {/* ── Clarification Modal Overlay ── */}
             <ClarificationModal
-                isOpen={showClarificationModal}
-                onClose={() => setShowClarificationModal(false)}
+                isOpen={showClarificationModal || state.showCourtClarification}
+                onClose={() => {
+                    setShowClarificationModal(false);
+                    dispatch({ type: 'SHOW_COURT_CLARIFICATION', show: false });
+                }}
                 rawDocumentText={
                     effectiveItems.map(i => i.originalText).join('\n\n')
                 }
                 onContinue={(action, details, resolvedText) => {
                     console.log('[ReviewHub] Clarification resolved:', action, details);
                     setShowClarificationModal(false);
+                    dispatch({ type: 'SHOW_COURT_CLARIFICATION', show: false });
 
                     if (resolvedText && action === 'generate_titles') {
                         // AI returned restructured text. We do NOT inject it into a single

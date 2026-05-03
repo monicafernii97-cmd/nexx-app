@@ -1,6 +1,13 @@
 /**
  * Court Export HTML Renderer
  *
+ * @deprecated Use the canonical pipeline instead:
+ *   adaptDraftedToCanonicalExport → canonicalExportToLegalDocument → renderLegalDocumentHTML
+ *
+ * This legacy renderer is retained for backward compatibility.
+ * New court_document exports MUST go through the canonical pipeline
+ * which enforces integrity checks, audit, and jurisdiction profiles.
+ *
  * Renders a court document CanonicalExportDocument into full HTML
  * with caption, title, body sections, prayer, signature, and certificate.
  *
@@ -18,6 +25,8 @@ import { escapeHtml, renderPageShell } from './shared';
 
 /**
  * Render a court document export to HTML.
+ *
+ * @deprecated Use the canonical pipeline: adaptDraftedToCanonicalExport → canonicalExportToLegalDocument → renderLegalDocumentHTML
  *
  * @param doc - CanonicalExportDocument with path='court_document'
  * @param profile - Resolved export jurisdiction profile

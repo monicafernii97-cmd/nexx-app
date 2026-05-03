@@ -33,6 +33,18 @@ export type DocumentKind =
   | 'objection'
   | 'exhibit_packet';
 
+/** Runtime set of valid DocumentKind values — kept in sync with the type above. */
+export const VALID_DOCUMENT_KINDS: ReadonlySet<string> = new Set<DocumentKind>([
+  'motion', 'amended_motion', 'second_amended_motion', 'third_amended_motion',
+  'response', 'declaration', 'notice', 'proposed_order',
+  'affidavit', 'petition', 'objection', 'exhibit_packet',
+]);
+
+/** Type guard: returns true if the value is a known DocumentKind. */
+export function isValidDocumentKind(value: unknown): value is DocumentKind {
+  return typeof value === 'string' && VALID_DOCUMENT_KINDS.has(value);
+}
+
 export type NumberingMode =
   | 'continuous'
   | 'restart_by_section'

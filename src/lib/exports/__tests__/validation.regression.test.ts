@@ -11,8 +11,17 @@ import type { CanonicalExportDocument } from '../types';
 function makeDoc(overrides: Partial<CanonicalExportDocument>): CanonicalExportDocument {
   return {
     path: 'court_document',
-    title: 'TEST DOCUMENT',
-    metadata: {},
+    title: 'MOTION TO MODIFY',
+    metadata: {
+      causeNumber: '2024-12345',
+    },
+    caption: {
+      style: 'texas_pleading' as const,
+      causeLine: 'CAUSE NO. 2024-12345',
+      leftLines: ['IN THE INTEREST OF', 'J.D., A CHILD'],
+      centerLines: ['§', '§', '§'],
+      rightLines: ['IN THE DISTRICT COURT', 'HARRIS COUNTY, TEXAS'],
+    },
     sections: [],
     ...overrides,
   };
@@ -27,10 +36,11 @@ describe('validateExportDocument', () => {
       expect(result.issues.find(i => i.id === 'no_sections')?.severity).toBe('blocker');
     });
 
-    it('warns on missing title', () => {
+    it('warns on missing title for non-court paths', () => {
       const result = validateExportDocument(makeDoc({
+        path: 'case_summary',
         title: '',
-        sections: [{ kind: 'court_section', id: 'body', paragraphs: ['text'] }],
+        sections: [{ kind: 'summary_section', id: 'body', heading: 'Summary', paragraphs: ['text'] }],
       }));
       expect(result.canProceed).toBe(true);
       expect(result.issues.find(i => i.id === 'missing_title')?.severity).toBe('warning');
@@ -50,17 +60,85 @@ describe('validateExportDocument', () => {
     it('warns on missing state jurisdiction', () => {
       const result = validateExportDocument(makeDoc({
         path: 'court_document',
-        metadata: { jurisdiction: {} },
+        metadata: { causeNumber: '2024-12345', jurisdiction: {} },
         sections: [{ kind: 'court_section', id: 'body', paragraphs: ['text'] }],
       }));
       expect(result.issues.find(i => i.id === 'court_missing_state')?.severity).toBe('warning');
     });
 
+    it('blocks on missing title', () => {
+      const result = validateExportDocument(makeDoc({
+        path: 'court_document',
+        title: '',
+      }));
+      expect(result.canProceed).toBe(false);
+      expect(result.issues.find(i => i.id === 'court_missing_title')?.severity).toBe('blocker');
+    });
+
+    it('blocks on generic/forbidden title', () => {
+      const result = validateExportDocument(makeDoc({
+        path: 'court_document',
+        title: 'COURT FILING DOCUMENT',
+        sections: [{ kind: 'court_section', id: 'body', paragraphs: ['text'] }],
+      }));
+      expect(result.canProceed).toBe(false);
+      expect(result.issues.find(i => i.id === 'court_generic_title')?.severity).toBe('blocker');
+    });
+
+    it('blocks on missing caption', () => {
+      const result = validateExportDocument(makeDoc({
+        path: 'court_document',
+        caption: undefined,
+        sections: [{ kind: 'court_section', id: 'body', paragraphs: ['text'] }],
+      }));
+      expect(result.canProceed).toBe(false);
+      expect(result.issues.find(i => i.id === 'court_missing_caption')?.severity).toBe('blocker');
+    });
+
+    it('blocks on missing cause number', () => {
+      const result = validateExportDocument(makeDoc({
+        path: 'court_document',
+        metadata: { causeNumber: '' },
+        sections: [{ kind: 'court_section', id: 'body', paragraphs: ['text'] }],
+      }));
+      expect(result.canProceed).toBe(false);
+      expect(result.issues.find(i => i.id === 'court_missing_cause_number')?.severity).toBe('blocker');
+    });
+
+    it('blocks on placeholder in content', () => {
+      const result = validateExportDocument(makeDoc({
+        path: 'court_document',
+        sections: [{ kind: 'court_section', id: 'body', paragraphs: ['The child [CHILD NAME] was...'] }],
+      }));
+      expect(result.canProceed).toBe(false);
+      expect(result.issues.find(i => i.id === 'court_placeholder_detected')?.severity).toBe('blocker');
+    });
+
+    it('blocks on internal value leak', () => {
+      const result = validateExportDocument(makeDoc({
+        path: 'court_document',
+        sections: [{ kind: 'court_section', id: 'body', paragraphs: ['The value is undefined here'] }],
+      }));
+      expect(result.canProceed).toBe(false);
+      expect(result.issues.find(i => i.id === 'court_internal_value_leak')?.severity).toBe('blocker');
+    });
+
     it('passes with valid court document', () => {
       const result = validateExportDocument(makeDoc({
         path: 'court_document',
-        metadata: { jurisdiction: { state: 'Texas', county: 'Harris' } },
-        sections: [{ kind: 'court_section', id: 'body', heading: 'Facts', paragraphs: ['text'] }],
+        title: 'MOTION TO MODIFY',
+        metadata: {
+          causeNumber: '2024-12345',
+          jurisdiction: { state: 'Texas', county: 'Harris' },
+        },
+        caption: {
+          style: 'texas_pleading' as const,
+          causeLine: 'CAUSE NO. 2024-12345',
+          leftLines: ['IN THE INTEREST OF', 'J.D., A CHILD'],
+          centerLines: ['§', '§', '§'],
+          rightLines: ['IN THE DISTRICT COURT', 'HARRIS COUNTY, TEXAS'],
+        },
+        sections: [{ kind: 'court_section', id: 'body', heading: 'Facts', paragraphs: ['The parties were married.'] }],
       }));
       expect(result.canProceed).toBe(true);
       expect(result.blockerCount).toBe(0);

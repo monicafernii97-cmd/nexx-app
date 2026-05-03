@@ -45,6 +45,14 @@ import { hashPayload, generateRunFingerprint } from '@/lib/exports/idempotency';
 import { computeArtifactChecksum, verifyUploadedArtifact } from '@/lib/exports/artifactIntegrity';
 import { ExportDocumentGenerationError } from '@/lib/exports/errors';
 import {
+    resolveCourtIdentity,
+    isValidDocumentKind,
+    type CourtIdentity,
+    type CourtSettingsData,
+    type DocumentKind,
+} from '@/lib/exports/resolveCourtIdentity';
+import { detectCourtDocumentIssues } from '@/lib/exports/courtDocumentIssues';
+import {
     MAX_TERMINAL_MUTATION_RETRIES,
     RETRY_BACKOFF_BASE_MS,
 } from '@/lib/exports/exportConfig';
@@ -63,6 +71,8 @@ interface ExportStreamRequest {
     caseId: string;
     runId: string;
     retryOfExportId?: string;
+    /** Client-side court identity patch from ClarificationModal. */
+    courtIdentityPatch?: Partial<CourtIdentity>;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,12 +88,7 @@ function sanitizeForFilename(str: string): string {
         .replace(/^_|_$/g, '');
 }
 
-/** Generate a deterministic filename: {caseType}_{exportPath}_{date}_{shortId}.pdf */
-function generateFilename(caseType: string, exportPath: string, runId: string): string {
-    const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    const shortId = runId.slice(-6);
-    return `${sanitizeForFilename(caseType)}_${sanitizeForFilename(exportPath)}_${date}_${shortId}.pdf`;
-}
+
 
 // adaptDraftedToGenerated — REMOVED
 // Replaced by adaptDraftedToCanonicalExport from src/lib/exports/
@@ -240,6 +245,7 @@ export async function POST(request: NextRequest) {
                     assemblyResult: body.assemblyResult,
                     reviewItems: (body as unknown as Record<string, unknown>).reviewItems ?? null,
                     overrides: (body as unknown as Record<string, unknown>).overrides ?? null,
+                    courtIdentityPatch: body.courtIdentityPatch ?? null,
                 };
                 const payloadHash = hashPayload(stablePreGenPayload);
                 runFingerprint = generateRunFingerprint({
@@ -450,6 +456,63 @@ export async function POST(request: NextRequest) {
                 checkAborted();
 
                 // ────────────────────────────────────────────────
+                // 2a. COURT IDENTITY RESOLUTION (court_document only)
+                // ────────────────────────────────────────────────
+                let courtIdentity: CourtIdentity | undefined;
+
+                if (exportPath === 'court_document') {
+                    send({
+                        type: 'milestone',
+                        stage: 'validating',
+                        percent: 73,
+                        message: 'Resolving court identity...',
+                    });
+
+                    // Query Convex for court settings (returns null when none exist)
+                    const courtSettings = await convex.query(api.courtSettings.get, {});
+
+                    const rawDocType = 'documentType' in exportConfig
+                        ? String((exportConfig as unknown as Record<string, unknown>).documentType)
+                        : undefined;
+
+                    courtIdentity = resolveCourtIdentity({
+                        patch: body.courtIdentityPatch,
+                        courtSettings: courtSettings as CourtSettingsData | null,
+                        draftTitle: getTemplateName(body.exportRequest?.path ?? 'general'),
+                        draftDocumentKind: isValidDocumentKind(rawDocType) ? rawDocType : undefined,
+                    });
+
+                    // ── Final authority: detect court document issues ──
+                    const sectionTexts = draftedSections.flatMap(s => [
+                        s.heading ?? '',
+                        s.body ?? '',
+                        ...(s.numberedItems ?? []),
+                    ]);
+                    const courtIssues = detectCourtDocumentIssues(
+                        courtIdentity,
+                        { documentType: courtIdentity.documentKind, exportPath },
+                        sectionTexts,
+                    );
+
+                    const blockers = courtIssues.filter(i => i.severity === 'blocker');
+                    if (blockers.length > 0) {
+                        // Send the clarification SSE error to the client first
+                        send({
+                            type: 'error',
+                            errorCode: 'COURT_DOCUMENT_NEEDS_CLARIFICATION',
+                            message: 'Court document has unresolved issues that require clarification.',
+                            issues: courtIssues,
+                        });
+
+                        // Throw coded error so the outer catch block handles
+                        // export/job/idempotency cleanup with proper retry logic
+                        const courtErr = new Error('Court document has unresolved issues.');
+                        (courtErr as Error & { code?: string }).code = 'COURT_DOCUMENT_NEEDS_CLARIFICATION';
+                        throw courtErr;
+                    }
+                }
+
+                // ────────────────────────────────────────────────
                 // 2b. EXHIBIT COVER DRAFTING (exhibit_document only)
                 // ────────────────────────────────────────────────
                 if (body.exportRequest?.path === 'exhibit_document') {
@@ -645,16 +708,20 @@ export async function POST(request: NextRequest) {
                 // 4a. Resolve jurisdiction profile (for caption/exhibit setup)
                 const exportProfile = resolveExportJurisdictionProfile(jurisdictionSettings);
 
-                // 4b. Build caption for court documents
+                // 4b. Build caption for court documents — use resolved identity when available
+                const resolvedState = courtIdentity?.state ?? courtState;
+                const resolvedCounty = courtIdentity?.county ?? courtCounty;
+                const resolvedCauseNumber = courtIdentity?.causeNumber ?? causeNumber;
+
                 const caption = exportPath === 'court_document'
                     ? buildExportCaption({
                         style: exportProfile.court.captionStyle,
-                        courtName: undefined,
-                        causeNumber,
-                        captionPetitionerName: petitionerName,
-                        captionRespondentName: respondentName,
-                        state: courtState,
-                        county: courtCounty,
+                        courtName: courtIdentity?.courtName ?? undefined,
+                        causeNumber: resolvedCauseNumber,
+                        captionPetitionerName: courtIdentity?.captionPetitionerName ?? petitionerName,
+                        captionRespondentName: courtIdentity?.captionRespondentName ?? respondentName,
+                        state: resolvedState,
+                        county: resolvedCounty,
                     }).caption
                     : null;
 
@@ -664,7 +731,7 @@ export async function POST(request: NextRequest) {
 
                 const adaptParams: AdaptToCanonicalParams = {
                     path: exportPath,
-                    title: getTemplateName(body.exportRequest?.path ?? 'general').toUpperCase(),
+                    title: (courtIdentity?.resolvedTitle ?? getTemplateName(body.exportRequest?.path ?? 'general')).toUpperCase(),
                     draftedSections: draftedSections.map((s) => ({
                         sectionId: s.sectionId,
                         heading: s.heading,
@@ -673,8 +740,8 @@ export async function POST(request: NextRequest) {
                         source: s.source,
                     })),
                     caseId: body.caseId,
-                    causeNumber,
-                    jurisdiction: { state: courtState, county: courtCounty },
+                    causeNumber: resolvedCauseNumber,
+                    jurisdiction: { state: resolvedState, county: resolvedCounty },
                     partyRole: undefined,
                     documentType: caseType,
                     caption,
@@ -683,9 +750,9 @@ export async function POST(request: NextRequest) {
                             intro: 'Respectfully submitted,',
                             signerLines: [
                                 `_________________________`,
-                                petitionerName,
-                                'Pro Se',
-                            ],
+                                courtIdentity?.filingPartyLegalName ?? petitionerName,
+                                courtIdentity?.isProSe ? 'Pro Se' : '',
+                            ].filter(Boolean),
                         }
                         : null,
                     certificate: exportPath === 'court_document'
@@ -696,7 +763,7 @@ export async function POST(request: NextRequest) {
                             ],
                             signerLines: [
                                 `_________________________`,
-                                petitionerName,
+                                courtIdentity?.filingPartyLegalName ?? petitionerName,
                             ],
                         }
                         : null,
@@ -732,7 +799,15 @@ export async function POST(request: NextRequest) {
                     adaptParams,
                     jurisdictionSettings,
                     resolvedProfile: exportProfile,
-                    causeNumber,
+                    causeNumber: courtIdentity?.causeNumber ?? causeNumber,
+                    courtContext: courtIdentity ? {
+                        filingPartyName: courtIdentity.filingPartyLegalName,
+                        filingPartyRole: courtIdentity.filingPartyRole,
+                        isProSe: courtIdentity.isProSe,
+                        prayerIntro: undefined,
+                        prayerRequests: undefined,
+                    } : undefined,
+                    resolvedTitle: courtIdentity?.resolvedTitle,
                     metadata: { caseType, exportPath, runId: body.runId },
                 });
 

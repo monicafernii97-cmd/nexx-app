@@ -17,6 +17,8 @@ import type { DraftingStage } from '@/app/(app)/docuvault/context/ExportContext'
 import type { OrchestratorAssemblyResult, ExportOverrides, PipelineStatus } from '@/lib/export-assembly/orchestrator';
 import type { ExportRequest, MappingReviewItem } from '@/lib/export-assembly/types/exports';
 import type { PreflightResult } from '@/lib/export-assembly/validation/preflightValidator';
+import type { CourtDocumentIssue } from '@/lib/exports/courtDocumentIssues';
+import type { CourtIdentity } from '@/lib/exports/resolveCourtIdentity';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,6 +33,8 @@ export interface DraftStreamInput {
     caseId: string;
     /** Optional: if retrying a previous export */
     retryOfExportId?: string;
+    /** Court identity patch from ClarificationModal (court_document only) */
+    courtIdentityPatch?: Partial<CourtIdentity>;
 }
 
 /** Structured SSE milestone event from the server. */
@@ -59,6 +63,8 @@ interface SSEErrorEvent {
     type: 'error';
     errorCode: string;
     message: string;
+    /** Court document issues (when errorCode === 'COURT_DOCUMENT_NEEDS_CLARIFICATION'). */
+    issues?: CourtDocumentIssue[];
 }
 
 type SSEEvent = SSEMilestoneEvent | SSECompleteEvent | SSEErrorEvent;
@@ -221,11 +227,23 @@ export function useDraftingStream({ dispatch }: ContextDispatchers) {
                             break;
 
                         case 'error':
-                            dispatch({
-                                type: 'ERROR',
-                                message: event.message,
-                                errorCode: event.errorCode,
-                            });
+                            // Court-specific: send issues back to review
+                            if (
+                                event.errorCode === 'COURT_DOCUMENT_NEEDS_CLARIFICATION' &&
+                                event.issues?.length
+                            ) {
+                                dispatch({
+                                    type: 'SET_COURT_ISSUES',
+                                    issues: event.issues,
+                                });
+                                dispatch({ type: 'BACK_TO_REVIEW' });
+                            } else {
+                                dispatch({
+                                    type: 'ERROR',
+                                    message: event.message,
+                                    errorCode: event.errorCode,
+                                });
+                            }
                             break;
                     }
                 }

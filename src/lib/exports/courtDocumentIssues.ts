@@ -182,10 +182,12 @@ const FORBIDDEN_TITLES = [
  * Strings that must never appear in final visible text.
  * Presence of any of these triggers `placeholder_text_detected` blocker.
  */
-const FORBIDDEN_VISIBLE_TEXT = [
+export const FORBIDDEN_VISIBLE_TEXT = [
   '[CHILD NAME]',
   '[COURT NAME]',
   '[CAUSE NUMBER]',
+  '[FILING PARTY NAME]',
+  '[JUDGE NAME]',
   'COURT FILING DOCUMENT',
   'court_document',
   'personal_injury',

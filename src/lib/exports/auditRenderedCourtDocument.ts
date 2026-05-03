@@ -13,18 +13,14 @@
 // Blocked Text
 // ═══════════════════════════════════════════════════════════════
 
+import { FORBIDDEN_VISIBLE_TEXT } from './courtDocumentIssues';
+
 /**
  * Strings that must never appear in final visible text.
  * Presence of any blocker prevents PDF export.
+ * Uses the shared canonical list from courtDocumentIssues.
  */
-const BLOCKED_VISIBLE_TEXT = [
-  '[CHILD NAME]',
-  '[COURT NAME]',
-  '[CAUSE NUMBER]',
-  'COURT FILING DOCUMENT',
-  'court_document',
-  'personal_injury',
-];
+const BLOCKED_VISIBLE_TEXT = FORBIDDEN_VISIBLE_TEXT;
 
 /**
  * Patterns that must never appear as standalone words in visible text.

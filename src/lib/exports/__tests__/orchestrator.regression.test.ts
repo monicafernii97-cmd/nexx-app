@@ -8,7 +8,7 @@
  * Covers:
  *   - Valid input → full result contract
  *   - Invalid canonical doc → EXPORT_DOCUMENT_VALIDATION_FAILED
- *   - Missing title → error thrown
+ *   - Missing title → blocker (court path now enforces this)
  *   - Profile metadata correctness (state, court, pre-resolved)
  *   - Deterministic filename
  */
@@ -37,7 +37,15 @@ function makeValidInput(overrides?: Partial<GenerateExportPDFInput>): GenerateEx
   return {
     adaptParams: {
       path: 'court_document',
-      title: 'TEST COURT DOCUMENT',
+      title: 'MOTION TO MODIFY PARENT-CHILD RELATIONSHIP',
+      causeNumber: '2024-12345-FM',
+      caption: {
+        style: 'texas_pleading' as const,
+        causeLine: 'CAUSE NO. 2024-12345-FM',
+        leftLines: ['IN THE INTEREST OF', 'J.D., A CHILD'],
+        centerLines: ['§', '§', '§'],
+        rightLines: ['IN THE 387TH DISTRICT COURT', 'FORT BEND COUNTY, TEXAS'],
+      },
       draftedSections: [
         {
           sectionId: 'body',
@@ -132,7 +140,15 @@ describe('generateExportPDF — orchestrator', () => {
     const input = makeValidInput({
       adaptParams: {
         path: 'court_document',
-        title: 'EMPTY DOC',
+        title: 'MOTION TO MODIFY',
+        causeNumber: '2024-12345-FM',
+        caption: {
+          style: 'texas_pleading' as const,
+          causeLine: 'CAUSE NO. 2024-12345-FM',
+          leftLines: ['IN THE INTEREST OF', 'J.D., A CHILD'],
+          centerLines: ['§', '§', '§'],
+          rightLines: ['IN THE 387TH DISTRICT COURT', 'FORT BEND COUNTY, TEXAS'],
+        },
         draftedSections: [],
       },
     });
@@ -143,27 +159,30 @@ describe('generateExportPDF — orchestrator', () => {
     });
   });
 
-  it('logs integrity warning for missing title but still renders', async () => {
+  it('throws EXPORT_DOCUMENT_VALIDATION_FAILED for missing title', async () => {
     const { generateExportPDF } = await import('../generateExportPDF');
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
     const input = makeValidInput({
       adaptParams: {
         path: 'court_document',
         title: '',
+        causeNumber: '2024-12345-FM',
+        caption: {
+          style: 'texas_pleading' as const,
+          causeLine: 'CAUSE NO. 2024-12345-FM',
+          leftLines: ['IN THE INTEREST OF', 'J.D., A CHILD'],
+          centerLines: ['§', '§', '§'],
+          rightLines: ['IN THE 387TH DISTRICT COURT', 'FORT BEND COUNTY, TEXAS'],
+        },
         draftedSections: [
           { sectionId: 'body', heading: 'Test', body: 'Content here.' },
         ],
       },
     });
 
-    // Advisory mode: integrity failures log a warning but don't block rendering
-    const result = await generateExportPDF(input);
-    expect(result.pdfBuffer).toBeInstanceOf(Buffer);
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[ExportPDF] Integrity advisory'),
-    );
-
-    consoleSpy.mockRestore();
+    // Court path now enforces title as a hard blocker
+    await expect(generateExportPDF(input)).rejects.toMatchObject({
+      name: 'ExportDocumentGenerationError',
+      code: 'EXPORT_DOCUMENT_VALIDATION_FAILED',
+    });
   });
 });

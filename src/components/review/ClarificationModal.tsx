@@ -190,11 +190,13 @@ export default function ClarificationModal({
     const isCourtMode = !!activeMode && activeMode !== 'missing_structure';
     const config = activeMode ? MODE_CONFIGS[activeMode] : null;
 
-    // Reset boilerplate editing state when mode changes to prevent stale
-    // text leaking from certificate mode into prayer mode (or vice-versa).
+    // Reset all mode-specific state when mode changes to prevent stale
+    // values leaking between certificate and prayer modes.
     useEffect(() => {
         setIsEditingBoilerplate(false);
         setEditedBoilerplate('');
+        setServiceMethod(null);
+        setCustomServiceText('');
     }, [activeMode]);
 
     // Issues for this mode
@@ -414,13 +416,12 @@ export default function ClarificationModal({
         }
     };
 
-    /** Dispatch a send_to_nexchat resolution — always navigates even if handoff fails. */
+    /** Dispatch a send_to_nexchat resolution. Shows error but keeps modal open on failure. */
     const handleSendToNexchat = () => {
         try {
             onResolve?.({ type: 'send_to_nexchat' });
         } catch (err) {
             console.error('[ClarificationModal] NEXchat handoff error:', err);
-            // Best-effort: show warning but still navigate (chat has fallback)
             setError('Handoff context may be incomplete, but you can still continue in NEXchat.');
         }
     };

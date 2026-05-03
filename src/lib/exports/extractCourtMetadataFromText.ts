@@ -297,7 +297,7 @@ export function extractCourtMetadataFromText(
 
   // ── SAPCR / "In the Interest of" extraction ──
   const interestMatch = text.match(
-    /IN\s+THE\s+INTEREST\s+OF\s+(?:§\s*)?([A-Z][A-Za-z\s.'-]+?)(?:\s*,\s*§|\s*§|\s*,\s*(?:A\s+CHILD|A\s+MINOR|CHILDREN|MINOR\s+CHILD))/i,
+    /IN\s+THE\s+INTEREST\s+OF\s+(?:§\s*)?([A-Z][A-Za-z\s.'-]+?)(?:\s*,\s*§|\s*§|\s*,?\s*(?:A\s+CHILD|A\s+MINOR|CHILDREN|MINOR\s+CHILD))/i,
   );
   if (interestMatch?.[1]) {
     const childName = interestMatch[1].trim();

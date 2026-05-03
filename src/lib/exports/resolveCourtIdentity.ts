@@ -330,7 +330,7 @@ export function resolveCourtIdentity(
   if (patchChildren.length > 0) fieldSources['children'] = 'reviewhub_edit';
   else if (csChildren.length > 0) fieldSources['children'] = 'court_settings';
   else if (npChildren.length > 0) fieldSources['children'] = 'nex_profile';
-  else if (extractedChildNames.length > 0) fieldSources['children'] = 'pasted_text';
+  else if (extractedChildNames.length > 0) fieldSources['childrenNames'] = 'pasted_text';
 
   // ── Court ──────────────────────────────────────────────────
   const countyResult = resolveField(

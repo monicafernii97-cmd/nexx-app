@@ -67,7 +67,7 @@ for (const s of US_STATES) STATE_LOOKUP.set(s.toUpperCase(), s);
 function extractCauseNumber(text: string): ExtractedField | undefined {
   // Pattern: "CAUSE NO." or "Case No." or "No." followed by alphanumeric case ID
   const match = text.match(
-    /(?:CAUSE\s+NO\.?|Case\s+No\.?|Cause\s+Number|CASE\s+NO\.?)\s*:?\s*([A-Z0-9][\w\-./]+)/i,
+    /(?:CAUSE\s+NO\.?|Case\s+No\.?|Cause\s+Number|CASE\s+NO\.?|No\.)\s*:?\s*([A-Z0-9][\w\-./]+)/i,
   );
   if (match?.[1]) {
     const val = match[1].trim();
@@ -193,8 +193,9 @@ function extractParties(text: string): {
   const result: ReturnType<typeof extractParties> = {};
 
   // Pattern 1: "NAME, Petitioner" ... "v." ... "NAME, Respondent"
+  // Allow mixed-case names (e.g., "Jane Doe, Petitioner")
   const petMatch = text.match(
-    /([A-Z][A-Z\s.'-]+?)\s*,\s*(?:Petitioner|PETITIONER)/,
+    /([A-Z][A-Za-z\s.'-]+?)\s*,\s*(?:Petitioner|PETITIONER)/i,
   );
   if (petMatch?.[1]) {
     result.petitionerName = {
@@ -204,7 +205,7 @@ function extractParties(text: string): {
   }
 
   const resMatch = text.match(
-    /([A-Z][A-Z\s.'-]+?)\s*,\s*(?:Respondent|RESPONDENT)/,
+    /([A-Z][A-Za-z\s.'-]+?)\s*,\s*(?:Respondent|RESPONDENT)/i,
   );
   if (resMatch?.[1]) {
     result.respondentName = {

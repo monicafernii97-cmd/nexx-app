@@ -366,7 +366,9 @@ export default function ReviewHubContent() {
             // so the client-side gate matches the backend resolution.
             const identity = resolveCourtIdentity({
                 patch: state.courtIdentityPatch ?? undefined,
+                extractedFromText,
                 courtSettings: courtSettingsData,
+                userProfile: userProfileData,
                 nexProfile: nexProfileData,
             });
             const itemTexts = effectiveItems.map(i => i.originalText);
@@ -624,7 +626,11 @@ export default function ReviewHubContent() {
                 courtIdentity={resolvedIdentity}
                 onResolve={(resolution) => {
                     if (resolution.type === 'patch_court_identity') {
-                        dispatch({ type: 'APPLY_COURT_RESOLUTION', patch: resolution.patch });
+                        dispatch({
+                            type: 'APPLY_COURT_RESOLUTION',
+                            patch: resolution.patch,
+                            resolvedText: resolution.resolvedText,
+                        });
                     } else if (resolution.type === 'send_to_nexchat') {
                         const stored = storeCourtHandoff({
                             source: 'clarification_modal',

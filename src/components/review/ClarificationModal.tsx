@@ -12,7 +12,7 @@
  * court_signature_repair, duplicate_content_repair
  */
 
-import React, { useId, useState, useCallback, useMemo } from 'react';
+import React, { useId, useState, useCallback, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     WarningCircle, ArrowRight, CircleNotch, Info,
@@ -190,6 +190,13 @@ export default function ClarificationModal({
     const isCourtMode = !!activeMode && activeMode !== 'missing_structure';
     const config = activeMode ? MODE_CONFIGS[activeMode] : null;
 
+    // Reset boilerplate editing state when mode changes to prevent stale
+    // text leaking from certificate mode into prayer mode (or vice-versa).
+    useEffect(() => {
+        setIsEditingBoilerplate(false);
+        setEditedBoilerplate('');
+    }, [activeMode]);
+
     // Issues for this mode
     const modeIssues = useMemo(() => {
         if (!courtIssues || !activeMode) return [];
@@ -215,12 +222,17 @@ export default function ClarificationModal({
         return resolvedFieldSources?.[key] === 'court_settings';
     }, [resolvedFieldSources]);
 
-    /** True if ALL config fields already have values from court_settings. */
+    /** True if ALL config fields already have values from court_settings AND user hasn't diverged. */
     const allFieldsFromSettings = useMemo(() => {
         if (!config || config.fields.length === 0) return false;
         return config.fields.every(f => {
-            const hasValue = !!(fieldValues[f.key]?.trim() || getFieldDefault(f.key));
-            return hasValue && isFieldFromSettings(f.key);
+            if (!isFieldFromSettings(f.key)) return false;
+            const defaultVal = getFieldDefault(f.key);
+            if (!defaultVal) return false;
+            // If user edited the field, check whether they diverged from the default
+            const userVal = fieldValues[f.key]?.trim();
+            if (userVal !== undefined && userVal !== defaultVal) return false;
+            return true;
         });
     }, [config, fieldValues, getFieldDefault, isFieldFromSettings]);
 
@@ -331,6 +343,16 @@ export default function ClarificationModal({
             setError('Unable to apply — no active mode detected. Please close and reopen.');
             return;
         }
+        // Cert/prayer precondition guard — visible error, never silent no-op
+        if (activeMode === 'court_certificate_repair' && !serviceMethod) {
+            setError('Please select a service method before continuing.');
+            return;
+        }
+        if (activeMode === 'court_prayer_repair' && !generatedBoilerplate?.trim()) {
+            setError('Unable to generate prayer text — court identity may be incomplete.');
+            return;
+        }
+
         setError(null);
         setIsProcessing(true);
 

@@ -199,6 +199,8 @@ export interface ExportState {
     courtIssues: CourtDocumentIssue[];
     /** Whether to show the ClarificationModal for court issues */
     showCourtClarification: boolean;
+    /** Generated boilerplate text (certificate/prayer) from ClarificationModal */
+    courtResolvedText?: string;
 }
 
 const initialState: ExportState = {
@@ -256,7 +258,7 @@ type ExportAction =
     | { type: 'SET_COURT_ISSUES'; issues: CourtDocumentIssue[] }
     | { type: 'SET_COURT_IDENTITY_PATCH'; patch: Partial<CourtIdentity> }
     | { type: 'SHOW_COURT_CLARIFICATION'; show: boolean }
-    | { type: 'APPLY_COURT_RESOLUTION'; patch: Partial<CourtIdentity> };
+    | { type: 'APPLY_COURT_RESOLUTION'; patch: Partial<CourtIdentity>; resolvedText?: string };
 
 /** Reducer managing the full export lifecycle state machine. */
 function exportReducer(state: ExportState, action: ExportAction): ExportState {
@@ -436,6 +438,9 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
             return {
                 ...state,
                 courtIdentityPatch: merged,
+                // Store generated boilerplate text (cert/prayer) so it can
+                // be injected into the document during drafting.
+                ...(action.resolvedText ? { courtResolvedText: action.resolvedText } : {}),
             };
         }
 

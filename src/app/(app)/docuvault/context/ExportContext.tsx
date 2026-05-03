@@ -199,6 +199,8 @@ export interface ExportState {
     courtIssues: CourtDocumentIssue[];
     /** Whether to show the ClarificationModal for court issues */
     showCourtClarification: boolean;
+    /** Generated boilerplate text (certificate/prayer) from ClarificationModal */
+    courtResolvedText?: string;
 }
 
 const initialState: ExportState = {
@@ -256,7 +258,7 @@ type ExportAction =
     | { type: 'SET_COURT_ISSUES'; issues: CourtDocumentIssue[] }
     | { type: 'SET_COURT_IDENTITY_PATCH'; patch: Partial<CourtIdentity> }
     | { type: 'SHOW_COURT_CLARIFICATION'; show: boolean }
-    | { type: 'APPLY_COURT_RESOLUTION'; patch: Partial<CourtIdentity> };
+    | { type: 'APPLY_COURT_RESOLUTION'; patch: Partial<CourtIdentity>; resolvedText?: string };
 
 /** Reducer managing the full export lifecycle state machine. */
 function exportReducer(state: ExportState, action: ExportAction): ExportState {
@@ -436,6 +438,9 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
             return {
                 ...state,
                 courtIdentityPatch: merged,
+                // Store generated boilerplate text (cert/prayer) so it can
+                // be injected into the document during drafting.
+                ...(action.resolvedText ? { courtResolvedText: action.resolvedText } : {}),
             };
         }
 
@@ -504,11 +509,12 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         if (state.phase !== 'reviewing') return;
 
         const interval = setInterval(() => {
-            // Compare full overrides + reviewItems + courtIdentityPatch content
+            // Compare full overrides + reviewItems + courtIdentityPatch + courtResolvedText
             const snapshot = JSON.stringify({
                 overrides: state.overrides,
                 reviewItems: state.reviewItems,
                 courtIdentityPatch: state.courtIdentityPatch,
+                courtResolvedText: state.courtResolvedText,
             });
 
             if (snapshot !== lastCheckedSnapshotRef.current) {
@@ -518,7 +524,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         }, AUTO_SAVE_INTERVAL_MS);
 
         return () => clearInterval(interval);
-    }, [state.phase, state.overrides, state.reviewItems, state.courtIdentityPatch]);
+    }, [state.phase, state.overrides, state.reviewItems, state.courtIdentityPatch, state.courtResolvedText]);
 
     // ── Convenience actions ──
     /** Start the configuration phase for a given export path. */

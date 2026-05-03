@@ -81,6 +81,8 @@ export type CourtDocumentIssue = {
     | 'ai_suggested'
     | 'manual';
   canAutoFill: boolean;
+  /** If true, the system can auto-generate content (e.g., certificate, prayer). */
+  autoGenerate?: boolean;
   requiresUserConfirmation: boolean;
   actionType:
     | 'autofill_from_profile'
@@ -399,9 +401,10 @@ export function detectCourtDocumentIssues(
         ...copy.missing_prayer,
         id: 'missing_prayer',
         severity: 'blocker',
-        canAutoFill: false,
-        requiresUserConfirmation: false,
-        actionType: 'regenerate_structure',
+        canAutoFill: true,
+        autoGenerate: true,
+        requiresUserConfirmation: true,
+        actionType: 'choose_suggestion',
       });
     }
   }
@@ -413,9 +416,10 @@ export function detectCourtDocumentIssues(
         ...copy.missing_certificate,
         id: 'missing_certificate',
         severity: 'blocker',
-        canAutoFill: false,
-        requiresUserConfirmation: false,
-        actionType: 'regenerate_structure',
+        canAutoFill: true,
+        autoGenerate: true,
+        requiresUserConfirmation: true,
+        actionType: 'choose_suggestion',
       });
     }
   }

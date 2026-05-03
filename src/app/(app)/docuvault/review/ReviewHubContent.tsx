@@ -36,8 +36,9 @@ import RevisionModal from '@/components/review/RevisionModal';
 import ClarificationModal from '@/components/review/ClarificationModal';
 import type { MappingReviewItem } from '@/lib/export-assembly/types/exports';
 import { detectCourtDocumentIssues, ISSUE_TO_MODE, MODE_PRIORITY, type ClarificationModalMode } from '@/lib/exports/courtDocumentIssues';
-import { resolveCourtIdentity, type CourtSettingsData, type NexProfileData, type CourtIdentity } from '@/lib/exports/resolveCourtIdentity';
+import { resolveCourtIdentity, type CourtSettingsData, type NexProfileData, type UserProfileData, type CourtIdentity } from '@/lib/exports/resolveCourtIdentity';
 import { storeCourtHandoff } from '@/lib/exports/courtHandoff';
+import { extractCourtMetadataFromText } from '@/lib/exports/extractCourtMetadataFromText';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 
@@ -161,23 +162,62 @@ export default function ReviewHubContent() {
             petitionerLegalName: rawCourtSettings.petitionerLegalName,
             respondentLegalName: rawCourtSettings.respondentLegalName,
             children: rawCourtSettings.children,
+            judicialDistrict: rawCourtSettings.judicialDistrict,
+            caseTitleFormat: rawCourtSettings.caseTitleFormat,
+            caseTitleCustom: rawCourtSettings.caseTitleCustom,
+            userRole: rawCourtSettings.petitionerRole,
+            userLegalName: rawCourtSettings.petitionerLegalName,
         }
         : undefined;
 
-    // nexProfile is the opposing party profile — map legalName as fullName
+    // nexProfile is the opposing party — safe for opposingPartyName/Role only
     const nexProfileData: NexProfileData | undefined = rawNexProfile
         ? { fullName: rawNexProfile.legalName }
         : undefined;
+
+    // User's own profile (Level 3 in priority chain)
+    const rawUserProfile = useQuery(api.users.me);
+    const userProfileData: UserProfileData | undefined = rawUserProfile
+        ? {
+            fullName: rawUserProfile.name,
+            state: rawUserProfile.state ?? undefined,
+            county: rawUserProfile.county ?? undefined,
+            hasAttorney: rawUserProfile.hasAttorney ?? undefined,
+        }
+        : undefined;
+
+    // Level 1: Extract court metadata from pasted document text
+    const extractedFromText = useMemo(() => {
+        if (!isCourtDocument || state.reviewItems.length === 0) return undefined;
+        const allText = state.reviewItems.map(i => i.originalText).join('\n');
+        const extracted = extractCourtMetadataFromText(allText);
+        // Flatten to Record<string, string | undefined> for resolveField (.value only)
+        const flat: Record<string, string | undefined> = {};
+        // Map extracted field names to resolver-expected keys
+        const keyMap: Record<string, string> = {
+            petitionerName: 'captionPetitionerName',
+            respondentName: 'captionRespondentName',
+        };
+        for (const [key, field] of Object.entries(extracted)) {
+            if (field && typeof field === 'object' && 'value' in field) {
+                const resolverKey = keyMap[key] ?? key;
+                flat[resolverKey] = field.value;
+            }
+        }
+        return flat;
+    }, [isCourtDocument, state.reviewItems]);
 
     // Resolved identity for modal auto-fill
     const resolvedIdentity = useMemo((): CourtIdentity | undefined => {
         if (!isCourtDocument) return undefined;
         return resolveCourtIdentity({
             patch: state.courtIdentityPatch ?? undefined,
+            extractedFromText,
             courtSettings: courtSettingsData,
+            userProfile: userProfileData,
             nexProfile: nexProfileData,
         });
-    }, [isCourtDocument, state.courtIdentityPatch, courtSettingsData, nexProfileData]);
+    }, [isCourtDocument, extractedFromText, state.courtIdentityPatch, courtSettingsData, userProfileData, nexProfileData]);
 
     // Detect court document issues on review phase entry and re-check when patch changes
     useEffect(() => {
@@ -186,7 +226,9 @@ export default function ReviewHubContent() {
         // client-side gate matches the backend resolution in route.ts.
         const identity = resolveCourtIdentity({
             patch: state.courtIdentityPatch ?? undefined,
+            extractedFromText,
             courtSettings: courtSettingsData,
+            userProfile: userProfileData,
             nexProfile: nexProfileData,
         });
         const itemTexts = state.reviewItems.map(i => i.originalText);
@@ -196,7 +238,7 @@ export default function ReviewHubContent() {
             itemTexts,
         );
         dispatch({ type: 'SET_COURT_ISSUES', issues });
-    }, [state.phase, isCourtDocument, state.courtIdentityPatch, state.reviewItems, courtSettingsData, nexProfileData, dispatch]);
+    }, [state.phase, isCourtDocument, state.courtIdentityPatch, state.reviewItems, extractedFromText, courtSettingsData, userProfileData, nexProfileData, dispatch]);
 
     // Track sidebar edit state to auto-save on selection change
     const pendingEditRef = useRef<{ nodeId: string; text: string } | null>(null);
@@ -324,7 +366,9 @@ export default function ReviewHubContent() {
             // so the client-side gate matches the backend resolution.
             const identity = resolveCourtIdentity({
                 patch: state.courtIdentityPatch ?? undefined,
+                extractedFromText,
                 courtSettings: courtSettingsData,
+                userProfile: userProfileData,
                 nexProfile: nexProfileData,
             });
             const itemTexts = effectiveItems.map(i => i.originalText);
@@ -582,7 +626,11 @@ export default function ReviewHubContent() {
                 courtIdentity={resolvedIdentity}
                 onResolve={(resolution) => {
                     if (resolution.type === 'patch_court_identity') {
-                        dispatch({ type: 'APPLY_COURT_RESOLUTION', patch: resolution.patch });
+                        dispatch({
+                            type: 'APPLY_COURT_RESOLUTION',
+                            patch: resolution.patch,
+                            resolvedText: resolution.resolvedText,
+                        });
                     } else if (resolution.type === 'send_to_nexchat') {
                         const stored = storeCourtHandoff({
                             source: 'clarification_modal',
@@ -629,7 +677,6 @@ export default function ReviewHubContent() {
                                     ? { petitionerLegalName: patch.opposingPartyLegalName }
                                     : { respondentLegalName: patch.opposingPartyLegalName })
                                 : {}),
-                            // Note: resolvedTitle/resolvedSubtitle are per-document, not court settings
                         });
                         return true;
                     } catch (err) {
@@ -637,6 +684,7 @@ export default function ReviewHubContent() {
                         return false;
                     }
                 }}
+                resolvedFieldSources={resolvedIdentity?.fieldSources}
             />
         </div>
     );

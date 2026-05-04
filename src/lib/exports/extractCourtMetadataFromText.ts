@@ -251,26 +251,6 @@ function extractDocumentTitle(text: string): { title?: ExtractedField; subtitle?
   // Core document type keywords that indicate a legal filing title
   const TITLE_KEYWORDS = /\b(?:MOTION|PETITION|ORDER|AFFIDAVIT|RESPONSE|APPLICATION|ANSWER|DECREE|JUDGMENT|BRIEF|MEMORANDUM|COMPLAINT|COUNTERCLAIM|COUNTER-?PETITION|CROSS-?CLAIM|OBJECTION|DECLARATION|STIPULATION|AGREEMENT|NOTICE|SUBPOENA|WRIT|PLEA|DEMURRER|REPORT|CERTIFICATE|ENTRY|PLEA|FINDING|RECOMMENDATION|RULING|MANDATE|INJUNCTION|PLEA\s+IN\s+ABATEMENT|SPECIAL\s+EXCEPTION)\b/i;
 
-  // Party role prefixes — all common legal party designations, with or without possessive
-  const PARTY_ROLES = '(?:' + [
-    "PETITIONER'?S?", "RESPONDENT'?S?", "PLAINTIFF'?S?", "DEFENDANT'?S?",
-    "MOVANT'?S?", "APPLICANT'?S?", "APPELLANT'?S?", "APPELLEE'?S?",
-    "RELATOR'?S?", "INTERVENOR'?S?", "CLAIMANT'?S?",
-    "COUNTER[- ]?PETITIONER'?S?", "COUNTER[- ]?RESPONDENT'?S?",
-    "COUNTER[- ]?PLAINTIFF'?S?", "COUNTER[- ]?DEFENDANT'?S?",
-    "CROSS[- ]?PETITIONER'?S?", "CROSS[- ]?RESPONDENT'?S?",
-    "CROSS[- ]?PLAINTIFF'?S?", "CROSS[- ]?DEFENDANT'?S?",
-    "GUARDIAN(?:\\s+AD\\s+LITEM)?'?S?", "AMICUS(?:\\s+CURIAE)?'?S?",
-    "REAL\\s+PARTY(?:\\s+IN\\s+INTEREST)?'?S?",
-  ].join('|') + ')';
-
-  // Ordinals and modifiers that can appear between the party role and the document type
-  const MODIFIERS = '(?:(?:FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH|NINTH|TENTH|ELEVENTH|TWELFTH|ORIGINAL|AMENDED|VERIFIED|EMERGENCY|UNOPPOSED|OPPOSED|JOINT|SUPPLEMENTAL|CORRECTED|REVISED|FURTHER|FINAL|INTERIM|PROPOSED|PRELIMINARY|RENEWED|SUCCESSIVE|CONSOLIDATED|ADDITIONAL)\\s+)*';
-
-  // Build prefix pattern: optional party role + any number of modifiers
-  const TITLE_PREFIX = new RegExp(
-    '^(?:' + PARTY_ROLES + '\\s+)?' + MODIFIERS, 'i',
-  );
 
   // Search within first 25 non-blank lines (captions can be long)
   for (let i = 0; i < Math.min(lines.length, 25); i++) {
@@ -282,7 +262,7 @@ function extractDocumentTitle(text: string): { title?: ExtractedField; subtitle?
     if (/^(?:TO\s+THE\s+HONORABLE|COMES\s+NOW)/i.test(line)) continue;
 
     // Check if this line contains a core title keyword
-    if (TITLE_KEYWORDS.test(line) && TITLE_PREFIX.test(line) && line.length >= 10) {
+    if (TITLE_KEYWORDS.test(line) && line.length >= 10) {
       const title: ExtractedField = { value: line, confidence: 'high' };
       let subtitle: ExtractedField | undefined;
 

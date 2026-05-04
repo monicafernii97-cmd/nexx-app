@@ -42,7 +42,12 @@ export function generateCertificateOfService(
   customMethodText?: string,
 ): string {
   const filingName = identity.filingPartyLegalName || '[Filing Party]';
-  const opposingName = identity.opposingPartyLegalName || '[Opposing Party]';
+  // Resolve opposing party name from all available sources before falling back to placeholder
+  const opposingName = identity.opposingPartyLegalName
+    || (identity.filingPartyRole === 'petitioner'
+        ? identity.captionRespondentName
+        : identity.captionPetitionerName)
+    || '[Opposing Party]';
   const today = formatDate(new Date());
 
   const methodLabel = serviceMethod === 'other'

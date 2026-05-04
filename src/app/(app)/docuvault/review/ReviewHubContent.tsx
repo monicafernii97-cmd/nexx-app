@@ -197,6 +197,8 @@ export default function ReviewHubContent() {
         const keyMap: Record<string, string> = {
             petitionerName: 'captionPetitionerName',
             respondentName: 'captionRespondentName',
+            documentTitle: 'resolvedTitle',
+            documentSubtitle: 'resolvedSubtitle',
         };
         for (const [key, field] of Object.entries(extracted)) {
             if (field && typeof field === 'object' && 'value' in field) {

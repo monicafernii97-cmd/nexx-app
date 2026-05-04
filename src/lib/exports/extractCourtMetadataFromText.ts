@@ -32,6 +32,7 @@ export type ExtractedCourtMetadata = {
   petitionerName?: ExtractedField;
   respondentName?: ExtractedField;
   documentTitle?: ExtractedField;
+  documentSubtitle?: ExtractedField;
   filingPartyRole?: ExtractedField;
   /** Child name(s) extracted from "In the Interest of" captions. */
   childrenNames?: ExtractedField;
@@ -233,34 +234,56 @@ function extractParties(text: string): {
 }
 
 /**
- * Extract document title from header lines.
- * Looks for capitalized titles before the caption block.
+ * Extract document title and optional subtitle from pasted text.
+ *
+ * Legal titles can take many forms:
+ *   - "MOTION FOR TEMPORARY ORDERS"
+ *   - "PETITIONER'S SECOND AMENDED MOTION FOR TEMPORARY ORDERS"
+ *   - "RESPONDENT'S ORIGINAL ANSWER"
+ *   - "AMENDED PETITION TO MODIFY"
+ *
+ * Subtitles appear as parenthetical lines immediately after the title:
+ *   "(Pending Final Hearing on Petition to Modify Parent–Child Relationship)"
  */
-function extractDocumentTitle(text: string): ExtractedField | undefined {
-  // Look for lines that are all-caps and look like document titles
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  const titlePatterns = [
-    /^(MOTION\s+(?:FOR|TO)\s+.+)$/i,
-    /^(PETITION\s+(?:FOR|TO|IN)\s+.+)$/i,
-    /^(ORDER\s+(?:FOR|ON|GRANTING|DENYING)\s+.+)$/i,
-    /^(AFFIDAVIT\s+(?:OF|IN|FOR)\s+.+)$/i,
-    /^(RESPONSE\s+TO\s+.+)$/i,
-    /^(ORIGINAL\s+.+)$/i,
-    /^(AMENDED\s+.+)$/i,
-    /^(COUNTER-?PETITION\s+.+)$/i,
-    /^(APPLICATION\s+FOR\s+.+)$/i,
-  ];
+function extractDocumentTitle(text: string): { title?: ExtractedField; subtitle?: ExtractedField } {
+  const rawLines = text.split('\n');
+  // Track original line index so subtitle check uses true adjacency
+  const nonBlank = rawLines
+    .map((line, index) => ({ line: line.trim(), index }))
+    .filter(entry => entry.line.length > 0);
 
-  for (const line of lines.slice(0, 15)) { // Check first 15 lines
-    for (const pattern of titlePatterns) {
-      const match = line.match(pattern);
-      if (match?.[1] && match[1].length >= 10) {
-        return { value: match[1].trim(), confidence: 'high' };
+  // Core document type keywords that indicate a legal filing title
+  const TITLE_KEYWORDS = /\b(?:MOTION|PETITION|ORDER|AFFIDAVIT|RESPONSE|APPLICATION|ANSWER|DECREE|JUDGMENT|BRIEF|MEMORANDUM|COMPLAINT|COUNTERCLAIM|COUNTER-?PETITION|CROSS-?CLAIM|OBJECTION|DECLARATION|STIPULATION|AGREEMENT|NOTICE|SUBPOENA|WRIT|PLEA|DEMURRER|REPORT|CERTIFICATE|ENTRY|PLEA|FINDING|RECOMMENDATION|RULING|MANDATE|INJUNCTION|PLEA\s+IN\s+ABATEMENT|SPECIAL\s+EXCEPTION)\b/i;
+
+  // Search within first 25 non-blank lines (captions can be long)
+  for (let i = 0; i < Math.min(nonBlank.length, 25); i++) {
+    const { line, index: rawIndex } = nonBlank[i];
+
+    // Skip lines that are clearly not titles
+    if (line.startsWith('CAUSE') || line.startsWith('NO.') || line.startsWith('§')) continue;
+    if (/^IN\s+THE\s+(?:INTEREST|MATTER|DISTRICT|CIRCUIT|COUNTY|SUPERIOR)/i.test(line)) continue;
+    if (/^(?:TO\s+THE\s+HONORABLE|COMES\s+NOW)/i.test(line)) continue;
+
+    // Check if this line contains a core title keyword
+    if (TITLE_KEYWORDS.test(line) && line.length >= 10) {
+      const title: ExtractedField = { value: line, confidence: 'high' };
+      let subtitle: ExtractedField | undefined;
+
+      // Check the actual next non-blank line — must be adjacent in the raw text
+      // (within 2 lines to allow a single blank line between title and subtitle)
+      const nextEntry = nonBlank[i + 1];
+      if (nextEntry && (nextEntry.index - rawIndex) <= 2) {
+        const nextLine = nextEntry.line;
+        if (/^\(.*\)$/.test(nextLine) && nextLine.length >= 5) {
+          subtitle = { value: nextLine.slice(1, -1).trim(), confidence: 'high' };
+        }
       }
+
+      return { title, subtitle };
     }
   }
 
-  return undefined;
+  return {};
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -288,7 +311,9 @@ export function extractCourtMetadataFromText(
   result.county = extractCounty(text);
   result.state = extractState(text);
   result.courtName = extractCourtName(text);
-  result.documentTitle = extractDocumentTitle(text);
+  const titleInfo = extractDocumentTitle(text);
+  result.documentTitle = titleInfo.title;
+  result.documentSubtitle = titleInfo.subtitle;
 
   const parties = extractParties(text);
   result.petitionerName = parties.petitionerName;

@@ -122,6 +122,16 @@ export type CourtIdentity = {
   /** Audit trail: which source resolved each legally significant field. */
   fieldSources: Record<string, FieldResolutionSource>;
 
+  /** Resolution audit log — required for debugging and trust. */
+  auditLog: {
+    /** Fields that were successfully resolved from any source. */
+    resolvedFields: string[];
+    /** Fields that remain unresolved after the full priority chain. */
+    unresolvedFields: string[];
+    /** Source map for each resolved field. */
+    sourceMap: Record<string, FieldResolutionSource>;
+  };
+
   /** Schema version for future migration safety. */
   schemaVersion: 1;
 };
@@ -429,6 +439,16 @@ export function resolveCourtIdentity(
   );
   if (subtitleResult.source) fieldSources['resolvedSubtitle'] = subtitleResult.source;
 
+  // ── Build audit log ─────────────────────────────────────────
+  const legallySignificantFields = [
+    'filingPartyLegalName', 'opposingPartyLegalName',
+    'captionPetitionerName', 'captionRespondentName',
+    'courtName', 'judicialDistrict', 'county', 'state',
+    'causeNumber', 'resolvedTitle', 'resolvedSubtitle',
+  ];
+  const resolvedFields = legallySignificantFields.filter(f => fieldSources[f]);
+  const unresolvedFields = legallySignificantFields.filter(f => !fieldSources[f]);
+
   return {
     filingPartyLegalName,
     filingPartyRole,
@@ -455,6 +475,11 @@ export function resolveCourtIdentity(
     resolvedTitle: titleResult.value ?? '',
     resolvedSubtitle: subtitleResult.value,
     fieldSources,
+    auditLog: {
+      resolvedFields,
+      unresolvedFields,
+      sourceMap: { ...fieldSources },
+    },
     schemaVersion: 1,
   };
 }

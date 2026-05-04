@@ -57,6 +57,7 @@ import {
 import { auditCourtHTML } from './auditRenderedCourtDocument';
 import type { CourtFormattingRules } from '@/lib/legal/types';
 import type { CourtDocumentContext } from './canonicalExportToLegalDocument';
+import { assertCourtDocumentFinalizable } from '@/lib/legal/engine/assertCourtDocumentFinalizable';
 
 // ═══════════════════════════════════════════════════════════════
 // Public Types
@@ -87,6 +88,10 @@ export type GenerateExportPDFInput = {
     exportPath: string;
     runId: string;
   };
+  /** Resolved court identity — required for finalization guard on court documents. */
+  courtIdentity?: import('@/lib/exports/resolveCourtIdentity').CourtIdentity;
+  /** Set to true for original petitions where no cause number exists yet. */
+  isInitiatingFiling?: boolean;
 };
 
 /** Output from the export PDF generation pipeline. */
@@ -196,6 +201,30 @@ export async function generateExportPDF(
           message: `Court HTML audit failed: ${blockers.join('; ')}`,
           details: { violations: htmlAudit.violations },
         });
+      }
+
+      // ── FINALIZATION GUARD ──────────────────────────────────
+      // Enforces the Legal Document Finalization Contract.
+      // Runs AFTER HTML rendering, BEFORE PDF generation.
+      // If the guard fails, NO PDF is generated.
+      if (input.courtIdentity) {
+        const guardResult = assertCourtDocumentFinalizable(
+          html,
+          input.courtIdentity,
+          {
+            exportPath: document.path,
+            caseType: input.metadata.caseType,
+            isInitiatingFiling: input.isInitiatingFiling,
+          },
+        );
+
+        if (!guardResult.ok) {
+          throw new ExportDocumentGenerationError({
+            code: 'EXPORT_DOCUMENT_NOT_FINALIZABLE',
+            message: `Document cannot be finalized: ${guardResult.errors.map(e => e.message).join('; ')}`,
+            details: guardResult,
+          });
+        }
       }
 
       // Use QG's formatting rules for PDF rendering (page size, margins, footers)

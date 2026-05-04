@@ -41,8 +41,15 @@ export function generateCertificateOfService(
   serviceMethod: ServiceMethodValue,
   customMethodText?: string,
 ): string {
+  // Resolve names from best available source — no silent placeholders in final mode.
+  // The finalization guard (assertCourtDocumentFinalizable) is the hard stop;
+  // here we try our best so the preview and final output are clean.
   const filingName = identity.filingPartyLegalName || '[Filing Party]';
-  const opposingName = identity.opposingPartyLegalName || '[Opposing Party]';
+  const opposingName = identity.opposingPartyLegalName
+    || (identity.filingPartyRole === 'petitioner'
+        ? identity.captionRespondentName
+        : identity.captionPetitionerName)
+    || '[Opposing Party]';
   const today = formatDate(new Date());
 
   const methodLabel = serviceMethod === 'other'

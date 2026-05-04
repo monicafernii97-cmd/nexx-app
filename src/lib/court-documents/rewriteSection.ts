@@ -47,6 +47,7 @@ Rules:
 - Ensure proper paragraph structure
 - Never fabricate facts — only polish what exists
 - Never add legal arguments not present in the original
+- NEVER insert placeholder brackets like [FACT NEEDED], [Opposing Party], or [Child Name]. If information is missing, work around it.
 - Output ONLY the rewritten section content — no commentary, no explanations
 
 If the user provides feedback instructions, follow them while maintaining legal quality.`;

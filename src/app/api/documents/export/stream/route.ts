@@ -809,6 +809,7 @@ export async function POST(request: NextRequest) {
                     } : undefined,
                     resolvedTitle: courtIdentity?.resolvedTitle,
                     metadata: { caseType, exportPath, runId: body.runId },
+                    courtIdentity,
                 });
 
                 const pdfBuffer = pipelineResult.pdfBuffer;

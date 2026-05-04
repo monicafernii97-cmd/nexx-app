@@ -96,7 +96,8 @@ Rules:
 - Number all prayer items
 - Use neutral, factual language
 - Never fabricate facts — only use provided case data
-- If a fact is needed but not available, insert [FACT NEEDED: description]
+- NEVER insert placeholder brackets like [FACT NEEDED], [Opposing Party], or [Child Name]. If a fact is missing, omit that sentence entirely rather than inserting a placeholder.
+- If a required identity field is missing, note it in a separate "missingFields" array in your response
 
 Sections to draft: ${args.sections.join(', ')}
 ${contextParts.join('\n\n')}`,

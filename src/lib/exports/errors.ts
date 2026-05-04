@@ -29,7 +29,8 @@ export type ExportGenerationErrorCode =
   | 'EXPORT_IDEMPOTENCY_CONFLICT'
   | 'EXPORT_ARTIFACT_INTEGRITY_FAILED'
   | 'EXPORT_QUEUE_OVERLOADED'
-  | 'EXPORT_JOB_TIMEOUT';
+  | 'EXPORT_JOB_TIMEOUT'
+  | 'EXPORT_DOCUMENT_NOT_FINALIZABLE';
 
 // ═══════════════════════════════════════════════════════════════
 // Error Class
@@ -81,6 +82,7 @@ const EXPORT_ERROR_CODES: ReadonlySet<string> = new Set<ExportGenerationErrorCod
   'EXPORT_ARTIFACT_INTEGRITY_FAILED',
   'EXPORT_QUEUE_OVERLOADED',
   'EXPORT_JOB_TIMEOUT',
+  'EXPORT_DOCUMENT_NOT_FINALIZABLE',
 ]);
 
 /** Runtime type guard for ExportGenerationErrorCode. */

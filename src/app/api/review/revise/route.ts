@@ -81,6 +81,7 @@ Rules:
 - Maintain the same voice and tense as the original unless the user asks to change it.
 - If the user asks to add a statute citation, use the correct format for Texas Family Code or whichever code is contextually relevant.
 - Keep the text court-appropriate at all times. No emotional language unless the user specifically requests it.
+- NEVER insert placeholder brackets like [FACT NEEDED], [Opposing Party], or [Child Name]. If information is missing, work around it or flag it naturally.
 - Do NOT add section headings or titles unless explicitly asked.`;
 
         // Build messages array including any prior revision history

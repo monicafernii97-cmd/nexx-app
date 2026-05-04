@@ -417,12 +417,14 @@ export function resolveCourtIdentity(
   // ── Title ──────────────────────────────────────────────────
   const titleResult = resolveField(
     [patch?.resolvedTitle, 'reviewhub_edit'],
+    [et.resolvedTitle, 'pasted_text'],
     [input.draftTitle, 'ai_generated'],
   );
   if (titleResult.source) fieldSources['resolvedTitle'] = titleResult.source;
 
   const subtitleResult = resolveField(
     [patch?.resolvedSubtitle, 'reviewhub_edit'],
+    [et.resolvedSubtitle, 'pasted_text'],
     [input.draftSubtitle, 'ai_generated'],
   );
   if (subtitleResult.source) fieldSources['resolvedSubtitle'] = subtitleResult.source;

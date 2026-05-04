@@ -440,14 +440,27 @@ export function resolveCourtIdentity(
   if (subtitleResult.source) fieldSources['resolvedSubtitle'] = subtitleResult.source;
 
   // ── Build audit log ─────────────────────────────────────────
-  const legallySignificantFields = [
-    'filingPartyLegalName', 'opposingPartyLegalName',
-    'captionPetitionerName', 'captionRespondentName',
-    'courtName', 'judicialDistrict', 'county', 'state',
-    'causeNumber', 'resolvedTitle', 'resolvedSubtitle',
-  ];
-  const resolvedFields = legallySignificantFields.filter(f => fieldSources[f]);
-  const unresolvedFields = legallySignificantFields.filter(f => !fieldSources[f]);
+  // Derive resolved/unresolved from actual final values, not just fieldSources.
+  // This catches fallback-derived values that are populated but have no explicit source.
+  const legallySignificantValues: Record<string, string | undefined> = {
+    filingPartyLegalName,
+    opposingPartyLegalName: opposingResult.value,
+    captionPetitionerName,
+    captionRespondentName,
+    courtName: courtResult.value,
+    judicialDistrict: districtResult.value,
+    county: countyResult.value,
+    state: stateResult.value,
+    causeNumber: causeResult.value,
+    resolvedTitle: titleResult.value,
+    // resolvedSubtitle is intentionally excluded — it is optional in most contexts
+  };
+  const resolvedFields = Object.entries(legallySignificantValues)
+    .filter(([, v]) => typeof v === 'string' && v.trim() !== '')
+    .map(([k]) => k);
+  const unresolvedFields = Object.entries(legallySignificantValues)
+    .filter(([, v]) => !(typeof v === 'string' && v.trim() !== ''))
+    .map(([k]) => k);
 
   return {
     filingPartyLegalName,

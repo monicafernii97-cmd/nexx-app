@@ -810,6 +810,9 @@ export async function POST(request: NextRequest) {
                     resolvedTitle: courtIdentity?.resolvedTitle,
                     metadata: { caseType, exportPath, runId: body.runId },
                     courtIdentity,
+                    isInitiatingFiling: 'isInitiatingFiling' in exportConfig
+                        ? Boolean(exportConfig.isInitiatingFiling)
+                        : false,
                 });
 
                 const pdfBuffer = pipelineResult.pdfBuffer;

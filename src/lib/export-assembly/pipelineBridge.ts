@@ -152,7 +152,7 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
         }
 
         try {
-            const drafted = await generateDraftContentWithRetry({
+            const draftResult = await generateDraftContentWithRetry({
                 templateId: `${request.path}_${Date.now()}`,
                 templateName: getTemplateName(request.path),
                 sections: sectionsToGenerate,
@@ -160,7 +160,7 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
                 courtRules: Object.keys(courtRules).length > 0 ? courtRules : undefined,
             }, sectionsToGenerate);
 
-            aiDraftedSections = drafted.map(d => ({
+            aiDraftedSections = draftResult.sections.map(d => ({
                 sectionId: d.sectionId,
                 heading: d.heading,
                 body: d.body,
@@ -444,13 +444,13 @@ async function generateDraftContentWithRetry(
         const timer = setTimeout(() => controller.abort(), DRAFT_TIMEOUT_MS);
 
         try {
-            const drafted = await generateDraftContent({
+            const result = await generateDraftContent({
                 ...params,
                 signal: controller.signal,
             });
 
             // Guard: treat empty or partial AI output as failure
-            const draftedMap = new Map(drafted.map(s => [s.sectionId, s]));
+            const draftedMap = new Map(result.sections.map(s => [s.sectionId, s]));
             const missing = expectedSectionIds.filter(id => {
                 const section = draftedMap.get(id);
                 if (!section) return true;
@@ -460,7 +460,7 @@ async function generateDraftContentWithRetry(
                     && section.numberedItems.some(item => item?.trim());
                 return !hasBody && !hasItems;
             });
-            if (drafted.length === 0 || missing.length > 0) {
+            if (result.sections.length === 0 || missing.length > 0) {
                 throw new Error(
                     `AI drafter returned incomplete output: missing/empty sections [${missing.join(', ')}]`,
                 );
@@ -471,11 +471,11 @@ async function generateDraftContentWithRetry(
                     component: 'PipelineBridge',
                     event: 'ai_drafting_succeeded_on_retry',
                     attempt: attempt + 1,
-                    sectionCount: drafted.length,
+                    sectionCount: result.sections.length,
                 }));
             }
 
-            return drafted;
+            return result;
         } catch (error) {
             lastError = error instanceof Error ? error : new Error(String(error));
 

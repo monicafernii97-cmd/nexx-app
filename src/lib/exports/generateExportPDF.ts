@@ -207,24 +207,30 @@ export async function generateExportPDF(
       // Enforces the Legal Document Finalization Contract.
       // Runs AFTER HTML rendering, BEFORE PDF generation.
       // If the guard fails, NO PDF is generated.
-      if (input.courtIdentity) {
-        const guardResult = assertCourtDocumentFinalizable(
-          html,
-          input.courtIdentity,
-          {
-            exportPath: document.path,
-            caseType: input.metadata.caseType,
-            isInitiatingFiling: input.isInitiatingFiling,
-          },
-        );
+      if (!input.courtIdentity) {
+        throw new ExportDocumentGenerationError({
+          code: 'EXPORT_DOCUMENT_NOT_FINALIZABLE',
+          message: 'Document cannot be finalized: resolved court identity is required for court-document export.',
+          details: { readiness: 'blocked_missing_required_fields', missing: ['courtIdentity'] },
+        });
+      }
 
-        if (!guardResult.ok) {
-          throw new ExportDocumentGenerationError({
-            code: 'EXPORT_DOCUMENT_NOT_FINALIZABLE',
-            message: `Document cannot be finalized: ${guardResult.errors.map(e => e.message).join('; ')}`,
-            details: guardResult,
-          });
-        }
+      const guardResult = assertCourtDocumentFinalizable(
+        html,
+        input.courtIdentity,
+        {
+          exportPath: document.path,
+          caseType: input.metadata.caseType,
+          isInitiatingFiling: input.isInitiatingFiling,
+        },
+      );
+
+      if (!guardResult.ok) {
+        throw new ExportDocumentGenerationError({
+          code: 'EXPORT_DOCUMENT_NOT_FINALIZABLE',
+          message: `Document cannot be finalized: ${guardResult.errors.map(e => e.message).join('; ')}`,
+          details: guardResult,
+        });
       }
 
       // Use QG's formatting rules for PDF rendering (page size, margins, footers)

@@ -246,15 +246,18 @@ function extractParties(text: string): {
  *   "(Pending Final Hearing on Petition to Modify Parent–Child Relationship)"
  */
 function extractDocumentTitle(text: string): { title?: ExtractedField; subtitle?: ExtractedField } {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const rawLines = text.split('\n');
+  // Track original line index so subtitle check uses true adjacency
+  const nonBlank = rawLines
+    .map((line, index) => ({ line: line.trim(), index }))
+    .filter(entry => entry.line.length > 0);
 
   // Core document type keywords that indicate a legal filing title
   const TITLE_KEYWORDS = /\b(?:MOTION|PETITION|ORDER|AFFIDAVIT|RESPONSE|APPLICATION|ANSWER|DECREE|JUDGMENT|BRIEF|MEMORANDUM|COMPLAINT|COUNTERCLAIM|COUNTER-?PETITION|CROSS-?CLAIM|OBJECTION|DECLARATION|STIPULATION|AGREEMENT|NOTICE|SUBPOENA|WRIT|PLEA|DEMURRER|REPORT|CERTIFICATE|ENTRY|PLEA|FINDING|RECOMMENDATION|RULING|MANDATE|INJUNCTION|PLEA\s+IN\s+ABATEMENT|SPECIAL\s+EXCEPTION)\b/i;
 
-
   // Search within first 25 non-blank lines (captions can be long)
-  for (let i = 0; i < Math.min(lines.length, 25); i++) {
-    const line = lines[i];
+  for (let i = 0; i < Math.min(nonBlank.length, 25); i++) {
+    const { line, index: rawIndex } = nonBlank[i];
 
     // Skip lines that are clearly not titles
     if (line.startsWith('CAUSE') || line.startsWith('NO.') || line.startsWith('§')) continue;
@@ -266,11 +269,14 @@ function extractDocumentTitle(text: string): { title?: ExtractedField; subtitle?
       const title: ExtractedField = { value: line, confidence: 'high' };
       let subtitle: ExtractedField | undefined;
 
-      // Check the next line for a parenthetical subtitle
-      const nextLine = lines[i + 1];
-      if (nextLine && /^\(.*\)$/.test(nextLine) && nextLine.length >= 5) {
-        // Strip outer parentheses
-        subtitle = { value: nextLine.slice(1, -1).trim(), confidence: 'high' };
+      // Check the actual next non-blank line — must be adjacent in the raw text
+      // (within 2 lines to allow a single blank line between title and subtitle)
+      const nextEntry = nonBlank[i + 1];
+      if (nextEntry && (nextEntry.index - rawIndex) <= 2) {
+        const nextLine = nextEntry.line;
+        if (/^\(.*\)$/.test(nextLine) && nextLine.length >= 5) {
+          subtitle = { value: nextLine.slice(1, -1).trim(), confidence: 'high' };
+        }
       }
 
       return { title, subtitle };

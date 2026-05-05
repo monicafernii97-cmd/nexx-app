@@ -476,8 +476,11 @@ export async function POST(request: NextRequest) {
                         ? String((exportConfig as unknown as Record<string, unknown>).documentType)
                         : undefined;
 
-                    // Extract metadata from review item text (mirrors client-side extraction)
-                    const allReviewText = (body.reviewItems ?? []).map(i => i.originalText).join('\n');
+                    // Extract metadata from review item text (mirrors client-side extraction).
+                    // Prefer edited/transformed text so post-edit identity data isn't stale.
+                    const allReviewText = (body.reviewItems ?? []).map(i =>
+                        i.userOverride?.editedText ?? i.transformedCourtSafeText ?? i.originalText,
+                    ).join('\n');
                     const extracted = extractCourtMetadataFromText(allReviewText);
                     const extractedFromText: Record<string, string | undefined> = {};
                     const keyMap: Record<string, string> = {

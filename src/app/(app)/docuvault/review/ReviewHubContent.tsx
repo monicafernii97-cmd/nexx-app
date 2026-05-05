@@ -80,6 +80,22 @@ function getErrorDescription(code: string | null): string {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Build the full text array for court-issue detection (review items + resolved boilerplate). */
+function buildCourtIssueTexts(
+    items: { originalText: string }[],
+    courtResolvedText?: string | null,
+): string[] {
+    const texts = items.map(item => item.originalText);
+    if (courtResolvedText) {
+        texts.push(courtResolvedText);
+    }
+    return texts;
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -233,14 +249,14 @@ export default function ReviewHubContent() {
             userProfile: userProfileData,
             nexProfile: nexProfileData,
         });
-        const itemTexts = state.reviewItems.map(i => i.originalText);
+        const itemTexts = buildCourtIssueTexts(state.reviewItems, state.courtResolvedText);
         const issues = detectCourtDocumentIssues(
             identity,
             { documentType: identity.documentKind, exportPath: 'court_document' },
             itemTexts,
         );
         dispatch({ type: 'SET_COURT_ISSUES', issues });
-    }, [state.phase, isCourtDocument, state.courtIdentityPatch, state.reviewItems, extractedFromText, courtSettingsData, userProfileData, nexProfileData, dispatch]);
+    }, [state.phase, isCourtDocument, state.courtIdentityPatch, state.courtResolvedText, state.reviewItems, extractedFromText, courtSettingsData, userProfileData, nexProfileData, dispatch]);
 
     // Track sidebar edit state to auto-save on selection change
     const pendingEditRef = useRef<{ nodeId: string; text: string } | null>(null);
@@ -373,7 +389,7 @@ export default function ReviewHubContent() {
                 userProfile: userProfileData,
                 nexProfile: nexProfileData,
             });
-            const itemTexts = effectiveItems.map(i => i.originalText);
+            const itemTexts = buildCourtIssueTexts(effectiveItems, state.courtResolvedText);
             const freshIssues = detectCourtDocumentIssues(
                 identity,
                 { documentType: identity.documentKind, exportPath: state.exportPath },

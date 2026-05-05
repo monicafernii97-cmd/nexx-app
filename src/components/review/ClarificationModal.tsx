@@ -774,7 +774,7 @@ export default function ClarificationModal({
                                         {isProcessing ? (
                                             <><CircleNotch size={14} className="animate-spin" /> Applying...</>
                                         ) : (
-                                            <>{saveToSettings ? 'Apply & Save' : 'Use for This Doc Only'} <ArrowRight size={14} weight="bold" /></>
+                                            <>{saveToSettings ? 'Apply & Save' : 'Continue'} <ArrowRight size={14} weight="bold" /></>
                                         )}
                                     </button>
                                 </div>

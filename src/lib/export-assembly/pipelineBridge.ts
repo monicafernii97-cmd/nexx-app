@@ -124,6 +124,7 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
 
     // Draft unlocked sections with GPT
     let aiDraftedSections: DraftedSection[] = [];
+    let aiMissingFields: string[] = [];
 
     if (sectionsToGenerate.length > 0) {
         onStatus?.({ phase: 'drafting', progress: 65, detail: `Drafting ${sectionsToGenerate.length} sections with AI...` });
@@ -167,6 +168,7 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
                 numberedItems: d.numberedItems,
                 source: 'ai_drafted' as const,
             }));
+            aiMissingFields = draftResult.missingFields;
         } catch (error) {
             const errorType = error instanceof Error ? error.name : typeof error;
             console.error(JSON.stringify({
@@ -234,6 +236,7 @@ export async function runDraftingPhase(input: PipelineBridgeInput): Promise<Orch
         draftedSections: allDrafted,
         meta,
         courtIdentity: input.courtIdentity,
+        missingFields: aiMissingFields.length > 0 ? aiMissingFields : undefined,
     };
 }
 

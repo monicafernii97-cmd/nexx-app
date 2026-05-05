@@ -220,7 +220,7 @@ export async function generateExportPDF(
         input.courtIdentity,
         {
           exportPath: document.path,
-          caseType: input.metadata.caseType,
+          caseType: input.courtIdentity.caseType || input.metadata.caseType,
           isInitiatingFiling: input.isInitiatingFiling,
         },
       );

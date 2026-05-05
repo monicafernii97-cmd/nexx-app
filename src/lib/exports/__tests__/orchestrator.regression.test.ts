@@ -59,7 +59,7 @@ function makeValidInput(overrides?: Partial<GenerateExportPDFInput>): GenerateEx
       county: 'Fort Bend',
     },
     metadata: {
-      caseType: 'personal_injury',
+      caseType: 'sapcr_modification',
       exportPath: 'court_document',
       runId: 'run-abc123xyz',
     },
@@ -78,7 +78,7 @@ function makeValidInput(overrides?: Partial<GenerateExportPDFInput>): GenerateEx
       county: 'Fort Bend',
       state: 'Texas',
       causeNumber: '2024-12345-FM',
-      caseType: 'personal_injury',
+      caseType: 'sapcr_modification',
       documentKind: 'motion' as const,
       numberingMode: 'continuous' as const,
       resolvedTitle: 'MOTION TO MODIFY PARENT-CHILD RELATIONSHIP',
@@ -153,7 +153,7 @@ describe('generateExportPDF — orchestrator', () => {
     const { generateExportPDF } = await import('../generateExportPDF');
     const result = await generateExportPDF(makeValidInput());
     // Filename should contain caseType, exportPath, date, and shortId
-    expect(result.filename).toContain('personal_injury');
+    expect(result.filename).toContain('sapcr_modification');
     expect(result.filename).toContain('court_document');
     expect(result.filename).toMatch(/\.pdf$/);
   });

@@ -126,14 +126,24 @@ ${contextParts.join('\n\n')}`,
 
   const text = response.output_text || '';
   try {
-    const parsed = JSON.parse(text) as {
-      sections?: DraftSection[];
-      missingFields?: string[];
-    };
-    return {
-      sections: parsed.sections ?? [],
-      missingFields: parsed.missingFields ?? [],
-    };
+    const parsed = JSON.parse(text);
+
+    // Runtime validation — AI output is untrusted
+    const rawSections = Array.isArray(parsed.sections) ? parsed.sections : [];
+    const sections: DraftSection[] = rawSections.filter(
+      (entry: unknown): entry is DraftSection =>
+        typeof entry === 'object' && entry !== null &&
+        typeof (entry as DraftSection).sectionId === 'string' &&
+        typeof (entry as DraftSection).heading === 'string' &&
+        typeof (entry as DraftSection).body === 'string',
+    );
+
+    const rawMissing = Array.isArray(parsed.missingFields) ? parsed.missingFields : [];
+    const missingFields: string[] = rawMissing.filter(
+      (entry: unknown): entry is string => typeof entry === 'string',
+    );
+
+    return { sections, missingFields };
   } catch {
     return { sections: [], missingFields: [] };
   }

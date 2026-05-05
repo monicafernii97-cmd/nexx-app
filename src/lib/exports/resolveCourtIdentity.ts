@@ -447,6 +447,7 @@ export function resolveCourtIdentity(
     opposingPartyLegalName: opposingResult.value,
     captionPetitionerName,
     captionRespondentName,
+    childName: childrenNames[0],
     courtName: courtResult.value,
     judicialDistrict: districtResult.value,
     county: countyResult.value,

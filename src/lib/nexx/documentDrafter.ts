@@ -128,6 +128,15 @@ ${contextParts.join('\n\n')}`,
   try {
     const parsed = JSON.parse(text);
 
+    // Guard: AI must return a plain object, not a primitive or array
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      console.warn('[generateDraftContent] AI response is not a plain object', {
+        templateId: args.templateId,
+        parsedType: Array.isArray(parsed) ? 'array' : typeof parsed,
+      });
+      return { sections: [], missingFields: [] };
+    }
+
     // Runtime validation — AI output is untrusted
     const rawSections = Array.isArray(parsed.sections) ? parsed.sections : [];
     const sections: DraftSection[] = rawSections

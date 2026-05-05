@@ -80,6 +80,22 @@ function getErrorDescription(code: string | null): string {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Build the full text array for court-issue detection (review items + resolved boilerplate). */
+function buildCourtIssueTexts(
+    items: { originalText: string }[],
+    courtResolvedText?: string | null,
+): string[] {
+    const texts = items.map(item => item.originalText);
+    if (courtResolvedText) {
+        texts.push(courtResolvedText);
+    }
+    return texts;
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -233,12 +249,7 @@ export default function ReviewHubContent() {
             userProfile: userProfileData,
             nexProfile: nexProfileData,
         });
-        const itemTexts = state.reviewItems.map(i => i.originalText);
-        // Include generated boilerplate (cert/prayer) so resolved issues
-        // are recognized and removed from the blocker list.
-        if (state.courtResolvedText) {
-            itemTexts.push(state.courtResolvedText);
-        }
+        const itemTexts = buildCourtIssueTexts(state.reviewItems, state.courtResolvedText);
         const issues = detectCourtDocumentIssues(
             identity,
             { documentType: identity.documentKind, exportPath: 'court_document' },
@@ -378,10 +389,7 @@ export default function ReviewHubContent() {
                 userProfile: userProfileData,
                 nexProfile: nexProfileData,
             });
-            const itemTexts = effectiveItems.map(i => i.originalText);
-            if (state.courtResolvedText) {
-                itemTexts.push(state.courtResolvedText);
-            }
+            const itemTexts = buildCourtIssueTexts(effectiveItems, state.courtResolvedText);
             const freshIssues = detectCourtDocumentIssues(
                 identity,
                 { documentType: identity.documentKind, exportPath: state.exportPath },

@@ -738,11 +738,15 @@ export async function POST(request: NextRequest) {
                     ? buildExportCaption({
                         style: exportProfile.court.captionStyle,
                         courtName: courtIdentity?.courtName ?? undefined,
+                        judicialDistrict: courtIdentity?.judicialDistrict ?? undefined,
                         causeNumber: resolvedCauseNumber,
                         captionPetitionerName: courtIdentity?.captionPetitionerName ?? petitionerName,
                         captionRespondentName: courtIdentity?.captionRespondentName ?? respondentName,
+                        childrenNames: courtIdentity?.childrenNames,
                         state: resolvedState,
                         county: resolvedCounty,
+                        caseType: courtIdentity?.documentKind ?? caseType,
+                        caseTitleFormat: courtIdentity?.caseTitleFormat ?? undefined,
                     }).caption
                     : null;
 

@@ -234,13 +234,18 @@ export default function ReviewHubContent() {
             nexProfile: nexProfileData,
         });
         const itemTexts = state.reviewItems.map(i => i.originalText);
+        // Include generated boilerplate (cert/prayer) so resolved issues
+        // are recognized and removed from the blocker list.
+        if (state.courtResolvedText) {
+            itemTexts.push(state.courtResolvedText);
+        }
         const issues = detectCourtDocumentIssues(
             identity,
             { documentType: identity.documentKind, exportPath: 'court_document' },
             itemTexts,
         );
         dispatch({ type: 'SET_COURT_ISSUES', issues });
-    }, [state.phase, isCourtDocument, state.courtIdentityPatch, state.reviewItems, extractedFromText, courtSettingsData, userProfileData, nexProfileData, dispatch]);
+    }, [state.phase, isCourtDocument, state.courtIdentityPatch, state.courtResolvedText, state.reviewItems, extractedFromText, courtSettingsData, userProfileData, nexProfileData, dispatch]);
 
     // Track sidebar edit state to auto-save on selection change
     const pendingEditRef = useRef<{ nodeId: string; text: string } | null>(null);
@@ -374,6 +379,9 @@ export default function ReviewHubContent() {
                 nexProfile: nexProfileData,
             });
             const itemTexts = effectiveItems.map(i => i.originalText);
+            if (state.courtResolvedText) {
+                itemTexts.push(state.courtResolvedText);
+            }
             const freshIssues = detectCourtDocumentIssues(
                 identity,
                 { documentType: identity.documentKind, exportPath: state.exportPath },

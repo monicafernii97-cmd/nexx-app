@@ -70,6 +70,14 @@ ${userContextInfo}`,
  * Generate draft content for template sections.
  * Returns structured content ready for the template renderer.
  */
+export type DraftSection = { sectionId: string; heading: string; body: string; numberedItems?: string[] };
+
+export type DraftContentResult = {
+  sections: DraftSection[];
+  /** Fields the AI identified as missing from the case data. */
+  missingFields: string[];
+};
+
 export async function generateDraftContent(args: {
   templateId: string;
   templateName: string;
@@ -78,7 +86,7 @@ export async function generateDraftContent(args: {
   courtRules?: Record<string, unknown>;
   /** Optional AbortSignal for timeout/cancellation support. */
   signal?: AbortSignal;
-}): Promise<Array<{ sectionId: string; heading: string; body: string; numberedItems?: string[] }>> {
+}): Promise<DraftContentResult> {
   const contextParts: string[] = [];
   if (args.caseGraph) contextParts.push(`Case data:\n${JSON.stringify(args.caseGraph, null, 2)}`);
   if (args.courtRules) contextParts.push(`Court rules:\n${JSON.stringify(args.courtRules, null, 2)}`);
@@ -96,7 +104,8 @@ Rules:
 - Number all prayer items
 - Use neutral, factual language
 - Never fabricate facts — only use provided case data
-- If a fact is needed but not available, insert [FACT NEEDED: description]
+- NEVER insert placeholder brackets like [FACT NEEDED], [Opposing Party], or [Child Name]. If a fact is missing, omit that sentence entirely rather than inserting a placeholder.
+- If a required identity field is missing, note it in a separate "missingFields" array in your response
 
 Sections to draft: ${args.sections.join(', ')}
 ${contextParts.join('\n\n')}`,
@@ -118,8 +127,52 @@ ${contextParts.join('\n\n')}`,
   const text = response.output_text || '';
   try {
     const parsed = JSON.parse(text);
-    return parsed.sections || [];
-  } catch {
-    return [];
+
+    // Guard: AI must return a plain object, not a primitive or array
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      console.warn('[generateDraftContent] AI response is not a plain object', {
+        templateId: args.templateId,
+        parsedType: Array.isArray(parsed) ? 'array' : typeof parsed,
+      });
+      return { sections: [], missingFields: [] };
+    }
+
+    // Runtime validation — AI output is untrusted
+    const rawSections = Array.isArray(parsed.sections) ? parsed.sections : [];
+    const sections: DraftSection[] = rawSections
+      .filter(
+        (entry: unknown): entry is Record<string, unknown> =>
+          typeof entry === 'object' && entry !== null &&
+          typeof (entry as DraftSection).sectionId === 'string' &&
+          typeof (entry as DraftSection).heading === 'string' &&
+          typeof (entry as DraftSection).body === 'string',
+      )
+      .map((entry: Record<string, unknown>): DraftSection => {
+        // Validate numberedItems — must be string[] or omitted
+        const rawItems = entry.numberedItems;
+        const numberedItems = Array.isArray(rawItems) && rawItems.every((i: unknown) => typeof i === 'string')
+          ? (rawItems as string[])
+          : undefined;
+        return {
+          sectionId: entry.sectionId as string,
+          heading: entry.heading as string,
+          body: entry.body as string,
+          ...(numberedItems ? { numberedItems } : {}),
+        };
+      });
+
+    const rawMissing = Array.isArray(parsed.missingFields) ? parsed.missingFields : [];
+    const missingFields: string[] = rawMissing.filter(
+      (entry: unknown): entry is string => typeof entry === 'string',
+    );
+
+    return { sections, missingFields };
+  } catch (error) {
+    console.warn('[generateDraftContent] Failed to parse AI response', {
+      templateId: args.templateId,
+      outputTextLength: text.length,
+      error: error instanceof Error ? error.message : 'unknown_error',
+    });
+    return { sections: [], missingFields: [] };
   }
 }

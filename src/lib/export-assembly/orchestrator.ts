@@ -111,6 +111,8 @@ export interface OrchestratorPipelineResult {
     meta: AssemblyMeta;
     /** Resolved court identity (court_document path only) */
     courtIdentity?: CourtIdentity;
+    /** Identity fields the AI drafter reported as missing from the case data. */
+    missingFields?: string[];
 }
 
 /** A single drafted section from GPT. */

@@ -47,7 +47,7 @@ export async function generateSectionContent(
   input: GenerateSectionInput,
 ): Promise<GenerateSectionResult> {
   try {
-    const drafted = await generateDraftContent({
+    const { sections: drafted } = await generateDraftContent({
       templateId: `section_${input.sectionId}_${Date.now()}`,
       templateName: `${input.heading} — ${input.documentType}`,
       sections: [input.sectionId],

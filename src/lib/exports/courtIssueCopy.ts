@@ -126,7 +126,7 @@ export const COURT_ISSUE_COPY: Record<CourtDocumentIssueId, IssueCopyEntry> = {
   missing_certificate: {
     title: 'This filing needs a Certificate of Service.',
     message:
-      'Court filings generally need a Certificate of Service showing that the document was served on the other party.',
+      'Court filings generally need a Certificate of Service showing how the document will be served on the other party.',
     whyItMatters:
       'Filing without a Certificate of Service may delay or require correction before the motion can be heard.',
   },

@@ -59,9 +59,32 @@ function makeValidInput(overrides?: Partial<GenerateExportPDFInput>): GenerateEx
       county: 'Fort Bend',
     },
     metadata: {
-      caseType: 'personal_injury',
+      caseType: 'sapcr_modification',
       exportPath: 'court_document',
       runId: 'run-abc123xyz',
+    },
+    courtIdentity: {
+      filingPartyLegalName: 'Jane Doe',
+      filingPartyRole: 'petitioner' as const,
+      isProSe: true,
+      opposingPartyLegalName: 'John Smith',
+      opposingPartyRole: 'respondent' as const,
+      captionPetitionerName: 'Jane Doe',
+      captionRespondentName: 'John Smith',
+      children: [{ name: 'J.D.', age: 5 }],
+      childrenNames: ['J.D.'],
+      courtName: '387th District Court',
+      judicialDistrict: '387th Judicial District',
+      county: 'Fort Bend',
+      state: 'Texas',
+      causeNumber: '2024-12345-FM',
+      caseType: 'sapcr_modification',
+      documentKind: 'motion' as const,
+      numberingMode: 'continuous' as const,
+      resolvedTitle: 'MOTION TO MODIFY PARENT-CHILD RELATIONSHIP',
+      fieldSources: {},
+      auditLog: { resolvedFields: [], unresolvedFields: [], sourceMap: {} },
+      schemaVersion: 1 as const,
     },
     ...overrides,
   };
@@ -130,7 +153,7 @@ describe('generateExportPDF — orchestrator', () => {
     const { generateExportPDF } = await import('../generateExportPDF');
     const result = await generateExportPDF(makeValidInput());
     // Filename should contain caseType, exportPath, date, and shortId
-    expect(result.filename).toContain('personal_injury');
+    expect(result.filename).toContain('sapcr_modification');
     expect(result.filename).toContain('court_document');
     expect(result.filename).toMatch(/\.pdf$/);
   });

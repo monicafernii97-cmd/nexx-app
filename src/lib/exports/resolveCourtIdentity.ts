@@ -122,6 +122,16 @@ export type CourtIdentity = {
   /** Audit trail: which source resolved each legally significant field. */
   fieldSources: Record<string, FieldResolutionSource>;
 
+  /** Resolution audit log — required for debugging and trust. */
+  auditLog: {
+    /** Fields that were successfully resolved from any source. */
+    resolvedFields: string[];
+    /** Fields that remain unresolved after the full priority chain. */
+    unresolvedFields: string[];
+    /** Source map for each resolved field. */
+    sourceMap: Record<string, FieldResolutionSource>;
+  };
+
   /** Schema version for future migration safety. */
   schemaVersion: 1;
 };
@@ -429,6 +439,30 @@ export function resolveCourtIdentity(
   );
   if (subtitleResult.source) fieldSources['resolvedSubtitle'] = subtitleResult.source;
 
+  // ── Build audit log ─────────────────────────────────────────
+  // Derive resolved/unresolved from actual final values, not just fieldSources.
+  // This catches fallback-derived values that are populated but have no explicit source.
+  const legallySignificantValues: Record<string, string | undefined> = {
+    filingPartyLegalName,
+    opposingPartyLegalName: opposingResult.value,
+    captionPetitionerName,
+    captionRespondentName,
+    childName: childrenNames[0],
+    courtName: courtResult.value,
+    judicialDistrict: districtResult.value,
+    county: countyResult.value,
+    state: stateResult.value,
+    causeNumber: causeResult.value,
+    resolvedTitle: titleResult.value,
+    // resolvedSubtitle is intentionally excluded — it is optional in most contexts
+  };
+  const resolvedFields = Object.entries(legallySignificantValues)
+    .filter(([, v]) => typeof v === 'string' && v.trim() !== '')
+    .map(([k]) => k);
+  const unresolvedFields = Object.entries(legallySignificantValues)
+    .filter(([, v]) => !(typeof v === 'string' && v.trim() !== ''))
+    .map(([k]) => k);
+
   return {
     filingPartyLegalName,
     filingPartyRole,
@@ -455,6 +489,21 @@ export function resolveCourtIdentity(
     resolvedTitle: titleResult.value ?? '',
     resolvedSubtitle: subtitleResult.value,
     fieldSources,
+    auditLog: {
+      resolvedFields,
+      unresolvedFields,
+      sourceMap: {
+        ...fieldSources,
+        // Alias childrenNames → childName to match legallySignificantValues keys
+        ...(fieldSources['childrenNames'] ? { childName: fieldSources['childrenNames'] } : {}),
+        // Fill gaps: resolved fields without an explicit source are marked 'inferred'
+        ...Object.fromEntries(
+          resolvedFields
+            .filter(key => !fieldSources[key] && key !== 'childName')
+            .map(key => [key, 'inferred' as const]),
+        ),
+      },
+    },
     schemaVersion: 1,
   };
 }

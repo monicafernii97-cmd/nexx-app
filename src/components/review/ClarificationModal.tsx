@@ -513,7 +513,7 @@ export default function ClarificationModal({
                                 {activeMode === 'court_certificate_repair' && (
                                     <div className="space-y-3">
                                         <label className="text-[12px] font-semibold text-white/60 block">
-                                            How was this document served?
+                                            How will this document be served?
                                         </label>
                                         <div className="space-y-2">
                                             {SERVICE_METHOD_OPTIONS.map(opt => (

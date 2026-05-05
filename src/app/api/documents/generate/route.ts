@@ -196,13 +196,19 @@ export async function POST(request: NextRequest) {
 
         let drafted;
         try {
-          drafted = await generateDraftContent({
+          const draftResult = await generateDraftContent({
             templateId: body.templateId,
             templateName: template.title,
             sections: sectionIds,
             courtRules: rules as unknown as Record<string, unknown>,
             caseGraph: caseContext,
           });
+          drafted = draftResult.sections;
+
+          // Surface missing fields as a warning (the finalization guard is the hard stop)
+          if (draftResult.missingFields.length > 0) {
+            console.warn('[DocuVault] AI drafter reported missing fields:', draftResult.missingFields);
+          }
         } catch (draftError) {
           const message = draftError instanceof Error ? draftError.message : 'Unknown AI drafting error';
           console.error('[DocuVault] AI drafting failed:', { templateId: body.templateId, message });

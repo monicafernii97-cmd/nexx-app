@@ -496,6 +496,12 @@ export function resolveCourtIdentity(
         ...fieldSources,
         // Alias childrenNames → childName to match legallySignificantValues keys
         ...(fieldSources['childrenNames'] ? { childName: fieldSources['childrenNames'] } : {}),
+        // Fill gaps: resolved fields without an explicit source are marked 'inferred'
+        ...Object.fromEntries(
+          resolvedFields
+            .filter(key => !fieldSources[key] && key !== 'childName')
+            .map(key => [key, 'inferred' as const]),
+        ),
       },
     },
     schemaVersion: 1,

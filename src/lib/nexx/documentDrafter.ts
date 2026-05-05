@@ -158,7 +158,12 @@ ${contextParts.join('\n\n')}`,
     );
 
     return { sections, missingFields };
-  } catch {
+  } catch (error) {
+    console.warn('[generateDraftContent] Failed to parse AI response', {
+      templateId: args.templateId,
+      outputTextLength: text.length,
+      error: error instanceof Error ? error.message : 'unknown_error',
+    });
     return { sections: [], missingFields: [] };
   }
 }

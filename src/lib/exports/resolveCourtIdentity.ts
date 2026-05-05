@@ -492,7 +492,11 @@ export function resolveCourtIdentity(
     auditLog: {
       resolvedFields,
       unresolvedFields,
-      sourceMap: { ...fieldSources },
+      sourceMap: {
+        ...fieldSources,
+        // Alias childrenNames → childName to match legallySignificantValues keys
+        ...(fieldSources['childrenNames'] ? { childName: fieldSources['childrenNames'] } : {}),
+      },
     },
     schemaVersion: 1,
   };

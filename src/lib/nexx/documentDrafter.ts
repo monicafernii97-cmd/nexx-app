@@ -130,13 +130,27 @@ ${contextParts.join('\n\n')}`,
 
     // Runtime validation — AI output is untrusted
     const rawSections = Array.isArray(parsed.sections) ? parsed.sections : [];
-    const sections: DraftSection[] = rawSections.filter(
-      (entry: unknown): entry is DraftSection =>
-        typeof entry === 'object' && entry !== null &&
-        typeof (entry as DraftSection).sectionId === 'string' &&
-        typeof (entry as DraftSection).heading === 'string' &&
-        typeof (entry as DraftSection).body === 'string',
-    );
+    const sections: DraftSection[] = rawSections
+      .filter(
+        (entry: unknown): entry is Record<string, unknown> =>
+          typeof entry === 'object' && entry !== null &&
+          typeof (entry as DraftSection).sectionId === 'string' &&
+          typeof (entry as DraftSection).heading === 'string' &&
+          typeof (entry as DraftSection).body === 'string',
+      )
+      .map((entry: Record<string, unknown>): DraftSection => {
+        // Validate numberedItems — must be string[] or omitted
+        const rawItems = entry.numberedItems;
+        const numberedItems = Array.isArray(rawItems) && rawItems.every((i: unknown) => typeof i === 'string')
+          ? (rawItems as string[])
+          : undefined;
+        return {
+          sectionId: entry.sectionId as string,
+          heading: entry.heading as string,
+          body: entry.body as string,
+          ...(numberedItems ? { numberedItems } : {}),
+        };
+      });
 
     const rawMissing = Array.isArray(parsed.missingFields) ? parsed.missingFields : [];
     const missingFields: string[] = rawMissing.filter(

@@ -52,6 +52,7 @@ import {
     type DocumentKind,
 } from '@/lib/exports/resolveCourtIdentity';
 import { detectCourtDocumentIssues } from '@/lib/exports/courtDocumentIssues';
+import { extractCourtMetadataFromText } from '@/lib/exports/extractCourtMetadataFromText';
 import {
     MAX_TERMINAL_MUTATION_RETRIES,
     RETRY_BACKOFF_BASE_MS,
@@ -475,8 +476,25 @@ export async function POST(request: NextRequest) {
                         ? String((exportConfig as unknown as Record<string, unknown>).documentType)
                         : undefined;
 
+                    // Extract metadata from review item text (mirrors client-side extraction)
+                    const allReviewText = (body.reviewItems ?? []).map(i => i.originalText).join('\n');
+                    const extracted = extractCourtMetadataFromText(allReviewText);
+                    const extractedFromText: Record<string, string | undefined> = {};
+                    const keyMap: Record<string, string> = {
+                        petitionerName: 'captionPetitionerName',
+                        respondentName: 'captionRespondentName',
+                        documentTitle: 'resolvedTitle',
+                        documentSubtitle: 'resolvedSubtitle',
+                    };
+                    for (const [key, field] of Object.entries(extracted)) {
+                        if (field && typeof field === 'object' && 'value' in field) {
+                            extractedFromText[keyMap[key] ?? key] = field.value;
+                        }
+                    }
+
                     courtIdentity = resolveCourtIdentity({
                         patch: body.courtIdentityPatch,
+                        extractedFromText,
                         courtSettings: courtSettings as CourtSettingsData | null,
                         draftTitle: getTemplateName(body.exportRequest?.path ?? 'general'),
                         draftDocumentKind: isValidDocumentKind(rawDocType) ? rawDocType : undefined,

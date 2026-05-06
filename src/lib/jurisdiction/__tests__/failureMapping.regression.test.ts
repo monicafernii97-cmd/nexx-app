@@ -66,6 +66,7 @@ describe('failure mapping — error code taxonomy', () => {
       EXPORT_QUEUE_OVERLOADED: true,
       EXPORT_JOB_TIMEOUT: true,
       EXPORT_DOCUMENT_NOT_FINALIZABLE: true,
+      EXPORT_SAPCR_MISSING_CHILD_NAME: true,
     };
 
     for (const code of Object.keys(allCodes) as ExportGenerationErrorCode[]) {

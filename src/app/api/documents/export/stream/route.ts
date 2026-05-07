@@ -482,16 +482,7 @@ export async function POST(request: NextRequest) {
                         i.userOverride?.editedText ?? i.transformedCourtSafeText ?? i.originalText,
                     ).join('\n');
 
-                    // ── DIAGNOSTIC: trace SAPCR child name resolution ──
-                    console.log('[ExportStream] SAPCR DIAGNOSTIC — reviewItems count:', (body.reviewItems ?? []).length);
-                    console.log('[ExportStream] SAPCR DIAGNOSTIC — allReviewText length:', allReviewText.length);
-                    console.log('[ExportStream] SAPCR DIAGNOSTIC — allReviewText (first 500):', allReviewText.slice(0, 500));
-                    console.log('[ExportStream] SAPCR DIAGNOSTIC — contains IN THE INTEREST OF:', /IN\s+THE\s+INTEREST\s+OF/i.test(allReviewText));
-
                     const extracted = extractCourtMetadataFromText(allReviewText);
-
-                    console.log('[ExportStream] SAPCR DIAGNOSTIC — extracted.childrenNames:', extracted.childrenNames);
-                    console.log('[ExportStream] SAPCR DIAGNOSTIC — extracted.caseTitleFormat:', extracted.caseTitleFormat);
 
                     const extractedFromText: Record<string, string | undefined> = {};
                     const keyMap: Record<string, string> = {
@@ -506,9 +497,6 @@ export async function POST(request: NextRequest) {
                         }
                     }
 
-                    console.log('[ExportStream] SAPCR DIAGNOSTIC — extractedFromText:', JSON.stringify(extractedFromText));
-                    console.log('[ExportStream] SAPCR DIAGNOSTIC — courtIdentityPatch:', JSON.stringify(body.courtIdentityPatch));
-
                     courtIdentity = resolveCourtIdentity({
                         patch: body.courtIdentityPatch,
                         extractedFromText,
@@ -516,10 +504,6 @@ export async function POST(request: NextRequest) {
                         draftTitle: getTemplateName(body.exportRequest?.path ?? 'general'),
                         draftDocumentKind: isValidDocumentKind(rawDocType) ? rawDocType : undefined,
                     });
-
-                    console.log('[ExportStream] SAPCR DIAGNOSTIC — courtIdentity.childrenNames:', courtIdentity.childrenNames);
-                    console.log('[ExportStream] SAPCR DIAGNOSTIC — courtIdentity.caseTitleFormat:', courtIdentity.caseTitleFormat);
-                    console.log('[ExportStream] SAPCR DIAGNOSTIC — courtIdentity.caseType:', courtIdentity.caseType);
 
                     // ── Final authority: detect court document issues ──
                     const sectionTexts = draftedSections.flatMap(s => [

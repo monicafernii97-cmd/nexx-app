@@ -734,6 +734,21 @@ export async function POST(request: NextRequest) {
                 const resolvedCounty = courtIdentity?.county ?? courtCounty;
                 const resolvedCauseNumber = courtIdentity?.causeNumber ?? causeNumber;
 
+                // ── SAPCR guard: fail fast if child name is missing ──
+                if (courtIdentity && exportPath === 'court_document') {
+                    const isSAPCR =
+                        courtIdentity.caseTitleFormat === 'in_interest_of' ||
+                        /sapcr|parent.child|custody|modification/i.test(courtIdentity.caseType) ||
+                        (courtIdentity.childrenNames?.length ?? 0) > 0;
+
+                    if (isSAPCR && (!courtIdentity.childrenNames || courtIdentity.childrenNames.length === 0)) {
+                        throw new ExportDocumentGenerationError({
+                            code: 'EXPORT_SAPCR_MISSING_CHILD_NAME',
+                            message: 'SAPCR caption cannot be finalized because child name is missing from courtIdentity.childrenNames.',
+                        });
+                    }
+                }
+
                 const caption = exportPath === 'court_document'
                     ? buildExportCaption({
                         style: exportProfile.court.captionStyle,

@@ -30,7 +30,8 @@ export type ExportGenerationErrorCode =
   | 'EXPORT_ARTIFACT_INTEGRITY_FAILED'
   | 'EXPORT_QUEUE_OVERLOADED'
   | 'EXPORT_JOB_TIMEOUT'
-  | 'EXPORT_DOCUMENT_NOT_FINALIZABLE';
+  | 'EXPORT_DOCUMENT_NOT_FINALIZABLE'
+  | 'EXPORT_SAPCR_MISSING_CHILD_NAME';
 
 // ═══════════════════════════════════════════════════════════════
 // Error Class
@@ -83,6 +84,7 @@ const EXPORT_ERROR_CODES: ReadonlySet<string> = new Set<ExportGenerationErrorCod
   'EXPORT_QUEUE_OVERLOADED',
   'EXPORT_JOB_TIMEOUT',
   'EXPORT_DOCUMENT_NOT_FINALIZABLE',
+  'EXPORT_SAPCR_MISSING_CHILD_NAME',
 ]);
 
 /** Runtime type guard for ExportGenerationErrorCode. */

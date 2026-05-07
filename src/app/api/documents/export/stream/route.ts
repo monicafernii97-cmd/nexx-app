@@ -752,7 +752,7 @@ export async function POST(request: NextRequest) {
                 const resolvedCounty = courtIdentity?.county ?? courtCounty;
                 const resolvedCauseNumber = courtIdentity?.causeNumber ?? causeNumber;
 
-                // ── SAPCR guard: fail fast if child name is missing ──
+                // ── SAPCR guard: recover child name from all sources ──
                 if (courtIdentity && exportPath === 'court_document') {
                     const isSAPCR =
                         courtIdentity.caseTitleFormat === 'in_interest_of' ||
@@ -760,10 +760,37 @@ export async function POST(request: NextRequest) {
                         (courtIdentity.childrenNames?.length ?? 0) > 0;
 
                     if (isSAPCR && (!courtIdentity.childrenNames || courtIdentity.childrenNames.length === 0)) {
-                        throw new ExportDocumentGenerationError({
-                            code: 'EXPORT_SAPCR_MISSING_CHILD_NAME',
-                            message: 'SAPCR caption cannot be finalized because child name is missing from courtIdentity.childrenNames.',
-                        });
+                        // Last-resort: scan ALL review item text for "IN THE INTEREST OF {name}"
+                        const fullReviewText = (body.reviewItems ?? []).map(i =>
+                            [i.userOverride?.editedText, i.transformedCourtSafeText, i.originalText]
+                                .filter(Boolean).join('\n'),
+                        ).join('\n');
+
+                        const interestMatch = fullReviewText.match(
+                            /IN\s+THE\s+INTEREST\s+OF\s+(?:§\s*)?([A-Z][A-Za-z\s.'-]+?)(?:\s*,\s*§|\s*§|\s*,?\s*(?:A\s+CHILD|A\s+MINOR|CHILDREN|MINOR\s+CHILD))/i,
+                        );
+
+                        if (interestMatch?.[1]) {
+                            // Recovered child name from review text
+                            console.log('[ExportStream] SAPCR recovery: extracted child name from review text:', interestMatch[1].trim());
+                            courtIdentity = {
+                                ...courtIdentity,
+                                childrenNames: [interestMatch[1].trim()],
+                            };
+                        } else {
+                            console.error('[ExportStream] SAPCR guard failed: no child name found in any source');
+                            console.error('[ExportStream] reviewItems count:', (body.reviewItems ?? []).length);
+                            console.error('[ExportStream] fullReviewText (first 300):', fullReviewText.slice(0, 300));
+                            console.error('[ExportStream] courtIdentity:', JSON.stringify({
+                                caseTitleFormat: courtIdentity.caseTitleFormat,
+                                caseType: courtIdentity.caseType,
+                                childrenNames: courtIdentity.childrenNames,
+                            }));
+                            throw new ExportDocumentGenerationError({
+                                code: 'EXPORT_SAPCR_MISSING_CHILD_NAME',
+                                message: 'SAPCR caption cannot be finalized because child name is missing. No child name found in review text, court settings, or identity patch.',
+                            });
+                        }
                     }
                 }
 

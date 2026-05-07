@@ -392,9 +392,12 @@ export async function POST(request: NextRequest) {
                         ?? reviewedItem?.originalText
                         ?? classifiedNodes[0].rawText;
 
-                    // Parse through unified legal document pipeline
-                    const { prepareLegalDocument } = await import('@/lib/legal-docs/pipeline/prepareLegalDocument');
-                    const parsedLegalDoc = prepareLegalDocument({
+                    // Parse draft through the structural pipeline WITHOUT integrity
+                    // assertion. The export pipeline handles court identity resolution,
+                    // SAPCR child-name recovery, caption construction, and final
+                    // integrity validation downstream in generateExportPDF().
+                    const { parseLegalDocumentDraft } = await import('@/lib/legal-docs/pipeline/prepareLegalDocument');
+                    const parsedLegalDoc = parseLegalDocumentDraft({
                         text: rawText,
                         metadata: {
                             causeNumber,
@@ -1045,8 +1048,18 @@ export async function POST(request: NextRequest) {
 
             } catch (error) {
                 // ── Error handling with typed codes ──
-                const errorObj = error as Error & { code?: string };
-                const errorCode = errorObj.code ?? classifyError(errorObj);
+                const errorObj = error as Error & { code?: string; name?: string };
+
+                // Recognize typed errors first, then classify by message pattern
+                let errorCode: string;
+                if (errorObj.code) {
+                    errorCode = errorObj.code;
+                } else if (errorObj.name === 'LegalDocumentIntegrityError') {
+                    errorCode = 'EXPORT_DOCUMENT_INTEGRITY_FAILED';
+                } else {
+                    errorCode = classifyError(errorObj);
+                }
+
                 const message = errorObj.message ?? 'Pipeline failed';
 
                 console.error(`[ExportStream] Pipeline error (${errorCode}):`, message);

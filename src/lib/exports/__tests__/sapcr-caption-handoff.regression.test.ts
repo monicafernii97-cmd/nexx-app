@@ -24,6 +24,16 @@ import type { LegalDocument } from '@/lib/legal-docs/types';
 const PASTED_CAPTION =
   'CAUSE NO. 20-DCV-271717 IN THE INTEREST OF AMELIA SOFIA FERNANDEZ PUGLIESE, A CHILD § § § § § IN THE DISTRICT COURT 387TH JUDICIAL DISTRICT FORT BEND COUNTY, TEXAS';
 
+const TWO_COLUMN_PASTED_CAPTION = `
+CAUSE NO. 20-DCV-271717
+
+IN THE INTEREST OF Â§ IN THE DISTRICT COURT
+Â§
+AMELIA SOFIA FERNANDEZ PUGLIESE, Â§ 387TH JUDICIAL DISTRICT
+Â§
+A CHILD Â§ FORT BEND COUNTY, TEXAS
+`;
+
 /** Build extractedFromText the same way ReviewHubContent and the export route do. */
 function buildExtractedFromText(pastedText: string): Record<string, string | undefined> {
   const extracted = extractCourtMetadataFromText(pastedText);
@@ -101,6 +111,18 @@ describe('SAPCR Caption Handoff', () => {
     expect(identity.childrenNames.length).toBeGreaterThan(0);
     expect(identity.childrenNames[0]).toMatch(/AMELIA SOFIA FERNANDEZ PUGLIESE/i);
     expect(identity.caseTitleFormat).toBe('in_interest_of');
+  });
+
+  it('extracts childrenNames from Texas two-column SAPCR captions', () => {
+    const extractedFromText = buildExtractedFromText(TWO_COLUMN_PASTED_CAPTION);
+    const identity = resolveCourtIdentity({
+      extractedFromText,
+      draftTitle: 'Motion for Temporary Orders',
+      draftDocumentKind: 'motion',
+    });
+
+    expect(identity.caseTitleFormat).toBe('in_interest_of');
+    expect(identity.childrenNames).toEqual(['AMELIA SOFIA FERNANDEZ PUGLIESE']);
   });
 
   it('Step 2: buildExportCaption produces correct SAPCR leftLines with child name', () => {

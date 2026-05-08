@@ -234,6 +234,52 @@ function extractParties(text: string): {
 }
 
 /**
+ * Extract the child name from SAPCR captions.
+ *
+ * Supports both one-line captions and Texas two-column captions where section
+ * symbols and court text sit between "IN THE INTEREST OF" and the child line.
+ */
+export function extractSapcrChildName(text: string): string | undefined {
+  const markerMatch = /IN\s+THE\s+INTEREST\s+OF/i.exec(text);
+  if (!markerMatch) return undefined;
+
+  const captionTail = text.slice(markerMatch.index, markerMatch.index + 1200);
+  const lines = captionTail.split(/\r?\n/);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    let line = lines[index];
+    if (index === 0) {
+      line = line.replace(/.*?IN\s+THE\s+INTEREST\s+OF/i, '');
+    }
+
+    const leftColumn = line.split('Â§')[0] ?? '';
+    const candidate = cleanSapcrChildCandidate(leftColumn);
+    if (candidate) return candidate;
+  }
+
+  return undefined;
+}
+
+function cleanSapcrChildCandidate(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+
+  const cleaned = value
+    .replace(/\b(A\s+CHILD|A\s+MINOR|MINOR\s+CHILD|CHILDREN)\b.*$/i, '')
+    .replace(/[Â§|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[,;:\s]+|[,;:\s]+$/g, '')
+    .trim();
+
+  if (!cleaned) return undefined;
+  if (!/[A-Za-z]/.test(cleaned)) return undefined;
+  if (/^(IN\s+THE\s+INTEREST\s+OF|IN\s+THE\s+DISTRICT\s+COURT|DISTRICT\s+COURT|JUDICIAL\s+DISTRICT)$/i.test(cleaned)) return undefined;
+  if (/^(A\s+CHILD|A\s+MINOR|MINOR\s+CHILD|CHILDREN)$/i.test(cleaned)) return undefined;
+  if (/\b(COURT|COUNTY|TEXAS|JUDICIAL|DISTRICT|CAUSE\s+NO)\b/i.test(cleaned)) return undefined;
+
+  return cleaned;
+}
+
+/**
  * Extract document title and optional subtitle from pasted text.
  *
  * Legal titles can take many forms:
@@ -324,8 +370,8 @@ export function extractCourtMetadataFromText(
   const interestMatch = text.match(
     /IN\s+THE\s+INTEREST\s+OF\s+(?:§\s*)?([A-Z][A-Za-z\s.'-]+?)(?:\s*,\s*§|\s*§|\s*,?\s*(?:A\s+CHILD|A\s+MINOR|CHILDREN|MINOR\s+CHILD))/i,
   );
-  if (interestMatch?.[1]) {
-    const childName = interestMatch[1].trim();
+  const childName = extractSapcrChildName(text) ?? interestMatch?.[1]?.trim();
+  if (childName) {
     result.childrenNames = { value: childName, confidence: 'high' };
     result.caseTitleFormat = { value: 'in_interest_of', confidence: 'high' };
   } else if (/IN\s+THE\s+INTEREST\s+OF/i.test(text)) {

@@ -49,10 +49,9 @@ import {
     isValidDocumentKind,
     type CourtIdentity,
     type CourtSettingsData,
-    type DocumentKind,
 } from '@/lib/exports/resolveCourtIdentity';
-import { detectCourtDocumentIssues } from '@/lib/exports/courtDocumentIssues';
-import { extractCourtMetadataFromText } from '@/lib/exports/extractCourtMetadataFromText';
+import { detectCourtDocumentIssues, type CourtDocumentIssue } from '@/lib/exports/courtDocumentIssues';
+import { extractCourtMetadataFromText, extractSapcrChildName } from '@/lib/exports/extractCourtMetadataFromText';
 import {
     MAX_TERMINAL_MUTATION_RETRIES,
     RETRY_BACKOFF_BASE_MS,
@@ -80,17 +79,6 @@ interface ExportStreamRequest {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Sanitize a string for use in filenames. */
-function sanitizeForFilename(str: string): string {
-    return str
-        .toLowerCase()
-        .replace(/[^a-z0-9_-]/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_|_$/g, '');
-}
-
-
-
 // adaptDraftedToGenerated — REMOVED
 // Replaced by adaptDraftedToCanonicalExport from src/lib/exports/
 // which preserves structural identity per export path.
@@ -100,6 +88,16 @@ function deriveComplianceStatus(preflight: PreflightResult): 'pass' | 'warning' 
     if (preflight.errorCount > 0) return 'error';
     if (preflight.warningCount > 0) return 'warning';
     return 'pass';
+}
+
+function cleanChildrenNames(names: string[] | undefined): string[] {
+    return (names ?? []).map((name) => name.trim()).filter(Boolean);
+}
+
+function isSapcrIdentity(identity: CourtIdentity): boolean {
+    return identity.caseTitleFormat === 'in_interest_of'
+        || cleanChildrenNames(identity.childrenNames).length > 0
+        || /sapcr|parent.child|custody|modification/i.test(identity.caseType ?? '');
 }
 
 // getExportRules — REMOVED
@@ -191,6 +189,8 @@ export async function POST(request: NextRequest) {
             let runFingerprint: string | null = null;
             let claimedExportRun = false;
             let jobId: string | null = null;
+            let pendingCourtIssues: CourtDocumentIssue[] | null = null;
+            let clarificationEventSent = false;
 
             try {
                 // ────────────────────────────────────────────────
@@ -504,6 +504,10 @@ export async function POST(request: NextRequest) {
                         draftTitle: getTemplateName(body.exportRequest?.path ?? 'general'),
                         draftDocumentKind: isValidDocumentKind(rawDocType) ? rawDocType : undefined,
                     });
+                    courtIdentity = {
+                        ...courtIdentity,
+                        childrenNames: cleanChildrenNames(courtIdentity.childrenNames),
+                    };
 
                     // ── Final authority: detect court document issues ──
                     const sectionTexts = draftedSections.flatMap(s => [
@@ -519,6 +523,7 @@ export async function POST(request: NextRequest) {
 
                     const blockers = courtIssues.filter(i => i.severity === 'blocker');
                     if (blockers.length > 0) {
+                        pendingCourtIssues = courtIssues;
                         // Send the clarification SSE error to the client first
                         send({
                             type: 'error',
@@ -526,6 +531,7 @@ export async function POST(request: NextRequest) {
                             message: 'Court document has unresolved issues that require clarification.',
                             issues: courtIssues,
                         });
+                        clarificationEventSent = true;
 
                         // Throw coded error so the outer catch block handles
                         // export/job/idempotency cleanup with proper retry logic
@@ -738,10 +744,12 @@ export async function POST(request: NextRequest) {
 
                 // ── SAPCR guard: recover child name from all sources ──
                 if (courtIdentity && exportPath === 'court_document') {
-                    const isSAPCR =
-                        courtIdentity.caseTitleFormat === 'in_interest_of' ||
-                        /sapcr|parent.child|custody|modification/i.test(courtIdentity.caseType) ||
-                        (courtIdentity.childrenNames?.length ?? 0) > 0;
+                    courtIdentity = {
+                        ...courtIdentity,
+                        childrenNames: cleanChildrenNames(courtIdentity.childrenNames),
+                    };
+
+                    const isSAPCR = isSapcrIdentity(courtIdentity);
 
                     if (isSAPCR && (!courtIdentity.childrenNames || courtIdentity.childrenNames.length === 0)) {
                         // Last-resort: scan ALL review item text for "IN THE INTEREST OF {name}"
@@ -750,16 +758,14 @@ export async function POST(request: NextRequest) {
                                 .filter(Boolean).join('\n'),
                         ).join('\n');
 
-                        const interestMatch = fullReviewText.match(
-                            /IN\s+THE\s+INTEREST\s+OF\s+(?:§\s*)?([A-Z][A-Za-z\s.'-]+?)(?:\s*,\s*§|\s*§|\s*,?\s*(?:A\s+CHILD|A\s+MINOR|CHILDREN|MINOR\s+CHILD))/i,
-                        );
+                        const recoveredChildName = extractSapcrChildName(fullReviewText);
 
-                        if (interestMatch?.[1]) {
+                        if (recoveredChildName) {
                             // Recovered child name from review text
-                            console.log('[ExportStream] SAPCR recovery: extracted child name from review text:', interestMatch[1].trim());
+                            console.log('[ExportStream] SAPCR recovery: extracted child name from review text:', recoveredChildName);
                             courtIdentity = {
                                 ...courtIdentity,
-                                childrenNames: [interestMatch[1].trim()],
+                                childrenNames: cleanChildrenNames([recoveredChildName]),
                             };
                         } else {
                             console.error('[ExportStream] SAPCR guard failed: no child name found in any source');
@@ -770,15 +776,27 @@ export async function POST(request: NextRequest) {
                                 caseType: courtIdentity.caseType,
                                 childrenNames: courtIdentity.childrenNames,
                             }));
-                            throw new ExportDocumentGenerationError({
-                                code: 'EXPORT_SAPCR_MISSING_CHILD_NAME',
-                                message: 'SAPCR caption cannot be finalized because child name is missing. No child name found in review text, court settings, or identity patch.',
+                            const courtIssues = detectCourtDocumentIssues(
+                                courtIdentity,
+                                { documentType: courtIdentity.documentKind, exportPath },
+                                [fullReviewText],
+                            );
+                            pendingCourtIssues = courtIssues;
+                            send({
+                                type: 'error',
+                                errorCode: 'COURT_DOCUMENT_NEEDS_CLARIFICATION',
+                                message: 'SAPCR caption needs the child name before export can continue.',
+                                issues: courtIssues,
                             });
+                            clarificationEventSent = true;
+                            const courtErr = new Error('SAPCR caption needs the child name before export can continue.');
+                            (courtErr as Error & { code?: string }).code = 'COURT_DOCUMENT_NEEDS_CLARIFICATION';
+                            throw courtErr;
                         }
                     }
                 }
 
-                const caption = exportPath === 'court_document'
+                const captionResult = exportPath === 'court_document'
                     ? buildExportCaption({
                         style: exportProfile.court.captionStyle,
                         courtName: courtIdentity?.courtName ?? undefined,
@@ -791,8 +809,36 @@ export async function POST(request: NextRequest) {
                         county: resolvedCounty,
                         caseType: courtIdentity?.documentKind ?? caseType,
                         caseTitleFormat: courtIdentity?.caseTitleFormat ?? undefined,
-                    }).caption
+                    })
                     : null;
+                const caption = captionResult?.caption ?? null;
+
+                if (courtIdentity && exportPath === 'court_document' && caption) {
+                    const leftText = caption.leftLines.join(' ');
+                    const hasSapcrCaption = /IN THE INTEREST OF/i.test(leftText);
+                    const childNameLines = caption.leftLines.filter((line) => {
+                        const trimmed = line.trim();
+                        return trimmed !== '' && !/^(IN THE INTEREST OF|A CHILD|CHILDREN)$/i.test(trimmed);
+                    });
+                    if (hasSapcrCaption && childNameLines.length === 0) {
+                        const courtIssues = detectCourtDocumentIssues(
+                            { ...courtIdentity, childrenNames: [] },
+                            { documentType: courtIdentity.documentKind, exportPath },
+                            [],
+                        );
+                        pendingCourtIssues = courtIssues;
+                        send({
+                            type: 'error',
+                            errorCode: 'COURT_DOCUMENT_NEEDS_CLARIFICATION',
+                            message: 'SAPCR caption needs the child name before export can continue.',
+                            issues: courtIssues,
+                        });
+                        clarificationEventSent = true;
+                        const courtErr = new Error('SAPCR caption needs the child name before export can continue.');
+                        (courtErr as Error & { code?: string }).code = 'COURT_DOCUMENT_NEEDS_CLARIFICATION';
+                        throw courtErr;
+                    }
+                }
 
                 // 4c. Build adapt params
                 const mappedSections = body.assemblyResult?.assembly
@@ -1101,11 +1147,22 @@ export async function POST(request: NextRequest) {
                     }
                 }
 
-                send({
-                    type: 'error',
-                    errorCode,
-                    message,
-                });
+                if (errorCode === 'COURT_DOCUMENT_NEEDS_CLARIFICATION') {
+                    if (!clarificationEventSent) {
+                        send({
+                            type: 'error',
+                            errorCode,
+                            message,
+                            issues: pendingCourtIssues ?? [],
+                        });
+                    }
+                } else {
+                    send({
+                        type: 'error',
+                        errorCode,
+                        message,
+                    });
+                }
             } finally {
                 controller.close();
             }
@@ -1148,6 +1205,7 @@ export async function POST(request: NextRequest) {
 /** Classify error into typed error code based on message/stack. */
 function classifyError(error: Error): string {
     const msg = error.message?.toLowerCase() ?? '';
+    if (msg.includes('sapcr caption') && msg.includes('child name')) return 'COURT_DOCUMENT_NEEDS_CLARIFICATION';
     if (msg.includes('client_aborted') || msg.includes('client disconnected')) return 'client_aborted';
     if (msg.includes('draft') || msg.includes('openai') || msg.includes('gpt')) return 'draft_failed';
     if (msg.includes('preflight')) return 'preflight_failed';

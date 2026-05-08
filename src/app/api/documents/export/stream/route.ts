@@ -51,7 +51,7 @@ import {
     type CourtSettingsData,
 } from '@/lib/exports/resolveCourtIdentity';
 import { detectCourtDocumentIssues, type CourtDocumentIssue } from '@/lib/exports/courtDocumentIssues';
-import { extractCourtMetadataFromText, extractSapcrChildName } from '@/lib/exports/extractCourtMetadataFromText';
+import { extractCourtMetadataFromText, extractSapcrChildNameRobust } from '@/lib/exports/extractCourtMetadataFromText';
 import {
     MAX_TERMINAL_MUTATION_RETRIES,
     RETRY_BACKOFF_BASE_MS,
@@ -758,7 +758,7 @@ export async function POST(request: NextRequest) {
                                 .filter(Boolean).join('\n'),
                         ).join('\n');
 
-                        const recoveredChildName = extractSapcrChildName(fullReviewText);
+                        const recoveredChildName = extractSapcrChildNameRobust(fullReviewText);
 
                         if (recoveredChildName) {
                             // Recovered child name from review text

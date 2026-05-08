@@ -260,6 +260,58 @@ export function extractSapcrChildName(text: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Encoding-safe SAPCR child extractor.
+ *
+ * Some pasted Texas captions arrive with a real section sign, while others
+ * carry the double-encoded form. Keep this helper ASCII-only so both survive.
+ */
+export function extractSapcrChildNameRobust(text: string): string | undefined {
+  const markerMatch = /IN\s+THE\s+INTEREST\s+OF/i.exec(text);
+  if (!markerMatch) return undefined;
+
+  const captionTail = text.slice(markerMatch.index, markerMatch.index + 1200);
+  const inlineMatch = captionTail.match(
+    /IN\s+THE\s+INTEREST\s+OF\s+(.{1,180}?)(?:,?\s*(?:\u00C2?\u00A7|\bA\s+CHILD\b|\bA\s+MINOR\b|\bCHILDREN\b|\bMINOR\s+CHILD\b))/i,
+  );
+  const inlineCandidate = cleanSapcrChildCandidateRobust(inlineMatch?.[1]);
+  if (inlineCandidate) return inlineCandidate;
+
+  const lines = captionTail.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    let line = lines[index];
+    if (index === 0) {
+      line = line.replace(/.*?IN\s+THE\s+INTEREST\s+OF/i, '');
+    }
+
+    const leftColumn = line.split(/\u00C2?\u00A7/)[0] ?? '';
+    const candidate = cleanSapcrChildCandidateRobust(leftColumn);
+    if (candidate) return candidate;
+  }
+
+  return undefined;
+}
+
+function cleanSapcrChildCandidateRobust(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+
+  const cleaned = value
+    .replace(/\b(A\s+CHILD|A\s+MINOR|MINOR\s+CHILD|CHILDREN)\b.*$/i, '')
+    .replace(/\u00C2?\u00A7/g, ' ')
+    .replace(/\|/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[,;:\s]+|[,;:\s]+$/g, '')
+    .trim();
+
+  if (!cleaned) return undefined;
+  if (!/[A-Za-z]/.test(cleaned)) return undefined;
+  if (/^(IN\s+THE\s+INTEREST\s+OF|IN\s+THE\s+DISTRICT\s+COURT|DISTRICT\s+COURT|JUDICIAL\s+DISTRICT)$/i.test(cleaned)) return undefined;
+  if (/^(A\s+CHILD|A\s+MINOR|MINOR\s+CHILD|CHILDREN)$/i.test(cleaned)) return undefined;
+  if (/\b(COURT|COUNTY|TEXAS|JUDICIAL|DISTRICT|CAUSE\s+NO)\b/i.test(cleaned)) return undefined;
+
+  return cleaned;
+}
+
 function cleanSapcrChildCandidate(value: string | undefined): string | undefined {
   if (!value) return undefined;
 
@@ -370,7 +422,8 @@ export function extractCourtMetadataFromText(
   const interestMatch = text.match(
     /IN\s+THE\s+INTEREST\s+OF\s+(?:§\s*)?([A-Z][A-Za-z\s.'-]+?)(?:\s*,\s*§|\s*§|\s*,?\s*(?:A\s+CHILD|A\s+MINOR|CHILDREN|MINOR\s+CHILD))/i,
   );
-  const childName = extractSapcrChildName(text) ?? interestMatch?.[1]?.trim();
+  const legacyChildName = cleanSapcrChildCandidateRobust(interestMatch?.[1]);
+  const childName = extractSapcrChildNameRobust(text) ?? legacyChildName;
   if (childName) {
     result.childrenNames = { value: childName, confidence: 'high' };
     result.caseTitleFormat = { value: 'in_interest_of', confidence: 'high' };

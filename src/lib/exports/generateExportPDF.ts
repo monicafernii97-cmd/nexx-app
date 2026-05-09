@@ -383,7 +383,27 @@ function recoverSapcrChildNameForIntegrity(
     draftedText,
   ].filter(Boolean).join('\n');
 
-  return extractSapcrChildNameRobust(recoveryText);
+  const recovered = extractSapcrChildNameRobust(recoveryText);
+  if (!recovered) {
+    console.error('[generateExportPDF] SAPCR final recovery failed', {
+      identitySourceTextLength: input.identitySourceText?.length ?? 0,
+      legalDocRawTextLength: legalDoc.rawText?.length ?? 0,
+      captionTextLength: captionText.length,
+      draftedTextLength: draftedText.length,
+      recoveryTextLength: recoveryText.length,
+      identitySourceHasInterestPhrase: /IN\s+THE\s+INTEREST\s+OF/i.test(input.identitySourceText ?? ''),
+      legalDocRawHasInterestPhrase: /IN\s+THE\s+INTEREST\s+OF/i.test(legalDoc.rawText ?? ''),
+      captionTextHasInterestPhrase: /IN\s+THE\s+INTEREST\s+OF/i.test(captionText),
+      draftedTextHasInterestPhrase: /IN\s+THE\s+INTEREST\s+OF/i.test(draftedText),
+      courtIdentityChildrenNamesCount: input.courtIdentity?.childrenNames?.length ?? 0,
+      courtIdentityChildrenCount: input.courtIdentity?.children?.length ?? 0,
+      captionLeftLineCount: caption.leftLines.length,
+      captionRightLineCount: caption.rightLines.length,
+      adaptCaptionLeftLineCount: input.adaptParams.caption?.leftLines.length ?? 0,
+    });
+  }
+
+  return recovered;
 }
 
 /** Stage 1: Resolve export jurisdiction profile from settings. */

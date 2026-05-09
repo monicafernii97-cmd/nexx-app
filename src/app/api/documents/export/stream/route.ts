@@ -126,10 +126,22 @@ function collectAssemblyIdentityText(
     ).join('\n');
 }
 
-function collectExportIdentityText(body: Pick<ExportStreamRequest, 'reviewItems' | 'assemblyResult'>): string {
+function collectRequestIdentityText(exportRequest: ExportRequest | undefined): string {
+    const config = (exportRequest?.config ?? {}) as unknown as Record<string, unknown>;
+    return [
+        config.pastedContent,
+        config.rawDocumentText,
+        config.documentText,
+        config.sourceText,
+    ].filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+        .join('\n');
+}
+
+function collectExportIdentityText(body: Pick<ExportStreamRequest, 'reviewItems' | 'assemblyResult' | 'exportRequest'>): string {
     return [
         collectReviewIdentityText(body.reviewItems),
         collectAssemblyIdentityText(body.assemblyResult),
+        collectRequestIdentityText(body.exportRequest),
     ].filter(Boolean).join('\n');
 }
 
@@ -537,6 +549,20 @@ export async function POST(request: NextRequest) {
                     };
 
                     // ── Final authority: detect court document issues ──
+                    if (isSapcrIdentity(courtIdentity) && courtIdentity.childrenNames.length === 0) {
+                        const requestConfig = (body.exportRequest?.config ?? {}) as unknown as Record<string, unknown>;
+                        console.warn('[ExportStream] SAPCR identity unresolved before issue detection', {
+                            reviewItemsCount: body.reviewItems?.length ?? 0,
+                            assemblyNodesCount: body.assemblyResult?.assembly?.classifiedNodes?.length ?? 0,
+                            identityTextLength: allReviewText.length,
+                            hasInterestPhrase: /IN\s+THE\s+INTEREST\s+OF/i.test(allReviewText),
+                            hasConfigPastedContent: typeof requestConfig.pastedContent === 'string' && requestConfig.pastedContent.trim() !== '',
+                            caseTitleFormat: courtIdentity.caseTitleFormat,
+                            caseType: courtIdentity.caseType,
+                            documentKind: courtIdentity.documentKind,
+                        });
+                    }
+
                     const sectionTexts = draftedSections.flatMap(s => [
                         s.heading ?? '',
                         s.body ?? '',
@@ -845,6 +871,16 @@ export async function POST(request: NextRequest) {
                         return trimmed !== '' && !/^(IN THE INTEREST OF|A CHILD|CHILDREN)$/i.test(trimmed);
                     });
                     if (hasSapcrCaption && childNameLines.length === 0) {
+                        const identityText = collectExportIdentityText(body);
+                        console.warn('[ExportStream] SAPCR caption built without child line', {
+                            reviewItemsCount: body.reviewItems?.length ?? 0,
+                            assemblyNodesCount: body.assemblyResult?.assembly?.classifiedNodes?.length ?? 0,
+                            identityTextLength: identityText.length,
+                            hasInterestPhrase: /IN\s+THE\s+INTEREST\s+OF/i.test(identityText),
+                            recoveredFromIdentityText: Boolean(extractSapcrChildNameRobust(identityText)),
+                            courtIdentityChildrenCount: courtIdentity.childrenNames?.length ?? 0,
+                            captionLeftLineCount: caption.leftLines.length,
+                        });
                         const courtIssues = detectCourtDocumentIssues(
                             { ...courtIdentity, childrenNames: [] },
                             { documentType: courtIdentity.documentKind, exportPath },

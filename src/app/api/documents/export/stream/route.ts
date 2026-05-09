@@ -846,7 +846,7 @@ export async function POST(request: NextRequest) {
                     }
                 }
 
-                const captionResult = exportPath === 'court_document'
+                let captionResult = exportPath === 'court_document'
                     ? buildExportCaption({
                         style: exportProfile.court.captionStyle,
                         courtName: courtIdentity?.courtName ?? undefined,
@@ -861,7 +861,7 @@ export async function POST(request: NextRequest) {
                         caseTitleFormat: courtIdentity?.caseTitleFormat ?? undefined,
                     })
                     : null;
-                const caption = captionResult?.caption ?? null;
+                let caption = captionResult?.caption ?? null;
 
                 if (courtIdentity && exportPath === 'court_document' && caption) {
                     const leftText = caption.leftLines.join(' ');
@@ -872,12 +872,33 @@ export async function POST(request: NextRequest) {
                     });
                     if (hasSapcrCaption && childNameLines.length === 0) {
                         const identityText = collectExportIdentityText(body);
+                        const recoveredChildName = extractSapcrChildNameRobust(identityText);
+                        if (recoveredChildName) {
+                            courtIdentity = {
+                                ...courtIdentity,
+                                childrenNames: cleanChildrenNames([recoveredChildName]),
+                            };
+                            captionResult = buildExportCaption({
+                                style: exportProfile.court.captionStyle,
+                                courtName: courtIdentity.courtName ?? undefined,
+                                judicialDistrict: courtIdentity.judicialDistrict ?? undefined,
+                                causeNumber: resolvedCauseNumber,
+                                captionPetitionerName: courtIdentity.captionPetitionerName ?? petitionerName,
+                                captionRespondentName: courtIdentity.captionRespondentName ?? respondentName,
+                                childrenNames: courtIdentity.childrenNames,
+                                state: resolvedState,
+                                county: resolvedCounty,
+                                caseType: courtIdentity.documentKind ?? caseType,
+                                caseTitleFormat: courtIdentity.caseTitleFormat ?? undefined,
+                            });
+                            caption = captionResult.caption;
+                        } else {
                         console.warn('[ExportStream] SAPCR caption built without child line', {
                             reviewItemsCount: body.reviewItems?.length ?? 0,
                             assemblyNodesCount: body.assemblyResult?.assembly?.classifiedNodes?.length ?? 0,
                             identityTextLength: identityText.length,
                             hasInterestPhrase: /IN\s+THE\s+INTEREST\s+OF/i.test(identityText),
-                            recoveredFromIdentityText: Boolean(extractSapcrChildNameRobust(identityText)),
+                            recoveredFromIdentityText: false,
                             courtIdentityChildrenCount: courtIdentity.childrenNames?.length ?? 0,
                             captionLeftLineCount: caption.leftLines.length,
                         });
@@ -897,6 +918,7 @@ export async function POST(request: NextRequest) {
                         const courtErr = new Error('SAPCR caption needs the child name before export can continue.');
                         (courtErr as Error & { code?: string }).code = 'COURT_DOCUMENT_NEEDS_CLARIFICATION';
                         throw courtErr;
+                        }
                     }
                 }
 

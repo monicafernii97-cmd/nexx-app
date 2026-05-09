@@ -114,6 +114,25 @@ function collectReviewIdentityText(reviewItems: MappingReviewItem[] | undefined)
     ).join('\n');
 }
 
+function collectAssemblyIdentityText(
+    assemblyResult: OrchestratorAssemblyResult | undefined,
+): string {
+    return (assemblyResult?.assembly?.classifiedNodes ?? []).map((node) =>
+        [
+            node.rawText,
+            node.cleanedText,
+            node.transformedText?.courtSafe,
+        ].filter(Boolean).join('\n'),
+    ).join('\n');
+}
+
+function collectExportIdentityText(body: Pick<ExportStreamRequest, 'reviewItems' | 'assemblyResult'>): string {
+    return [
+        collectReviewIdentityText(body.reviewItems),
+        collectAssemblyIdentityText(body.assemblyResult),
+    ].filter(Boolean).join('\n');
+}
+
 // ---------------------------------------------------------------------------
 // Route Handler
 // ---------------------------------------------------------------------------
@@ -488,7 +507,7 @@ export async function POST(request: NextRequest) {
 
                     // Extract metadata from every review text variant so identity data
                     // survives caption cleanup in edited/transformed text.
-                    const allReviewText = collectReviewIdentityText(body.reviewItems);
+                    const allReviewText = collectExportIdentityText(body);
 
                     const extracted = extractCourtMetadataFromText(allReviewText);
 
@@ -760,8 +779,8 @@ export async function POST(request: NextRequest) {
                     const isSAPCR = isSapcrIdentity(courtIdentity);
 
                     if (isSAPCR && (!courtIdentity.childrenNames || courtIdentity.childrenNames.length === 0)) {
-                        // Last-resort: scan ALL review item text for "IN THE INTEREST OF {name}"
-                        const fullReviewText = collectReviewIdentityText(body.reviewItems);
+                        // Last-resort: scan review items and the original pasted source.
+                        const fullReviewText = collectExportIdentityText(body);
 
                         const recoveredChildName = extractSapcrChildNameRobust(fullReviewText);
 

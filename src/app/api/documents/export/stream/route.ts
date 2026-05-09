@@ -104,6 +104,16 @@ function isSapcrIdentity(identity: CourtIdentity): boolean {
 // Replaced by resolveExportJurisdictionProfile + toExportFormattingRules
 // from the canonical export pipeline.
 
+function collectReviewIdentityText(reviewItems: MappingReviewItem[] | undefined): string {
+    return (reviewItems ?? []).map((item) =>
+        [
+            item.userOverride?.editedText,
+            item.transformedCourtSafeText,
+            item.originalText,
+        ].filter(Boolean).join('\n'),
+    ).join('\n');
+}
+
 // ---------------------------------------------------------------------------
 // Route Handler
 // ---------------------------------------------------------------------------
@@ -476,11 +486,9 @@ export async function POST(request: NextRequest) {
                         ? String((exportConfig as unknown as Record<string, unknown>).documentType)
                         : undefined;
 
-                    // Extract metadata from review item text (mirrors client-side extraction).
-                    // Prefer edited/transformed text so post-edit identity data isn't stale.
-                    const allReviewText = (body.reviewItems ?? []).map(i =>
-                        i.userOverride?.editedText ?? i.transformedCourtSafeText ?? i.originalText,
-                    ).join('\n');
+                    // Extract metadata from every review text variant so identity data
+                    // survives caption cleanup in edited/transformed text.
+                    const allReviewText = collectReviewIdentityText(body.reviewItems);
 
                     const extracted = extractCourtMetadataFromText(allReviewText);
 
@@ -753,10 +761,7 @@ export async function POST(request: NextRequest) {
 
                     if (isSAPCR && (!courtIdentity.childrenNames || courtIdentity.childrenNames.length === 0)) {
                         // Last-resort: scan ALL review item text for "IN THE INTEREST OF {name}"
-                        const fullReviewText = (body.reviewItems ?? []).map(i =>
-                            [i.userOverride?.editedText, i.transformedCourtSafeText, i.originalText]
-                                .filter(Boolean).join('\n'),
-                        ).join('\n');
+                        const fullReviewText = collectReviewIdentityText(body.reviewItems);
 
                         const recoveredChildName = extractSapcrChildNameRobust(fullReviewText);
 

@@ -1007,6 +1007,7 @@ export async function POST(request: NextRequest) {
                     resolvedTitle: courtIdentity?.resolvedTitle,
                     metadata: { caseType, exportPath, runId: body.runId },
                     courtIdentity,
+                    identitySourceText: collectExportIdentityText(body),
                     isInitiatingFiling: 'isInitiatingFiling' in exportConfig
                         ? Boolean(exportConfig.isInitiatingFiling)
                         : false,

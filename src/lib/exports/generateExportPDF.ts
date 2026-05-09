@@ -58,6 +58,7 @@ import { auditCourtHTML } from './auditRenderedCourtDocument';
 import type { CourtFormattingRules } from '@/lib/legal/types';
 import type { CourtDocumentContext } from './canonicalExportToLegalDocument';
 import { assertCourtDocumentFinalizable } from '@/lib/legal/engine/assertCourtDocumentFinalizable';
+import { extractSapcrChildNameRobust } from './extractCourtMetadataFromText';
 
 // ═══════════════════════════════════════════════════════════════
 // Public Types
@@ -90,6 +91,8 @@ export type GenerateExportPDFInput = {
   };
   /** Resolved court identity — required for finalization guard on court documents. */
   courtIdentity?: import('@/lib/exports/resolveCourtIdentity').CourtIdentity;
+  /** Source text used for final identity recovery in court-document exports. */
+  identitySourceText?: string;
   /** Set to true for original petitions where no cause number exists yet. */
   isInitiatingFiling?: boolean;
 };
@@ -157,7 +160,31 @@ export async function generateExportPDF(
       // ── COURT DOCUMENTS: Route through Quick Generate renderer ──
       // 🔒 Hard integrity enforcement: fails = export blocked.
 
-      const legalDoc = canonicalExportToLegalDocument(document, input.courtContext);
+      let legalDoc = canonicalExportToLegalDocument(document, input.courtContext);
+      let courtIdentityForFinalization = input.courtIdentity;
+      const recoveredSapcrChildName = recoverSapcrChildNameForIntegrity(input, legalDoc);
+      if (recoveredSapcrChildName && legalDoc.caption) {
+        legalDoc = {
+          ...legalDoc,
+          caption: {
+            ...legalDoc.caption,
+            leftLines: [
+              'IN THE INTEREST OF',
+              recoveredSapcrChildName.toUpperCase(),
+              'A CHILD',
+            ],
+          },
+        };
+        if (courtIdentityForFinalization) {
+          courtIdentityForFinalization = {
+            ...courtIdentityForFinalization,
+            childrenNames: [recoveredSapcrChildName],
+            children: courtIdentityForFinalization.children?.length
+              ? courtIdentityForFinalization.children
+              : [{ name: recoveredSapcrChildName, age: 0 }],
+          };
+        }
+      }
 
       // Hard integrity check — throws on any violation.
       // No advisory mode — court documents must be structurally correct.
@@ -207,7 +234,7 @@ export async function generateExportPDF(
       // Enforces the Legal Document Finalization Contract.
       // Runs AFTER HTML rendering, BEFORE PDF generation.
       // If the guard fails, NO PDF is generated.
-      if (!input.courtIdentity) {
+      if (!courtIdentityForFinalization) {
         throw new ExportDocumentGenerationError({
           code: 'EXPORT_DOCUMENT_NOT_FINALIZABLE',
           message: 'Document cannot be finalized: resolved court identity is required for court-document export.',
@@ -217,10 +244,10 @@ export async function generateExportPDF(
 
       const guardResult = assertCourtDocumentFinalizable(
         html,
-        input.courtIdentity,
+        courtIdentityForFinalization,
         {
           exportPath: document.path,
-          caseType: input.courtIdentity.caseType || input.metadata.caseType,
+          caseType: courtIdentityForFinalization.caseType || input.metadata.caseType,
           isInitiatingFiling: input.isInitiatingFiling,
         },
       );
@@ -309,6 +336,55 @@ export async function generateExportPDF(
 // ═══════════════════════════════════════════════════════════════
 // Stage Helpers
 // ═══════════════════════════════════════════════════════════════
+
+function recoverSapcrChildNameForIntegrity(
+  input: GenerateExportPDFInput,
+  legalDoc: ReturnType<typeof canonicalExportToLegalDocument>,
+): string | undefined {
+  const caption = legalDoc.caption;
+  if (!caption) return undefined;
+
+  const leftText = caption.leftLines.join(' ');
+  if (!/IN THE INTEREST OF/i.test(leftText)) return undefined;
+
+  const childNameLines = caption.leftLines.filter((line) => {
+    const trimmed = line.trim();
+    return trimmed !== '' && !/^(IN THE INTEREST OF|A CHILD|CHILDREN)$/i.test(trimmed);
+  });
+  if (childNameLines.length > 0) return undefined;
+
+  const identityChildName = input.courtIdentity?.childrenNames?.find((name) => name.trim());
+  if (identityChildName) return identityChildName.trim();
+
+  const profileChildName = input.courtIdentity?.children?.find((child) => child.name.trim())?.name;
+  if (profileChildName) return profileChildName.trim();
+
+  const draftedText = input.adaptParams.draftedSections.map((section) =>
+    [
+      section.heading,
+      section.body,
+      ...(section.numberedItems ?? []),
+    ].filter(Boolean).join('\n'),
+  ).join('\n');
+
+  const captionText = input.adaptParams.caption
+    ? [
+      input.adaptParams.caption.causeLine,
+      ...input.adaptParams.caption.leftLines,
+      ...input.adaptParams.caption.centerLines,
+      ...input.adaptParams.caption.rightLines,
+    ].filter(Boolean).join('\n')
+    : '';
+
+  const recoveryText = [
+    input.identitySourceText,
+    legalDoc.rawText,
+    captionText,
+    draftedText,
+  ].filter(Boolean).join('\n');
+
+  return extractSapcrChildNameRobust(recoveryText);
+}
 
 /** Stage 1: Resolve export jurisdiction profile from settings. */
 function resolveProfileStage(settings: ExportSettingsInput) {

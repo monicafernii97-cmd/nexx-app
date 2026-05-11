@@ -583,6 +583,7 @@ export async function POST(request: NextRequest) {
                         });
                     }
 
+                    const fullIssueText = collectExportIdentityText(body);
                     const sectionTexts = draftedSections.flatMap(s => [
                         s.heading ?? '',
                         s.body ?? '',
@@ -591,7 +592,7 @@ export async function POST(request: NextRequest) {
                     const courtIssues = detectCourtDocumentIssues(
                         courtIdentity,
                         { documentType: courtIdentity.documentKind, exportPath },
-                        sectionTexts,
+                        [fullIssueText, ...sectionTexts],
                     );
 
                     const blockers = courtIssues.filter(i => i.severity === 'blocker');

@@ -148,17 +148,17 @@ function buildTexasCaption(input: CaptionBuildInput, forceSAPCR: boolean): Expor
   const cause = input.causeNumber || '_______________';
   const causeLabel = input.causeLabel ?? 'CAUSE NO.';
 
-  // Build right lines: court + judicial district as separate lines
-  const rightLines: string[] = [`IN THE ${courtLine.toUpperCase()}`];
-  if (input.judicialDistrict) {
-    rightLines.push(input.judicialDistrict.toUpperCase());
-  }
-  rightLines.push(`${county.toUpperCase()} COUNTY, TEXAS`);
-
   // SAPCR: IN THE INTEREST OF {children}
   if (forceSAPCR || input.childrenNames?.length) {
-    const childLines = (input.childrenNames ?? []).map((name) => name.toUpperCase());
+    const childLines = (input.childrenNames ?? []).flatMap(formatTexasSapcrChildName);
     const childLabel = (input.childrenNames?.length ?? 0) === 1 ? 'A CHILD' : 'CHILDREN';
+    const rightLines = [
+      `IN THE ${courtLine.toUpperCase()}`,
+      '',
+      ...(input.judicialDistrict ? [input.judicialDistrict.toUpperCase(), ''] : []),
+      `${county.toUpperCase()} COUNTY, TEXAS`,
+    ];
+    const rowCount = Math.max(childLines.length + 2, rightLines.length);
     return {
       style: 'texas_pleading',
       causeLine: `${causeLabel} ${cause}`,
@@ -167,10 +167,17 @@ function buildTexasCaption(input: CaptionBuildInput, forceSAPCR: boolean): Expor
         ...childLines,
         childLabel,
       ],
-      centerLines: ['§', '§', '§', '§'],
+      centerLines: Array(rowCount).fill('§'),
       rightLines,
     };
   }
+
+  // Build right lines: court + judicial district as separate lines
+  const rightLines: string[] = [`IN THE ${courtLine.toUpperCase()}`];
+  if (input.judicialDistrict) {
+    rightLines.push(input.judicialDistrict.toUpperCase());
+  }
+  rightLines.push(`${county.toUpperCase()} COUNTY, TEXAS`);
 
   // General Texas: Petitioner v. Respondent
   return {
@@ -186,6 +193,26 @@ function buildTexasCaption(input: CaptionBuildInput, forceSAPCR: boolean): Expor
     centerLines: ['§', '§', '§'],
     rightLines,
   };
+}
+
+function formatTexasSapcrChildName(name: string): string[] {
+  const normalized = name.trim().replace(/\s+/g, ' ').toUpperCase();
+  if (!normalized) return [];
+  if (normalized.length <= 26) return [normalized];
+
+  const lines: string[] = [];
+  let current = '';
+  for (const word of normalized.split(' ')) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= 26 || !current) {
+      current = candidate;
+      continue;
+    }
+    lines.push(current);
+    current = word;
+  }
+  if (current) lines.push(current);
+  return lines;
 }
 
 function buildFederalCaption(input: CaptionBuildInput): ExportCaption {

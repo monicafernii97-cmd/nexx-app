@@ -147,20 +147,19 @@ describe('SAPCR Caption Handoff', () => {
     expect(caption.style).toBe('texas_pleading');
     expect(caption.leftLines).toContain('IN THE INTEREST OF');
 
-    // Must include the actual child name (uppercased)
-    const childNameLine = caption.leftLines.find(l =>
-      /AMELIA SOFIA FERNANDEZ PUGLIESE/i.test(l),
-    );
-    expect(childNameLine).toBeDefined();
+    // Must include the actual child name (uppercased), allowing Texas
+    // pleading layout to wrap long child names across caption rows.
+    const joinedCaptionName = caption.leftLines.join(' ');
+    expect(joinedCaptionName).toMatch(/AMELIA SOFIA FERNANDEZ PUGLIESE/i);
+    expect(caption.leftLines).toContain('AMELIA SOFIA FERNANDEZ');
+    expect(caption.leftLines).toContain('PUGLIESE');
 
     // Must include child label
     expect(caption.leftLines).toContain('A CHILD');
 
     // Caption structure: IN THE INTEREST OF, then child name, then label
     const interestIdx = caption.leftLines.indexOf('IN THE INTEREST OF');
-    const childIdx = caption.leftLines.findIndex(l =>
-      /AMELIA SOFIA FERNANDEZ PUGLIESE/i.test(l),
-    );
+    const childIdx = caption.leftLines.indexOf('AMELIA SOFIA FERNANDEZ');
     const labelIdx = caption.leftLines.indexOf('A CHILD');
     expect(interestIdx).toBeLessThan(childIdx);
     expect(childIdx).toBeLessThan(labelIdx);

@@ -96,10 +96,10 @@ export function toExportFormattingRules(
     causeNumberPosition: 'top-right',
 
     // Page Structure
-    pageNumbering: true,
-    pageNumberPosition: 'bottom-center',
-    pageNumberFormat: 'simple',
-    footerEnabled: true,
+    pageNumbering: profile.pageNumbering?.enabled ?? false,
+    pageNumberPosition: profile.pageNumbering?.position ?? 'bottom-center',
+    pageNumberFormat: profile.pageNumbering?.format ?? 'simple',
+    footerEnabled: profile.pageNumbering?.enabled ?? false,
     footerFontSize: 10,
 
     // Paragraph & Heading

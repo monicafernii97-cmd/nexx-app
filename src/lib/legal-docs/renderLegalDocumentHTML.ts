@@ -51,7 +51,7 @@ export function renderLegalDocumentHTML(
 <style>
   @page {
     size: ${pageSize};
-    margin: 0;
+    margin: ${m.top}pt ${m.right}pt ${m.bottom}pt ${m.left}pt;
   }
 
   html, body {
@@ -69,8 +69,8 @@ export function renderLegalDocumentHTML(
   }
 
   .document {
-    width: 6.333in;
-    margin: 0 auto;
+    width: 100%;
+    margin: 0;
   }
 
   /* ── Caption ── */
@@ -140,13 +140,17 @@ export function renderLegalDocumentHTML(
   .body-paragraph {
     text-align: ${profile.typography.bodyAlign};
     text-indent: 0;
-    margin: 0 0 6pt;
+    margin: 0 0 12pt;
+    orphans: 3;
+    widows: 3;
   }
 
   .body-paragraph-intro {
     text-align: ${profile.typography.bodyAlign};
     text-indent: 0.5in;
-    margin: 0 0 6pt;
+    margin: 0 0 12pt;
+    orphans: 3;
+    widows: 3;
   }
 
   .salutation {
@@ -159,12 +163,16 @@ export function renderLegalDocumentHTML(
     ${profile.typography.uppercaseHeadings ? 'text-transform: uppercase;' : ''}
     text-align: left;
     margin: 12pt 0 6pt;
+    page-break-after: avoid;
+    break-after: avoid;
   }
 
   .subheading-inline {
     font-weight: 700;
     ${profile.typography.uppercaseHeadings ? 'text-transform: uppercase;' : ''}
     margin: 14pt 0 6pt;
+    page-break-after: avoid;
+    break-after: avoid;
   }
 
   .numbered-list {
@@ -174,17 +182,21 @@ export function renderLegalDocumentHTML(
   }
 
   .numbered-list li {
-    margin: 0 0 6pt;
+    margin: 0 0 12pt;
     padding-left: 0.25in;
     text-indent: -0.25in;
     text-align: ${profile.typography.bodyAlign};
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .numbered-paragraph {
     display: flex;
     align-items: flex-start;
-    margin: 0 0 6pt;
+    margin: 0 0 12pt;
     line-height: ${profile.typography.lineHeightPt}pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .numbered-paragraph-number {
@@ -205,10 +217,12 @@ export function renderLegalDocumentHTML(
   }
 
   .bullet-list li {
-    margin: 0 0 6pt;
+    margin: 0 0 12pt;
     padding-left: 18pt;
     text-indent: -18pt;
     text-align: ${profile.typography.bodyAlign};
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .bullet-list li::before {
@@ -222,6 +236,8 @@ export function renderLegalDocumentHTML(
     ${profile.typography.uppercaseHeadings ? 'text-transform: uppercase;' : ''}
     text-align: left;
     margin: 16pt 0 6pt;
+    page-break-after: avoid;
+    break-after: avoid;
   }
 
   /* ── Signature ── */
@@ -259,10 +275,12 @@ export function renderLegalDocumentHTML(
   }
 
   .lettered-list li {
-    margin: 0 0 6pt;
+    margin: 0 0 12pt;
     padding-left: 18pt;
     text-indent: -18pt;
     text-align: ${profile.typography.bodyAlign};
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   /* ── Verification ── */
@@ -274,7 +292,7 @@ export function renderLegalDocumentHTML(
   }
 </style>
 </head>
-<body>
+<body data-renderer="legal-document">
   <div class="document">
     ${renderCaption(doc, profile)}
     ${renderTitle(doc)}
@@ -482,7 +500,7 @@ function renderCertificate(doc: LegalDocument, profile: JurisdictionProfile): st
   if (!doc.certificate) return '';
 
   return `
-    <div class="certificate-of-service" style="page-break-before: always; break-before: page;">
+    <div class="certificate-of-service">
       <div class="certificate-heading">${esc(doc.certificate.heading)}</div>
       ${doc.certificate.bodyLines.map((line) => `<p class="body-paragraph" style="text-indent:0">${esc(line)}</p>`).join('')}
       <div class="signature-block">

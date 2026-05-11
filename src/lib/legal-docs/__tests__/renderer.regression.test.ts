@@ -45,6 +45,16 @@ describe('renderer regression — multi-state pleadings', () => {
     expect(html).toContain('caption-right');
   });
 
+  it('renders Texas page margins in the CSS page box', () => {
+    const { html } = renderFixture(texasPleadingFixture, {
+      state: 'Texas',
+      county: 'Fort Bend',
+    });
+
+    expect(html).toContain('data-renderer="legal-document"');
+    expect(html).toContain('margin: 80pt 78pt 72pt 78pt;');
+  });
+
   it('renders Texas title and subtitle in output', () => {
     const { html } = renderFixture(texasPleadingFixture, {
       state: 'Texas',

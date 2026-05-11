@@ -36,6 +36,32 @@ describe('buildExportCaption', () => {
     expect(caption.leftLines).toContain('A CHILD');
   });
 
+  it('wraps long Texas SAPCR child names and staggers right caption rows', () => {
+    const { caption } = buildExportCaption({
+      style: 'texas_pleading',
+      causeNumber: '20-DCV-271717',
+      courtName: 'District Court',
+      judicialDistrict: '387th Judicial District',
+      childrenNames: ['Amelia Sofia Fernandez Pugliese'],
+      county: 'Fort Bend',
+    });
+
+    expect(caption.leftLines).toEqual([
+      'IN THE INTEREST OF',
+      'AMELIA SOFIA FERNANDEZ',
+      'PUGLIESE',
+      'A CHILD',
+    ]);
+    expect(caption.rightLines).toEqual([
+      'IN THE DISTRICT COURT',
+      '',
+      '387TH JUDICIAL DISTRICT',
+      '',
+      'FORT BEND COUNTY, TEXAS',
+    ]);
+    expect(caption.centerLines).toEqual(['§', '§', '§', '§', '§']);
+  });
+
   it('builds Texas general caption without children', () => {
     const { caption } = buildExportCaption({
       style: 'texas_pleading',

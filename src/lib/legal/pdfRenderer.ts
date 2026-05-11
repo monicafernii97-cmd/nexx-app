@@ -112,22 +112,26 @@ export async function renderHTMLToPDF(
       }
     }
 
+    const usesCssPageBox = html.includes('data-renderer="legal-document"');
+
     // Generate PDF with court-rules-derived settings
     const pdfBuffer = await page.pdf({
       format: undefined, // Use explicit width/height instead
       width: `${rules.paperWidth}in`,
       height: `${rules.paperHeight}in`,
       margin: {
-        top: `${rules.marginTop}in`,
+        top: usesCssPageBox ? '0in' : `${rules.marginTop}in`,
         // Extra bottom margin when page numbers are enabled to accommodate footer
-        bottom: showPageNumbers
+        bottom: usesCssPageBox
+          ? '0in'
+          : showPageNumbers
           ? `${Math.max(rules.marginBottom, 1.0)}in`
           : `${rules.marginBottom}in`,
-        left: `${rules.marginLeft}in`,
-        right: `${rules.marginRight}in`,
+        left: usesCssPageBox ? '0in' : `${rules.marginLeft}in`,
+        right: usesCssPageBox ? '0in' : `${rules.marginRight}in`,
       },
       printBackground: true,
-      preferCSSPageSize: false, // Use explicit dimensions from rules instead of CSS @page
+      preferCSSPageSize: usesCssPageBox,
       displayHeaderFooter: showPageNumbers,
       headerTemplate: '<span></span>', // Empty header
       footerTemplate,

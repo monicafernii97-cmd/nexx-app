@@ -49,6 +49,8 @@ export function renderLegalDocumentHTML(
 <meta charset="UTF-8" />
 <title>${esc(doc.title.main)}</title>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Tinos:wght@400;700&display=swap');
+
   @page {
     size: ${pageSize};
     margin: ${m.top}pt ${m.right}pt ${m.bottom}pt ${m.left}pt;
@@ -57,7 +59,7 @@ export function renderLegalDocumentHTML(
   html, body {
     margin: 0;
     padding: 0;
-    font-family: ${profile.typography.fontFamily};
+    font-family: ${legalFontFamily(profile.typography.fontFamily)};
     font-size: ${profile.typography.fontSizePt}pt;
     line-height: ${profile.typography.lineHeightPt}pt;
     color: #000;
@@ -162,17 +164,21 @@ export function renderLegalDocumentHTML(
     ${profile.typography.headingBold ? 'font-weight: 700;' : ''}
     ${profile.typography.uppercaseHeadings ? 'text-transform: uppercase;' : ''}
     text-align: left;
-    margin: 12pt 0 6pt;
+    margin: 18pt 0 8pt;
     page-break-after: avoid;
     break-after: avoid;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .subheading-inline {
     font-weight: 700;
     ${profile.typography.uppercaseHeadings ? 'text-transform: uppercase;' : ''}
-    margin: 14pt 0 6pt;
+    margin: 18pt 0 8pt;
     page-break-after: avoid;
     break-after: avoid;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .numbered-list {
@@ -197,6 +203,18 @@ export function renderLegalDocumentHTML(
     line-height: ${profile.typography.lineHeightPt}pt;
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+
+  .section-heading + .body-paragraph,
+  .section-heading + .numbered-paragraph,
+  .section-heading + .bullet-list,
+  .subheading-inline + .body-paragraph,
+  .subheading-inline + .numbered-paragraph,
+  .subheading-inline + .bullet-list,
+  .prayer-heading + .body-paragraph,
+  .certificate-heading + .body-paragraph {
+    page-break-before: avoid;
+    break-before: avoid;
   }
 
   .numbered-paragraph-number {
@@ -571,6 +589,15 @@ function esc(input: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function legalFontFamily(profileFontFamily: string): string {
+  const fallback = '"Times New Roman", Tinos, Times, serif';
+  const trimmed = profileFontFamily.trim();
+  if (!trimmed) return fallback;
+  if (/\bTinos\b/.test(trimmed)) return trimmed;
+  if (/Times New Roman/i.test(trimmed)) return fallback;
+  return `${trimmed}, Tinos, Times, serif`;
 }
 
 /**

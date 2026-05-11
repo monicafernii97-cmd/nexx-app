@@ -318,8 +318,8 @@ describe('toCourtFormattingRules adapter', () => {
     expect(rules.fontSize).toBe(11);
     expect(rules.lineSpacing).toBeCloseTo(18 / 11);
     expect(rules.captionStyle).toBe('section-symbol');
-    expect(rules.captionColumnWidths.left).toBe(3.125);
-    expect(rules.captionColumnWidths.center).toBe(0.083);
+    expect(rules.captionColumnWidths.left).toBe(2.95);
+    expect(rules.captionColumnWidths.center).toBe(0.25);
     expect(rules.bodyAlignment).toBe('justify');
   });
 

@@ -56,6 +56,7 @@ describe('renderer regression — multi-state pleadings', () => {
     expect(html).toContain('font-size: 11pt;');
     expect(html).toContain('family=Tinos');
     expect(html).toContain('font-family: "Times New Roman", Tinos, Times, serif;');
+    expect(html).toContain('width: 6.15in;');
   });
 
   it('renders Texas title and subtitle in output', () => {
@@ -65,7 +66,8 @@ describe('renderer regression — multi-state pleadings', () => {
     });
 
     expect(html).toContain('MOTION FOR TEMPORARY ORDERS');
-    expect(html).toContain('Pending Final Hearing');
+    expect(html).toContain('(Pending Final Hearing');
+    expect(html).toContain('class="title-subtitle"');
   });
 
   it('renders PRAYER heading when prayer block exists', () => {

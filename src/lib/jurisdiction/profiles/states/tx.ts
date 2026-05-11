@@ -37,9 +37,9 @@ export const TX_DEFAULT_PROFILE: JurisdictionProfile = {
     style: 'texas_pleading',
     causeLabel: 'CAUSE NO.',
     useThreeColumnTable: true,
-    leftWidthIn: 3.125,
-    centerWidthIn: 0.083,
-    rightWidthIn: 3.125,
+    leftWidthIn: 2.95,
+    centerWidthIn: 0.25,
+    rightWidthIn: 2.95,
     centerSymbol: '§',
   },
 

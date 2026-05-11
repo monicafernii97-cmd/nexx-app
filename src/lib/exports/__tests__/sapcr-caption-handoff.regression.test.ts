@@ -152,7 +152,7 @@ describe('SAPCR Caption Handoff', () => {
     const joinedCaptionName = caption.leftLines.join(' ');
     expect(joinedCaptionName).toMatch(/AMELIA SOFIA FERNANDEZ PUGLIESE/i);
     expect(caption.leftLines).toContain('AMELIA SOFIA FERNANDEZ');
-    expect(caption.leftLines).toContain('PUGLIESE');
+    expect(caption.leftLines).toContain('PUGLIESE,');
 
     // Must include child label
     expect(caption.leftLines).toContain('A CHILD');

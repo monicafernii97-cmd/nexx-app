@@ -150,8 +150,12 @@ function buildTexasCaption(input: CaptionBuildInput, forceSAPCR: boolean): Expor
 
   // SAPCR: IN THE INTEREST OF {children}
   if (forceSAPCR || input.childrenNames?.length) {
-    const childLines = (input.childrenNames ?? []).flatMap(formatTexasSapcrChildName);
+    const childNames = input.childrenNames ?? [];
+    const childLines = childNames.flatMap(formatTexasSapcrChildName);
     const childLabel = (input.childrenNames?.length ?? 0) === 1 ? 'A CHILD' : 'CHILDREN';
+    if (childNames.length === 1 && childLines.length > 0) {
+      childLines[childLines.length - 1] = ensureTrailingComma(childLines[childLines.length - 1]);
+    }
     const rightLines = [
       `IN THE ${courtLine.toUpperCase()}`,
       '',
@@ -213,6 +217,13 @@ function formatTexasSapcrChildName(name: string): string[] {
   }
   if (current) lines.push(current);
   return lines;
+}
+
+/**
+ * Ensures single-child SAPCR caption names precede "A CHILD" with a comma.
+ */
+function ensureTrailingComma(line: string): string {
+  return /,\s*$/.test(line) ? line : `${line},`;
 }
 
 function buildFederalCaption(input: CaptionBuildInput): ExportCaption {

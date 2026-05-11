@@ -34,6 +34,7 @@ describe('buildExportCaption', () => {
     });
 
     expect(caption.leftLines).toContain('A CHILD');
+    expect(caption.leftLines).toContain('JOHN SMITH JR.,');
   });
 
   it('wraps long Texas SAPCR child names and staggers right caption rows', () => {
@@ -49,7 +50,7 @@ describe('buildExportCaption', () => {
     expect(caption.leftLines).toEqual([
       'IN THE INTEREST OF',
       'AMELIA SOFIA FERNANDEZ',
-      'PUGLIESE',
+      'PUGLIESE,',
       'A CHILD',
     ]);
     expect(caption.rightLines).toEqual([

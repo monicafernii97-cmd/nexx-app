@@ -86,14 +86,15 @@ export function renderLegalDocumentHTML(
     text-align: center;
     font-weight: 700;
     ${profile.typography.uppercaseCaption ? 'text-transform: uppercase;' : ''}
-    margin-bottom: 12pt;
+    margin-bottom: 20pt;
   }
 
   .caption-table {
-    width: 100%;
+    width: ${(profile.caption.leftWidthIn ?? 3.125) + (profile.caption.centerWidthIn ?? 0.083) + (profile.caption.rightWidthIn ?? 3.125)}in;
+    max-width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
-    margin-bottom: 14pt;
+    margin: 0 auto 14pt;
   }
 
   .caption-left,
@@ -140,7 +141,8 @@ export function renderLegalDocumentHTML(
 
   .title-subtitle {
     text-align: center;
-    font-weight: 700;
+    font-weight: 600;
+    font-size: ${Math.max(9, profile.typography.fontSizePt - 1)}pt;
     margin: 0 0 8pt;
   }
 
@@ -398,13 +400,22 @@ function renderTitle(doc: LegalDocument): string {
     <div class="rule"></div>
     <div class="title-main">${esc(doc.title.main)}</div>
     ${additionalLines}
-    ${doc.title.subtitle ? `<div class="title-subtitle">${esc(doc.title.subtitle)}</div>` : ''}
+    ${doc.title.subtitle ? `<div class="title-subtitle">${esc(formatTitleSubtitle(doc.title.subtitle))}</div>` : ''}
     <div class="rule"></div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // Intro Blocks
 // ═══════════════════════════════════════════════════════════════
+
+/**
+ * Normalizes title subtitles to the parenthetical style expected in pleadings.
+ */
+function formatTitleSubtitle(subtitle: string): string {
+  const trimmed = subtitle.trim();
+  if (!trimmed) return '';
+  return /^\(.+\)$/.test(trimmed) ? trimmed : `(${trimmed})`;
+}
 
 function renderIntroBlocks(doc: LegalDocument): string {
   if (!doc.introBlocks.length) return '';

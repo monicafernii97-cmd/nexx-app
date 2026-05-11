@@ -121,6 +121,29 @@ describe('adaptDraftedToCanonicalExport', () => {
     }
   });
 
+  it('preserves court bullet items separately from body paragraphs', () => {
+    const params: AdaptToCanonicalParams = {
+      path: 'court_document',
+      title: 'TEST',
+      draftedSections: [
+        {
+          sectionId: 'best-interest',
+          heading: 'Best Interest',
+          body: 'The requested relief protects the child.',
+          bulletItems: ['Preserves stability', 'Reduces conflict'],
+        },
+      ],
+    };
+
+    const doc = adaptDraftedToCanonicalExport(params);
+    const section = doc.sections[0];
+    expect(section.kind).toBe('court_section');
+    if (section.kind === 'court_section') {
+      expect(section.paragraphs).toEqual(['The requested relief protects the child.']);
+      expect(section.bulletItems).toEqual(['Preserves stability', 'Reduces conflict']);
+    }
+  });
+
   it('handles timeline_summary and incident_report paths', () => {
     for (const path of ['timeline_summary', 'incident_report'] as const) {
       const params: AdaptToCanonicalParams = {

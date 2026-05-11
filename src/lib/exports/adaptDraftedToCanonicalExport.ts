@@ -43,6 +43,7 @@ export type DraftedSectionInput = {
   heading?: string;
   body?: string;
   numberedItems?: string[];
+  bulletItems?: string[];
   source?: 'ai_drafted' | 'user_locked' | 'user_edited' | 'raw_fallback_no_ai';
 };
 
@@ -215,6 +216,7 @@ function buildCourtSections(
       heading: s.heading,
       paragraphs: s.body ? splitParagraphs(s.body) : [],
       numberedItems: s.numberedItems ?? [],
+      bulletItems: s.bulletItems ?? [],
     }));
 }
 

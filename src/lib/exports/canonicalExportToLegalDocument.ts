@@ -23,7 +23,6 @@ import type {
   LegalBlock,
   ParagraphBlock,
   NumberedParagraphBlock,
-  NumberedListBlock,
   BulletListBlock,
   PrayerBlock,
   SignatureBlock,
@@ -47,6 +46,7 @@ export type CourtDocumentContext = {
   isProSe?: boolean;
   documentTitle?: string;
   documentKind?: string;
+  introBlocks?: LegalBlock[];
   prayerIntro?: string;
   prayerRequests?: string[];
 };
@@ -139,7 +139,9 @@ export function canonicalExportToLegalDocument(
   });
 
   // ── Build intro blocks from court context ─────────────────
-  const introBlocks = buildIntroBlocks(ctx, doc.title);
+  const introBlocks = ctx?.introBlocks?.length
+    ? ctx.introBlocks
+    : buildIntroBlocks(ctx, doc.title);
 
   // ── Build prayer ─────────────────────────────────────
   // Prefer structured prayer from context; fallback to parsed section

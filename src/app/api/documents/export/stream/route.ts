@@ -35,12 +35,14 @@ import { generateExhibitCoverDrafts } from '@/lib/exports/exhibits/generateExhib
 import { applyExhibitCoverDrafts } from '@/lib/exports/exhibits/applyExhibitCoverDrafts';
 import type { ExhibitMappedSections } from '@/lib/export-assembly/types/exports';
 import type { AdaptToCanonicalParams } from '@/lib/exports/adaptDraftedToCanonicalExport';
+import { mapLegalDocumentToDraftedSections } from '@/lib/exports/mapLegalDocumentToDraftedSections';
 import { buildExportCaption } from '@/lib/exports/buildExportCaption';
 import {
   resolveExportJurisdictionProfile,
 } from '@/lib/exports/jurisdiction/resolveExportJurisdictionProfile';
 import { generateExportPDF } from '@/lib/exports/generateExportPDF';
 import type { ExportPath } from '@/lib/exports/types';
+import type { LegalBlock } from '@/lib/legal-docs/types';
 import { hashPayload, generateRunFingerprint } from '@/lib/exports/idempotency';
 import { computeArtifactChecksum, verifyUploadedArtifact } from '@/lib/exports/artifactIntegrity';
 import { ExportDocumentGenerationError } from '@/lib/exports/errors';
@@ -402,6 +404,10 @@ export async function POST(request: NextRequest) {
                     && classifiedNodes[0].tags?.includes('pre_drafted');
 
                 let draftedSections: DraftedSection[];
+                let parsedSubtitle: string | undefined;
+                let parsedIntroBlocks: LegalBlock[] | undefined;
+                let parsedPrayerIntro: string | undefined;
+                let parsedPrayerRequests: string[] | undefined;
 
                 if (isFastPath) {
                     // ── UNIFIED PIPELINE: Pasted content goes through legal structure parser ──
@@ -465,26 +471,15 @@ export async function POST(request: NextRequest) {
                         },
                     });
 
+                    parsedSubtitle = parsedLegalDoc.title.subtitle;
+                    parsedIntroBlocks = parsedLegalDoc.introBlocks;
+                    parsedPrayerIntro = parsedLegalDoc.prayer?.intro;
+                    parsedPrayerRequests = parsedLegalDoc.prayer?.requests;
+
                     // Convert parsed sections into draftedSections format for compatibility
-                    // with the existing adapt pipeline downstream
-                    draftedSections = parsedLegalDoc.sections.map((section) => ({
-                        sectionId: section.id,
-                        heading: section.heading,
-                        body: section.blocks
-                            .map((block) => {
-                                if (block.type === 'paragraph') return block.text;
-                                if (block.type === 'numbered_paragraph') return `${block.number}. ${block.text}`;
-                                if (block.type === 'bullet_list') return block.items.map(i => `• ${i}`).join('\n');
-                                if (block.type === 'numbered_list') return block.items.map((item: string, idx: number) => `${idx + 1}. ${item}`).join('\n');
-                                if (block.type === 'lettered_list') return block.items.join('\n');
-                                return '';
-                            })
-                            .join('\n\n'),
-                        numberedItems: section.blocks
-                            .filter((b): b is import('@/lib/legal-docs/types').NumberedParagraphBlock => b.type === 'numbered_paragraph')
-                            .map(b => b.text),
-                        source: 'user_locked' as const,
-                    }));
+                    // with the existing adapt pipeline downstream. Keep paragraphs, numbered
+                    // items, and bullet items separate so the renderer does not duplicate lists.
+                    draftedSections = mapLegalDocumentToDraftedSections(parsedLegalDoc);
 
                 } else {
                     // ── FULL PATH: Draft via GPT ──
@@ -969,13 +964,22 @@ export async function POST(request: NextRequest) {
                         heading: s.heading,
                         body: s.body,
                         numberedItems: s.numberedItems,
+                        bulletItems: s.bulletItems,
                         source: s.source,
                     })),
+                    subtitle: parsedSubtitle ?? courtIdentity?.resolvedSubtitle,
                     caseId: body.caseId,
                     causeNumber: resolvedCauseNumber,
                     jurisdiction: { state: resolvedState, county: resolvedCounty },
                     partyRole: undefined,
                     documentType: caseType,
+                    documentKind: courtIdentity?.documentKind,
+                    filingType: courtIdentity?.filingType,
+                    filingPartyName: courtIdentity?.filingPartyLegalName,
+                    filingPartyRole: courtIdentity?.filingPartyRole,
+                    isProSe: courtIdentity?.isProSe,
+                    prayerIntro: parsedPrayerIntro,
+                    prayerRequests: parsedPrayerRequests,
                     caption,
                     signature: exportPath === 'court_document'
                         ? {
@@ -1036,8 +1040,11 @@ export async function POST(request: NextRequest) {
                         filingPartyName: courtIdentity.filingPartyLegalName,
                         filingPartyRole: courtIdentity.filingPartyRole,
                         isProSe: courtIdentity.isProSe,
-                        prayerIntro: undefined,
-                        prayerRequests: undefined,
+                        documentKind: isFastPath ? courtIdentity.documentKind : undefined,
+                        documentTitle: isFastPath ? courtIdentity.resolvedTitle : undefined,
+                        introBlocks: parsedIntroBlocks,
+                        prayerIntro: parsedPrayerIntro,
+                        prayerRequests: parsedPrayerRequests,
                     } : undefined,
                     resolvedTitle: courtIdentity?.resolvedTitle,
                     metadata: { caseType, exportPath, runId: body.runId },

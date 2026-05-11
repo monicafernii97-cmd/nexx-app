@@ -52,8 +52,10 @@ describe('renderer regression — multi-state pleadings', () => {
     });
 
     expect(html).toContain('data-renderer="legal-document"');
-    expect(html).toContain('margin: 108pt 108pt 108pt 108pt;');
+    expect(html).toContain('margin: 72pt 72pt 72pt 72pt;');
     expect(html).toContain('font-size: 11pt;');
+    expect(html).toContain('family=Tinos');
+    expect(html).toContain('font-family: "Times New Roman", Tinos, Times, serif;');
   });
 
   it('renders Texas title and subtitle in output', () => {

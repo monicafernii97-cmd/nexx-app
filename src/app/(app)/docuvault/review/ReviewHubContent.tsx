@@ -317,6 +317,15 @@ export default function ReviewHubContent() {
         return () => { abort(); };
     }, [abort]);
 
+    // SSE can move reducer state out of drafting without rejecting startStream().
+    // Keep the local button/submit guard aligned with the reducer phase.
+    useEffect(() => {
+        if (state.phase !== 'drafting') {
+            draftingGuardRef.current = false;
+            setIsDrafting(false);
+        }
+    }, [state.phase]);
+
     // Merge item overrides into review items so grouping/stats reflect edits
     const effectiveItems = useMemo(() => {
         const overridesByNodeId = new Map(

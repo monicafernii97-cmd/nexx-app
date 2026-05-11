@@ -596,6 +596,20 @@ export async function POST(request: NextRequest) {
 
                     const blockers = courtIssues.filter(i => i.severity === 'blocker');
                     if (blockers.length > 0) {
+                        console.warn('[ExportStream] Court clarification blockers', {
+                            blockerIds: blockers.map(i => i.id),
+                            issueIds: courtIssues.map(i => i.id),
+                            courtIdentitySummary: courtIdentity ? {
+                                hasChildNames: cleanChildrenNames(courtIdentity.childrenNames).length > 0,
+                                hasCauseNumber: Boolean(courtIdentity.causeNumber?.trim()),
+                                hasCourtName: Boolean(courtIdentity.courtName?.trim()),
+                                hasJudicialDistrict: Boolean(courtIdentity.judicialDistrict?.trim()),
+                                hasCounty: Boolean(courtIdentity.county?.trim()),
+                                hasState: Boolean(courtIdentity.state?.trim()),
+                                documentKind: courtIdentity.documentKind,
+                                caseTitleFormat: courtIdentity.caseTitleFormat,
+                            } : null,
+                        });
                         pendingCourtIssues = courtIssues;
                         // Send the clarification SSE error to the client first
                         send({

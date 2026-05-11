@@ -436,16 +436,33 @@ export async function POST(request: NextRequest) {
                         ?? reviewedItem?.originalText
                         ?? classifiedNodes[0].rawText;
 
-                    // Parse through unified legal document pipeline
-                    const { prepareLegalDocument } = await import('@/lib/legal-docs/pipeline/prepareLegalDocument');
-                    const parsedLegalDoc = prepareLegalDocument({
-                        text: rawText,
+                    // Parse structure only. Final integrity belongs in generateExportPDF(),
+                    // after court identity, profile children, and SAPCR caption recovery
+                    // have all been resolved.
+                    const {
+                        normalizeLegalInput,
+                        classifyLegalDocument,
+                        parseLegalDocumentStructure,
+                        validateParsedStructure,
+                        buildLegalDocument,
+                    } = await import('@/lib/legal-docs/pipeline/prepareLegalDocument');
+                    const normalized = normalizeLegalInput(rawText);
+                    const classification = classifyLegalDocument(normalized.cleanedText);
+                    const parsedStructure = parseLegalDocumentStructure(normalized.cleanedText, {
+                        documentFamily: classification.documentFamily,
+                        jurisdictionHint: courtState,
+                    });
+                    validateParsedStructure(parsedStructure);
+                    const parsedLegalDoc = buildLegalDocument({
+                        parsed: parsedStructure,
                         metadata: {
                             causeNumber,
-                            jurisdiction: courtState,
-                            county: courtCounty,
+                            jurisdiction: courtState ?? classification.jurisdictionLikely.state,
+                            county: courtCounty ?? classification.jurisdictionLikely.county,
+                            court: classification.jurisdictionLikely.court,
+                            district: classification.jurisdictionLikely.district,
+                            documentType: classification.pleadingType,
                         },
-                        jurisdictionHint: courtState,
                     });
 
                     // Convert parsed sections into draftedSections format for compatibility
@@ -469,8 +486,6 @@ export async function POST(request: NextRequest) {
                         source: 'user_locked' as const,
                     }));
 
-                    // Store parsed legal document for downstream use
-                    (body as unknown as Record<string, unknown>).__parsedLegalDocument = parsedLegalDoc;
                 } else {
                     // ── FULL PATH: Draft via GPT ──
                     send({

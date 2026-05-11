@@ -158,6 +158,24 @@ describe('generateExportPDF — orchestrator', () => {
     expect(result.filename).toMatch(/\.pdf$/);
   });
 
+  it('recovers SAPCR child names from resolved identity before integrity assertion', async () => {
+    const { generateExportPDF } = await import('../generateExportPDF');
+    const result = await generateExportPDF(makeValidInput({
+      adaptParams: {
+        ...makeValidInput().adaptParams,
+        caption: {
+          style: 'texas_pleading' as const,
+          causeLine: 'CAUSE NO. 2024-12345-FM',
+          leftLines: ['IN THE INTEREST OF', 'A CHILD'],
+          centerLines: ['Â§', 'Â§', 'Â§'],
+          rightLines: ['IN THE 387TH DISTRICT COURT', 'FORT BEND COUNTY, TEXAS'],
+        },
+      },
+    }));
+
+    expect(result.html).toContain('J.D.');
+  });
+
   it('throws EXPORT_DOCUMENT_VALIDATION_FAILED for empty sections', async () => {
     const { generateExportPDF } = await import('../generateExportPDF');
     const input = makeValidInput({

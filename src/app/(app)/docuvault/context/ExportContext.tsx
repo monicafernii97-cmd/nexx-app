@@ -694,6 +694,9 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                 if (config.path === 'court_document') {
                     const enrichedConfig: Record<string, unknown> = {
                         ...(exportRequest.config as unknown as Record<string, unknown>),
+                        pastedContent: pastedText,
+                        rawDocumentText: pastedText,
+                        sourceText: pastedText,
                     };
                     if (captionData.courtName) enrichedConfig.courtName = captionData.courtName;
                     if (captionData.state) enrichedConfig.courtState = captionData.state;

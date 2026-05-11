@@ -42,7 +42,7 @@ import {
 } from '@/lib/exports/jurisdiction/resolveExportJurisdictionProfile';
 import { generateExportPDF } from '@/lib/exports/generateExportPDF';
 import type { ExportPath } from '@/lib/exports/types';
-import type { LegalBlock } from '@/lib/legal-docs/types';
+import type { InlineRun, LegalBlock } from '@/lib/legal-docs/types';
 import { hashPayload, generateRunFingerprint } from '@/lib/exports/idempotency';
 import { computeArtifactChecksum, verifyUploadedArtifact } from '@/lib/exports/artifactIntegrity';
 import { ExportDocumentGenerationError } from '@/lib/exports/errors';
@@ -407,6 +407,7 @@ export async function POST(request: NextRequest) {
                 let parsedSubtitle: string | undefined;
                 let parsedIntroBlocks: LegalBlock[] | undefined;
                 let parsedPrayerIntro: string | undefined;
+                let parsedPrayerIntroRuns: InlineRun[] | undefined;
                 let parsedPrayerRequests: string[] | undefined;
 
                 if (isFastPath) {
@@ -474,6 +475,7 @@ export async function POST(request: NextRequest) {
                     parsedSubtitle = parsedLegalDoc.title.subtitle;
                     parsedIntroBlocks = parsedLegalDoc.introBlocks;
                     parsedPrayerIntro = parsedLegalDoc.prayer?.intro;
+                    parsedPrayerIntroRuns = parsedLegalDoc.prayer?.introRuns;
                     parsedPrayerRequests = parsedLegalDoc.prayer?.requests;
 
                     // Convert parsed sections into draftedSections format for compatibility
@@ -1044,6 +1046,7 @@ export async function POST(request: NextRequest) {
                         documentTitle: isFastPath ? courtIdentity.resolvedTitle : undefined,
                         introBlocks: parsedIntroBlocks,
                         prayerIntro: parsedPrayerIntro,
+                        prayerIntroRuns: parsedPrayerIntroRuns,
                         prayerRequests: parsedPrayerRequests,
                     } : undefined,
                     resolvedTitle: courtIdentity?.resolvedTitle,

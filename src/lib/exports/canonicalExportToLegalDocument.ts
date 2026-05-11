@@ -28,6 +28,7 @@ import type {
   SignatureBlock,
   CertificateBlock,
   VerificationBlock,
+  InlineRun,
 } from '@/lib/legal-docs/types';
 import type {
   ExportJurisdictionProfile,
@@ -48,6 +49,7 @@ export type CourtDocumentContext = {
   documentKind?: string;
   introBlocks?: LegalBlock[];
   prayerIntro?: string;
+  prayerIntroRuns?: InlineRun[];
   prayerRequests?: string[];
 };
 
@@ -150,7 +152,12 @@ export function canonicalExportToLegalDocument(
     (ctx?.prayerRequests ?? []).map((r) => r.trim()).filter(Boolean);
   const prayer: PrayerBlock | null =
     normalizedPrayerRequests.length > 0
-      ? { heading: 'PRAYER', intro: ctx!.prayerIntro, requests: normalizedPrayerRequests }
+      ? {
+          heading: 'PRAYER',
+          intro: ctx!.prayerIntro,
+          introRuns: ctx!.prayerIntroRuns,
+          requests: normalizedPrayerRequests,
+        }
       : prayerSection
         ? convertPrayer(prayerSection)
         : null;

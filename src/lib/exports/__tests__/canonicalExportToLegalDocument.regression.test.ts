@@ -43,4 +43,33 @@ describe('canonicalExportToLegalDocument', () => {
       text: expect.stringContaining('pursuant to Chapter 105'),
     });
   });
+
+  it('preserves parsed prayer intro bold runs for court exports', () => {
+    const doc: CanonicalExportDocument = {
+      path: 'court_document',
+      title: 'MOTION FOR TEMPORARY ORDERS',
+      metadata: {},
+      caption: null,
+      sections: [],
+      signature: null,
+      certificate: null,
+      verification: null,
+      exhibitPacket: null,
+      timelineVisual: null,
+    };
+
+    const legalDoc = canonicalExportToLegalDocument(doc, {
+      prayerIntro: 'WHEREFORE, PREMISES CONSIDERED, Petitioner respectfully requests relief.',
+      prayerIntroRuns: [
+        { text: 'WHEREFORE, PREMISES CONSIDERED,', bold: true },
+        { text: ' Petitioner respectfully requests relief.' },
+      ],
+      prayerRequests: ['Grant the requested relief.'],
+    });
+
+    expect(legalDoc.prayer?.introRuns).toEqual([
+      { text: 'WHEREFORE, PREMISES CONSIDERED,', bold: true },
+      { text: ' Petitioner respectfully requests relief.' },
+    ]);
+  });
 });

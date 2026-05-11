@@ -21,7 +21,6 @@ import type {
   LegalBlock,
   ParagraphBlock,
   NumberedParagraphBlock,
-  BulletListBlock,
   PrayerBlock,
   SignatureBlock,
   CertificateBlock,
@@ -352,7 +351,11 @@ function extractIntroBlocks(
 
     // Salutation
     if (P.salutation.test(line)) {
-      introBlocks.push({ type: 'paragraph', text: line });
+      introBlocks.push({
+        type: 'paragraph',
+        text: line,
+        runs: [{ text: line, bold: true }],
+      });
       cursor = i + 1;
       continue;
     }

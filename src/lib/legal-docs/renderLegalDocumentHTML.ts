@@ -29,6 +29,12 @@ import type { DocumentTypeProfile } from './document-type/profiles';
 // Main Entry Point
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Renders a normalized legal document into print-ready HTML.
+ *
+ * The output is deterministic and profile-driven so the PDF renderer can apply
+ * jurisdiction-specific caption, typography, margin, and pagination rules.
+ */
 export function renderLegalDocumentHTML(
   doc: LegalDocument,
   profile: JurisdictionProfile,
@@ -588,6 +594,9 @@ function toRoman(num: number): string {
   return result;
 }
 
+/**
+ * Escapes untrusted text before inserting it into the legal document template.
+ */
 function esc(input: string): string {
   return input
     .replace(/&/g, '&amp;')

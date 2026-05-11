@@ -207,11 +207,17 @@ export function renderLegalDocumentHTML(
 
   .section-heading + .body-paragraph,
   .section-heading + .numbered-paragraph,
+  .section-heading + .numbered-list,
   .section-heading + .bullet-list,
+  .section-heading + .lettered-list,
   .subheading-inline + .body-paragraph,
   .subheading-inline + .numbered-paragraph,
+  .subheading-inline + .numbered-list,
   .subheading-inline + .bullet-list,
+  .subheading-inline + .lettered-list,
   .prayer-heading + .body-paragraph,
+  .prayer-heading + .numbered-list,
+  .prayer-heading + .lettered-list,
   .certificate-heading + .body-paragraph {
     page-break-before: avoid;
     break-before: avoid;
@@ -591,6 +597,13 @@ function esc(input: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * Builds the PDF font stack used by legal documents.
+ *
+ * Vercel's Linux Chromium runtime may not have Microsoft Times New Roman
+ * installed, so Texas-style pleadings keep Times New Roman first for local
+ * Windows rendering and include Tinos as a metrically compatible web fallback.
+ */
 function legalFontFamily(profileFontFamily: string): string {
   const fallback = '"Times New Roman", Tinos, Times, serif';
   const trimmed = profileFontFamily.trim();

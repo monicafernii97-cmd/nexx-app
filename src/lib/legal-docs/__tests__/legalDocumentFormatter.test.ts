@@ -315,8 +315,8 @@ describe('toCourtFormattingRules adapter', () => {
     expect(rules.paperWidth).toBe(8.5);
     expect(rules.paperHeight).toBe(11);
     expect(rules.fontFamily).toContain('Times New Roman');
-    expect(rules.fontSize).toBe(12);
-    expect(rules.lineSpacing).toBe(1.5);
+    expect(rules.fontSize).toBe(11);
+    expect(rules.lineSpacing).toBeCloseTo(18 / 11);
     expect(rules.captionStyle).toBe('section-symbol');
     expect(rules.captionColumnWidths.left).toBe(3.125);
     expect(rules.captionColumnWidths.center).toBe(0.083);

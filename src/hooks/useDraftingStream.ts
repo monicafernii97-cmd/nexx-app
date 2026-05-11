@@ -35,6 +35,8 @@ export interface DraftStreamInput {
     retryOfExportId?: string;
     /** Court identity patch from ClarificationModal (court_document only) */
     courtIdentityPatch?: Partial<CourtIdentity>;
+    /** Full text used only for court identity recovery during final export. */
+    identitySourceText?: string;
 }
 
 /** Structured SSE milestone event from the server. */

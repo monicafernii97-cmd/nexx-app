@@ -95,6 +95,50 @@ function buildCourtIssueTexts(
     return texts;
 }
 
+/** Collect identity-bearing text from the current review state for final export recovery. */
+function buildCourtIdentitySourceText(
+    exportRequest: unknown,
+    assemblyResult: unknown,
+    items: MappingReviewItem[],
+    courtResolvedText?: string | null,
+): string {
+    const requestConfig = ((exportRequest as { config?: Record<string, unknown> } | null)?.config ?? {});
+    const requestText = [
+        requestConfig.pastedContent,
+        requestConfig.rawDocumentText,
+        requestConfig.documentText,
+        requestConfig.sourceText,
+    ];
+    const classifiedNodes =
+        (assemblyResult as {
+            assembly?: {
+                classifiedNodes?: Array<{
+                    rawText?: string;
+                    cleanedText?: string;
+                    transformedText?: { courtSafe?: string };
+                }>;
+            };
+        } | null)?.assembly?.classifiedNodes ?? [];
+    const nodeText = classifiedNodes.flatMap((node) => [
+        node.rawText,
+        node.cleanedText,
+        node.transformedText?.courtSafe,
+    ]);
+    const itemText = items.flatMap((item) => [
+        item.userOverride?.editedText,
+        item.transformedCourtSafeText,
+        item.originalText,
+    ]);
+
+    return [
+        ...requestText,
+        ...nodeText,
+        ...itemText,
+        courtResolvedText,
+    ].filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+        .join('\n');
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -421,6 +465,14 @@ export default function ReviewHubContent() {
             caseId: state.caseId,
             retryOfExportId: retryExportIdRef.current ?? undefined,
             courtIdentityPatch: state.courtIdentityPatch ?? undefined,
+            identitySourceText: state.exportPath === 'court_document'
+                ? buildCourtIdentitySourceText(
+                    state.exportRequest,
+                    state.assemblyResult,
+                    effectiveItems,
+                    state.courtResolvedText,
+                )
+                : undefined,
         };
         retryExportIdRef.current = null; // Clear after use
 

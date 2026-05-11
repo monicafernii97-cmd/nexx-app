@@ -73,6 +73,8 @@ interface ExportStreamRequest {
     retryOfExportId?: string;
     /** Client-side court identity patch from ClarificationModal. */
     courtIdentityPatch?: Partial<CourtIdentity>;
+    /** Client-collected source text for caption/court identity recovery. */
+    identitySourceText?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,8 +139,9 @@ function collectRequestIdentityText(exportRequest: ExportRequest | undefined): s
         .join('\n');
 }
 
-function collectExportIdentityText(body: Pick<ExportStreamRequest, 'reviewItems' | 'assemblyResult' | 'exportRequest'>): string {
+function collectExportIdentityText(body: Pick<ExportStreamRequest, 'reviewItems' | 'assemblyResult' | 'exportRequest' | 'identitySourceText'>): string {
     return [
+        body.identitySourceText,
         collectReviewIdentityText(body.reviewItems),
         collectAssemblyIdentityText(body.assemblyResult),
         collectRequestIdentityText(body.exportRequest),

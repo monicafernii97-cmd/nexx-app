@@ -26,9 +26,13 @@ export function mapLegalDocumentToDraftedSections(doc: LegalDocument): DraftedSe
     for (const block of section.blocks) {
       if (block.type === 'paragraph') {
         const text = (block as ParagraphBlock).text;
-        if (text.startsWith('__ALPHA_HEADING__')) {
+        const normalized = text.trimStart();
+        if (normalized.startsWith('__ALPHA_HEADING__')) {
           flushAccumulator(current, draftedSections);
-          current = makeAccumulator(`${section.id}_${draftedSections.length + 1}`, text.replace('__ALPHA_HEADING__', ''));
+          current = makeAccumulator(
+            `${section.id}_${draftedSections.length + 1}`,
+            normalized.replace('__ALPHA_HEADING__', '').trim(),
+          );
           continue;
         }
         current.paragraphs.push(text);

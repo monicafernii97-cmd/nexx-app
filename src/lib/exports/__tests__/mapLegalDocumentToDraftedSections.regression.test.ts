@@ -70,6 +70,13 @@ describe('mapLegalDocumentToDraftedSections', () => {
 
     const sections = mapLegalDocumentToDraftedSections(doc);
 
+    expect(sections.map((section) => section.sectionId)).toEqual([
+      'requested-orders',
+      'requested-orders_2',
+      'requested-orders_3',
+      'requested-orders_4',
+      'requested-orders_5',
+    ]);
     expect(sections.map((section) => section.heading)).toEqual([
       'III. REQUESTED TEMPORARY ORDERS',
       'A. ELECTRONIC COMMUNICATION',

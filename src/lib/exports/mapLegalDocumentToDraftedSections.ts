@@ -21,6 +21,7 @@ export function mapLegalDocumentToDraftedSections(doc: LegalDocument): DraftedSe
   const draftedSections: DraftedSection[] = [];
 
   for (const section of doc.sections) {
+    let subsectionIndex = 1;
     let current: SectionAccumulator = makeAccumulator(section.id, section.heading);
 
     for (const block of section.blocks) {
@@ -29,8 +30,9 @@ export function mapLegalDocumentToDraftedSections(doc: LegalDocument): DraftedSe
         const normalized = text.trimStart();
         if (normalized.startsWith('__ALPHA_HEADING__')) {
           flushAccumulator(current, draftedSections);
+          subsectionIndex += 1;
           current = makeAccumulator(
-            `${section.id}_${draftedSections.length + 1}`,
+            `${section.id}_${subsectionIndex}`,
             normalized.replace('__ALPHA_HEADING__', '').trim(),
           );
           continue;

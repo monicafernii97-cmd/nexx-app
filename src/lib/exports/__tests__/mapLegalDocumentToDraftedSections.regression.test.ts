@@ -99,4 +99,46 @@ describe('mapLegalDocumentToDraftedSections', () => {
       'Each parent retains statutory rights to obtain medical information.',
     ]);
   });
+
+  it('uses section-local ids for alpha subsection splits', () => {
+    const doc = {
+      metadata: {},
+      caption: null,
+      title: { main: 'MOTION' },
+      introBlocks: [],
+      sections: [
+        {
+          id: 'background',
+          heading: 'I. BACKGROUND',
+          level: 'roman',
+          blocks: [{ type: 'paragraph', text: 'Background facts.' }],
+        },
+        {
+          id: 'requested-orders',
+          heading: 'III. REQUESTED TEMPORARY ORDERS',
+          level: 'roman',
+          blocks: [
+            { type: 'paragraph', text: '__ALPHA_HEADING__A. ELECTRONIC COMMUNICATION' },
+            { type: 'numbered_paragraph', number: 1, text: 'Electronic communication request.' },
+            { type: 'paragraph', text: '__ALPHA_HEADING__B. STRUCTURED WRITTEN COMMUNICATION' },
+            { type: 'numbered_paragraph', number: 1, text: 'Written communication request.' },
+          ],
+        },
+      ],
+      prayer: null,
+      signature: null,
+      certificate: null,
+      verification: null,
+      rawText: '',
+    } satisfies LegalDocument;
+
+    const sections = mapLegalDocumentToDraftedSections(doc);
+
+    expect(sections.map((section) => section.sectionId)).toEqual([
+      'background',
+      'requested-orders',
+      'requested-orders_2',
+      'requested-orders_3',
+    ]);
+  });
 });

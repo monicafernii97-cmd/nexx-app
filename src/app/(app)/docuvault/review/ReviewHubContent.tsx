@@ -243,6 +243,9 @@ export default function ReviewHubContent() {
             state: rawUserProfile.state ?? undefined,
             county: rawUserProfile.county ?? undefined,
             hasAttorney: rawUserProfile.hasAttorney ?? undefined,
+            children: rawUserProfile.children ?? undefined,
+            childrenNames: rawUserProfile.childrenNames ?? undefined,
+            childrenAges: rawUserProfile.childrenAges ?? undefined,
         }
         : undefined;
 

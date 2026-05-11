@@ -178,6 +178,9 @@ export type UserProfileData = {
   state?: string;
   county?: string;
   hasAttorney?: boolean;
+  children?: { name?: string; age?: number }[];
+  childrenNames?: string[];
+  childrenAges?: number[];
 };
 
 /** Explicit overrides from ClarificationModal / ReviewHub. */
@@ -322,6 +325,14 @@ export function resolveCourtIdentity(
     name: (c.name ?? '').trim(),
     age: c.age ?? 0,
   })).filter(c => c.name !== '');
+  const upChildren = (up.children ?? []).map(c => ({
+    name: (c.name ?? '').trim(),
+    age: c.age ?? 0,
+  })).filter(c => c.name !== '');
+  const upChildrenFromNames = (up.childrenNames ?? []).map((name, index) => ({
+    name: name.trim(),
+    age: up.childrenAges?.[index] ?? 0,
+  })).filter(c => c.name !== '');
 
   // Extracted child name from "In the Interest of" caption (already flattened to string)
   const extractedChildNames: string[] = et.childrenNames
@@ -330,7 +341,9 @@ export function resolveCourtIdentity(
 
   const children = patchChildren.length > 0 ? patchChildren :
     csChildren.length > 0 ? csChildren :
-    npChildren.length > 0 ? npChildren : [];
+    npChildren.length > 0 ? npChildren :
+    upChildren.length > 0 ? upChildren :
+    upChildrenFromNames.length > 0 ? upChildrenFromNames : [];
 
   // Priority: patch > pasted_text > court_settings/nex_profile children
   const childrenNames = (patch?.childrenNames?.length ?? 0) > 0
@@ -345,6 +358,7 @@ export function resolveCourtIdentity(
   else if (patchChildren.length > 0) fieldSources['childrenNames'] = 'reviewhub_edit';
   else if (csChildren.length > 0) fieldSources['childrenNames'] = 'court_settings';
   else if (npChildren.length > 0) fieldSources['childrenNames'] = 'nex_profile';
+  else if (upChildren.length > 0 || upChildrenFromNames.length > 0) fieldSources['childrenNames'] = 'personal_profile';
 
   // ── Court ──────────────────────────────────────────────────
   const countyResult = resolveField(

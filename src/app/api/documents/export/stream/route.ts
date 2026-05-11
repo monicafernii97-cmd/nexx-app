@@ -513,8 +513,9 @@ export async function POST(request: NextRequest) {
                         message: 'Resolving court identity...',
                     });
 
-                    // Query Convex for court settings (returns null when none exist)
+                    // Query Convex for court/profile settings (returns null when none exist)
                     const courtSettings = await convex.query(api.courtSettings.get, {});
+                    const userProfile = await convex.query(api.users.me, {});
 
                     const rawDocType = 'documentType' in exportConfig
                         ? String((exportConfig as unknown as Record<string, unknown>).documentType)
@@ -543,6 +544,7 @@ export async function POST(request: NextRequest) {
                         patch: body.courtIdentityPatch,
                         extractedFromText,
                         courtSettings: courtSettings as CourtSettingsData | null,
+                        userProfile: userProfile as import('@/lib/exports/resolveCourtIdentity').UserProfileData | null,
                         draftTitle: getTemplateName(body.exportRequest?.path ?? 'general'),
                         draftDocumentKind: isValidDocumentKind(rawDocType) ? rawDocType : undefined,
                     });

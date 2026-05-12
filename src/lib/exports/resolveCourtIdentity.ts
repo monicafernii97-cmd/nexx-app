@@ -261,7 +261,8 @@ export function resolveCourtIdentity(
   const filingPartyLegalName = nameResult.value ?? '';
   if (nameResult.source) fieldSources['filingPartyLegalName'] = nameResult.source;
 
-  const roleStr = patch?.filingPartyRole ?? et.filingPartyRole ?? cs.userRole ?? '';
+  const rawFilingPartyRole = patch?.filingPartyRole ?? et.filingPartyRole ?? cs.userRole;
+  const roleStr = rawFilingPartyRole ?? '';
   const filingPartyRole: 'petitioner' | 'respondent' =
     /respondent/i.test(roleStr) ? 'respondent' : 'petitioner';
   if (patch?.filingPartyRole) fieldSources['filingPartyRole'] = 'reviewhub_edit';
@@ -278,10 +279,19 @@ export function resolveCourtIdentity(
 
   // ── Opposing party ─────────────────────────────────────────
   // NEX profile IS the opposing party — safe to use here.
+  const hasExplicitFilingRole = isPresent(rawFilingPartyRole);
   const opposingResult = resolveField(
     [patch?.opposingPartyLegalName, 'reviewhub_edit'],
     [et.opposingPartyLegalName, 'pasted_text'],
     [cs.opposingPartyLegalName, 'court_settings'],
+    [
+      hasExplicitFilingRole
+        ? (filingPartyRole === 'respondent'
+            ? cs.petitionerLegalName
+            : cs.respondentLegalName)
+        : undefined,
+      'court_settings',
+    ],
     [np.fullName, 'nex_profile'],
   );
   if (opposingResult.source) fieldSources['opposingPartyLegalName'] = opposingResult.source;

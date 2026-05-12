@@ -132,7 +132,7 @@ function DashboardContent() {
                 )}
             </AnimatePresence>
 
-            <OnboardingTour />
+            <OnboardingTour user={user} />
 
             <PageHeader
                 icon={House}

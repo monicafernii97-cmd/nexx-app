@@ -86,6 +86,8 @@ export default defineSchema({
             v.literal('paused')
         )),
         onboardingComplete: v.boolean(),
+        /** Dashboard guided tour has been seen or dismissed by this user. */
+        dashboardTourCompletedAt: v.optional(v.number()),
         primaryGoals: v.optional(v.array(v.string())),
         createdAt: v.number(),
     }).index('by_clerk', ['clerkId']),

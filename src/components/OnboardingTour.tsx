@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useMutation } from 'convex/react';
+import { api } from '@convex/_generated/api';
+import type { Doc } from '@convex/_generated/dataModel';
 import {
     TOUR_STORAGE_KEY,
     TOUR_PENDING_KEY,
@@ -9,6 +12,12 @@ import {
 } from '@/lib/tourUtils';
 
 const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+type TourLaunchSource = 'auto' | 'manual';
+const TOUR_SYNC_PENDING_PREFIX = `${TOUR_STORAGE_KEY}:sync-pending`;
+
+interface OnboardingTourProps {
+    user: Pick<Doc<'users'>, '_id' | 'dashboardTourCompletedAt'> | null | undefined;
+}
 
 /** Tour step config — uses navIdSelector so selectors stay in sync with Sidebar IDs. */
 function getTourSteps() {
@@ -106,10 +115,17 @@ function getTourSteps() {
 
 /**
  * Onboarding tour component — shows a welcome dialog for first-time users
- * then walks them through the sidebar navigation. Persisted via localStorage.
+ * then walks them through the sidebar navigation. Persisted on the user record,
+ * with localStorage as a client-side fallback for older/offline sessions.
  */
-export default function OnboardingTour() {
+export default function OnboardingTour({ user }: OnboardingTourProps) {
     const [showWelcome, setShowWelcome] = useState(false);
+    const [launchSource, setLaunchSource] = useState<TourLaunchSource>('auto');
+    const markTourCompleted = useMutation(api.users.markDashboardTourCompleted);
+    const tourUserId = user?._id;
+    const hasPersistedTourCompletion = Boolean(user?.dashboardTourCompletedAt);
+    const tourStorageKey = tourUserId ? `${TOUR_STORAGE_KEY}:${tourUserId}` : TOUR_STORAGE_KEY;
+    const tourSyncPendingKey = tourUserId ? `${TOUR_SYNC_PENDING_PREFIX}:${tourUserId}` : TOUR_SYNC_PENDING_PREFIX;
     const dialogRef = useRef<HTMLDivElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
     const startupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -136,31 +152,82 @@ export default function OnboardingTour() {
         };
     }, []);
 
+    const persistTourCompleted = useCallback(() => {
+        if (!tourUserId || hasPersistedTourCompletion) {
+            localStorage.setItem(tourStorageKey, 'true');
+            return;
+        }
+
+        void markTourCompleted({ id: tourUserId })
+            .then(() => {
+                localStorage.setItem(tourStorageKey, 'true');
+                localStorage.removeItem(tourSyncPendingKey);
+            })
+            .catch((err) => {
+                localStorage.setItem(tourSyncPendingKey, 'true');
+                console.error('[NEXX Tour] Failed to persist tour completion:', err);
+            });
+    }, [hasPersistedTourCompletion, markTourCompleted, tourStorageKey, tourSyncPendingKey, tourUserId]);
+
+    useEffect(() => {
+        if (!tourUserId || hasPersistedTourCompletion) return;
+        if (
+            !localStorage.getItem(tourSyncPendingKey)
+            && !localStorage.getItem(tourStorageKey)
+        ) return;
+
+        const retryTourCompletionSync = () => {
+            void markTourCompleted({ id: tourUserId })
+                .then(() => {
+                    localStorage.setItem(tourStorageKey, 'true');
+                    localStorage.removeItem(tourSyncPendingKey);
+                })
+                .catch((err) => {
+                    localStorage.setItem(tourSyncPendingKey, 'true');
+                    console.error('[NEXX Tour] Failed to backfill tour completion:', err);
+                });
+        };
+
+        retryTourCompletionSync();
+        window.addEventListener('online', retryTourCompletionSync);
+        return () => window.removeEventListener('online', retryTourCompletionSync);
+    }, [hasPersistedTourCompletion, markTourCompleted, tourStorageKey, tourSyncPendingKey, tourUserId]);
+
     // Consolidated startup: check both first-run and pending-replay in a single effect.
     // Schedules at most one timer to prevent overlapping show calls.
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
+        if (user === undefined) return;
+
         // Pending replay (navigated here from another route via ? button)
         const pending = localStorage.getItem(TOUR_PENDING_KEY);
         if (pending) {
-            localStorage.removeItem(TOUR_PENDING_KEY);
-            startupTimerRef.current = setTimeout(() => setShowWelcome(true), 500);
+            startupTimerRef.current = setTimeout(() => {
+                setLaunchSource('manual');
+                setShowWelcome(true);
+                localStorage.removeItem(TOUR_PENDING_KEY);
+            }, 500);
             return clearStartupTimer;
         }
 
-        // First-time user (hasn't seen tour yet)
-        const seen = localStorage.getItem(TOUR_STORAGE_KEY);
+        // First dashboard visit for this user. Existing users with a persisted
+        // completion timestamp should never be auto-prompted on login/refresh.
+        const seen = user?.dashboardTourCompletedAt || localStorage.getItem(tourStorageKey);
         if (!seen) {
-            startupTimerRef.current = setTimeout(() => setShowWelcome(true), 800);
+            startupTimerRef.current = setTimeout(() => {
+                setLaunchSource('auto');
+                setShowWelcome(true);
+            }, 800);
             return clearStartupTimer;
         }
-    }, [clearStartupTimer]);
+    }, [clearStartupTimer, tourStorageKey, user]);
 
     // Listen for restart event (fired when already on /dashboard)
     useEffect(() => {
         const handleRestart = () => {
             clearStartupTimer();
+            setLaunchSource('manual');
             setShowWelcome(true);
         };
         window.addEventListener(RESTART_EVENT, handleRestart);
@@ -178,6 +245,9 @@ export default function OnboardingTour() {
             if (e.key === 'Escape') {
                 e.preventDefault();
                 setShowWelcome(false);
+                if (launchSource === 'auto') {
+                    persistTourCompleted();
+                }
                 return;
             }
 
@@ -213,25 +283,22 @@ export default function OnboardingTour() {
             }
             skipFocusRestoreRef.current = false;
         };
-    }, [showWelcome]);
+    }, [launchSource, persistTourCompleted, showWelcome]);
 
     /** Shared recovery handler — reverts storage key and re-shows welcome so user can retry. */
     const handleTourStartFailure = useCallback((err: unknown) => {
         console.error('[NEXX Tour] Failed to start tour:', err);
         driverRef.current = null;
-        localStorage.removeItem(TOUR_STORAGE_KEY);
+        localStorage.removeItem(tourStorageKey);
         if (mountedRef.current) {
             setShowWelcome(true);
         }
-    }, []);
+    }, [tourStorageKey]);
 
     const startTour = useCallback(async () => {
         clearStartupTimer();
         skipFocusRestoreRef.current = true;
         setShowWelcome(false);
-
-        // Persist "seen" flag before async imports so even if interrupted it won't re-show
-        localStorage.setItem(TOUR_STORAGE_KEY, 'true');
 
         try {
             // Lazy-load driver.js only when starting the tour (keeps initial bundle small)
@@ -267,6 +334,7 @@ export default function OnboardingTour() {
 
                     driverRef.current = driverObj;
                     driverObj.drive();
+                    persistTourCompleted();
                 } catch (err) {
                     // Cleanup partially-created driver before recovery
                     if (driverRef.current) {
@@ -279,13 +347,15 @@ export default function OnboardingTour() {
         } catch (err) {
             handleTourStartFailure(err);
         }
-    }, [clearStartupTimer, handleTourStartFailure]);
+    }, [clearStartupTimer, handleTourStartFailure, persistTourCompleted]);
 
     const dismissWelcome = useCallback(() => {
         clearStartupTimer();
         setShowWelcome(false);
-        // Don't persist — "Skip for Now" means the tour will return next session
-    }, [clearStartupTimer]);
+        if (launchSource === 'auto') {
+            persistTourCompleted();
+        }
+    }, [clearStartupTimer, launchSource, persistTourCompleted]);
 
     if (!showWelcome) return null;
 

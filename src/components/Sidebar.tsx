@@ -25,11 +25,12 @@ import {
     CalendarCheck,
     FileText,
     IconWeight,
+    Info,
 } from '@phosphor-icons/react';
 import { useState, useMemo, useCallback, useEffect, useRef, type ComponentType, type CSSProperties } from 'react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { nexxClerkAppearance } from '@/lib/clerk-theme';
-import { navIdSelector } from '@/lib/tourUtils';
+import { navIdSelector, restartTour } from '@/lib/tourUtils';
 import { useSidebar } from '@/lib/sidebar-context';
 
 /** Child navigation item definition for sidebar sub-menus. */
@@ -295,6 +296,28 @@ export default function Sidebar() {
 
             {/* Bottom User Section */}
             <div className="px-4 pb-6 pt-2 mt-auto space-y-4">
+                <button
+                    type="button"
+                    onClick={restartTour}
+                    aria-label="Replay guided tour"
+                    title="Replay guided tour"
+                    className={`w-full h-10 rounded-xl flex items-center gap-3 px-3 transition-all bg-white/[0.03] border border-white/5 hover:border-white/20 hover:bg-white/[0.06] text-white/35 hover:text-white cursor-pointer ${collapsed ? 'justify-center' : ''}`}
+                >
+                    <Info size={16} weight="bold" className="shrink-0" />
+                    <AnimatePresence>
+                        {!collapsed && (
+                            <motion.span
+                                initial={{ opacity: 0, width: 0 }}
+                                animate={{ opacity: 1, width: 'auto' }}
+                                exit={{ opacity: 0, width: 0 }}
+                                className="text-[11px] font-bold tracking-tight whitespace-nowrap"
+                            >
+                                Guided tour
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
+                </button>
+
                 {isLoaded && user ? (
                     <div className="relative group focus-within:ring-2 focus-within:ring-indigo-500/40 rounded-xl w-full">
                         {/* Visual layer */}

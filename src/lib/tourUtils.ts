@@ -28,8 +28,6 @@ export function navIdSelector(href: string): string {
 export function restartTour() {
     if (typeof window === 'undefined') return;
 
-    localStorage.removeItem(TOUR_STORAGE_KEY);
-
     // Check if we're on dashboard — if not, navigate there first
     if (window.location.pathname !== '/dashboard') {
         localStorage.setItem(TOUR_PENDING_KEY, 'true');

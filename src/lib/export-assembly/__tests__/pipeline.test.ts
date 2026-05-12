@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { runAssembly } from '@/lib/export-assembly/orchestrator';
 import type { ExportRequest } from '@/lib/export-assembly/types/exports';
 import type { WorkspaceNode } from '@/lib/export-assembly/types/workspace';
+import type { TimelineEventNode } from '@/lib/export-assembly/types/narrative';
 import type { PipelineStatus } from '@/lib/export-assembly/orchestrator';
 
 // ---------------------------------------------------------------------------
@@ -70,6 +71,42 @@ const FIXTURE_REQUEST: ExportRequest = {
         includePrayer: true,
         includeCertificateOfService: true,
         includeProposedOrder: false,
+        outputFormat: 'pdf',
+    },
+};
+
+const FIXTURE_TIMELINE: TimelineEventNode[] = [
+    {
+        id: 'timeline-1',
+        date: '2025-01-15',
+        title: 'Missed school pickup',
+        description: 'Respondent failed to pick up the children from school at the agreed time.',
+        type: 'exchange',
+        issueTags: ['custody_violation'],
+    },
+    {
+        id: 'timeline-2',
+        date: '2025-02-02',
+        title: 'Refused exchange',
+        description: 'Respondent refused the scheduled exchange and did not provide advance notice.',
+        type: 'incident',
+        issueTags: ['custody_violation'],
+    },
+];
+
+const SUMMARY_REQUEST: ExportRequest = {
+    path: 'case_summary',
+    structureSource: 'summary_default',
+    selectedNodeIds: ['node-fact-1'],
+    selectedEvidenceIds: [],
+    selectedTimelineIds: [],
+    config: {
+        audience: 'internal',
+        detailLevel: 'standard',
+        organization: 'chronological',
+        includeTimeline: true,
+        includeEvidenceAppendix: false,
+        includeRecommendations: false,
         outputFormat: 'pdf',
     },
 };
@@ -179,5 +216,38 @@ describe('Export Assembly Pipeline', () => {
         expect(result).toBeDefined();
         expect(result.reviewItems).toHaveLength(0);
         expect(result.meta.totalNodes).toBe(0);
+    });
+
+    it('excludes timeline context when Include Timeline is off', () => {
+        const result = runAssembly(
+            {
+                ...SUMMARY_REQUEST,
+                config: { ...SUMMARY_REQUEST.config, includeTimeline: false },
+            },
+            FIXTURE_NODES,
+            FIXTURE_TIMELINE,
+        );
+
+        expect(result.assembly.path).toBe('case_summary');
+        if (result.assembly.path === 'case_summary') {
+            expect(result.assembly.mappedSections.timelineSummary).toHaveLength(0);
+        }
+        expect(result.assembly.narrative.chronology).toHaveLength(0);
+    });
+
+    it('uses only selected timeline events when Include Timeline is on with selected incidents', () => {
+        const result = runAssembly(
+            {
+                ...SUMMARY_REQUEST,
+                selectedTimelineIds: ['timeline-2'],
+            },
+            FIXTURE_NODES,
+            FIXTURE_TIMELINE,
+        );
+
+        expect(result.assembly.narrative.chronology.length).toBeGreaterThan(0);
+        const serialized = JSON.stringify(result.assembly.narrative.chronology);
+        expect(serialized).toContain('timeline-2');
+        expect(serialized).not.toContain('timeline-1');
     });
 });

@@ -54,6 +54,18 @@ interface ClarificationModalProps {
     onSaveToSettings?: (patch: Partial<CourtIdentity>) => Promise<boolean>;
     /** Source of each resolved field — used to determine smart rendering. */
     resolvedFieldSources?: Record<string, FieldResolutionSource>;
+    exhibitClarification?: {
+        reference: string;
+        candidates: Array<{
+            id: string;
+            title: string;
+            content?: string;
+            score: number;
+            reasons: string[];
+        }>;
+        onSelect: (candidateId: string) => void;
+        onSkip: () => void;
+    };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -190,7 +202,7 @@ async function saveToSettingsWithTimeout(
 export default function ClarificationModal({
     isOpen, onClose, onContinue, rawDocumentText,
     courtMode, courtIssues, courtIdentity, onResolve, onSaveToSettings,
-    resolvedFieldSources,
+    resolvedFieldSources, exhibitClarification,
 }: ClarificationModalProps) {
     const titleId = useId();
     const descriptionId = useId();
@@ -215,6 +227,7 @@ export default function ClarificationModal({
 
     // Determine active mode
     const activeMode = courtMode ?? (courtIssues?.length ? getPriorityMode(courtIssues) : undefined);
+    const isExhibitMode = Boolean(exhibitClarification);
     const isCourtMode = !!activeMode && activeMode !== 'missing_structure';
     const config = activeMode ? MODE_CONFIGS[activeMode] : null;
 
@@ -516,17 +529,53 @@ export default function ClarificationModal({
                                 : <Info size={20} weight="fill" className="text-[#38BDF8]" />
                             }
                             <h2 id={titleId} className="text-[16px] font-bold text-white tracking-tight">
-                                {config?.title ?? 'Clarification Needed'}
+                                {exhibitClarification ? 'Match Exhibit Reference' : config?.title ?? 'Clarification Needed'}
                             </h2>
                         </div>
                         <p id={descriptionId} className="text-[14px] text-white/70 leading-relaxed">
-                            {config?.description ?? 'This document needs additional information.'}
+                            {exhibitClarification
+                                ? `NEXX found "${exhibitClarification.reference}" in your document. Choose the matching Exhibit Hub item, or skip this reference.`
+                                : config?.description ?? 'This document needs additional information.'}
                         </p>
                     </div>
 
                     {/* Body */}
                     <div className="p-6 space-y-4 overflow-y-auto flex-1">
-                        {isCourtMode ? (
+                        {exhibitClarification ? (
+                            <div className="space-y-3">
+                                {exhibitClarification.candidates.map(candidate => (
+                                    <button
+                                        key={candidate.id}
+                                        type="button"
+                                        onClick={() => exhibitClarification.onSelect(candidate.id)}
+                                        disabled={isProcessing}
+                                        className="w-full p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-[#3B82F6]/10 hover:border-[#3B82F6]/40 transition-all text-left disabled:opacity-50"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="text-[14px] font-bold text-white">{candidate.title}</p>
+                                            <span className="text-[10px] font-bold text-[#93C5FD] uppercase tracking-widest">
+                                                {candidate.score}
+                                            </span>
+                                        </div>
+                                        {candidate.content && (
+                                            <p className="mt-1 text-[12px] text-white/50 line-clamp-2">{candidate.content}</p>
+                                        )}
+                                        {candidate.reasons.length > 0 && (
+                                            <p className="mt-2 text-[11px] text-white/35">
+                                                Matched by {candidate.reasons.join(', ')}
+                                            </p>
+                                        )}
+                                    </button>
+                                ))}
+                                <textarea
+                                    value={details}
+                                    onChange={e => setDetails(e.target.value)}
+                                    className="w-full min-h-[80px] rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-[13px] text-white/90 placeholder:text-white/30 focus:outline-none focus:border-[#3B82F6]/50 resize-y transition-colors"
+                                    placeholder="Write another clarification if none of these are right..."
+                                    disabled={isProcessing}
+                                />
+                            </div>
+                        ) : isCourtMode ? (
                             <>
                                 {/* Issue list */}
                                 {modeIssues.length > 0 && (
@@ -793,7 +842,27 @@ export default function ClarificationModal({
 
                     {/* Footer Actions */}
                     <div className="p-5 px-6 border-t border-white/5 bg-black/20 rounded-b-[20px] flex items-center justify-between gap-3">
-                        {isCourtMode ? (
+                        {isExhibitMode ? (
+                            <div className="flex items-center gap-3 ml-auto">
+                                <button type="button" onClick={exhibitClarification?.onSkip} disabled={isProcessing}
+                                    className="px-5 py-2.5 rounded-xl text-[13px] font-bold text-white/50 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40">
+                                    None / Skip
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (details.trim()) {
+                                            onContinue('other', details.trim());
+                                        } else {
+                                            onClose();
+                                        }
+                                    }}
+                                    disabled={isProcessing}
+                                    className="px-5 py-2.5 rounded-xl text-[13px] font-bold text-white/50 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40">
+                                    {details.trim() ? 'Save Clarification' : 'Write Clarification'}
+                                </button>
+                            </div>
+                        ) : isCourtMode ? (
                             <>
                                 <button
                                     type="button"

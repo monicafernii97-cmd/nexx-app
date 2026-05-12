@@ -27,7 +27,7 @@ import {
     Circle,
     XCircle,
 } from '@phosphor-icons/react';
-import { useExport, type DraftingStage } from '../context/ExportContext';
+import { useExport, type DraftingStage, type ExportExhibitReferenceMatch } from '../context/ExportContext';
 import { useDraftingStream, type DraftStreamInput } from '@/hooks/useDraftingStream';
 import { runPreflightChecks } from '@/lib/export-assembly/validation/preflightValidator';
 import MappingCanvas from '@/components/review/MappingCanvas';
@@ -39,6 +39,12 @@ import { detectCourtDocumentIssues, ISSUE_TO_MODE, MODE_PRIORITY, type Clarifica
 import { resolveCourtIdentity, type CourtSettingsData, type NexProfileData, type UserProfileData, type CourtIdentity } from '@/lib/exports/resolveCourtIdentity';
 import { storeCourtHandoff } from '@/lib/exports/courtHandoff';
 import { extractCourtMetadataFromText } from '@/lib/exports/extractCourtMetadataFromText';
+import {
+    matchExhibitReferences,
+    type AmbiguousExhibitReference,
+    type ExhibitHubCandidate,
+    type ResolvedExhibitReference,
+} from '@/lib/exports/exhibits/matchExhibitReferences';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 
@@ -139,6 +145,79 @@ function buildCourtIdentitySourceText(
         .join('\n');
 }
 
+type ExhibitSourceDoc = {
+    _id: string;
+    type?: string;
+    title?: string;
+    content?: string;
+    caseId?: string;
+    metadataJson?: string;
+};
+
+function parseMetadataJson(metadataJson?: string): Record<string, unknown> {
+    if (!metadataJson) return {};
+    try {
+        const parsed = JSON.parse(metadataJson);
+        return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {};
+    } catch {
+        return {};
+    }
+}
+
+function readStringField(record: Record<string, unknown>, keys: string[]): string | undefined {
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return undefined;
+}
+
+function sameCaseOrUnscoped(docCaseId: unknown, activeCaseId?: string): boolean {
+    return !activeCaseId || !docCaseId || String(docCaseId) === activeCaseId;
+}
+
+function buildExhibitCandidates(
+    rawPins: ExhibitSourceDoc[] | undefined,
+    rawExhibitNotes: ExhibitSourceDoc[] | undefined,
+    activeCaseId?: string,
+): ExhibitHubCandidate[] {
+    const candidates = new Map<string, ExhibitHubCandidate>();
+
+    for (const note of rawExhibitNotes ?? []) {
+        if (!sameCaseOrUnscoped(note.caseId, activeCaseId)) continue;
+        const metadata = parseMetadataJson(note.metadataJson);
+        candidates.set(String(note._id), {
+            id: String(note._id),
+            title: note.title?.trim() || 'Untitled exhibit',
+            content: note.content,
+            label: readStringField(metadata, ['label', 'exhibitLabel', 'exhibit', 'reference']),
+            filename: readStringField(metadata, ['filename', 'fileName', 'sourceFileName']),
+            source: 'case_memory',
+        });
+    }
+
+    for (const pin of rawPins ?? []) {
+        if (!sameCaseOrUnscoped(pin.caseId, activeCaseId)) continue;
+        if (!['key_fact', 'draft_snippet', 'timeline_anchor'].includes(pin.type ?? '')) continue;
+        candidates.set(String(pin._id), {
+            id: String(pin._id),
+            title: pin.title?.trim() || 'Untitled exhibit',
+            content: pin.content,
+            source: 'case_pin',
+        });
+    }
+
+    return [...candidates.values()];
+}
+
+function toExportMatches(resolved: ResolvedExhibitReference[]): ExportExhibitReferenceMatch[] {
+    return resolved.map(({ mention, match }) => ({
+        reference: mention.raw,
+        exhibitId: match.exhibit.id,
+        exhibitTitle: match.exhibit.title,
+    }));
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -196,6 +275,10 @@ export default function ReviewHubContent() {
 
     // UI redesign shell states
     const [showClarificationModal, setShowClarificationModal] = useState(false);
+    const [showExhibitClarification, setShowExhibitClarification] = useState(false);
+    const [activeExhibitAmbiguity, setActiveExhibitAmbiguity] = useState<AmbiguousExhibitReference | null>(null);
+    const appliedExhibitReferenceKeyRef = useRef('');
+    const promptedExhibitReferenceKeyRef = useRef('');
     
     // Show the clarification modal if there are unclassified items
     const clarificationShownRef = useRef(false);
@@ -215,6 +298,8 @@ export default function ReviewHubContent() {
     // Query court settings and nex profile for full identity resolution
     const rawCourtSettings = useQuery(api.courtSettings.get);
     const rawNexProfile = useQuery(api.nexProfiles.getByUser);
+    const rawCasePins = useQuery(api.casePins.listByUser, {});
+    const rawExhibitNotes = useQuery(api.caseMemory.listByType, { type: 'exhibit_note' });
 
     // Map Convex objects to the shapes expected by resolveCourtIdentity
     const courtSettingsData = useMemo((): CourtSettingsData | undefined => (
@@ -364,6 +449,79 @@ export default function ReviewHubContent() {
             };
         });
     }, [state.reviewItems, state.overrides.itemOverrides]);
+
+    const pastedDocumentText = useMemo(() => {
+        const configuredText = state.config?.pastedContent?.trim();
+        if (configuredText) return configuredText;
+        return effectiveItems
+            .map(item => item.userOverride?.editedText ?? item.originalText)
+            .filter(text => text.trim())
+            .join('\n\n');
+    }, [state.config?.pastedContent, effectiveItems]);
+
+    const exhibitCandidates = useMemo(
+        () => buildExhibitCandidates(
+            rawCasePins as ExhibitSourceDoc[] | undefined,
+            rawExhibitNotes as ExhibitSourceDoc[] | undefined,
+            state.caseId ? String(state.caseId) : undefined,
+        ),
+        [rawCasePins, rawExhibitNotes, state.caseId],
+    );
+
+    const exhibitMatchResult = useMemo(() => {
+        if (!isCourtDocument || state.phase !== 'reviewing' || !pastedDocumentText.trim()) {
+            return { mentions: [], confirmed: [], ambiguous: [] };
+        }
+        return matchExhibitReferences(pastedDocumentText, exhibitCandidates);
+    }, [isCourtDocument, state.phase, pastedDocumentText, exhibitCandidates]);
+
+    useEffect(() => {
+        if (exhibitMatchResult.confirmed.length === 0) return;
+        const existingReferences = new Set(state.exhibitReferenceMatches.map(match => match.reference));
+        const nextMatches = exhibitMatchResult.confirmed.filter(({ mention }) => !existingReferences.has(mention.raw));
+        if (nextMatches.length === 0) return;
+
+        const key = nextMatches
+            .map(({ mention, match }) => `${mention.raw}:${match.exhibit.id}`)
+            .join('|');
+        if (appliedExhibitReferenceKeyRef.current === key) return;
+        appliedExhibitReferenceKeyRef.current = key;
+
+        dispatch({
+            type: 'APPLY_EXHIBIT_REFERENCE_MATCHES',
+            matches: toExportMatches(nextMatches),
+        });
+    }, [dispatch, exhibitMatchResult.confirmed, state.exhibitReferenceMatches]);
+
+    useEffect(() => {
+        if (!isCourtDocument || state.phase !== 'reviewing') return;
+        if (showClarificationModal || state.showCourtClarification || showExhibitClarification || activeExhibitAmbiguity) return;
+
+        const resolvedReferences = new Set([
+            ...state.exhibitReferenceMatches.map(match => match.reference),
+            ...state.skippedExhibitReferences,
+        ]);
+        const nextAmbiguity = exhibitMatchResult.ambiguous.find(({ mention }) => !resolvedReferences.has(mention.raw));
+        if (!nextAmbiguity) return;
+
+        const key = `${nextAmbiguity.mention.raw}:${nextAmbiguity.candidates.map(candidate => candidate.exhibit.id).join(',')}`;
+        if (promptedExhibitReferenceKeyRef.current === key) return;
+        promptedExhibitReferenceKeyRef.current = key;
+
+        setActiveExhibitAmbiguity(nextAmbiguity);
+        setShowExhibitClarification(true);
+    }, [
+        activeExhibitAmbiguity,
+        dispatch,
+        exhibitMatchResult.ambiguous,
+        isCourtDocument,
+        showClarificationModal,
+        showExhibitClarification,
+        state.exhibitReferenceMatches,
+        state.phase,
+        state.showCourtClarification,
+        state.skippedExhibitReferences,
+    ]);
 
     // Group review items by their suggested section (first suggestion)
     const sectionGroups = useMemo(() => {
@@ -599,6 +757,63 @@ export default function ReviewHubContent() {
         setRevisingItemId(nodeId);
     }, [editItem]);
 
+    const closeExhibitClarification = useCallback((skipReference: boolean) => {
+        if (skipReference && activeExhibitAmbiguity) {
+            dispatch({
+                type: 'APPLY_EXHIBIT_REFERENCE_MATCHES',
+                matches: [],
+                skippedReferences: [activeExhibitAmbiguity.mention.raw],
+            });
+        }
+        setShowExhibitClarification(false);
+        setActiveExhibitAmbiguity(null);
+    }, [activeExhibitAmbiguity, dispatch]);
+
+    const handleSelectExhibitCandidate = useCallback((candidateId: string) => {
+        if (!activeExhibitAmbiguity) return;
+        const selected = activeExhibitAmbiguity.candidates.find(candidate => candidate.exhibit.id === candidateId);
+        if (!selected) return;
+
+        dispatch({
+            type: 'APPLY_EXHIBIT_REFERENCE_MATCHES',
+            matches: [{
+                reference: activeExhibitAmbiguity.mention.raw,
+                exhibitId: selected.exhibit.id,
+                exhibitTitle: selected.exhibit.title,
+            }],
+        });
+        closeExhibitClarification(false);
+    }, [activeExhibitAmbiguity, closeExhibitClarification, dispatch]);
+
+    const handleTypedExhibitClarification = useCallback((details: string) => {
+        if (!activeExhibitAmbiguity) return;
+        const clarifiedText = `${activeExhibitAmbiguity.mention.raw}\n${details}`;
+        const clarified = matchExhibitReferences(
+            clarifiedText,
+            activeExhibitAmbiguity.candidates.map(candidate => candidate.exhibit),
+        );
+        const selected = clarified.confirmed[0]?.match;
+
+        if (selected) {
+            dispatch({
+                type: 'APPLY_EXHIBIT_REFERENCE_MATCHES',
+                matches: [{
+                    reference: activeExhibitAmbiguity.mention.raw,
+                    exhibitId: selected.exhibit.id,
+                    exhibitTitle: selected.exhibit.title,
+                }],
+            });
+            closeExhibitClarification(false);
+            return;
+        }
+
+        closeExhibitClarification(true);
+    }, [activeExhibitAmbiguity, closeExhibitClarification, dispatch]);
+
+    const handleSkipExhibitReference = useCallback(() => {
+        closeExhibitClarification(true);
+    }, [closeExhibitClarification]);
+
     // =========================================================================
     // Phase Routing
     // =========================================================================
@@ -770,8 +985,11 @@ export default function ReviewHubContent() {
 
             {/* ── Clarification Modal Overlay ── */}
             <ClarificationModal
-                isOpen={showClarificationModal || state.showCourtClarification}
+                isOpen={showClarificationModal || state.showCourtClarification || showExhibitClarification}
                 onClose={() => {
+                    if (activeExhibitAmbiguity) {
+                        closeExhibitClarification(true);
+                    }
                     if (!clarificationAppliedRef.current) {
                         resumeDraftAfterClarificationRef.current = false;
                     }
@@ -784,6 +1002,14 @@ export default function ReviewHubContent() {
                 }
                 onContinue={(action, details, resolvedText) => {
                     console.log('[ReviewHub] Clarification resolved:', action, details);
+                    if (activeExhibitAmbiguity) {
+                        if (details.trim()) {
+                            handleTypedExhibitClarification(details.trim());
+                        } else {
+                            closeExhibitClarification(true);
+                        }
+                        return;
+                    }
                     setShowClarificationModal(false);
                     dispatch({ type: 'SHOW_COURT_CLARIFICATION', show: false });
                     if (resolvedText && action === 'generate_titles') {
@@ -855,6 +1081,18 @@ export default function ReviewHubContent() {
                     }
                 }}
                 resolvedFieldSources={resolvedIdentity?.fieldSources}
+                exhibitClarification={activeExhibitAmbiguity ? {
+                    reference: activeExhibitAmbiguity.mention.raw,
+                    candidates: activeExhibitAmbiguity.candidates.map(candidate => ({
+                        id: candidate.exhibit.id,
+                        title: candidate.exhibit.title,
+                        content: candidate.exhibit.content,
+                        score: candidate.score,
+                        reasons: candidate.reasons,
+                    })),
+                    onSelect: handleSelectExhibitCandidate,
+                    onSkip: handleSkipExhibitReference,
+                } : undefined}
             />
         </div>
     );

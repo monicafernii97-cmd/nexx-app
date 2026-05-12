@@ -41,7 +41,6 @@ import { storeCourtHandoff } from '@/lib/exports/courtHandoff';
 import { extractCourtMetadataFromText } from '@/lib/exports/extractCourtMetadataFromText';
 import {
     matchExhibitReferences,
-    type AmbiguousExhibitReference,
     type ExhibitHubCandidate,
     type ResolvedExhibitReference,
 } from '@/lib/exports/exhibits/matchExhibitReferences';
@@ -154,6 +153,15 @@ type ExhibitSourceDoc = {
     metadataJson?: string;
 };
 
+type TimelineEventDoc = {
+    _id: string;
+    title?: string;
+    description?: string;
+    eventDate?: string;
+    status?: 'candidate' | 'confirmed';
+    caseId?: string;
+};
+
 /** Safely parse exhibit metadata stored as JSON, falling back to an empty object. */
 function parseMetadataJson(metadataJson?: string): Record<string, unknown> {
     if (!metadataJson) return {};
@@ -214,6 +222,27 @@ function buildExhibitCandidates(
     return [...candidates.values()];
 }
 
+function buildTimelineEvents(
+    rawEvents: TimelineEventDoc[] | undefined,
+    activeCaseId?: string,
+): TimelineEventDoc[] {
+    return (rawEvents ?? [])
+        .filter(event => sameCaseOrUnscoped(event.caseId, activeCaseId))
+        .sort((a, b) => {
+            const aDate = a.eventDate ?? '';
+            const bDate = b.eventDate ?? '';
+            if (aDate && bDate && aDate !== bDate) return aDate.localeCompare(bDate);
+            if (aDate) return -1;
+            if (bDate) return 1;
+            return (a.title ?? '').localeCompare(b.title ?? '');
+        });
+}
+
+function formatTimelineDate(eventDate?: string): string {
+    if (!eventDate) return 'Undated';
+    return eventDate;
+}
+
 /** Convert resolved matcher results into the export context's persisted match shape. */
 function toExportMatches(resolved: ResolvedExhibitReference[]): ExportExhibitReferenceMatch[] {
     return resolved.map(({ mention, match }) => ({
@@ -249,7 +278,8 @@ export default function ReviewHubContent() {
     const [revisingItemId, setRevisingItemId] = useState<string | null>(null);
     const [isDrafting, setIsDrafting] = useState(false);
     const [showPreflight, setShowPreflight] = useState(false);
-    const [exhibitClarificationError, setExhibitClarificationError] = useState<string | null>(null);
+    const [manualExhibitId, setManualExhibitId] = useState('');
+    const [manualExhibitReference, setManualExhibitReference] = useState('');
 
     // Court document: compute whether export is allowed
     const isCourtDocument = state.exportPath === 'court_document';
@@ -281,10 +311,7 @@ export default function ReviewHubContent() {
 
     // UI redesign shell states
     const [showClarificationModal, setShowClarificationModal] = useState(false);
-    const [showExhibitClarification, setShowExhibitClarification] = useState(false);
-    const [activeExhibitAmbiguity, setActiveExhibitAmbiguity] = useState<AmbiguousExhibitReference | null>(null);
     const appliedExhibitReferenceKeyRef = useRef('');
-    const promptedExhibitReferenceKeyRef = useRef('');
     
     // Show the clarification modal if there are unclassified items
     const clarificationShownRef = useRef(false);
@@ -306,6 +333,7 @@ export default function ReviewHubContent() {
     const rawNexProfile = useQuery(api.nexProfiles.getByUser);
     const rawCasePins = useQuery(api.casePins.listByUser, {});
     const rawExhibitNotes = useQuery(api.caseMemory.listByType, { type: 'exhibit_note' });
+    const rawTimelineEvents = useQuery(api.timelineCandidates.listByUser, {});
 
     // Map Convex objects to the shapes expected by resolveCourtIdentity
     const courtSettingsData = useMemo((): CourtSettingsData | undefined => (
@@ -474,6 +502,20 @@ export default function ReviewHubContent() {
         [rawCasePins, rawExhibitNotes, state.caseId],
     );
 
+    const timelineEvents = useMemo(
+        () => buildTimelineEvents(
+            rawTimelineEvents as TimelineEventDoc[] | undefined,
+            state.caseId ? String(state.caseId) : undefined,
+        ),
+        [rawTimelineEvents, state.caseId],
+    );
+
+    const selectedTimelineIds = useMemo(
+        () => state.config?.selectedTimelineIds ?? state.exportRequest?.selectedTimelineIds ?? [],
+        [state.config?.selectedTimelineIds, state.exportRequest?.selectedTimelineIds],
+    );
+    const selectedTimelineIdSet = useMemo(() => new Set(selectedTimelineIds), [selectedTimelineIds]);
+
     const exhibitMatchResult = useMemo(() => {
         if (!isCourtDocument || state.phase !== 'reviewing' || !pastedDocumentText.trim()) {
             return { mentions: [], confirmed: [], ambiguous: [] };
@@ -483,8 +525,13 @@ export default function ReviewHubContent() {
 
     useEffect(() => {
         if (exhibitMatchResult.confirmed.length === 0) return;
-        const existingReferences = new Set(state.exhibitReferenceMatches.map(match => match.reference));
-        const nextMatches = exhibitMatchResult.confirmed.filter(({ mention }) => !existingReferences.has(mention.raw));
+        const resolvedOrSkippedReferences = new Set([
+            ...state.exhibitReferenceMatches.map(match => match.reference),
+            ...state.skippedExhibitReferences,
+        ]);
+        const nextMatches = exhibitMatchResult.confirmed.filter(
+            ({ mention }) => !resolvedOrSkippedReferences.has(mention.raw),
+        );
         if (nextMatches.length === 0) return;
 
         const key = nextMatches
@@ -497,37 +544,15 @@ export default function ReviewHubContent() {
             type: 'APPLY_EXHIBIT_REFERENCE_MATCHES',
             matches: toExportMatches(nextMatches),
         });
-    }, [dispatch, exhibitMatchResult.confirmed, state.exhibitReferenceMatches]);
+    }, [dispatch, exhibitMatchResult.confirmed, state.exhibitReferenceMatches, state.skippedExhibitReferences]);
 
-    useEffect(() => {
-        if (!isCourtDocument || state.phase !== 'reviewing') return;
-        if (showClarificationModal || state.showCourtClarification || showExhibitClarification || activeExhibitAmbiguity) return;
-
+    const unresolvedExhibitAmbiguities = useMemo(() => {
         const resolvedReferences = new Set([
             ...state.exhibitReferenceMatches.map(match => match.reference),
             ...state.skippedExhibitReferences,
         ]);
-        const nextAmbiguity = exhibitMatchResult.ambiguous.find(({ mention }) => !resolvedReferences.has(mention.raw));
-        if (!nextAmbiguity) return;
-
-        const key = `${nextAmbiguity.mention.raw}:${nextAmbiguity.candidates.map(candidate => candidate.exhibit.id).join(',')}`;
-        if (promptedExhibitReferenceKeyRef.current === key) return;
-        promptedExhibitReferenceKeyRef.current = key;
-
-        setExhibitClarificationError(null);
-        setActiveExhibitAmbiguity(nextAmbiguity);
-        setShowExhibitClarification(true);
-    }, [
-        activeExhibitAmbiguity,
-        exhibitMatchResult.ambiguous,
-        isCourtDocument,
-        showClarificationModal,
-        showExhibitClarification,
-        state.exhibitReferenceMatches,
-        state.phase,
-        state.showCourtClarification,
-        state.skippedExhibitReferences,
-    ]);
+        return exhibitMatchResult.ambiguous.filter(({ mention }) => !resolvedReferences.has(mention.raw));
+    }, [exhibitMatchResult.ambiguous, state.exhibitReferenceMatches, state.skippedExhibitReferences]);
 
     // Group review items by their suggested section (first suggestion)
     const sectionGroups = useMemo(() => {
@@ -763,65 +788,88 @@ export default function ReviewHubContent() {
         setRevisingItemId(nodeId);
     }, [editItem]);
 
-    const closeExhibitClarification = useCallback((skipReference: boolean) => {
-        if (skipReference && activeExhibitAmbiguity) {
-            dispatch({
-                type: 'APPLY_EXHIBIT_REFERENCE_MATCHES',
-                matches: [],
-                skippedReferences: [activeExhibitAmbiguity.mention.raw],
-            });
-        }
-        setExhibitClarificationError(null);
-        setShowExhibitClarification(false);
-        setActiveExhibitAmbiguity(null);
-    }, [activeExhibitAmbiguity, dispatch]);
-
-    const handleSelectExhibitCandidate = useCallback((candidateId: string) => {
-        if (!activeExhibitAmbiguity) return;
-        const selected = activeExhibitAmbiguity.candidates.find(candidate => candidate.exhibit.id === candidateId);
+    const handleSelectExhibitCandidate = useCallback((reference: string, candidateId: string) => {
+        const selected = exhibitCandidates.find(candidate => candidate.id === candidateId);
         if (!selected) return;
 
-        setExhibitClarificationError(null);
         dispatch({
             type: 'APPLY_EXHIBIT_REFERENCE_MATCHES',
             matches: [{
-                reference: activeExhibitAmbiguity.mention.raw,
-                exhibitId: selected.exhibit.id,
-                exhibitTitle: selected.exhibit.title,
+                reference,
+                exhibitId: selected.id,
+                exhibitTitle: selected.title,
             }],
         });
-        closeExhibitClarification(false);
-    }, [activeExhibitAmbiguity, closeExhibitClarification, dispatch]);
+    }, [dispatch, exhibitCandidates]);
 
-    const handleTypedExhibitClarification = useCallback((details: string) => {
-        if (!activeExhibitAmbiguity) return;
-        const clarifiedText = `${activeExhibitAmbiguity.mention.raw}\n${details}`;
-        const clarified = matchExhibitReferences(
-            clarifiedText,
-            activeExhibitAmbiguity.candidates.map(candidate => candidate.exhibit),
-        );
-        const selected = clarified.confirmed[0]?.match;
+    const handleSkipExhibitReference = useCallback((reference: string) => {
+        dispatch({
+            type: 'APPLY_EXHIBIT_REFERENCE_MATCHES',
+            matches: [],
+            skippedReferences: [reference],
+        });
+    }, [dispatch]);
 
-        if (selected) {
-            dispatch({
-                type: 'APPLY_EXHIBIT_REFERENCE_MATCHES',
-                matches: [{
-                    reference: activeExhibitAmbiguity.mention.raw,
-                    exhibitId: selected.exhibit.id,
-                    exhibitTitle: selected.exhibit.title,
-                }],
-            });
-            closeExhibitClarification(false);
-            return;
+    const handleRemoveExhibitReference = useCallback((reference: string) => {
+        dispatch({ type: 'REMOVE_EXHIBIT_REFERENCE_MATCH', reference, skipReference: true });
+    }, [dispatch]);
+
+    const handleAddManualExhibit = useCallback(() => {
+        const selected = exhibitCandidates.find(candidate => candidate.id === manualExhibitId);
+        if (!selected) return;
+        const reference = manualExhibitReference.trim() || selected.label || selected.title;
+
+        dispatch({
+            type: 'APPLY_EXHIBIT_REFERENCE_MATCHES',
+            matches: [{
+                reference,
+                exhibitId: selected.id,
+                exhibitTitle: selected.title,
+            }],
+        });
+        setManualExhibitId('');
+        setManualExhibitReference('');
+    }, [dispatch, exhibitCandidates, manualExhibitId, manualExhibitReference]);
+
+    const handleUseEntireTimeline = useCallback(() => {
+        dispatch({
+            type: 'UPDATE_TIMELINE_SELECTION',
+            includeTimeline: true,
+            selectedTimelineIds: timelineEvents.map(event => String(event._id)),
+        });
+    }, [dispatch, timelineEvents]);
+
+    const handleClearTimeline = useCallback(() => {
+        dispatch({
+            type: 'UPDATE_TIMELINE_SELECTION',
+            includeTimeline: false,
+            selectedTimelineIds: [],
+        });
+    }, [dispatch]);
+
+    const handleToggleIncludeTimeline = useCallback(() => {
+        dispatch({
+            type: 'UPDATE_TIMELINE_SELECTION',
+            includeTimeline: !includeTimeline,
+            selectedTimelineIds: selectedTimelineIds.length > 0
+                ? selectedTimelineIds
+                : timelineEvents.map(event => String(event._id)),
+        });
+    }, [dispatch, includeTimeline, selectedTimelineIds, timelineEvents]);
+
+    const handleToggleTimelineEvent = useCallback((eventId: string) => {
+        const next = new Set(selectedTimelineIds);
+        if (next.has(eventId)) {
+            next.delete(eventId);
+        } else {
+            next.add(eventId);
         }
-
-        setExhibitClarificationError('That clarification did not identify an exhibit. Choose a suggested exhibit or try a more specific title, label, or filename.');
-        setShowExhibitClarification(true);
-    }, [activeExhibitAmbiguity, closeExhibitClarification, dispatch]);
-
-    const handleSkipExhibitReference = useCallback(() => {
-        closeExhibitClarification(true);
-    }, [closeExhibitClarification]);
+        dispatch({
+            type: 'UPDATE_TIMELINE_SELECTION',
+            includeTimeline: next.size > 0,
+            selectedTimelineIds: [...next],
+        });
+    }, [dispatch, selectedTimelineIds]);
 
     // =========================================================================
     // Phase Routing
@@ -898,7 +946,7 @@ export default function ReviewHubContent() {
                                 role="switch"
                                 aria-checked={includeTimeline}
                                 title="Include chronological timeline content in this export"
-                                onClick={() => updateReviewOptions({ includeTimeline: !includeTimeline })}
+                                onClick={handleToggleIncludeTimeline}
                                 className={`px-3 py-2 rounded-xl border text-[11px] font-bold transition-all ${
                                     includeTimeline
                                         ? 'bg-[#60A5FA]/20 border-[#60A5FA]/40 text-[#93C5FD]'
@@ -962,6 +1010,171 @@ export default function ReviewHubContent() {
                     </div>
                 )}
 
+                {/* Timeline & Exhibits: optional, quiet review surface */}
+                <div className="shrink-0 mx-6 mt-3 rounded-xl border border-white/10 bg-white/[0.03]">
+                    <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-3">
+                        <div>
+                            <h2 className="text-[13px] font-bold text-white">Timeline & Exhibits</h2>
+                            <p className="text-[11px] text-white/45">
+                                Optional references for this export. Ignored suggestions will not block finalization.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-white/45">
+                            <span>{state.exhibitReferenceMatches.length} exhibit link{state.exhibitReferenceMatches.length === 1 ? '' : 's'}</span>
+                            <span>-</span>
+                            <span>{selectedTimelineIds.length} timeline item{selectedTimelineIds.length === 1 ? '' : 's'}</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 p-4">
+                        <section className="space-y-3 min-w-0">
+                            <div className="flex items-center justify-between gap-3">
+                                <h3 className="text-[12px] font-bold uppercase tracking-wide text-white/60">Exhibit References</h3>
+                                {unresolvedExhibitAmbiguities.length > 0 && (
+                                    <span className="px-2 py-1 rounded-md bg-amber-400/10 text-amber-300 text-[10px] font-bold">
+                                        {unresolvedExhibitAmbiguities.length} needs review
+                                    </span>
+                                )}
+                            </div>
+
+                            {state.exhibitReferenceMatches.length > 0 && (
+                                <div className="space-y-2">
+                                    {state.exhibitReferenceMatches.map(match => (
+                                        <div key={`${match.reference}:${match.exhibitId}`} className="flex items-center justify-between gap-3 rounded-lg bg-emerald-400/10 border border-emerald-400/20 px-3 py-2">
+                                            <div className="min-w-0">
+                                                <p className="text-[12px] font-bold text-emerald-200 truncate">{match.reference}</p>
+                                                <p className="text-[11px] text-white/50 truncate">{match.exhibitTitle}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveExhibitReference(match.reference)}
+                                                className="text-[11px] font-bold text-white/45 hover:text-white transition-colors"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {unresolvedExhibitAmbiguities.map(ambiguity => (
+                                <div key={`${ambiguity.mention.raw}:${ambiguity.mention.index}`} className="rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-3 space-y-2">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="text-[12px] font-bold text-white">{ambiguity.mention.raw}</p>
+                                            <p className="text-[11px] text-amber-200/80">Needs review</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSkipExhibitReference(ambiguity.mention.raw)}
+                                            className="text-[11px] font-bold text-white/45 hover:text-white transition-colors"
+                                        >
+                                            Skip
+                                        </button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {ambiguity.candidates.map(candidate => (
+                                            <button
+                                                key={candidate.exhibit.id}
+                                                type="button"
+                                                onClick={() => handleSelectExhibitCandidate(ambiguity.mention.raw, candidate.exhibit.id)}
+                                                className="max-w-full px-2.5 py-1.5 rounded-md bg-white/5 border border-white/10 hover:border-[#60A5FA]/40 hover:bg-[#60A5FA]/10 transition-colors text-left"
+                                            >
+                                                <span className="block text-[11px] font-bold text-white truncate">{candidate.exhibit.title}</span>
+                                                <span className="block text-[10px] text-white/40">{candidate.score} match</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                <input
+                                    value={manualExhibitReference}
+                                    onChange={event => setManualExhibitReference(event.target.value)}
+                                    placeholder="Reference label"
+                                    className="sm:w-36 rounded-lg bg-black/20 border border-white/10 px-3 py-2 text-[12px] text-white placeholder:text-white/30 focus:outline-none focus:border-[#60A5FA]/50"
+                                />
+                                <select
+                                    value={manualExhibitId}
+                                    onChange={event => setManualExhibitId(event.target.value)}
+                                    className="min-w-0 flex-1 rounded-lg bg-black/20 border border-white/10 px-3 py-2 text-[12px] text-white focus:outline-none focus:border-[#60A5FA]/50"
+                                >
+                                    <option value="">Add from Exhibit Hub...</option>
+                                    {exhibitCandidates.map(candidate => (
+                                        <option key={candidate.id} value={candidate.id}>{candidate.title}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={handleAddManualExhibit}
+                                    disabled={!manualExhibitId}
+                                    className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-[12px] font-bold text-white/70 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Add
+                                </button>
+                            </div>
+                        </section>
+
+                        <section className="space-y-3 min-w-0">
+                            <div className="flex items-center justify-between gap-3">
+                                <h3 className="text-[12px] font-bold uppercase tracking-wide text-white/60">Timeline Context</h3>
+                                <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${includeTimeline ? 'bg-[#60A5FA]/15 text-[#93C5FD]' : 'bg-white/5 text-white/45'}`}>
+                                    {includeTimeline ? 'Included' : 'Not included'}
+                                </span>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleUseEntireTimeline}
+                                    disabled={timelineEvents.length === 0}
+                                    className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-[12px] font-bold text-white/70 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Use Entire Timeline
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleClearTimeline}
+                                    className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-[12px] font-bold text-white/55 hover:text-white hover:bg-white/10 transition-colors"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+
+                            <div className="max-h-48 overflow-y-auto space-y-2 pr-1" style={{ scrollbarWidth: 'thin' }}>
+                                {timelineEvents.length === 0 ? (
+                                    <p className="text-[12px] text-white/40">No timeline events are available for this case.</p>
+                                ) : timelineEvents.map(event => {
+                                    const eventId = String(event._id);
+                                    const selected = selectedTimelineIdSet.has(eventId);
+                                    return (
+                                        <label key={eventId} className={`flex items-start gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+                                            selected
+                                                ? 'bg-[#60A5FA]/10 border-[#60A5FA]/30'
+                                                : 'bg-white/5 border-white/10 hover:bg-white/10'
+                                        }`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selected}
+                                                onChange={() => handleToggleTimelineEvent(eventId)}
+                                                className="mt-0.5"
+                                            />
+                                            <span className="min-w-0">
+                                                <span className="block text-[12px] font-bold text-white truncate">{event.title || 'Untitled timeline event'}</span>
+                                                <span className="block text-[11px] text-white/45">
+                                                    {formatTimelineDate(event.eventDate)}
+                                                    {event.status ? ` - ${event.status}` : ''}
+                                                </span>
+                                            </span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
                 {/* Canvas */}
                 <div className="flex-1 flex overflow-hidden">
                     {/* Mapping Canvas */}
@@ -994,12 +1207,9 @@ export default function ReviewHubContent() {
 
             {/* ── Clarification Modal Overlay ── */}
             <ClarificationModal
-                key={activeExhibitAmbiguity ? `exhibit:${activeExhibitAmbiguity.mention.raw}` : courtMode ?? 'structure'}
-                isOpen={showClarificationModal || state.showCourtClarification || showExhibitClarification}
+                key={courtMode ?? 'structure'}
+                isOpen={showClarificationModal || state.showCourtClarification}
                 onClose={() => {
-                    if (activeExhibitAmbiguity) {
-                        closeExhibitClarification(true);
-                    }
                     if (!clarificationAppliedRef.current) {
                         resumeDraftAfterClarificationRef.current = false;
                     }
@@ -1012,14 +1222,6 @@ export default function ReviewHubContent() {
                 }
                 onContinue={(action, details, resolvedText) => {
                     console.log('[ReviewHub] Clarification resolved:', action, details);
-                    if (activeExhibitAmbiguity) {
-                        if (details.trim()) {
-                            handleTypedExhibitClarification(details.trim());
-                        } else {
-                            closeExhibitClarification(true);
-                        }
-                        return;
-                    }
                     setShowClarificationModal(false);
                     dispatch({ type: 'SHOW_COURT_CLARIFICATION', show: false });
                     if (resolvedText && action === 'generate_titles') {
@@ -1091,19 +1293,6 @@ export default function ReviewHubContent() {
                     }
                 }}
                 resolvedFieldSources={resolvedIdentity?.fieldSources}
-                exhibitClarification={activeExhibitAmbiguity ? {
-                    reference: activeExhibitAmbiguity.mention.raw,
-                    candidates: activeExhibitAmbiguity.candidates.map(candidate => ({
-                        id: candidate.exhibit.id,
-                        title: candidate.exhibit.title,
-                        content: candidate.exhibit.content,
-                        score: candidate.score,
-                        reasons: candidate.reasons,
-                    })),
-                    onSelect: handleSelectExhibitCandidate,
-                    onSkip: handleSkipExhibitReference,
-                    error: exhibitClarificationError ?? undefined,
-                } : undefined}
             />
         </div>
     );

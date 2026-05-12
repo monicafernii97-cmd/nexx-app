@@ -216,7 +216,7 @@ export interface ExportState {
     skippedExhibitReferences: string[];
 }
 
-const initialState: ExportState = {
+export const initialState: ExportState = {
     phase: 'idle',
     exportPath: null,
     exportRequest: null,
@@ -274,11 +274,13 @@ type ExportAction =
     | { type: 'SET_COURT_IDENTITY_PATCH'; patch: Partial<CourtIdentity> }
     | { type: 'SHOW_COURT_CLARIFICATION'; show: boolean }
     | { type: 'UPDATE_REVIEW_OPTIONS'; includeTimeline?: boolean; includeExhibits?: boolean }
+    | { type: 'UPDATE_TIMELINE_SELECTION'; includeTimeline?: boolean; selectedTimelineIds: string[] }
     | { type: 'APPLY_EXHIBIT_REFERENCE_MATCHES'; matches: ExportExhibitReferenceMatch[]; skippedReferences?: string[] }
+    | { type: 'REMOVE_EXHIBIT_REFERENCE_MATCH'; reference: string; skipReference?: boolean }
     | { type: 'APPLY_COURT_RESOLUTION'; patch: Partial<CourtIdentity>; resolvedText?: string };
 
 /** Reducer managing the full export lifecycle state machine. */
-function exportReducer(state: ExportState, action: ExportAction): ExportState {
+export function exportReducer(state: ExportState, action: ExportAction): ExportState {
     switch (action.type) {
         case 'START_CONFIGURE':
             return {
@@ -473,6 +475,36 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
             };
         }
 
+        case 'UPDATE_TIMELINE_SELECTION': {
+            const selectedTimelineIds = [...new Set(action.selectedTimelineIds)];
+            const includeTimeline = action.includeTimeline ?? state.config?.includeTimeline ?? selectedTimelineIds.length > 0;
+            const requestConfig = state.exportRequest?.config
+                ? {
+                    ...((state.exportRequest.config ?? {}) as unknown as Record<string, unknown>),
+                    includeTimeline,
+                    selectedTimelineIds,
+                }
+                : undefined;
+
+            return {
+                ...state,
+                config: state.config
+                    ? {
+                        ...state.config,
+                        includeTimeline,
+                        selectedTimelineIds,
+                    }
+                    : state.config,
+                exportRequest: state.exportRequest
+                    ? {
+                        ...state.exportRequest,
+                        selectedTimelineIds,
+                        config: requestConfig as unknown as typeof state.exportRequest.config,
+                    }
+                    : state.exportRequest,
+            };
+        }
+
         case 'APPLY_EXHIBIT_REFERENCE_MATCHES': {
             const existingMatches = state.exhibitReferenceMatches;
             const byReference = new Map(existingMatches.map(match => [match.reference, match]));
@@ -507,6 +539,59 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
                         linkedExhibitIds,
                         exhibitReferenceMatches: nextMatches,
                         includeExhibits: linkedExhibitIds.length > 0 ? true : state.config.includeExhibits,
+                    }
+                    : state.config,
+                exportRequest: state.exportRequest
+                    ? {
+                        ...state.exportRequest,
+                        selectedEvidenceIds: linkedExhibitIds,
+                        config: requestConfig as unknown as typeof state.exportRequest.config,
+                    }
+                    : state.exportRequest,
+                assemblyResult: state.assemblyResult && state.exportPath === 'court_document'
+                    ? ({
+                        ...state.assemblyResult,
+                        assembly: {
+                            ...state.assemblyResult.assembly,
+                            mappedSections: {
+                                ...(state.assemblyResult.assembly.mappedSections as unknown as Record<string, unknown>),
+                                exhibitReferences: nextMatches.map(match => ({
+                                    label: match.reference,
+                                    description: match.exhibitTitle,
+                                    linkedEvidenceId: match.exhibitId,
+                                })),
+                            } as typeof state.assemblyResult.assembly.mappedSections,
+                        },
+                    } as OrchestratorAssemblyResult)
+                    : state.assemblyResult,
+            };
+        }
+
+        case 'REMOVE_EXHIBIT_REFERENCE_MATCH': {
+            const nextMatches = state.exhibitReferenceMatches.filter(match => match.reference !== action.reference);
+            const linkedExhibitIds = [...new Set(nextMatches.map(match => match.exhibitId))];
+            const skippedReferences = action.skipReference
+                ? [...new Set([...state.skippedExhibitReferences, action.reference])]
+                : state.skippedExhibitReferences;
+            const requestConfig = state.exportRequest?.config
+                ? {
+                    ...((state.exportRequest.config ?? {}) as unknown as Record<string, unknown>),
+                    linkedExhibitIds,
+                    exhibitReferenceMatches: nextMatches,
+                    includeExhibitReference: linkedExhibitIds.length > 0 || undefined,
+                }
+                : undefined;
+
+            return {
+                ...state,
+                exhibitReferenceMatches: nextMatches,
+                skippedExhibitReferences: skippedReferences,
+                config: state.config
+                    ? {
+                        ...state.config,
+                        linkedExhibitIds,
+                        exhibitReferenceMatches: nextMatches,
+                        includeExhibits: linkedExhibitIds.length > 0 ? state.config.includeExhibits : false,
                     }
                     : state.config,
                 exportRequest: state.exportRequest
@@ -624,6 +709,10 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                 reviewItems: state.reviewItems,
                 courtIdentityPatch: state.courtIdentityPatch,
                 courtResolvedText: state.courtResolvedText,
+                includeTimeline: state.config?.includeTimeline,
+                selectedTimelineIds: state.config?.selectedTimelineIds,
+                includeExhibits: state.config?.includeExhibits,
+                linkedExhibitIds: state.config?.linkedExhibitIds,
                 exhibitReferenceMatches: state.exhibitReferenceMatches,
                 skippedExhibitReferences: state.skippedExhibitReferences,
             });
@@ -641,6 +730,10 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         state.reviewItems,
         state.courtIdentityPatch,
         state.courtResolvedText,
+        state.config?.includeTimeline,
+        state.config?.selectedTimelineIds,
+        state.config?.includeExhibits,
+        state.config?.linkedExhibitIds,
         state.exhibitReferenceMatches,
         state.skippedExhibitReferences,
     ]);

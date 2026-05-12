@@ -344,7 +344,7 @@ export function renderLegalDocumentHTML(
     ${renderPrayer(doc)}
     ${renderSignature(doc, profile)}
     ${renderVerification(doc, profile)}
-    ${renderCertificate(doc, profile)}
+    ${renderCertificate(doc)}
   </div>
 </body>
 </html>`;

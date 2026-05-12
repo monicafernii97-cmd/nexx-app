@@ -73,7 +73,14 @@ function tokenOverlap(a: string, b: string): number {
 /** Infer exhibit labels from every searchable field on an Exhibit Hub candidate. */
 function inferCandidateLabels(candidate: ExhibitHubCandidate): Set<string> {
   const labels = new Set<string>();
-  for (const value of [candidate.label, candidate.title, candidate.filename, candidate.content]) {
+  if (candidate.label) {
+    const normalized = normalizeLabel(candidate.label);
+    if (/^(?:[A-Z]{1,3}|\d{1,4})$/.test(normalized)) {
+      labels.add(normalized);
+    }
+  }
+
+  for (const value of [candidate.title, candidate.filename, candidate.content]) {
     if (!value) continue;
     for (const match of value.matchAll(new RegExp(LABEL_PATTERN.source, LABEL_PATTERN.flags))) {
       labels.add((match[1] ?? '').toUpperCase());

@@ -19,6 +19,17 @@ describe('exhibit reference matching', () => {
     expect(result.ambiguous).toHaveLength(0);
   });
 
+  it('matches explicit exhibit references when label is stored canonically', () => {
+    const result = matchExhibitReferences('Attached as Exhibit A is the supporting document.', [
+      { id: 'pin_1', title: 'School email chain', label: 'A', source: 'case_pin' },
+      { id: 'pin_2', title: 'Medical receipt', label: 'B', source: 'case_pin' },
+    ]);
+
+    expect(result.confirmed).toHaveLength(1);
+    expect(result.confirmed[0].match.exhibit.id).toBe('pin_1');
+    expect(result.ambiguous).toHaveLength(0);
+  });
+
   it('confirms a clear existing Exhibit Hub match by filename', () => {
     const result = matchExhibitReferences('The document relies on school-email-chain.pdf for notice.', [
       { id: 'pin_1', title: 'School email chain', filename: 'school-email-chain.pdf', source: 'case_pin' },

@@ -525,8 +525,13 @@ export default function ReviewHubContent() {
 
     useEffect(() => {
         if (exhibitMatchResult.confirmed.length === 0) return;
-        const existingReferences = new Set(state.exhibitReferenceMatches.map(match => match.reference));
-        const nextMatches = exhibitMatchResult.confirmed.filter(({ mention }) => !existingReferences.has(mention.raw));
+        const resolvedOrSkippedReferences = new Set([
+            ...state.exhibitReferenceMatches.map(match => match.reference),
+            ...state.skippedExhibitReferences,
+        ]);
+        const nextMatches = exhibitMatchResult.confirmed.filter(
+            ({ mention }) => !resolvedOrSkippedReferences.has(mention.raw),
+        );
         if (nextMatches.length === 0) return;
 
         const key = nextMatches
@@ -539,7 +544,7 @@ export default function ReviewHubContent() {
             type: 'APPLY_EXHIBIT_REFERENCE_MATCHES',
             matches: toExportMatches(nextMatches),
         });
-    }, [dispatch, exhibitMatchResult.confirmed, state.exhibitReferenceMatches]);
+    }, [dispatch, exhibitMatchResult.confirmed, state.exhibitReferenceMatches, state.skippedExhibitReferences]);
 
     const unresolvedExhibitAmbiguities = useMemo(() => {
         const resolvedReferences = new Set([

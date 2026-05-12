@@ -164,6 +164,7 @@ export default function OnboardingTour({ user }: OnboardingTourProps) {
                 localStorage.removeItem(tourSyncPendingKey);
             })
             .catch((err) => {
+                localStorage.setItem(tourStorageKey, 'true');
                 localStorage.setItem(tourSyncPendingKey, 'true');
                 console.error('[NEXX Tour] Failed to persist tour completion:', err);
             });
@@ -183,6 +184,7 @@ export default function OnboardingTour({ user }: OnboardingTourProps) {
                     localStorage.removeItem(tourSyncPendingKey);
                 })
                 .catch((err) => {
+                    localStorage.setItem(tourStorageKey, 'true');
                     localStorage.setItem(tourSyncPendingKey, 'true');
                     console.error('[NEXX Tour] Failed to backfill tour completion:', err);
                 });
@@ -334,7 +336,9 @@ export default function OnboardingTour({ user }: OnboardingTourProps) {
 
                     driverRef.current = driverObj;
                     driverObj.drive();
-                    persistTourCompleted();
+                    if (launchSource === 'auto') {
+                        persistTourCompleted();
+                    }
                 } catch (err) {
                     // Cleanup partially-created driver before recovery
                     if (driverRef.current) {
@@ -347,7 +351,7 @@ export default function OnboardingTour({ user }: OnboardingTourProps) {
         } catch (err) {
             handleTourStartFailure(err);
         }
-    }, [clearStartupTimer, handleTourStartFailure, persistTourCompleted]);
+    }, [clearStartupTimer, handleTourStartFailure, launchSource, persistTourCompleted]);
 
     const dismissWelcome = useCallback(() => {
         clearStartupTimer();

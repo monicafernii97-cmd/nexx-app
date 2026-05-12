@@ -30,6 +30,17 @@ describe('exhibit reference matching', () => {
     expect(result.ambiguous).toHaveLength(0);
   });
 
+  it('keeps dotted title suffixes distinct from filename extensions', () => {
+    const result = matchExhibitReferences('The filing references Schedule A.2.', [
+      { id: 'pin_1', title: 'Schedule A.1', source: 'case_pin' },
+      { id: 'pin_2', title: 'Schedule A.2', source: 'case_pin' },
+    ]);
+
+    expect(result.confirmed).toHaveLength(1);
+    expect(result.confirmed[0].match.exhibit.id).toBe('pin_2');
+    expect(result.ambiguous).toHaveLength(0);
+  });
+
   it('confirms a clear existing Exhibit Hub match by filename', () => {
     const result = matchExhibitReferences('The document relies on school-email-chain.pdf for notice.', [
       { id: 'pin_1', title: 'School email chain', filename: 'school-email-chain.pdf', source: 'case_pin' },

@@ -41,10 +41,14 @@ const LABEL_PATTERN = /\b(?:Exhibit|Ex\.?)\s*([A-Z]{1,3}|\d{1,4})\b/gi;
 function normalize(value: string): string {
   return value
     .toLowerCase()
-    .replace(/\.[a-z0-9]+$/i, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
     .replace(/\s+/g, ' ');
+}
+
+/** Normalize stored filenames while ignoring their final extension. */
+function normalizeFilename(value: string): string {
+  return normalize(value.replace(/\.[a-z0-9]+$/i, ''));
 }
 
 /** Extract the canonical label from an exhibit phrase, such as "A" from "Exhibit A". */
@@ -129,19 +133,25 @@ function collectCandidatePhraseMentions(
   const mentions: ExhibitReferenceMention[] = [];
 
   for (const candidate of candidates) {
-    for (const phrase of [candidate.label, candidate.title, candidate.filename]) {
-      if (!phrase) continue;
-      const normalizedPhrase = normalize(phrase);
+    const phrases = [
+      { raw: candidate.label, normalized: candidate.label ? normalize(candidate.label) : '' },
+      { raw: candidate.title, normalized: normalize(candidate.title) },
+      { raw: candidate.filename, normalized: candidate.filename ? normalizeFilename(candidate.filename) : '' },
+    ];
+
+    for (const phrase of phrases) {
+      if (!phrase.raw) continue;
+      const normalizedPhrase = phrase.normalized;
       if (normalizedPhrase.length < 6 || !normalizedText.includes(normalizedPhrase)) continue;
       if (seenPhrases.has(normalizedPhrase)) continue;
 
-      const key = mentionKey(phrase, 0);
+      const key = mentionKey(phrase.raw, 0);
       if (seen.has(key)) continue;
       seen.add(key);
       seenPhrases.add(normalizedPhrase);
       mentions.push({
-        raw: phrase,
-        normalizedLabel: normalizeLabel(phrase),
+        raw: phrase.raw,
+        normalizedLabel: normalizeLabel(phrase.raw),
         index: 0,
       });
     }
@@ -150,15 +160,52 @@ function collectCandidatePhraseMentions(
   return mentions;
 }
 
+/** Score a lower-confidence contextual match from the full document text. */
+function applyDocumentContextScore(
+  normalizedText: string,
+  normalizedFilename: string,
+  normalizedTitle: string,
+  candidate: ExhibitHubCandidate,
+  reasons: string[],
+): number {
+  let score = 0;
+
+  if (normalizedFilename && normalizedText.includes(normalizedFilename)) {
+    score += 15;
+    reasons.push('filename context');
+  }
+
+  if (normalizedTitle && normalizedText.includes(normalizedTitle)) {
+    score += 15;
+    reasons.push('title context');
+  } else {
+    const overlap = tokenOverlapWithNormalized(normalizedText, candidate.title);
+    if (overlap >= 0.6) {
+      score += Math.round(overlap * 20);
+      reasons.push('title context words');
+    }
+  }
+
+  if (candidate.content) {
+    const overlap = tokenOverlapWithNormalized(normalizedText, candidate.content);
+    if (overlap >= 0.7) {
+      score += Math.round(overlap * 10);
+      reasons.push('content context words');
+    }
+  }
+
+  return score;
+}
+
 /** Score one exhibit candidate against one detected mention and the surrounding document text. */
 function scoreCandidate(
-  text: string,
   normalizedText: string,
   mention: ExhibitReferenceMention,
   candidate: ExhibitHubCandidate,
 ): ExhibitReferenceCandidateMatch | null {
   const reasons: string[] = [];
   let score = 0;
+  const normalizedMention = normalize(mention.raw);
   const candidateLabels = inferCandidateLabels(candidate);
   const hasExplicitLabelMention = /\b(?:exhibit|ex\.?)\s*([a-z]{1,3}|\d{1,4})\b/i.test(mention.raw);
 
@@ -172,18 +219,18 @@ function scoreCandidate(
   }
 
   const normalizedTitle = normalize(candidate.title);
-  const normalizedFilename = candidate.filename ? normalize(candidate.filename) : '';
+  const normalizedFilename = candidate.filename ? normalizeFilename(candidate.filename) : '';
 
-  if (normalizedFilename && normalizedText.includes(normalizedFilename)) {
+  if (normalizedFilename && normalizedMention.includes(normalizedFilename)) {
     score += 90;
     reasons.push('filename');
   }
 
-  if (normalizedTitle && normalizedText.includes(normalizedTitle)) {
+  if (normalizedTitle && normalizedMention.includes(normalizedTitle)) {
     score += 85;
     reasons.push('title');
   } else {
-    const overlap = tokenOverlapWithNormalized(normalizedText, candidate.title);
+    const overlap = tokenOverlapWithNormalized(normalizedMention, candidate.title);
     if (overlap >= 0.6) {
       score += Math.round(overlap * 60);
       reasons.push('title words');
@@ -191,12 +238,20 @@ function scoreCandidate(
   }
 
   if (candidate.content) {
-    const overlap = tokenOverlapWithNormalized(normalizedText, candidate.content);
+    const overlap = tokenOverlapWithNormalized(normalizedMention, candidate.content);
     if (overlap >= 0.7) {
       score += Math.round(overlap * 30);
       reasons.push('content words');
     }
   }
+
+  score += applyDocumentContextScore(
+    normalizedText,
+    normalizedFilename,
+    normalizedTitle,
+    candidate,
+    reasons,
+  );
 
   return score > 0 ? { exhibit: candidate, score, reasons } : null;
 }
@@ -217,7 +272,7 @@ export function matchExhibitReferences(
 
   for (const mention of mentions) {
     const ranked = candidates
-      .map(candidate => scoreCandidate(text, normalizedText, mention, candidate))
+      .map(candidate => scoreCandidate(normalizedText, mention, candidate))
       .filter((match): match is ExhibitReferenceCandidateMatch => Boolean(match))
       .sort((a, b) => b.score - a.score);
 

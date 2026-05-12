@@ -54,13 +54,18 @@ function normalizeLabel(value: string): string {
 }
 
 /** Split normalized text into meaningful comparison tokens. */
-function tokens(value: string): Set<string> {
-  return new Set(normalize(value).split(' ').filter(token => token.length >= 3));
+function normalizedTokens(value: string): Set<string> {
+  return new Set(value.split(' ').filter(token => token.length >= 3));
 }
 
-/** Score how much two text fields overlap by their significant tokens. */
-function tokenOverlap(a: string, b: string): number {
-  const aTokens = tokens(a);
+/** Split raw text into meaningful comparison tokens. */
+function tokens(value: string): Set<string> {
+  return normalizedTokens(normalize(value));
+}
+
+/** Score token overlap when the first text has already been normalized. */
+function tokenOverlapWithNormalized(aNormalized: string, b: string): number {
+  const aTokens = normalizedTokens(aNormalized);
   const bTokens = tokens(b);
   if (aTokens.size === 0 || bTokens.size === 0) return 0;
   let overlap = 0;
@@ -148,6 +153,7 @@ function collectCandidatePhraseMentions(
 /** Score one exhibit candidate against one detected mention and the surrounding document text. */
 function scoreCandidate(
   text: string,
+  normalizedText: string,
   mention: ExhibitReferenceMention,
   candidate: ExhibitHubCandidate,
 ): ExhibitReferenceCandidateMatch | null {
@@ -165,7 +171,6 @@ function scoreCandidate(
     reasons.push(`label ${mention.normalizedLabel}`);
   }
 
-  const normalizedText = normalize(text);
   const normalizedTitle = normalize(candidate.title);
   const normalizedFilename = candidate.filename ? normalize(candidate.filename) : '';
 
@@ -178,7 +183,7 @@ function scoreCandidate(
     score += 85;
     reasons.push('title');
   } else {
-    const overlap = tokenOverlap(text, candidate.title);
+    const overlap = tokenOverlapWithNormalized(normalizedText, candidate.title);
     if (overlap >= 0.6) {
       score += Math.round(overlap * 60);
       reasons.push('title words');
@@ -186,7 +191,7 @@ function scoreCandidate(
   }
 
   if (candidate.content) {
-    const overlap = tokenOverlap(text, candidate.content);
+    const overlap = tokenOverlapWithNormalized(normalizedText, candidate.content);
     if (overlap >= 0.7) {
       score += Math.round(overlap * 30);
       reasons.push('content words');
@@ -201,6 +206,7 @@ export function matchExhibitReferences(
   text: string,
   candidates: ExhibitHubCandidate[],
 ): ExhibitReferenceMatchResult {
+  const normalizedText = normalize(text);
   const labelMentions = extractExhibitMentions(text);
   const mentions = [
     ...labelMentions,
@@ -211,7 +217,7 @@ export function matchExhibitReferences(
 
   for (const mention of mentions) {
     const ranked = candidates
-      .map(candidate => scoreCandidate(text, mention, candidate))
+      .map(candidate => scoreCandidate(text, normalizedText, mention, candidate))
       .filter((match): match is ExhibitReferenceCandidateMatch => Boolean(match))
       .sort((a, b) => b.score - a.score);
 

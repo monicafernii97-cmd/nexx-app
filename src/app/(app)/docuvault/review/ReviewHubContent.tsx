@@ -449,7 +449,7 @@ export default function ReviewHubContent() {
         // If blockers remain, DO NOT start SSE request.
         if (state.exportPath === 'court_document') {
             if (isCourtIdentityLoading) {
-                dispatch({ type: 'SHOW_COURT_CLARIFICATION', show: false });
+                resumeDraftAfterClarificationRef.current = true;
                 return;
             }
             // Full source set: merge patch with courtSettings and nexProfile
@@ -528,6 +528,7 @@ export default function ReviewHubContent() {
 
     useEffect(() => {
         if (!resumeDraftAfterClarificationRef.current) return;
+        if (isCourtIdentityLoading) return;
         if (state.phase !== 'reviewing') return;
         if (showClarificationModal || state.showCourtClarification) return;
         if (isCourtDocument && courtBlockers.length > 0) return;
@@ -539,6 +540,7 @@ export default function ReviewHubContent() {
         state.showCourtClarification,
         showClarificationModal,
         isCourtDocument,
+        isCourtIdentityLoading,
         courtBlockers.length,
         handleApproveAndDraft,
     ]);

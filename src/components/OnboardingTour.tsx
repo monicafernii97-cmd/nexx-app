@@ -266,9 +266,6 @@ export default function OnboardingTour({ user }: OnboardingTourProps) {
         skipFocusRestoreRef.current = true;
         setShowWelcome(false);
 
-        // Persist "seen" before async imports so even if interrupted it won't auto-open again.
-        persistTourCompleted();
-
         try {
             // Lazy-load driver.js only when starting the tour (keeps initial bundle small)
             const { driver } = await import('driver.js');
@@ -303,6 +300,7 @@ export default function OnboardingTour({ user }: OnboardingTourProps) {
 
                     driverRef.current = driverObj;
                     driverObj.drive();
+                    persistTourCompleted();
                 } catch (err) {
                     // Cleanup partially-created driver before recovery
                     if (driverRef.current) {

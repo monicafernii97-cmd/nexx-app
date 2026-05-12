@@ -78,7 +78,11 @@ function DocuVaultPageInner() {
 
     // Structured export state (direct court-document path)
     const { startStructuredExport } = useExport();
-    const selectedCaseId = activeCaseId
+    const selectedCaseId = (
+        activeCaseId && cases?.some(c => c._id === activeCaseId)
+            ? activeCaseId
+            : undefined
+    )
         ?? cases?.find(c => c.status === 'active')?._id
         ?? cases?.[0]?._id;
 

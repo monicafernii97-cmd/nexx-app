@@ -59,6 +59,7 @@ describe('renderer regression — multi-state pleadings', () => {
     expect(html).toContain('width: 6.15in;');
     expect(html).toContain('line-height: 14.5pt;');
     expect(html).toContain('margin-bottom: 24pt;');
+    expect(html).toContain('margin: 0 0 16pt;');
   });
 
   it('renders Texas title and subtitle in output', () => {

@@ -59,4 +59,19 @@ describe('pagination regression — multi-state pleadings', () => {
     expect(html).toContain('class="prayer-block"');
     expect(html).toContain('break-inside: avoid;');
   });
+
+  it('keeps body paragraphs together to avoid bottom-of-page starts', () => {
+    const doc = parseLegalDocument(texasPleadingFixture);
+    const profile = resolveJurisdictionProfile({
+      state: 'Texas',
+      county: 'Fort Bend',
+    });
+
+    const qgProfile = assertQuickGenerateProfile(profile);
+    const html = renderLegalDocumentHTML(doc, qgProfile);
+
+    expect(html).toContain('.body-paragraph {');
+    expect(html).toContain('page-break-inside: avoid;');
+    expect(html).toContain('break-inside: avoid;');
+  });
 });

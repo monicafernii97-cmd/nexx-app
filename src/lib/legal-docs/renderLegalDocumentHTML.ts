@@ -156,17 +156,21 @@ export function renderLegalDocumentHTML(
   .body-paragraph {
     text-align: ${profile.typography.bodyAlign};
     text-indent: 0;
-    margin: 0 0 11pt;
+    margin: 0 0 16pt;
     orphans: 3;
     widows: 3;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .body-paragraph-intro {
     text-align: ${profile.typography.bodyAlign};
     text-indent: 0.5in;
-    margin: 0 0 11pt;
+    margin: 0 0 16pt;
     orphans: 3;
     widows: 3;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .salutation {
@@ -202,7 +206,7 @@ export function renderLegalDocumentHTML(
   }
 
   .numbered-list li {
-    margin: 0 0 11pt;
+    margin: 0 0 16pt;
     padding-left: 0.25in;
     text-indent: -0.25in;
     text-align: ${profile.typography.bodyAlign};
@@ -213,7 +217,7 @@ export function renderLegalDocumentHTML(
   .numbered-paragraph {
     display: flex;
     align-items: flex-start;
-    margin: 0 0 11pt;
+    margin: 0 0 16pt;
     line-height: ${profile.typography.lineHeightPt}pt;
     page-break-inside: avoid;
     break-inside: avoid;
@@ -255,7 +259,7 @@ export function renderLegalDocumentHTML(
   }
 
   .bullet-list li {
-    margin: 0 0 11pt;
+    margin: 0 0 16pt;
     padding-left: 18pt;
     text-indent: -18pt;
     text-align: ${profile.typography.bodyAlign};
@@ -318,7 +322,7 @@ export function renderLegalDocumentHTML(
   }
 
   .lettered-list li {
-    margin: 0 0 11pt;
+    margin: 0 0 16pt;
     padding-left: 18pt;
     text-indent: -18pt;
     text-align: ${profile.typography.bodyAlign};

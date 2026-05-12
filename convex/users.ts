@@ -172,6 +172,23 @@ export const completeOnboarding = mutation({
     },
 });
 
+/** Mark the dashboard guided tour as seen/dismissed for the authenticated user. */
+export const markDashboardTourCompleted = mutation({
+    args: { id: v.id('users') },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error('Not authenticated');
+        const user = await ctx.db.get(args.id);
+        if (!user || user.clerkId !== identity.subject) {
+            throw new Error('Not authorized to update dashboard tour state');
+        }
+
+        if (!user.dashboardTourCompletedAt) {
+            await ctx.db.patch(args.id, { dashboardTourCompletedAt: Date.now() });
+        }
+    },
+});
+
 /** Look up user by Clerk ID — auth-guarded. Used by API routes to fetch tier info. */
 export const getByClerkId = query({
     args: { clerkId: v.string() },

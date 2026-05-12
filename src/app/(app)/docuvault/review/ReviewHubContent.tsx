@@ -212,8 +212,9 @@ export default function ReviewHubContent() {
     const rawNexProfile = useQuery(api.nexProfiles.getByUser);
 
     // Map Convex objects to the shapes expected by resolveCourtIdentity
-    const courtSettingsData: CourtSettingsData | undefined = rawCourtSettings
-        ? {
+    const courtSettingsData = useMemo((): CourtSettingsData | undefined => (
+        rawCourtSettings
+            ? {
             state: rawCourtSettings.state,
             county: rawCourtSettings.county,
             courtName: rawCourtSettings.courtName,
@@ -228,17 +229,21 @@ export default function ReviewHubContent() {
             userRole: rawCourtSettings.petitionerRole,
             userLegalName: rawCourtSettings.petitionerLegalName,
         }
-        : undefined;
+            : undefined
+    ), [rawCourtSettings]);
 
     // nexProfile is the opposing party — safe for opposingPartyName/Role only
-    const nexProfileData: NexProfileData | undefined = rawNexProfile
-        ? { fullName: rawNexProfile.legalName }
-        : undefined;
+    const nexProfileData = useMemo((): NexProfileData | undefined => (
+        rawNexProfile
+            ? { fullName: rawNexProfile.legalName }
+            : undefined
+    ), [rawNexProfile]);
 
     // User's own profile (Level 3 in priority chain)
     const rawUserProfile = useQuery(api.users.me);
-    const userProfileData: UserProfileData | undefined = rawUserProfile
-        ? {
+    const userProfileData = useMemo((): UserProfileData | undefined => (
+        rawUserProfile
+            ? {
             fullName: rawUserProfile.name,
             state: rawUserProfile.state ?? undefined,
             county: rawUserProfile.county ?? undefined,
@@ -247,7 +252,10 @@ export default function ReviewHubContent() {
             childrenNames: rawUserProfile.childrenNames ?? undefined,
             childrenAges: rawUserProfile.childrenAges ?? undefined,
         }
-        : undefined;
+            : undefined
+    ), [rawUserProfile]);
+    const isCourtIdentityLoading = isCourtDocument
+        && (rawCourtSettings === undefined || rawNexProfile === undefined || rawUserProfile === undefined);
 
     // Level 1: Extract court metadata from pasted document text
     const extractedFromText = useMemo(() => {
@@ -287,6 +295,7 @@ export default function ReviewHubContent() {
     // Detect court document issues on review phase entry and re-check when patch changes
     useEffect(() => {
         if (state.phase !== 'reviewing' || !isCourtDocument) return;
+        if (isCourtIdentityLoading) return;
         // Full source set: merge patch with courtSettings and nexProfile so the
         // client-side gate matches the backend resolution in route.ts.
         const identity = resolveCourtIdentity({
@@ -303,12 +312,15 @@ export default function ReviewHubContent() {
             itemTexts,
         );
         dispatch({ type: 'SET_COURT_ISSUES', issues });
-    }, [state.phase, isCourtDocument, state.courtIdentityPatch, state.courtResolvedText, state.reviewItems, extractedFromText, courtSettingsData, userProfileData, nexProfileData, dispatch]);
+    }, [state.phase, isCourtDocument, isCourtIdentityLoading, state.courtIdentityPatch, state.courtResolvedText, state.reviewItems, extractedFromText, courtSettingsData, userProfileData, nexProfileData, dispatch]);
 
     // Track sidebar edit state to auto-save on selection change
     const pendingEditRef = useRef<{ nodeId: string; text: string } | null>(null);
     // Synchronous guard — prevents double-submission before React re-renders
     const draftingGuardRef = useRef(false);
+    const resumeDraftAfterClarificationRef = useRef(false);
+    const clarificationAppliedRef = useRef(false);
+    const previousPhaseRef = useRef(state.phase);
     // Preserve failed exportId for retry linkage
     const retryExportIdRef = useRef<string | null>(null);
 
@@ -436,6 +448,10 @@ export default function ReviewHubContent() {
         // Re-run detectCourtDocumentIssues against latest merged state.
         // If blockers remain, DO NOT start SSE request.
         if (state.exportPath === 'court_document') {
+            if (isCourtIdentityLoading) {
+                dispatch({ type: 'SHOW_COURT_CLARIFICATION', show: false });
+                return;
+            }
             // Full source set: merge patch with courtSettings and nexProfile
             // so the client-side gate matches the backend resolution.
             const identity = resolveCourtIdentity({
@@ -453,6 +469,7 @@ export default function ReviewHubContent() {
             );
             const freshBlockers = freshIssues.filter(i => i.severity === 'blocker');
             if (freshBlockers.length > 0) {
+                resumeDraftAfterClarificationRef.current = true;
                 dispatch({ type: 'SET_COURT_ISSUES', issues: freshIssues });
                 dispatch({ type: 'SHOW_COURT_CLARIFICATION', show: true });
                 return;
@@ -495,7 +512,36 @@ export default function ReviewHubContent() {
             console.error('[ReviewHub] Stream start failed:', err);
             dispatch({ type: 'ERROR', message: String(err), errorCode: 'draft_failed' });
         });
-    }, [editItem, startDrafting, startStream, state, effectiveItems, dispatch]);
+    }, [editItem, startDrafting, startStream, state, effectiveItems, dispatch, extractedFromText, courtSettingsData, userProfileData, nexProfileData, isCourtIdentityLoading]);
+
+    useEffect(() => {
+        if (
+            previousPhaseRef.current === 'drafting'
+            && state.phase === 'reviewing'
+            && state.showCourtClarification
+            && courtBlockers.length > 0
+        ) {
+            resumeDraftAfterClarificationRef.current = true;
+        }
+        previousPhaseRef.current = state.phase;
+    }, [state.phase, state.showCourtClarification, courtBlockers.length]);
+
+    useEffect(() => {
+        if (!resumeDraftAfterClarificationRef.current) return;
+        if (state.phase !== 'reviewing') return;
+        if (showClarificationModal || state.showCourtClarification) return;
+        if (isCourtDocument && courtBlockers.length > 0) return;
+
+        resumeDraftAfterClarificationRef.current = false;
+        queueMicrotask(() => handleApproveAndDraft());
+    }, [
+        state.phase,
+        state.showCourtClarification,
+        showClarificationModal,
+        isCourtDocument,
+        courtBlockers.length,
+        handleApproveAndDraft,
+    ]);
 
     /** Confirm before discarding all review work. */
     const handleReset = useCallback(() => {
@@ -689,6 +735,10 @@ export default function ReviewHubContent() {
             <ClarificationModal
                 isOpen={showClarificationModal || state.showCourtClarification}
                 onClose={() => {
+                    if (!clarificationAppliedRef.current) {
+                        resumeDraftAfterClarificationRef.current = false;
+                    }
+                    clarificationAppliedRef.current = false;
                     setShowClarificationModal(false);
                     dispatch({ type: 'SHOW_COURT_CLARIFICATION', show: false });
                 }}
@@ -708,6 +758,7 @@ export default function ReviewHubContent() {
                 courtIdentity={resolvedIdentity}
                 onResolve={(resolution) => {
                     if (resolution.type === 'patch_court_identity') {
+                        clarificationAppliedRef.current = true;
                         dispatch({
                             type: 'APPLY_COURT_RESOLUTION',
                             patch: resolution.patch,

@@ -214,4 +214,21 @@ describe('ClarificationModal Integration Tests', () => {
     expect(HANDOFF_FALLBACK_MESSAGE).toContain('ReviewHub');
     expect(HANDOFF_FALLBACK_MESSAGE).toContain('paste the draft');
   });
+
+  it('44. saved respondent is resolved as opposing party for petitioner filings', () => {
+    const identity = resolveCourtIdentity({
+      courtSettings: {
+        userLegalName: 'Jane Doe',
+        userRole: 'petitioner',
+        petitionerLegalName: 'Jane Doe',
+        respondentLegalName: 'John Doe',
+        state: 'Texas',
+        county: 'Harris',
+      },
+      draftTitle: 'Motion for Temporary Orders',
+    });
+
+    expect(identity.opposingPartyLegalName).toBe('John Doe');
+    expect(identity.fieldSources.opposingPartyLegalName).toBe('court_settings');
+  });
 });

@@ -282,6 +282,14 @@ export function resolveCourtIdentity(
     [patch?.opposingPartyLegalName, 'reviewhub_edit'],
     [et.opposingPartyLegalName, 'pasted_text'],
     [cs.opposingPartyLegalName, 'court_settings'],
+    [
+      filingPartyRole === 'respondent'
+        ? cs.petitionerLegalName
+        : filingPartyRole === 'petitioner'
+          ? cs.respondentLegalName
+          : undefined,
+      'court_settings',
+    ],
     [np.fullName, 'nex_profile'],
   );
   if (opposingResult.source) fieldSources['opposingPartyLegalName'] = opposingResult.source;

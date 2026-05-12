@@ -145,6 +145,33 @@ const IDENTITY_FIELDS = new Set([
 /** Fields that map to text content that should replace document text directly. */
 const TEXT_RESOLUTION_FIELDS = new Set(['prayerText', 'certificateText']);
 
+/** Court modes whose configured fields must be completed before applying. */
+const REQUIRED_FIELD_MODES = new Set<ClarificationModalMode>([
+    'court_caption_repair',
+    'court_required_fields',
+    'court_signature_repair',
+]);
+
+const SETTINGS_SAVE_TIMEOUT_MS = 8_000;
+
+/** Prevent a slow settings save from trapping the modal in Applying forever. */
+async function saveToSettingsWithTimeout(
+    save: (patch: Partial<CourtIdentity>) => Promise<boolean>,
+    patch: Partial<CourtIdentity>,
+): Promise<boolean> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+        return await Promise.race([
+            save(patch),
+            new Promise<boolean>((resolve) => {
+                timeoutId = setTimeout(() => resolve(false), SETTINGS_SAVE_TIMEOUT_MS);
+            }),
+        ]);
+    } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Component
 // ═══════════════════════════════════════════════════════════════
@@ -368,6 +395,18 @@ export default function ClarificationModal({
         setIsProcessing(true);
 
         try {
+            const missingRequiredFields = REQUIRED_FIELD_MODES.has(activeMode)
+                ? (config?.fields ?? []).filter(field => !(fieldValues[field.key] ?? getFieldDefault(field.key)).trim())
+                : [];
+            if (missingRequiredFields.length > 0) {
+                setError(
+                    missingRequiredFields.length === 1
+                        ? `Please enter ${missingRequiredFields[0].label} before continuing.`
+                        : `Please complete: ${missingRequiredFields.map(field => field.label).join(', ')}.`,
+                );
+                return;
+            }
+
             // Build patch from field values
             const patch: Partial<CourtIdentity> = {};
             const textParts: string[] = [];
@@ -417,7 +456,7 @@ export default function ClarificationModal({
             // Save to Court Settings if requested (separate from onResolve)
             if (saveToSettings && hasPatch && onSaveToSettings) {
                 setSaveStatus('saving');
-                const success = await onSaveToSettings(patch);
+                const success = await saveToSettingsWithTimeout(onSaveToSettings, patch);
                 setSaveStatus(success ? 'saved' : 'failed');
             }
 

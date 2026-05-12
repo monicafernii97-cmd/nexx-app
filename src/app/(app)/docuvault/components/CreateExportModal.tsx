@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X,
@@ -13,10 +13,11 @@ import {
     Sliders,
     ArrowsClockwise,
     Info,
+    CalendarCheck,
 } from '@phosphor-icons/react';
 import { useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
+import type { Doc, Id } from '@convex/_generated/dataModel';
 import type { ExportPath } from '@/lib/export-assembly/types/exports';
 import {
     EXPORT_PATH_LABELS,
@@ -35,6 +36,7 @@ export interface ExportConfig {
     templateId?: string;
     includeTimeline: boolean;
     includeExhibits: boolean;
+    selectedTimelineIds?: string[];
     narrativeDepth: 'light' | 'standard' | 'full';
     jurisdictionProfileId?: string;
 }
@@ -74,6 +76,55 @@ const DEFAULT_EXHIBITS: Record<ExportPath, boolean> = {
     exhibit_document: true,
 };
 
+type TimelineEventDoc = Doc<'timelineCandidates'>;
+
+type TimelineChoice = {
+    id: string;
+    label: string;
+    description: string;
+    eventIds: string[];
+};
+
+/** Display timeline event dates consistently when an event has no date. */
+function formatEventDate(date?: string): string {
+    return date?.trim() || 'Undated';
+}
+
+/** Group timeline events into user-selectable incident or single-event choices. */
+function buildTimelineChoices(events: TimelineEventDoc[]): TimelineChoice[] {
+    const groups = new Map<string, TimelineEventDoc[]>();
+
+    for (const event of events) {
+        const groupId = event.linkedIncidentId
+            ? `incident:${event.linkedIncidentId}`
+            : `event:${event._id}`;
+        let bucket = groups.get(groupId);
+        if (!bucket) {
+            bucket = [];
+            groups.set(groupId, bucket);
+        }
+        bucket.push(event);
+    }
+
+    return [...groups.entries()].map(([id, group]) => {
+        const sorted = [...group].sort((a, b) =>
+            (a.eventDate ?? '').localeCompare(b.eventDate ?? '') || a.title.localeCompare(b.title),
+        );
+        const first = sorted[0];
+        const label = id.startsWith('incident:')
+            ? first.title || `Incident timeline (${sorted.length} event${sorted.length === 1 ? '' : 's'})`
+            : first.title;
+        const status = sorted.some(event => event.status === 'candidate') ? 'Includes pending timeline entries.' : 'Confirmed timeline entries.';
+
+        return {
+            id,
+            label,
+            description: `${formatEventDate(first.eventDate)} - ${sorted.length} event${sorted.length === 1 ? '' : 's'} - ${status}`,
+            eventIds: sorted.map(event => event._id),
+        };
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -98,6 +149,10 @@ export default function CreateExportModal({
     const [includeTimeline, setIncludeTimeline] = useState(false);
     const [includeExhibits, setIncludeExhibits] = useState(DEFAULT_EXHIBITS['court_document']);
     const [narrativeDepth, setNarrativeDepth] = useState<ExportConfig['narrativeDepth']>('standard');
+    const [showTimelineClarification, setShowTimelineClarification] = useState(false);
+    const [timelineSelectionMode, setTimelineSelectionMode] = useState<'entire' | 'selected'>('entire');
+    const [selectedTimelineChoiceIds, setSelectedTimelineChoiceIds] = useState<string[]>([]);
+    const [timelineError, setTimelineError] = useState<string | null>(null);
 
     // ── Submit guard ──
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,6 +160,14 @@ export default function CreateExportModal({
 
     // ── Data ──
     const cases = useQuery(api.cases.list);
+    const timelineEvents = useQuery(
+        api.assemblyQueries.getAssemblyEventsByCase,
+        selectedCaseId ? { caseId: selectedCaseId } : 'skip',
+    );
+    const timelineChoices = useMemo(
+        () => buildTimelineChoices(timelineEvents ?? []),
+        [timelineEvents],
+    );
 
     // ── Handlers ──
     const handlePathSelect = useCallback((path: ExportPath) => {
@@ -114,25 +177,77 @@ export default function CreateExportModal({
 
     const isValid = selectedPath && selectedCaseId;
 
-    const handleSubmit = useCallback(async () => {
-        if (!isValid || !selectedCaseId) return;
-        if (submitGuardRef.current) return; // prevent double-click
+    const buildConfig = useCallback((selectedTimelineIds?: string[]): ExportConfig => ({
+        path: selectedPath,
+        caseId: selectedCaseId!,
+        includeTimeline,
+        includeExhibits,
+        selectedTimelineIds,
+        narrativeDepth,
+    }), [selectedPath, selectedCaseId, includeTimeline, includeExhibits, narrativeDepth]);
+
+    const submitConfig = useCallback(async (config: ExportConfig) => {
+        if (submitGuardRef.current) return;
         submitGuardRef.current = true;
         setIsSubmitting(true);
 
         try {
-            await onSubmit({
-                path: selectedPath,
-                caseId: selectedCaseId,
-                includeTimeline,
-                includeExhibits,
-                narrativeDepth,
-            });
+            await onSubmit(config);
         } finally {
             setIsSubmitting(false);
             submitGuardRef.current = false;
         }
-    }, [isValid, selectedCaseId, selectedPath, includeTimeline, includeExhibits, narrativeDepth, onSubmit]);
+    }, [onSubmit]);
+
+    const handleSubmit = useCallback(async () => {
+        if (!isValid || !selectedCaseId) return;
+        setTimelineError(null);
+
+        if (includeTimeline) {
+            if (timelineEvents === undefined) {
+                setTimelineError('Loading timeline data. Please try again in a moment.');
+                return;
+            }
+
+            const allTimelineIds = timelineEvents.map(event => event._id);
+            if (timelineEvents.length <= 1 || timelineChoices.length <= 1) {
+                await submitConfig(buildConfig(allTimelineIds));
+                return;
+            }
+
+            setTimelineSelectionMode('entire');
+            setSelectedTimelineChoiceIds([]);
+            setShowTimelineClarification(true);
+            return;
+        }
+
+        await submitConfig(buildConfig([]));
+    }, [isValid, selectedCaseId, includeTimeline, timelineEvents, timelineChoices.length, submitConfig, buildConfig]);
+
+    const handleTimelineChoiceToggle = useCallback((choiceId: string) => {
+        setSelectedTimelineChoiceIds(prev =>
+            prev.includes(choiceId)
+                ? prev.filter(id => id !== choiceId)
+                : [...prev, choiceId],
+        );
+    }, []);
+
+    const handleTimelineClarificationContinue = useCallback(async () => {
+        setTimelineError(null);
+        const selectedIds = timelineSelectionMode === 'entire'
+            ? (timelineEvents ?? []).map(event => event._id)
+            : timelineChoices
+                .filter(choice => selectedTimelineChoiceIds.includes(choice.id))
+                .flatMap(choice => choice.eventIds);
+
+        if (timelineSelectionMode === 'selected' && selectedIds.length === 0) {
+            setTimelineError('Select at least one incident timeline, or choose the entire timeline.');
+            return;
+        }
+
+        setShowTimelineClarification(false);
+        await submitConfig(buildConfig(selectedIds));
+    }, [timelineSelectionMode, timelineEvents, timelineChoices, selectedTimelineChoiceIds, submitConfig, buildConfig]);
 
     // Resync case selection when the modal opens or the active case changes
     useEffect(() => {
@@ -316,6 +431,11 @@ export default function CreateExportModal({
                                             }`} />
                                         </button>
                                     </div>
+                                    {timelineError && !showTimelineClarification && (
+                                        <div className="px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[12px]">
+                                            {timelineError}
+                                        </div>
+                                    )}
 
                                     {/* Include Exhibit Reference Toggle */}
                                     <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
@@ -414,6 +534,119 @@ export default function CreateExportModal({
                             </div>
                         </div>
                     </motion.div>
+                    {showTimelineClarification && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.96, y: 16 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.96, y: 16 }}
+                            className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+                        >
+                            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+                            <div className="relative w-full max-w-[620px] rounded-[1.5rem] border border-white/15 bg-[#0A1128]/95 shadow-[0_24px_80px_rgba(0,0,0,0.75)] overflow-hidden">
+                                <div className="p-5 border-b border-white/10 flex items-start gap-4">
+                                    <div className="w-11 h-11 rounded-xl bg-[#60A5FA]/15 border border-[#60A5FA]/25 flex items-center justify-center shrink-0">
+                                        <CalendarCheck size={22} weight="fill" className="text-[#60A5FA]" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-serif font-bold text-white">Which timeline should be included?</h3>
+                                        <p className="text-[13px] text-white/55 mt-1">
+                                            This case has multiple timeline groups. Choose the full case timeline or only the incident timeline(s) relevant to this export.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="p-5 space-y-3 max-h-[56vh] overflow-y-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => setTimelineSelectionMode('entire')}
+                                        className={`w-full text-left p-4 rounded-xl border transition-all ${
+                                            timelineSelectionMode === 'entire'
+                                                ? 'bg-[#60A5FA]/15 border-[#60A5FA]/40'
+                                                : 'bg-white/5 border-white/10 hover:bg-white/10'
+                                        }`}
+                                    >
+                                        <p className="text-[14px] font-bold text-white">Entire case timeline</p>
+                                        <p className="text-[12px] text-white/50 mt-1">
+                                            Include all {timelineEvents?.length ?? 0} timeline event{(timelineEvents?.length ?? 0) === 1 ? '' : 's'} for this case.
+                                        </p>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setTimelineSelectionMode('selected')}
+                                        className={`w-full text-left p-4 rounded-xl border transition-all ${
+                                            timelineSelectionMode === 'selected'
+                                                ? 'bg-[#60A5FA]/15 border-[#60A5FA]/40'
+                                                : 'bg-white/5 border-white/10 hover:bg-white/10'
+                                        }`}
+                                    >
+                                        <p className="text-[14px] font-bold text-white">Specific incident timeline(s)</p>
+                                        <p className="text-[12px] text-white/50 mt-1">
+                                            Choose one or more incident/event groups below.
+                                        </p>
+                                    </button>
+
+                                    {timelineSelectionMode === 'selected' && (
+                                        <div className="space-y-2 pt-1">
+                                            {timelineChoices.map(choice => {
+                                                const checked = selectedTimelineChoiceIds.includes(choice.id);
+                                                return (
+                                                    <button
+                                                        key={choice.id}
+                                                        type="button"
+                                                        onClick={() => handleTimelineChoiceToggle(choice.id)}
+                                                        className={`w-full text-left p-3 rounded-xl border flex items-start gap-3 transition-all ${
+                                                            checked
+                                                                ? 'bg-emerald-500/10 border-emerald-400/30'
+                                                                : 'bg-black/20 border-white/10 hover:bg-white/5'
+                                                        }`}
+                                                    >
+                                                        <span className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                                                            checked ? 'bg-emerald-400 border-emerald-400' : 'border-white/30'
+                                                        }`}>
+                                                            {checked && <Check size={10} weight="bold" className="text-[#0A1128]" />}
+                                                        </span>
+                                                        <span>
+                                                            <span className="block text-[13px] font-bold text-white">{choice.label}</span>
+                                                            <span className="block text-[11px] text-white/45 mt-0.5">{choice.description}</span>
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {timelineError && (
+                                        <div className="px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[12px]">
+                                            {timelineError}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="p-5 border-t border-white/10 flex items-center justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowTimelineClarification(false);
+                                            setTimelineError(null);
+                                        }}
+                                        disabled={isSubmitting}
+                                        className="px-5 py-2.5 rounded-xl text-[13px] font-bold text-white/55 hover:text-white hover:bg-white/5 transition-all"
+                                    >
+                                        Back
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleTimelineClarificationContinue}
+                                        disabled={isSubmitting}
+                                        className="px-6 py-2.5 rounded-xl text-[13px] font-bold text-white bg-[#123D7E] border border-white/20 hover:bg-[#1A4B9B] transition-all disabled:opacity-50"
+                                    >
+                                        {isSubmitting ? 'Assembling...' : 'Continue'}
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
                 </>
             )}
         </AnimatePresence>

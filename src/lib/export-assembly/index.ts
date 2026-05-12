@@ -98,9 +98,12 @@ export function assembleExportInput(
         ? allNodes.filter(n => selectedNodeIdSet.has(n.id))
         : allNodes; // If no specific selection, use all
 
-    const selectedEvents = selectedTimelineIdSet.size > 0
-        ? allEvents.filter(e => selectedTimelineIdSet.has(e.id))
-        : allEvents;
+    const includeTimeline = (request.config as { includeTimeline?: boolean }).includeTimeline === true;
+    const selectedEvents = includeTimeline
+        ? selectedTimelineIdSet.size > 0
+            ? allEvents.filter(e => selectedTimelineIdSet.has(e.id))
+            : allEvents
+        : [];
 
     // ── Step 2: Classify all selected nodes ──
     const classifiedNodes = classifyNodes(selectedNodes);

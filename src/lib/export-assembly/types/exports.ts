@@ -90,6 +90,7 @@ export interface CourtConfig {
     includePrayer: boolean;
     includeCertificateOfService: boolean;
     includeProposedOrder: boolean;
+    includeTimeline?: boolean;
     linkedExhibitIds?: string[];
     outputFormat: OutputFormat;
 }
@@ -113,6 +114,7 @@ export interface ExhibitConfig {
     includeSourceMetadata: boolean;
     includeDividerPages: boolean;
     includeConfidentialNotes: boolean;
+    includeTimeline?: boolean;
     mergedOutput: boolean;
     outputFormat: OutputFormat;
 }

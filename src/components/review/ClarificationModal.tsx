@@ -54,6 +54,19 @@ interface ClarificationModalProps {
     onSaveToSettings?: (patch: Partial<CourtIdentity>) => Promise<boolean>;
     /** Source of each resolved field — used to determine smart rendering. */
     resolvedFieldSources?: Record<string, FieldResolutionSource>;
+    exhibitClarification?: {
+        reference: string;
+        candidates: Array<{
+            id: string;
+            title: string;
+            content?: string;
+            score: number;
+            reasons: string[];
+        }>;
+        onSelect: (candidateId: string) => void;
+        onSkip: () => void;
+        error?: string;
+    };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -190,7 +203,7 @@ async function saveToSettingsWithTimeout(
 export default function ClarificationModal({
     isOpen, onClose, onContinue, rawDocumentText,
     courtMode, courtIssues, courtIdentity, onResolve, onSaveToSettings,
-    resolvedFieldSources,
+    resolvedFieldSources, exhibitClarification,
 }: ClarificationModalProps) {
     const titleId = useId();
     const descriptionId = useId();
@@ -199,6 +212,7 @@ export default function ClarificationModal({
     // ── Structure mode state ──
     const [selectedAction, setSelectedAction] = useState<ClarificationAction>('generate_titles');
     const [details, setDetails] = useState('');
+    const [detailsScope, setDetailsScope] = useState<string>('structure');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -215,8 +229,16 @@ export default function ClarificationModal({
 
     // Determine active mode
     const activeMode = courtMode ?? (courtIssues?.length ? getPriorityMode(courtIssues) : undefined);
+    const isExhibitMode = Boolean(exhibitClarification);
     const isCourtMode = !!activeMode && activeMode !== 'missing_structure';
     const config = activeMode ? MODE_CONFIGS[activeMode] : null;
+    const activeDetailsScope = isExhibitMode ? `exhibit:${exhibitClarification?.reference ?? ''}` : activeMode ?? 'structure';
+    const scopedDetails = detailsScope === activeDetailsScope ? details : '';
+
+    const updateDetails = useCallback((value: string) => {
+        setDetailsScope(activeDetailsScope);
+        setDetails(value);
+    }, [activeDetailsScope]);
 
     // Reset all mode-specific state when mode changes to prevent stale
     // values leaking between certificate and prayer modes.
@@ -311,8 +333,8 @@ export default function ClarificationModal({
             setIsProcessing(true);
             try {
                 const instruction = selectedAction === 'generate_titles'
-                    ? `Analyze this unstructured legal document text and add appropriate section headings and structure. Break it into logical sections with Roman numeral headings (I, II, III, etc.) that follow standard legal document conventions. ${details ? `Additional instructions: ${details}` : ''}`
-                    : details || 'Please help restructure this document.';
+                    ? `Analyze this unstructured legal document text and add appropriate section headings and structure. Break it into logical sections with Roman numeral headings (I, II, III, etc.) that follow standard legal document conventions. ${scopedDetails ? `Additional instructions: ${scopedDetails}` : ''}`
+                    : scopedDetails || 'Please help restructure this document.';
                 const res = await fetch('/api/review/revise', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -354,7 +376,7 @@ export default function ClarificationModal({
                 }
                 if (streamError) throw new Error(streamError);
                 if (!sawDoneEvent) throw new Error('Stream ended without completion signal');
-                onContinue(selectedAction, details, fullText);
+                onContinue(selectedAction, scopedDetails, fullText);
             } catch (err) {
                 console.error('[ClarificationModal] Error:', err);
                 setError((err as Error).message || 'Something went wrong. Please try again.');
@@ -516,17 +538,60 @@ export default function ClarificationModal({
                                 : <Info size={20} weight="fill" className="text-[#38BDF8]" />
                             }
                             <h2 id={titleId} className="text-[16px] font-bold text-white tracking-tight">
-                                {config?.title ?? 'Clarification Needed'}
+                                {exhibitClarification ? 'Match Exhibit Reference' : config?.title ?? 'Clarification Needed'}
                             </h2>
                         </div>
                         <p id={descriptionId} className="text-[14px] text-white/70 leading-relaxed">
-                            {config?.description ?? 'This document needs additional information.'}
+                            {exhibitClarification
+                                ? `NEXX found "${exhibitClarification.reference}" in your document. Choose the matching Exhibit Hub item, or skip this reference.`
+                                : config?.description ?? 'This document needs additional information.'}
                         </p>
                     </div>
 
                     {/* Body */}
                     <div className="p-6 space-y-4 overflow-y-auto flex-1">
-                        {isCourtMode ? (
+                        {exhibitClarification ? (
+                            <div className="space-y-3">
+                                {exhibitClarification.candidates.map(candidate => (
+                                    <button
+                                        key={candidate.id}
+                                        type="button"
+                                        onClick={() => exhibitClarification.onSelect(candidate.id)}
+                                        disabled={isProcessing}
+                                        className="w-full p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-[#3B82F6]/10 hover:border-[#3B82F6]/40 transition-all text-left disabled:opacity-50"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="text-[14px] font-bold text-white">{candidate.title}</p>
+                                            <span className="text-[10px] font-bold text-[#93C5FD] uppercase tracking-widest">
+                                                {candidate.score}
+                                            </span>
+                                        </div>
+                                        {candidate.content && (
+                                            <p className="mt-1 text-[12px] text-white/50 line-clamp-2">{candidate.content}</p>
+                                        )}
+                                        {candidate.reasons.length > 0 && (
+                                            <p className="mt-2 text-[11px] text-white/35">
+                                                Matched by {candidate.reasons.join(', ')}
+                                            </p>
+                                        )}
+                                    </button>
+                                ))}
+                                <textarea
+                                    value={scopedDetails}
+                                    onChange={e => updateDetails(e.target.value)}
+                                    className="w-full min-h-[80px] rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-[13px] text-white/90 placeholder:text-white/30 focus:outline-none focus:border-[#3B82F6]/50 resize-y transition-colors"
+                                    placeholder="Write another clarification if none of these are right..."
+                                    disabled={isProcessing}
+                                />
+                                {exhibitClarification.error && (
+                                    <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
+                                        className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[12px]">
+                                        <WarningCircle size={14} weight="fill" className="inline mr-1.5" />
+                                        {exhibitClarification.error}
+                                    </motion.div>
+                                )}
+                            </div>
+                        ) : isCourtMode ? (
                             <>
                                 {/* Issue list */}
                                 {modeIssues.length > 0 && (
@@ -771,8 +836,8 @@ export default function ClarificationModal({
                                 />
                                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="pt-2 overflow-hidden">
                                     <textarea
-                                        value={details}
-                                        onChange={e => setDetails(e.target.value)}
+                                        value={scopedDetails}
+                                        onChange={e => updateDetails(e.target.value)}
                                         className="w-full min-h-[80px] rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-[13px] text-white/90 placeholder:text-white/30 focus:outline-none focus:border-[#3B82F6]/50 resize-y transition-colors"
                                         placeholder={selectedAction === 'other' ? 'Describe how you want the document restructured...' : 'Additional details or instructions (optional)...'}
                                         disabled={isProcessing}
@@ -793,7 +858,27 @@ export default function ClarificationModal({
 
                     {/* Footer Actions */}
                     <div className="p-5 px-6 border-t border-white/5 bg-black/20 rounded-b-[20px] flex items-center justify-between gap-3">
-                        {isCourtMode ? (
+                        {isExhibitMode ? (
+                            <div className="flex items-center gap-3 ml-auto">
+                                <button type="button" onClick={exhibitClarification?.onSkip} disabled={isProcessing}
+                                    className="px-5 py-2.5 rounded-xl text-[13px] font-bold text-white/50 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40">
+                                    None / Skip
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (scopedDetails.trim()) {
+                                            onContinue('other', scopedDetails.trim());
+                                        } else {
+                                            onClose();
+                                        }
+                                    }}
+                                    disabled={isProcessing}
+                                    className="px-5 py-2.5 rounded-xl text-[13px] font-bold text-white/50 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40">
+                                    {scopedDetails.trim() ? 'Save Clarification' : 'Close'}
+                                </button>
+                            </div>
+                        ) : isCourtMode ? (
                             <>
                                 <button
                                     type="button"
@@ -825,7 +910,7 @@ export default function ClarificationModal({
                                     Cancel
                                 </button>
                                 <button type="button" onClick={handleStructureContinue}
-                                    disabled={isProcessing || (selectedAction === 'other' && !details.trim())}
+                                    disabled={isProcessing || (selectedAction === 'other' && !scopedDetails.trim())}
                                     className="btn-primary flex items-center gap-2 !text-[13px] !py-2.5 disabled:opacity-50">
                                     {isProcessing ? (
                                         <><CircleNotch size={14} className="animate-spin" /> Processing...</>

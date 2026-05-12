@@ -212,6 +212,7 @@ export default function ClarificationModal({
     // ── Structure mode state ──
     const [selectedAction, setSelectedAction] = useState<ClarificationAction>('generate_titles');
     const [details, setDetails] = useState('');
+    const [detailsScope, setDetailsScope] = useState<string>('structure');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -231,6 +232,13 @@ export default function ClarificationModal({
     const isExhibitMode = Boolean(exhibitClarification);
     const isCourtMode = !!activeMode && activeMode !== 'missing_structure';
     const config = activeMode ? MODE_CONFIGS[activeMode] : null;
+    const activeDetailsScope = isExhibitMode ? `exhibit:${exhibitClarification?.reference ?? ''}` : activeMode ?? 'structure';
+    const scopedDetails = detailsScope === activeDetailsScope ? details : '';
+
+    const updateDetails = useCallback((value: string) => {
+        setDetailsScope(activeDetailsScope);
+        setDetails(value);
+    }, [activeDetailsScope]);
 
     // Reset all mode-specific state when mode changes to prevent stale
     // values leaking between certificate and prayer modes.
@@ -325,8 +333,8 @@ export default function ClarificationModal({
             setIsProcessing(true);
             try {
                 const instruction = selectedAction === 'generate_titles'
-                    ? `Analyze this unstructured legal document text and add appropriate section headings and structure. Break it into logical sections with Roman numeral headings (I, II, III, etc.) that follow standard legal document conventions. ${details ? `Additional instructions: ${details}` : ''}`
-                    : details || 'Please help restructure this document.';
+                    ? `Analyze this unstructured legal document text and add appropriate section headings and structure. Break it into logical sections with Roman numeral headings (I, II, III, etc.) that follow standard legal document conventions. ${scopedDetails ? `Additional instructions: ${scopedDetails}` : ''}`
+                    : scopedDetails || 'Please help restructure this document.';
                 const res = await fetch('/api/review/revise', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -368,7 +376,7 @@ export default function ClarificationModal({
                 }
                 if (streamError) throw new Error(streamError);
                 if (!sawDoneEvent) throw new Error('Stream ended without completion signal');
-                onContinue(selectedAction, details, fullText);
+                onContinue(selectedAction, scopedDetails, fullText);
             } catch (err) {
                 console.error('[ClarificationModal] Error:', err);
                 setError((err as Error).message || 'Something went wrong. Please try again.');
@@ -569,8 +577,8 @@ export default function ClarificationModal({
                                     </button>
                                 ))}
                                 <textarea
-                                    value={details}
-                                    onChange={e => setDetails(e.target.value)}
+                                    value={scopedDetails}
+                                    onChange={e => updateDetails(e.target.value)}
                                     className="w-full min-h-[80px] rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-[13px] text-white/90 placeholder:text-white/30 focus:outline-none focus:border-[#3B82F6]/50 resize-y transition-colors"
                                     placeholder="Write another clarification if none of these are right..."
                                     disabled={isProcessing}
@@ -828,8 +836,8 @@ export default function ClarificationModal({
                                 />
                                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="pt-2 overflow-hidden">
                                     <textarea
-                                        value={details}
-                                        onChange={e => setDetails(e.target.value)}
+                                        value={scopedDetails}
+                                        onChange={e => updateDetails(e.target.value)}
                                         className="w-full min-h-[80px] rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-[13px] text-white/90 placeholder:text-white/30 focus:outline-none focus:border-[#3B82F6]/50 resize-y transition-colors"
                                         placeholder={selectedAction === 'other' ? 'Describe how you want the document restructured...' : 'Additional details or instructions (optional)...'}
                                         disabled={isProcessing}
@@ -859,15 +867,15 @@ export default function ClarificationModal({
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        if (details.trim()) {
-                                            onContinue('other', details.trim());
+                                        if (scopedDetails.trim()) {
+                                            onContinue('other', scopedDetails.trim());
                                         } else {
                                             onClose();
                                         }
                                     }}
                                     disabled={isProcessing}
                                     className="px-5 py-2.5 rounded-xl text-[13px] font-bold text-white/50 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40">
-                                    {details.trim() ? 'Save Clarification' : 'Write Clarification'}
+                                    {scopedDetails.trim() ? 'Save Clarification' : 'Write Clarification'}
                                 </button>
                             </div>
                         ) : isCourtMode ? (
@@ -902,7 +910,7 @@ export default function ClarificationModal({
                                     Cancel
                                 </button>
                                 <button type="button" onClick={handleStructureContinue}
-                                    disabled={isProcessing || (selectedAction === 'other' && !details.trim())}
+                                    disabled={isProcessing || (selectedAction === 'other' && !scopedDetails.trim())}
                                     className="btn-primary flex items-center gap-2 !text-[13px] !py-2.5 disabled:opacity-50">
                                     {isProcessing ? (
                                         <><CircleNotch size={14} className="animate-spin" /> Processing...</>

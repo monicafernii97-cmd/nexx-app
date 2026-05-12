@@ -618,12 +618,14 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         if (state.phase !== 'reviewing') return;
 
         const interval = setInterval(() => {
-            // Compare full overrides + reviewItems + courtIdentityPatch + courtResolvedText
+            // Compare all review edits that must trigger autosave.
             const snapshot = JSON.stringify({
                 overrides: state.overrides,
                 reviewItems: state.reviewItems,
                 courtIdentityPatch: state.courtIdentityPatch,
                 courtResolvedText: state.courtResolvedText,
+                exhibitReferenceMatches: state.exhibitReferenceMatches,
+                skippedExhibitReferences: state.skippedExhibitReferences,
             });
 
             if (snapshot !== lastCheckedSnapshotRef.current) {
@@ -633,7 +635,15 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         }, AUTO_SAVE_INTERVAL_MS);
 
         return () => clearInterval(interval);
-    }, [state.phase, state.overrides, state.reviewItems, state.courtIdentityPatch, state.courtResolvedText]);
+    }, [
+        state.phase,
+        state.overrides,
+        state.reviewItems,
+        state.courtIdentityPatch,
+        state.courtResolvedText,
+        state.exhibitReferenceMatches,
+        state.skippedExhibitReferences,
+    ]);
 
     // ── Convenience actions ──
     /** Start the configuration phase for a given export path. */

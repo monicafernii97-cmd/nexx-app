@@ -23,7 +23,7 @@ export const TX_DEFAULT_PROFILE: JurisdictionProfile = {
 
   page: {
     ...US_DEFAULT_PROFILE.page,
-    marginsPt: { top: 72, right: 72, bottom: 72, left: 72 },
+    marginsPt: { top: 60, right: 72, bottom: 72, left: 72 },
   },
 
   typography: {

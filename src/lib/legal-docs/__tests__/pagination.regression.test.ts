@@ -45,4 +45,18 @@ describe('pagination regression — multi-state pleadings', () => {
     expect(qgProfile.sections.signatureKeepTogether).toBe(true);
     expect(html).toContain('no-break-inside');
   });
+
+  it('keeps prayer heading with its following content', () => {
+    const doc = parseLegalDocument(texasPleadingFixture);
+    const profile = resolveJurisdictionProfile({
+      state: 'Texas',
+      county: 'Fort Bend',
+    });
+
+    const qgProfile = assertQuickGenerateProfile(profile);
+    const html = renderLegalDocumentHTML(doc, qgProfile);
+
+    expect(html).toContain('class="prayer-block"');
+    expect(html).toContain('break-inside: avoid;');
+  });
 });

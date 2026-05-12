@@ -21,7 +21,7 @@
  *   - Times New Roman 12pt / 18pt line height (unless profile overrides)
  */
 
-import type { LegalDocument, LegalBlock, InlineRun, NumberedParagraphBlock, ParagraphBlock } from './types';
+import type { LegalDocument, LegalBlock, InlineRun } from './types';
 import type { QuickGenerateProfile as JurisdictionProfile } from '@/lib/jurisdiction/types';
 import type { DocumentTypeProfile } from './document-type/profiles';
 
@@ -86,7 +86,8 @@ export function renderLegalDocumentHTML(
     text-align: center;
     font-weight: 700;
     ${profile.typography.uppercaseCaption ? 'text-transform: uppercase;' : ''}
-    margin-bottom: 20pt;
+    margin-bottom: 14pt;
+    line-height: 15pt;
   }
 
   .caption-table {
@@ -94,7 +95,7 @@ export function renderLegalDocumentHTML(
     max-width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
-    margin: 0 auto 14pt;
+    margin: 0 auto 10pt;
   }
 
   .caption-left,
@@ -112,7 +113,8 @@ export function renderLegalDocumentHTML(
 
   .caption-cell-line {
     display: block;
-    min-height: ${profile.typography.lineHeightPt}pt;
+    min-height: 14.5pt;
+    line-height: 14.5pt;
   }
 
   .caption-generic {
@@ -127,6 +129,10 @@ export function renderLegalDocumentHTML(
   }
 
   /* ── Title ── */
+  .title-block {
+    margin-bottom: 24pt;
+  }
+
   .rule {
     border-top: 1px solid #000;
     margin: 10pt 0;
@@ -150,7 +156,7 @@ export function renderLegalDocumentHTML(
   .body-paragraph {
     text-align: ${profile.typography.bodyAlign};
     text-indent: 0;
-    margin: 0 0 14pt;
+    margin: 0 0 11pt;
     orphans: 3;
     widows: 3;
   }
@@ -158,7 +164,7 @@ export function renderLegalDocumentHTML(
   .body-paragraph-intro {
     text-align: ${profile.typography.bodyAlign};
     text-indent: 0.5in;
-    margin: 0 0 14pt;
+    margin: 0 0 11pt;
     orphans: 3;
     widows: 3;
   }
@@ -196,7 +202,7 @@ export function renderLegalDocumentHTML(
   }
 
   .numbered-list li {
-    margin: 0 0 14pt;
+    margin: 0 0 11pt;
     padding-left: 0.25in;
     text-indent: -0.25in;
     text-align: ${profile.typography.bodyAlign};
@@ -207,7 +213,7 @@ export function renderLegalDocumentHTML(
   .numbered-paragraph {
     display: flex;
     align-items: flex-start;
-    margin: 0 0 14pt;
+    margin: 0 0 11pt;
     line-height: ${profile.typography.lineHeightPt}pt;
     page-break-inside: avoid;
     break-inside: avoid;
@@ -249,7 +255,7 @@ export function renderLegalDocumentHTML(
   }
 
   .bullet-list li {
-    margin: 0 0 14pt;
+    margin: 0 0 11pt;
     padding-left: 18pt;
     text-indent: -18pt;
     text-align: ${profile.typography.bodyAlign};
@@ -270,6 +276,11 @@ export function renderLegalDocumentHTML(
     margin: 16pt 0 6pt;
     page-break-after: avoid;
     break-after: avoid;
+  }
+
+  .prayer-block {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   /* ── Signature ── */
@@ -307,7 +318,7 @@ export function renderLegalDocumentHTML(
   }
 
   .lettered-list li {
-    margin: 0 0 14pt;
+    margin: 0 0 11pt;
     padding-left: 18pt;
     text-indent: -18pt;
     text-align: ${profile.typography.bodyAlign};
@@ -397,11 +408,13 @@ function renderTitle(doc: LegalDocument): string {
     : '';
 
   return `
+    <div class="title-block">
     <div class="rule"></div>
     <div class="title-main">${esc(doc.title.main)}</div>
     ${additionalLines}
     ${doc.title.subtitle ? `<div class="title-subtitle">${esc(formatTitleSubtitle(doc.title.subtitle))}</div>` : ''}
-    <div class="rule"></div>`;
+    <div class="rule"></div>
+    </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -505,13 +518,15 @@ function renderPrayer(doc: LegalDocument): string {
     : doc.prayer.intro ? `<p class="body-paragraph">${esc(doc.prayer.intro)}</p>` : '';
 
   return `
+    <div class="prayer-block">
     <div class="prayer-heading">${esc(doc.prayer.heading)}</div>
     ${introHtml}
     ${doc.prayer.requests.length
       ? `<ol class="numbered-list">
           ${doc.prayer.requests.map((item: string, idx: number) => `<li>${idx + 1}. ${esc(item)}</li>`).join('')}
         </ol>`
-      : ''}`;
+      : ''}
+    </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -537,7 +552,7 @@ function renderSignature(doc: LegalDocument, profile: JurisdictionProfile): stri
 // Certificate of Service
 // ═══════════════════════════════════════════════════════════════
 
-function renderCertificate(doc: LegalDocument, profile: JurisdictionProfile): string {
+function renderCertificate(doc: LegalDocument): string {
   if (!doc.certificate) return '';
 
   return `

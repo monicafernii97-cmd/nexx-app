@@ -43,6 +43,20 @@ describe('exhibit reference matching', () => {
     expect(result.ambiguous).toHaveLength(0);
   });
 
+  it('does not let document-wide signals override an explicit exhibit label', () => {
+    const result = matchExhibitReferences(
+      'Attached as Exhibit B. The school email chain is discussed in the same paragraph.',
+      [
+        { id: 'pin_1', title: 'Exhibit A - School email chain', filename: 'school-email-chain.pdf', source: 'case_pin' },
+        { id: 'pin_2', title: 'Exhibit B - Medical receipt', filename: 'medical-receipt.pdf', source: 'case_pin' },
+      ],
+    );
+
+    const explicitMatch = result.confirmed.find(match => match.mention.raw === 'Exhibit B');
+    expect(explicitMatch?.match.exhibit.id).toBe('pin_2');
+    expect(explicitMatch?.mention.normalizedLabel).toBe('B');
+  });
+
   it('marks close competing matches as ambiguous', () => {
     const result = matchExhibitReferences('Attached as Exhibit A is the receipt.', [
       { id: 'pin_1', title: 'Exhibit A - School receipt', content: 'receipt', source: 'case_pin' },

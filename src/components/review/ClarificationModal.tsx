@@ -875,7 +875,7 @@ export default function ClarificationModal({
                                     }}
                                     disabled={isProcessing}
                                     className="px-5 py-2.5 rounded-xl text-[13px] font-bold text-white/50 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40">
-                                    {scopedDetails.trim() ? 'Save Clarification' : 'Write Clarification'}
+                                    {scopedDetails.trim() ? 'Save Clarification' : 'Close'}
                                 </button>
                             </div>
                         ) : isCourtMode ? (

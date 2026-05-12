@@ -147,6 +147,11 @@ function scoreCandidate(
   const reasons: string[] = [];
   let score = 0;
   const candidateLabels = inferCandidateLabels(candidate);
+  const hasExplicitLabelMention = /\b(?:exhibit|ex\.?)\s*([a-z]{1,3}|\d{1,4})\b/i.test(mention.raw);
+
+  if (hasExplicitLabelMention && mention.normalizedLabel && !candidateLabels.has(mention.normalizedLabel)) {
+    return null;
+  }
 
   if (mention.normalizedLabel && candidateLabels.has(mention.normalizedLabel)) {
     score += 100;

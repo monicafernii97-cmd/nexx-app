@@ -481,12 +481,13 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
             }
             const nextMatches = [...byReference.values()];
             const linkedExhibitIds = [...new Set(nextMatches.map(match => match.exhibitId))];
+            const matchedReferences = new Set(action.matches.map(match => match.reference));
             const skippedReferences = [
                 ...new Set([
                     ...state.skippedExhibitReferences,
                     ...(action.skippedReferences ?? []),
                 ]),
-            ];
+            ].filter(reference => !matchedReferences.has(reference));
             const requestConfig = state.exportRequest?.config
                 ? {
                     ...((state.exportRequest.config ?? {}) as unknown as Record<string, unknown>),

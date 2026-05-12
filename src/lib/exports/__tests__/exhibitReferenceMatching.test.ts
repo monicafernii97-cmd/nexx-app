@@ -29,6 +29,20 @@ describe('exhibit reference matching', () => {
     expect(result.confirmed[0].match.exhibit.id).toBe('pin_1');
   });
 
+  it('keeps separate mentions that resolve to the same exhibit', () => {
+    const result = matchExhibitReferences(
+      'Attached as Exhibit A and referenced again as school-email-chain.pdf.',
+      [
+        { id: 'pin_1', title: 'Exhibit A - School email chain', filename: 'school-email-chain.pdf', source: 'case_pin' },
+        { id: 'pin_2', title: 'Exhibit B - Medical receipt', filename: 'medical-receipt.pdf', source: 'case_pin' },
+      ],
+    );
+
+    expect(result.confirmed).toHaveLength(2);
+    expect(result.confirmed.map(match => match.match.exhibit.id)).toEqual(['pin_1', 'pin_1']);
+    expect(result.ambiguous).toHaveLength(0);
+  });
+
   it('marks close competing matches as ambiguous', () => {
     const result = matchExhibitReferences('Attached as Exhibit A is the receipt.', [
       { id: 'pin_1', title: 'Exhibit A - School receipt', content: 'receipt', source: 'case_pin' },

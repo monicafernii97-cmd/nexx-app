@@ -85,10 +85,12 @@ type TimelineChoice = {
     eventIds: string[];
 };
 
+/** Display timeline event dates consistently when an event has no date. */
 function formatEventDate(date?: string): string {
     return date?.trim() || 'Undated';
 }
 
+/** Group timeline events into user-selectable incident or single-event choices. */
 function buildTimelineChoices(events: TimelineEventDoc[]): TimelineChoice[] {
     const groups = new Map<string, TimelineEventDoc[]>();
 
@@ -96,7 +98,12 @@ function buildTimelineChoices(events: TimelineEventDoc[]): TimelineChoice[] {
         const groupId = event.linkedIncidentId
             ? `incident:${event.linkedIncidentId}`
             : `event:${event._id}`;
-        groups.set(groupId, [...(groups.get(groupId) ?? []), event]);
+        let bucket = groups.get(groupId);
+        if (!bucket) {
+            bucket = [];
+            groups.set(groupId, bucket);
+        }
+        bucket.push(event);
     }
 
     return [...groups.entries()].map(([id, group]) => {

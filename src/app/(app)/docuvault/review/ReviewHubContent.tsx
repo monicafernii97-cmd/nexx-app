@@ -154,6 +154,7 @@ type ExhibitSourceDoc = {
     metadataJson?: string;
 };
 
+/** Safely parse exhibit metadata stored as JSON, falling back to an empty object. */
 function parseMetadataJson(metadataJson?: string): Record<string, unknown> {
     if (!metadataJson) return {};
     try {
@@ -164,6 +165,7 @@ function parseMetadataJson(metadataJson?: string): Record<string, unknown> {
     }
 }
 
+/** Read the first non-empty string from a metadata record using known field aliases. */
 function readStringField(record: Record<string, unknown>, keys: string[]): string | undefined {
     for (const key of keys) {
         const value = record[key];
@@ -172,10 +174,12 @@ function readStringField(record: Record<string, unknown>, keys: string[]): strin
     return undefined;
 }
 
+/** Allow case-scoped documents plus legacy documents that were saved without a case id. */
 function sameCaseOrUnscoped(docCaseId: unknown, activeCaseId?: string): boolean {
     return !activeCaseId || !docCaseId || String(docCaseId) === activeCaseId;
 }
 
+/** Build a de-duplicated list of Exhibit Hub candidates from case pins and exhibit notes. */
 function buildExhibitCandidates(
     rawPins: ExhibitSourceDoc[] | undefined,
     rawExhibitNotes: ExhibitSourceDoc[] | undefined,
@@ -210,6 +214,7 @@ function buildExhibitCandidates(
     return [...candidates.values()];
 }
 
+/** Convert resolved matcher results into the export context's persisted match shape. */
 function toExportMatches(resolved: ResolvedExhibitReference[]): ExportExhibitReferenceMatch[] {
     return resolved.map(({ mention, match }) => ({
         reference: mention.raw,
@@ -244,6 +249,7 @@ export default function ReviewHubContent() {
     const [revisingItemId, setRevisingItemId] = useState<string | null>(null);
     const [isDrafting, setIsDrafting] = useState(false);
     const [showPreflight, setShowPreflight] = useState(false);
+    const [exhibitClarificationError, setExhibitClarificationError] = useState<string | null>(null);
 
     // Court document: compute whether export is allowed
     const isCourtDocument = state.exportPath === 'court_document';
@@ -508,11 +514,11 @@ export default function ReviewHubContent() {
         if (promptedExhibitReferenceKeyRef.current === key) return;
         promptedExhibitReferenceKeyRef.current = key;
 
+        setExhibitClarificationError(null);
         setActiveExhibitAmbiguity(nextAmbiguity);
         setShowExhibitClarification(true);
     }, [
         activeExhibitAmbiguity,
-        dispatch,
         exhibitMatchResult.ambiguous,
         isCourtDocument,
         showClarificationModal,
@@ -765,6 +771,7 @@ export default function ReviewHubContent() {
                 skippedReferences: [activeExhibitAmbiguity.mention.raw],
             });
         }
+        setExhibitClarificationError(null);
         setShowExhibitClarification(false);
         setActiveExhibitAmbiguity(null);
     }, [activeExhibitAmbiguity, dispatch]);
@@ -774,6 +781,7 @@ export default function ReviewHubContent() {
         const selected = activeExhibitAmbiguity.candidates.find(candidate => candidate.exhibit.id === candidateId);
         if (!selected) return;
 
+        setExhibitClarificationError(null);
         dispatch({
             type: 'APPLY_EXHIBIT_REFERENCE_MATCHES',
             matches: [{
@@ -807,7 +815,8 @@ export default function ReviewHubContent() {
             return;
         }
 
-        closeExhibitClarification(true);
+        setExhibitClarificationError('That clarification did not identify an exhibit. Choose a suggested exhibit or try a more specific title, label, or filename.');
+        setShowExhibitClarification(true);
     }, [activeExhibitAmbiguity, closeExhibitClarification, dispatch]);
 
     const handleSkipExhibitReference = useCallback(() => {
@@ -985,6 +994,7 @@ export default function ReviewHubContent() {
 
             {/* ── Clarification Modal Overlay ── */}
             <ClarificationModal
+                key={activeExhibitAmbiguity ? `exhibit:${activeExhibitAmbiguity.mention.raw}` : courtMode ?? 'structure'}
                 isOpen={showClarificationModal || state.showCourtClarification || showExhibitClarification}
                 onClose={() => {
                     if (activeExhibitAmbiguity) {
@@ -1092,6 +1102,7 @@ export default function ReviewHubContent() {
                     })),
                     onSelect: handleSelectExhibitCandidate,
                     onSkip: handleSkipExhibitReference,
+                    error: exhibitClarificationError ?? undefined,
                 } : undefined}
             />
         </div>

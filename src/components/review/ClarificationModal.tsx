@@ -65,6 +65,7 @@ interface ClarificationModalProps {
         }>;
         onSelect: (candidateId: string) => void;
         onSkip: () => void;
+        error?: string;
     };
 }
 
@@ -574,6 +575,13 @@ export default function ClarificationModal({
                                     placeholder="Write another clarification if none of these are right..."
                                     disabled={isProcessing}
                                 />
+                                {exhibitClarification.error && (
+                                    <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
+                                        className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[12px]">
+                                        <WarningCircle size={14} weight="fill" className="inline mr-1.5" />
+                                        {exhibitClarification.error}
+                                    </motion.div>
+                                )}
                             </div>
                         ) : isCourtMode ? (
                             <>

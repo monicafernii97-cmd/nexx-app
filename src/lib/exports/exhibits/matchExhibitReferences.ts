@@ -37,6 +37,7 @@ export interface ExhibitReferenceMatchResult {
 
 const LABEL_PATTERN = /\b(?:Exhibit|Ex\.?)\s*([A-Z]{1,3}|\d{1,4})\b/gi;
 
+/** Normalize user-entered and stored exhibit text for resilient comparison. */
 function normalize(value: string): string {
   return value
     .toLowerCase()
@@ -46,15 +47,18 @@ function normalize(value: string): string {
     .replace(/\s+/g, ' ');
 }
 
+/** Extract the canonical label from an exhibit phrase, such as "A" from "Exhibit A". */
 function normalizeLabel(value: string): string {
   const match = value.match(/\b(?:exhibit|ex\.?)\s*([a-z]{1,3}|\d{1,4})\b/i);
   return match?.[1]?.toUpperCase() ?? value.trim().toUpperCase();
 }
 
+/** Split normalized text into meaningful comparison tokens. */
 function tokens(value: string): Set<string> {
   return new Set(normalize(value).split(' ').filter(token => token.length >= 3));
 }
 
+/** Score how much two text fields overlap by their significant tokens. */
 function tokenOverlap(a: string, b: string): number {
   const aTokens = tokens(a);
   const bTokens = tokens(b);
@@ -66,6 +70,7 @@ function tokenOverlap(a: string, b: string): number {
   return overlap / Math.min(aTokens.size, bTokens.size);
 }
 
+/** Infer exhibit labels from every searchable field on an Exhibit Hub candidate. */
 function inferCandidateLabels(candidate: ExhibitHubCandidate): Set<string> {
   const labels = new Set<string>();
   for (const value of [candidate.label, candidate.title, candidate.filename, candidate.content]) {
@@ -77,6 +82,7 @@ function inferCandidateLabels(candidate: ExhibitHubCandidate): Set<string> {
   return labels;
 }
 
+/** Find explicit exhibit references in pasted document text. */
 export function extractExhibitMentions(text: string): ExhibitReferenceMention[] {
   const seen = new Set<string>();
   const mentions: ExhibitReferenceMention[] = [];
@@ -94,10 +100,12 @@ export function extractExhibitMentions(text: string): ExhibitReferenceMention[] 
   return mentions;
 }
 
+/** Build a stable mention identity from its raw text and source index. */
 function mentionKey(raw: string, index: number): string {
   return `${normalize(raw)}:${index}`;
 }
 
+/** Add title and filename mentions when users refer to exhibits without "Exhibit X" labels. */
 function collectCandidatePhraseMentions(
   text: string,
   candidates: ExhibitHubCandidate[],
@@ -130,6 +138,7 @@ function collectCandidatePhraseMentions(
   return mentions;
 }
 
+/** Score one exhibit candidate against one detected mention and the surrounding document text. */
 function scoreCandidate(
   text: string,
   mention: ExhibitReferenceMention,
@@ -175,6 +184,7 @@ function scoreCandidate(
   return score > 0 ? { exhibit: candidate, score, reasons } : null;
 }
 
+/** Match pasted exhibit references to existing Exhibit Hub candidates, flagging unclear cases. */
 export function matchExhibitReferences(
   text: string,
   candidates: ExhibitHubCandidate[],
@@ -186,7 +196,6 @@ export function matchExhibitReferences(
   ];
   const confirmed: ResolvedExhibitReference[] = [];
   const ambiguous: AmbiguousExhibitReference[] = [];
-  const usedIds = new Set<string>();
 
   for (const mention of mentions) {
     const ranked = candidates
@@ -210,10 +219,7 @@ export function matchExhibitReferences(
 
     const [top, second] = ranked;
     if (top.score >= 80 && (!second || top.score - second.score >= 20)) {
-      if (!usedIds.has(top.exhibit.id)) {
-        confirmed.push({ mention, match: top });
-        usedIds.add(top.exhibit.id);
-      }
+      confirmed.push({ mention, match: top });
     } else {
       ambiguous.push({ mention, candidates: ranked.slice(0, 5) });
     }

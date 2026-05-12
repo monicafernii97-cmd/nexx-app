@@ -113,7 +113,7 @@ export type ExportPhase =
 // Config + Validation Types
 // ---------------------------------------------------------------------------
 
-/** Configuration collected from CreateExportModal. */
+/** Configuration for the structured export pipeline. */
 export interface ExportConfig {
     path: ExportPath;
     caseId: Id<'cases'>;
@@ -258,6 +258,7 @@ type ExportAction =
     | { type: 'SET_COURT_ISSUES'; issues: CourtDocumentIssue[] }
     | { type: 'SET_COURT_IDENTITY_PATCH'; patch: Partial<CourtIdentity> }
     | { type: 'SHOW_COURT_CLARIFICATION'; show: boolean }
+    | { type: 'UPDATE_REVIEW_OPTIONS'; includeTimeline?: boolean; includeExhibits?: boolean }
     | { type: 'APPLY_COURT_RESOLUTION'; patch: Partial<CourtIdentity>; resolvedText?: string };
 
 /** Reducer managing the full export lifecycle state machine. */
@@ -425,6 +426,36 @@ function exportReducer(state: ExportState, action: ExportAction): ExportState {
                 ...state,
                 showCourtClarification: action.show,
             };
+
+        case 'UPDATE_REVIEW_OPTIONS': {
+            const configPatch = {
+                ...(action.includeTimeline !== undefined ? { includeTimeline: action.includeTimeline } : {}),
+                ...(action.includeExhibits !== undefined ? { includeExhibits: action.includeExhibits } : {}),
+            };
+            const requestConfigPatch = {
+                ...(action.includeTimeline !== undefined ? { includeTimeline: action.includeTimeline } : {}),
+                ...(action.includeExhibits !== undefined
+                    ? {
+                        includeExhibitReference: action.includeExhibits,
+                        includeEvidenceAppendix: action.includeExhibits,
+                    }
+                    : {}),
+            };
+
+            return {
+                ...state,
+                config: state.config ? { ...state.config, ...configPatch } : state.config,
+                exportRequest: state.exportRequest
+                    ? {
+                        ...state.exportRequest,
+                        config: {
+                            ...((state.exportRequest.config ?? {}) as unknown as Record<string, unknown>),
+                            ...requestConfigPatch,
+                        } as typeof state.exportRequest.config,
+                    }
+                    : state.exportRequest,
+            };
+        }
 
         case 'APPLY_COURT_RESOLUTION': {
             // 🔒 Idempotent merge — per-field, not per-object (Invariant H3)

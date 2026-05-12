@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useRef, useEffect, Suspense } from 'react';
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import {
     FileText,
     Plus,
@@ -21,7 +21,6 @@ import { UI_TABS, getTemplatesForTab } from '@/lib/legal/templateCategories';
 import type { UITabCategory } from '@/lib/legal/templateCategories';
 import { PageContainer } from '@/components/layout/PageLayout';
 import type { DocumentTemplate } from '@/lib/legal/types';
-import CreateExportModal from './components/CreateExportModal';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useExport } from './context/ExportContext';
 import '@/styles/pipelines.css';
@@ -53,6 +52,7 @@ function DocuVaultPageInner() {
     const user = useQuery(api.users.get, userId ? { id: userId } : 'skip');
     const courtSettings = useQuery(api.courtSettings.get);
     const drafts = useQuery(api.courtDocumentDrafts.listByUser, { limit: 5 });
+    const cases = useQuery(api.cases.list);
     /** True while user profile query is in-flight (prevents generation with wrong defaults). */
     const isUserProfileLoading = Boolean(userId) && (user === undefined || courtSettings === undefined);
 
@@ -72,11 +72,14 @@ function DocuVaultPageInner() {
     // Error state
     const [generationError, setGenerationError] = useState<string | null>(null);
     const [isParsing, setIsParsing] = useState(false);
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const parseAbortRef = useRef<AbortController | null>(null);
 
-    // Structured export modal state (unified export path)
-    const [showCreateExport, setShowCreateExport] = useState(false);
+    // Structured export state (direct court-document path)
     const { startStructuredExport } = useExport();
+    const selectedCaseId = activeCaseId
+        ?? cases?.find(c => c.status === 'active')?._id
+        ?? cases?.[0]?._id;
 
     // Abort parse stream on unmount
     useEffect(() => {
@@ -112,6 +115,50 @@ function DocuVaultPageInner() {
             initialSelectionDoneRef.current = matched;
         }
     }, [searchParams]);
+
+    const handleGeneratePdf = useCallback(async () => {
+        if (isGeneratingPdf) return;
+        if (isParsing || isUserProfileLoading) {
+            setGenerationError(isParsing ? 'Please wait - file is still being parsed.' : 'Loading your profile. Please try again in a moment.');
+            return;
+        }
+        if (cases === undefined) {
+            setGenerationError('Loading your cases. Please try again in a moment.');
+            return;
+        }
+        if (!selectedCaseId) {
+            setGenerationError('Create or select a case before generating a PDF.');
+            return;
+        }
+
+        setIsGeneratingPdf(true);
+        setGenerationError(null);
+        try {
+            await startStructuredExport({
+                path: 'court_document',
+                caseId: selectedCaseId,
+                templateId: selectedTemplate?.id,
+                includeTimeline: false,
+                includeExhibits: false,
+                narrativeDepth: 'standard',
+                pastedContent: documentContent || undefined,
+            });
+        } catch (err) {
+            console.error('[DocuVault] Export start failed:', err);
+            setGenerationError(err instanceof Error ? err.message : 'Export failed. Please try again.');
+        } finally {
+            setIsGeneratingPdf(false);
+        }
+    }, [
+        cases,
+        documentContent,
+        isGeneratingPdf,
+        isParsing,
+        isUserProfileLoading,
+        selectedCaseId,
+        selectedTemplate,
+        startStructuredExport,
+    ]);
 
 
 
@@ -336,12 +383,12 @@ function DocuVaultPageInner() {
                             {/* Generate PDF — at bottom of sidebar */}
                             <div className="mt-auto pt-6 border-t border-white/5">
                                 <button
-                                    onClick={() => setShowCreateExport(true)}
-                                    disabled={isParsing || isUserProfileLoading}
+                                    onClick={handleGeneratePdf}
+                                    disabled={isParsing || isUserProfileLoading || isGeneratingPdf || cases === undefined}
                                     className="w-full py-3 rounded-xl bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-white/20 text-white text-[10px] font-bold uppercase tracking-widest shadow-[0_4px_16px_rgba(26,75,155,0.3)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:border-white/40 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Export size={16} weight="bold" className="group-hover:translate-x-1 transition-transform" />
-                                    {isParsing ? 'Parsing...' : 'Generate PDF'}
+                                    {isParsing ? 'Parsing...' : isGeneratingPdf ? 'Preparing...' : 'Generate PDF'}
                                 </button>
                             </div>
 
@@ -349,29 +396,6 @@ function DocuVaultPageInner() {
                         </div>
                     </div>
 
-                    {/* Create Export Modal */}
-                    <CreateExportModal
-                        isOpen={showCreateExport}
-                        onClose={() => setShowCreateExport(false)}
-                        onSubmit={async (config) => {
-                            if (isParsing || isUserProfileLoading) {
-                                setGenerationError(isParsing ? 'Please wait — file is still being parsed.' : 'Loading your profile. Please try again in a moment.');
-                                return;
-                            }
-                            try {
-                                await startStructuredExport({
-                                    ...config,
-                                    pastedContent: documentContent || undefined,
-                                });
-                                setShowCreateExport(false);
-                            } catch (err) {
-                                console.error('[DocuVault] Export start failed:', err);
-                                setGenerationError(err instanceof Error ? err.message : 'Export failed. Please try again.');
-                            }
-                        }}
-                        defaultCaseId={activeCaseId ?? undefined}
-                        lockCaseSelection={!!activeCaseId}
-                    />
 
                     </div>
 

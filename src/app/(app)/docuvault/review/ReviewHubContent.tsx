@@ -173,6 +173,11 @@ export default function ReviewHubContent() {
         return state.courtIssues.filter(i => i.severity === 'blocker');
     }, [isCourtDocument, state.courtIssues]);
     const canExportCourtDocument = !isCourtDocument || courtBlockers.length === 0;
+    const includeTimeline = state.config?.includeTimeline ?? false;
+    const includeExhibits = state.config?.includeExhibits ?? false;
+    const updateReviewOptions = useCallback((options: { includeTimeline?: boolean; includeExhibits?: boolean }) => {
+        dispatch({ type: 'UPDATE_REVIEW_OPTIONS', ...options });
+    }, [dispatch]);
 
     // Court settings save mutation
     const upsertCourtSettings = useMutation(api.courtSettings.upsert);
@@ -661,7 +666,35 @@ export default function ReviewHubContent() {
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-end gap-2 flex-wrap">
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={includeTimeline}
+                                title="Include chronological timeline content in this export"
+                                onClick={() => updateReviewOptions({ includeTimeline: !includeTimeline })}
+                                className={`px-3 py-2 rounded-xl border text-[11px] font-bold transition-all ${
+                                    includeTimeline
+                                        ? 'bg-[#60A5FA]/20 border-[#60A5FA]/40 text-[#93C5FD]'
+                                        : 'bg-white/5 border-white/10 text-white/55 hover:bg-white/10 hover:text-white/80'
+                                }`}
+                            >
+                                Include Timeline
+                            </button>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={includeExhibits}
+                                title="Include exhibit references in this export"
+                                onClick={() => updateReviewOptions({ includeExhibits: !includeExhibits })}
+                                className={`px-3 py-2 rounded-xl border text-[11px] font-bold transition-all ${
+                                    includeExhibits
+                                        ? 'bg-[#60A5FA]/20 border-[#60A5FA]/40 text-[#93C5FD]'
+                                        : 'bg-white/5 border-white/10 text-white/55 hover:bg-white/10 hover:text-white/80'
+                                }`}
+                            >
+                                Include Exhibit Reference
+                            </button>
                             {lockedSections > 0 && (
                                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold">
                                     <CheckCircle size={14} weight="fill" />

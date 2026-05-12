@@ -67,7 +67,7 @@ const DEPTH_OPTIONS: { value: ExportConfig['narrativeDepth']; label: string }[] 
     { value: 'full', label: 'Full' },
 ];
 
-/** Default "Include Exhibits" per path. */
+/** Default "Include Exhibit Reference" per path. */
 const DEFAULT_EXHIBITS: Record<ExportPath, boolean> = {
     court_document: false,
     case_summary: false,
@@ -317,19 +317,19 @@ export default function CreateExportModal({
                                         </button>
                                     </div>
 
-                                    {/* Include Exhibits Toggle */}
+                                    {/* Include Exhibit Reference Toggle */}
                                     <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-1.5">
-                                                <p className="text-[14px] font-bold text-white">Include Exhibits</p>
+                                                <p className="text-[14px] font-bold text-white">Include Exhibit Reference</p>
                                                 <span className="group relative">
                                                     <Info size={14} className="text-white/30 hover:text-white/60 transition-colors cursor-help" aria-describedby="exhibits-tooltip" tabIndex={0} />
                                                     <span id="exhibits-tooltip" role="tooltip" className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-[11px] text-white/90 bg-[#1a1f35] border border-white/10 rounded-lg shadow-xl w-52 opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50">
-                                                        Toggle ON to attach evidence and exhibits. Best for court filings that reference documents.
+                                                        Toggle ON to include exhibit references. Best for court filings that reference documents.
                                                     </span>
                                                 </span>
                                             </div>
-                                            <p className="text-[12px] text-white/50 mt-0.5">Attach evidence references and exhibits</p>
+                                            <p className="text-[12px] text-white/50 mt-0.5">Include exhibit references</p>
                                         </div>
                                         <button
                                             type="button"

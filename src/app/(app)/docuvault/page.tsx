@@ -74,6 +74,7 @@ function DocuVaultPageInner() {
     const [isParsing, setIsParsing] = useState(false);
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const parseAbortRef = useRef<AbortController | null>(null);
+    const generatePdfGuardRef = useRef(false);
 
     // Structured export state (direct court-document path)
     const { startStructuredExport } = useExport();
@@ -117,7 +118,7 @@ function DocuVaultPageInner() {
     }, [searchParams]);
 
     const handleGeneratePdf = useCallback(async () => {
-        if (isGeneratingPdf) return;
+        if (generatePdfGuardRef.current || isGeneratingPdf) return;
         if (isParsing || isUserProfileLoading) {
             setGenerationError(isParsing ? 'Please wait - file is still being parsed.' : 'Loading your profile. Please try again in a moment.');
             return;
@@ -131,6 +132,7 @@ function DocuVaultPageInner() {
             return;
         }
 
+        generatePdfGuardRef.current = true;
         setIsGeneratingPdf(true);
         setGenerationError(null);
         try {
@@ -147,6 +149,7 @@ function DocuVaultPageInner() {
             console.error('[DocuVault] Export start failed:', err);
             setGenerationError(err instanceof Error ? err.message : 'Export failed. Please try again.');
         } finally {
+            generatePdfGuardRef.current = false;
             setIsGeneratingPdf(false);
         }
     }, [

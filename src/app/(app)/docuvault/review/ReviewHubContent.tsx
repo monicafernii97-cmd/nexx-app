@@ -232,7 +232,9 @@ export default function ReviewHubContent() {
             caseTitleFormat: rawCourtSettings.caseTitleFormat,
             caseTitleCustom: rawCourtSettings.caseTitleCustom,
             userRole: rawCourtSettings.petitionerRole,
-            userLegalName: rawCourtSettings.petitionerLegalName,
+            userLegalName: /respondent/i.test(rawCourtSettings.petitionerRole ?? '')
+                ? (rawCourtSettings.respondentLegalName ?? rawCourtSettings.petitionerLegalName)
+                : (rawCourtSettings.petitionerLegalName ?? rawCourtSettings.respondentLegalName),
         }
             : undefined
     ), [rawCourtSettings]);

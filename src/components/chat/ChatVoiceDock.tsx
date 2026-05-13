@@ -52,6 +52,7 @@ export function ChatVoiceDock({
   const fullTranscript = useMemo(() => transcriptText(voice.transcript), [voice.transcript]);
   const hasMicFallback = voice.status === 'permission_denied' || voice.status === 'error';
 
+  /** Connect or disconnect the Realtime voice session from the dock orb. */
   const handleOrbClick = () => {
     if (voice.isActive || voice.status === 'connecting' || voice.status === 'requesting_microphone') {
       voice.stop();
@@ -62,6 +63,7 @@ export function ChatVoiceDock({
     void voice.start();
   };
 
+  /** Send typed fallback text through voice when connected, or into chat when offline. */
   const submitFallbackText = () => {
     const text = fallbackText.trim();
     if (!text) return;
@@ -78,6 +80,7 @@ export function ChatVoiceDock({
     setFallbackText('');
   };
 
+  /** Reuse existing workspace actions to save or pin the latest assistant voice reply. */
   const saveAssistantText = (action: ActionType) => {
     if (!lastAssistantText || !onAssistantAction) return;
     onAssistantAction(action, {

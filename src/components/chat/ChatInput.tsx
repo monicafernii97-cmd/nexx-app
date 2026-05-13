@@ -9,9 +9,13 @@ type SpeechRecognitionCtor = new () => SpeechRecognition;
 /** Structured mode selectors — persistent toggles distinct from quick action chips */
 export type ComposerMode = 'general' | 'strategy' | 'judge_lens' | 'drafting' | 'timeline' | 'procedure';
 
+/** One-shot request from outside the composer to insert text into the draft. */
 export interface ComposerDraftInsertion {
+    /** Monotonic id used to ignore duplicate insertion requests. */
     id: number;
+    /** Text to place into the composer draft. */
     text: string;
+    /** Whether inserted text should append to or replace the current draft. */
     mode?: 'append' | 'replace';
 }
 

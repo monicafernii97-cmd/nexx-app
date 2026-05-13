@@ -282,6 +282,7 @@ export default function ConversationPage() {
         [isStreaming, isPending, isThreadReady, unsavedReply, callChatAPI]
     );
 
+    /** Append finalized voice transcript text into the composer without submitting it. */
     const handleInsertVoiceComposer = useCallback((text: string) => {
         const trimmed = text.trim();
         if (!trimmed) return;
@@ -292,6 +293,7 @@ export default function ConversationPage() {
         });
     }, []);
 
+    /** Submit a finalized voice transcript as a normal chat message. */
     const handleSubmitVoiceTranscript = useCallback((text: string) => {
         const trimmed = text.trim();
         if (!trimmed) return;

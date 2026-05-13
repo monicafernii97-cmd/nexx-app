@@ -8,10 +8,12 @@ import { Id } from '@convex/_generated/dataModel';
 import { useParams, useRouter } from 'next/navigation';
 import { Archive, ClockCounterClockwise, Lock, Sun, Moon } from '@phosphor-icons/react';
 import MessageBubble, { type ChatTheme } from '@/components/chat/MessageBubble';
-import ChatInput from '@/components/chat/ChatInput';
+import ChatInput, { type ComposerDraftInsertion } from '@/components/chat/ChatInput';
+import { ChatVoiceDock } from '@/components/chat/ChatVoiceDock';
+import { WorkspaceClient } from '@/components/chat/WorkspaceClient';
 import { AnalysisStatusStrip, DEFAULT_ANALYSIS_STEPS, getStepsByElapsed } from '@/components/chat/AnalysisStatusStrip';
 import type { NexxAssistantResponse, RouteMode } from '@/lib/types';
-import type { AnalysisStep } from '@/lib/ui-intelligence/types';
+import type { ActionType, AnalysisStep } from '@/lib/ui-intelligence/types';
 
 /** Premium full-screen chat interface for a single NEXX AI conversation. */
 export default function ConversationPage() {
@@ -42,9 +44,11 @@ export default function ConversationPage() {
         mode?: RouteMode;
     } | null>(null);
     const [analysisSteps, setAnalysisSteps] = useState<AnalysisStep[]>(DEFAULT_ANALYSIS_STEPS);
+    const [composerDraftInsertion, setComposerDraftInsertion] = useState<ComposerDraftInsertion | null>(null);
     const streamStartRef = useRef<number>(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const pendingInitialSentRef = useRef(false);
+    const draftInsertionSeqRef = useRef(0);
 
     // ── Theme state (persisted to localStorage) ──
     const [theme, setTheme] = useState<ChatTheme>('dark');
@@ -278,6 +282,24 @@ export default function ConversationPage() {
         [isStreaming, isPending, isThreadReady, unsavedReply, callChatAPI]
     );
 
+    /** Append finalized voice transcript text into the composer without submitting it. */
+    const handleInsertVoiceComposer = useCallback((text: string) => {
+        const trimmed = text.trim();
+        if (!trimmed) return;
+        setComposerDraftInsertion({
+            id: ++draftInsertionSeqRef.current,
+            text: trimmed,
+            mode: 'append',
+        });
+    }, []);
+
+    /** Submit a finalized voice transcript as a normal chat message. */
+    const handleSubmitVoiceTranscript = useCallback((text: string) => {
+        const trimmed = text.trim();
+        if (!trimmed) return;
+        void handleSend(trimmed);
+    }, [handleSend]);
+
     useEffect(() => {
         pendingInitialSentRef.current = false;
     }, [conversationId]);
@@ -420,6 +442,8 @@ export default function ConversationPage() {
 
 
     return (
+        <WorkspaceClient>
+            {(workspace) => (
         <div className={`flex flex-col h-[calc(100vh-80px)] max-w-5xl mx-auto px-2 md:px-4 pt-4 transition-colors duration-300 ${isLight ? 'bg-white' : ''}`}>
             {/* Header */}
             <motion.div
@@ -548,6 +572,15 @@ export default function ConversationPage() {
                                 }
                                 : undefined
                         }
+                        onAction={
+                            msg.role === 'assistant'
+                                ? (action: ActionType, content?: string) => workspace.onAction(action, {
+                                    type: 'overview',
+                                    title: 'Assistant response',
+                                    content: content ?? msg.content,
+                                })
+                                : undefined
+                        }
                     />
                 ))}
 
@@ -625,16 +658,31 @@ export default function ConversationPage() {
                 transition={{ delay: 0.2 }}
                 className="pt-2 pb-6 px-1 lg:px-6 shrink-0 relative z-20"
             >
+                <div className="mb-3">
+                    <ChatVoiceDock
+                        disabled={isStreaming || isPending || !isThreadReady || !!unsavedReply}
+                        isLight={isLight}
+                        onInsertComposer={handleInsertVoiceComposer}
+                        onSubmitUserMessage={handleSubmitVoiceTranscript}
+                        onAssistantAction={workspace.onAction}
+                    />
+                </div>
                 <div className={`rounded-2xl p-1.5 transition-colors duration-300 ${isLight
                     ? 'bg-white border border-gray-200 shadow-[0_8px_32px_rgba(0,0,0,0.05)]'
                     : 'hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.4)]'
                     }`}>
-                    <ChatInput onSend={handleSend} disabled={isStreaming || isPending || !isThreadReady || !!unsavedReply} />
+                    <ChatInput
+                        onSend={handleSend}
+                        disabled={isStreaming || isPending || !isThreadReady || !!unsavedReply}
+                        draftInsertion={composerDraftInsertion}
+                    />
                 </div>
                 <p className={`text-center text-[9px] font-bold tracking-widest uppercase mt-3 flex items-center justify-center ${isLight ? 'text-gray-400' : 'text-white/30'}`}>
                     NEXX provides strategic guidance, not formal legal advice.
                 </p>
             </motion.div>
         </div>
+            )}
+        </WorkspaceClient>
     );
 }

@@ -102,9 +102,10 @@ export default function NewIncidentPage() {
         void recorder.transcribe(recorder.audioBlob).then((result) => {
             if (!result?.text) return;
             const text = result.text.trim();
-            setNarrative((prev) => `${prev}${prev.trim() ? '\n\n' : ''}${text}`);
+            const mergedTranscript = `${narrative}${narrative.trim() ? '\n\n' : ''}${text}`;
+            setNarrative(mergedTranscript);
             setVoiceDraft(deriveIncidentVoiceDraft({
-                transcript: text,
+                transcript: mergedTranscript,
                 date,
                 time,
                 location,
@@ -118,8 +119,15 @@ export default function NewIncidentPage() {
                 title: 'Voice memo transcribed',
                 description: 'The transcript is editable before saving or analysis.',
             });
+        }).catch((error) => {
+            console.error('[IncidentVoice] Transcription failed:', error);
+            showToast({
+                variant: 'error',
+                title: 'Transcription failed',
+                description: error instanceof Error ? error.message : 'Please try again.',
+            });
         });
-    }, [behavioralAnalysis, courtSummary, date, location, recorder, showToast, strategicResponse, time, witnesses]);
+    }, [behavioralAnalysis, courtSummary, date, location, narrative, recorder, showToast, strategicResponse, time, witnesses]);
 
     useEffect(() => {
         if (!recorder.error?.message) return;
@@ -534,6 +542,8 @@ export default function NewIncidentPage() {
                                                 behavioralAnalysis,
                                                 strategicResponse,
                                             }));
+                                        } else {
+                                            setVoiceDraft(null);
                                         }
                                     }}
                                     placeholder="Describe the incident with precision — what happened, who was present, what was said or done..."
@@ -907,6 +917,7 @@ export default function NewIncidentPage() {
                                     setStep('describe');
                                     setIsEditing(false);
                                     setNarrative('');
+                                    setVoiceDraft(null);
                                     setCourtSummary('');
                                     setBehavioralAnalysis('');
                                     setStrategicResponse('');

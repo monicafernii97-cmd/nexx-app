@@ -1,0 +1,234 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  getRealtimeEventTranscript,
+  type RealtimeSessionResponse,
+  type VoiceConnectionStatus,
+  type VoiceMode,
+  type VoiceTranscriptEntry,
+} from '@/lib/voice';
+
+interface UseRealtimeVoiceOptions {
+  mode?: VoiceMode;
+  instructions?: string;
+}
+
+interface RealtimeError {
+  message: string;
+  code?: string;
+}
+
+interface SendRealtimeTextOptions {
+  createResponse?: boolean;
+}
+
+const REALTIME_WEBRTC_URL = 'https://api.openai.com/v1/realtime/calls';
+
+/** Browser WebRTC voice session hook using server-minted short-lived Realtime credentials. */
+export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
+  const [status, setStatus] = useState<VoiceConnectionStatus>('idle');
+  const [error, setError] = useState<RealtimeError | null>(null);
+  const [transcript, setTranscript] = useState<VoiceTranscriptEntry[]>([]);
+  const [session, setSession] = useState<RealtimeSessionResponse | null>(null);
+  const peerRef = useRef<RTCPeerConnection | null>(null);
+  const dataChannelRef = useRef<RTCDataChannel | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const assistantDraftRef = useRef('');
+
+  const appendTranscript = useCallback((entry: Omit<VoiceTranscriptEntry, 'id' | 'createdAt'>) => {
+    setTranscript((current) => [
+      ...current,
+      {
+        ...entry,
+        id: crypto.randomUUID(),
+        createdAt: Date.now(),
+      },
+    ]);
+  }, []);
+
+  const cleanup = useCallback(() => {
+    dataChannelRef.current?.close();
+    dataChannelRef.current = null;
+
+    peerRef.current?.getSenders().forEach((sender) => {
+      sender.track?.stop();
+    });
+    peerRef.current?.close();
+    peerRef.current = null;
+
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current.srcObject = null;
+      audioElementRef.current.remove();
+      audioElementRef.current = null;
+    }
+
+    assistantDraftRef.current = '';
+    setSession(null);
+  }, []);
+
+  const stop = useCallback(() => {
+    setStatus('stopping');
+    cleanup();
+    setStatus('idle');
+  }, [cleanup]);
+
+  const handleRealtimeEvent = useCallback((event: unknown) => {
+    if (!event || typeof event !== 'object') return;
+    const record = event as Record<string, unknown>;
+    const type = typeof record.type === 'string' ? record.type : '';
+
+    if (type === 'input_audio_buffer.speech_started') {
+      setStatus('listening');
+    } else if (type === 'response.created') {
+      setStatus('speaking');
+      assistantDraftRef.current = '';
+    } else if (type === 'response.done') {
+      setStatus('connected');
+      if (assistantDraftRef.current.trim()) {
+        appendTranscript({ role: 'assistant', text: assistantDraftRef.current.trim(), isFinal: true });
+        assistantDraftRef.current = '';
+      }
+    } else if (type === 'error') {
+      const message = typeof record.error === 'object' && record.error !== null
+        ? String((record.error as Record<string, unknown>).message ?? 'Realtime voice error')
+        : 'Realtime voice error';
+      setError({ message });
+      setStatus('error');
+    }
+
+    const fragment = getRealtimeEventTranscript(event);
+    if (!fragment) return;
+
+    if (fragment.role === 'assistant' && !fragment.isFinal) {
+      assistantDraftRef.current += fragment.text;
+      return;
+    }
+
+    appendTranscript(fragment);
+  }, [appendTranscript]);
+
+  const start = useCallback(async () => {
+    if (status === 'connecting' || status === 'connected' || status === 'listening' || status === 'speaking') return;
+
+    setError(null);
+    setStatus('requesting_microphone');
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      setStatus('connecting');
+
+      const sessionResponse = await fetch('/api/realtime/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: options.mode ?? 'chat',
+          instructions: options.instructions,
+        }),
+      });
+
+      if (!sessionResponse.ok) {
+        throw new Error('Unable to create realtime voice session.');
+      }
+
+      const nextSession = await sessionResponse.json() as RealtimeSessionResponse;
+      setSession(nextSession);
+
+      const peer = new RTCPeerConnection();
+      peerRef.current = peer;
+
+      const audioElement = new Audio();
+      audioElement.autoplay = true;
+      audioElementRef.current = audioElement;
+
+      peer.ontrack = (event) => {
+        audioElement.srcObject = event.streams[0] ?? null;
+      };
+
+      stream.getAudioTracks().forEach((track) => peer.addTrack(track, stream));
+
+      const dataChannel = peer.createDataChannel('oai-events');
+      dataChannelRef.current = dataChannel;
+      dataChannel.onopen = () => setStatus('connected');
+      dataChannel.onmessage = (event) => {
+        try {
+          handleRealtimeEvent(JSON.parse(event.data));
+        } catch {
+          // Ignore non-JSON transport keepalives.
+        }
+      };
+      dataChannel.onerror = () => {
+        setError({ message: 'Realtime data channel failed.' });
+        setStatus('error');
+      };
+
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+
+      const answerResponse = await fetch(REALTIME_WEBRTC_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${nextSession.clientSecret}`,
+          'Content-Type': 'application/sdp',
+        },
+        body: offer.sdp,
+      });
+
+      if (!answerResponse.ok) {
+        throw new Error('Realtime WebRTC handshake failed.');
+      }
+
+      const answerSdp = await answerResponse.text();
+      await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+    } catch (err) {
+      cleanup();
+      const isPermissionError = err instanceof DOMException && (
+        err.name === 'NotAllowedError' ||
+        err.name === 'PermissionDeniedError'
+      );
+      setError({ message: err instanceof Error ? err.message : 'Unable to start voice session.' });
+      setStatus(isPermissionError ? 'permission_denied' : 'error');
+    }
+  }, [cleanup, handleRealtimeEvent, options.instructions, options.mode, status]);
+
+  const sendText = useCallback((text: string, sendOptions: SendRealtimeTextOptions = {}) => {
+    const dataChannel = dataChannelRef.current;
+    if (!dataChannel || dataChannel.readyState !== 'open' || !text.trim()) return false;
+
+    dataChannel.send(JSON.stringify({
+      type: 'conversation.item.create',
+      item: {
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_text', text: text.trim() }],
+      },
+    }));
+
+    if (sendOptions.createResponse ?? true) {
+      dataChannel.send(JSON.stringify({ type: 'response.create' }));
+    }
+
+    appendTranscript({ role: 'user', text: text.trim(), isFinal: true });
+    return true;
+  }, [appendTranscript]);
+
+  useEffect(() => cleanup, [cleanup]);
+
+  return {
+    status,
+    error,
+    transcript,
+    session,
+    isActive: status === 'connected' || status === 'listening' || status === 'speaking',
+    start,
+    stop,
+    sendText,
+    clearTranscript: () => setTranscript([]),
+  };
+}

@@ -29,7 +29,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import '@/styles/pipelines.css';
 
 /** Structured error for stable code-based matching instead of brittle string comparisons. */
-type ProcessError = { code: 'empty_narrative' | 'missing_case' | 'generic'; message: string } | null;
+type ProcessError = { code: 'empty_narrative' | 'missing_case' | 'invalid_datetime' | 'generic'; message: string } | null;
 type CaptureStep = 'describe' | 'review' | 'confirmed';
 
 const captureSteps: { id: CaptureStep; label: string }[] = [
@@ -37,6 +37,13 @@ const captureSteps: { id: CaptureStep; label: string }[] = [
     { id: 'review', label: 'Review' },
     { id: 'confirmed', label: 'Confirmed' },
 ];
+
+const isValidIncidentDateTime = (dateValue: string, timeValue: string) => {
+    const normalizedDate = dateValue.trim();
+    const normalizedTime = timeValue.trim();
+    if (!normalizedDate || !normalizedTime) return false;
+    return !Number.isNaN(new Date(`${normalizedDate}T${normalizedTime}`).getTime());
+};
 
 /** Incident Intake Hub - The primary pipeline for event recording. */
 export default function IncidentReportPage() {
@@ -59,6 +66,7 @@ export default function IncidentReportPage() {
         ? true
         : Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
+    const stepRef = useRef<CaptureStep>(step);
 
     const [processError, setProcessError] = useState<ProcessError>(null);
     const [isPinning, setIsPinning] = useState<string | null>(null);
@@ -77,6 +85,27 @@ export default function IncidentReportPage() {
     );
     const createIncident = useMutation(api.incidents.create);
     const createCasePin = useMutation(api.casePins.create);
+    const dateTimeIsValid = isValidIncidentDateTime(date, time);
+
+    const stopSpeechRecognition = useCallback(() => {
+        try {
+            recognitionRef.current?.stop();
+        } catch (err) {
+            console.error('[IncidentIntake] Failed to stop speech recognition:', err);
+        }
+        setIsListening(false);
+    }, []);
+
+    useEffect(() => {
+        stepRef.current = step;
+        if (step !== 'describe') {
+            try {
+                recognitionRef.current?.stop();
+            } catch (err) {
+                console.error('[IncidentIntake] Failed to stop speech recognition:', err);
+            }
+        }
+    }, [step]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -91,6 +120,8 @@ export default function IncidentReportPage() {
         recognition.lang = 'en-US';
 
         recognition.onresult = (event: SpeechRecognitionEvent) => {
+            if (stepRef.current !== 'describe') return;
+
             const finalChunks: string[] = [];
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 const result = event.results[i];
@@ -123,8 +154,7 @@ export default function IncidentReportPage() {
     const toggleListening = useCallback(() => {
         if (!recognitionRef.current) return;
         if (isListening) {
-            recognitionRef.current.stop();
-            setIsListening(false);
+            stopSpeechRecognition();
             return;
         }
 
@@ -134,7 +164,7 @@ export default function IncidentReportPage() {
         } catch (err) {
             console.error('[IncidentIntake] Failed to start speech recognition:', err);
         }
-    }, [isListening]);
+    }, [isListening, stopSpeechRecognition]);
 
     /** Advance to review after validating the local capture fields. */
     const handleReview = useCallback(() => {
@@ -147,10 +177,15 @@ export default function IncidentReportPage() {
             }
             return;
         }
+        if (!isValidIncidentDateTime(date, time)) {
+            setProcessError({ code: 'invalid_datetime', message: 'Please enter a valid date and time.' });
+            return;
+        }
 
         setProcessError(null);
+        stopSpeechRecognition();
         setStep('review');
-    }, [narrative, activeCaseId]);
+    }, [narrative, activeCaseId, date, time, stopSpeechRecognition]);
 
     /** Process the incident narrative and save to Convex. */
     const handleProcess = useCallback(async () => {
@@ -159,16 +194,25 @@ export default function IncidentReportPage() {
             handleReview();
             return;
         }
+        if (!isValidIncidentDateTime(date, time)) {
+            setProcessError({ code: 'invalid_datetime', message: 'Please enter a valid date and time.' });
+            setStep('describe');
+            return;
+        }
+
+        const normalizedDate = date.trim();
+        const normalizedTime = time.trim();
 
         setIsProcessing(true);
         setProcessError(null);
+        stopSpeechRecognition();
 
         try {
             await createIncident({
                 narrative: trimmed,
                 severity: 1,
-                date,
-                time,
+                date: normalizedDate,
+                time: normalizedTime,
                 caseId: activeCaseId,
             });
 
@@ -180,7 +224,7 @@ export default function IncidentReportPage() {
         } finally {
             setIsProcessing(false);
         }
-    }, [narrative, activeCaseId, date, time, createIncident, handleReview]);
+    }, [narrative, activeCaseId, date, time, createIncident, handleReview, stopSpeechRecognition]);
 
     /** Pin an incident to the case workspace. Prevents duplicate clicks. */
     const handleAddToWorkspace = useCallback(async (incident: { _id: Id<'incidents'>; narrative: string; date: string }) => {
@@ -283,6 +327,7 @@ export default function IncidentReportPage() {
                                                     : 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border-[rgba(255,255,255,0.12)] hover:border-[rgba(255,255,255,0.3)]'
                                             }`}
                                             title={isListening ? 'Stop recording' : 'Start voice recording'}
+                                            aria-label={isListening ? 'Stop recording' : 'Start voice recording'}
                                             aria-pressed={isListening}
                                         >
                                             <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -309,11 +354,12 @@ export default function IncidentReportPage() {
                             </div>
 
                             <div>
-                                <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
+                                <label htmlFor="incident-narrative" className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
                                     <PencilSimple size={14} /> Manual Narrative
                                 </label>
                                 <div className="relative">
                                     <textarea
+                                        id="incident-narrative"
                                         value={narrative}
                                         onChange={(e) => {
                                             setNarrative(e.target.value);
@@ -333,24 +379,32 @@ export default function IncidentReportPage() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <div>
-                                    <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
+                                    <label htmlFor="incident-date" className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
                                         <CalendarBlank size={14} /> Date
                                     </label>
                                     <input
+                                        id="incident-date"
                                         type="date"
                                         value={date}
-                                        onChange={(e) => setDate(e.target.value)}
+                                        onChange={(e) => {
+                                            setDate(e.target.value);
+                                            if (processError?.code === 'invalid_datetime') setProcessError(null);
+                                        }}
                                         className="w-full rounded-[1.25rem] border-none bg-white px-5 py-4 text-[#0A1128] shadow-inner outline-none focus:ring-2 focus:ring-[#1A4B9B]"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
+                                    <label htmlFor="incident-time" className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
                                         <Clock size={14} /> Time
                                     </label>
                                     <input
+                                        id="incident-time"
                                         type="time"
                                         value={time}
-                                        onChange={(e) => setTime(e.target.value)}
+                                        onChange={(e) => {
+                                            setTime(e.target.value);
+                                            if (processError?.code === 'invalid_datetime') setProcessError(null);
+                                        }}
                                         className="w-full rounded-[1.25rem] border-none bg-white px-5 py-4 text-[#0A1128] shadow-inner outline-none focus:ring-2 focus:ring-[#1A4B9B]"
                                     />
                                 </div>
@@ -364,9 +418,10 @@ export default function IncidentReportPage() {
                                 <button
                                     type="button"
                                     onClick={handleReview}
-                                    disabled={!narrative.trim() || !activeCaseId}
+                                    disabled={!narrative.trim() || !activeCaseId || !dateTimeIsValid}
+                                    aria-label="Review incident"
                                     className={`flex items-center justify-center gap-3 px-6 py-3 rounded-xl font-bold uppercase tracking-[0.2em] text-[10px] transition-all shadow-2xl ${
-                                        narrative.trim() && activeCaseId
+                                        narrative.trim() && activeCaseId && dateTimeIsValid
                                             ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
                                             : 'bg-white/5 text-white/20 border border-white/5 cursor-not-allowed'
                                     }`}
@@ -408,8 +463,9 @@ export default function IncidentReportPage() {
                                 <button
                                     type="button"
                                     onClick={handleProcess}
-                                    disabled={isProcessing || !activeCaseId}
+                                    disabled={isProcessing || !activeCaseId || !dateTimeIsValid}
                                     aria-busy={isProcessing}
+                                    aria-label={isProcessing ? 'Saving incident' : 'Confirm and log incident'}
                                     className="flex-[1.5] flex items-center justify-center gap-2 disabled:opacity-50 py-4 uppercase text-[12px] font-bold tracking-widest rounded-xl transition-all shadow-md text-white bg-indigo-600 hover:bg-indigo-500"
                                 >
                                     {isProcessing ? <ArrowClockwise size={18} className="animate-spin" /> : <CheckCircle size={18} weight="fill" />}
@@ -433,6 +489,7 @@ export default function IncidentReportPage() {
                             <button
                                 type="button"
                                 onClick={() => {
+                                    stopSpeechRecognition();
                                     setStep('describe');
                                     setNarrative('');
                                     setProcessError(null);

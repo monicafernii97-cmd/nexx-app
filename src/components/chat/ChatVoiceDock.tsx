@@ -22,10 +22,12 @@ const MODE_TO_INSTRUCTIONS: Record<VoiceMode, string> = {
   judge_lens: 'Help the user think through how a court could hear the facts. Avoid legal conclusions and keep framing practical.',
 };
 
+/** Return the newest finalized transcript text for a single speaker role. */
 function latestFinalText(entries: VoiceTranscriptEntry[], role: VoiceTranscriptEntry['role']) {
   return [...entries].reverse().find((entry) => entry.role === role && entry.isFinal && entry.text.trim())?.text.trim() ?? '';
 }
 
+/** Build a plain text transcript suitable for inserting into the chat composer. */
 function transcriptText(entries: VoiceTranscriptEntry[]) {
   return entries
     .filter((entry) => entry.isFinal && entry.text.trim())

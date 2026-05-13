@@ -41,6 +41,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const mutedRef = useRef(false);
   const startAttemptRef = useRef(0);
 
+  /** Append a transcript entry and return its generated id for later updates. */
   const appendTranscript = useCallback((entry: Omit<VoiceTranscriptEntry, 'id' | 'createdAt'>) => {
     const id = crypto.randomUUID();
     setTranscript((current) => [
@@ -54,6 +55,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     return id;
   }, []);
 
+  /** Create or update the in-progress assistant transcript row as text deltas arrive. */
   const updateAssistantDraftTranscript = useCallback((text: string, isFinal: boolean) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -73,6 +75,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     }
   }, [appendTranscript]);
 
+  /** Tear down all WebRTC/audio resources without clearing the visible transcript. */
   const cleanup = useCallback(() => {
     dataChannelRef.current?.close();
     dataChannelRef.current = null;
@@ -98,6 +101,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     setSession(null);
   }, []);
 
+  /** Stop the current Realtime session and invalidate pending async start work. */
   const stop = useCallback(() => {
     startAttemptRef.current += 1;
     setStatus('stopping');
@@ -105,6 +109,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     setStatus('idle');
   }, [cleanup]);
 
+  /** Interpret OpenAI Realtime data-channel events into status and transcript state. */
   const handleRealtimeEvent = useCallback((event: unknown) => {
     if (!event || typeof event !== 'object') return;
     const record = event as Record<string, unknown>;
@@ -149,6 +154,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     appendTranscript(fragment);
   }, [appendTranscript, updateAssistantDraftTranscript]);
 
+  /** Enable or disable outgoing microphone tracks while preserving the session. */
   const setMicrophoneMuted = useCallback((muted: boolean) => {
     mutedRef.current = muted;
     mediaStreamRef.current?.getAudioTracks().forEach((track) => {
@@ -157,6 +163,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     setIsMuted(muted);
   }, []);
 
+  /** Start a browser WebRTC session using a server-created short-lived credential. */
   const start = useCallback(async () => {
     if (status === 'connecting' || status === 'connected' || status === 'listening' || status === 'speaking') return;
 
@@ -268,6 +275,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     }
   }, [cleanup, handleRealtimeEvent, options.instructions, options.mode, status]);
 
+  /** Send typed fallback text through the open Realtime data channel. */
   const sendText = useCallback((text: string, sendOptions: SendRealtimeTextOptions = {}) => {
     const dataChannel = dataChannelRef.current;
     if (!dataChannel || dataChannel.readyState !== 'open' || !text.trim()) return false;
@@ -294,6 +302,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     cleanup();
   }, [cleanup]);
 
+  /** Clear visible transcript rows and reset any in-progress assistant draft tracking. */
   const clearTranscript = useCallback(() => {
     assistantDraftRef.current = '';
     assistantDraftIdRef.current = null;

@@ -294,6 +294,12 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     cleanup();
   }, [cleanup]);
 
+  const clearTranscript = useCallback(() => {
+    assistantDraftRef.current = '';
+    assistantDraftIdRef.current = null;
+    setTranscript([]);
+  }, []);
+
   return {
     status,
     error,
@@ -307,6 +313,6 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     unmute: () => setMicrophoneMuted(false),
     toggleMute: () => setMicrophoneMuted(!mutedRef.current),
     sendText,
-    clearTranscript: () => setTranscript([]),
+    clearTranscript,
   };
 }

@@ -48,6 +48,7 @@ export default function ConversationPage() {
     const streamStartRef = useRef<number>(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const pendingInitialSentRef = useRef(false);
+    const draftInsertionSeqRef = useRef(0);
 
     // ── Theme state (persisted to localStorage) ──
     const [theme, setTheme] = useState<ChatTheme>('dark');
@@ -285,7 +286,7 @@ export default function ConversationPage() {
         const trimmed = text.trim();
         if (!trimmed) return;
         setComposerDraftInsertion({
-            id: Date.now(),
+            id: ++draftInsertionSeqRef.current,
             text: trimmed,
             mode: 'append',
         });

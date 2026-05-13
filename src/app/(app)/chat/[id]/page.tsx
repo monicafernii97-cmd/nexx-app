@@ -1,15 +1,14 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Archive, Lock, Sun, Moon } from '@phosphor-icons/react';
+import { Archive, ClockCounterClockwise, Lock, Sun, Moon } from '@phosphor-icons/react';
 import MessageBubble, { type ChatTheme } from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
-import { CaseContextBar, buildCaseContextChips } from '@/components/chat/CaseContextBar';
 import { AnalysisStatusStrip, DEFAULT_ANALYSIS_STEPS, getStepsByElapsed } from '@/components/chat/AnalysisStatusStrip';
 import type { NexxAssistantResponse, RouteMode } from '@/lib/types';
 import type { AnalysisStep } from '@/lib/ui-intelligence/types';
@@ -45,6 +44,7 @@ export default function ConversationPage() {
     const [analysisSteps, setAnalysisSteps] = useState<AnalysisStep[]>(DEFAULT_ANALYSIS_STEPS);
     const streamStartRef = useRef<number>(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const pendingInitialSentRef = useRef(false);
 
     // ── Theme state (persisted to localStorage) ──
     const [theme, setTheme] = useState<ChatTheme>('dark');
@@ -72,18 +72,6 @@ export default function ConversationPage() {
             html.classList.remove('dark');
         }
     }, [theme]);
-
-    // Build case context chips from user profile
-    const caseContextChips = useMemo(() => {
-        if (!userProfile) return [];
-        return buildCaseContextChips({
-            state: userProfile.state ?? undefined,
-            county: userProfile.county ?? undefined,
-            caseType: userProfile.custodyType ?? undefined,
-            proSe: !userProfile.hasAttorney,
-            childrenInvolved: !!(userProfile.children?.length || userProfile.childrenNames?.length),
-        });
-    }, [userProfile]);
 
     // Analysis step progression during streaming
     useEffect(() => {
@@ -289,6 +277,27 @@ export default function ConversationPage() {
         [isStreaming, isPending, isThreadReady, unsavedReply, callChatAPI]
     );
 
+    useEffect(() => {
+        if (pendingInitialSentRef.current || !isThreadReady || isStreaming || isPending || unsavedReply) return;
+        if (typeof window === 'undefined') return;
+
+        const initialMsgKey = `nexx_initial_msg_${String(conversationId)}`;
+        const handoffMsgKey = `nexx_handoff_msg_${String(conversationId)}`;
+        const pendingMessage = sessionStorage.getItem(initialMsgKey) ?? sessionStorage.getItem(handoffMsgKey);
+
+        if (!pendingMessage) return;
+
+        pendingInitialSentRef.current = true;
+        sessionStorage.removeItem(initialMsgKey);
+        sessionStorage.removeItem(handoffMsgKey);
+        const timeoutId = window.setTimeout(() => {
+            setIsPending(true);
+            void callChatAPI(pendingMessage).finally(() => setIsPending(false));
+        }, 0);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [conversationId, isThreadReady, isStreaming, isPending, unsavedReply, callChatAPI]);
+
     /**
      * Retry the last AI response — atomically deletes the assistant message
      * and re-streams a fresh answer from the same conversation state.
@@ -398,27 +407,28 @@ export default function ConversationPage() {
             <motion.div
                 initial={{ opacity: 0, y: -12 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`rounded-xl p-3 flex items-center gap-4 mb-6 shrink-0 transition-colors duration-300 ${isLight
-                    ? 'bg-white border border-gray-200 shadow-[0_8px_32px_rgba(0,0,0,0.05)]'
-                    : 'hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.3)]'
+                className={`mb-5 flex shrink-0 items-center gap-3 border-b pb-3 transition-colors duration-300 ${isLight
+                    ? 'border-gray-200 bg-white'
+                    : 'border-white/10'
                     }`}
             >
                 <button
                     onClick={() => router.push('/chat')}
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-all border ${isLight
+                    className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[10px] font-bold uppercase tracking-widest transition-all border ${isLight
                         ? 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                         : 'bg-white/5 border-white/5 text-white/60 hover:text-white hover:bg-white/10'
                         }`}
-                    aria-label="Back to conversations"
+                    aria-label="Open conversation history"
                 >
-                    <ArrowLeft size={16} weight="regular" />
+                    <ClockCounterClockwise size={15} weight="regular" />
+                    <span className="hidden sm:inline">History</span>
                 </button>
                 
-                <div className="flex-1 min-w-0 pl-1">
-                    <h1 className={`text-sm font-bold truncate ${isLight ? 'text-gray-900' : 'text-white/90'}`}>
+                <div className="min-w-0 flex-1 pl-1">
+                    <h1 className={`truncate font-serif text-xl leading-tight tracking-tight ${isLight ? 'text-gray-900' : 'text-white/95'}`}>
                         {conversation?.title || 'NEXX Executive Intelligence'}
                     </h1>
-                    <div className="flex items-center gap-3 mt-0.5">
+                    <div className="mt-1 flex items-center gap-3">
                         <div className={`flex items-center gap-1 ${isLight ? 'text-gray-400' : 'text-white/40'}`}>
                             <Lock size={10} weight="fill" />
                             <p className="text-[9px] font-bold tracking-widest uppercase truncate">
@@ -453,16 +463,6 @@ export default function ConversationPage() {
                     <Archive size={16} weight="regular" />
                 </button>
             </motion.div>
-
-            {/* Case Context Bar */}
-            {caseContextChips.length > 0 && (
-                <div className="px-4 lg:px-8 pt-2">
-                    <CaseContextBar
-                        chips={caseContextChips}
-                        caseName={conversation?.title}
-                    />
-                </div>
-            )}
 
             {/* Analysis Status Strip */}
             <div className="px-4 lg:px-8">

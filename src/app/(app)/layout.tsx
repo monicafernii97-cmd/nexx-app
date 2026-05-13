@@ -30,12 +30,10 @@ import { motion } from 'framer-motion';
  * └──────────┴───────────────────────────────┘
  */
 
-/** Routes where the Insights Rail is relevant — segment-aware to avoid false positives (e.g. '/chatbot'). */
+/** Routes where the Insights Rail is relevant — segment-aware to avoid false positives. */
 function useShowInsightsRail() {
     const pathname = usePathname();
     return (
-        pathname === '/chat' ||
-        pathname?.startsWith('/chat/') ||
         pathname === '/incident-report' ||
         pathname?.startsWith('/incident-report/')
     );

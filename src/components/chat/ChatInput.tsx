@@ -9,6 +9,12 @@ type SpeechRecognitionCtor = new () => SpeechRecognition;
 /** Structured mode selectors — persistent toggles distinct from quick action chips */
 export type ComposerMode = 'general' | 'strategy' | 'judge_lens' | 'drafting' | 'timeline' | 'procedure';
 
+export interface ComposerDraftInsertion {
+    id: number;
+    text: string;
+    mode?: 'append' | 'replace';
+}
+
 interface ChatInputProps {
     onSend: (message: string, file?: File, mode?: ComposerMode) => void;
     disabled?: boolean;
@@ -16,6 +22,7 @@ interface ChatInputProps {
     onQuickAction?: (action: string) => void;
     activeMode?: ComposerMode;
     onModeChange?: (mode: ComposerMode) => void;
+    draftInsertion?: ComposerDraftInsertion | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -46,7 +53,7 @@ const MODE_OPTIONS: { id: ComposerMode; label: string }[] = [
 ];
 
 /** Premium Auto-resizing chat input bar with quick actions, mode toggles, and voice input. */
-export default function ChatInput({ onSend, disabled, placeholder, onQuickAction, activeMode, onModeChange }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, placeholder, onQuickAction, activeMode, onModeChange, draftInsertion }: ChatInputProps) {
     const [input, setInput] = useState('');
     const [currentMode, setCurrentMode] = useState<ComposerMode>(activeMode ?? 'general');
 
@@ -71,12 +78,32 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     const prefixRef = useRef('');
     // Accumulated dictated text for the current session (rebuilt on each onresult)
     const dictatedRef = useRef('');
+    const lastDraftInsertionIdRef = useRef<number | null>(null);
 
     /** Update both React state and the mutable ref in one call. */
     const updateInput = useCallback((value: string) => {
         inputRef.current = value;
         setInput(value);
     }, []);
+
+    useEffect(() => {
+        if (!draftInsertion || lastDraftInsertionIdRef.current === draftInsertion.id) return;
+
+        lastDraftInsertionIdRef.current = draftInsertion.id;
+        const text = draftInsertion.text.trim();
+        if (!text) return;
+
+        const current = inputRef.current;
+        if (draftInsertion.mode === 'replace' || current.trim().length === 0) {
+            updateInput(text);
+            textareaRef.current?.focus();
+            return;
+        }
+
+        const separator = current.endsWith('\n') || current.endsWith(' ') ? '' : '\n\n';
+        updateInput(`${current}${separator}${text}`);
+        textareaRef.current?.focus();
+    }, [draftInsertion, updateInput]);
 
     const getSpeechRecognition = useCallback((): SpeechRecognitionCtor | null => {
         if (typeof window === 'undefined') return null;

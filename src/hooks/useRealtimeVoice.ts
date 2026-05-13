@@ -31,23 +31,47 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const [error, setError] = useState<RealtimeError | null>(null);
   const [transcript, setTranscript] = useState<VoiceTranscriptEntry[]>([]);
   const [session, setSession] = useState<RealtimeSessionResponse | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const assistantDraftRef = useRef('');
+  const assistantDraftIdRef = useRef<string | null>(null);
+  const mutedRef = useRef(false);
   const startAttemptRef = useRef(0);
 
   const appendTranscript = useCallback((entry: Omit<VoiceTranscriptEntry, 'id' | 'createdAt'>) => {
+    const id = crypto.randomUUID();
     setTranscript((current) => [
       ...current,
       {
         ...entry,
-        id: crypto.randomUUID(),
+        id,
         createdAt: Date.now(),
       },
     ]);
+    return id;
   }, []);
+
+  const updateAssistantDraftTranscript = useCallback((text: string, isFinal: boolean) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    if (!assistantDraftIdRef.current) {
+      assistantDraftIdRef.current = appendTranscript({ role: 'assistant', text: trimmed, isFinal });
+      return;
+    }
+
+    const draftId = assistantDraftIdRef.current;
+    setTranscript((current) => current.map((entry) => (
+      entry.id === draftId ? { ...entry, text: trimmed, isFinal } : entry
+    )));
+
+    if (isFinal) {
+      assistantDraftIdRef.current = null;
+    }
+  }, [appendTranscript]);
 
   const cleanup = useCallback(() => {
     dataChannelRef.current?.close();
@@ -70,6 +94,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     }
 
     assistantDraftRef.current = '';
+    assistantDraftIdRef.current = null;
     setSession(null);
   }, []);
 
@@ -90,10 +115,11 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     } else if (type === 'response.created') {
       setStatus('speaking');
       assistantDraftRef.current = '';
+      assistantDraftIdRef.current = null;
     } else if (type === 'response.done') {
       setStatus('connected');
       if (assistantDraftRef.current.trim()) {
-        appendTranscript({ role: 'assistant', text: assistantDraftRef.current.trim(), isFinal: true });
+        updateAssistantDraftTranscript(assistantDraftRef.current, true);
         assistantDraftRef.current = '';
       }
     } else if (type === 'error') {
@@ -109,11 +135,27 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
 
     if (fragment.role === 'assistant' && !fragment.isFinal) {
       assistantDraftRef.current += fragment.text;
+      updateAssistantDraftTranscript(assistantDraftRef.current, false);
+      return;
+    }
+
+    if (fragment.role === 'assistant' && fragment.isFinal) {
+      assistantDraftRef.current = fragment.text;
+      updateAssistantDraftTranscript(fragment.text, true);
+      assistantDraftRef.current = '';
       return;
     }
 
     appendTranscript(fragment);
-  }, [appendTranscript]);
+  }, [appendTranscript, updateAssistantDraftTranscript]);
+
+  const setMicrophoneMuted = useCallback((muted: boolean) => {
+    mutedRef.current = muted;
+    mediaStreamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = !muted;
+    });
+    setIsMuted(muted);
+  }, []);
 
   const start = useCallback(async () => {
     if (status === 'connecting' || status === 'connected' || status === 'listening' || status === 'speaking') return;
@@ -131,6 +173,9 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         return;
       }
       mediaStreamRef.current = stream;
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = !mutedRef.current;
+      });
       setStatus('connecting');
 
       const sessionResponse = await fetch('/api/realtime/session', {
@@ -254,9 +299,13 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     error,
     transcript,
     session,
+    isMuted,
     isActive: status === 'connected' || status === 'listening' || status === 'speaking',
     start,
     stop,
+    mute: () => setMicrophoneMuted(true),
+    unmute: () => setMicrophoneMuted(false),
+    toggleMute: () => setMicrophoneMuted(!mutedRef.current),
     sendText,
     clearTranscript: () => setTranscript([]),
   };

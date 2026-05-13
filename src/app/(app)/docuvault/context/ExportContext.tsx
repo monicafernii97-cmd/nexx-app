@@ -400,7 +400,7 @@ export function exportReducer(state: ExportState, action: ExportAction): ExportS
                 statusDetail: 'Document ready',
                 exportId: action.exportId,
                 filename: action.filename,
-                documentTitle: action.documentTitle ?? state.documentTitle,
+                documentTitle: typeof action.documentTitle === 'string' ? action.documentTitle : null,
                 draftingStage: null,
             };
 

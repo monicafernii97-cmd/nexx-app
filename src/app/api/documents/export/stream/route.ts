@@ -1224,6 +1224,7 @@ export async function POST(request: NextRequest) {
                     type: 'complete',
                     exportId,
                     filename,
+                    documentTitle,
                     sectionCount: draftedSections.length,
                     aiDraftedCount,
                     lockedCount,

@@ -45,26 +45,29 @@ const isValidIncidentDateTime = (dateValue: string, timeValue: string) => {
     return !Number.isNaN(new Date(`${normalizedDate}T${normalizedTime}`).getTime());
 };
 
+const getLocalNow = () => {
+    const now = new Date();
+    return {
+        date: [
+            now.getFullYear(),
+            String(now.getMonth() + 1).padStart(2, '0'),
+            String(now.getDate()).padStart(2, '0'),
+        ].join('-'),
+        time: now.toTimeString().slice(0, 5),
+    };
+};
+
 /** Incident Intake Hub - The primary pipeline for event recording. */
 export default function IncidentReportPage() {
     const { activeCaseId } = useWorkspace();
     const router = useRouter();
     const [step, setStep] = useState<CaptureStep>('describe');
     const [narrative, setNarrative] = useState('');
-    const [date, setDate] = useState(() => {
-        const now = new Date();
-        return [
-            now.getFullYear(),
-            String(now.getMonth() + 1).padStart(2, '0'),
-            String(now.getDate()).padStart(2, '0'),
-        ].join('-');
-    });
-    const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
+    const [date, setDate] = useState('');
+    const [time, setTime] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [isListening, setIsListening] = useState(false);
-    const speechSupported = typeof window === 'undefined'
-        ? true
-        : Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+    const [speechSupported, setSpeechSupported] = useState<boolean | null>(null);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const stepRef = useRef<CaptureStep>(step);
 
@@ -110,8 +113,15 @@ export default function IncidentReportPage() {
     useEffect(() => {
         if (typeof window === 'undefined') return;
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const mountTimer = window.setTimeout(() => {
+            const localNow = getLocalNow();
+            setDate(localNow.date);
+            setTime(localNow.time);
+            setSpeechSupported(Boolean(SpeechRecognition));
+        }, 0);
+
         if (!SpeechRecognition) {
-            return;
+            return () => window.clearTimeout(mountTimer);
         }
 
         const recognition = new SpeechRecognition();
@@ -147,6 +157,7 @@ export default function IncidentReportPage() {
         recognitionRef.current = recognition;
 
         return () => {
+            window.clearTimeout(mountTimer);
             recognition.abort();
         };
     }, []);
@@ -316,7 +327,7 @@ export default function IncidentReportPage() {
                     {step === 'describe' && (
                         <>
                             <div className="text-center">
-                                {speechSupported ? (
+                                {speechSupported === null ? null : speechSupported ? (
                                     <>
                                         <button
                                             type="button"
@@ -493,13 +504,9 @@ export default function IncidentReportPage() {
                                     setStep('describe');
                                     setNarrative('');
                                     setProcessError(null);
-                                    const now = new Date();
-                                    setDate([
-                                        now.getFullYear(),
-                                        String(now.getMonth() + 1).padStart(2, '0'),
-                                        String(now.getDate()).padStart(2, '0'),
-                                    ].join('-'));
-                                    setTime(now.toTimeString().slice(0, 5));
+                                    const localNow = getLocalNow();
+                                    setDate(localNow.date);
+                                    setTime(localNow.time);
                                 }}
                                 className="inline-flex items-center justify-center px-6 py-3.5 gap-2 shadow-[0_4px_20px_rgba(26,75,155,0.4)] text-[13px] font-bold tracking-widest uppercase rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all"
                             >

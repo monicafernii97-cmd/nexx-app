@@ -113,6 +113,8 @@ export type GenerateExportPDFResult = {
   html: string;
   /** Deterministic filename for the PDF. */
   filename: string;
+  /** Human-readable document title for the completion UI. */
+  documentTitle: string;
   /** Pipeline duration in milliseconds. */
   durationMs: number;
 };
@@ -280,14 +282,12 @@ export async function generateExportPDF(
       );
     }
 
-    // 8. Generate deterministic filename
-    // Court documents use resolvedTitle when available for a professional filename
-    const filename = input.resolvedTitle && document.path === 'court_document'
-      ? generateCourtFilename(input.resolvedTitle, input.metadata.runId)
-      : generateExportFilename({
-          ...input.metadata,
-          exportPath: document.path,
-        });
+    // 8. Generate deterministic title + filename.
+    const titleSource = input.resolvedTitle && document.path === 'court_document'
+      ? input.resolvedTitle
+      : document.title || getFallbackDocumentTitle(document.path);
+    const documentTitle = generateExportDisplayTitle(titleSource);
+    const filename = generateFilenameFromTitle(documentTitle);
 
     const durationMs = Date.now() - startTime;
 
@@ -313,6 +313,7 @@ export async function generateExportPDF(
       pdfMeta,
       html,
       filename,
+      documentTitle,
       durationMs,
     };
   } catch (error) {
@@ -537,11 +538,8 @@ export function generateExportFilename(metadata: {
   runId: string;
 }): string {
   try {
-    const date = new Date().toISOString().slice(0, 10);
-    const shortId = metadata.runId.length >= 6
-      ? metadata.runId.slice(-6)
-      : metadata.runId || 'unknown';
-    return `${sanitize(metadata.caseType)}_${sanitize(metadata.exportPath)}_${date}_${shortId}.pdf`;
+    const title = generateExportDisplayTitle(`${metadata.caseType} ${metadata.exportPath}`);
+    return generateFilenameFromTitle(title);
   } catch (err) {
     throw new ExportDocumentGenerationError({
       code: 'EXPORT_FILENAME_FAILED',
@@ -551,22 +549,54 @@ export function generateExportFilename(metadata: {
   }
 }
 
+/** Generate a title-cased display title for the completed export. */
+export function generateExportDisplayTitle(title: string): string {
+  const normalized = title
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return (normalized || 'Generated Document')
+    .toLowerCase()
+    .split(' ')
+    .map((word) => word.replace(/^[a-z0-9]/, (char) => char.toUpperCase()))
+    .join(' ')
+    .replace(/(['’])S\b/g, '$1s');
+}
+
 /** Sanitize a string for use in filenames: lowercase, alphanumeric + underscores. */
 function sanitize(str: string): string {
   return str
     .toLowerCase()
-    .replace(/[^a-z0-9_-]/g, '_')
+    .replace(/&/g, ' and ')
+    .replace(/['’]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '');
 }
 
 /**
- * Generate a court-specific filename from the resolved title.
- * Example: "Motion to Modify" → "motion_to_modify_2026-05-02_a1b2c3.pdf"
+ * Generate a clean snake_case PDF filename from the smart title.
+ * Example: "Motion to Modify" -> "motion_to_modify.pdf"
  */
-function generateCourtFilename(resolvedTitle: string, runId: string): string {
-  const date = new Date().toISOString().slice(0, 10);
-  const shortId = runId.length >= 6 ? runId.slice(-6) : runId || 'unknown';
-  const titleSlug = sanitize(resolvedTitle) || 'court_document';
-  return `${titleSlug}_${date}_${shortId}.pdf`;
+export function generateFilenameFromTitle(title: string): string {
+  return `${sanitize(title) || 'generated_document'}.pdf`;
+}
+
+/** Provide a human fallback when a canonical document has no title. */
+function getFallbackDocumentTitle(path: ExportPath): string {
+  switch (path) {
+    case 'court_document':
+      return 'Court Document';
+    case 'case_summary':
+      return 'Summary Report';
+    case 'exhibit_document':
+      return 'Exhibit Packet';
+    case 'timeline_summary':
+      return 'Timeline Summary';
+    case 'incident_report':
+      return 'Incident Report';
+    default:
+      return 'Generated Document';
+  }
 }

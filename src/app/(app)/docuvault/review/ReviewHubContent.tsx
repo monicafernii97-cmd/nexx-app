@@ -61,6 +61,22 @@ function getExportLabel(exportPath: string | null | undefined): string {
     }
 }
 
+/** Derive a readable title from a saved PDF filename when the stream lacks one. */
+function titleFromFilename(filename: string | null | undefined): string | null {
+    if (!filename) return null;
+    const title = filename
+        .replace(/\.pdf$/i, '')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!title) return null;
+    return title
+        .toLowerCase()
+        .split(' ')
+        .map(word => word.replace(/^[a-z0-9]/, char => char.toUpperCase()))
+        .join(' ');
+}
+
 /** Drafting checklist stages in order. */
 const DRAFTING_STAGES: { key: DraftingStage; label: string }[] = [
     { key: 'drafting', label: 'Drafting AI sections' },
@@ -882,7 +898,7 @@ export default function ReviewHubContent() {
 
     // Completed phase — success card
     if (state.phase === 'completed') {
-        return <CompletedPhaseUI state={state} onNewExport={handleReset} />;
+        return <CompletedPhaseUI state={state} onBackToReview={handleBackToReview} />;
     }
 
     // Error phase — error card
@@ -1381,27 +1397,31 @@ function DraftingPhaseUI({
 }
 
 // =========================================================================
-// Completed Phase — Success Card
+// Completed Phase — Focused Preview
 // =========================================================================
 
-/** Success card shown after export completes — download link, stats, and new export button. */
+/** Focused completion screen with embedded PDF preview and final actions. */
 function CompletedPhaseUI({
     state,
-    onNewExport,
+    onBackToReview,
 }: {
     state: ReturnType<typeof useExport>['state'];
-    onNewExport: () => void;
+    onBackToReview: () => void;
 }) {
-    const preflightPassCount = state.preflight?.checks.filter(c => c.severity === 'pass').length ?? 0;
-    const preflightWarnCount = state.preflight?.warningCount ?? 0;
-    const preflightErrorCount = state.preflight?.errorCount ?? 0;
     const downloadUrl = state.exportId
         ? `/api/documents/export/${state.exportId}/download`
         : null;
+    const previewUrl = downloadUrl ? `${downloadUrl}?disposition=inline` : null;
+    const documentTitle = state.documentTitle
+        ?? titleFromFilename(state.filename)
+        ?? 'Generated Document';
+    const preflightPassCount = state.preflight?.checks.filter(c => c.severity === 'pass').length ?? 0;
+    const preflightWarnCount = state.preflight?.warningCount ?? 0;
+    const preflightErrorCount = state.preflight?.errorCount ?? 0;
 
     return (
-        <div className="flex items-center justify-center h-full">
-            <div className="w-full max-w-lg p-4 rounded-2xl bg-[rgba(10,17,40,0.8)] border border-white/10 backdrop-blur-xl">
+        <div className="h-full overflow-y-auto p-6" style={{ scrollbarWidth: 'thin' }}>
+            <div className="mx-auto w-full max-w-6xl p-4 rounded-2xl bg-[rgba(10,17,40,0.8)] border border-white/10 backdrop-blur-xl">
                 {/* Success header */}
                 <div className="flex items-center gap-4 mb-6">
                     <div className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
@@ -1409,14 +1429,31 @@ function CompletedPhaseUI({
                     </div>
                     <div>
                         <h2 className="text-[18px] font-bold text-white">Export Complete</h2>
-                        <p className="text-[13px] text-white/50">
-                            {state.filename ?? 'Document generated successfully'}
+                        <p className="text-[15px] font-semibold text-white/80">
+                            {documentTitle}
                         </p>
+                        {state.filename && (
+                            <p className="text-[12px] text-white/40">{state.filename}</p>
+                        )}
                     </div>
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="mb-6 min-h-[620px] overflow-hidden rounded-2xl border border-white/10 bg-white shadow-[0_18px_48px_rgba(0,0,0,0.25)]">
+                    {previewUrl ? (
+                        <iframe
+                            title={`${documentTitle} PDF preview`}
+                            src={previewUrl}
+                            className="h-[72vh] min-h-[620px] w-full bg-white"
+                        />
+                    ) : (
+                        <div className="flex h-[620px] items-center justify-center bg-white">
+                            <p className="text-[13px] font-semibold text-slate-500">PDF preview unavailable.</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Legacy stats intentionally hidden for focused completion UX. */}
+                <div className="hidden grid-cols-3 gap-3 mb-6">
                     <div className="p-3 rounded-xl bg-white/5 border border-white/10">
                         <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Items</p>
                         <p className="text-[18px] font-bold text-white">
@@ -1444,7 +1481,19 @@ function CompletedPhaseUI({
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex gap-3 mb-4">
+                <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                    {previewUrl && (
+                        <a
+                            href={previewUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex-1 py-3 rounded-xl text-[13px] font-bold text-white/70 text-center bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white transition-all flex items-center justify-center gap-2"
+                        >
+                            <ArrowSquareOut size={16} />
+                            Open Full Preview
+                        </a>
+                    )}
+
                     {/* Download PDF */}
                     {downloadUrl && (
                         <a
@@ -1463,17 +1512,17 @@ function CompletedPhaseUI({
                         className="flex-1 py-3 rounded-xl text-[13px] font-bold text-white/70 text-center bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white transition-all flex items-center justify-center gap-2"
                     >
                         <ArrowSquareOut size={16} />
-                        View in DocuVault
+                        Save + View in Vault
                     </a>
                 </div>
 
-                {/* Start new export */}
+                {/* Return to review */}
                 <button
                     type="button"
-                    onClick={onNewExport}
+                    onClick={onBackToReview}
                     className="w-full py-2.5 rounded-xl text-[12px] font-bold text-white/50 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white/70 transition-colors"
                 >
-                    Start New Export
+                    Return to Review Hub
                 </button>
             </div>
         </div>

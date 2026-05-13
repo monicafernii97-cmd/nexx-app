@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
@@ -9,26 +9,56 @@ import {
     ClipboardText,
     ArrowRight,
     Microphone,
+    MicrophoneSlash,
     PlusCircle,
     ArrowClockwise,
     CheckCircle,
-    MagnifyingGlass as FileSearch,
+    Check,
+    PencilSimple,
+    CalendarBlank,
+    Clock,
+    WarningCircle,
+    ArrowLeft,
     Clock as TimelineIcon,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
-import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
+import { useRouter } from 'next/navigation';
+import { PageContainer } from '@/components/layout/PageLayout';
 import { useWorkspace } from '@/lib/workspace-context';
 
 import '@/styles/pipelines.css';
 
 /** Structured error for stable code-based matching instead of brittle string comparisons. */
 type ProcessError = { code: 'empty_narrative' | 'missing_case' | 'generic'; message: string } | null;
+type CaptureStep = 'describe' | 'review' | 'confirmed';
+
+const captureSteps: { id: CaptureStep; label: string }[] = [
+    { id: 'describe', label: 'Describe' },
+    { id: 'review', label: 'Review' },
+    { id: 'confirmed', label: 'Confirmed' },
+];
 
 /** Incident Intake Hub - The primary pipeline for event recording. */
 export default function IncidentReportPage() {
     const { activeCaseId } = useWorkspace();
+    const router = useRouter();
+    const [step, setStep] = useState<CaptureStep>('describe');
     const [narrative, setNarrative] = useState('');
+    const [date, setDate] = useState(() => {
+        const now = new Date();
+        return [
+            now.getFullYear(),
+            String(now.getMonth() + 1).padStart(2, '0'),
+            String(now.getDate()).padStart(2, '0'),
+        ].join('-');
+    });
+    const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isListening, setIsListening] = useState(false);
+    const speechSupported = typeof window === 'undefined'
+        ? true
+        : Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+    const recognitionRef = useRef<SpeechRecognition | null>(null);
 
     const [processError, setProcessError] = useState<ProcessError>(null);
     const [isPinning, setIsPinning] = useState<string | null>(null);
@@ -48,8 +78,66 @@ export default function IncidentReportPage() {
     const createIncident = useMutation(api.incidents.create);
     const createCasePin = useMutation(api.casePins.create);
 
-    /** Process the incident narrative and save to Convex. */
-    const handleProcess = useCallback(async () => {
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+            const finalChunks: string[] = [];
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const result = event.results[i];
+                if (result.isFinal) {
+                    finalChunks.push(result[0].transcript.trim());
+                }
+            }
+            if (finalChunks.length) {
+                setNarrative((prev) => `${prev}${prev ? ' ' : ''}${finalChunks.join(' ')}`);
+                setProcessError(null);
+            }
+        };
+
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+            console.error('[IncidentIntake] Speech recognition error:', event.error);
+            setIsListening(false);
+        };
+
+        recognition.onend = () => {
+            setIsListening(false);
+        };
+
+        recognitionRef.current = recognition;
+
+        return () => {
+            recognition.abort();
+        };
+    }, []);
+
+    const toggleListening = useCallback(() => {
+        if (!recognitionRef.current) return;
+        if (isListening) {
+            recognitionRef.current.stop();
+            setIsListening(false);
+            return;
+        }
+
+        try {
+            recognitionRef.current.start();
+            setIsListening(true);
+        } catch (err) {
+            console.error('[IncidentIntake] Failed to start speech recognition:', err);
+        }
+    }, [isListening]);
+
+    /** Advance to review after validating the local capture fields. */
+    const handleReview = useCallback(() => {
         const trimmed = narrative.trim();
         if (!trimmed || !activeCaseId) {
             if (!trimmed) {
@@ -60,32 +148,39 @@ export default function IncidentReportPage() {
             return;
         }
 
+        setProcessError(null);
+        setStep('review');
+    }, [narrative, activeCaseId]);
+
+    /** Process the incident narrative and save to Convex. */
+    const handleProcess = useCallback(async () => {
+        const trimmed = narrative.trim();
+        if (!trimmed || !activeCaseId) {
+            handleReview();
+            return;
+        }
+
         setIsProcessing(true);
         setProcessError(null);
 
         try {
-            const now = new Date();
-            const localDate = [
-                now.getFullYear(),
-                String(now.getMonth() + 1).padStart(2, '0'),
-                String(now.getDate()).padStart(2, '0'),
-            ].join('-');
             await createIncident({
                 narrative: trimmed,
                 severity: 1,
-                date: localDate,
-                time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                date,
+                time,
                 caseId: activeCaseId,
             });
 
             setNarrative('');
+            setStep('confirmed');
         } catch (err) {
             console.error('[IncidentIntake] Create failed:', err);
             setProcessError({ code: 'generic', message: err instanceof Error ? err.message : 'Failed to save incident' });
         } finally {
             setIsProcessing(false);
         }
-    }, [narrative, activeCaseId, createIncident]);
+    }, [narrative, activeCaseId, date, time, createIncident, handleReview]);
 
     /** Pin an incident to the case workspace. Prevents duplicate clicks. */
     const handleAddToWorkspace = useCallback(async (incident: { _id: Id<'incidents'>; narrative: string; date: string }) => {
@@ -115,70 +210,253 @@ export default function IncidentReportPage() {
 
     return (
         <PageContainer>
-            <PageHeader
-                icon={ClipboardText}
-                title={<>Record <span className="text-editorial shimmer">Incident</span></>}
-                description="Turn a chaotic moment into a structured fact. Type your narrative below."
-            />
-
-            <div className="max-w-4xl mx-auto flex-1 min-h-0 flex flex-col w-full gap-6 pb-4">
-                
-                {/* 1. The Focused Intake Area (Luxury Glass) */}
-                <div className="flex-[0.5] min-h-0 hyper-glass p-6 flex flex-col floating-element glow-slate">
-                    <div className="relative group flex-1 min-h-0">
-                        <textarea
-                            value={narrative}
-                            onChange={(e) => {
-                                setNarrative(e.target.value);
-                                if (processError) setProcessError(null);
-                            }}
-                            aria-label="Incident narrative"
-                            placeholder="What happened? Record the facts exactly as they occurred..."
-                            className="w-full h-full bg-transparent border-none text-lg font-serif text-white placeholder:text-white/30 outline-none resize-none px-0 py-3 selection:bg-indigo-500/30 leading-relaxed"
-                        />
-                        
-                        {/* Floating Glow Background */}
-                        <div className="absolute inset-0 bg-indigo-500/5 blur-[80px] rounded-full -z-10 group-focus-within:bg-indigo-500/10 transition-all pointer-events-none" />
+            <div className="max-w-5xl mx-auto flex-1 min-h-0 flex flex-col w-full gap-6 pb-4">
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="flex flex-col gap-8"
+                >
+                    <div className="flex items-center gap-5">
+                        <button
+                            type="button"
+                            onClick={() => router.back()}
+                            className="w-11 h-11 rounded-full flex items-center justify-center transition-all hover:scale-105 bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] shadow-md border border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)]"
+                            aria-label="Go back"
+                        >
+                            <ArrowLeft size={20} weight="bold" className="text-white" />
+                        </button>
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-serif font-bold text-white m-0">
+                                Evidence & <span className="text-white shimmer">Pattern Log</span>
+                            </h1>
+                            <p className="text-[14px] font-medium text-white/90 mt-1">
+                                Documenting patterns of behavior with precision for court.
+                            </p>
+                        </div>
                     </div>
 
-                    {/* 2. Intake Controls */}
-                    <div className="flex items-center justify-between pt-4 border-t border-white/5">
-                        <div className="flex items-center gap-6">
-                            <button disabled className="flex items-center gap-2 text-white/20 cursor-not-allowed text-[11px] font-bold uppercase tracking-[0.2em] group transition-all" title="Coming soon">
-                                <Microphone size={18} weight="light" className="group-hover:text-rose-400 transition-colors" />
-                                Voice Entry
-                            </button>
-                            <button disabled className="flex items-center gap-2 text-white/20 cursor-not-allowed text-[11px] font-bold uppercase tracking-[0.2em] group transition-all" title="Coming soon">
-                                <PlusCircle size={18} weight="light" className="group-hover:text-indigo-400 transition-colors" />
-                                Attach Media
+                    <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-1">
+                        {captureSteps.map((captureStep, i) => {
+                            const activeIndex = captureSteps.findIndex((item) => item.id === step);
+                            const isActive = activeIndex >= i;
+                            const isPast = activeIndex > i;
+                            return (
+                                <div key={captureStep.id} className="flex items-center gap-3 flex-1 min-w-[120px]">
+                                    <div
+                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold transition-all duration-500 shrink-0 shadow-sm ${
+                                            isActive
+                                                ? 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] text-white scale-110 shadow-[0_4px_12px_rgba(18,61,126,0.3)] border border-[rgba(255,255,255,0.3)]'
+                                                : 'bg-[#0A1128] text-white/50 border border-white/20'
+                                        }`}
+                                    >
+                                        {isPast ? <Check size={14} weight="bold" /> : i + 1}
+                                    </div>
+                                    <span className={`text-[13px] tracking-wide font-bold uppercase whitespace-nowrap ${isActive ? 'text-white' : 'text-white/60'}`}>
+                                        {captureStep.label}
+                                    </span>
+                                    {i < captureSteps.length - 1 && (
+                                        <div className="flex-1 h-px min-w-[20px] bg-white/10" />
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </motion.div>
+
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="hyper-glass p-6 md:p-8 flex flex-col gap-8 floating-element glow-slate border border-white/10"
+                >
+                    {step === 'describe' && (
+                        <>
+                            <div className="text-center">
+                                {speechSupported ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={toggleListening}
+                                            className={`w-24 h-24 rounded-full mx-auto flex items-center justify-center cursor-pointer transition-all hover:scale-105 shadow-[0_8px_32px_rgba(26,75,155,0.5)] border-[4px] group relative overflow-hidden ${
+                                                isListening
+                                                    ? 'bg-[linear-gradient(135deg,#C75A5A,#8B3A3A)] border-[rgba(199,90,90,0.5)] animate-pulse shadow-[0_0_30px_rgba(199,90,90,0.5)]'
+                                                    : 'bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border-[rgba(255,255,255,0.12)] hover:border-[rgba(255,255,255,0.3)]'
+                                            }`}
+                                            title={isListening ? 'Stop recording' : 'Start voice recording'}
+                                            aria-pressed={isListening}
+                                        >
+                                            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            {isListening ? (
+                                                <MicrophoneSlash size={34} weight="fill" className="text-white drop-shadow-md" />
+                                            ) : (
+                                                <Microphone size={34} weight="duotone" className="text-white group-hover:scale-110 transition-all drop-shadow-md" />
+                                            )}
+                                        </button>
+                                        <p className={`text-[13px] font-bold tracking-widest uppercase mt-5 ${isListening ? 'text-rose' : 'text-white'}`}>
+                                            {isListening ? 'Listening... Tap to Stop' : 'Tap to Record Testimony'}
+                                        </p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="w-24 h-24 rounded-full mx-auto flex items-center justify-center bg-white/5 border-[4px] border-white/10 opacity-60">
+                                            <MicrophoneSlash size={34} className="text-white/50" />
+                                        </div>
+                                        <p className="text-[12px] font-medium text-white/40 mt-5">
+                                            Voice recording is not supported in this browser.
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
+                                    <PencilSimple size={14} /> Manual Narrative
+                                </label>
+                                <div className="relative">
+                                    <textarea
+                                        value={narrative}
+                                        onChange={(e) => {
+                                            setNarrative(e.target.value);
+                                            if (processError) setProcessError(null);
+                                        }}
+                                        aria-label="Incident narrative"
+                                        placeholder="Describe the incident with precision - what happened, who was present, what was said or done..."
+                                        rows={7}
+                                        maxLength={5000}
+                                        className="w-full resize-none bg-white text-[#0A1128] placeholder:text-[#0A1128]/50 text-[15px] leading-relaxed rounded-[1.25rem] focus:ring-2 focus:ring-[#1A4B9B] border-none shadow-inner px-5 py-4 outline-none"
+                                    />
+                                    <p className={`absolute bottom-3 right-4 text-[11px] font-bold ${narrative.length > 4500 ? 'text-rose' : 'text-[#0A1128]/40'}`}>
+                                        {narrative.length}/5000
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div>
+                                    <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
+                                        <CalendarBlank size={14} /> Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={date}
+                                        onChange={(e) => setDate(e.target.value)}
+                                        className="w-full rounded-[1.25rem] border-none bg-white px-5 py-4 text-[#0A1128] shadow-inner outline-none focus:ring-2 focus:ring-[#1A4B9B]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
+                                        <Clock size={14} /> Time
+                                    </label>
+                                    <input
+                                        type="time"
+                                        value={time}
+                                        onChange={(e) => setTime(e.target.value)}
+                                        className="w-full rounded-[1.25rem] border-none bg-white px-5 py-4 text-[#0A1128] shadow-inner outline-none focus:ring-2 focus:ring-[#1A4B9B]"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-2 border-t border-white/5">
+                                <button disabled className="flex items-center justify-center gap-2 text-white/20 cursor-not-allowed text-[11px] font-bold uppercase tracking-[0.2em] transition-all" title="Coming soon">
+                                    <PlusCircle size={18} weight="light" />
+                                    Attach Media
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleReview}
+                                    disabled={!narrative.trim() || !activeCaseId}
+                                    className={`flex items-center justify-center gap-3 px-6 py-3 rounded-xl font-bold uppercase tracking-[0.2em] text-[10px] transition-all shadow-2xl ${
+                                        narrative.trim() && activeCaseId
+                                            ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
+                                            : 'bg-white/5 text-white/20 border border-white/5 cursor-not-allowed'
+                                    }`}
+                                >
+                                    Review Incident <ArrowRight size={16} weight="bold" />
+                                </button>
+                            </div>
+                        </>
+                    )}
+
+                    {step === 'review' && (
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+                                    <ClipboardText size={20} className="text-indigo-300" />
+                                </div>
+                                <div>
+                                    <h2 className="font-serif text-xl text-white">Review captured testimony</h2>
+                                    <p className="text-[12px] text-white/45 font-bold uppercase tracking-[0.2em]">Confirm before saving to the timeline</p>
+                                </div>
+                            </div>
+                            <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5 space-y-4">
+                                <div className="flex flex-wrap gap-3 text-[11px] font-bold uppercase tracking-[0.18em] text-white/60">
+                                    <span className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10">{date}</span>
+                                    <span className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10">{time}</span>
+                                </div>
+                                <p className="text-[15px] leading-relaxed text-white/80 whitespace-pre-wrap font-serif">
+                                    {narrative}
+                                </p>
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setStep('describe')}
+                                    className="flex-1 py-4 uppercase text-[12px] font-bold tracking-widest rounded-xl transition-all text-white bg-white/5 border border-white/20 hover:bg-white/10"
+                                >
+                                    Back to Edit
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleProcess}
+                                    disabled={isProcessing || !activeCaseId}
+                                    aria-busy={isProcessing}
+                                    className="flex-[1.5] flex items-center justify-center gap-2 disabled:opacity-50 py-4 uppercase text-[12px] font-bold tracking-widest rounded-xl transition-all shadow-md text-white bg-indigo-600 hover:bg-indigo-500"
+                                >
+                                    {isProcessing ? <ArrowClockwise size={18} className="animate-spin" /> : <CheckCircle size={18} weight="fill" />}
+                                    {isProcessing ? 'Saving...' : 'Confirm & Log'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 'confirmed' && (
+                        <div className="text-center py-4">
+                            <div className="w-16 h-16 rounded-full mx-auto mb-5 flex items-center justify-center bg-emerald-500 shadow-[0_8px_24px_rgba(90,158,111,0.25)]">
+                                <Check size={26} weight="bold" className="text-white" />
+                            </div>
+                            <h2 className="font-serif text-2xl font-bold mb-3 text-white">
+                                Incident Documented
+                            </h2>
+                            <p className="text-[15px] font-medium mb-8 text-white/60 max-w-sm mx-auto leading-relaxed">
+                                This record has been saved to your incident timeline.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setStep('describe');
+                                    setNarrative('');
+                                    setProcessError(null);
+                                    const now = new Date();
+                                    setDate([
+                                        now.getFullYear(),
+                                        String(now.getMonth() + 1).padStart(2, '0'),
+                                        String(now.getDate()).padStart(2, '0'),
+                                    ].join('-'));
+                                    setTime(now.toTimeString().slice(0, 5));
+                                }}
+                                className="inline-flex items-center justify-center px-6 py-3.5 gap-2 shadow-[0_4px_20px_rgba(26,75,155,0.4)] text-[13px] font-bold tracking-widest uppercase rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all"
+                            >
+                                <PlusCircle size={16} weight="bold" /> Log Another
                             </button>
                         </div>
-
-                        <button 
-                            onClick={handleProcess}
-                            disabled={!narrative.trim() || isProcessing || !activeCaseId}
-                            aria-busy={isProcessing}
-                            aria-label={isProcessing ? 'Processing incident' : 'Log incident'}
-                            className={`flex items-center gap-3 px-6 py-2.5 rounded-xl font-bold uppercase tracking-[0.2em] text-[10px] transition-all shadow-2xl ${
-                                narrative.trim() && !isProcessing && activeCaseId
-                                ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30' 
-                                : 'bg-white/5 text-white/10 border border-white/5 cursor-not-allowed'
-                            }`}
-                        >
-                            {isProcessing ? (
-                                <ArrowClockwise size={18} className="animate-spin" />
-                            ) : (
-                                <ClipboardText size={18} weight="fill" />
-                            )}
-                            {isProcessing ? 'Processing' : 'Log Incident'}
-                        </button>
-                    </div>
-                </div>
+                    )}
+                </motion.div>
 
                 {/* Error & Warnings */}
                 <div className="px-4 space-y-4 shrink-0">
                     {displayedError && (
-                        <div role="alert" aria-live="assertive" className="px-6 py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold uppercase tracking-widest">
+                        <div role="alert" aria-live="assertive" className="px-6 py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                            <WarningCircle size={16} weight="fill" />
                             {displayedError}
                         </div>
                     )}

@@ -55,6 +55,7 @@ function ChatListContent() {
         if (handoffProcessedRef.current) return;
         if (searchParams.get('handoff') !== 'court') return;
         if (!activeCaseId) return;
+        handoffProcessedRef.current = true;
 
         const payload = consumeCourtHandoff();
 
@@ -69,7 +70,6 @@ function ChatListContent() {
                 const msgKey = `nexx_handoff_msg_${String(id)}`;
                 sessionStorage.setItem(msgKey, payload ? buildHandoffPrompt(payload) : HANDOFF_FALLBACK_MESSAGE);
 
-                handoffProcessedRef.current = true;
                 router.replace(`/chat/${id}`);
             } catch (err) {
                 console.error('[ChatList] Failed to create handoff conversation:', err);
@@ -237,6 +237,19 @@ function HistoryDrawer({
     deletingId,
     onDelete,
 }: HistoryDrawerProps) {
+    useEffect(() => {
+        if (!open) return;
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                onClose();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [open, onClose]);
+
     return (
         <AnimatePresence>
             {open && (
@@ -257,6 +270,8 @@ function HistoryDrawer({
                         transition={{ type: 'spring', damping: 28, stiffness: 260 }}
                         className="fixed right-0 top-0 z-50 flex h-dvh w-full max-w-[23rem] flex-col border-l border-white/10 bg-[#10121c]/95 p-4 shadow-[-24px_0_80px_rgba(0,0,0,0.35)] backdrop-blur-xl"
                         aria-label="Chat history"
+                        aria-modal="true"
+                        role="dialog"
                     >
                         <div className="mb-4 flex items-center justify-between gap-3">
                             <div>
@@ -338,12 +353,12 @@ function ConversationSection({
             </div>
             <div className="space-y-1.5">
                 {conversations.map((conversation) => (
-                    <Link
-                        key={conversation._id}
-                        href={`/chat/${conversation._id}`}
-                        className="group relative block rounded-xl border border-transparent px-3 py-2.5 transition hover:border-white/10 hover:bg-white/[0.045]"
-                    >
-                        <div className="flex items-start gap-3 pr-8">
+                    <div key={conversation._id} className="group relative">
+                        <Link
+                            href={`/chat/${conversation._id}`}
+                            className="block rounded-xl border border-transparent px-3 py-2.5 transition hover:border-white/10 hover:bg-white/[0.045]"
+                        >
+                            <div className="flex items-start gap-3 pr-8">
                             <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] text-white/45">
                                 {archived ? <Archive size={14} /> : <ChatTeardropDots size={14} />}
                             </div>
@@ -353,10 +368,11 @@ function ConversationSection({
                                 </p>
                                 <p className="mt-1 truncate text-[11px] text-white/35">
                                     {formatDistanceToNow(conversation.lastMessageAt, { addSuffix: true })}
-                                    {conversation.messageCount !== undefined && ` · ${conversation.messageCount} messages`}
+                                    {conversation.messageCount !== undefined && ` - ${conversation.messageCount} messages`}
                                 </p>
                             </div>
-                        </div>
+                            </div>
+                        </Link>
                         <button
                             type="button"
                             onClick={(e) => onDelete(e, conversation._id)}
@@ -366,7 +382,7 @@ function ConversationSection({
                         >
                             <Trash size={13} />
                         </button>
-                    </Link>
+                    </div>
                 ))}
             </div>
         </section>

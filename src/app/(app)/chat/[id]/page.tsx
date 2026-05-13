@@ -252,6 +252,7 @@ export default function ConversationPage() {
             setUnsavedReply(fallbackContent);
             setUnsavedResponseData({ requestId });
             setStreamingContent(fallbackContent);
+            throw error;
         } finally {
             setIsStreaming(false);
         }
@@ -278,6 +279,10 @@ export default function ConversationPage() {
     );
 
     useEffect(() => {
+        pendingInitialSentRef.current = false;
+    }, [conversationId]);
+
+    useEffect(() => {
         if (pendingInitialSentRef.current || !isThreadReady || isStreaming || isPending || unsavedReply) return;
         if (typeof window === 'undefined') return;
 
@@ -288,14 +293,27 @@ export default function ConversationPage() {
         if (!pendingMessage) return;
 
         pendingInitialSentRef.current = true;
-        sessionStorage.removeItem(initialMsgKey);
-        sessionStorage.removeItem(handoffMsgKey);
+        let hasStarted = false;
         const timeoutId = window.setTimeout(() => {
+            hasStarted = true;
             setIsPending(true);
-            void callChatAPI(pendingMessage).finally(() => setIsPending(false));
+            void callChatAPI(pendingMessage)
+                .then(() => {
+                    sessionStorage.removeItem(initialMsgKey);
+                    sessionStorage.removeItem(handoffMsgKey);
+                })
+                .catch(() => {
+                    pendingInitialSentRef.current = false;
+                })
+                .finally(() => setIsPending(false));
         }, 0);
 
-        return () => window.clearTimeout(timeoutId);
+        return () => {
+            window.clearTimeout(timeoutId);
+            if (!hasStarted) {
+                pendingInitialSentRef.current = false;
+            }
+        };
     }, [conversationId, isThreadReady, isStreaming, isPending, unsavedReply, callChatAPI]);
 
     /**

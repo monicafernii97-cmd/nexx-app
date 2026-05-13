@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TranscriptionResponse } from '@/lib/voice';
 
 type RecorderStatus = 'idle' | 'requesting_microphone' | 'recording' | 'stopping' | 'transcribing' | 'error' | 'permission_denied';
+const BUSY_RECORDER_STATUSES: RecorderStatus[] = ['requesting_microphone', 'recording', 'stopping', 'transcribing'];
 
 interface RecorderError {
   message: string;
@@ -27,7 +28,7 @@ export function useIncidentRecorder() {
   }, []);
 
   const start = useCallback(async () => {
-    if (status === 'recording' || status === 'requesting_microphone') return;
+    if (BUSY_RECORDER_STATUSES.includes(status)) return;
     setError(null);
     setAudioBlob(null);
     setTranscription(null);
@@ -75,6 +76,7 @@ export function useIncidentRecorder() {
   }, [cleanup, status]);
 
   const stop = useCallback(() => {
+    if (status === 'stopping' || status === 'transcribing') return;
     if (recorderRef.current?.state === 'recording') {
       setStatus('stopping');
       recorderRef.current.stop();
@@ -82,7 +84,7 @@ export function useIncidentRecorder() {
     }
     cleanup();
     setStatus('idle');
-  }, [cleanup]);
+  }, [cleanup, status]);
 
   const transcribe = useCallback(async (blob = audioBlob) => {
     if (!blob) return null;

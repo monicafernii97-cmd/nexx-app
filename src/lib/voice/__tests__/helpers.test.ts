@@ -45,6 +45,7 @@ describe('voice helpers', () => {
 
   it('recognizes supported transcription MIME types', () => {
     expect(isSupportedTranscriptionMimeType('audio/webm')).toBe(true);
+    expect(isSupportedTranscriptionMimeType('audio/mpga')).toBe(true);
     expect(isSupportedTranscriptionMimeType('application/pdf')).toBe(false);
   });
 

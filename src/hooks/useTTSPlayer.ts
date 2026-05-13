@@ -24,9 +24,14 @@ export function useTTSPlayer() {
     abortRef.current = null;
 
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-      audioRef.current.remove();
+      const audio = audioRef.current;
+      audio.onplay = null;
+      audio.onpause = null;
+      audio.onended = null;
+      audio.onerror = null;
+      audio.pause();
+      audio.src = '';
+      audio.remove();
       audioRef.current = null;
     }
 

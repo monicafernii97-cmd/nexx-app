@@ -37,6 +37,7 @@ export const SUPPORTED_TRANSCRIPTION_MIME_TYPES = [
   'audio/flac',
   'audio/m4a',
   'audio/mp3',
+  'audio/mpga',
   'audio/mp4',
   'audio/mpeg',
   'audio/ogg',

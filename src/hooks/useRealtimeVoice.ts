@@ -36,6 +36,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const assistantDraftRef = useRef('');
+  const startAttemptRef = useRef(0);
 
   const appendTranscript = useCallback((entry: Omit<VoiceTranscriptEntry, 'id' | 'createdAt'>) => {
     setTranscript((current) => [
@@ -73,6 +74,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   }, []);
 
   const stop = useCallback(() => {
+    startAttemptRef.current += 1;
     setStatus('stopping');
     cleanup();
     setStatus('idle');
@@ -116,11 +118,18 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const start = useCallback(async () => {
     if (status === 'connecting' || status === 'connected' || status === 'listening' || status === 'speaking') return;
 
+    const attempt = ++startAttemptRef.current;
+    const isCurrentAttempt = () => attempt === startAttemptRef.current;
+
     setError(null);
     setStatus('requesting_microphone');
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!isCurrentAttempt()) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       mediaStreamRef.current = stream;
       setStatus('connecting');
 
@@ -133,15 +142,22 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         }),
       });
 
+      if (!isCurrentAttempt()) return;
+
       if (!sessionResponse.ok) {
         throw new Error('Unable to create realtime voice session.');
       }
 
       const nextSession = await sessionResponse.json() as RealtimeSessionResponse;
+      if (!isCurrentAttempt()) return;
       setSession(nextSession);
 
       const peer = new RTCPeerConnection();
       peerRef.current = peer;
+      if (!isCurrentAttempt()) {
+        cleanup();
+        return;
+      }
 
       const audioElement = new Audio();
       audioElement.autoplay = true;
@@ -155,8 +171,11 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
 
       const dataChannel = peer.createDataChannel('oai-events');
       dataChannelRef.current = dataChannel;
-      dataChannel.onopen = () => setStatus('connected');
+      dataChannel.onopen = () => {
+        if (isCurrentAttempt()) setStatus('connected');
+      };
       dataChannel.onmessage = (event) => {
+        if (!isCurrentAttempt()) return;
         try {
           handleRealtimeEvent(JSON.parse(event.data));
         } catch {
@@ -164,12 +183,15 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         }
       };
       dataChannel.onerror = () => {
+        if (!isCurrentAttempt()) return;
         setError({ message: 'Realtime data channel failed.' });
         setStatus('error');
       };
 
       const offer = await peer.createOffer();
+      if (!isCurrentAttempt()) return;
       await peer.setLocalDescription(offer);
+      if (!isCurrentAttempt()) return;
 
       const answerResponse = await fetch(REALTIME_WEBRTC_URL, {
         method: 'POST',
@@ -180,13 +202,17 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         body: offer.sdp,
       });
 
+      if (!isCurrentAttempt()) return;
+
       if (!answerResponse.ok) {
         throw new Error('Realtime WebRTC handshake failed.');
       }
 
       const answerSdp = await answerResponse.text();
+      if (!isCurrentAttempt()) return;
       await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
     } catch (err) {
+      if (!isCurrentAttempt()) return;
       cleanup();
       const isPermissionError = err instanceof DOMException && (
         err.name === 'NotAllowedError' ||
@@ -218,7 +244,10 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     return true;
   }, [appendTranscript]);
 
-  useEffect(() => cleanup, [cleanup]);
+  useEffect(() => () => {
+    startAttemptRef.current += 1;
+    cleanup();
+  }, [cleanup]);
 
   return {
     status,

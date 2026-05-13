@@ -192,6 +192,8 @@ export interface ExportState {
     exportId: string | null;
     /** Generated PDF filename */
     filename: string | null;
+    /** Smart display title for the generated document */
+    documentTitle: string | null;
     /** Current sub-stage during drafting (for checklist UI) */
     draftingStage: DraftingStage;
     /** Export version number */
@@ -233,6 +235,7 @@ export const initialState: ExportState = {
     caseId: undefined,
     exportId: null,
     filename: null,
+    documentTitle: null,
     draftingStage: null,
     version: null,
     rootExportId: null,
@@ -266,7 +269,7 @@ type ExportAction =
     | { type: 'SET_LAST_COMPLETED_STAGE'; stage: ExportState['lastCompletedStage'] }
     | { type: 'START_DRAFTING' }
     | { type: 'DRAFT_PROGRESS'; status: PipelineStatus; stage?: DraftingStage }
-    | { type: 'COMPLETE'; exportId: string; filename: string }
+    | { type: 'COMPLETE'; exportId: string; filename: string; documentTitle?: string }
     | { type: 'ERROR'; message: string; errorCode?: string }
     | { type: 'RESET' }
     | { type: 'BACK_TO_REVIEW' }
@@ -397,6 +400,7 @@ export function exportReducer(state: ExportState, action: ExportAction): ExportS
                 statusDetail: 'Document ready',
                 exportId: action.exportId,
                 filename: action.filename,
+                documentTitle: typeof action.documentTitle === 'string' ? action.documentTitle : null,
                 draftingStage: null,
             };
 
@@ -666,7 +670,7 @@ interface ExportContextValue {
     excludeItem: (nodeId: string, excluded: boolean) => void;
     setPreflight: (result: PreflightResult) => void;
     startDrafting: () => void;
-    complete: (exportId: string, filename: string) => void;
+    complete: (exportId: string, filename: string, documentTitle?: string) => void;
     setError: (message: string, errorCode?: string) => void;
     reset: () => void;
     /** Single orchestration entry for structured export. */
@@ -801,9 +805,9 @@ export function ExportProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'START_DRAFTING' });
     }, []);
 
-    /** Mark the export as successfully completed with its ID and filename. */
-    const complete = useCallback((exportId: string, filename: string) => {
-        dispatch({ type: 'COMPLETE', exportId, filename });
+    /** Mark the export as successfully completed with its ID, title, and filename. */
+    const complete = useCallback((exportId: string, filename: string, documentTitle?: string) => {
+        dispatch({ type: 'COMPLETE', exportId, filename, documentTitle });
     }, []);
 
     /** Transition to the error phase with a user-facing message and optional code. */

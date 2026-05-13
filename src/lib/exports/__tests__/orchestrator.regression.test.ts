@@ -152,10 +152,11 @@ describe('generateExportPDF — orchestrator', () => {
   it('generates deterministic filename', async () => {
     const { generateExportPDF } = await import('../generateExportPDF');
     const result = await generateExportPDF(makeValidInput());
-    // Filename should contain caseType, exportPath, date, and shortId
-    expect(result.filename).toContain('sapcr_modification');
-    expect(result.filename).toContain('court_document');
-    expect(result.filename).toMatch(/\.pdf$/);
+    expect(result.documentTitle).toBe('Motion To Modify Parent Child Relationship');
+    expect(result.filename).toBe('motion_to_modify_parent_child_relationship.pdf');
+    expect(result.filename).not.toContain('sapcr_modification');
+    expect(result.filename).not.toContain('run-abc123xyz');
+    expect(result.filename).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 
   it('recovers SAPCR child names from resolved identity before integrity assertion', async () => {

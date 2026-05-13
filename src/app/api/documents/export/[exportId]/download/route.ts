@@ -64,11 +64,14 @@ export async function GET(
         }
 
         const filename = doc.filename ?? 'export.pdf';
+        const disposition = request.nextUrl.searchParams.get('disposition') === 'inline'
+            ? 'inline'
+            : 'attachment';
         return new NextResponse(pdfResponse.body, {
             status: 200,
             headers: {
                 'Content-Type': doc.mimeType ?? 'application/pdf',
-                'Content-Disposition': `attachment; filename="${filename}"`,
+                'Content-Disposition': `${disposition}; filename="${filename}"`,
                 'Cache-Control': 'private, no-cache',
             },
         });

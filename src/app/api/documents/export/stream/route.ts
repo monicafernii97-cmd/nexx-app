@@ -61,6 +61,21 @@ import {
 
 export const maxDuration = 120; // Extended for GPT + PDF rendering
 
+function filenameToDisplayTitle(filename: unknown): string | null {
+    if (typeof filename !== 'string' || !filename.trim()) return null;
+    const withoutExtension = filename.replace(/\.pdf$/i, '');
+    const title = withoutExtension
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!title) return null;
+    return title
+        .toLowerCase()
+        .split(' ')
+        .map(word => word.replace(/^[a-z0-9]/, char => char.toUpperCase()))
+        .join(' ');
+}
+
 // ---------------------------------------------------------------------------
 // Request Types
 // ---------------------------------------------------------------------------
@@ -325,7 +340,8 @@ export async function POST(request: NextRequest) {
                         exportId: claimResult.exportId,
                         reused: true,
                         message: 'Export already completed — returning cached result.',
-                        filename: cachedExport?.filename ?? null,
+                        filename: typeof cachedExport?.filename === 'string' ? cachedExport.filename : 'export.pdf',
+                        documentTitle: filenameToDisplayTitle(cachedExport?.filename),
                         artifactVerified: true,
                         sha256: cachedExport?.sha256 ?? null,
                         sectionCount: null,
@@ -1080,6 +1096,7 @@ export async function POST(request: NextRequest) {
                 });
 
                 const filename = pipelineResult.filename;
+                const documentTitle = pipelineResult.documentTitle;
 
                 // Get upload URL from Convex
                 const uploadUrl = await convex.mutation(api.generatedDocumentsExport.generateExportUploadUrl, {});
@@ -1207,6 +1224,7 @@ export async function POST(request: NextRequest) {
                     type: 'complete',
                     exportId,
                     filename,
+                    documentTitle,
                     sectionCount: draftedSections.length,
                     aiDraftedCount,
                     lockedCount,

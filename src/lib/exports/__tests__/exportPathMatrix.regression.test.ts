@@ -11,7 +11,11 @@ import { assertRenderedExportStructure } from '../assertRenderedExportStructure'
 import type { CanonicalExportDocument, ExportPath } from '../types';
 import { PROFILE_REGISTRY } from '@/lib/jurisdiction/profiles/registry';
 import { assertExportProfile } from '@/lib/jurisdiction/assertProfileForPipeline';
-import { generateExportFilename } from '../generateExportPDF';
+import {
+  generateExportDisplayTitle,
+  generateExportFilename,
+  generateFilenameFromTitle,
+} from '../generateExportPDF';
 
 const profile = assertExportProfile(PROFILE_REGISTRY.get('us-default')!);
 
@@ -99,6 +103,23 @@ describe('export path matrix — all 5 paths', () => {
       });
     });
   }
+});
+
+describe('export filename/title generation', () => {
+  it('uses title case display titles and clean snake_case filenames without run IDs', () => {
+    const displayTitle = generateExportDisplayTitle("PETITIONER'S SECOND AMENDED MOTION FOR TEMPORARY ORDERS");
+    expect(displayTitle).toBe("Petitioner's Second Amended Motion For Temporary Orders");
+    expect(generateFilenameFromTitle(displayTitle)).toBe('petitioners_second_amended_motion_for_temporary_orders.pdf');
+
+    const filename = generateExportFilename({
+      caseType: 'personal_injury',
+      exportPath: 'court_document',
+      runId: 'abc123xyz',
+    });
+    expect(filename).toBe('personal_injury_court_document.pdf');
+    expect(filename).not.toContain('abc123xyz');
+    expect(filename).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════

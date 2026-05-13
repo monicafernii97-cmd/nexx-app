@@ -54,6 +54,7 @@ interface SSECompleteEvent {
     type: 'complete';
     exportId: string;
     filename: string;
+    documentTitle?: string;
     sectionCount: number;
     aiDraftedCount: number;
     lockedCount: number;
@@ -218,6 +219,7 @@ export function useDraftingStream({ dispatch }: ContextDispatchers) {
                                 type: 'COMPLETE',
                                 exportId: event.exportId,
                                 filename: event.filename,
+                                documentTitle: event.documentTitle,
                             });
                             // Also set final preflight
                             if (event.preflightSummary) {

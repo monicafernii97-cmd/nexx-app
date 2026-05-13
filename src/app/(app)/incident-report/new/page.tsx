@@ -30,15 +30,22 @@ import {
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { PlayAloudButton } from '@/components/voice';
+import { useToast } from '@/components/feedback/ToastProvider';
+import { useIncidentRecorder } from '@/hooks/useIncidentRecorder';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
+import { deriveIncidentVoiceDraft, type IncidentVoiceDraft } from '@/lib/incidents/voiceDraft';
 
 type Step = 'describe' | 'review' | 'confirmed';
+type VoiceSaveAction = 'incident' | 'timeline' | 'case_note' | 'exhibit_note';
 
 /** Premium multi-step incident creation form with AI-powered narrative analysis. */
 export default function NewIncidentPage() {
     const { userId } = useUser();
     const { activeCaseId } = useWorkspace();
     const router = useRouter();
+    const recorder = useIncidentRecorder();
+    const { showToast } = useToast();
     const [step, setStep] = useState<Step>('describe');
     const [narrative, setNarrative] = useState('');
     const [tags, setTags] = useState<string[]>([]);
@@ -61,71 +68,79 @@ export default function NewIncidentPage() {
     const [analyzeError, setAnalyzeError] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [voiceSaving, setVoiceSaving] = useState<VoiceSaveAction | null>(null);
     const [createdId, setCreatedId] = useState<Id<'incidents'> | null>(null);
+    const [voiceDraft, setVoiceDraft] = useState<IncidentVoiceDraft | null>(null);
 
     // ── Speech Recognition ──
-    const [isListening, setIsListening] = useState(false);
-    const [speechSupported, setSpeechSupported] = useState(true);
-    const recognitionRef = useRef<SpeechRecognition | null>(null);
-
-    useEffect(() => {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            setSpeechSupported(false);
-            return;
-        }
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
-            const finalChunks: string[] = [];
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const result = event.results[i];
-                if (result.isFinal) {
-                    finalChunks.push(result[0].transcript.trim());
-                }
-            }
-            if (finalChunks.length) {
-                setNarrative((prev) => `${prev}${prev ? ' ' : ''}${finalChunks.join(' ')}`);
-            }
-        };
-
-        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-            console.error('Speech recognition error:', event.error);
-            setIsListening(false);
-        };
-
-        recognition.onend = () => {
-            setIsListening(false);
-        };
-
-        recognitionRef.current = recognition;
-
-        return () => {
-            recognition.abort();
-        };
-    }, []);
-
-    const toggleListening = useCallback(() => {
-        if (!recognitionRef.current) return;
-        if (isListening) {
-            recognitionRef.current.stop();
-            setIsListening(false);
-        } else {
-            try {
-                recognitionRef.current.start();
-                setIsListening(true);
-            } catch (err) {
-                console.error('Failed to start speech recognition:', err);
-            }
-        }
-    }, [isListening]);
+    const transcribedBlobRef = useRef<Blob | null>(null);
 
     const createIncident = useMutation(api.incidents.create);
     const updateIncident = useMutation(api.incidents.update);
     const confirmIncident = useMutation(api.incidents.confirm);
+    const createTimelineCandidate = useMutation(api.timelineCandidates.create);
+    const saveCaseMemory = useMutation(api.caseMemory.save);
+
+    const refreshVoiceDraft = useCallback((overrides: Partial<IncidentVoiceDraft> = {}) => {
+        const draft = deriveIncidentVoiceDraft({
+            transcript: narrative,
+            date,
+            time,
+            location,
+            witnesses,
+            courtSummary,
+            behavioralAnalysis,
+            strategicResponse,
+        });
+        setVoiceDraft({ ...draft, ...overrides });
+    }, [behavioralAnalysis, courtSummary, date, location, narrative, strategicResponse, time, witnesses]);
+
+    useEffect(() => {
+        if (!recorder.audioBlob || transcribedBlobRef.current === recorder.audioBlob) return;
+        transcribedBlobRef.current = recorder.audioBlob;
+
+        void recorder.transcribe(recorder.audioBlob).then((result) => {
+            if (!result?.text) return;
+            const text = result.text.trim();
+            setNarrative((prev) => `${prev}${prev.trim() ? '\n\n' : ''}${text}`);
+            setVoiceDraft(deriveIncidentVoiceDraft({
+                transcript: text,
+                date,
+                time,
+                location,
+                witnesses,
+                courtSummary,
+                behavioralAnalysis,
+                strategicResponse,
+            }));
+            showToast({
+                variant: 'success',
+                title: 'Voice memo transcribed',
+                description: 'The transcript is editable before saving or analysis.',
+            });
+        });
+    }, [behavioralAnalysis, courtSummary, date, location, recorder, showToast, strategicResponse, time, witnesses]);
+
+    useEffect(() => {
+        if (!recorder.error?.message) return;
+        showToast({
+            variant: recorder.status === 'permission_denied' ? 'warning' : 'error',
+            title: recorder.status === 'permission_denied' ? 'Microphone blocked' : 'Voice recording failed',
+            description: recorder.error.message,
+        });
+    }, [recorder.error, recorder.status, showToast]);
+
+    /** Start or stop a longer voice memo recording for server-side transcription. */
+    const toggleIncidentRecording = useCallback(() => {
+        if (recorder.isRecording) {
+            recorder.stop();
+            return;
+        }
+        void recorder.start();
+    }, [recorder]);
+    const isListening = recorder.isRecording;
+    const speechSupported = recorder.status !== 'permission_denied';
+    const toggleListening = toggleIncidentRecording;
 
     const handleAnalyze = async () => {
         if (!narrative.trim()) return;
@@ -161,6 +176,16 @@ export default function NewIncidentPage() {
             setBehavioralAnalysis(data.behavioralAnalysis || '');
             setStrategicResponse(data.strategicResponse || '');
             setTags(data.tags || []);
+            setVoiceDraft(deriveIncidentVoiceDraft({
+                transcript: narrative.trim(),
+                date,
+                time,
+                location,
+                witnesses,
+                courtSummary: data.courtSummary || '',
+                behavioralAnalysis: data.behavioralAnalysis || '',
+                strategicResponse: data.strategicResponse || '',
+            }));
             setStep('review');
         } catch (error) {
             console.error('Analysis error:', error);
@@ -212,6 +237,11 @@ export default function NewIncidentPage() {
                 });
                 setCreatedId(incidentId);
             }
+            showToast({
+                variant: 'success',
+                title: 'Incident draft saved',
+                destination: { label: 'View incidents', href: '/incident-report' },
+            });
             router.push('/incident-report');
         } catch (error) {
             console.error('Draft save error:', error);
@@ -266,6 +296,12 @@ export default function NewIncidentPage() {
             }
 
             await confirmIncident({ id: incidentId });
+            showToast({
+                variant: 'success',
+                title: 'Incident saved',
+                description: 'The record is confirmed in your incident timeline.',
+                destination: { label: 'View incidents', href: '/incident-report' },
+            });
             setStep('confirmed');
         } catch (error) {
             console.error('Publish error:', error);
@@ -274,6 +310,98 @@ export default function NewIncidentPage() {
             setIsSaving(false);
         }
     };
+
+    /** Save the structured voice draft as a timeline candidate for later confirmation. */
+    const handleSaveTimelineCandidate = useCallback(async () => {
+        const draft = voiceDraft ?? deriveIncidentVoiceDraft({ transcript: narrative, date, time, location, witnesses, courtSummary, behavioralAnalysis, strategicResponse });
+        if (!activeCaseId || !draft.timelineDescription.trim()) return;
+        setVoiceSaving('timeline');
+        try {
+            await createTimelineCandidate({
+                title: draft.timelineTitle,
+                description: draft.timelineDescription,
+                eventDate: draft.eventDate || undefined,
+                caseId: activeCaseId,
+                tags: tags.length ? tags : undefined,
+                requestId: `incident-voice-timeline:${Date.now()}`,
+            });
+            showToast({
+                variant: 'success',
+                title: 'Timeline candidate saved',
+                description: 'Review and confirm it from the timeline workspace.',
+                destination: { label: 'Open timeline', href: '/chat/timeline' },
+            });
+        } catch (error) {
+            showToast({
+                variant: 'error',
+                title: 'Timeline save failed',
+                description: error instanceof Error ? error.message : 'Please try again.',
+            });
+        } finally {
+            setVoiceSaving(null);
+        }
+    }, [activeCaseId, behavioralAnalysis, courtSummary, createTimelineCandidate, date, location, narrative, showToast, strategicResponse, tags, time, voiceDraft, witnesses]);
+
+    /** Save the structured voice draft as a general case note. */
+    const handleSaveCaseNote = useCallback(async () => {
+        const draft = voiceDraft ?? deriveIncidentVoiceDraft({ transcript: narrative, date, time, location, witnesses, courtSummary, behavioralAnalysis, strategicResponse });
+        if (!activeCaseId || !draft.summary.trim()) return;
+        setVoiceSaving('case_note');
+        try {
+            await saveCaseMemory({
+                type: 'case_note',
+                title: draft.title,
+                content: `${draft.summary}\n\nWhy it matters: ${draft.whyItMatters}`,
+                caseId: activeCaseId,
+                metadataJson: JSON.stringify({ source: 'incident_voice_dictation', peopleInvolved: draft.peopleInvolved, eventDate: draft.eventDate }),
+                requestId: `incident-voice-case-note:${Date.now()}`,
+            });
+            showToast({
+                variant: 'success',
+                title: 'Case note saved',
+                destination: { label: 'Open workspace', href: '/chat' },
+            });
+        } catch (error) {
+            showToast({
+                variant: 'error',
+                title: 'Case note save failed',
+                description: error instanceof Error ? error.message : 'Please try again.',
+            });
+        } finally {
+            setVoiceSaving(null);
+        }
+    }, [activeCaseId, behavioralAnalysis, courtSummary, date, location, narrative, saveCaseMemory, showToast, strategicResponse, time, voiceDraft, witnesses]);
+
+    /** Save the structured voice draft as an exhibit note for DocuVault assembly. */
+    const handleSaveExhibitNote = useCallback(async () => {
+        const draft = voiceDraft ?? deriveIncidentVoiceDraft({ transcript: narrative, date, time, location, witnesses, courtSummary, behavioralAnalysis, strategicResponse });
+        if (!activeCaseId || !draft.summary.trim()) return;
+        setVoiceSaving('exhibit_note');
+        try {
+            await saveCaseMemory({
+                type: 'exhibit_note',
+                title: `Exhibit note - ${draft.title}`,
+                content: `${draft.summary}\n\nPeople involved: ${draft.peopleInvolved.join(', ') || 'Not specified'}\nWhy it matters: ${draft.whyItMatters}`,
+                caseId: activeCaseId,
+                metadataJson: JSON.stringify({ source: 'incident_voice_dictation', eventDate: draft.eventDate }),
+                requestId: `incident-voice-exhibit-note:${Date.now()}`,
+            });
+            showToast({
+                variant: 'success',
+                title: 'Exhibit note saved',
+                description: 'It is available as case memory for DocuVault/exhibit work.',
+                destination: { label: 'Open DocuVault', href: '/docuvault' },
+            });
+        } catch (error) {
+            showToast({
+                variant: 'error',
+                title: 'Exhibit note save failed',
+                description: error instanceof Error ? error.message : 'Please try again.',
+            });
+        } finally {
+            setVoiceSaving(null);
+        }
+    }, [activeCaseId, behavioralAnalysis, courtSummary, date, location, narrative, saveCaseMemory, showToast, strategicResponse, time, voiceDraft, witnesses]);
 
     const severityLabels = ['Low', 'Medium', 'High'];
     const severityColors = ['var(--emerald)', 'var(--warning)', 'var(--rose)'];
@@ -388,12 +516,26 @@ export default function NewIncidentPage() {
                         {/* Manual Narrative */}
                         <div>
                             <label className="text-[12px] font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-white">
-                                <PencilSimple size={14} /> Manual Narrative
+                                <PencilSimple size={14} /> Editable Transcript
                             </label>
                             <div className="relative">
                                 <textarea
                                     value={narrative}
-                                    onChange={(e) => setNarrative(e.target.value)}
+                                    onChange={(e) => {
+                                        setNarrative(e.target.value);
+                                        if (e.target.value.trim()) {
+                                            setVoiceDraft(deriveIncidentVoiceDraft({
+                                                transcript: e.target.value,
+                                                date,
+                                                time,
+                                                location,
+                                                witnesses,
+                                                courtSummary,
+                                                behavioralAnalysis,
+                                                strategicResponse,
+                                            }));
+                                        }
+                                    }}
                                     placeholder="Describe the incident with precision — what happened, who was present, what was said or done..."
                                     rows={6}
                                     className="input-premium resize-none w-full bg-white text-[#0A1128] placeholder:text-[#0A1128]/50 text-[15px] leading-relaxed rounded-[1.5rem] focus:ring-2 focus:ring-[#1A4B9B] border-none shadow-inner"
@@ -403,6 +545,50 @@ export default function NewIncidentPage() {
                                 </p>
                             </div>
                         </div>
+
+                        {voiceDraft && (
+                            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-5 space-y-4">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <h3 className="text-[12px] font-bold tracking-[0.2em] uppercase text-white">Voice-to-case draft</h3>
+                                        <p className="text-[12px] text-white/55 mt-1">Editable fields derived from the transcript before saving.</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => refreshVoiceDraft()}
+                                        className="rounded-xl border border-white/10 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-white/70 hover:bg-white/10"
+                                    >
+                                        Refresh fields
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <label className="space-y-2">
+                                        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/60">Title</span>
+                                        <input value={voiceDraft.title} onChange={(e) => setVoiceDraft({ ...voiceDraft, title: e.target.value, timelineTitle: e.target.value })} className="input-premium bg-white text-[#0A1128] w-full rounded-xl border-none" />
+                                    </label>
+                                    <label className="space-y-2">
+                                        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/60">Event date</span>
+                                        <input type="date" value={voiceDraft.eventDate} onChange={(e) => setVoiceDraft({ ...voiceDraft, eventDate: e.target.value })} className="input-premium bg-white text-[#0A1128] w-full rounded-xl border-none" />
+                                    </label>
+                                    <label className="md:col-span-2 space-y-2">
+                                        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/60">Summary</span>
+                                        <textarea value={voiceDraft.summary} onChange={(e) => setVoiceDraft({ ...voiceDraft, summary: e.target.value, timelineDescription: e.target.value })} rows={3} className="input-premium resize-none bg-white text-[#0A1128] w-full rounded-xl border-none" />
+                                    </label>
+                                    <label className="space-y-2">
+                                        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/60">People involved</span>
+                                        <input value={voiceDraft.peopleInvolved.join(', ')} onChange={(e) => setVoiceDraft({ ...voiceDraft, peopleInvolved: e.target.value.split(',').map((name) => name.trim()).filter(Boolean) })} className="input-premium bg-white text-[#0A1128] w-full rounded-xl border-none" />
+                                    </label>
+                                    <label className="space-y-2">
+                                        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/60">Why it matters</span>
+                                        <textarea value={voiceDraft.whyItMatters} onChange={(e) => setVoiceDraft({ ...voiceDraft, whyItMatters: e.target.value })} rows={3} className="input-premium resize-none bg-white text-[#0A1128] w-full rounded-xl border-none" />
+                                    </label>
+                                    <label className="md:col-span-2 space-y-2">
+                                        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/60">Timeline candidate</span>
+                                        <textarea value={voiceDraft.timelineDescription} onChange={(e) => setVoiceDraft({ ...voiceDraft, timelineDescription: e.target.value })} rows={3} className="input-premium resize-none bg-white text-[#0A1128] w-full rounded-xl border-none" />
+                                    </label>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Date & Time */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -563,12 +749,15 @@ export default function NewIncidentPage() {
                                 <h3 className="text-[13px] font-bold tracking-[0.2em] uppercase text-sapphire flex items-center gap-2">
                                     <ListChecks size={16} weight="bold" className="text-champagne drop-shadow-sm" /> Court-Ready Summary
                                 </h3>
-                                <button
-                                    onClick={() => setIsEditing(!isEditing)}
-                                    className="px-4 py-2 rounded-xl text-[12px] font-bold uppercase tracking-wider bg-cloud hover:bg-[rgba(10,22,41,0.08)] text-sapphire transition-colors flex items-center gap-2"
-                                >
-                                    <PencilSimple size={14} /> {isEditing ? 'Done' : 'Edit'}
-                                </button>
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                    <PlayAloudButton text={courtSummary} disabled={!courtSummary.trim()} />
+                                    <button
+                                        onClick={() => setIsEditing(!isEditing)}
+                                        className="px-4 py-2 rounded-xl text-[12px] font-bold uppercase tracking-wider bg-cloud hover:bg-[rgba(10,22,41,0.08)] text-sapphire transition-colors flex items-center gap-2"
+                                    >
+                                        <PencilSimple size={14} /> {isEditing ? 'Done' : 'Edit'}
+                                    </button>
+                                </div>
                             </div>
                             {isEditing ? (
                                 <textarea
@@ -639,6 +828,29 @@ export default function NewIncidentPage() {
                                 </div>
                             )}
                         </div>
+
+                        {voiceDraft && (
+                            <div className="card-premium p-5">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <h3 className="text-[12px] font-bold tracking-[0.2em] uppercase text-sapphire">Voice-to-case actions</h3>
+                                        <p className="text-[12px] text-sapphire/60 mt-1">Save the reviewed transcript into existing case workspaces.</p>
+                                    </div>
+                                    <PlayAloudButton text={`${voiceDraft.summary}\n\n${voiceDraft.whyItMatters}`} />
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+                                    <button type="button" onClick={handleSaveTimelineCandidate} disabled={voiceSaving !== null || !activeCaseId} className="rounded-xl border border-[rgba(10,22,41,0.08)] bg-cloud px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-sapphire hover:bg-[rgba(10,22,41,0.06)] disabled:opacity-45">
+                                        {voiceSaving === 'timeline' ? 'Saving...' : 'Save Timeline Candidate'}
+                                    </button>
+                                    <button type="button" onClick={handleSaveCaseNote} disabled={voiceSaving !== null || !activeCaseId} className="rounded-xl border border-[rgba(10,22,41,0.08)] bg-cloud px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-sapphire hover:bg-[rgba(10,22,41,0.06)] disabled:opacity-45">
+                                        {voiceSaving === 'case_note' ? 'Saving...' : 'Save Case Note'}
+                                    </button>
+                                    <button type="button" onClick={handleSaveExhibitNote} disabled={voiceSaving !== null || !activeCaseId} className="rounded-xl border border-[rgba(10,22,41,0.08)] bg-cloud px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-sapphire hover:bg-[rgba(10,22,41,0.06)] disabled:opacity-45">
+                                        {voiceSaving === 'exhibit_note' ? 'Saving...' : 'Save Exhibit Note'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Error display for review step */}
                         {analyzeError && (

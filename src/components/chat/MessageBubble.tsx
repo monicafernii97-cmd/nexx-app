@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useCallback, useMemo, useId } from 'react'
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { NexxArtifacts, LegalConfidence, JudgeSimulationResult, OppositionSimulationResult } from '@/lib/types';
+import { PlayAloudButton } from '@/components/voice';
 import { AssistantMessageCard } from './AssistantMessageCard';
 import type { AssistantResponseViewModel, ActionType, DetectedPattern, LocalProcedureInfo } from '@/lib/ui-intelligence/types';
 
@@ -529,12 +530,19 @@ export default function MessageBubble({
             <div className="flex-1 max-w-4xl min-w-0 pr-4">
                 {/* Structured response rendering (AssistantMessageCard) */}
                 {structuredViewModel && !isStreaming ? (
-                    <AssistantMessageCard
-                        viewModel={structuredViewModel}
-                        patterns={detectedPatterns}
-                        procedureInfo={procedureInfo}
-                        onAction={(action, content) => onAction?.(action, content)}
-                    />
+                    <>
+                        <AssistantMessageCard
+                            viewModel={structuredViewModel}
+                            patterns={detectedPatterns}
+                            procedureInfo={procedureInfo}
+                            onAction={(action, content) => onAction?.(action, content)}
+                        />
+                        {content.trim() && (
+                            <div className="mt-3">
+                                <PlayAloudButton text={content} />
+                            </div>
+                        )}
+                    </>
                 ) : (
                     <>
                 {/* Confidence badge — rendered above the message */}
@@ -554,6 +562,12 @@ export default function MessageBubble({
                 </div>
 
                 {/* ── Artifact Panels ── */}
+                {!isStreaming && content.trim() && (
+                    <div className="mt-3">
+                        <PlayAloudButton text={content} />
+                    </div>
+                )}
+
                 {hasAnyArtifact && !isStreaming && (
                     <div className="mt-4 space-y-1">
                         {artifacts.draftReady && (

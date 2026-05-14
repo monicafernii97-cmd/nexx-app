@@ -12,15 +12,13 @@ import {
     Archive,
     ChatCircleDots,
     ChatTeardropDots,
-    Clock,
-    Plus,
     SidebarSimple,
     Trash,
     X,
 } from '@phosphor-icons/react';
 import { formatDistanceToNow } from 'date-fns';
 import ChatInput from '@/components/chat/ChatInput';
-import { PageContainer } from '@/components/layout/PageLayout';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import { useWorkspace } from '@/lib/workspace-context';
 import { consumeCourtHandoff, buildHandoffPrompt, HANDOFF_FALLBACK_MESSAGE } from '@/lib/exports/courtHandoff';
 
@@ -47,7 +45,7 @@ function ChatListContent() {
     const createConversation = useMutation(api.conversations.create);
     const removeConversation = useMutation(api.conversations.remove);
     const [isCreating, setIsCreating] = useState(false);
-    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(() => searchParams.get('history') === '1');
     const [deletingId, setDeletingId] = useState<Id<'conversations'> | null>(null);
     const handoffProcessedRef = useRef(false);
 
@@ -84,29 +82,12 @@ function ChatListContent() {
     const archivedConversations = isLoadingConversations ? [] : conversations.filter((c) => c.status === 'archived');
     const totalConversations = activeConversations.length + archivedConversations.length;
 
-    const createBlankConversation = async () => {
-        if (!activeCaseId || isCreating) return;
-        setIsCreating(true);
-        try {
-            const id = await createConversation({
-                title: 'New Conversation',
-                mode: 'general',
-                caseId: activeCaseId,
-            });
-            router.push(`/chat/${id}`);
-        } catch (error) {
-            console.error('Failed to create conversation:', error);
-        } finally {
-            setIsCreating(false);
-        }
-    };
-
     const handleSendNewChat = async (message: string) => {
         if (!activeCaseId || isCreating) return;
         setIsCreating(true);
         try {
             const id = await createConversation({
-                title: 'New Conversation',
+                title: buildConversationTitle(message),
                 mode: 'general',
                 caseId: activeCaseId,
             });
@@ -138,67 +119,48 @@ function ChatListContent() {
     return (
         <PageContainer lockHeight>
             <div className="flex min-h-0 flex-1 flex-col">
-                <header className="mb-6 flex items-center justify-between gap-4">
-                    <div className="min-w-0">
-                        <div className="mb-3 flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
-                                <ChatTeardropDots size={20} weight="regular" className="text-indigo-300" />
-                            </div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-white/35">
-                                Nexx Chat
-                            </p>
-                        </div>
-                        <h1 className="font-serif text-3xl leading-tight tracking-tight text-white md:text-4xl">
-                            What do you want to work through?
-                        </h1>
-                    </div>
+                <PageHeader
+                    icon={ChatTeardropDots}
+                    title="Chat"
+                    description="Secure guidance for the next right step."
+                    rightElement={(
+                        <button
+                            type="button"
+                            onClick={() => setIsHistoryOpen(true)}
+                            className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-[11px] font-bold uppercase tracking-widest text-white/65 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
+                            aria-label="Open chat history"
+                        >
+                            <SidebarSimple size={16} />
+                            <span className="hidden sm:inline">History</span>
+                            <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[9px] text-white/45">
+                                {isLoadingConversations ? '...' : totalConversations}
+                            </span>
+                        </button>
+                    )}
+                />
 
-                    <button
-                        type="button"
-                        onClick={() => setIsHistoryOpen(true)}
-                        className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-[11px] font-bold uppercase tracking-widest text-white/65 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
-                        aria-label="Open chat history"
-                    >
-                        <SidebarSimple size={16} />
-                        <span className="hidden sm:inline">History</span>
-                        <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[9px] text-white/45">
-                            {isLoadingConversations ? '...' : totalConversations}
-                        </span>
-                    </button>
-                </header>
-
-                <main className="flex min-h-0 flex-1 flex-col justify-center">
+                <main className="flex min-h-0 flex-1 flex-col justify-center pb-8">
                     <motion.section
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="mx-auto flex w-full max-w-3xl flex-col gap-5"
                     >
+                        <div className="mx-auto flex w-full max-w-sm flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-7 text-center shadow-[0_8px_32px_rgba(0,0,0,0.20)]">
+                            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/5">
+                                <span className="pb-1 font-serif text-xl font-bold text-white/70"><i>N</i></span>
+                            </div>
+                            <h2 className="mb-2 text-sm font-bold text-white/90">Secure Counsel Authorized</h2>
+                            <p className="text-xs font-medium leading-relaxed text-white/40">
+                                Start fresh here. Older conversations stay available in History.
+                            </p>
+                        </div>
+
                         <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-2 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl">
                             <ChatInput
                                 onSend={handleSendNewChat}
                                 disabled={!isWorkspaceReady || isCreating}
                                 placeholder={isCreating ? 'Opening a new conversation...' : 'Ask NEXX anything...'}
                             />
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-center gap-2">
-                            <button
-                                type="button"
-                                onClick={createBlankConversation}
-                                disabled={!isWorkspaceReady || isCreating}
-                                className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 text-[10px] font-bold uppercase tracking-widest text-white/55 transition hover:border-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
-                            >
-                                <Plus size={14} />
-                                {isCreating ? 'Opening' : 'Blank Chat'}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setIsHistoryOpen(true)}
-                                className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[10px] font-bold uppercase tracking-widest text-white/45 transition hover:bg-white/[0.04] hover:text-white/75"
-                            >
-                                <Clock size={14} />
-                                Recent Conversations
-                            </button>
                         </div>
                     </motion.section>
                 </main>
@@ -215,6 +177,15 @@ function ChatListContent() {
             />
         </PageContainer>
     );
+}
+
+/** Build a compact conversation title from the user's first prompt. */
+function buildConversationTitle(message: string) {
+    const normalized = message.replace(/\s+/g, ' ').trim();
+    if (!normalized) return 'New Chat';
+    const withoutTrailingPunctuation = normalized.replace(/[.!?]+$/g, '');
+    const words = withoutTrailingPunctuation.split(' ').slice(0, 8).join(' ');
+    return words.length > 64 ? `${words.slice(0, 61).trim()}...` : words;
 }
 
 interface HistoryDrawerProps {

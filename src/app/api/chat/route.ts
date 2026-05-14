@@ -27,6 +27,15 @@ import type { CaseGraph } from '@/lib/nexx/caseGraph';
 
 const MAX_MESSAGE_LENGTH = 100_000;
 
+/** Build a compact, content-based title for conversations that still use a placeholder. */
+function buildConversationTitle(message: string) {
+  const normalized = message.replace(/\s+/g, ' ').trim();
+  if (!normalized) return 'New Chat';
+  const withoutTrailingPunctuation = normalized.replace(/[.!?]+$/g, '');
+  const words = withoutTrailingPunctuation.split(' ').slice(0, 8).join(' ');
+  return words.length > 64 ? `${words.slice(0, 61).trim()}...` : words;
+}
+
 /**
  * Vercel Pro: 300s timeout for AI responses.
  * Non-streaming structured output requires the full response before
@@ -501,6 +510,11 @@ export async function POST(req: NextRequest) {
             confidence: parsedResponse.artifacts.confidence,
           };
 
+          const shouldUpdateConversationTitle =
+            isFirstTurn ||
+            conversation.title === 'New Conversation' ||
+            conversation.title === 'New Chat';
+
           // ── Step 13: Save user message to Convex ──
           try {
             await convex.mutation(api.messages.createMessage, {
@@ -510,6 +524,17 @@ export async function POST(req: NextRequest) {
               mode: routeMode,
               requestId: `${turnRequestId}-user`,
             });
+
+            if (shouldUpdateConversationTitle) {
+              try {
+                await convex.mutation(api.conversations.updateTitle, {
+                  id: typedConversationId,
+                  title: buildConversationTitle(message),
+                });
+              } catch (titleError) {
+                console.warn('[Chat] Failed to update conversation title:', titleError);
+              }
+            }
           } catch (err) {
             console.warn('[Chat] Failed to save user message:', err);
           }

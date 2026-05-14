@@ -13,6 +13,7 @@ import {
   CircleNotch
 } from '@phosphor-icons/react';
 import DiffViewer from './DiffViewer';
+import { PlayAloudButton } from '@/components/voice';
 import type { CourtDocumentSection } from '@/lib/court-documents/types';
 
 interface SectionBoxProps {
@@ -112,6 +113,9 @@ export default function SectionBox({
         </div>
 
         <div className="flex items-center gap-2">
+          {content.trim() && status !== 'empty' && (
+            <PlayAloudButton text={content} />
+          )}
           <button 
             onClick={handleEdit}
             disabled={status === 'locked' || isLoading}

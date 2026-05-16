@@ -132,6 +132,9 @@ export async function GET(request: Request) {
                 const tagLabels = incident.tags.map(t => categoryLabelByValue.get(t) || t.replace(/_/g, ' '));
                 tagsHtml = `<br/><small style="color: #666;"><strong>Tags:</strong> ${escapeHtml(tagLabels.join(', '))}</small>`;
             }
+            const evidenceHtml = incident.evidence && incident.evidence.length > 0
+                ? `<br/><small style="color: #666;"><strong>Attached Media:</strong> ${escapeHtml(incident.evidence.join(' '))}</small>`
+                : '';
             
             timelineRows += `
                 <tr>
@@ -140,6 +143,7 @@ export async function GET(request: Request) {
                         <strong>${escapeHtml(catLabel)}</strong><br/>
                         ${escapeHtml(incident.courtSummary || incident.narrative || '')}
                         ${tagsHtml}
+                        ${evidenceHtml}
                     </td>
                 </tr>
             `;

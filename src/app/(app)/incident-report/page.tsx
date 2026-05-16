@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, type ChangeEvent } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
@@ -31,6 +31,52 @@ import '@/styles/pipelines.css';
 /** Structured error for stable code-based matching instead of brittle string comparisons. */
 type ProcessError = { code: 'empty_narrative' | 'missing_case' | 'invalid_datetime' | 'generic'; message: string } | null;
 type CaptureStep = 'describe' | 'review' | 'confirmed';
+type MediaAttachmentStatus = 'uploading' | 'analyzing' | 'ready' | 'failed';
+type MediaAttachment = {
+    id: string;
+    fileName: string;
+    mimeType: string;
+    size: number;
+    status: MediaAttachmentStatus;
+    documentId?: Id<'documents'>;
+    analysis?: string;
+    error?: string;
+};
+
+const ACCEPTED_MEDIA_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const MEDIA_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
+const MAX_MEDIA_SIZE = 10 * 1024 * 1024;
+
+const getAttachmentId = (file: File) => {
+    const randomPart = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2);
+    return `${file.name}-${file.size}-${file.lastModified}-${randomPart}`;
+};
+
+const formatFileSize = (bytes: number) => {
+    if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const analyzeImageLocally = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+        const objectUrl = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+            resolve([
+                `Image attachment "${file.name}" was stored as photo evidence for this incident.`,
+                `File type: ${file.type}. Size: ${formatFileSize(file.size)}. Dimensions: ${image.naturalWidth} x ${image.naturalHeight}px.`,
+                'Image metadata was captured and saved with the incident record for review.',
+            ].join(' '));
+        };
+        image.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error('The image could not be read. Try a different image file.'));
+        };
+        image.src = objectUrl;
+    });
 
 const captureSteps: { id: CaptureStep; label: string }[] = [
     { id: 'describe', label: 'Describe' },
@@ -68,7 +114,9 @@ export default function IncidentReportPage() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [speechSupported, setSpeechSupported] = useState<boolean | null>(null);
+    const [mediaAttachments, setMediaAttachments] = useState<MediaAttachment[]>([]);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
+    const mediaInputRef = useRef<HTMLInputElement | null>(null);
     const stepRef = useRef<CaptureStep>(step);
 
     const [processError, setProcessError] = useState<ProcessError>(null);
@@ -88,6 +136,10 @@ export default function IncidentReportPage() {
     );
     const createIncident = useMutation(api.incidents.create);
     const createCasePin = useMutation(api.casePins.create);
+    const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
+    const createDocument = useMutation(api.documents.create);
+    const updateDocument = useMutation(api.documents.update);
+    const removeDocument = useMutation(api.documents.remove);
     const dateTimeIsValid = isValidIncidentDateTime(date, time);
 
     const stopSpeechRecognition = useCallback(() => {
@@ -198,6 +250,112 @@ export default function IncidentReportPage() {
         setStep('review');
     }, [narrative, activeCaseId, date, time, stopSpeechRecognition]);
 
+    const updateAttachment = useCallback((id: string, patch: Partial<MediaAttachment>) => {
+        setMediaAttachments((prev) =>
+            prev.map((attachment) => attachment.id === id ? { ...attachment, ...patch } : attachment)
+        );
+    }, []);
+
+    const handleAttachMedia = useCallback(() => {
+        mediaInputRef.current?.click();
+    }, []);
+
+    const handleMediaSelected = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+        const selectedFiles = Array.from(event.target.files ?? []);
+        event.target.value = '';
+        if (!selectedFiles.length) return;
+        if (!activeCaseId) {
+            setProcessError({ code: 'missing_case', message: 'Please select or create a case before attaching media.' });
+            return;
+        }
+        setProcessError(null);
+
+        selectedFiles.forEach((file) => {
+            const id = getAttachmentId(file);
+            const baseAttachment: MediaAttachment = {
+                id,
+                fileName: file.name,
+                mimeType: file.type || 'application/octet-stream',
+                size: file.size,
+                status: 'uploading',
+            };
+
+            setMediaAttachments((prev) => [...prev, baseAttachment]);
+
+            if (!ACCEPTED_MEDIA_TYPES.has(file.type)) {
+                updateAttachment(id, {
+                    status: 'failed',
+                    error: 'Unsupported file type. Attach JPG, PNG, WEBP, or GIF images.',
+                });
+                return;
+            }
+
+            if (file.size > MAX_MEDIA_SIZE) {
+                updateAttachment(id, {
+                    status: 'failed',
+                    error: 'File is too large. Attach an image under 10 MB.',
+                });
+                return;
+            }
+
+            void (async () => {
+                try {
+                    const uploadUrl = await generateUploadUrl({});
+                    const uploadResponse = await fetch(uploadUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': file.type },
+                        body: file,
+                    });
+                    const uploadResult = await uploadResponse.json();
+                    const storageId = uploadResult?.storageId as Id<'_storage'> | undefined;
+                    if (!uploadResponse.ok || !storageId) {
+                        throw new Error('Media upload failed.');
+                    }
+
+                    updateAttachment(id, { status: 'analyzing' });
+                    const analysis = await analyzeImageLocally(file);
+                    const documentId = await createDocument({
+                        title: file.name,
+                        type: 'photo_evidence',
+                        content: analysis,
+                        storageId,
+                        mimeType: file.type,
+                        fileSize: file.size,
+                        caseId: activeCaseId,
+                    });
+                    updateAttachment(id, {
+                        status: 'ready',
+                        documentId,
+                        analysis,
+                        error: undefined,
+                    });
+                } catch (err) {
+                    updateAttachment(id, {
+                        status: 'failed',
+                        error: err instanceof Error ? err.message : 'Media analysis failed.',
+                    });
+                }
+            })();
+        });
+    }, [activeCaseId, createDocument, generateUploadUrl, updateAttachment]);
+
+    const handleRemoveMedia = useCallback((id: string) => {
+        const attachment = mediaAttachments.find((item) => item.id === id);
+        setMediaAttachments((prev) => prev.filter((attachment) => attachment.id !== id));
+        if (attachment?.documentId) {
+            void removeDocument({ id: attachment.documentId }).catch((err) => {
+                console.error('[IncidentIntake] Failed to remove attached media document:', err);
+            });
+        }
+    }, [mediaAttachments, removeDocument]);
+
+    const mediaEvidence = useMemo(
+        () => mediaAttachments
+            .filter((attachment) => attachment.status === 'ready' && attachment.analysis)
+            .map((attachment) => `Attached media (${attachment.fileName}): ${attachment.analysis}`),
+        [mediaAttachments],
+    );
+
     /** Process the incident narrative and save to Convex. */
     const handleProcess = useCallback(async () => {
         const trimmed = narrative.trim();
@@ -219,15 +377,31 @@ export default function IncidentReportPage() {
         stopSpeechRecognition();
 
         try {
-            await createIncident({
+            const incidentId = await createIncident({
                 narrative: trimmed,
                 severity: 1,
                 date: normalizedDate,
                 time: normalizedTime,
                 caseId: activeCaseId,
+                evidence: mediaEvidence.length ? mediaEvidence : undefined,
             });
 
+            const linkedDocuments = mediaAttachments.filter(
+                (attachment): attachment is MediaAttachment & { documentId: Id<'documents'> } => Boolean(attachment.documentId)
+            );
+            if (linkedDocuments.length) {
+                await Promise.allSettled(
+                    linkedDocuments.map((attachment) =>
+                        updateDocument({
+                            id: attachment.documentId,
+                            incidentId,
+                        })
+                    )
+                );
+            }
+
             setNarrative('');
+            setMediaAttachments([]);
             setStep('confirmed');
         } catch (err) {
             console.error('[IncidentIntake] Create failed:', err);
@@ -235,7 +409,7 @@ export default function IncidentReportPage() {
         } finally {
             setIsProcessing(false);
         }
-    }, [narrative, activeCaseId, date, time, createIncident, handleReview, stopSpeechRecognition]);
+    }, [narrative, activeCaseId, date, time, createIncident, handleReview, stopSpeechRecognition, mediaEvidence, mediaAttachments, updateDocument]);
 
     /** Pin an incident to the case workspace. Prevents duplicate clicks. */
     const handleAddToWorkspace = useCallback(async (incident: { _id: Id<'incidents'>; narrative: string; date: string }) => {
@@ -422,10 +596,54 @@ export default function IncidentReportPage() {
                             </div>
 
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-2 border-t border-white/5">
-                                <button disabled className="flex items-center justify-center gap-2 text-white/20 cursor-not-allowed text-[11px] font-bold uppercase tracking-[0.2em] transition-all" title="Coming soon">
-                                    <PlusCircle size={18} weight="light" />
-                                    Attach Media
-                                </button>
+                                <div className="flex flex-col gap-2">
+                                    <input
+                                        ref={mediaInputRef}
+                                        type="file"
+                                        accept={MEDIA_ACCEPT}
+                                        multiple
+                                        className="sr-only"
+                                        onChange={handleMediaSelected}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleAttachMedia}
+                                        className="flex items-center justify-center sm:justify-start gap-2 text-white/65 hover:text-white text-[11px] font-bold uppercase tracking-[0.2em] transition-all"
+                                        title="Attach media"
+                                    >
+                                        <PlusCircle size={18} weight="light" />
+                                        Attach Media
+                                    </button>
+                                    {mediaAttachments.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 max-w-xl">
+                                            {mediaAttachments.map((attachment) => (
+                                                <div
+                                                    key={attachment.id}
+                                                    className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-white/70"
+                                                >
+                                                    <span className="max-w-[160px] truncate font-semibold">{attachment.fileName}</span>
+                                                    <span className={`font-bold uppercase ${
+                                                        attachment.status === 'ready'
+                                                            ? 'text-emerald-300'
+                                                            : attachment.status === 'failed'
+                                                                ? 'text-red-300'
+                                                                : 'text-amber-300'
+                                                    }`}>
+                                                        {attachment.status === 'ready' ? 'Analyzed' : attachment.status}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveMedia(attachment.id)}
+                                                        className="text-white/35 hover:text-white transition-colors"
+                                                        aria-label={`Remove ${attachment.fileName}`}
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                                 <button
                                     type="button"
                                     onClick={handleReview}
@@ -462,6 +680,29 @@ export default function IncidentReportPage() {
                                 <p className="text-[15px] leading-relaxed text-white/80 whitespace-pre-wrap font-serif">
                                     {narrative}
                                 </p>
+                                {mediaAttachments.length > 0 && (
+                                    <div className="rounded-xl bg-black/15 border border-white/10 p-4 space-y-3">
+                                        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/45">Attached media analysis</p>
+                                        {mediaAttachments.map((attachment) => (
+                                            <div key={attachment.id} className="space-y-1 text-[13px] leading-relaxed text-white/70">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="font-bold text-white/85">{attachment.fileName}</span>
+                                                    <span className={`text-[10px] font-bold uppercase tracking-[0.16em] ${
+                                                        attachment.status === 'ready'
+                                                            ? 'text-emerald-300'
+                                                            : attachment.status === 'failed'
+                                                                ? 'text-red-300'
+                                                                : 'text-amber-300'
+                                                    }`}>
+                                                        {attachment.status === 'ready' ? 'Analysis complete' : attachment.status}
+                                                    </span>
+                                                </div>
+                                                {attachment.analysis && <p className="text-white/65">{attachment.analysis}</p>}
+                                                {attachment.error && <p className="text-red-300">{attachment.error}</p>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             <div className="flex flex-col sm:flex-row gap-3">
                                 <button

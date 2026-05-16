@@ -14,10 +14,9 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
     ArrowLeft,
-    Lightning,
     Export,
     CheckCircle,
     Download,
@@ -61,10 +60,10 @@ function getExportLabel(exportPath: string | null | undefined): string {
     }
 }
 
-/** Derive a readable title from a saved PDF filename when the stream lacks one. */
-function titleFromFilename(filename: string | null | undefined): string | null {
-    if (!filename) return null;
-    const title = filename
+/** Format persisted filenames or document ids into a formal user-facing title. */
+function formatDocumentDisplayTitle(value: string | null | undefined): string | null {
+    if (!value) return null;
+    const title = value
         .replace(/\.pdf$/i, '')
         .replace(/[_-]+/g, ' ')
         .replace(/\s+/g, ' ')
@@ -1412,41 +1411,38 @@ function CompletedPhaseUI({
         ? `/api/documents/export/${state.exportId}/download`
         : null;
     const previewUrl = downloadUrl ? `${downloadUrl}?disposition=inline` : null;
-    const documentTitle = state.documentTitle
-        ?? titleFromFilename(state.filename)
+    const documentTitle = formatDocumentDisplayTitle(state.documentTitle)
+        ?? formatDocumentDisplayTitle(state.filename)
         ?? 'Generated Document';
     const preflightPassCount = state.preflight?.checks.filter(c => c.severity === 'pass').length ?? 0;
     const preflightWarnCount = state.preflight?.warningCount ?? 0;
     const preflightErrorCount = state.preflight?.errorCount ?? 0;
 
     return (
-        <div className="h-full overflow-y-auto p-6" style={{ scrollbarWidth: 'thin' }}>
-            <div className="mx-auto w-full max-w-6xl p-4 rounded-2xl bg-[rgba(10,17,40,0.8)] border border-white/10 backdrop-blur-xl">
+        <div className="flex h-full min-h-0 items-center justify-center overflow-hidden p-4 sm:p-6">
+            <div className="mx-auto flex max-h-[calc(100dvh-7rem)] w-full max-w-4xl flex-col rounded-2xl border border-white/10 bg-[rgba(10,17,40,0.88)] p-4 shadow-[0_18px_48px_rgba(0,0,0,0.25)] backdrop-blur-xl sm:p-5">
                 {/* Success header */}
-                <div className="flex items-center gap-4 mb-6">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-                        <CheckCircle size={28} weight="fill" className="text-emerald-400" />
+                <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15">
+                        <CheckCircle size={24} weight="fill" className="text-emerald-400" />
                     </div>
-                    <div>
-                        <h2 className="text-[18px] font-bold text-white">Export Complete</h2>
-                        <p className="text-[15px] font-semibold text-white/80">
+                    <div className="min-w-0">
+                        <h2 className="text-[16px] font-bold text-white">Export Complete</h2>
+                        <p className="truncate text-[13px] font-semibold text-white/75">
                             {documentTitle}
                         </p>
-                        {state.filename && (
-                            <p className="text-[12px] text-white/40">{state.filename}</p>
-                        )}
                     </div>
                 </div>
 
-                <div className="mb-6 min-h-[620px] overflow-hidden rounded-2xl border border-white/10 bg-white shadow-[0_18px_48px_rgba(0,0,0,0.25)]">
+                <div className="mb-4 min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-slate-50 shadow-[0_12px_32px_rgba(0,0,0,0.22)]">
                     {previewUrl ? (
                         <iframe
                             title={`${documentTitle} PDF preview`}
                             src={previewUrl}
-                            className="h-[72vh] min-h-[620px] w-full bg-white"
+                            className="h-full min-h-[340px] w-full bg-slate-50"
                         />
                     ) : (
-                        <div className="flex h-[620px] items-center justify-center bg-white">
+                        <div className="flex h-[340px] items-center justify-center bg-slate-50">
                             <p className="text-[13px] font-semibold text-slate-500">PDF preview unavailable.</p>
                         </div>
                     )}
@@ -1481,13 +1477,13 @@ function CompletedPhaseUI({
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                <div className="mb-3 grid gap-2 sm:grid-cols-3">
                     {previewUrl && (
                         <a
                             href={previewUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="flex-1 py-3 rounded-xl text-[13px] font-bold text-white/70 text-center bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white transition-all flex items-center justify-center gap-2"
+                            className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-[12px] font-bold text-white/70 transition-all hover:bg-white/10 hover:text-white"
                         >
                             <ArrowSquareOut size={16} />
                             Open Full Preview
@@ -1499,7 +1495,7 @@ function CompletedPhaseUI({
                         <a
                             href={downloadUrl}
                             download={state.filename ?? 'export.pdf'}
-                            className="flex-1 py-3 rounded-xl text-[13px] font-bold text-white text-center bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-white/20 shadow-[0_4px_16px_rgba(26,75,155,0.3)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                            className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/20 bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] px-3 py-2 text-center text-[12px] font-bold text-white shadow-[0_4px_16px_rgba(26,75,155,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)]"
                         >
                             <Download size={16} weight="bold" />
                             Download PDF
@@ -1508,8 +1504,8 @@ function CompletedPhaseUI({
 
                     {/* View in DocuVault */}
                     <a
-                        href="/docuvault"
-                        className="flex-1 py-3 rounded-xl text-[13px] font-bold text-white/70 text-center bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white transition-all flex items-center justify-center gap-2"
+                        href="/docuvault/gallery"
+                        className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-[12px] font-bold text-white/70 transition-all hover:bg-white/10 hover:text-white"
                     >
                         <ArrowSquareOut size={16} />
                         Save + View in Vault
@@ -1520,7 +1516,7 @@ function CompletedPhaseUI({
                 <button
                     type="button"
                     onClick={onBackToReview}
-                    className="w-full py-2.5 rounded-xl text-[12px] font-bold text-white/50 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white/70 transition-colors"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 py-2 text-[11px] font-bold text-white/50 transition-colors hover:bg-white/10 hover:text-white/70"
                 >
                     Return to Review Hub
                 </button>

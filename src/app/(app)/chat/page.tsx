@@ -132,7 +132,7 @@ function ChatListContent() {
             <div className="flex min-h-0 flex-1 flex-col">
                 <PageHeader
                     icon={ChatTeardropDots}
-                    title="Chat"
+                    title="NEXXChat with NEXX"
                     description="Secure guidance for the next right step."
                     rightElement={(
                         <button
@@ -150,12 +150,13 @@ function ChatListContent() {
                     )}
                 />
 
-                <main className="flex min-h-0 flex-1 flex-col justify-center pb-8">
+                <main className="flex min-h-0 flex-1 pb-6 sm:pb-8">
                     <motion.section
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="mx-auto flex w-full max-w-3xl flex-col gap-5"
+                        className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col"
                     >
+                        <div className="min-h-8 flex-[1_1_0]" />
                         <div className="mx-auto flex w-full max-w-sm flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-7 text-center shadow-[0_8px_32px_rgba(0,0,0,0.20)]">
                             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/5">
                                 <span className="pb-1 font-serif text-xl font-bold text-white/70"><i>N</i></span>
@@ -166,13 +167,14 @@ function ChatListContent() {
                             </p>
                         </div>
 
-                        <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-2 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+                        <div className="mt-8 rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-2 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:mt-10">
                             <ChatInput
                                 onSend={handleSendNewChat}
                                 disabled={!isWorkspaceReady || isCreating}
                                 placeholder={isCreating ? 'Opening a new conversation...' : 'Ask NEXX anything...'}
                             />
                         </div>
+                        <div className="min-h-5 flex-[0.2_1_0]" />
                     </motion.section>
                 </main>
             </div>

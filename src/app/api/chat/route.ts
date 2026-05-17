@@ -510,10 +510,12 @@ export async function POST(req: NextRequest) {
             confidence: parsedResponse.artifacts.confidence,
           };
 
+          const currentTitle = (conversation.title ?? '').trim();
           const shouldUpdateConversationTitle =
-            isFirstTurn ||
-            conversation.title === 'New Conversation' ||
-            conversation.title === 'New Chat';
+            isFirstTurn &&
+            (currentTitle.length === 0 ||
+              currentTitle === 'New Conversation' ||
+              currentTitle === 'New Chat');
 
           // ── Step 13: Save user message to Convex ──
           try {

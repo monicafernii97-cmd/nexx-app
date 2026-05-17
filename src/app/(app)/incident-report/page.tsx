@@ -576,6 +576,7 @@ export default function IncidentReportPage() {
         setIsExportingIncident(incident._id);
 
         try {
+            setPinError(null);
             const evidenceText = incident.evidence?.length
                 ? `\n\nLinked evidence:\n${incident.evidence.map((item) => `- ${item}`).join('\n')}`
                 : '';

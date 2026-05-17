@@ -55,13 +55,12 @@ export default function ExhibitPacketBuilder() {
 
   // Available evidence from workspace (not yet added)
   const availableEvidence = useMemo(() => {
+    if (!activeCaseId) return [];
+
     const existing = new Set(items.map(i => i.sourceId));
     const evidence: Array<{ id: string; title: string; summary: string; type: 'text' | 'image' | 'pdf' }> = [];
 
-    // Filter pins by active case, then extract evidence-worthy items
-    const casePins = activeCaseId
-      ? allCasePins?.filter(p => p.caseId === activeCaseId) ?? []
-      : allCasePins ?? [];
+    const casePins = allCasePins?.filter(p => p.caseId === activeCaseId) ?? [];
 
     for (const pin of casePins) {
       if (existing.has(pin._id)) continue;
@@ -75,9 +74,8 @@ export default function ExhibitPacketBuilder() {
       }
     }
 
-    const exhibitNotes = activeCaseId
-      ? allCaseMemory?.filter(item => item.caseId === activeCaseId && item.type === 'exhibit_note') ?? []
-      : allCaseMemory?.filter(item => item.type === 'exhibit_note') ?? [];
+    const exhibitNotes =
+      allCaseMemory?.filter(item => item.caseId === activeCaseId && item.type === 'exhibit_note') ?? [];
 
     for (const note of exhibitNotes) {
       if (existing.has(note._id)) continue;

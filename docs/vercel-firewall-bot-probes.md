@@ -51,31 +51,31 @@ they are not filesystem globs.
 - `pre:/backups`
 - `eq:/phpinfo.php`
 - `eq:/server-status`
-- `re:\.(php\d?|phtml)(?:/|$)`
-- `re:\.bak(?:/|$)`
-- `re:\.backup(?:/|$)`
-- `re:\.old(?:/|$)`
-- `re:\.orig(?:/|$)`
-- `re:\.save(?:/|$)`
-- `re:\.sql(?:/|$)`
-- `re:\.sqlite(?:/|$)`
-- `re:\.sqlite3(?:/|$)`
-- `re:\.db(?:/|$)`
-- `re:\.log(?:/|$)`
-- `re:\.ini(?:/|$)`
-- `re:\.pem(?:/|$)`
-- `re:\.key(?:/|$)`
-- `re:\.crt(?:/|$)`
-- `re:\.cer(?:/|$)`
-- `re:\.p12(?:/|$)`
-- `re:\.pfx(?:/|$)`
-- `re:\.zip(?:/|$)`
+- `re:(?i)\.(php\d?|phtml)(?:/|$)`
+- `re:(?i)\.bak(?:/|$)`
+- `re:(?i)\.backup(?:/|$)`
+- `re:(?i)\.old(?:/|$)`
+- `re:(?i)\.orig(?:/|$)`
+- `re:(?i)\.save(?:/|$)`
+- `re:(?i)\.sql(?:/|$)`
+- `re:(?i)\.sqlite(?:/|$)`
+- `re:(?i)\.sqlite3(?:/|$)`
+- `re:(?i)\.db(?:/|$)`
+- `re:(?i)\.log(?:/|$)`
+- `re:(?i)\.ini(?:/|$)`
+- `re:(?i)\.pem(?:/|$)`
+- `re:(?i)\.key(?:/|$)`
+- `re:(?i)\.crt(?:/|$)`
+- `re:(?i)\.cer(?:/|$)`
+- `re:(?i)\.p12(?:/|$)`
+- `re:(?i)\.pfx(?:/|$)`
+- `re:(?i)\.zip(?:/|$)`
 
 Use regex conditions for extension-style probes instead of suffix-only
 conditions. Suffix operators can miss scanner variants with a trailing slash,
-such as `/file.php/`; regexes like `re:\.php(?:/|$)` and
-`re:\.(php\d?|phtml)(?:/|$)` cover both ordinary filenames and slash-terminated
-probe paths.
+such as `/file.php/`; case-insensitive regexes like `re:(?i)\.php(?:/|$)` and
+`re:(?i)\.(php\d?|phtml)(?:/|$)` cover mixed-case filenames and
+slash-terminated probe paths.
 
 ## Production Verification
 

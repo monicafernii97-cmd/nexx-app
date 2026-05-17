@@ -120,6 +120,7 @@ export default function IncidentReportPage() {
     const mediaInputRef = useRef<HTMLInputElement | null>(null);
     const stepRef = useRef<CaptureStep>(step);
     const mediaAbortControllersRef = useRef<Map<string, AbortController>>(new Map());
+    const mediaDocumentsRef = useRef<Set<Id<'documents'>>>(new Set());
     const removedMediaIdsRef = useRef<Set<string>>(new Set());
 
     const [processError, setProcessError] = useState<ProcessError>(null);
@@ -143,7 +144,12 @@ export default function IncidentReportPage() {
     const createDocument = useMutation(api.documents.create);
     const updateDocument = useMutation(api.documents.update);
     const removeDocument = useMutation(api.documents.remove);
+    const removeDocumentRef = useRef(removeDocument);
     const dateTimeIsValid = isValidIncidentDateTime(date, time);
+
+    useEffect(() => {
+        removeDocumentRef.current = removeDocument;
+    }, [removeDocument]);
 
     const stopSpeechRecognition = useCallback(() => {
         try {
@@ -219,9 +225,16 @@ export default function IncidentReportPage() {
 
     useEffect(() => {
         const controllers = mediaAbortControllersRef.current;
+        const documents = mediaDocumentsRef.current;
         return () => {
             controllers.forEach((controller) => controller.abort());
             controllers.clear();
+            documents.forEach((documentId) => {
+                void removeDocumentRef.current({ id: documentId }).catch((err) => {
+                    console.error('[IncidentIntake] Failed to remove abandoned media document:', err);
+                });
+            });
+            documents.clear();
         };
     }, []);
 
@@ -275,13 +288,15 @@ export default function IncidentReportPage() {
     );
 
     const handleAttachMedia = useCallback(() => {
+        if (isProcessing) return;
         mediaInputRef.current?.click();
-    }, []);
+    }, [isProcessing]);
 
     const handleMediaSelected = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
         const selectedFiles = Array.from(event.target.files ?? []);
         event.target.value = '';
         if (!selectedFiles.length) return;
+        if (isProcessing) return;
         if (!activeCaseId) {
             setProcessError({ code: 'missing_case', message: 'Please select or create a case before attaching media.' });
             return;
@@ -355,7 +370,9 @@ export default function IncidentReportPage() {
                         fileSize: file.size,
                         caseId: activeCaseId,
                     });
+                    mediaDocumentsRef.current.add(documentId);
                     if (!isCurrentAttachment()) {
+                        mediaDocumentsRef.current.delete(documentId);
                         void removeDocument({ id: documentId }).catch((err) => {
                             console.error('[IncidentIntake] Failed to remove canceled media document:', err);
                         });
@@ -378,20 +395,22 @@ export default function IncidentReportPage() {
                 }
             })();
         });
-    }, [activeCaseId, createDocument, generateUploadUrl, removeDocument, updateAttachment]);
+    }, [activeCaseId, createDocument, generateUploadUrl, isProcessing, removeDocument, updateAttachment]);
 
     const handleRemoveMedia = useCallback((id: string) => {
+        if (isProcessing) return;
         const attachment = mediaAttachments.find((item) => item.id === id);
         removedMediaIdsRef.current.add(id);
         mediaAbortControllersRef.current.get(id)?.abort();
         mediaAbortControllersRef.current.delete(id);
         setMediaAttachments((prev) => prev.filter((attachment) => attachment.id !== id));
         if (attachment?.documentId) {
+            mediaDocumentsRef.current.delete(attachment.documentId);
             void removeDocument({ id: attachment.documentId }).catch((err) => {
                 console.error('[IncidentIntake] Failed to remove attached media document:', err);
             });
         }
-    }, [mediaAttachments, removeDocument]);
+    }, [isProcessing, mediaAttachments, removeDocument]);
 
     const mediaEvidence = useMemo(
         () => mediaAttachments
@@ -461,6 +480,11 @@ export default function IncidentReportPage() {
                         failures,
                     });
                 }
+                linkResults.forEach((result, index) => {
+                    if (result.status === 'fulfilled') {
+                        mediaDocumentsRef.current.delete(linkedDocuments[index].documentId);
+                    }
+                });
             }
 
             setNarrative('');
@@ -771,7 +795,8 @@ export default function IncidentReportPage() {
                                 <button
                                     type="button"
                                     onClick={() => setStep('describe')}
-                                    className="flex-1 py-4 uppercase text-[12px] font-bold tracking-widest rounded-xl transition-all text-white bg-white/5 border border-white/20 hover:bg-white/10"
+                                    disabled={isProcessing}
+                                    className="flex-1 py-4 uppercase text-[12px] font-bold tracking-widest rounded-xl transition-all text-white bg-white/5 border border-white/20 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Back to Edit
                                 </button>

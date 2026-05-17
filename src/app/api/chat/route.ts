@@ -513,9 +513,10 @@ export async function POST(req: NextRequest) {
 
           const currentTitle = (conversation.title ?? '').trim();
           const shouldUpdateConversationTitle =
-            currentTitle.length === 0 ||
-            currentTitle === 'New Conversation' ||
-            currentTitle === 'New Chat';
+            isFirstTurn &&
+            (currentTitle.length === 0 ||
+              currentTitle === 'New Conversation' ||
+              currentTitle === 'New Chat');
 
           // ── Step 13: Save user message to Convex ──
           try {

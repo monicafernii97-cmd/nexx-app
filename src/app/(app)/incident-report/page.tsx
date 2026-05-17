@@ -47,6 +47,7 @@ type MediaAttachment = {
 const ACCEPTED_MEDIA_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MEDIA_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
 const MAX_MEDIA_SIZE = 10 * 1024 * 1024;
+const CONCURRENT_UPLOADS = 3;
 
 const getAttachmentId = (file: File) => {
     const randomPart = typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -303,20 +304,22 @@ export default function IncidentReportPage() {
         }
         setProcessError(null);
 
-        selectedFiles.forEach((file) => {
-            const id = getAttachmentId(file);
-            const baseAttachment: MediaAttachment = {
-                id,
-                caseId: activeCaseId,
-                fileName: file.name,
-                mimeType: file.type || 'application/octet-stream',
-                size: file.size,
-                status: 'uploading',
-            };
+        const queuedFiles = selectedFiles.map((file) => ({ file, id: getAttachmentId(file) }));
+        const baseAttachments: MediaAttachment[] = queuedFiles.map(({ file, id }) => ({
+            id,
+            caseId: activeCaseId,
+            fileName: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            size: file.size,
+            status: 'uploading',
+        }));
 
+        queuedFiles.forEach(({ id }) => {
             removedMediaIdsRef.current.delete(id);
-            setMediaAttachments((prev) => [...prev, baseAttachment]);
+        });
+        setMediaAttachments((prev) => [...prev, ...baseAttachments]);
 
+        const processFile = async (file: File, id: string) => {
             if (!ACCEPTED_MEDIA_TYPES.has(file.type)) {
                 updateAttachment(id, {
                     status: 'failed',
@@ -337,64 +340,67 @@ export default function IncidentReportPage() {
             mediaAbortControllersRef.current.set(id, controller);
             const isCurrentAttachment = () => !controller.signal.aborted && !removedMediaIdsRef.current.has(id);
 
-            void (async () => {
-                try {
-                    const uploadUrl = await generateUploadUrl({});
-                    if (!isCurrentAttachment()) return;
-                    const uploadResponse = await fetch(uploadUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': file.type },
-                        body: file,
-                        signal: controller.signal,
-                    });
-                    if (!uploadResponse.ok) {
-                        const errorBody = await uploadResponse.text().catch(() => '');
-                        throw new Error(`Media upload failed (${uploadResponse.status}). ${errorBody}`.trim());
-                    }
-                    if (!isCurrentAttachment()) return;
-                    const uploadResult = await uploadResponse.json();
-                    const storageId = uploadResult?.storageId as Id<'_storage'> | undefined;
-                    if (!storageId) {
-                        throw new Error('Media upload returned no storage ID.');
-                    }
-
-                    updateAttachment(id, { status: 'analyzing' });
-                    const analysis = await analyzeImageLocally(file);
-                    if (!isCurrentAttachment()) return;
-                    const documentId = await createDocument({
-                        title: file.name,
-                        type: 'photo_evidence',
-                        content: analysis,
-                        storageId,
-                        mimeType: file.type,
-                        fileSize: file.size,
-                        caseId: activeCaseId,
-                    });
-                    mediaDocumentsRef.current.add(documentId);
-                    if (!isCurrentAttachment()) {
-                        mediaDocumentsRef.current.delete(documentId);
-                        void removeDocument({ id: documentId }).catch((err) => {
-                            console.error('[IncidentIntake] Failed to remove canceled media document:', err);
-                        });
-                        return;
-                    }
-                    updateAttachment(id, {
-                        status: 'ready',
-                        documentId,
-                        analysis,
-                        error: undefined,
-                    });
-                } catch (err) {
-                    if (controller.signal.aborted || removedMediaIdsRef.current.has(id)) return;
-                    updateAttachment(id, {
-                        status: 'failed',
-                        error: err instanceof Error ? err.message : 'Media analysis failed.',
-                    });
-                } finally {
-                    mediaAbortControllersRef.current.delete(id);
+            try {
+                const uploadUrl = await generateUploadUrl({});
+                if (!isCurrentAttachment()) return;
+                const uploadResponse = await fetch(uploadUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': file.type },
+                    body: file,
+                    signal: controller.signal,
+                });
+                if (!uploadResponse.ok) {
+                    const errorBody = await uploadResponse.text().catch(() => '');
+                    throw new Error(`Media upload failed (${uploadResponse.status}). ${errorBody}`.trim());
                 }
-            })();
-        });
+                if (!isCurrentAttachment()) return;
+                const uploadResult = await uploadResponse.json();
+                const storageId = uploadResult?.storageId as Id<'_storage'> | undefined;
+                if (!storageId) {
+                    throw new Error('Media upload returned no storage ID.');
+                }
+
+                updateAttachment(id, { status: 'analyzing' });
+                const analysis = await analyzeImageLocally(file);
+                if (!isCurrentAttachment()) return;
+                const documentId = await createDocument({
+                    title: file.name,
+                    type: 'photo_evidence',
+                    content: analysis,
+                    storageId,
+                    mimeType: file.type,
+                    fileSize: file.size,
+                    caseId: activeCaseId,
+                });
+                mediaDocumentsRef.current.add(documentId);
+                if (!isCurrentAttachment()) {
+                    mediaDocumentsRef.current.delete(documentId);
+                    void removeDocument({ id: documentId }).catch((err) => {
+                        console.error('[IncidentIntake] Failed to remove canceled media document:', err);
+                    });
+                    return;
+                }
+                updateAttachment(id, {
+                    status: 'ready',
+                    documentId,
+                    analysis,
+                    error: undefined,
+                });
+            } catch (err) {
+                if (controller.signal.aborted || removedMediaIdsRef.current.has(id)) return;
+                updateAttachment(id, {
+                    status: 'failed',
+                    error: err instanceof Error ? err.message : 'Media analysis failed.',
+                });
+            } finally {
+                mediaAbortControllersRef.current.delete(id);
+            }
+        };
+
+        for (let index = 0; index < queuedFiles.length; index += CONCURRENT_UPLOADS) {
+            const batch = queuedFiles.slice(index, index + CONCURRENT_UPLOADS);
+            await Promise.all(batch.map(({ file, id }) => processFile(file, id)));
+        }
     }, [activeCaseId, createDocument, generateUploadUrl, isProcessing, removeDocument, updateAttachment]);
 
     const handleRemoveMedia = useCallback((id: string) => {

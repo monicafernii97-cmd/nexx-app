@@ -34,6 +34,7 @@ type CaptureStep = 'describe' | 'review' | 'confirmed';
 type MediaAttachmentStatus = 'uploading' | 'analyzing' | 'ready' | 'failed';
 type MediaAttachment = {
     id: string;
+    caseId: Id<'cases'>;
     fileName: string;
     mimeType: string;
     size: number;
@@ -118,6 +119,8 @@ export default function IncidentReportPage() {
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const mediaInputRef = useRef<HTMLInputElement | null>(null);
     const stepRef = useRef<CaptureStep>(step);
+    const mediaAbortControllersRef = useRef<Map<string, AbortController>>(new Map());
+    const removedMediaIdsRef = useRef<Set<string>>(new Set());
 
     const [processError, setProcessError] = useState<ProcessError>(null);
     const [isPinning, setIsPinning] = useState<string | null>(null);
@@ -214,6 +217,14 @@ export default function IncidentReportPage() {
         };
     }, []);
 
+    useEffect(() => {
+        const controllers = mediaAbortControllersRef.current;
+        return () => {
+            controllers.forEach((controller) => controller.abort());
+            controllers.clear();
+        };
+    }, []);
+
     const toggleListening = useCallback(() => {
         if (!recognitionRef.current) return;
         if (isListening) {
@@ -256,6 +267,13 @@ export default function IncidentReportPage() {
         );
     }, []);
 
+    const hasPendingMedia = mediaAttachments.some(
+        (attachment) => attachment.status === 'uploading' || attachment.status === 'analyzing'
+    );
+    const hasMismatchedMedia = mediaAttachments.some(
+        (attachment) => Boolean(activeCaseId) && attachment.caseId !== activeCaseId
+    );
+
     const handleAttachMedia = useCallback(() => {
         mediaInputRef.current?.click();
     }, []);
@@ -274,12 +292,14 @@ export default function IncidentReportPage() {
             const id = getAttachmentId(file);
             const baseAttachment: MediaAttachment = {
                 id,
+                caseId: activeCaseId,
                 fileName: file.name,
                 mimeType: file.type || 'application/octet-stream',
                 size: file.size,
                 status: 'uploading',
             };
 
+            removedMediaIdsRef.current.delete(id);
             setMediaAttachments((prev) => [...prev, baseAttachment]);
 
             if (!ACCEPTED_MEDIA_TYPES.has(file.type)) {
@@ -298,18 +318,25 @@ export default function IncidentReportPage() {
                 return;
             }
 
+            const controller = new AbortController();
+            mediaAbortControllersRef.current.set(id, controller);
+            const isCurrentAttachment = () => !controller.signal.aborted && !removedMediaIdsRef.current.has(id);
+
             void (async () => {
                 try {
                     const uploadUrl = await generateUploadUrl({});
+                    if (!isCurrentAttachment()) return;
                     const uploadResponse = await fetch(uploadUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': file.type },
                         body: file,
+                        signal: controller.signal,
                     });
                     if (!uploadResponse.ok) {
                         const errorBody = await uploadResponse.text().catch(() => '');
                         throw new Error(`Media upload failed (${uploadResponse.status}). ${errorBody}`.trim());
                     }
+                    if (!isCurrentAttachment()) return;
                     const uploadResult = await uploadResponse.json();
                     const storageId = uploadResult?.storageId as Id<'_storage'> | undefined;
                     if (!storageId) {
@@ -318,6 +345,7 @@ export default function IncidentReportPage() {
 
                     updateAttachment(id, { status: 'analyzing' });
                     const analysis = await analyzeImageLocally(file);
+                    if (!isCurrentAttachment()) return;
                     const documentId = await createDocument({
                         title: file.name,
                         type: 'photo_evidence',
@@ -327,6 +355,12 @@ export default function IncidentReportPage() {
                         fileSize: file.size,
                         caseId: activeCaseId,
                     });
+                    if (!isCurrentAttachment()) {
+                        void removeDocument({ id: documentId }).catch((err) => {
+                            console.error('[IncidentIntake] Failed to remove canceled media document:', err);
+                        });
+                        return;
+                    }
                     updateAttachment(id, {
                         status: 'ready',
                         documentId,
@@ -334,17 +368,23 @@ export default function IncidentReportPage() {
                         error: undefined,
                     });
                 } catch (err) {
+                    if (controller.signal.aborted || removedMediaIdsRef.current.has(id)) return;
                     updateAttachment(id, {
                         status: 'failed',
                         error: err instanceof Error ? err.message : 'Media analysis failed.',
                     });
+                } finally {
+                    mediaAbortControllersRef.current.delete(id);
                 }
             })();
         });
-    }, [activeCaseId, createDocument, generateUploadUrl, updateAttachment]);
+    }, [activeCaseId, createDocument, generateUploadUrl, removeDocument, updateAttachment]);
 
     const handleRemoveMedia = useCallback((id: string) => {
         const attachment = mediaAttachments.find((item) => item.id === id);
+        removedMediaIdsRef.current.add(id);
+        mediaAbortControllersRef.current.get(id)?.abort();
+        mediaAbortControllersRef.current.delete(id);
         setMediaAttachments((prev) => prev.filter((attachment) => attachment.id !== id));
         if (attachment?.documentId) {
             void removeDocument({ id: attachment.documentId }).catch((err) => {
@@ -355,9 +395,9 @@ export default function IncidentReportPage() {
 
     const mediaEvidence = useMemo(
         () => mediaAttachments
-            .filter((attachment) => attachment.status === 'ready' && attachment.analysis)
+            .filter((attachment) => attachment.caseId === activeCaseId && attachment.status === 'ready' && attachment.analysis)
             .map((attachment) => `Attached media (${attachment.fileName}): ${attachment.analysis}`),
-        [mediaAttachments],
+        [activeCaseId, mediaAttachments],
     );
 
     /** Process the incident narrative and save to Convex. */
@@ -370,6 +410,14 @@ export default function IncidentReportPage() {
         if (!isValidIncidentDateTime(date, time)) {
             setProcessError({ code: 'invalid_datetime', message: 'Please enter a valid date and time.' });
             setStep('describe');
+            return;
+        }
+        if (hasPendingMedia) {
+            setProcessError({ code: 'generic', message: 'Please wait for attached media to finish processing before saving.' });
+            return;
+        }
+        if (hasMismatchedMedia) {
+            setProcessError({ code: 'generic', message: 'Attached media belongs to a different case. Remove it before saving this incident.' });
             return;
         }
 
@@ -391,10 +439,11 @@ export default function IncidentReportPage() {
             });
 
             const linkedDocuments = mediaAttachments.filter(
-                (attachment): attachment is MediaAttachment & { documentId: Id<'documents'> } => Boolean(attachment.documentId)
+                (attachment): attachment is MediaAttachment & { documentId: Id<'documents'> } =>
+                    attachment.caseId === activeCaseId && Boolean(attachment.documentId)
             );
             if (linkedDocuments.length) {
-                await Promise.allSettled(
+                const linkResults = await Promise.allSettled(
                     linkedDocuments.map((attachment) =>
                         updateDocument({
                             id: attachment.documentId,
@@ -402,6 +451,16 @@ export default function IncidentReportPage() {
                         })
                     )
                 );
+                const failures = linkResults
+                    .map((result, index) => ({ result, attachment: linkedDocuments[index] }))
+                    .filter(({ result }) => result.status === 'rejected');
+                if (failures.length) {
+                    console.error('[IncidentIntake] Some media documents failed to link:', {
+                        incidentId,
+                        documents: failures.map(({ attachment }) => attachment.documentId),
+                        failures,
+                    });
+                }
             }
 
             setNarrative('');
@@ -413,7 +472,7 @@ export default function IncidentReportPage() {
         } finally {
             setIsProcessing(false);
         }
-    }, [narrative, activeCaseId, date, time, createIncident, handleReview, stopSpeechRecognition, mediaEvidence, mediaAttachments, updateDocument]);
+    }, [narrative, activeCaseId, date, time, hasPendingMedia, hasMismatchedMedia, createIncident, handleReview, stopSpeechRecognition, mediaEvidence, mediaAttachments, updateDocument]);
 
     /** Pin an incident to the case workspace. Prevents duplicate clicks. */
     const handleAddToWorkspace = useCallback(async (incident: { _id: Id<'incidents'>; narrative: string; date: string }) => {
@@ -719,7 +778,7 @@ export default function IncidentReportPage() {
                                 <button
                                     type="button"
                                     onClick={handleProcess}
-                                    disabled={isProcessing || !activeCaseId || !dateTimeIsValid}
+                                    disabled={isProcessing || !activeCaseId || !dateTimeIsValid || hasPendingMedia || hasMismatchedMedia}
                                     aria-busy={isProcessing}
                                     aria-label={isProcessing ? 'Saving incident' : 'Confirm and log incident'}
                                     className="flex-[1.5] flex items-center justify-center gap-2 disabled:opacity-50 py-4 uppercase text-[12px] font-bold tracking-widest rounded-xl transition-all shadow-md text-white bg-indigo-600 hover:bg-indigo-500"

@@ -407,7 +407,7 @@ export default function IncidentDetailPage() {
                         </h3>
                         <div className="space-y-3">
                             {incident.evidence.map((item, index) => (
-                                <p key={`${index}-${item.slice(0, 20)}`} className="text-[14px] leading-relaxed whitespace-pre-wrap text-sapphire font-medium">
+                                <p key={index} className="text-[14px] leading-relaxed whitespace-pre-wrap text-sapphire font-medium">
                                     {item}
                                 </p>
                             ))}

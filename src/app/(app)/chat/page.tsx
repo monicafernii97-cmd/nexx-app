@@ -5,7 +5,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Doc, Id } from '@convex/_generated/dataModel';
 import type { MouseEvent } from 'react';
-import { useEffect, useRef, useState, Suspense } from 'react';
+import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -45,9 +45,20 @@ function ChatListContent() {
     const createConversation = useMutation(api.conversations.create);
     const removeConversation = useMutation(api.conversations.remove);
     const [isCreating, setIsCreating] = useState(false);
-    const [isHistoryOpen, setIsHistoryOpen] = useState(() => searchParams.get('history') === '1');
     const [deletingId, setDeletingId] = useState<Id<'conversations'> | null>(null);
     const handoffProcessedRef = useRef(false);
+    const isHistoryOpen = searchParams.get('history') === '1';
+
+    const setHistoryOpen = useCallback((open: boolean) => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (open) {
+            params.set('history', '1');
+        } else {
+            params.delete('history');
+        }
+        const query = params.toString();
+        router.replace(query ? `/chat?${query}` : '/chat', { scroll: false });
+    }, [router, searchParams]);
 
     useEffect(() => {
         if (handoffProcessedRef.current) return;
@@ -126,7 +137,7 @@ function ChatListContent() {
                     rightElement={(
                         <button
                             type="button"
-                            onClick={() => setIsHistoryOpen(true)}
+                            onClick={() => setHistoryOpen(true)}
                             className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-[11px] font-bold uppercase tracking-widest text-white/65 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
                             aria-label="Open chat history"
                         >
@@ -168,7 +179,7 @@ function ChatListContent() {
 
             <HistoryDrawer
                 open={isHistoryOpen}
-                onClose={() => setIsHistoryOpen(false)}
+                onClose={() => setHistoryOpen(false)}
                 isLoading={isLoadingConversations}
                 activeConversations={activeConversations}
                 archivedConversations={archivedConversations}

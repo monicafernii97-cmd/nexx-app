@@ -108,10 +108,10 @@ export default function proxy(req: NextRequest, event: NextFetchEvent) {
 export const config = {
   matcher: [
     /**
-     * Skip Next internals and ordinary static files. Keep JSON out of this list
-     * so credentials.json and service-account.json can be caught as probes.
+     * Skip Next internals and ordinary static files. Keep JSON and archives out
+     * of this list so credential and backup probes can be caught.
      */
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|avif|ttf|otf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|map|txt|xml)).*)',
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|avif|ttf|otf|woff2?|ico|csv|docx?|xlsx?|webmanifest|map|txt|xml)).*)',
 
     /**
      * Run for API routes so protected APIs still get Clerk auth. Probe fallback

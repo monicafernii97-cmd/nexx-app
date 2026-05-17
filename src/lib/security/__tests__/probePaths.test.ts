@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { isProbePathname } from '@/lib/security/probePaths';
+import {
+  isProbePathname,
+  normalizeProbePath,
+} from '@/lib/security/probePaths';
 
 describe('probe path detection', () => {
   it.each([
@@ -15,12 +18,17 @@ describe('probe path detection', () => {
     '/firebase-service-account.json',
     '/wp-admin/install.php',
     '/wp-login.php',
+    '/wp-login.php/',
+    '/WP-LOGIN.PHP',
     '/xmlrpc.php',
     '/phpinfo.php',
     '/server-status',
+    '/server-status/',
     '/test.php',
     '/backup.sql',
+    '/backup.zip',
     '/private.key',
+    '/%2Eenv',
     '/test.php/',
     '/backup.sql/',
     '/phpinfo.php/',
@@ -45,5 +53,10 @@ describe('probe path detection', () => {
     '/api/documents/generate',
   ])('allows legitimate path %s', (pathname) => {
     expect(isProbePathname(pathname)).toBe(false);
+  });
+
+  it('normalizes malformed escape sequences without throwing', () => {
+    expect(normalizeProbePath('/%GG')).toBe('/%gg');
+    expect(isProbePathname('/%GG')).toBe(false);
   });
 });

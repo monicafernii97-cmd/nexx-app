@@ -2,8 +2,11 @@
 
 Create a Vercel Firewall custom rule named `deny-common-exploit-probes`.
 
-Use **Request Path** or **Raw Path** matching. Do not use framework route
-matching for this rule, because framework route matching runs after the app
+Prefer **Request Path** matching for ordinary scanner probes. Request Path is
+the normalized, decoded URL path Vercel uses for routing. Use **Raw Path** only
+when you need byte-for-byte matching against unusual percent-encoding, encoded
+slashes, or other edge-path distinctions. Do not use framework route matching
+for this rule, because framework route matching runs after the app
 proxy/middleware layer.
 
 ## Rollout
@@ -13,60 +16,60 @@ proxy/middleware layer.
 3. Switch the action to **Deny**.
 4. If available, enable persistent deny/challenge for repeat offenders.
 
-## Match Categories
+## Match Conditions
 
-Deny requests whose request path matches any of these categories:
+Deny requests whose request path matches any of these operator-form
+conditions. These values are intended for Vercel Firewall's condition builder;
+they are not filesystem globs.
 
-- `/.env`
-- `/.env.*`
-- `/api/.env`
-- `/backend/.env`
-- `/app/.env`
-- `/.aws/credentials`
-- `/.aws/*`
-- `/credentials.json`
-- `/service-account.json`
-- `/firebase-service-account.json`
-- `/composer.json`
-- `/composer.lock`
-- `/database.sql`
-- `/.git/*`
-- `/.git`
-- `/.svn/*`
-- `/.hg/*`
-- `/wp-admin/*`
-- `/wp-login.php`
-- `/xmlrpc.php`
-- `/wp-content/*`
-- `/wp-includes/*`
-- `/phpmyadmin/*`
-- `/pma/*`
-- `/adminer/*`
-- `/vendor/*`
-- `/backup/*`
-- `/backup*`
-- `/backups/*`
-- `/backups*`
-- `/phpinfo.php`
-- `/server-status`
-- `/*.php`
-- `/*.bak`
-- `/*.backup`
-- `/*.old`
-- `/*.orig`
-- `/*.save`
-- `/*.sql`
-- `/*.sqlite`
-- `/*.sqlite3`
-- `/*.db`
-- `/*.log`
-- `/*.ini`
-- `/*.pem`
-- `/*.key`
-- `/*.crt`
-- `/*.cer`
-- `/*.p12`
-- `/*.pfx`
+- `eq:/.env`
+- `pre:/.env.`
+- `eq:/api/.env`
+- `eq:/backend/.env`
+- `eq:/app/.env`
+- `eq:/.aws/credentials`
+- `pre:/.aws/`
+- `sub:credentials.json`
+- `sub:service-account.json`
+- `sub:firebase-service-account.json`
+- `eq:/composer.json`
+- `eq:/composer.lock`
+- `sub:database.sql`
+- `pre:/.git`
+- `pre:/.svn`
+- `pre:/.hg`
+- `pre:/wp-admin`
+- `eq:/wp-login.php`
+- `eq:/xmlrpc.php`
+- `pre:/wp-content`
+- `pre:/wp-includes`
+- `pre:/phpmyadmin`
+- `pre:/pma`
+- `pre:/adminer`
+- `pre:/vendor`
+- `pre:/backup`
+- `pre:/backups`
+- `eq:/phpinfo.php`
+- `eq:/server-status`
+- `suf:.php`
+- `suf:.bak`
+- `suf:.backup`
+- `suf:.old`
+- `suf:.orig`
+- `suf:.save`
+- `suf:.sql`
+- `suf:.sqlite`
+- `suf:.sqlite3`
+- `suf:.db`
+- `suf:.log`
+- `suf:.ini`
+- `suf:.pem`
+- `suf:.key`
+- `suf:.crt`
+- `suf:.cer`
+- `suf:.p12`
+- `suf:.pfx`
+- `suf:.zip`
 
 ## Production Verification
 

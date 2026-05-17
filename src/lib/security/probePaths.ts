@@ -33,7 +33,13 @@ const SENSITIVE_FILE_RE =
   /(?:^|\/)(?:\.env(?:\..*)?|credentials\.json|service-account\.json|firebase-service-account\.json|composer\.(?:json|lock)|database\.sql)(?:$|[/?#])/i;
 
 const SENSITIVE_EXTENSION_RE =
-  /\.(?:php|env|bak|backup|old|orig|save|sql|sqlite|sqlite3|db|log|ini|pem|key|crt|cer|p12|pfx)(?=$|[/?#])/i;
+  /\.(?:php|env|bak|backup|old|orig|save|sql|sqlite|sqlite3|db|log|ini|pem|key|crt|cer|p12|pfx|zip)(?=$|[/?#])/i;
+
+/** Remove one trailing slash so exact probe paths cannot bypass checks with `/`. */
+function stripSingleTrailingSlash(pathname: string): string {
+  if (pathname.length <= 1 || !pathname.endsWith('/')) return pathname;
+  return pathname.slice(0, -1);
+}
 
 /** Decode and lowercase request paths so encoded scanner probes are classified consistently. */
 export function normalizeProbePath(pathname: string): string {
@@ -55,10 +61,16 @@ export function isAllowedWellKnownPath(pathname: string): boolean {
 /** Classify obvious exploit-scanner request paths that should not reach Clerk auth. */
 export function isProbePathname(pathname: string): boolean {
   const normalizedPathname = normalizeProbePath(pathname);
+  const exactPathname = stripSingleTrailingSlash(normalizedPathname);
 
   if (isAllowedWellKnownPath(normalizedPathname)) return false;
 
-  if (BLOCKED_EXACT_PATHS.has(normalizedPathname)) return true;
+  if (
+    BLOCKED_EXACT_PATHS.has(normalizedPathname) ||
+    BLOCKED_EXACT_PATHS.has(exactPathname)
+  ) {
+    return true;
+  }
 
   if (
     BLOCKED_PREFIXES.some(

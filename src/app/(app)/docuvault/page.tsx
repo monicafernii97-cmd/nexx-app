@@ -19,21 +19,11 @@ import { api } from '@convex/_generated/api';
 import { useUser } from '@/lib/user-context';
 import { UI_TABS, getTemplatesForTab } from '@/lib/legal/templateCategories';
 import type { UITabCategory } from '@/lib/legal/templateCategories';
-import { PageContainer } from '@/components/layout/PageLayout';
+import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import type { DocumentTemplate } from '@/lib/legal/types';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useExport } from './context/ExportContext';
 import '@/styles/pipelines.css';
-
-
-
-/** Truncate text to maxLen characters, breaking at word boundary when possible. */
-const truncateText = (text: string, maxLen = 100) => {
-    if (text.length <= maxLen) return text;
-    const truncated = text.slice(0, maxLen);
-    const lastSpace = truncated.lastIndexOf(' ');
-    return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated) + '...';
-};
 
 /** Wrapper with Suspense boundary for useSearchParams */
 export default function DocuVaultPage() {
@@ -58,8 +48,6 @@ function DocuVaultPageInner() {
 
     // Resolved court settings — courtSettings table is canonical, user profile is fallback
     const resolvedState = courtSettings?.state || user?.state || '';
-    const resolvedCounty = courtSettings?.county || user?.county || '';
-
     // Tab & template state
     const [activeTab, setActiveTab] = useState<UITabCategory>('lead');
     const [selectedTemplate, setSelectedTemplate] = useState<DocumentTemplate | null>(null);
@@ -179,23 +167,21 @@ function DocuVaultPageInner() {
                 >
                     {/* Zone 1: Intake Hub — compact */}
                     <div className="lg:flex-[0.35] min-h-0 lg:min-h-[420px] flex flex-col space-y-3">
-                        {/* Header with Navigation */}
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h1 className="text-xl font-serif text-white tracking-tight leading-none mb-1">DocuVault</h1>
-                                <p className="text-[9px] text-white/20 font-bold uppercase tracking-[0.2em]">Intake & Templates</p>
-                            </div>
-                            
-                            {/* Status Pills */}
-                            <div className="flex items-center gap-2.5">
-                                <div className="px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-bold uppercase tracking-widest">
-                                    Draft Mode
+                        <PageHeader
+                            icon={FileText}
+                            title="DocuVault"
+                            description="Intake & Templates"
+                            rightElement={
+                                <div className="flex flex-wrap items-center gap-2.5">
+                                    <div className="px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-bold uppercase tracking-widest">
+                                        Draft Mode
+                                    </div>
+                                    <div className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/40 text-[9px] font-bold uppercase tracking-widest">
+                                        Jurisdiction: {resolvedState || 'Not Set'}
+                                    </div>
                                 </div>
-                                <div className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/40 text-[9px] font-bold uppercase tracking-widest">
-                                    Jurisdiction: {resolvedState || 'Not Set'}
-                                </div>
-                            </div>
-                        </div>
+                            }
+                        />
 
                     {/* Error banner */}
                     <AnimatePresence>

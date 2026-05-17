@@ -11,6 +11,19 @@ import { INCIDENT_CATEGORIES } from '@/lib/constants';
 
 export const maxDuration = 60; // Vercel Pro plan: up to 60s for PDF generation
 
+/** Render incident evidence entries as escaped HTML list items. */
+function renderEvidenceListHtml(evidence?: string[]) {
+    if (!evidence || evidence.length === 0) {
+        return '';
+    }
+
+    const evidenceItems = evidence
+        .map(item => `<li>${escapeHtml(item)}</li>`)
+        .join('');
+
+    return `<br/><small style="color: #666;"><strong>Attached Media:</strong></small><ul style="margin: 0.25rem 0 0 1.25rem; color: #666;">${evidenceItems}</ul>`;
+}
+
 export async function GET(request: Request) {
     try {
         const { userId } = await auth();
@@ -132,6 +145,7 @@ export async function GET(request: Request) {
                 const tagLabels = incident.tags.map(t => categoryLabelByValue.get(t) || t.replace(/_/g, ' '));
                 tagsHtml = `<br/><small style="color: #666;"><strong>Tags:</strong> ${escapeHtml(tagLabels.join(', '))}</small>`;
             }
+            const evidenceHtml = renderEvidenceListHtml(incident.evidence);
             
             timelineRows += `
                 <tr>
@@ -140,6 +154,7 @@ export async function GET(request: Request) {
                         <strong>${escapeHtml(catLabel)}</strong><br/>
                         ${escapeHtml(incident.courtSummary || incident.narrative || '')}
                         ${tagsHtml}
+                        ${evidenceHtml}
                     </td>
                 </tr>
             `;

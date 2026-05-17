@@ -24,6 +24,7 @@ import {
     ArrowsClockwise,
     DownloadSimple,
     CircleNotch,
+    Paperclip,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { INCIDENT_CATEGORIES } from '@/lib/constants';
@@ -393,6 +394,26 @@ export default function IncidentDetailPage() {
                         </p>
                     )}
                 </motion.div>
+
+                {incident.evidence && incident.evidence.length > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.18 }}
+                        className="card-premium p-6 md:p-8"
+                    >
+                        <h3 className="text-[12px] font-bold tracking-[0.2em] uppercase mb-4 text-sapphire flex items-center gap-2 border-b border-[rgba(10,22,41,0.04)] pb-4">
+                            <Paperclip size={16} className="text-sapphire-muted" /> Attached Media Context
+                        </h3>
+                        <div className="space-y-3">
+                            {incident.evidence.map((item, index) => (
+                                <p key={index} className="text-[14px] leading-relaxed whitespace-pre-wrap text-sapphire font-medium">
+                                    {item}
+                                </p>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
 
                 {/* Court-Ready Summary */}
                 <motion.div

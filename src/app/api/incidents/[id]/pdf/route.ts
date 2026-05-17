@@ -61,6 +61,16 @@ export async function GET(
                 </div>`;
         }
 
+        const evidenceHtml = incident.evidence && incident.evidence.length > 0
+            ? `
+              <div class="comm-summary-label">ATTACHED MEDIA CONTEXT</div>
+              <ol class="comm-summary-points">
+                ${incident.evidence
+                    .map((item) => `<li>${escapeHtml(item)}</li>`)
+                    .join('')}
+              </ol>`
+            : '';
+
         // Generate the HTML for the Incident Report
         const html = `<!DOCTYPE html>
 <html lang="en">
@@ -106,6 +116,8 @@ export async function GET(
             <td>${escapeHtml(incident.courtSummary || incident.narrative)}</td>
         </tr>
       </table>
+
+      ${evidenceHtml}
 
       ${keyPointBoxes}
     </div>

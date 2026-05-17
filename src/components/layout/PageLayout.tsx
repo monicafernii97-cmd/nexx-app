@@ -3,6 +3,9 @@
 import { motion } from 'framer-motion';
 import { ReactNode } from 'react';
 
+export const PAGE_TITLE_CLASS_NAME = 'text-2xl lg:text-3xl font-serif text-white tracking-tight leading-tight';
+export const PAGE_SUBTITLE_CLASS_NAME = 'text-[12px] lg:text-[13px] font-medium text-white/40 max-w-2xl leading-relaxed tracking-wide';
+
 export interface PageHeaderProps {
     /** A Phosphor Icon Component */
     icon: React.ElementType;
@@ -27,11 +30,11 @@ export function PageHeader({ icon: Icon, title, description, rightElement }: Pag
                     </div>
                 )}
                 <div className="space-y-1.5">
-                    <h1 className="text-2xl lg:text-3xl font-serif text-white tracking-tight leading-tight">
+                    <h1 className={PAGE_TITLE_CLASS_NAME}>
                         {title}
                     </h1>
                     {description && (
-                        <p className="text-[13px] font-medium text-white/40 max-w-2xl leading-relaxed tracking-wide">
+                        <p className={PAGE_SUBTITLE_CLASS_NAME}>
                             {description}
                         </p>
                     )}

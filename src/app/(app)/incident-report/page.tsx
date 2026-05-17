@@ -23,7 +23,11 @@ import {
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { PageContainer } from '@/components/layout/PageLayout';
+import {
+    PAGE_SUBTITLE_CLASS_NAME,
+    PAGE_TITLE_CLASS_NAME,
+    PageContainer,
+} from '@/components/layout/PageLayout';
 import { useWorkspace } from '@/lib/workspace-context';
 
 import '@/styles/pipelines.css';
@@ -549,10 +553,10 @@ export default function IncidentReportPage() {
                             <ArrowLeft size={20} weight="bold" className="text-white" />
                         </button>
                         <div>
-                            <h1 className="text-2xl md:text-3xl font-serif font-bold text-white m-0">
+                            <h1 className={`${PAGE_TITLE_CLASS_NAME} m-0`}>
                                 Evidence & <span className="text-white shimmer">Pattern Log</span>
                             </h1>
-                            <p className="text-[14px] font-medium text-white/90 mt-1">
+                            <p className={`${PAGE_SUBTITLE_CLASS_NAME} mt-1.5`}>
                                 Documenting patterns of behavior with precision for court.
                             </p>
                         </div>

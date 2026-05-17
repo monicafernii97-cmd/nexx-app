@@ -8,8 +8,7 @@ import { Id } from '@convex/_generated/dataModel';
 import { useParams, useRouter } from 'next/navigation';
 import { Archive, ClockCounterClockwise, Lock, Sun, Moon } from '@phosphor-icons/react';
 import MessageBubble, { type ChatTheme } from '@/components/chat/MessageBubble';
-import ChatInput, { type ComposerDraftInsertion } from '@/components/chat/ChatInput';
-import { ChatVoiceDock } from '@/components/chat/ChatVoiceDock';
+import ChatInput from '@/components/chat/ChatInput';
 import { WorkspaceClient } from '@/components/chat/WorkspaceClient';
 import { AnalysisStatusStrip, DEFAULT_ANALYSIS_STEPS, getStepsByElapsed } from '@/components/chat/AnalysisStatusStrip';
 import type { NexxAssistantResponse, RouteMode } from '@/lib/types';
@@ -44,11 +43,9 @@ export default function ConversationPage() {
         mode?: RouteMode;
     } | null>(null);
     const [analysisSteps, setAnalysisSteps] = useState<AnalysisStep[]>(DEFAULT_ANALYSIS_STEPS);
-    const [composerDraftInsertion, setComposerDraftInsertion] = useState<ComposerDraftInsertion | null>(null);
     const streamStartRef = useRef<number>(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const pendingInitialSentRef = useRef(false);
-    const draftInsertionSeqRef = useRef(0);
 
     // ── Theme state (persisted to localStorage) ──
     const [theme, setTheme] = useState<ChatTheme>('dark');
@@ -282,24 +279,6 @@ export default function ConversationPage() {
         [isStreaming, isPending, isThreadReady, unsavedReply, callChatAPI]
     );
 
-    /** Append finalized voice transcript text into the composer without submitting it. */
-    const handleInsertVoiceComposer = useCallback((text: string) => {
-        const trimmed = text.trim();
-        if (!trimmed) return;
-        setComposerDraftInsertion({
-            id: ++draftInsertionSeqRef.current,
-            text: trimmed,
-            mode: 'append',
-        });
-    }, []);
-
-    /** Submit a finalized voice transcript as a normal chat message. */
-    const handleSubmitVoiceTranscript = useCallback((text: string) => {
-        const trimmed = text.trim();
-        if (!trimmed) return;
-        void handleSend(trimmed);
-    }, [handleSend]);
-
     useEffect(() => {
         pendingInitialSentRef.current = false;
     }, [conversationId]);
@@ -454,18 +433,6 @@ export default function ConversationPage() {
                     : 'border-white/10'
                     }`}
             >
-                <button
-                    onClick={() => router.push('/chat')}
-                    className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[10px] font-bold uppercase tracking-widest transition-all border ${isLight
-                        ? 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                        : 'bg-white/5 border-white/5 text-white/60 hover:text-white hover:bg-white/10'
-                        }`}
-                    aria-label="Open conversation history"
-                >
-                    <ClockCounterClockwise size={15} weight="regular" />
-                    <span className="hidden sm:inline">History</span>
-                </button>
-                
                 <div className="min-w-0 flex-1 pl-1">
                     <h1 className={`truncate font-serif text-xl leading-tight tracking-tight ${isLight ? 'text-gray-900' : 'text-white/95'}`}>
                         {conversation?.title || 'NEXX Executive Intelligence'}
@@ -479,6 +446,18 @@ export default function ConversationPage() {
                         </div>
                     </div>
                 </div>
+
+                <button
+                    onClick={() => router.push('/chat?history=1')}
+                    className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[10px] font-bold uppercase tracking-widest transition-all border ${isLight
+                        ? 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                        : 'bg-white/5 border-white/5 text-white/60 hover:text-white hover:bg-white/10'
+                        }`}
+                    aria-label="Open conversation history"
+                >
+                    <ClockCounterClockwise size={15} weight="regular" />
+                    <span className="hidden sm:inline">History</span>
+                </button>
 
                 {/* Theme toggle */}
                 <button
@@ -658,15 +637,6 @@ export default function ConversationPage() {
                 transition={{ delay: 0.2 }}
                 className="pt-2 pb-6 px-1 lg:px-6 shrink-0 relative z-20"
             >
-                <div className="mb-3">
-                    <ChatVoiceDock
-                        disabled={isStreaming || isPending || !isThreadReady || !!unsavedReply}
-                        isLight={isLight}
-                        onInsertComposer={handleInsertVoiceComposer}
-                        onSubmitUserMessage={handleSubmitVoiceTranscript}
-                        onAssistantAction={workspace.onAction}
-                    />
-                </div>
                 <div className={`rounded-2xl p-1.5 transition-colors duration-300 ${isLight
                     ? 'bg-white border border-gray-200 shadow-[0_8px_32px_rgba(0,0,0,0.05)]'
                     : 'hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.4)]'
@@ -674,7 +644,6 @@ export default function ConversationPage() {
                     <ChatInput
                         onSend={handleSend}
                         disabled={isStreaming || isPending || !isThreadReady || !!unsavedReply}
-                        draftInsertion={composerDraftInsertion}
                     />
                 </div>
                 <p className={`text-center text-[9px] font-bold tracking-widest uppercase mt-3 flex items-center justify-center ${isLight ? 'text-gray-400' : 'text-white/30'}`}>

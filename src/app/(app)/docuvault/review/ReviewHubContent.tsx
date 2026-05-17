@@ -1406,7 +1406,7 @@ function CompletedPhaseUI({
 
     return (
         <div className="flex h-full min-h-0 items-center justify-center overflow-hidden p-2 sm:p-4">
-            <div className="mx-auto flex h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-full max-w-5xl flex-col rounded-2xl border border-white/10 bg-[rgba(10,17,40,0.88)] p-3 shadow-[0_18px_48px_rgba(0,0,0,0.25)] backdrop-blur-xl sm:h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-2rem)] sm:p-4">
+            <div className="mx-auto flex h-full max-h-full min-h-0 w-full max-w-5xl flex-col rounded-2xl border border-white/10 bg-[rgba(10,17,40,0.88)] p-3 shadow-[0_18px_48px_rgba(0,0,0,0.25)] backdrop-blur-xl sm:p-4">
                 {/* Success header */}
                 <div className="mb-3 flex shrink-0 items-center gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15">

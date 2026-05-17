@@ -35,6 +35,9 @@ const SENSITIVE_FILE_RE =
 const SENSITIVE_EXTENSION_RE =
   /\.(?:php|env|bak|backup|old|orig|save|sql|sqlite|sqlite3|db|log|ini|pem|key|crt|cer|p12|pfx|zip)(?=$|[/?#])/i;
 
+const ACME_CHALLENGE_TOKEN_RE =
+  /^\/\.well-known\/acme-challenge\/[A-Za-z0-9_-]+$/;
+
 /** Remove one trailing slash so exact probe paths cannot bypass checks with `/`. */
 function stripSingleTrailingSlash(pathname: string): string {
   if (pathname.length <= 1 || !pathname.endsWith('/')) return pathname;
@@ -53,7 +56,7 @@ export function normalizeProbePath(pathname: string): string {
 /** Return true for allowed standards paths that intentionally begin with `.well-known`. */
 export function isAllowedWellKnownPath(pathname: string): boolean {
   return (
-    pathname.startsWith('/.well-known/acme-challenge/') ||
+    ACME_CHALLENGE_TOKEN_RE.test(pathname) ||
     pathname === '/.well-known/security.txt'
   );
 }

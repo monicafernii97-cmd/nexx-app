@@ -51,25 +51,31 @@ they are not filesystem globs.
 - `pre:/backups`
 - `eq:/phpinfo.php`
 - `eq:/server-status`
-- `suf:.php`
-- `suf:.bak`
-- `suf:.backup`
-- `suf:.old`
-- `suf:.orig`
-- `suf:.save`
-- `suf:.sql`
-- `suf:.sqlite`
-- `suf:.sqlite3`
-- `suf:.db`
-- `suf:.log`
-- `suf:.ini`
-- `suf:.pem`
-- `suf:.key`
-- `suf:.crt`
-- `suf:.cer`
-- `suf:.p12`
-- `suf:.pfx`
-- `suf:.zip`
+- `re:\.(php\d?|phtml)(?:/|$)`
+- `re:\.bak(?:/|$)`
+- `re:\.backup(?:/|$)`
+- `re:\.old(?:/|$)`
+- `re:\.orig(?:/|$)`
+- `re:\.save(?:/|$)`
+- `re:\.sql(?:/|$)`
+- `re:\.sqlite(?:/|$)`
+- `re:\.sqlite3(?:/|$)`
+- `re:\.db(?:/|$)`
+- `re:\.log(?:/|$)`
+- `re:\.ini(?:/|$)`
+- `re:\.pem(?:/|$)`
+- `re:\.key(?:/|$)`
+- `re:\.crt(?:/|$)`
+- `re:\.cer(?:/|$)`
+- `re:\.p12(?:/|$)`
+- `re:\.pfx(?:/|$)`
+- `re:\.zip(?:/|$)`
+
+Use regex conditions for extension-style probes instead of suffix-only
+conditions. Suffix operators can miss scanner variants with a trailing slash,
+such as `/file.php/`; regexes like `re:\.php(?:/|$)` and
+`re:\.(php\d?|phtml)(?:/|$)` cover both ordinary filenames and slash-terminated
+probe paths.
 
 ## Production Verification
 

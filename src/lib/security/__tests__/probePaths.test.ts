@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isAllowedWellKnownPath,
   isProbePathname,
   normalizeProbePath,
 } from '@/lib/security/probePaths';
@@ -33,6 +34,7 @@ describe('probe path detection', () => {
     '/backup.sql/',
     '/phpinfo.php/',
     '/private.key/',
+    '/.well-known/acme-challenge/test.php',
   ])('blocks scanner path %s', (pathname) => {
     expect(isProbePathname(pathname)).toBe(true);
   });
@@ -58,5 +60,18 @@ describe('probe path detection', () => {
   it('normalizes malformed escape sequences without throwing', () => {
     expect(normalizeProbePath('/%GG')).toBe('/%gg');
     expect(isProbePathname('/%GG')).toBe(false);
+  });
+
+  it('only allowlists token-shaped well-known ACME challenge paths', () => {
+    expect(isAllowedWellKnownPath('/.well-known/acme-challenge/test-token_1')).toBe(
+      true,
+    );
+    expect(isAllowedWellKnownPath('/.well-known/security.txt')).toBe(true);
+    expect(isAllowedWellKnownPath('/.well-known/acme-challenge/test-token/extra')).toBe(
+      false,
+    );
+    expect(isAllowedWellKnownPath('/.well-known/acme-challenge/test.php')).toBe(
+      false,
+    );
   });
 });

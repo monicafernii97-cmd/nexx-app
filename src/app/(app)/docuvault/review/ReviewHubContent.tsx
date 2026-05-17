@@ -1380,6 +1380,192 @@ function DraftingPhaseUI({
     );
 }
 
+type PdfPageViewport = {
+    width: number;
+    height: number;
+};
+
+type PdfPageProxy = {
+    getViewport: (options: { scale: number }) => PdfPageViewport;
+    render: (options: {
+        canvas: HTMLCanvasElement;
+        canvasContext: CanvasRenderingContext2D;
+        viewport: PdfPageViewport;
+    }) => { promise: Promise<void> };
+};
+
+type PdfDocumentProxy = {
+    numPages: number;
+    getPage: (pageNumber: number) => Promise<PdfPageProxy>;
+    destroy: () => Promise<void> | void;
+};
+
+type PdfJsModule = {
+    GlobalWorkerOptions: { workerSrc: string };
+    getDocument: (source: { url: string; withCredentials: boolean }) => { promise: Promise<PdfDocumentProxy> };
+};
+
+function PdfPageFitPreview({
+    previewUrl,
+    documentTitle,
+}: {
+    previewUrl: string;
+    documentTitle: string;
+}) {
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
+    const documentRef = useRef<PdfDocumentProxy | null>(null);
+    const renderTokenRef = useRef(0);
+    const [containerWidth, setContainerWidth] = useState(0);
+    const [pageNumbers, setPageNumbers] = useState<number[]>([]);
+    const [status, setStatus] = useState<'loading' | 'rendering' | 'ready' | 'error'>('loading');
+
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const updateWidth = () => {
+            setContainerWidth(Math.floor(container.clientWidth));
+        };
+
+        updateWidth();
+        const observer = new ResizeObserver(updateWidth);
+        observer.observe(container);
+
+        return () => observer.disconnect();
+    }, []);
+
+    useEffect(() => {
+        let isCancelled = false;
+
+        async function loadPdf() {
+            setStatus('loading');
+            setPageNumbers([]);
+
+            try {
+                const pdfjs = await import('pdfjs-dist') as unknown as PdfJsModule;
+                pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+                    'pdfjs-dist/build/pdf.worker.min.mjs',
+                    import.meta.url,
+                ).toString();
+
+                const pdfDocument = await pdfjs.getDocument({
+                    url: previewUrl,
+                    withCredentials: true,
+                }).promise;
+
+                if (isCancelled) {
+                    await pdfDocument.destroy();
+                    return;
+                }
+
+                documentRef.current = pdfDocument;
+                setPageNumbers(Array.from({ length: pdfDocument.numPages }, (_, index) => index + 1));
+                setStatus('rendering');
+            } catch (error) {
+                console.error('[DocuVault PDF Preview] Failed to load PDF preview:', error);
+                if (!isCancelled) setStatus('error');
+            }
+        }
+
+        void loadPdf();
+
+        return () => {
+            isCancelled = true;
+            const currentDocument = documentRef.current;
+            documentRef.current = null;
+            if (currentDocument) void currentDocument.destroy();
+        };
+    }, [previewUrl]);
+
+    useEffect(() => {
+        const pdfDocument = documentRef.current;
+        if (!pdfDocument || pageNumbers.length === 0 || containerWidth <= 0) return;
+        const activeDocument = pdfDocument;
+
+        let isCancelled = false;
+        const token = renderTokenRef.current + 1;
+        renderTokenRef.current = token;
+
+        async function renderPages() {
+            setStatus('rendering');
+            const availableWidth = Math.max(containerWidth - 24, 180);
+            const maxPageWidth = Math.min(availableWidth, 760);
+            const outputScale = Math.max(1, window.devicePixelRatio || 1);
+
+            for (const pageNumber of pageNumbers) {
+                if (isCancelled || renderTokenRef.current !== token) return;
+
+                const page = await activeDocument.getPage(pageNumber);
+                const baseViewport = page.getViewport({ scale: 1 });
+                const scale = maxPageWidth / baseViewport.width;
+                const viewport = page.getViewport({ scale });
+                const canvas = canvasRefs.current.get(pageNumber);
+                const canvasContext = canvas?.getContext('2d');
+
+                if (!canvas || !canvasContext) continue;
+
+                canvas.width = Math.floor(viewport.width * outputScale);
+                canvas.height = Math.floor(viewport.height * outputScale);
+                canvas.style.width = `${Math.floor(viewport.width)}px`;
+                canvas.style.height = `${Math.floor(viewport.height)}px`;
+                canvasContext.setTransform(outputScale, 0, 0, outputScale, 0, 0);
+                canvasContext.clearRect(0, 0, viewport.width, viewport.height);
+
+                await page.render({ canvas, canvasContext, viewport }).promise;
+            }
+
+            if (!isCancelled && renderTokenRef.current === token) {
+                setStatus('ready');
+            }
+        }
+
+        void renderPages().catch((error) => {
+            console.error('[DocuVault PDF Preview] Failed to render PDF preview:', error);
+            if (!isCancelled) setStatus('error');
+        });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [containerWidth, pageNumbers]);
+
+    return (
+        <div ref={containerRef} className="h-full min-h-[260px] overflow-y-auto rounded-lg bg-[#f4f1ea] px-2 py-3 sm:px-3">
+            {status !== 'ready' && (
+                <div className="sticky top-2 z-10 mx-auto mb-3 w-fit rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-[11px] font-bold text-slate-500 shadow-sm">
+                    {status === 'error' ? 'Preview unavailable' : 'Rendering page-fit preview'}
+                </div>
+            )}
+
+            {status === 'error' ? (
+                <div className="flex min-h-[260px] items-center justify-center text-center">
+                    <p className="max-w-sm text-[13px] font-semibold text-slate-500">
+                        PDF preview could not render here. Use Open Full Preview or Download PDF below.
+                    </p>
+                </div>
+            ) : (
+                <div className="mx-auto flex w-full max-w-[780px] flex-col items-center gap-4">
+                    {pageNumbers.map((pageNumber) => (
+                        <canvas
+                            key={pageNumber}
+                            ref={(canvas) => {
+                                if (canvas) {
+                                    canvasRefs.current.set(pageNumber, canvas);
+                                } else {
+                                    canvasRefs.current.delete(pageNumber);
+                                }
+                            }}
+                            aria-label={`${documentTitle} page ${pageNumber}`}
+                            className="max-w-full rounded-sm bg-white shadow-[0_10px_28px_rgba(15,23,42,0.18)]"
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 // =========================================================================
 // Completed Phase — Focused Preview
 // =========================================================================
@@ -1395,9 +1581,7 @@ function CompletedPhaseUI({
     const downloadUrl = state.exportId
         ? `/api/documents/export/${state.exportId}/download`
         : null;
-    const previewUrl = downloadUrl
-        ? `${downloadUrl}?disposition=inline#toolbar=0&navpanes=0&scrollbar=1&view=Fit`
-        : null;
+    const previewUrl = downloadUrl ? `${downloadUrl}?disposition=inline` : null;
     const documentTitleSource = state.documentTitle?.trim() ? state.documentTitle : state.filename;
     const documentTitle = formatDocumentDisplayTitle(documentTitleSource, 'Generated Document');
     const preflightPassCount = state.preflight?.checks.filter(c => c.severity === 'pass').length ?? 0;
@@ -1422,11 +1606,7 @@ function CompletedPhaseUI({
 
                 <div className="mb-3 min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-[#f4f1ea] p-2 shadow-[0_12px_32px_rgba(0,0,0,0.22)] sm:p-3">
                     {previewUrl ? (
-                        <iframe
-                            title={`${documentTitle} PDF preview`}
-                            src={previewUrl}
-                            className="h-full min-h-[260px] w-full rounded-lg border-0 bg-[#f4f1ea]"
-                        />
+                        <PdfPageFitPreview previewUrl={previewUrl} documentTitle={documentTitle} />
                     ) : (
                         <div className="flex h-full min-h-[260px] items-center justify-center rounded-lg bg-[#f4f1ea]">
                             <p className="text-[13px] font-semibold text-slate-500">PDF preview unavailable.</p>

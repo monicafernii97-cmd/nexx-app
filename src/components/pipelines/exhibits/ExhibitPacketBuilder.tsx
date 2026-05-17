@@ -13,10 +13,8 @@ import {
   BookOpen, 
   Hash, 
   SquaresFour,
-  ArrowRight,
   CheckCircle,
   Plus,
-  MagnifyingGlass,
 } from '@phosphor-icons/react';
 import { useWorkspace } from '@/lib/workspace-context';
 
@@ -40,6 +38,7 @@ export default function ExhibitPacketBuilder() {
   // Live workspace data — casePins.listByUser doesn't filter by case,
   // so we filter client-side
   const allCasePins = useQuery(api.casePins.listByUser, {});
+  const allCaseMemory = useQuery(api.caseMemory.listByUser, {});
 
   // Local state for exhibit items (user-assembled)
   const [items, setItems] = useState<ExhibitItem[]>([]);
@@ -76,8 +75,22 @@ export default function ExhibitPacketBuilder() {
       }
     }
 
+    const exhibitNotes = activeCaseId
+      ? allCaseMemory?.filter(item => item.caseId === activeCaseId && item.type === 'exhibit_note') ?? []
+      : allCaseMemory?.filter(item => item.type === 'exhibit_note') ?? [];
+
+    for (const note of exhibitNotes) {
+      if (existing.has(note._id)) continue;
+      evidence.push({
+        id: note._id,
+        title: note.title,
+        summary: note.content.slice(0, 120) + (note.content.length > 120 ? '...' : ''),
+        type: 'text',
+      });
+    }
+
     return evidence;
-  }, [allCasePins, items, activeCaseId]);
+  }, [allCasePins, allCaseMemory, items, activeCaseId]);
 
   // Exhibit letter generator
   const exhibitLabel = (index: number) => {
@@ -155,7 +168,7 @@ export default function ExhibitPacketBuilder() {
             </div>
           )}
 
-          {items.map((item, index) => (
+          {items.map((item) => (
             <div key={item.id} className="group flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-amber-500/30 transition-all cursor-move">
               <div className="text-white/20 group-hover:text-amber-400/40">
                 <DotsSixVertical size={24} />

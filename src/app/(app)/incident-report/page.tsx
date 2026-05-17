@@ -29,6 +29,7 @@ import {
     PageContainer,
 } from '@/components/layout/PageLayout';
 import { useWorkspace } from '@/lib/workspace-context';
+import { useToast } from '@/components/feedback/ToastProvider';
 
 import '@/styles/pipelines.css';
 
@@ -113,6 +114,7 @@ const getLocalNow = () => {
 export default function IncidentReportPage() {
     const { activeCaseId } = useWorkspace();
     const router = useRouter();
+    const { showToast } = useToast();
     const [step, setStep] = useState<CaptureStep>('describe');
     const [narrative, setNarrative] = useState('');
     const [date, setDate] = useState('');
@@ -131,6 +133,8 @@ export default function IncidentReportPage() {
     const [processError, setProcessError] = useState<ProcessError>(null);
     const [isPinning, setIsPinning] = useState<string | null>(null);
     const pinningRef = useRef<string | null>(null);
+    const [isExportingIncident, setIsExportingIncident] = useState<string | null>(null);
+    const exportingIncidentRef = useRef<string | null>(null);
     const [pinError, setPinError] = useState<string | null>(null);
 
     // Derive displayed error — automatically suppresses stale "no case" message once case is selected
@@ -145,6 +149,7 @@ export default function IncidentReportPage() {
     );
     const createIncident = useMutation(api.incidents.create);
     const createCasePin = useMutation(api.casePins.create);
+    const saveCaseMemory = useMutation(api.caseMemory.save);
     const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
     const createDocument = useMutation(api.documents.create);
     const updateDocument = useMutation(api.documents.update);
@@ -509,8 +514,16 @@ export default function IncidentReportPage() {
     }, [narrative, activeCaseId, date, time, hasPendingMedia, hasMismatchedMedia, createIncident, handleReview, stopSpeechRecognition, mediaEvidence, mediaAttachments, updateDocument]);
 
     /** Pin an incident to the case workspace. Prevents duplicate clicks. */
-    const handleAddToWorkspace = useCallback(async (incident: { _id: Id<'incidents'>; narrative: string; date: string }) => {
-        if (!activeCaseId || pinningRef.current) return;
+    const handleAddToWorkspace = useCallback(async (incident: { _id: Id<'incidents'>; narrative: string; date: string; time?: string }) => {
+        if (pinningRef.current) return;
+        if (!activeCaseId) {
+            showToast({
+                variant: 'warning',
+                title: 'Select a case first',
+                description: 'Choose an active case before saving this incident to the workspace.',
+            });
+            return;
+        }
         pinningRef.current = incident._id;
         setIsPinning(incident._id);
 
@@ -518,19 +531,87 @@ export default function IncidentReportPage() {
             setPinError(null);
             await createCasePin({
                 caseId: activeCaseId,
-                type: 'key_fact',
+                type: 'timeline_anchor',
                 title: `Incident — ${incident.date}`,
                 content: incident.narrative,
+                rawSourceText: incident.narrative,
+                confidence: 'high',
+                detectedDate: incident.date,
+                aiVersion: 'incident-intake-actions-v1',
                 requestId: `incident:${incident._id}:workspace`,
+            });
+            showToast({
+                variant: 'success',
+                title: 'Saved to Case Workspace',
+                description: 'The incident is pinned as a timeline anchor for this case.',
+                destination: { label: 'Open workspace', href: '/chat/overview' },
             });
         } catch (err) {
             console.error('[IncidentIntake] Pin creation failed:', err);
             setPinError('Failed to add incident to workspace. Please try again.');
+            showToast({
+                variant: 'error',
+                title: 'Workspace save failed',
+                description: err instanceof Error ? err.message : 'Please try again.',
+            });
         } finally {
             pinningRef.current = null;
             setIsPinning(null);
         }
-    }, [activeCaseId, createCasePin]);
+    }, [activeCaseId, createCasePin, showToast]);
+
+    /** Save an incident as an exhibit note for the existing Exhibit Hub/DocuVault flow. */
+    const handleExportToExhibit = useCallback(async (incident: { _id: Id<'incidents'>; narrative: string; date: string; time?: string; evidence?: string[] }) => {
+        if (exportingIncidentRef.current) return;
+        if (!activeCaseId) {
+            showToast({
+                variant: 'warning',
+                title: 'Select a case first',
+                description: 'Choose an active case before sending this incident to Exhibit Hub.',
+            });
+            return;
+        }
+
+        exportingIncidentRef.current = incident._id;
+        setIsExportingIncident(incident._id);
+
+        try {
+            const evidenceText = incident.evidence?.length
+                ? `\n\nLinked evidence:\n${incident.evidence.map((item) => `- ${item}`).join('\n')}`
+                : '';
+            await saveCaseMemory({
+                type: 'exhibit_note',
+                title: `Exhibit source - Incident ${incident.date}`,
+                content: `Incident date: ${incident.date}${incident.time ? ` at ${incident.time}` : ''}\n\n${incident.narrative}${evidenceText}`,
+                caseId: activeCaseId,
+                metadataJson: JSON.stringify({
+                    source: 'incident_report_timeline_intake',
+                    incidentId: incident._id,
+                    eventDate: incident.date,
+                    eventTime: incident.time ?? null,
+                    evidenceCount: incident.evidence?.length ?? 0,
+                }),
+                requestId: `incident:${incident._id}:exhibit-note`,
+            });
+            showToast({
+                variant: 'success',
+                title: 'Sent to Exhibit Hub',
+                description: 'Saved as an exhibit note for DocuVault/exhibit assembly.',
+                destination: { label: 'Open Exhibit Hub', href: '/docuvault/exhibits' },
+            });
+        } catch (err) {
+            console.error('[IncidentIntake] Exhibit note creation failed:', err);
+            setPinError('Failed to send incident to Exhibit Hub. Please try again.');
+            showToast({
+                variant: 'error',
+                title: 'Exhibit export failed',
+                description: err instanceof Error ? err.message : 'Please try again.',
+            });
+        } finally {
+            exportingIncidentRef.current = null;
+            setIsExportingIncident(null);
+        }
+    }, [activeCaseId, saveCaseMemory, showToast]);
 
 
 
@@ -960,8 +1041,17 @@ export default function IncidentReportPage() {
                                         >
                                             {isPinning === incident._id ? 'Securing...' : isPinning ? 'Please wait' : 'Case Workspace'}
                                         </button>
-                                        <button disabled className="px-4 py-2 rounded-lg bg-amber-500/5 text-amber-500/30 text-[9px] font-bold uppercase tracking-[0.2em] border border-amber-500/10 cursor-not-allowed" title="Coming soon">
-                                            Export to Exhibit
+                                        <button
+                                            type="button"
+                                            onClick={() => handleExportToExhibit(incident)}
+                                            disabled={Boolean(isExportingIncident)}
+                                            className={`px-4 py-2 rounded-lg text-[9px] font-bold uppercase tracking-[0.2em] border transition-all ${
+                                                isExportingIncident
+                                                    ? 'bg-amber-500/10 text-amber-400/60 border-amber-500/20 cursor-not-allowed'
+                                                    : 'bg-amber-500/10 text-amber-300 border-amber-500/20 hover:bg-amber-500/15 hover:border-amber-400/40 hover:text-amber-200'
+                                            }`}
+                                        >
+                                            {isExportingIncident === incident._id ? 'Sending...' : isExportingIncident ? 'Please wait' : 'Export to Exhibit'}
                                         </button>
                                     </div>
                                 </div>

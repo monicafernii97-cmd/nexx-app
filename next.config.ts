@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Bundle PDF.js modules so the DocuVault canvas preview worker loads
+  // consistently instead of falling back to main-thread PDF parsing.
+  transpilePackages: ['pdfjs-dist'],
   // Let the proxy classify trailing-slash scanner probes before Next.js can
   // normalize them into redirects that still consume request processing.
   skipTrailingSlashRedirect: true,

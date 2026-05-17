@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Let the proxy classify trailing-slash scanner probes before Next.js can
+  // normalize them into redirects that still consume request processing.
+  skipTrailingSlashRedirect: true,
   // Exclude packages with native binaries from the serverless bundle —
   // they must be resolved at runtime, not bundled.
   // NOTE: jsdom was previously here but removed because its dependency

@@ -52,6 +52,7 @@ const isProtectedApiRoute = createRouteMatcher([
   '/api/workspace(.*)',
 ]);
 
+/** Return a JSON auth failure for protected APIs instead of rendering sign-in HTML. */
 function unauthorizedApiResponse(): NextResponse {
   return NextResponse.json(
     { error: 'Unauthorized' },
@@ -64,6 +65,7 @@ function unauthorizedApiResponse(): NextResponse {
   );
 }
 
+/** Return a cacheable empty 404 for scanner probes that should not reach Clerk. */
 function hardNotFound(): NextResponse {
   return new NextResponse(null, {
     status: 404,
@@ -90,6 +92,7 @@ const clerk = clerkMiddleware(async (auth, req) => {
   return NextResponse.next();
 });
 
+/** Run probe blocking before Clerk and then enforce explicit app/API protection. */
 export default function proxy(req: NextRequest, event: NextFetchEvent) {
   /**
    * Vercel Firewall should catch these first in production. This fallback keeps

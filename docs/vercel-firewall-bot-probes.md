@@ -23,9 +23,13 @@ Deny requests whose request path matches any of these categories:
 - `/backend/.env`
 - `/app/.env`
 - `/.aws/credentials`
+- `/.aws/*`
 - `/credentials.json`
 - `/service-account.json`
 - `/firebase-service-account.json`
+- `/composer.json`
+- `/composer.lock`
+- `/database.sql`
 - `/.git/*`
 - `/.git`
 - `/.svn/*`
@@ -38,6 +42,11 @@ Deny requests whose request path matches any of these categories:
 - `/phpmyadmin/*`
 - `/pma/*`
 - `/adminer/*`
+- `/vendor/*`
+- `/backup/*`
+- `/backup*`
+- `/backups/*`
+- `/backups*`
 - `/phpinfo.php`
 - `/server-status`
 - `/*.php`
@@ -54,6 +63,8 @@ Deny requests whose request path matches any of these categories:
 - `/*.ini`
 - `/*.pem`
 - `/*.key`
+- `/*.crt`
+- `/*.cer`
 - `/*.p12`
 - `/*.pfx`
 

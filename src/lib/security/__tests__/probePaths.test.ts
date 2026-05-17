@@ -21,6 +21,10 @@ describe('probe path detection', () => {
     '/test.php',
     '/backup.sql',
     '/private.key',
+    '/test.php/',
+    '/backup.sql/',
+    '/phpinfo.php/',
+    '/private.key/',
   ])('blocks scanner path %s', (pathname) => {
     expect(isProbePathname(pathname)).toBe(true);
   });

@@ -6,14 +6,11 @@ import {
     FileText,
     MagnifyingGlass as Search,
     ArrowLeft,
+    ArrowSquareOut,
     DownloadSimple as Download,
     Trash,
     Clock,
     Plus,
-    DotsThreeOutlineVertical,
-    CheckCircle,
-    XCircle,
-    WarningCircle
 } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { useQuery, useMutation } from 'convex/react';
@@ -21,6 +18,7 @@ import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { EXPORT_PATH_LABELS, EXPORT_PATHS } from '@/lib/export-assembly/exportPathLabels';
 import type { ExportPath } from '@/lib/export-assembly/types/exports';
+import { formatDocumentDisplayTitle } from '@/lib/formatting/documentTitle';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 
 /** Gallery page displaying saved and generated legal documents. */
@@ -48,7 +46,8 @@ export default function DocuVaultGalleryPage() {
         if (!exports) return [];
         return exports.map(doc => ({
             id: doc._id,
-            title: doc.filename ?? doc.templateTitle,
+            title: formatDocumentDisplayTitle(doc.filename ?? doc.templateTitle),
+            filename: doc.filename ?? 'export.pdf',
             category: doc.exportPath ?? doc.templateId,
             createdAt: new Date(doc.createdAt),
             status: (['completed', 'final', 'filed'].includes(doc.status) ? 'complete' : 'draft') as 'complete' | 'draft',
@@ -296,14 +295,25 @@ export default function DocuVaultGalleryPage() {
                                         {/* Actions */}
                                         <div className="flex gap-3">
                                             {doc.storageId && (
-                                                <a
-                                                    href={`/api/documents/export/${doc.id}/download`}
-                                                    download={doc.title}
-                                                    className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors shadow-sm"
-                                                    aria-label="Download document"
-                                                >
-                                                    <Download size={16} weight="bold" />
-                                                </a>
+                                                <>
+                                                    <a
+                                                        href={`/api/documents/export/${doc.id}/download?disposition=inline`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors shadow-sm"
+                                                        aria-label={`Open ${doc.title}`}
+                                                    >
+                                                        <ArrowSquareOut size={16} weight="bold" />
+                                                    </a>
+                                                    <a
+                                                        href={`/api/documents/export/${doc.id}/download`}
+                                                        download={doc.filename}
+                                                        className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors shadow-sm"
+                                                        aria-label={`Download ${doc.title}`}
+                                                    >
+                                                        <Download size={16} weight="bold" />
+                                                    </a>
+                                                </>
                                             )}
                                         </div>
                                     </div>

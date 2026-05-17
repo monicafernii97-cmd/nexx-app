@@ -1395,7 +1395,9 @@ function CompletedPhaseUI({
     const downloadUrl = state.exportId
         ? `/api/documents/export/${state.exportId}/download`
         : null;
-    const previewUrl = downloadUrl ? `${downloadUrl}?disposition=inline` : null;
+    const previewUrl = downloadUrl
+        ? `${downloadUrl}?disposition=inline#toolbar=0&navpanes=0&scrollbar=1&view=Fit`
+        : null;
     const documentTitleSource = state.documentTitle?.trim() ? state.documentTitle : state.filename;
     const documentTitle = formatDocumentDisplayTitle(documentTitleSource, 'Generated Document');
     const preflightPassCount = state.preflight?.checks.filter(c => c.severity === 'pass').length ?? 0;
@@ -1403,10 +1405,10 @@ function CompletedPhaseUI({
     const preflightErrorCount = state.preflight?.errorCount ?? 0;
 
     return (
-        <div className="flex h-full min-h-0 items-center justify-center overflow-hidden p-4 sm:p-6">
-            <div className="mx-auto flex max-h-[calc(100dvh-7rem)] w-full max-w-4xl flex-col rounded-2xl border border-white/10 bg-[rgba(10,17,40,0.88)] p-4 shadow-[0_18px_48px_rgba(0,0,0,0.25)] backdrop-blur-xl sm:p-5">
+        <div className="flex h-full min-h-0 items-center justify-center overflow-hidden p-2 sm:p-4">
+            <div className="mx-auto flex h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-full max-w-5xl flex-col rounded-2xl border border-white/10 bg-[rgba(10,17,40,0.88)] p-3 shadow-[0_18px_48px_rgba(0,0,0,0.25)] backdrop-blur-xl sm:h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-2rem)] sm:p-4">
                 {/* Success header */}
-                <div className="mb-4 flex items-center gap-3">
+                <div className="mb-3 flex shrink-0 items-center gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/15">
                         <CheckCircle size={24} weight="fill" className="text-emerald-400" />
                     </div>
@@ -1418,15 +1420,15 @@ function CompletedPhaseUI({
                     </div>
                 </div>
 
-                <div className="mb-4 min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-slate-50 shadow-[0_12px_32px_rgba(0,0,0,0.22)]">
+                <div className="mb-3 min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-[#f4f1ea] p-2 shadow-[0_12px_32px_rgba(0,0,0,0.22)] sm:p-3">
                     {previewUrl ? (
                         <iframe
                             title={`${documentTitle} PDF preview`}
                             src={previewUrl}
-                            className="h-full min-h-[340px] w-full bg-slate-50"
+                            className="h-full min-h-[260px] w-full rounded-lg border-0 bg-[#f4f1ea]"
                         />
                     ) : (
-                        <div className="flex h-[340px] items-center justify-center bg-slate-50">
+                        <div className="flex h-full min-h-[260px] items-center justify-center rounded-lg bg-[#f4f1ea]">
                             <p className="text-[13px] font-semibold text-slate-500">PDF preview unavailable.</p>
                         </div>
                     )}
@@ -1461,7 +1463,7 @@ function CompletedPhaseUI({
                 </div>
 
                 {/* Action buttons */}
-                <div className="mb-3 grid gap-2 sm:grid-cols-3">
+                <div className="mb-2 grid shrink-0 gap-2 sm:grid-cols-3">
                     {previewUrl && (
                         <a
                             href={previewUrl}
@@ -1500,7 +1502,7 @@ function CompletedPhaseUI({
                 <button
                     type="button"
                     onClick={onBackToReview}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 py-2 text-[11px] font-bold text-white/50 transition-colors hover:bg-white/10 hover:text-white/70"
+                    className="w-full shrink-0 rounded-xl border border-white/10 bg-white/5 py-2 text-[11px] font-bold text-white/50 transition-colors hover:bg-white/10 hover:text-white/70"
                 >
                     Return to Review Hub
                 </button>

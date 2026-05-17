@@ -18,23 +18,8 @@ import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { EXPORT_PATH_LABELS, EXPORT_PATHS } from '@/lib/export-assembly/exportPathLabels';
 import type { ExportPath } from '@/lib/export-assembly/types/exports';
+import { formatDocumentDisplayTitle } from '@/lib/formatting/documentTitle';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
-
-/** Format saved export filenames into formal display titles without changing downloads. */
-function formatDocumentDisplayTitle(value: string | null | undefined): string {
-    if (!value) return 'Untitled Document';
-    const title = value
-        .replace(/\.pdf$/i, '')
-        .replace(/[_-]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-    if (!title) return 'Untitled Document';
-    return title
-        .toLowerCase()
-        .split(' ')
-        .map(word => word.replace(/^[a-z0-9]/, char => char.toUpperCase()))
-        .join(' ');
-}
 
 /** Gallery page displaying saved and generated legal documents. */
 export default function DocuVaultGalleryPage() {
@@ -314,7 +299,7 @@ export default function DocuVaultGalleryPage() {
                                                     <a
                                                         href={`/api/documents/export/${doc.id}/download?disposition=inline`}
                                                         target="_blank"
-                                                        rel="noreferrer"
+                                                        rel="noopener noreferrer"
                                                         className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors shadow-sm"
                                                         aria-label={`Open ${doc.title}`}
                                                     >

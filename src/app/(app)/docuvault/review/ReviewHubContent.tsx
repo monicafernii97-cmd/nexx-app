@@ -38,6 +38,7 @@ import { detectCourtDocumentIssues, ISSUE_TO_MODE, MODE_PRIORITY, type Clarifica
 import { resolveCourtIdentity, type CourtSettingsData, type NexProfileData, type UserProfileData, type CourtIdentity } from '@/lib/exports/resolveCourtIdentity';
 import { storeCourtHandoff } from '@/lib/exports/courtHandoff';
 import { extractCourtMetadataFromText } from '@/lib/exports/extractCourtMetadataFromText';
+import { formatDocumentDisplayTitle } from '@/lib/formatting/documentTitle';
 import {
     matchExhibitReferences,
     type ExhibitHubCandidate,
@@ -58,22 +59,6 @@ function getExportLabel(exportPath: string | null | undefined): string {
         case 'exhibit_packet': return 'Exhibit Packet';
         default: return 'Export';
     }
-}
-
-/** Format persisted filenames or document ids into a formal user-facing title. */
-function formatDocumentDisplayTitle(value: string | null | undefined): string | null {
-    if (!value) return null;
-    const title = value
-        .replace(/\.pdf$/i, '')
-        .replace(/[_-]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-    if (!title) return null;
-    return title
-        .toLowerCase()
-        .split(' ')
-        .map(word => word.replace(/^[a-z0-9]/, char => char.toUpperCase()))
-        .join(' ');
 }
 
 /** Drafting checklist stages in order. */
@@ -1411,9 +1396,8 @@ function CompletedPhaseUI({
         ? `/api/documents/export/${state.exportId}/download`
         : null;
     const previewUrl = downloadUrl ? `${downloadUrl}?disposition=inline` : null;
-    const documentTitle = formatDocumentDisplayTitle(state.documentTitle)
-        ?? formatDocumentDisplayTitle(state.filename)
-        ?? 'Generated Document';
+    const documentTitleSource = state.documentTitle?.trim() ? state.documentTitle : state.filename;
+    const documentTitle = formatDocumentDisplayTitle(documentTitleSource, 'Generated Document');
     const preflightPassCount = state.preflight?.checks.filter(c => c.severity === 'pass').length ?? 0;
     const preflightWarnCount = state.preflight?.warningCount ?? 0;
     const preflightErrorCount = state.preflight?.errorCount ?? 0;
@@ -1482,7 +1466,7 @@ function CompletedPhaseUI({
                         <a
                             href={previewUrl}
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
                             className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-[12px] font-bold text-white/70 transition-all hover:bg-white/10 hover:text-white"
                         >
                             <ArrowSquareOut size={16} />
@@ -1508,7 +1492,7 @@ function CompletedPhaseUI({
                         className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-[12px] font-bold text-white/70 transition-all hover:bg-white/10 hover:text-white"
                     >
                         <ArrowSquareOut size={16} />
-                        Save + View in Vault
+                        View in Vault
                     </a>
                 </div>
 

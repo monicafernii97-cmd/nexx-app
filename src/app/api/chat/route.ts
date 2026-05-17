@@ -33,7 +33,8 @@ function buildConversationTitle(message: string) {
   if (!normalized) return 'New Chat';
   const withoutTrailingPunctuation = normalized.replace(/[.!?]+$/g, '');
   const words = withoutTrailingPunctuation.split(' ').slice(0, 8).join(' ');
-  return words.length > 64 ? `${words.slice(0, 61).trim()}...` : words;
+  const compact = words.length > 64 ? `${words.slice(0, 61).trim()}...` : words;
+  return compact.trim().length > 0 ? compact : 'New Chat';
 }
 
 /**

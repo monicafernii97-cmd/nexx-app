@@ -33,7 +33,8 @@ function buildConversationTitle(message: string) {
   if (!normalized) return 'New Chat';
   const withoutTrailingPunctuation = normalized.replace(/[.!?]+$/g, '');
   const words = withoutTrailingPunctuation.split(' ').slice(0, 8).join(' ');
-  return words.length > 64 ? `${words.slice(0, 61).trim()}...` : words;
+  const compact = words.length > 64 ? `${words.slice(0, 61).trim()}...` : words;
+  return compact.trim().length > 0 ? compact : 'New Chat';
 }
 
 /**
@@ -510,10 +511,11 @@ export async function POST(req: NextRequest) {
             confidence: parsedResponse.artifacts.confidence,
           };
 
+          const currentTitle = (conversation.title ?? '').trim();
           const shouldUpdateConversationTitle =
-            isFirstTurn ||
-            conversation.title === 'New Conversation' ||
-            conversation.title === 'New Chat';
+            currentTitle.length === 0 ||
+            currentTitle === 'New Conversation' ||
+            currentTitle === 'New Chat';
 
           // ── Step 13: Save user message to Convex ──
           try {

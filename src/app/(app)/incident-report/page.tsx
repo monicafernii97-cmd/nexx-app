@@ -306,10 +306,14 @@ export default function IncidentReportPage() {
                         headers: { 'Content-Type': file.type },
                         body: file,
                     });
+                    if (!uploadResponse.ok) {
+                        const errorBody = await uploadResponse.text().catch(() => '');
+                        throw new Error(`Media upload failed (${uploadResponse.status}). ${errorBody}`.trim());
+                    }
                     const uploadResult = await uploadResponse.json();
                     const storageId = uploadResult?.storageId as Id<'_storage'> | undefined;
-                    if (!uploadResponse.ok || !storageId) {
-                        throw new Error('Media upload failed.');
+                    if (!storageId) {
+                        throw new Error('Media upload returned no storage ID.');
                     }
 
                     updateAttachment(id, { status: 'analyzing' });

@@ -167,7 +167,7 @@ function ChatListContent() {
                             </p>
                         </div>
 
-                        <div className="mt-[6rem] rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-2 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:mt-[7.5rem]">
+                        <div className="mt-12 rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-2 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:mt-[7.5rem]">
                             <ChatInput
                                 onSend={handleSendNewChat}
                                 disabled={!isWorkspaceReady || isCreating}

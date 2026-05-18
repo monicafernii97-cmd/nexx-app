@@ -119,14 +119,18 @@ export async function POST(req: NextRequest) {
             requestId,
         });
 
-        await convex.mutation(api.caseMemory.save, {
-            caseId,
-            type: 'draft_snippet',
-            content: formatCaseNarrativeAsDraft(narrative),
-            title: narrative.title || `Case Summary Narrative - ${new Date().toLocaleDateString()}`,
-            metadataJson: JSON.stringify({ source: 'workspace_narrative', artifactType: 'case_summary_narrative' }),
-            requestId: stableRequestId(caseId, 'narrative_workspace_draft'),
-        });
+        try {
+            await convex.mutation(api.caseMemory.save, {
+                caseId,
+                type: 'draft_snippet',
+                content: formatCaseNarrativeAsDraft(narrative),
+                title: narrative.title || `Case Summary Narrative - ${new Date().toLocaleDateString()}`,
+                metadataJson: JSON.stringify({ source: 'workspace_narrative', artifactType: 'case_summary_narrative' }),
+                requestId: stableRequestId(caseId, 'narrative_workspace_draft'),
+            });
+        } catch (draftSaveError) {
+            console.error('[narrative] Draft persistence failed:', draftSaveError);
+        }
 
         return NextResponse.json(narrative);
     } catch (err) {

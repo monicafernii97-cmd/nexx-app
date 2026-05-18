@@ -78,7 +78,7 @@ export function GenerateReportModal({
     isGenerating = false,
     itemCounts,
 }: GenerateReportModalProps) {
-    const [outputType, setOutputType] = useState<OutputType>('summary');
+    const [outputType, setOutputType] = useState<OutputType>('both');
 
     const [patternHandling, setPatternHandling] = useState<PatternHandling>('include_supported');
     const modalRef = useRef<HTMLDivElement>(null);

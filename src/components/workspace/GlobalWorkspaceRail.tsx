@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
     CheckCircle,
@@ -15,10 +15,13 @@ import {
     CaretLeft,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useWorkspace } from '@/lib/workspace-context';
-import { useState } from 'react';
-import { useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
+import { useToast } from '@/components/feedback/ToastProvider';
+import { GenerateReportModal } from '@/components/workspace/GenerateReportModal';
+import type { OutputType, PatternHandling } from '@/lib/workspace-types';
 
 // ---------------------------------------------------------------------------
 // Readiness scoring — how "court-ready" is the user's workspace?
@@ -71,6 +74,43 @@ interface SuggestedAction {
 /** Shared loading skeleton items to prevent style/count drift between collapsed and expanded states. */
 const SKELETON_PLACEHOLDERS = [1, 2, 3] as const;
 
+interface WorkspaceReport {
+    title?: string;
+    generatedAt?: string;
+    summary?: string;
+    sections?: Array<{ heading?: string; body?: string }>;
+    recommendations?: string[];
+}
+
+/** Convert a generated workspace report into a readable saved work product. */
+function formatWorkspaceReport(report: WorkspaceReport): string {
+    const sections = report.sections
+        ?.map(section => {
+            const heading = section.heading?.trim();
+            const body = section.body?.trim();
+            if (!heading && !body) return null;
+            return [heading, body].filter(Boolean).join('\n');
+        })
+        .filter(Boolean) ?? [];
+    const recommendations = report.recommendations?.filter(Boolean) ?? [];
+
+    return [
+        report.summary?.trim() && `Summary\n${report.summary.trim()}`,
+        ...sections,
+        recommendations.length > 0 && `Recommendations\n${recommendations.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
+    ].filter(Boolean).join('\n\n');
+}
+
+/** True when the selected output should be available as a workspace draft. */
+function includesSummaryDraft(outputType: OutputType) {
+    return outputType === 'summary' || outputType === 'both';
+}
+
+/** True when the selected output should be staged inside Exhibit Hub. */
+function includesExhibitNote(outputType: OutputType) {
+    return outputType === 'court_document' || outputType === 'both';
+}
+
 /**
  * GlobalWorkspaceRail — The "Insights Rail" (280px sticky right panel).
  *
@@ -82,6 +122,11 @@ const SKELETON_PLACEHOLDERS = [1, 2, 3] as const;
 export function GlobalWorkspaceRail() {
     const { counts, pins, memory, timeline, activeCaseId } = useWorkspace();
     const [isExpanded, setIsExpanded] = useState(true);
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+    const router = useRouter();
+    const { showToast } = useToast();
+    const saveCaseMemory = useMutation(api.caseMemory.save);
 
     // ── Detected patterns from Convex ──
     const detectedPatterns = useQuery(
@@ -94,6 +139,96 @@ export function GlobalWorkspaceRail() {
     // Prevents showing "missing" readiness for data that simply hasn't arrived yet.
     const isPatternsLoading = !!activeCaseId && detectedPatterns === undefined;
     const isLoading = pins === undefined || memory === undefined || timeline === undefined || isPatternsLoading;
+
+    const handleGenerateReport = useCallback(async ({
+        outputType,
+        patternHandling,
+    }: {
+        outputType: OutputType;
+        patternHandling: PatternHandling;
+    }) => {
+        if (!activeCaseId) {
+            showToast({
+                variant: 'warning',
+                title: 'Select a case first',
+                description: 'Choose an active case before generating a workspace report.',
+            });
+            return;
+        }
+
+        setIsGeneratingReport(true);
+        try {
+            const response = await fetch('/api/workspace/report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    caseId: activeCaseId,
+                    outputType,
+                    tone: 'attorney_ready',
+                    patternHandling,
+                }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(typeof data.error === 'string' ? data.error : 'Report generation failed');
+            }
+
+            const report = data as WorkspaceReport;
+            const title = report.title?.trim() || 'Case Workspace Report';
+            const content = formatWorkspaceReport(report);
+            const timestamp = Date.now();
+            let exhibitNoteId: string | null = null;
+
+            if (includesSummaryDraft(outputType)) {
+                await saveCaseMemory({
+                    caseId: activeCaseId,
+                    type: 'draft_snippet',
+                    title,
+                    content,
+                    metadataJson: JSON.stringify({ source: 'insights_rail_report', artifactType: 'case_summary_report' }),
+                    requestId: `insights-report-summary-${activeCaseId}-${timestamp}`,
+                });
+            }
+
+            if (includesExhibitNote(outputType)) {
+                const savedId = await saveCaseMemory({
+                    caseId: activeCaseId,
+                    type: 'exhibit_note',
+                    title: `Exhibit overview - ${title}`,
+                    content: [
+                        'Workspace PDF overview source.',
+                        '',
+                        content,
+                    ].join('\n'),
+                    metadataJson: JSON.stringify({ source: 'insights_rail_report', artifactType: 'workspace_pdf_overview_exhibit_note' }),
+                    requestId: `insights-report-exhibit-${activeCaseId}-${timestamp}`,
+                });
+                exhibitNoteId = String(savedId);
+            }
+
+            setIsReportModalOpen(false);
+            showToast({
+                variant: 'success',
+                title: includesExhibitNote(outputType) ? 'Report staged in Exhibit Hub' : 'Report saved to Workspace',
+                description: includesExhibitNote(outputType)
+                    ? 'The generated overview is ready for exhibit assembly.'
+                    : 'The generated overview is saved as a workspace draft.',
+            });
+
+            router.push(exhibitNoteId
+                ? `/docuvault/exhibits?sourceId=${encodeURIComponent(exhibitNoteId)}`
+                : '/chat/overview'
+            );
+        } catch (err) {
+            showToast({
+                variant: 'error',
+                title: 'Report generation failed',
+                description: err instanceof Error ? err.message : 'Please try again.',
+            });
+        } finally {
+            setIsGeneratingReport(false);
+        }
+    }, [activeCaseId, router, saveCaseMemory, showToast]);
 
     // ── Readiness scoring ──
     const readiness: ReadinessItem[] = useMemo(() => [
@@ -324,17 +459,30 @@ export function GlobalWorkspaceRail() {
 
                 {/* ── Generate Report CTA ── */}
                 <section className="mt-auto pt-4 border-t border-white/5">
-                    <Link
-                        href="/docuvault"
+                    <button
+                        type="button"
+                        onClick={() => setIsReportModalOpen(true)}
                         className="flex items-center justify-center gap-2.5 w-full px-4 py-3 rounded-xl bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] border border-white/20 text-white text-[11px] font-bold uppercase tracking-widest shadow-[0_4px_16px_rgba(26,75,155,0.3)] hover:shadow-[0_8px_24px_rgba(26,75,155,0.4)] hover:-translate-y-0.5 transition-all no-underline group"
                     >
                         <FileText size={16} weight="bold" className="group-hover:scale-110 transition-transform" />
                         Generate Report
-                    </Link>
+                    </button>
                 </section>
                 </div>
                 )}
             </div>
+            <GenerateReportModal
+                isOpen={isReportModalOpen}
+                onClose={() => setIsReportModalOpen(false)}
+                onGenerate={handleGenerateReport}
+                isGenerating={isGeneratingReport}
+                itemCounts={{
+                    facts: counts.keyFacts,
+                    timeline: counts.timeline,
+                    patterns: patternCount,
+                    pins: counts.pins,
+                }}
+            />
         </motion.aside>
     );
 }

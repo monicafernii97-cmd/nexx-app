@@ -127,28 +127,21 @@ export default function ExhibitPacketBuilder() {
     const evidence = availableEvidence.find(item => item.id === sourceId);
     if (!evidence) return;
 
-    autoStagedSourceRef.current = sourceId;
-    let isCancelled = false;
-    queueMicrotask(() => {
-      if (isCancelled) return;
-      setItems(prev => {
-        if (prev.some(item => item.sourceId === sourceId)) return prev;
-        return [
-          ...prev,
-          {
-            id: createExhibitItemId(),
-            label: getExhibitLabel(prev.length),
-            title: evidence.title,
-            type: evidence.type,
-            summary: evidence.summary,
-            sourceId: evidence.id,
-          },
-        ];
-      });
+    setItems(prev => {
+      if (prev.some(item => item.sourceId === sourceId)) return prev;
+      autoStagedSourceRef.current = sourceId;
+      return [
+        ...prev,
+        {
+          id: createExhibitItemId(),
+          label: getExhibitLabel(prev.length),
+          title: evidence.title,
+          type: evidence.type,
+          summary: evidence.summary,
+          sourceId: evidence.id,
+        },
+      ];
     });
-    return () => {
-      isCancelled = true;
-    };
   }, [availableEvidence, sourceId]);
 
   const removeItem = (itemId: string) => {

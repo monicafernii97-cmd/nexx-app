@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
     CheckCircle,
@@ -111,6 +111,15 @@ function includesExhibitNote(outputType: OutputType) {
     return outputType === 'court_document' || outputType === 'both';
 }
 
+function createStableReportOperationId(...parts: string[]) {
+    const input = parts.join('\u001f');
+    let hash = 5381;
+    for (let index = 0; index < input.length; index += 1) {
+        hash = ((hash << 5) + hash) ^ input.charCodeAt(index);
+    }
+    return `${parts[0]}-${(hash >>> 0).toString(36)}`;
+}
+
 /**
  * GlobalWorkspaceRail — The "Insights Rail" (280px sticky right panel).
  *
@@ -124,6 +133,7 @@ export function GlobalWorkspaceRail() {
     const [isExpanded, setIsExpanded] = useState(true);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+    const reportAbortControllerRef = useRef<AbortController | null>(null);
     const router = useRouter();
     const { showToast } = useToast();
     const saveCaseMemory = useMutation(api.caseMemory.save);
@@ -157,10 +167,14 @@ export function GlobalWorkspaceRail() {
         }
 
         setIsGeneratingReport(true);
+        reportAbortControllerRef.current?.abort();
+        const reportController = new AbortController();
+        reportAbortControllerRef.current = reportController;
         try {
             const response = await fetch('/api/workspace/report', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: reportController.signal,
                 body: JSON.stringify({
                     caseId: activeCaseId,
                     outputType,
@@ -169,48 +183,88 @@ export function GlobalWorkspaceRail() {
                 }),
             });
             const data = await response.json().catch(() => ({}));
+            if (reportController.signal.aborted) return;
             if (!response.ok) {
                 throw new Error(typeof data.error === 'string' ? data.error : 'Report generation failed');
+            }
+            if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+                throw new Error('Generated report response was empty');
             }
 
             const report = data as WorkspaceReport;
             const title = report.title?.trim() || 'Case Workspace Report';
             const content = formatWorkspaceReport(report);
-            const timestamp = Date.now();
+            if (!content.trim()) {
+                throw new Error('Generated report was empty');
+            }
+            const reportOperationId = createStableReportOperationId(
+                activeCaseId,
+                outputType,
+                patternHandling,
+                title,
+                content,
+            );
             let exhibitNoteId: string | null = null;
+            let savedAnyArtifact = false;
+            const saveErrors: unknown[] = [];
 
             if (includesSummaryDraft(outputType)) {
-                await saveCaseMemory({
-                    caseId: activeCaseId,
-                    type: 'draft_snippet',
-                    title,
-                    content,
-                    metadataJson: JSON.stringify({ source: 'insights_rail_report', artifactType: 'case_summary_report' }),
-                    requestId: `insights-report-summary-${activeCaseId}-${timestamp}`,
-                });
+                try {
+                    await saveCaseMemory({
+                        caseId: activeCaseId,
+                        type: 'draft_snippet',
+                        title,
+                        content,
+                        metadataJson: JSON.stringify({ source: 'insights_rail_report', artifactType: 'case_summary_report' }),
+                        requestId: `insights-report-summary-${reportOperationId}`,
+                    });
+                    savedAnyArtifact = true;
+                } catch (err) {
+                    saveErrors.push(err);
+                }
             }
 
+            if (reportController.signal.aborted) return;
+
             if (includesExhibitNote(outputType)) {
-                const savedId = await saveCaseMemory({
-                    caseId: activeCaseId,
-                    type: 'exhibit_note',
-                    title: `Exhibit overview - ${title}`,
-                    content: [
-                        'Workspace PDF overview source.',
-                        '',
-                        content,
-                    ].join('\n'),
-                    metadataJson: JSON.stringify({ source: 'insights_rail_report', artifactType: 'workspace_pdf_overview_exhibit_note' }),
-                    requestId: `insights-report-exhibit-${activeCaseId}-${timestamp}`,
-                });
-                exhibitNoteId = savedId ? String(savedId) : null;
+                try {
+                    const savedId = await saveCaseMemory({
+                        caseId: activeCaseId,
+                        type: 'exhibit_note',
+                        title: `Exhibit overview - ${title}`,
+                        content: [
+                            'Generated workspace report source.',
+                            '',
+                            content,
+                        ].join('\n'),
+                        metadataJson: JSON.stringify({ source: 'insights_rail_report', artifactType: 'workspace_generated_text_exhibit_note' }),
+                        requestId: `insights-report-exhibit-${reportOperationId}`,
+                    });
+                    exhibitNoteId = savedId ? String(savedId) : null;
+                    savedAnyArtifact = Boolean(savedId) || savedAnyArtifact;
+                    if (!savedId) {
+                        saveErrors.push(new Error('Exhibit note save returned no id'));
+                    }
+                } catch (err) {
+                    saveErrors.push(err);
+                }
             }
+
+            if (!savedAnyArtifact) {
+                const firstError = saveErrors.find(error => error instanceof Error);
+                throw firstError instanceof Error ? firstError : new Error('Report save failed');
+            }
+            if (reportController.signal.aborted) return;
 
             setIsReportModalOpen(false);
             showToast({
-                variant: 'success',
-                title: includesExhibitNote(outputType) ? 'Report staged in Exhibit Hub' : 'Report saved to Workspace',
-                description: includesExhibitNote(outputType)
+                variant: saveErrors.length ? 'warning' : 'success',
+                title: saveErrors.length
+                    ? 'Report saved with partial output'
+                    : includesExhibitNote(outputType) ? 'Report staged in Exhibit Hub' : 'Report saved to Workspace',
+                description: saveErrors.length
+                    ? 'At least one requested report artifact was saved. Retry is safe and will reuse the same save keys.'
+                    : includesExhibitNote(outputType)
                     ? 'The generated overview is ready for exhibit assembly.'
                     : 'The generated overview is saved as a workspace draft.',
             });
@@ -220,15 +274,26 @@ export function GlobalWorkspaceRail() {
                 : '/chat/overview'
             );
         } catch (err) {
+            if (reportController.signal.aborted) return;
             showToast({
                 variant: 'error',
                 title: 'Report generation failed',
                 description: err instanceof Error ? err.message : 'Please try again.',
             });
         } finally {
-            setIsGeneratingReport(false);
+            if (reportAbortControllerRef.current === reportController) {
+                reportAbortControllerRef.current = null;
+                setIsGeneratingReport(false);
+            }
         }
     }, [activeCaseId, router, saveCaseMemory, showToast]);
+
+    const handleCloseReportModal = useCallback(() => {
+        reportAbortControllerRef.current?.abort();
+        reportAbortControllerRef.current = null;
+        setIsGeneratingReport(false);
+        setIsReportModalOpen(false);
+    }, []);
 
     // ── Readiness scoring ──
     const readiness: ReadinessItem[] = useMemo(() => [
@@ -473,7 +538,7 @@ export function GlobalWorkspaceRail() {
             </div>
             <GenerateReportModal
                 isOpen={isReportModalOpen}
-                onClose={() => setIsReportModalOpen(false)}
+                onClose={handleCloseReportModal}
                 onGenerate={handleGenerateReport}
                 isGenerating={isGeneratingReport}
                 itemCounts={{

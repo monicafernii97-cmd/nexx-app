@@ -21,6 +21,17 @@ import { api } from '@convex/_generated/api';
 import { useToast } from '@/components/feedback/ToastProvider';
 import { formatCaseNarrativeAsDraft } from '@/lib/workspace-types';
 
+function hasSummaryNarrativeMetadata(metadataJson?: string) {
+    if (!metadataJson) return false;
+    try {
+        const metadata = JSON.parse(metadataJson) as { source?: string; artifactType?: string };
+        return metadata.artifactType === 'case_summary_narrative'
+            && (metadata.source === 'workspace_narrative' || metadata.source === 'workspace_overview');
+    } catch {
+        return false;
+    }
+}
+
 
 
 /**
@@ -122,14 +133,24 @@ export default function WorkspaceOverview() {
         if (!narrative || !activeCaseId || isSavingNarrative) return;
         setIsSavingNarrative(true);
         try {
-            await saveToCaseMemory({
-                caseId: activeCaseId,
-                type: 'draft_snippet',
-                title: narrative.title || 'Case Summary Narrative',
-                content: formatCaseNarrativeAsDraft(narrative),
-                metadataJson: JSON.stringify({ source: 'workspace_overview', artifactType: 'case_summary_narrative' }),
-                requestId: `workspace-narrative-draft-${activeCaseId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            });
+            const title = narrative.title || 'Case Summary Narrative';
+            const content = formatCaseNarrativeAsDraft(narrative);
+            const existingDraft = memory?.find(item =>
+                item.type === 'draft_snippet' && hasSummaryNarrativeMetadata(item.metadataJson)
+            );
+
+            if (existingDraft) {
+                await updateMemory(existingDraft._id, { title, content });
+            } else {
+                await saveToCaseMemory({
+                    caseId: activeCaseId,
+                    type: 'draft_snippet',
+                    title,
+                    content,
+                    metadataJson: JSON.stringify({ source: 'workspace_overview', artifactType: 'case_summary_narrative' }),
+                    requestId: `workspace-narrative-draft-${activeCaseId}`,
+                });
+            }
             showToast({
                 variant: 'success',
                 title: 'Saved to Workspace',
@@ -145,7 +166,7 @@ export default function WorkspaceOverview() {
         } finally {
             setIsSavingNarrative(false);
         }
-    }, [activeCaseId, isSavingNarrative, narrative, saveToCaseMemory, showToast]);
+    }, [activeCaseId, isSavingNarrative, memory, narrative, saveToCaseMemory, showToast, updateMemory]);
 
     const handleDownloadNarrativePdf = useCallback(async () => {
         if (!narrative || isDownloadingNarrative) return;

@@ -148,7 +148,7 @@ export default function DraftsPage() {
                             content={formatDraftContent(item.type, item.content)}
                             createdAt={item.createdAt}
                             onRemove={removeMemory}
-                            onUpdate={updateMemory}
+                            onUpdate={item.type === 'narrative_synthesis' ? undefined : updateMemory}
                             sourceConversationId={item.sourceConversationId}
                         />
                     ))}

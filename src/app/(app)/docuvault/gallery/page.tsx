@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
     FileText,
     MagnifyingGlass as Search,
@@ -102,12 +102,26 @@ function DocuVaultGalleryPageInner() {
     };
 
     /** Close quick look while preserving the user's gallery filters in the URL. */
-    const closeQuickLook = () => {
+    const closeQuickLook = useCallback(() => {
         const params = new URLSearchParams(searchParams.toString());
         params.delete('preview');
         const query = params.toString();
         router.replace(query ? `/docuvault/gallery?${query}` : '/docuvault/gallery', { scroll: false });
-    };
+    }, [router, searchParams]);
+
+    /** Let keyboard users dismiss the quick-look dialog with Escape. */
+    useEffect(() => {
+        if (!quickLookDoc) return;
+
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                closeQuickLook();
+            }
+        };
+
+        document.addEventListener('keydown', handleEscape);
+        return () => document.removeEventListener('keydown', handleEscape);
+    }, [quickLookDoc, closeQuickLook]);
 
     /** Handle delete with confirmation and user-visible error feedback. */
     const handleDelete = async (docId: Id<'generatedDocuments'>) => {
@@ -458,6 +472,7 @@ function DocuVaultGalleryPageInner() {
                                     src={`/api/documents/export/${quickLookDoc.id}/download?disposition=inline`}
                                     title={`Quick look preview for ${quickLookDoc.title}`}
                                     className="h-full w-full rounded-lg border-0 bg-white"
+                                    sandbox="allow-same-origin allow-scripts allow-popups"
                                 />
                             </div>
                             <div className="flex shrink-0 items-center justify-end gap-2 border-t border-white/10 px-4 py-3">

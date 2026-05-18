@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useMemo } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import {
     FileText,
     MagnifyingGlass as Search,
@@ -11,8 +11,10 @@ import {
     Trash,
     Clock,
     Plus,
+    X,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
@@ -23,6 +25,17 @@ import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 
 /** Gallery page displaying saved and generated legal documents. */
 export default function DocuVaultGalleryPage() {
+    return (
+        <Suspense fallback={<div className="flex min-h-[50vh] items-center justify-center" role="status" aria-live="polite"><div className="h-8 w-8 animate-spin rounded-full border-2 border-[#60A5FA] border-t-transparent" /><span className="sr-only">Loading document gallery...</span></div>}>
+            <DocuVaultGalleryPageInner />
+        </Suspense>
+    );
+}
+
+/** Query-aware gallery content that can open a generated document quick look. */
+function DocuVaultGalleryPageInner() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<string>('all');
     const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name'>('newest');
@@ -76,6 +89,25 @@ export default function DocuVaultGalleryPage() {
 
     const completeDocs = filteredDocs.filter(d => d.status === 'complete');
     const draftDocs = filteredDocs.filter(d => d.status === 'draft');
+    const previewDocId = searchParams.get('preview');
+    const quickLookDoc = previewDocId
+        ? documents.find(doc => String(doc.id) === previewDocId && doc.storageId)
+        : null;
+
+    /** Update the URL so the quick-look modal can be opened directly from export completion. */
+    const openQuickLook = (docId: Id<'generatedDocuments'>) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('preview', String(docId));
+        router.replace(`/docuvault/gallery?${params.toString()}`, { scroll: false });
+    };
+
+    /** Close quick look while preserving the user's gallery filters in the URL. */
+    const closeQuickLook = () => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete('preview');
+        const query = params.toString();
+        router.replace(query ? `/docuvault/gallery?${query}` : '/docuvault/gallery', { scroll: false });
+    };
 
     /** Handle delete with confirmation and user-visible error feedback. */
     const handleDelete = async (docId: Id<'generatedDocuments'>) => {
@@ -296,15 +328,14 @@ export default function DocuVaultGalleryPage() {
                                         <div className="flex gap-3">
                                             {doc.storageId && (
                                                 <>
-                                                    <a
-                                                        href={`/api/documents/export/${doc.id}/download?disposition=inline`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openQuickLook(doc.id)}
                                                         className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors shadow-sm"
-                                                        aria-label={`Open ${doc.title}`}
+                                                        aria-label={`Quick look ${doc.title}`}
                                                     >
                                                         <ArrowSquareOut size={16} weight="bold" />
-                                                    </a>
+                                                    </button>
                                                     <a
                                                         href={`/api/documents/export/${doc.id}/download`}
                                                         download={doc.filename}
@@ -381,6 +412,76 @@ export default function DocuVaultGalleryPage() {
                     </>
                 )}
             </motion.div>
+            <AnimatePresence>
+                {quickLookDoc && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+                        role="presentation"
+                    >
+                        <button
+                            type="button"
+                            aria-label="Close document quick look"
+                            className="absolute inset-0 cursor-default"
+                            onClick={closeQuickLook}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.96, y: 12 }}
+                            className="relative z-10 flex h-[78vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#10121c] shadow-2xl"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="document-quick-look-title"
+                        >
+                            <div className="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 px-4 py-3">
+                                <div className="min-w-0">
+                                    <p id="document-quick-look-title" className="truncate text-[14px] font-bold text-white">
+                                        {quickLookDoc.title}
+                                    </p>
+                                    <p className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-white/35">
+                                        Quick Look
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={closeQuickLook}
+                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/55 transition hover:bg-white/10 hover:text-white"
+                                    aria-label="Close quick look"
+                                >
+                                    <X size={16} weight="bold" />
+                                </button>
+                            </div>
+                            <div className="min-h-0 flex-1 bg-[#f4f1ea] p-2">
+                                <iframe
+                                    src={`/api/documents/export/${quickLookDoc.id}/download?disposition=inline`}
+                                    title={`Quick look preview for ${quickLookDoc.title}`}
+                                    className="h-full w-full rounded-lg border-0 bg-white"
+                                />
+                            </div>
+                            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-white/10 px-4 py-3">
+                                <a
+                                    href={`/api/documents/export/${quickLookDoc.id}/download?disposition=inline`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-bold uppercase tracking-widest text-white/60 transition hover:bg-white/10 hover:text-white"
+                                >
+                                    Full Preview
+                                </a>
+                                <a
+                                    href={`/api/documents/export/${quickLookDoc.id}/download`}
+                                    download={quickLookDoc.filename}
+                                    className="rounded-lg border border-white/20 bg-[linear-gradient(135deg,#1A4B9B,#123D7E)] px-3 py-2 text-[11px] font-bold uppercase tracking-widest text-white transition hover:-translate-y-0.5"
+                                >
+                                    Download
+                                </a>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </PageContainer>
     );
 }

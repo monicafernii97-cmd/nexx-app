@@ -16,8 +16,48 @@ import { ItemCard } from '@/components/workspace/ItemCard';
 import { EmptyState } from '@/components/workspace/EmptyState';
 import { PatternsBlock } from '@/components/workspace/PatternsBlock';
 import { NarrativeBlock, type CaseNarrative } from '@/components/workspace/NarrativeBlock';
-import { useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
+import { useToast } from '@/components/feedback/ToastProvider';
+import { formatCaseNarrativeAsDraft } from '@/lib/workspace-types';
+
+/** Check whether a memory item is the generated case summary narrative draft. */
+function hasSummaryNarrativeMetadata(metadataJson?: string) {
+    if (!metadataJson) return false;
+    try {
+        const metadata = JSON.parse(metadataJson) as { source?: string; artifactType?: string };
+        return metadata.artifactType === 'case_summary_narrative'
+            && (metadata.source === 'workspace_narrative' || metadata.source === 'workspace_overview');
+    } catch {
+        return false;
+    }
+}
+
+/** Extract a safe attachment filename from a Content-Disposition header. */
+function getAttachmentFilename(contentDisposition: string | null): string | null {
+    if (!contentDisposition) return null;
+
+    const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+    const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i);
+    const rawFilename = utf8Match?.[1] ?? quotedMatch?.[1];
+    if (!rawFilename) return null;
+
+    try {
+        return decodeURIComponent(rawFilename).replace(/[\\/]/g, '').trim() || null;
+    } catch {
+        return rawFilename.replace(/[\\/]/g, '').trim() || null;
+    }
+}
+
+/** Build the client fallback filename used only when the server omits one. */
+function getFallbackNarrativeFilename(title: string | undefined): string {
+    const slug = (title || 'case-summary-narrative')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+        || 'case-summary-narrative';
+    return `${slug}.pdf`;
+}
 
 
 
@@ -31,7 +71,9 @@ import { api } from '@convex/_generated/api';
  * "What happened → When → Is there a pattern → What does it all mean?"
  */
 export default function WorkspaceOverview() {
-    const { pins, memory, timeline, counts, removeMemory, activeCaseId } = useWorkspace();
+    const { pins, memory, timeline, counts, removeMemory, updateMemory, activeCaseId } = useWorkspace();
+    const { showToast } = useToast();
+    const saveToCaseMemory = useMutation(api.caseMemory.save);
 
 
 
@@ -70,6 +112,9 @@ export default function WorkspaceOverview() {
     const [narrative, setNarrative] = useState<CaseNarrative | null>(null);
     const [isGeneratingNarrative, setIsGeneratingNarrative] = useState(false);
     const [narrativeError, setNarrativeError] = useState<string | null>(null);
+    const [isSavingNarrative, setIsSavingNarrative] = useState(false);
+    const [isDownloadingNarrative, setIsDownloadingNarrative] = useState(false);
+    const [isCreatingExhibit, setIsCreatingExhibit] = useState(false);
 
     const handleGenerateNarrative = useCallback(async () => {
         if (!activeCaseId || isGeneratingNarrative) return;
@@ -111,12 +156,111 @@ export default function WorkspaceOverview() {
 
 
 
-    const handleSendToDocuVault = useCallback(() => {
-        if (!narrative) return;
-        // Store the narrative in sessionStorage so DocuVault can hydrate it
-        sessionStorage.setItem('nexx:narrative', JSON.stringify(narrative));
-        router.push('/docuvault?source=narrative');
-    }, [narrative, router]);
+    const handleSaveNarrativeDraft = useCallback(async () => {
+        if (!narrative || !activeCaseId || isSavingNarrative) return;
+        setIsSavingNarrative(true);
+        try {
+            const title = narrative.title || 'Case Summary Narrative';
+            const content = formatCaseNarrativeAsDraft(narrative);
+            const existingDraft = memory?.find(item =>
+                item.type === 'draft_snippet' && hasSummaryNarrativeMetadata(item.metadataJson)
+            );
+
+            if (existingDraft) {
+                await updateMemory(existingDraft._id, { title, content });
+            } else {
+                await saveToCaseMemory({
+                    caseId: activeCaseId,
+                    type: 'draft_snippet',
+                    title,
+                    content,
+                    metadataJson: JSON.stringify({ source: 'workspace_overview', artifactType: 'case_summary_narrative' }),
+                    requestId: `workspace-narrative-draft-${activeCaseId}`,
+                });
+            }
+            showToast({
+                variant: 'success',
+                title: 'Saved to Workspace',
+                description: 'The summary narrative is available in Drafts & Work Product.',
+                destination: { label: 'View Drafts', href: '/chat/drafts' },
+            });
+        } catch (err) {
+            showToast({
+                variant: 'error',
+                title: 'Save failed',
+                description: err instanceof Error ? err.message : 'Could not save narrative.',
+            });
+        } finally {
+            setIsSavingNarrative(false);
+        }
+    }, [activeCaseId, isSavingNarrative, memory, narrative, saveToCaseMemory, showToast, updateMemory]);
+
+    const handleDownloadNarrativePdf = useCallback(async () => {
+        if (!narrative || isDownloadingNarrative) return;
+        setIsDownloadingNarrative(true);
+        try {
+            const res = await fetch('/api/workspace/narrative/pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ narrative }),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'PDF generation failed');
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = getAttachmentFilename(res.headers.get('Content-Disposition'))
+                ?? getFallbackNarrativeFilename(narrative.title);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            showToast({
+                variant: 'error',
+                title: 'Download failed',
+                description: err instanceof Error ? err.message : 'Could not download the summary PDF.',
+            });
+        } finally {
+            setIsDownloadingNarrative(false);
+        }
+    }, [isDownloadingNarrative, narrative, showToast]);
+
+    const handleCreateExhibitNote = useCallback(async () => {
+        if (!narrative || !activeCaseId || isCreatingExhibit) return;
+        setIsCreatingExhibit(true);
+        try {
+            await saveToCaseMemory({
+                caseId: activeCaseId,
+                type: 'exhibit_note',
+                title: `Exhibit note - ${narrative.title || 'Case Summary Narrative'}`,
+                content: [
+                    'Unsworn declaration style exhibit note.',
+                    '',
+                    formatCaseNarrativeAsDraft(narrative),
+                ].join('\n'),
+                metadataJson: JSON.stringify({ source: 'workspace_narrative', artifactType: 'unsworn_declaration_exhibit_note' }),
+                requestId: `workspace-narrative-exhibit-${activeCaseId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            });
+            showToast({
+                variant: 'success',
+                title: 'Saved to Exhibit Hub',
+                description: 'The narrative is available as an exhibit-style note.',
+            });
+            router.push('/docuvault/exhibits');
+        } catch (err) {
+            showToast({
+                variant: 'error',
+                title: 'Exhibit save failed',
+                description: err instanceof Error ? err.message : 'Could not create exhibit note.',
+            });
+        } finally {
+            setIsCreatingExhibit(false);
+        }
+    }, [activeCaseId, isCreatingExhibit, narrative, router, saveToCaseMemory, showToast]);
 
     const stats = [
         { label: 'Key Facts', value: counts.keyFacts, loading: memory === undefined, icon: Notebook, color: 'var(--support-violet)', href: '/chat/key-points' },
@@ -212,6 +356,7 @@ export default function WorkspaceOverview() {
                                 content={item.content}
                                 createdAt={item.createdAt}
                                 onRemove={removeMemory}
+                                onUpdate={updateMemory}
                                 compact
                             />
                         ))}
@@ -329,7 +474,12 @@ export default function WorkspaceOverview() {
                     narrative={narrative}
                     isGenerating={isGeneratingNarrative}
                     onGenerate={handleGenerateNarrative}
-                    onSendToDocuVault={handleSendToDocuVault}
+                    onSaveToWorkspace={handleSaveNarrativeDraft}
+                    onDownloadPdf={handleDownloadNarrativePdf}
+                    onCreateExhibit={handleCreateExhibitNote}
+                    isSavingToWorkspace={isSavingNarrative}
+                    isDownloadingPdf={isDownloadingNarrative}
+                    isCreatingExhibit={isCreatingExhibit}
                 />
                 {narrativeError && (
                     <p className="text-[11px] text-red-400/70 mt-2">{narrativeError}</p>

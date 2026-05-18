@@ -16,7 +16,7 @@ import type { Id } from '@convex/_generated/dataModel';
 import { CASE_NARRATIVE_SCHEMA } from '@/lib/nexx/schemas';
 import { buildNarrativePrompt } from '@/lib/nexx/prompts/narrativePrompt';
 import { PRIMARY_MODEL } from '@/lib/tiers';
-import type { CaseNarrative } from '@/lib/workspace-types';
+import { formatCaseNarrativeAsDraft, type CaseNarrative } from '@/lib/workspace-types';
 import { stableRequestId, serializeForPrompt } from '@/lib/workspace-utils';
 
 export const maxDuration = 60;
@@ -76,7 +76,9 @@ export async function POST(req: NextRequest) {
             timeline: serializeForPrompt(caseScopedTimeline, 'timeline events'),
             caseMemory: serializeForPrompt(
                 caseScopedMemory.filter((m: { type: string }) =>
-                    m.type !== 'pattern_analysis' && m.type !== 'narrative_synthesis',
+                    m.type !== 'pattern_analysis'
+                    && m.type !== 'narrative_synthesis'
+                    && m.type !== 'draft_snippet',
                 ),
                 'case memory items',
             ),
@@ -116,6 +118,19 @@ export async function POST(req: NextRequest) {
             title: narrative.title || `Case Narrative — ${new Date().toLocaleDateString()}`,
             requestId,
         });
+
+        try {
+            await convex.mutation(api.caseMemory.save, {
+                caseId,
+                type: 'draft_snippet',
+                content: formatCaseNarrativeAsDraft(narrative),
+                title: narrative.title || `Case Summary Narrative - ${new Date().toLocaleDateString()}`,
+                metadataJson: JSON.stringify({ source: 'workspace_narrative', artifactType: 'case_summary_narrative' }),
+                requestId: stableRequestId(caseId, 'narrative_workspace_draft'),
+            });
+        } catch (draftSaveError) {
+            console.error('[narrative] Draft persistence failed:', draftSaveError);
+        }
 
         return NextResponse.json(narrative);
     } catch (err) {

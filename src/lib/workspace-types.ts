@@ -28,6 +28,36 @@ export interface CaseNarrative {
     narrative: string;
 }
 
+/** Normalize runtime list values so draft formatting cannot throw on malformed payloads. */
+function normalizeNarrativeList(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value
+        .filter((item): item is string => typeof item === 'string')
+        .map(item => item.trim())
+        .filter(Boolean);
+}
+
+/** Format a generated case narrative into readable workspace draft text. */
+export function formatCaseNarrativeAsDraft(narrative: CaseNarrative): string {
+    const overview = typeof narrative.overview === 'string' ? narrative.overview.trim() : '';
+    const body = typeof narrative.narrative === 'string' ? narrative.narrative.trim() : '';
+    const keyFacts = normalizeNarrativeList(narrative.keyFactsSummary);
+    const timeline = normalizeNarrativeList(narrative.timelineSummary);
+    const patterns = normalizeNarrativeList(narrative.supportedPatternsSummary);
+    const questions = normalizeNarrativeList(narrative.openQuestions);
+
+    const sections = [
+        overview && `Overview\n${overview}`,
+        keyFacts.length > 0 && `Key Facts\n${keyFacts.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
+        timeline.length > 0 && `Timeline Summary\n${timeline.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
+        patterns.length > 0 && `Supported Patterns\n${patterns.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
+        body && `Narrative\n${body}`,
+        questions.length > 0 && `Open Questions\n${questions.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
+    ];
+
+    return sections.filter(Boolean).join('\n\n');
+}
+
 // ---------------------------------------------------------------------------
 // Report Configuration — used by report API and GenerateReportModal
 // ---------------------------------------------------------------------------

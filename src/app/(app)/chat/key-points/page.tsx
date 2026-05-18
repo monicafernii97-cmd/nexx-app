@@ -9,12 +9,24 @@ import { ItemCard } from '@/components/workspace/ItemCard';
 import { EmptyState } from '@/components/workspace/EmptyState';
 import { FilterTabs } from '@/components/workspace/FilterTabs';
 
+/** Safely read the pin mirror id written by WorkspaceClient board sync. */
+function getPinMirrorId(metadataJson?: string): string | null {
+    if (!metadataJson) return null;
+    try {
+        const metadata = JSON.parse(metadataJson) as { mirrorId?: unknown; pinRequestId?: unknown };
+        const mirrorId = metadata.mirrorId ?? metadata.pinRequestId;
+        return typeof mirrorId === 'string' ? mirrorId : null;
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Key Points Page — Centralized explorer for all saved case insights.
  * Features full 12-type filtering, search, and bulk management.
  */
 export default function KeyPointsPage() {
-    const { memory, removeMemory, pins } = useWorkspace();
+    const { memory, removeMemory, updateMemory, pins } = useWorkspace();
     const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -103,7 +115,11 @@ export default function KeyPointsPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
                     {filteredItems.map(item => {
-                        const isPinned = pins?.some(p => p.sourceMessageId === item.sourceMessageId && p.title === item.title);
+                        const mirrorId = getPinMirrorId(item.metadataJson);
+                        const isPinned = !!pins?.some(p =>
+                            (!!item.sourceMessageId && !!p.sourceMessageId && p.sourceMessageId === item.sourceMessageId)
+                            || (!!mirrorId && p.requestId === mirrorId)
+                        );
                         return (
                             <ItemCard
                                 key={item._id}
@@ -113,6 +129,7 @@ export default function KeyPointsPage() {
                                 content={item.content}
                                 createdAt={item.createdAt}
                                 onRemove={removeMemory}
+                                onUpdate={updateMemory}
                                 isPinned={isPinned}
                             />
                         );

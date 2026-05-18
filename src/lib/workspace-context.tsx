@@ -36,6 +36,7 @@ export interface WorkspaceContextType {
     // Actions
     removePin: (pinId: Id<'casePins'>) => Promise<void>;
     removeMemory: (itemId: Id<'caseMemory'>) => Promise<void>;
+    updateMemory: (itemId: Id<'caseMemory'>, updates: { title?: string; content?: string }) => Promise<void>;
     confirmTimeline: (candidateId: Id<'timelineCandidates'>) => Promise<void>;
 }
 
@@ -120,6 +121,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     // Mutations
     const removePinMutation = useMutation(api.casePins.remove);
     const removeMemoryMutation = useMutation(api.caseMemory.remove);
+    const updateMemoryMutation = useMutation(api.caseMemory.update);
     const confirmTimelineMutation = useMutation(api.timelineCandidates.confirm);
 
     // Derived values — tolerant of partial loads (CR #12)
@@ -145,6 +147,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const removeMemory = useCallback(
         async (itemId: Id<'caseMemory'>) => { await removeMemoryMutation({ itemId }); },
         [removeMemoryMutation],
+    );
+
+    const updateMemory = useCallback(
+        async (itemId: Id<'caseMemory'>, updates: { title?: string; content?: string }) => {
+            await updateMemoryMutation({ itemId, ...updates });
+        },
+        [updateMemoryMutation],
     );
 
     const confirmTimeline = useCallback(
@@ -179,6 +188,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         counts,
         removePin,
         removeMemory,
+        updateMemory,
         confirmTimeline,
     };
 

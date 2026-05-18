@@ -7,6 +7,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { ItemCard } from '@/components/workspace/ItemCard';
 import { EmptyState } from '@/components/workspace/EmptyState';
 import { FilterTabs } from '@/components/workspace/FilterTabs';
+import { formatCaseNarrativeAsDraft, type CaseNarrative } from '@/lib/workspace-types';
 
 /**
  * Drafts Page — Manages all saved draft snippets from chat.
@@ -18,13 +19,24 @@ import { FilterTabs } from '@/components/workspace/FilterTabs';
 const DRAFT_TABS = [
     { id: 'all', label: 'All' },
     { id: 'draft_snippet', label: 'Drafts' },
+    { id: 'narrative_synthesis', label: 'Narratives' },
     { id: 'hearing_prep_point', label: 'Hearing Prep' },
     { id: 'exhibit_note', label: 'Exhibits' },
     { id: 'procedure_note', label: 'Procedures' },
 ];
 
 // M3: Module-scoped stable Set — prevents stale closure in useMemo
-const DRAFT_TYPES = new Set(['draft_snippet', 'hearing_prep_point', 'exhibit_note', 'procedure_note']);
+const DRAFT_TYPES = new Set(['draft_snippet', 'narrative_synthesis', 'hearing_prep_point', 'exhibit_note', 'procedure_note']);
+
+/** Format stored draft content for display without mutating the persisted payload. */
+function formatDraftContent(type: string, content: string): string {
+    if (type !== 'narrative_synthesis') return content;
+    try {
+        return formatCaseNarrativeAsDraft(JSON.parse(content) as CaseNarrative);
+    } catch {
+        return content;
+    }
+}
 
 /**
  * DraftsPage \u2014 Manages all saved draft snippets from chat.
@@ -32,7 +44,7 @@ const DRAFT_TYPES = new Set(['draft_snippet', 'hearing_prep_point', 'exhibit_not
  * hearing prep, and other work product created from AI sessions.
  */
 export default function DraftsPage() {
-    const { memory, removeMemory } = useWorkspace();
+    const { memory, removeMemory, updateMemory } = useWorkspace();
     const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -42,11 +54,13 @@ export default function DraftsPage() {
     }, [memory]);
 
     const filteredItems = useMemo(() => {
+        const query = searchQuery.trim().toLowerCase();
         return allDrafts.filter(item => {
             const matchesTab = activeTab === 'all' || item.type === activeTab;
-            const matchesSearch = !searchQuery.trim() ||
-                item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                item.content.toLowerCase().includes(searchQuery.toLowerCase());
+            const searchableContent = formatDraftContent(item.type, item.content).toLowerCase();
+            const matchesSearch = !query ||
+                item.title.toLowerCase().includes(query) ||
+                searchableContent.includes(query);
             return matchesTab && matchesSearch;
         });
     }, [allDrafts, activeTab, searchQuery]);
@@ -132,9 +146,10 @@ export default function DraftsPage() {
                             id={item._id}
                             type={item.type}
                             title={item.title}
-                            content={item.content}
+                            content={formatDraftContent(item.type, item.content)}
                             createdAt={item.createdAt}
                             onRemove={removeMemory}
+                            onUpdate={item.type === 'narrative_synthesis' ? undefined : updateMemory}
                             sourceConversationId={item.sourceConversationId}
                         />
                     ))}

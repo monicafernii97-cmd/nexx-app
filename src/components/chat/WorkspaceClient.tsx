@@ -14,6 +14,7 @@
 import { useState, useCallback, useRef, type ReactNode } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
+import type { Doc } from '@convex/_generated/dataModel';
 import type { ActionType, PanelData } from '@/lib/ui-intelligence/types';
 import type { PinnableType } from '@/lib/integration/types';
 import { ACTION_DESTINATIONS } from '@/lib/integration/types';
@@ -25,13 +26,29 @@ import type { PinAutofillResult, PinConfidence } from '@/lib/pins/types';
 
 // Re-export PinnableType default used for initial autofill
 const DEFAULT_PIN_TYPE: PinnableType = 'key_fact';
+type CaseMemoryType = Doc<'caseMemory'>['type'];
+
+/** Create a deterministic compact hash for cross-table pin mirror keys. */
+function stableHash(value: string): string {
+    let hash = 0x811c9dc5;
+    for (let index = 0; index < value.length; index += 1) {
+        hash ^= value.charCodeAt(index);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(36);
+}
+
+/** Build the shared request key that links a pin to its mirrored board item. */
+function buildPinMirrorId(type: PinnableType, title: string, content: string, caseId?: string): string {
+    return `pin-mirror-${stableHash([caseId ?? 'global', type, title.trim(), content.trim()].join('\u001f'))}`;
+}
 
 // ---------------------------------------------------------------------------
 // Save-type mapping (action → caseMemory save type)
 // ---------------------------------------------------------------------------
 
 /** Maps action types to the caseMemory save classification. */
-const ACTION_TO_SAVE_TYPE: Partial<Record<ActionType, string>> = {
+const ACTION_TO_SAVE_TYPE: Partial<Record<ActionType, CaseMemoryType>> = {
     save_note: 'case_note',
     save_to_case: 'case_note',
     save_strategy: 'strategy_point',
@@ -41,6 +58,18 @@ const ACTION_TO_SAVE_TYPE: Partial<Record<ActionType, string>> = {
     convert_to_incident: 'incident_note',
     convert_to_exhibit: 'exhibit_note',
     insert_into_template: 'draft_snippet',
+};
+
+const PIN_TO_MEMORY_TYPE: Partial<Record<PinnableType, CaseMemoryType>> = {
+    key_fact: 'key_fact',
+    strategy_point: 'strategy_point',
+    good_faith_point: 'good_faith_point',
+    strength_highlight: 'strength_highlight',
+    risk_concern: 'risk_concern',
+    hearing_prep_point: 'hearing_prep_point',
+    draft_snippet: 'draft_snippet',
+    question_to_verify: 'question_to_verify',
+    timeline_anchor: 'timeline_candidate',
 };
 
 // ---------------------------------------------------------------------------
@@ -155,8 +184,8 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
     const handlePin = useCallback(
         async (type: PinnableType, title: string, content: string) => {
             setIsPinning(true);
+            const requestId = buildPinMirrorId(type, title, content, activeCaseId ?? undefined);
             try {
-                const requestId = `pin-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
                 await createPin({
                     type,
                     title,
@@ -168,24 +197,55 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                     detectedDate: autofillMeta.detectedDate ?? undefined,
                     aiVersion: autofillMeta.aiVersion ?? undefined,
                 });
-
-                showToast({
-                    variant: 'success',
-                    title: 'Pinned to Workspace',
-                    description: `"${title}" is now in your rail.`,
-                });
-                setPinModalOpen(false);
             } catch (err) {
                 showToast({
                     variant: 'error',
                     title: 'Pin failed',
                     description: err instanceof Error ? err.message : 'Unknown error',
                 });
-            } finally {
                 setIsPinning(false);
+                return;
             }
+
+            const memoryType = PIN_TO_MEMORY_TYPE[type];
+            let savedToBoard = false;
+            if (memoryType) {
+                try {
+                    await saveToCaseMemory({
+                        type: memoryType,
+                        title,
+                        content,
+                        caseId: activeCaseId ?? undefined,
+                        requestId: `${requestId}:memory`,
+                        metadataJson: JSON.stringify({
+                            source: 'workspace_pin',
+                            pinType: type,
+                            mirrorId: requestId,
+                            pinRequestId: requestId,
+                        }),
+                    });
+                    savedToBoard = true;
+                } catch (err) {
+                    console.warn('[WorkspaceClient] Pin saved to rail, board sync failed', err);
+                    showToast({
+                        variant: 'warning',
+                        title: 'Pinned, but board sync failed',
+                        description: `The rail pin was saved. Try saving to the board again later. Ref: ${requestId}`,
+                    });
+                }
+            }
+
+            showToast({
+                variant: 'success',
+                title: 'Pinned to Workspace',
+                description: savedToBoard
+                    ? `"${title}" is now in your rail and Key Points board.`
+                    : `"${title}" is now in your rail.`,
+            });
+            setPinModalOpen(false);
+            setIsPinning(false);
         },
-        [createPin, showToast, activeCaseId, rawPinSource, autofillMeta]
+        [createPin, saveToCaseMemory, showToast, activeCaseId, rawPinSource, autofillMeta]
     );
 
     // ── Fetch pin autofill from API ──
@@ -273,7 +333,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
             try {
                 const requestId = `qs-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
                 await saveToCaseMemory({
-                    type: saveType as Parameters<typeof saveToCaseMemory>[0]['type'],
+                    type: saveType,
                     title,
                     content,
                     caseId: activeCaseId ?? undefined,

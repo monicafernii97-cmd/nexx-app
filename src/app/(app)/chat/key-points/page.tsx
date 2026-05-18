@@ -103,7 +103,7 @@ export default function KeyPointsPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
                     {filteredItems.map(item => {
-                        const isPinned = !!item.sourceMessageId && pins?.some(p =>
+                        const isPinned = !!item.sourceMessageId && !!pins?.some(p =>
                             !!p.sourceMessageId && p.sourceMessageId === item.sourceMessageId
                         );
                         return (

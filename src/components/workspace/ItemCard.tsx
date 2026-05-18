@@ -108,6 +108,12 @@ export function ItemCard<TId extends string>({
     const [draftContent, setDraftContent] = useState(content);
     const [isSaving, setIsSaving] = useState(false);
 
+    const handleStartEdit = () => {
+        setDraftTitle(title);
+        setDraftContent(content);
+        setIsEditing(true);
+    };
+
     const handleCancelEdit = () => {
         setDraftTitle(title);
         setDraftContent(content);
@@ -173,7 +179,7 @@ export function ItemCard<TId extends string>({
                 <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
                     {onUpdate && (
                         <button
-                            onClick={() => setIsEditing(true)}
+                            onClick={handleStartEdit}
                             className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1128]"
                             aria-label="Edit item"
                         >

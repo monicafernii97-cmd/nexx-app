@@ -167,8 +167,8 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
     const handlePin = useCallback(
         async (type: PinnableType, title: string, content: string) => {
             setIsPinning(true);
+            const requestId = `pin-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
             try {
-                const requestId = `pin-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
                 await createPin({
                     type,
                     title,
@@ -180,9 +180,20 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                     detectedDate: autofillMeta.detectedDate ?? undefined,
                     aiVersion: autofillMeta.aiVersion ?? undefined,
                 });
+            } catch (err) {
+                showToast({
+                    variant: 'error',
+                    title: 'Pin failed',
+                    description: err instanceof Error ? err.message : 'Unknown error',
+                });
+                setIsPinning(false);
+                return;
+            }
 
-                const memoryType = PIN_TO_MEMORY_TYPE[type];
-                if (memoryType) {
+            const memoryType = PIN_TO_MEMORY_TYPE[type];
+            let savedToBoard = false;
+            if (memoryType) {
+                try {
                     await saveToCaseMemory({
                         type: memoryType as Parameters<typeof saveToCaseMemory>[0]['type'],
                         title,
@@ -191,23 +202,26 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                         requestId: `pin-memory-${requestId}`,
                         metadataJson: JSON.stringify({ source: 'workspace_pin', pinType: type }),
                     });
+                    savedToBoard = true;
+                } catch (err) {
+                    console.warn('[WorkspaceClient] Pin saved to rail, board sync failed', err);
+                    showToast({
+                        variant: 'warning',
+                        title: 'Pinned, but board sync failed',
+                        description: `The rail pin was saved. Try saving to the board again later. Ref: ${requestId}`,
+                    });
                 }
-
-                showToast({
-                    variant: 'success',
-                    title: 'Pinned to Workspace',
-                    description: `"${title}" is now in your rail and Key Points board.`,
-                });
-                setPinModalOpen(false);
-            } catch (err) {
-                showToast({
-                    variant: 'error',
-                    title: 'Pin failed',
-                    description: err instanceof Error ? err.message : 'Unknown error',
-                });
-            } finally {
-                setIsPinning(false);
             }
+
+            showToast({
+                variant: 'success',
+                title: 'Pinned to Workspace',
+                description: savedToBoard
+                    ? `"${title}" is now in your rail and Key Points board.`
+                    : `"${title}" is now in your rail.`,
+            });
+            setPinModalOpen(false);
+            setIsPinning(false);
         },
         [createPin, saveToCaseMemory, showToast, activeCaseId, rawPinSource, autofillMeta]
     );

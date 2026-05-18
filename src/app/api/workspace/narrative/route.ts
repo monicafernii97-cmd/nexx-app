@@ -76,7 +76,9 @@ export async function POST(req: NextRequest) {
             timeline: serializeForPrompt(caseScopedTimeline, 'timeline events'),
             caseMemory: serializeForPrompt(
                 caseScopedMemory.filter((m: { type: string }) =>
-                    m.type !== 'pattern_analysis' && m.type !== 'narrative_synthesis',
+                    m.type !== 'pattern_analysis'
+                    && m.type !== 'narrative_synthesis'
+                    && m.type !== 'draft_snippet',
                 ),
                 'case memory items',
             ),

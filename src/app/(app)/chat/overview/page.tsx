@@ -128,7 +128,7 @@ export default function WorkspaceOverview() {
                 title: narrative.title || 'Case Summary Narrative',
                 content: formatCaseNarrativeAsDraft(narrative),
                 metadataJson: JSON.stringify({ source: 'workspace_overview', artifactType: 'case_summary_narrative' }),
-                requestId: `workspace-narrative-draft-${activeCaseId}`,
+                requestId: `workspace-narrative-draft-${activeCaseId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             });
             showToast({
                 variant: 'success',
@@ -194,7 +194,7 @@ export default function WorkspaceOverview() {
                     formatCaseNarrativeAsDraft(narrative),
                 ].join('\n'),
                 metadataJson: JSON.stringify({ source: 'workspace_narrative', artifactType: 'unsworn_declaration_exhibit_note' }),
-                requestId: `workspace-narrative-exhibit-${activeCaseId}`,
+                requestId: `workspace-narrative-exhibit-${activeCaseId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             });
             showToast({
                 variant: 'success',

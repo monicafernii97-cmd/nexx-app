@@ -53,11 +53,13 @@ export default function DraftsPage() {
     }, [memory]);
 
     const filteredItems = useMemo(() => {
+        const query = searchQuery.trim().toLowerCase();
         return allDrafts.filter(item => {
             const matchesTab = activeTab === 'all' || item.type === activeTab;
-            const matchesSearch = !searchQuery.trim() ||
-                item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                item.content.toLowerCase().includes(searchQuery.toLowerCase());
+            const searchableContent = formatDraftContent(item.type, item.content).toLowerCase();
+            const matchesSearch = !query ||
+                item.title.toLowerCase().includes(query) ||
+                searchableContent.includes(query);
             return matchesTab && matchesSearch;
         });
     }, [allDrafts, activeTab, searchQuery]);

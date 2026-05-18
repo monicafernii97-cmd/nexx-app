@@ -7,6 +7,10 @@ import type { CaseNarrative } from '@/lib/workspace-types';
 
 export const maxDuration = 60;
 
+function isStringArray(value: unknown): value is string[] {
+    return Array.isArray(value) && value.every(item => typeof item === 'string');
+}
+
 function isCaseNarrative(value: unknown): value is CaseNarrative {
     const candidate = value as Partial<CaseNarrative> | null;
     return !!candidate
@@ -14,10 +18,10 @@ function isCaseNarrative(value: unknown): value is CaseNarrative {
         && typeof candidate.title === 'string'
         && typeof candidate.overview === 'string'
         && typeof candidate.narrative === 'string'
-        && Array.isArray(candidate.keyFactsSummary)
-        && Array.isArray(candidate.timelineSummary)
-        && Array.isArray(candidate.supportedPatternsSummary)
-        && Array.isArray(candidate.openQuestions);
+        && isStringArray(candidate.keyFactsSummary)
+        && isStringArray(candidate.timelineSummary)
+        && isStringArray(candidate.supportedPatternsSummary)
+        && isStringArray(candidate.openQuestions);
 }
 
 function renderList(title: string, items: string[]): string {

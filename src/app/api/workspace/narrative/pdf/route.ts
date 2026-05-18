@@ -71,6 +71,7 @@ function renderList(title: string, items: string[]): string {
 /** Convert paragraph-delimited plain text into escaped HTML paragraphs. */
 function renderParagraphs(text: string): string {
     return text
+        .replace(/\r\n|\r/g, '\n')
         .split(/\n{2,}/)
         .map(paragraph => paragraph.trim())
         .filter(Boolean)

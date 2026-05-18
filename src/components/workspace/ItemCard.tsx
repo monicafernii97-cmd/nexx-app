@@ -109,6 +109,7 @@ export function ItemCard<TId extends string>({
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
 
+    /** Open edit mode with the latest persisted values. */
     const handleStartEdit = () => {
         setDraftTitle(title);
         setDraftContent(content);
@@ -116,6 +117,7 @@ export function ItemCard<TId extends string>({
         setIsEditing(true);
     };
 
+    /** Discard unsaved edits and restore the latest persisted values. */
     const handleCancelEdit = () => {
         setDraftTitle(title);
         setDraftContent(content);
@@ -123,6 +125,7 @@ export function ItemCard<TId extends string>({
         setIsEditing(false);
     };
 
+    /** Persist edits while keeping the editor open if the update fails. */
     const handleSaveEdit = async () => {
         if (!onUpdate || isSaving) return;
         setIsSaving(true);

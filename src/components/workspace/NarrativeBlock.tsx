@@ -221,6 +221,7 @@ export function NarrativeBlock({
                 {/* Workspace actions */}
                 <div className="grid grid-cols-1 gap-3 mt-6 pt-4 border-t border-white/5 md:grid-cols-3">
                     <button
+                        type="button"
                         onClick={onSaveToWorkspace}
                         disabled={!onSaveToWorkspace || isSavingToWorkspace}
                         aria-disabled={!onSaveToWorkspace || isSavingToWorkspace}
@@ -234,6 +235,7 @@ export function NarrativeBlock({
                         {isSavingToWorkspace ? 'Saving...' : 'Save to Workspace'}
                     </button>
                     <button
+                        type="button"
                         onClick={onDownloadPdf}
                         disabled={!onDownloadPdf || isDownloadingPdf}
                         aria-disabled={!onDownloadPdf || isDownloadingPdf}
@@ -247,6 +249,7 @@ export function NarrativeBlock({
                         {isDownloadingPdf ? 'Preparing...' : 'Download PDF'}
                     </button>
                     <button
+                        type="button"
                         onClick={onCreateExhibit}
                         disabled={!onCreateExhibit || isCreatingExhibit}
                         aria-disabled={!onCreateExhibit || isCreatingExhibit}

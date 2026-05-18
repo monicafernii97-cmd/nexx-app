@@ -1582,6 +1582,9 @@ function CompletedPhaseUI({
         ? `/api/documents/export/${state.exportId}/download`
         : null;
     const previewUrl = downloadUrl ? `${downloadUrl}?disposition=inline` : null;
+    const vaultUrl = state.exportId
+        ? `/docuvault/gallery?preview=${encodeURIComponent(state.exportId)}`
+        : '/docuvault/gallery';
     const documentTitleSource = state.documentTitle?.trim() ? state.documentTitle : state.filename;
     const documentTitle = formatDocumentDisplayTitle(documentTitleSource, 'Generated Document');
     const preflightPassCount = state.preflight?.checks.filter(c => c.severity === 'pass').length ?? 0;
@@ -1670,7 +1673,7 @@ function CompletedPhaseUI({
 
                     {/* View in DocuVault */}
                     <a
-                        href="/docuvault/gallery"
+                        href={vaultUrl}
                         className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-[12px] font-bold text-white/70 transition-all hover:bg-white/10 hover:text-white"
                     >
                         <ArrowSquareOut size={16} />

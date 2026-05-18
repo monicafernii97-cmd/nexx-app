@@ -137,7 +137,8 @@ export function ItemCard<TId extends string>({
             });
             setIsEditing(false);
         } catch (err) {
-            setSaveError(err instanceof Error ? err.message : 'Could not save changes.');
+            console.error('[ItemCard] Failed to save changes', err);
+            setSaveError('Could not save changes. Please try again.');
         } finally {
             setIsSaving(false);
         }

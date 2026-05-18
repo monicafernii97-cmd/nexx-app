@@ -11,6 +11,7 @@ const MAX_TITLE_CHARS = 200;
 const MAX_TEXT_FIELD_CHARS = 40_000;
 const MAX_LIST_ITEMS = 200;
 const MAX_LIST_ITEM_CHARS = 2_000;
+const MAX_REQUEST_BYTES = 1_000_000;
 
 /** Return true only when every value in the candidate array is a string. */
 function isStringArray(value: unknown): value is string[] {
@@ -29,6 +30,13 @@ function isCaseNarrative(value: unknown): value is CaseNarrative {
         && isStringArray(candidate.timelineSummary)
         && isStringArray(candidate.supportedPatternsSummary)
         && isStringArray(candidate.openQuestions);
+}
+
+/** Return true when the declared request body is too large to parse safely. */
+function isRequestBodyTooLarge(contentLength: string | null): boolean {
+    if (!contentLength) return false;
+    const declaredBytes = Number.parseInt(contentLength, 10);
+    return Number.isFinite(declaredBytes) && declaredBytes > MAX_REQUEST_BYTES;
 }
 
 /** Return true when a narrative exceeds the safe PDF rendering limits. */
@@ -144,6 +152,10 @@ export async function POST(req: NextRequest) {
     const { userId } = await auth();
     if (!userId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (isRequestBodyTooLarge(req.headers.get('content-length'))) {
+        return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
     }
 
     let narrative: CaseNarrative;

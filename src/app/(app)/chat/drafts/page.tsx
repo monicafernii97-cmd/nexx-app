@@ -28,6 +28,7 @@ const DRAFT_TABS = [
 // M3: Module-scoped stable Set — prevents stale closure in useMemo
 const DRAFT_TYPES = new Set(['draft_snippet', 'narrative_synthesis', 'hearing_prep_point', 'exhibit_note', 'procedure_note']);
 
+/** Format stored draft content for display without mutating the persisted payload. */
 function formatDraftContent(type: string, content: string): string {
     if (type !== 'narrative_synthesis') return content;
     try {

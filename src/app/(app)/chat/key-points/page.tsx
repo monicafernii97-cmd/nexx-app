@@ -103,7 +103,9 @@ export default function KeyPointsPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
                     {filteredItems.map(item => {
-                        const isPinned = pins?.some(p => p.sourceMessageId === item.sourceMessageId && p.title === item.title);
+                        const isPinned = !!item.sourceMessageId && pins?.some(p =>
+                            !!p.sourceMessageId && p.sourceMessageId === item.sourceMessageId
+                        );
                         return (
                             <ItemCard
                                 key={item._id}

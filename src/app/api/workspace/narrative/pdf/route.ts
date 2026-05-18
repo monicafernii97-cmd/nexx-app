@@ -7,10 +7,12 @@ import type { CaseNarrative } from '@/lib/workspace-types';
 
 export const maxDuration = 60;
 
+/** Return true only when every value in the candidate array is a string. */
 function isStringArray(value: unknown): value is string[] {
     return Array.isArray(value) && value.every(item => typeof item === 'string');
 }
 
+/** Validate the incoming narrative payload before rendering a PDF. */
 function isCaseNarrative(value: unknown): value is CaseNarrative {
     const candidate = value as Partial<CaseNarrative> | null;
     return !!candidate
@@ -24,6 +26,7 @@ function isCaseNarrative(value: unknown): value is CaseNarrative {
         && isStringArray(candidate.openQuestions);
 }
 
+/** Render a titled ordered list section for non-empty narrative arrays. */
 function renderList(title: string, items: string[]): string {
     if (items.length === 0) return '';
     return `
@@ -34,6 +37,7 @@ function renderList(title: string, items: string[]): string {
     `;
 }
 
+/** Convert paragraph-delimited plain text into escaped HTML paragraphs. */
 function renderParagraphs(text: string): string {
     return text
         .split(/\n{2,}/)
@@ -43,6 +47,7 @@ function renderParagraphs(text: string): string {
         .join('');
 }
 
+/** Convert a narrative title into a conservative download filename. */
 function sanitizeFilename(value: string): string {
     return value
         .toLowerCase()
@@ -51,6 +56,7 @@ function sanitizeFilename(value: string): string {
         .slice(0, 80) || 'case-summary-narrative';
 }
 
+/** Render the full printable HTML document used by the narrative PDF route. */
 function renderNarrativeHtml(narrative: CaseNarrative): string {
     return `<!doctype html>
 <html lang="en">

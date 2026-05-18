@@ -107,28 +107,34 @@ export function ItemCard<TId extends string>({
     const [draftTitle, setDraftTitle] = useState(title);
     const [draftContent, setDraftContent] = useState(content);
     const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     const handleStartEdit = () => {
         setDraftTitle(title);
         setDraftContent(content);
+        setSaveError(null);
         setIsEditing(true);
     };
 
     const handleCancelEdit = () => {
         setDraftTitle(title);
         setDraftContent(content);
+        setSaveError(null);
         setIsEditing(false);
     };
 
     const handleSaveEdit = async () => {
         if (!onUpdate || isSaving) return;
         setIsSaving(true);
+        setSaveError(null);
         try {
             await onUpdate(id, {
                 title: draftTitle.trim() || title,
                 content: draftContent.trim() || content,
             });
             setIsEditing(false);
+        } catch (err) {
+            setSaveError(err instanceof Error ? err.message : 'Could not save changes.');
         } finally {
             setIsSaving(false);
         }
@@ -223,6 +229,11 @@ export function ItemCard<TId extends string>({
                         className="w-full resize-y rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[13px] leading-relaxed text-white/80 outline-none focus:border-[var(--support-violet)]/50"
                         aria-label="Item content"
                     />
+                    {saveError && (
+                        <p className="text-[11px] leading-snug text-red-300/80">
+                            {saveError}
+                        </p>
+                    )}
                     <div className="flex items-center gap-2">
                         <button
                             type="button"

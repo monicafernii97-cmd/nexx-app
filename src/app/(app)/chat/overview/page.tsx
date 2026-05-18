@@ -21,6 +21,7 @@ import { api } from '@convex/_generated/api';
 import { useToast } from '@/components/feedback/ToastProvider';
 import { formatCaseNarrativeAsDraft } from '@/lib/workspace-types';
 
+/** Check whether a memory item is the generated case summary narrative draft. */
 function hasSummaryNarrativeMetadata(metadataJson?: string) {
     if (!metadataJson) return false;
     try {

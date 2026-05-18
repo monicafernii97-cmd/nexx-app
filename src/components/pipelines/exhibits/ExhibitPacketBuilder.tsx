@@ -35,6 +35,11 @@ function getExhibitLabel(index: number) {
   return `Exhibit ${letters[Math.floor(index / 26) - 1]}${letters[index % 26]}`;
 }
 
+const createExhibitItemId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? `item_${crypto.randomUUID()}`
+    : `item_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
 /**
  * ExhibitPacketBuilder: The assembly line for Evidence.
  * Features: Reordering, Bates numbering config, and automated ToC generation.
@@ -105,7 +110,7 @@ export default function ExhibitPacketBuilder() {
     setItems(prev => [
       ...prev,
       {
-        id: `item_${Date.now()}`,
+        id: createExhibitItemId(),
         label: getExhibitLabel(prev.length),
         title: evidence.title,
         type: evidence.type,
@@ -131,7 +136,7 @@ export default function ExhibitPacketBuilder() {
         return [
           ...prev,
           {
-            id: `item_${Date.now()}`,
+            id: createExhibitItemId(),
             label: getExhibitLabel(prev.length),
             title: evidence.title,
             type: evidence.type,

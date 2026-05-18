@@ -203,7 +203,7 @@ export function GlobalWorkspaceRail() {
                     metadataJson: JSON.stringify({ source: 'insights_rail_report', artifactType: 'workspace_pdf_overview_exhibit_note' }),
                     requestId: `insights-report-exhibit-${activeCaseId}-${timestamp}`,
                 });
-                exhibitNoteId = String(savedId);
+                exhibitNoteId = savedId ? String(savedId) : null;
             }
 
             setIsReportModalOpen(false);

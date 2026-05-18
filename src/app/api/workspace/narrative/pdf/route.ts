@@ -7,6 +7,11 @@ import type { CaseNarrative } from '@/lib/workspace-types';
 
 export const maxDuration = 60;
 
+const MAX_TITLE_CHARS = 200;
+const MAX_TEXT_FIELD_CHARS = 40_000;
+const MAX_LIST_ITEMS = 200;
+const MAX_LIST_ITEM_CHARS = 2_000;
+
 /** Return true only when every value in the candidate array is a string. */
 function isStringArray(value: unknown): value is string[] {
     return Array.isArray(value) && value.every(item => typeof item === 'string');
@@ -24,6 +29,24 @@ function isCaseNarrative(value: unknown): value is CaseNarrative {
         && isStringArray(candidate.timelineSummary)
         && isStringArray(candidate.supportedPatternsSummary)
         && isStringArray(candidate.openQuestions);
+}
+
+/** Return true when a narrative exceeds the safe PDF rendering limits. */
+function isNarrativeTooLarge(narrative: CaseNarrative): boolean {
+    const textFields = [narrative.overview, narrative.narrative];
+    const listFields = [
+        narrative.keyFactsSummary,
+        narrative.timelineSummary,
+        narrative.supportedPatternsSummary,
+        narrative.openQuestions,
+    ];
+
+    return narrative.title.length > MAX_TITLE_CHARS
+        || textFields.some(field => field.length > MAX_TEXT_FIELD_CHARS)
+        || listFields.some(items =>
+            items.length > MAX_LIST_ITEMS
+            || items.some(item => item.length > MAX_LIST_ITEM_CHARS)
+        );
 }
 
 /** Render a titled ordered list section for non-empty narrative arrays. */
@@ -132,6 +155,11 @@ export async function POST(req: NextRequest) {
         narrative = body.narrative;
     } catch {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    // Bound inputs before renderNarrativeHtml/renderHTMLToPDF can spend the route budget.
+    if (isNarrativeTooLarge(narrative)) {
+        return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
     }
 
     try {

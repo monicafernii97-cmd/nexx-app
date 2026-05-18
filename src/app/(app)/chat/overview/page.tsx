@@ -33,6 +33,32 @@ function hasSummaryNarrativeMetadata(metadataJson?: string) {
     }
 }
 
+/** Extract a safe attachment filename from a Content-Disposition header. */
+function getAttachmentFilename(contentDisposition: string | null): string | null {
+    if (!contentDisposition) return null;
+
+    const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+    const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i);
+    const rawFilename = utf8Match?.[1] ?? quotedMatch?.[1];
+    if (!rawFilename) return null;
+
+    try {
+        return decodeURIComponent(rawFilename).replace(/[\\/]/g, '').trim() || null;
+    } catch {
+        return rawFilename.replace(/[\\/]/g, '').trim() || null;
+    }
+}
+
+/** Build the client fallback filename used only when the server omits one. */
+function getFallbackNarrativeFilename(title: string | undefined): string {
+    const slug = (title || 'case-summary-narrative')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+        || 'case-summary-narrative';
+    return `${slug}.pdf`;
+}
+
 
 
 /**
@@ -186,7 +212,8 @@ export default function WorkspaceOverview() {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `${(narrative.title || 'case-summary-narrative').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'case-summary-narrative'}.pdf`;
+            link.download = getAttachmentFilename(res.headers.get('Content-Disposition'))
+                ?? getFallbackNarrativeFilename(narrative.title);
             document.body.appendChild(link);
             link.click();
             link.remove();

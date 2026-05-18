@@ -26,8 +26,15 @@ interface NarrativeBlockProps {
     isGenerating?: boolean;
     /** Callback to trigger generation */
     onGenerate?: () => void;
-    /** Callback to send narrative data to DocuVault */
-    onSendToDocuVault?: () => void;
+    /** Callback to persist the narrative into workspace drafts */
+    onSaveToWorkspace?: () => void;
+    /** Callback to download the narrative as a PDF */
+    onDownloadPdf?: () => void;
+    /** Callback to create/open an exhibit-style document flow */
+    onCreateExhibit?: () => void;
+    isSavingToWorkspace?: boolean;
+    isDownloadingPdf?: boolean;
+    isCreatingExhibit?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -44,13 +51,18 @@ interface NarrativeBlockProps {
  * - Premium typography (larger text, generous line-height)
  * - 320px max-height cap with gradient fade-out (creates curiosity + depth)
  * - "Expand Full Summary" toggle
- * - Dual CTA: Download Summary PDF / Convert to Court Document
+ * - CTAs: Save to Workspace / Download Summary PDF / Create Exhibit Note
  */
 export function NarrativeBlock({
     narrative,
     isGenerating = false,
     onGenerate,
-    onSendToDocuVault,
+    onSaveToWorkspace,
+    onDownloadPdf,
+    onCreateExhibit,
+    isSavingToWorkspace = false,
+    isDownloadingPdf = false,
+    isCreatingExhibit = false,
 }: NarrativeBlockProps) {
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -206,28 +218,46 @@ export function NarrativeBlock({
                     </div>
                 )}
 
-                {/* Dual CTAs */}
-                <div className="flex items-center gap-3 mt-6 pt-4 border-t border-white/5">
+                {/* Workspace actions */}
+                <div className="grid grid-cols-1 gap-3 mt-6 pt-4 border-t border-white/5 md:grid-cols-3">
                     <button
-                        aria-disabled="true"
-                        tabIndex={-1}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-white/10 bg-white/[0.02] text-[12px] font-bold uppercase tracking-wider text-white/25 cursor-not-allowed"
+                        onClick={onSaveToWorkspace}
+                        disabled={!onSaveToWorkspace || isSavingToWorkspace}
+                        aria-disabled={!onSaveToWorkspace || isSavingToWorkspace}
+                        className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-all ${
+                            onSaveToWorkspace
+                                ? 'border border-[var(--support-violet)]/20 bg-[var(--support-violet)]/10 text-[var(--support-violet)] hover:bg-[var(--support-violet)]/15 cursor-pointer'
+                                : 'border border-white/10 bg-white/[0.02] text-white/25 cursor-not-allowed'
+                        }`}
                     >
-                        <FilePdf size={14} weight="bold" />
-                        Download PDF
+                        <BookOpen size={14} weight="bold" />
+                        {isSavingToWorkspace ? 'Saving...' : 'Save to Workspace'}
                     </button>
                     <button
-                        onClick={onSendToDocuVault}
-                        disabled={!onSendToDocuVault}
-                        aria-disabled={!onSendToDocuVault}
-                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-all ${
-                            onSendToDocuVault
+                        onClick={onDownloadPdf}
+                        disabled={!onDownloadPdf || isDownloadingPdf}
+                        aria-disabled={!onDownloadPdf || isDownloadingPdf}
+                        className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-all ${
+                            onDownloadPdf
+                                ? 'border border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white cursor-pointer'
+                                : 'border border-white/10 bg-white/[0.02] text-white/25 cursor-not-allowed'
+                        }`}
+                    >
+                        <FilePdf size={14} weight="bold" />
+                        {isDownloadingPdf ? 'Preparing...' : 'Download PDF'}
+                    </button>
+                    <button
+                        onClick={onCreateExhibit}
+                        disabled={!onCreateExhibit || isCreatingExhibit}
+                        aria-disabled={!onCreateExhibit || isCreatingExhibit}
+                        className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-all ${
+                            onCreateExhibit
                                 ? 'bg-gradient-to-r from-[var(--accent-emerald)]/20 to-[var(--accent-emerald)]/10 border border-[var(--accent-emerald)]/20 text-[var(--accent-emerald)] hover:from-[var(--accent-emerald)]/30 hover:to-[var(--accent-emerald)]/15 cursor-pointer'
                                 : 'border border-white/10 bg-white/[0.02] text-white/25 cursor-not-allowed'
                         }`}
                     >
                         <Scales size={14} weight="bold" />
-                        Court Document
+                        {isCreatingExhibit ? 'Saving...' : 'Exhibit Hub'}
                         <ArrowRight size={10} />
                     </button>
                 </div>

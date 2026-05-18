@@ -43,6 +43,18 @@ const ACTION_TO_SAVE_TYPE: Partial<Record<ActionType, string>> = {
     insert_into_template: 'draft_snippet',
 };
 
+const PIN_TO_MEMORY_TYPE: Partial<Record<PinnableType, string>> = {
+    key_fact: 'key_fact',
+    strategy_point: 'strategy_point',
+    good_faith_point: 'good_faith_point',
+    strength_highlight: 'strength_highlight',
+    risk_concern: 'risk_concern',
+    hearing_prep_point: 'hearing_prep_point',
+    draft_snippet: 'draft_snippet',
+    question_to_verify: 'question_to_verify',
+    timeline_anchor: 'timeline_candidate',
+};
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -169,10 +181,22 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                     aiVersion: autofillMeta.aiVersion ?? undefined,
                 });
 
+                const memoryType = PIN_TO_MEMORY_TYPE[type];
+                if (memoryType) {
+                    await saveToCaseMemory({
+                        type: memoryType as Parameters<typeof saveToCaseMemory>[0]['type'],
+                        title,
+                        content,
+                        caseId: activeCaseId ?? undefined,
+                        requestId: `pin-memory-${requestId}`,
+                        metadataJson: JSON.stringify({ source: 'workspace_pin', pinType: type }),
+                    });
+                }
+
                 showToast({
                     variant: 'success',
                     title: 'Pinned to Workspace',
-                    description: `"${title}" is now in your rail.`,
+                    description: `"${title}" is now in your rail and Key Points board.`,
                 });
                 setPinModalOpen(false);
             } catch (err) {
@@ -185,7 +209,7 @@ export function WorkspaceClient({ children }: WorkspaceClientProps) {
                 setIsPinning(false);
             }
         },
-        [createPin, showToast, activeCaseId, rawPinSource, autofillMeta]
+        [createPin, saveToCaseMemory, showToast, activeCaseId, rawPinSource, autofillMeta]
     );
 
     // ── Fetch pin autofill from API ──

@@ -28,6 +28,20 @@ export interface CaseNarrative {
     narrative: string;
 }
 
+/** Format a generated case narrative into readable workspace draft text. */
+export function formatCaseNarrativeAsDraft(narrative: CaseNarrative): string {
+    const sections = [
+        narrative.overview && `Overview\n${narrative.overview}`,
+        narrative.keyFactsSummary.length > 0 && `Key Facts\n${narrative.keyFactsSummary.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
+        narrative.timelineSummary.length > 0 && `Timeline Summary\n${narrative.timelineSummary.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
+        narrative.supportedPatternsSummary.length > 0 && `Supported Patterns\n${narrative.supportedPatternsSummary.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
+        narrative.narrative && `Narrative\n${narrative.narrative}`,
+        narrative.openQuestions.length > 0 && `Open Questions\n${narrative.openQuestions.map((item, index) => `${index + 1}. ${item}`).join('\n')}`,
+    ];
+
+    return sections.filter(Boolean).join('\n\n');
+}
+
 // ---------------------------------------------------------------------------
 // Report Configuration — used by report API and GenerateReportModal
 // ---------------------------------------------------------------------------

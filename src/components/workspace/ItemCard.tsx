@@ -1,11 +1,15 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { useState } from 'react';
 import { 
     Calendar, 
     PushPin, 
     Notebook, 
     Trash,
+    PencilSimple,
+    Check,
+    X,
     ShieldCheck,
     SealWarning,
     Strategy,
@@ -68,6 +72,7 @@ interface ItemCardProps<TId extends string = string> {
     content: string;
     createdAt: number;
     onRemove: (id: TId) => Promise<void>;
+    onUpdate?: (id: TId, updates: { title?: string; content?: string }) => Promise<void>;
     isPinned?: boolean;
     compact?: boolean;
     /** If present, shows a SourceBadge linking to the origin conversation */
@@ -90,6 +95,7 @@ export function ItemCard<TId extends string>({
     content,
     createdAt,
     onRemove,
+    onUpdate,
     isPinned = false,
     compact = false,
     sourceConversationId,
@@ -97,6 +103,30 @@ export function ItemCard<TId extends string>({
     const config = TYPE_CONFIGS[type] || { label: type, color: 'accent-platinum', icon: Notebook };
     const Icon = config.icon;
     const accentColor = `var(--${config.color})`;
+    const [isEditing, setIsEditing] = useState(false);
+    const [draftTitle, setDraftTitle] = useState(title);
+    const [draftContent, setDraftContent] = useState(content);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleCancelEdit = () => {
+        setDraftTitle(title);
+        setDraftContent(content);
+        setIsEditing(false);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!onUpdate || isSaving) return;
+        setIsSaving(true);
+        try {
+            await onUpdate(id, {
+                title: draftTitle.trim() || title,
+                content: draftContent.trim() || content,
+            });
+            setIsEditing(false);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     return (
         <motion.div
@@ -141,6 +171,15 @@ export function ItemCard<TId extends string>({
                 </div>
 
                 <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
+                    {onUpdate && (
+                        <button
+                            onClick={() => setIsEditing(true)}
+                            className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1128]"
+                            aria-label="Edit item"
+                        >
+                            <PencilSimple size={14} weight="bold" />
+                        </button>
+                    )}
                     <button
                         onClick={() => onRemove(id)}
                         className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A1128]"
@@ -152,20 +191,61 @@ export function ItemCard<TId extends string>({
             </div>
 
             {/* Title */}
-            <h4 className={`
-                font-semibold text-white tracking-tight mb-2
-                ${compact ? 'text-[13px] line-clamp-1' : 'text-[15px]'}
-            `}>
-                {title}
-            </h4>
+            {isEditing ? (
+                <input
+                    value={draftTitle}
+                    onChange={(event) => setDraftTitle(event.target.value)}
+                    className="mb-2 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[14px] font-semibold text-white outline-none focus:border-[var(--support-violet)]/50"
+                    aria-label="Item title"
+                />
+            ) : (
+                <h4 className={`
+                    font-semibold text-white tracking-tight mb-2
+                    ${compact ? 'text-[13px] line-clamp-1' : 'text-[15px]'}
+                `}>
+                    {title}
+                </h4>
+            )}
 
             {/* Content */}
-            <p className={`
-                text-white/60 leading-relaxed
-                ${compact ? 'text-[11px] line-clamp-2' : 'text-[13px] line-clamp-4'}
-            `}>
-                {content}
-            </p>
+            {isEditing ? (
+                <div className="space-y-3">
+                    <textarea
+                        value={draftContent}
+                        onChange={(event) => setDraftContent(event.target.value)}
+                        rows={compact ? 4 : 6}
+                        className="w-full resize-y rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[13px] leading-relaxed text-white/80 outline-none focus:border-[var(--support-violet)]/50"
+                        aria-label="Item content"
+                    />
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleSaveEdit}
+                            disabled={isSaving}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300 disabled:opacity-50"
+                        >
+                            <Check size={12} weight="bold" />
+                            {isSaving ? 'Saving' : 'Save'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleCancelEdit}
+                            disabled={isSaving}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/45 disabled:opacity-50"
+                        >
+                            <X size={12} weight="bold" />
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <p className={`
+                    text-white/60 leading-relaxed
+                    ${compact ? 'text-[11px] line-clamp-2' : 'text-[13px] line-clamp-4'}
+                `}>
+                    {content}
+                </p>
+            )}
 
             {/* Footer */}
             {!compact && (

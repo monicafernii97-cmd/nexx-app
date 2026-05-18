@@ -46,8 +46,8 @@ interface GenerateReportModalProps {
 
 const OUTPUT_OPTIONS: { id: OutputType; label: string; description: string; icon: typeof FilePdf }[] = [
     { id: 'summary', label: 'Case Summary PDF', description: 'Personal strategy briefing', icon: FilePdf },
-    { id: 'court_document', label: 'Court Document Draft', description: 'Pre-fill a court filing', icon: Scales },
-    { id: 'both', label: 'Both', description: 'Summary + court-ready draft', icon: Files },
+    { id: 'court_document', label: 'Exhibit Note Draft', description: 'Prepare exhibit-style source material', icon: Scales },
+    { id: 'both', label: 'Both', description: 'Summary + exhibit note draft', icon: Files },
 ];
 
 
@@ -62,12 +62,12 @@ const PATTERN_OPTIONS: { id: PatternHandling; label: string; icon: typeof ChartB
 // ---------------------------------------------------------------------------
 
 /**
- * GenerateReportModal — The bridge between Workspace and DocuVault.
+ * GenerateReportModal — The bridge between Workspace summaries and exhibit prep.
  *
  * Flow:
  * 1. User clicks "Generate Report" in sidebar or workspace
  * 2. Modal opens with 3 option groups: Output Type, Tone, Pattern Handling
- * 3. On "Build Report" → generates narrative → redirects to DocuVault (prefilled)
+ * 3. On "Build Report" → generates a summary or exhibit-style draft
  *
  * Visual: 720px width, 28px padding, 24px radius.
  */

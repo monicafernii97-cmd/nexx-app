@@ -14,7 +14,7 @@ import { FilterTabs } from '@/components/workspace/FilterTabs';
  * Features full 12-type filtering, search, and bulk management.
  */
 export default function KeyPointsPage() {
-    const { memory, removeMemory, pins } = useWorkspace();
+    const { memory, removeMemory, updateMemory, pins } = useWorkspace();
     const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -113,6 +113,7 @@ export default function KeyPointsPage() {
                                 content={item.content}
                                 createdAt={item.createdAt}
                                 onRemove={removeMemory}
+                                onUpdate={updateMemory}
                                 isPinned={isPinned}
                             />
                         );

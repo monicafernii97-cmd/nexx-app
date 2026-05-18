@@ -16,7 +16,7 @@ import type { Id } from '@convex/_generated/dataModel';
 import { CASE_NARRATIVE_SCHEMA } from '@/lib/nexx/schemas';
 import { buildNarrativePrompt } from '@/lib/nexx/prompts/narrativePrompt';
 import { PRIMARY_MODEL } from '@/lib/tiers';
-import type { CaseNarrative } from '@/lib/workspace-types';
+import { formatCaseNarrativeAsDraft, type CaseNarrative } from '@/lib/workspace-types';
 import { stableRequestId, serializeForPrompt } from '@/lib/workspace-utils';
 
 export const maxDuration = 60;
@@ -115,6 +115,15 @@ export async function POST(req: NextRequest) {
             content: JSON.stringify(narrative),
             title: narrative.title || `Case Narrative — ${new Date().toLocaleDateString()}`,
             requestId,
+        });
+
+        await convex.mutation(api.caseMemory.save, {
+            caseId,
+            type: 'draft_snippet',
+            content: formatCaseNarrativeAsDraft(narrative),
+            title: narrative.title || `Case Summary Narrative - ${new Date().toLocaleDateString()}`,
+            metadataJson: JSON.stringify({ source: 'workspace_narrative', artifactType: 'case_summary_narrative' }),
+            requestId: stableRequestId(caseId, 'narrative_workspace_draft'),
         });
 
         return NextResponse.json(narrative);

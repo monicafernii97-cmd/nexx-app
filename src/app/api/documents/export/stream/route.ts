@@ -58,6 +58,7 @@ import {
     MAX_TERMINAL_MUTATION_RETRIES,
     RETRY_BACKOFF_BASE_MS,
 } from '@/lib/exports/exportConfig';
+import { encodeSseComment } from '@/lib/server/sse';
 
 export const maxDuration = 120; // Extended for GPT + PDF rendering
 
@@ -231,6 +232,8 @@ export async function POST(request: NextRequest) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
         async start(controller) {
+            let heartbeat: ReturnType<typeof setInterval> | undefined;
+
             const send = (data: Record<string, unknown>) => {
                 try {
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
@@ -238,6 +241,19 @@ export async function POST(request: NextRequest) {
                     // Controller may be closed (client disconnected)
                 }
             };
+
+            const stopHeartbeat = () => {
+                if (heartbeat) {
+                    clearInterval(heartbeat);
+                    heartbeat = undefined;
+                }
+            };
+
+            const abortHandler = () => {
+                stopHeartbeat();
+            };
+
+            request.signal.addEventListener('abort', abortHandler);
 
             /** Check if client disconnected; throw to exit pipeline early. */
             const checkAborted = () => {
@@ -252,6 +268,14 @@ export async function POST(request: NextRequest) {
             let jobId: string | null = null;
             let pendingCourtIssues: CourtDocumentIssue[] | null = null;
             let clarificationEventSent = false;
+
+            heartbeat = setInterval(() => {
+                try {
+                    controller.enqueue(encodeSseComment('keep-alive'));
+                } catch {
+                    stopHeartbeat();
+                }
+            }, 15_000);
 
             try {
                 // ────────────────────────────────────────────────
@@ -1310,7 +1334,13 @@ export async function POST(request: NextRequest) {
                     });
                 }
             } finally {
-                controller.close();
+                stopHeartbeat();
+                request.signal.removeEventListener('abort', abortHandler);
+                try {
+                    controller.close();
+                } catch {
+                    // Controller may already be closed after a client disconnect.
+                }
             }
         },
     });
@@ -1318,8 +1348,9 @@ export async function POST(request: NextRequest) {
     return new Response(stream, {
         headers: {
             'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
+            'Cache-Control': 'no-cache, no-transform',
             'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
         },
     });
   } catch (topLevelError) {

@@ -78,6 +78,18 @@ interface ContextDispatchers {
     dispatch: React.Dispatch<any>;
 }
 
+function isFetchNetworkFailure(err: unknown): boolean {
+    if (!(err instanceof TypeError)) return false;
+    return /failed to fetch|networkerror|load failed/i.test(err.message);
+}
+
+function getStreamFailureMessage(err: unknown): string {
+    if (isFetchNetworkFailure(err)) {
+        return 'The export connection dropped while generating the PDF. Please retry; if it happens again, the export service may be timing out or restarting.';
+    }
+    return err instanceof Error ? err.message : 'Stream connection failed';
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -257,10 +269,11 @@ export function useDraftingStream({ dispatch }: ContextDispatchers) {
             if (err instanceof DOMException && err.name === 'AbortError') {
                 return runId;
             }
+            const isNetworkFailure = isFetchNetworkFailure(err);
             dispatch({
                 type: 'ERROR',
-                message: err instanceof Error ? err.message : 'Stream connection failed',
-                errorCode: 'unknown_failed',
+                message: getStreamFailureMessage(err),
+                errorCode: isNetworkFailure ? 'stream_connection_failed' : 'unknown_failed',
             });
         }
 

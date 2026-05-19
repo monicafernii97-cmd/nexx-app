@@ -71,14 +71,21 @@ const PATTERN_OPTIONS: { id: PatternHandling; label: string; icon: typeof ChartB
  *
  * Visual: 720px width, 28px padding, 24px radius.
  */
-export function GenerateReportModal({
-    isOpen,
+export function GenerateReportModal(props: GenerateReportModalProps) {
+    return (
+        <AnimatePresence>
+            {props.isOpen && <GenerateReportModalContent {...props} />}
+        </AnimatePresence>
+    );
+}
+
+function GenerateReportModalContent({
     onClose,
     onGenerate,
     isGenerating = false,
     itemCounts,
 }: GenerateReportModalProps) {
-    const [outputType, setOutputType] = useState<OutputType>('summary');
+    const [outputType, setOutputType] = useState<OutputType>('both');
 
     const [patternHandling, setPatternHandling] = useState<PatternHandling>('include_supported');
     const modalRef = useRef<HTMLDivElement>(null);
@@ -86,7 +93,6 @@ export function GenerateReportModal({
 
     // Escape to close + focus management
     useEffect(() => {
-        if (!isOpen) return;
         previousFocusRef.current = document.activeElement as HTMLElement;
         const timer = setTimeout(() => modalRef.current?.focus(), 50);
 
@@ -99,16 +105,14 @@ export function GenerateReportModal({
             clearTimeout(timer);
             previousFocusRef.current?.focus();
         };
-    }, [isOpen, onClose]);
+    }, [onClose]);
 
     const handleGenerate = useCallback(() => {
         onGenerate({ outputType, patternHandling });
     }, [onGenerate, outputType, patternHandling]);
 
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <>
+        <>
                     {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -274,8 +278,6 @@ export function GenerateReportModal({
                             </div>
                         </div>
                     </motion.div>
-                </>
-            )}
-        </AnimatePresence>
+        </>
     );
 }

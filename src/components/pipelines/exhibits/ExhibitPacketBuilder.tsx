@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from 'convex/react';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@convex/_generated/api';
 import { 
   DotsSixVertical, 
@@ -27,6 +28,18 @@ interface ExhibitItem {
   sourceId?: string;
 }
 
+/** Build the display label used for each staged exhibit. */
+function getExhibitLabel(index: number) {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  if (index < 26) return `Exhibit ${letters[index]}`;
+  return `Exhibit ${letters[Math.floor(index / 26) - 1]}${letters[index % 26]}`;
+}
+
+const createExhibitItemId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? `item_${crypto.randomUUID()}`
+    : `item_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
 /**
  * ExhibitPacketBuilder: The assembly line for Evidence.
  * Features: Reordering, Bates numbering config, and automated ToC generation.
@@ -34,6 +47,9 @@ interface ExhibitItem {
  */
 export default function ExhibitPacketBuilder() {
   const { activeCaseId } = useWorkspace();
+  const searchParams = useSearchParams();
+  const sourceId = searchParams.get('sourceId');
+  const autoStagedSourceRef = useRef<string | null>(null);
 
   // Live workspace data — casePins.listByUser doesn't filter by case,
   // so we filter client-side
@@ -90,19 +106,12 @@ export default function ExhibitPacketBuilder() {
     return evidence;
   }, [allCasePins, allCaseMemory, items, activeCaseId]);
 
-  // Exhibit letter generator
-  const exhibitLabel = (index: number) => {
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    if (index < 26) return `Exhibit ${letters[index]}`;
-    return `Exhibit ${letters[Math.floor(index / 26) - 1]}${letters[index % 26]}`;
-  };
-
   const addEvidence = (evidence: { id: string; title: string; summary: string; type: 'text' | 'image' | 'pdf' }) => {
     setItems(prev => [
       ...prev,
       {
-        id: `item_${Date.now()}`,
-        label: exhibitLabel(prev.length),
+        id: createExhibitItemId(),
+        label: getExhibitLabel(prev.length),
         title: evidence.title,
         type: evidence.type,
         summary: evidence.summary,
@@ -112,8 +121,31 @@ export default function ExhibitPacketBuilder() {
     setShowPicker(false);
   };
 
+  useEffect(() => {
+    if (!sourceId || autoStagedSourceRef.current === sourceId) return;
+
+    const evidence = availableEvidence.find(item => item.id === sourceId);
+    if (!evidence) return;
+
+    setItems(prev => {
+      if (prev.some(item => item.sourceId === sourceId)) return prev;
+      autoStagedSourceRef.current = sourceId;
+      return [
+        ...prev,
+        {
+          id: createExhibitItemId(),
+          label: getExhibitLabel(prev.length),
+          title: evidence.title,
+          type: evidence.type,
+          summary: evidence.summary,
+          sourceId: evidence.id,
+        },
+      ];
+    });
+  }, [availableEvidence, sourceId]);
+
   const removeItem = (itemId: string) => {
-    setItems(prev => prev.filter(i => i.id !== itemId).map((item, i) => ({ ...item, label: exhibitLabel(i) })));
+    setItems(prev => prev.filter(i => i.id !== itemId).map((item, i) => ({ ...item, label: getExhibitLabel(i) })));
   };
 
   const handleGeneratePacket = async () => {

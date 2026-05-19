@@ -78,11 +78,13 @@ interface ContextDispatchers {
     dispatch: React.Dispatch<any>;
 }
 
+/** Detect browser-level fetch failures where no HTTP response was received. */
 function isFetchNetworkFailure(err: unknown): boolean {
     if (!(err instanceof TypeError)) return false;
     return /failed to fetch|networkerror|load failed/i.test(err.message);
 }
 
+/** Convert stream startup/read failures into recovery-oriented user copy. */
 function getStreamFailureMessage(err: unknown): string {
     if (isFetchNetworkFailure(err)) {
         return 'The export connection dropped while generating the PDF. Please retry; if it happens again, the export service may be timing out or restarting.';

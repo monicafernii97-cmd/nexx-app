@@ -234,6 +234,7 @@ export async function POST(request: NextRequest) {
         async start(controller) {
             let heartbeat: ReturnType<typeof setInterval> | undefined;
 
+            /** Emit a structured SSE data event to the connected export client. */
             const send = (data: Record<string, unknown>) => {
                 try {
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
@@ -242,6 +243,7 @@ export async function POST(request: NextRequest) {
                 }
             };
 
+            /** Stop the keep-alive interval after completion, failure, or disconnect. */
             const stopHeartbeat = () => {
                 if (heartbeat) {
                     clearInterval(heartbeat);
@@ -249,6 +251,7 @@ export async function POST(request: NextRequest) {
                 }
             };
 
+            /** Stop background work that only exists to keep the client stream open. */
             const abortHandler = () => {
                 stopHeartbeat();
             };

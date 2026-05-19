@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
     CheckCircle,
@@ -137,6 +137,13 @@ export function GlobalWorkspaceRail() {
     const router = useRouter();
     const { showToast } = useToast();
     const saveCaseMemory = useMutation(api.caseMemory.save);
+
+    useEffect(() => {
+        return () => {
+            reportAbortControllerRef.current?.abort();
+            reportAbortControllerRef.current = null;
+        };
+    }, []);
 
     // ── Detected patterns from Convex ──
     const detectedPatterns = useQuery(

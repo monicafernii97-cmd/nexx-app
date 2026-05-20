@@ -580,7 +580,7 @@ export default function IncidentReportPage() {
             const evidenceText = incident.evidence?.length
                 ? `\n\nLinked evidence:\n${incident.evidence.map((item) => `- ${item}`).join('\n')}`
                 : '';
-            await saveCaseMemory({
+            const exhibitNoteId = await saveCaseMemory({
                 type: 'exhibit_note',
                 title: `Exhibit source - Incident ${incident.date}`,
                 content: `Incident date: ${incident.date}${incident.time ? ` at ${incident.time}` : ''}\n\n${incident.narrative}${evidenceText}`,
@@ -594,11 +594,12 @@ export default function IncidentReportPage() {
                 }),
                 requestId: `incident:${incident._id}:exhibit-note`,
             });
+            const exhibitHubHref = `/docuvault/exhibits?sourceId=${encodeURIComponent(String(exhibitNoteId))}`;
             showToast({
                 variant: 'success',
                 title: 'Sent to Exhibit Hub',
-                description: 'Saved as an exhibit note for DocuVault/exhibit assembly.',
-                destination: { label: 'Open Exhibit Hub', href: '/docuvault/exhibits' },
+                description: 'Saved as an exhibit note and staged for exhibit assembly.',
+                destination: { label: 'Open Exhibit Hub', href: exhibitHubHref },
             });
         } catch (err) {
             console.error('[IncidentIntake] Exhibit note creation failed:', err);

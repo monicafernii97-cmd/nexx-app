@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     FileText,
     MagnifyingGlass as Search,
@@ -14,7 +14,7 @@ import {
     X,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
@@ -34,6 +34,7 @@ export default function DocuVaultGalleryPage() {
 
 /** Query-aware gallery content that can open a generated document quick look. */
 function DocuVaultGalleryPageInner() {
+    const pathname = usePathname();
     const router = useRouter();
     const searchParams = useSearchParams();
     const [searchQuery, setSearchQuery] = useState('');
@@ -41,6 +42,8 @@ function DocuVaultGalleryPageInner() {
     const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name'>('newest');
     const [deletingId, setDeletingId] = useState<Id<'generatedDocuments'> | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    const dialogRef = useRef<HTMLDivElement | null>(null);
+    const previousFocusRef = useRef<HTMLElement | null>(null);
 
     // ── Fetch real data from Convex ──
     const exports = useQuery(api.generatedDocumentsExport.getRecentExports, { limit: 100 });
@@ -95,32 +98,78 @@ function DocuVaultGalleryPageInner() {
         : null;
 
     /** Update the URL so the quick-look modal can be opened directly from export completion. */
-    const openQuickLook = (docId: Id<'generatedDocuments'>) => {
+    const openQuickLook = useCallback((docId: Id<'generatedDocuments'>) => {
+        previousFocusRef.current = document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
         const params = new URLSearchParams(searchParams.toString());
         params.set('preview', String(docId));
-        router.replace(`/docuvault/gallery?${params.toString()}`, { scroll: false });
-    };
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }, [pathname, router, searchParams]);
 
     /** Close quick look while preserving the user's gallery filters in the URL. */
     const closeQuickLook = useCallback(() => {
         const params = new URLSearchParams(searchParams.toString());
         params.delete('preview');
         const query = params.toString();
-        router.replace(query ? `/docuvault/gallery?${query}` : '/docuvault/gallery', { scroll: false });
-    }, [router, searchParams]);
+        router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    }, [pathname, router, searchParams]);
 
-    /** Let keyboard users dismiss the quick-look dialog with Escape. */
+    /** Focus the quick-look dialog, trap tab navigation, and restore focus on close. */
     useEffect(() => {
         if (!quickLookDoc) return;
 
-        const handleEscape = (event: KeyboardEvent) => {
+        if (!previousFocusRef.current && document.activeElement instanceof HTMLElement) {
+            previousFocusRef.current = document.activeElement;
+        }
+
+        const dialog = dialogRef.current;
+        dialog?.focus();
+
+        const getFocusableElements = () => Array.from(
+            dialog?.querySelectorAll<HTMLElement>(
+                'a[href], button:not([disabled]), iframe, input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            ) ?? [],
+        ).filter(element => !element.hasAttribute('disabled') && element.tabIndex !== -1);
+
+        const handleDialogKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
+                event.preventDefault();
                 closeQuickLook();
+                return;
+            }
+
+            if (event.key !== 'Tab') return;
+
+            const focusable = getFocusableElements();
+            if (focusable.length === 0) {
+                event.preventDefault();
+                dialog?.focus();
+                return;
+            }
+
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            const active = document.activeElement;
+
+            if (!dialog?.contains(active) || active === dialog) {
+                event.preventDefault();
+                (event.shiftKey ? last : first).focus();
+            } else if (event.shiftKey && active === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && active === last) {
+                event.preventDefault();
+                first.focus();
             }
         };
 
-        document.addEventListener('keydown', handleEscape);
-        return () => document.removeEventListener('keydown', handleEscape);
+        document.addEventListener('keydown', handleDialogKeyDown);
+        return () => {
+            document.removeEventListener('keydown', handleDialogKeyDown);
+            previousFocusRef.current?.focus();
+            previousFocusRef.current = null;
+        };
     }, [quickLookDoc, closeQuickLook]);
 
     /** Handle delete with confirmation and user-visible error feedback. */
@@ -441,6 +490,7 @@ function DocuVaultGalleryPageInner() {
                             onClick={closeQuickLook}
                         />
                         <motion.div
+                            ref={dialogRef}
                             initial={{ opacity: 0, scale: 0.96, y: 12 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.96, y: 12 }}
@@ -448,6 +498,7 @@ function DocuVaultGalleryPageInner() {
                             role="dialog"
                             aria-modal="true"
                             aria-labelledby="document-quick-look-title"
+                            tabIndex={-1}
                         >
                             <div className="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 px-4 py-3">
                                 <div className="min-w-0">

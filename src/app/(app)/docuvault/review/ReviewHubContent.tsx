@@ -80,6 +80,7 @@ function getErrorDescription(code: string | null): string {
         case 'render_pdf_failed': return 'PDF generation failed. Chrome may be unavailable.';
         case 'upload_failed': return 'Failed to upload PDF to storage.';
         case 'save_failed': return 'Failed to save export record.';
+        case 'stream_connection_failed': return 'The export connection dropped during PDF generation.';
         default: return 'An unexpected error occurred during export.';
     }
 }

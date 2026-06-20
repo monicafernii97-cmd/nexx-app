@@ -21,6 +21,7 @@ interface ChatInputProps {
 // ---------------------------------------------------------------------------
 
 const QUICK_ACTIONS = [
+    { id: 'analyze_court_order', label: 'Analyze Court Order', icon: FileArrowUp },
     { id: 'analyze_thread', label: 'Analyze a Thread', icon: MagnifyingGlass },
     { id: 'draft_court', label: 'Draft Court Language', icon: PencilLine },
     { id: 'build_timeline', label: 'Build Timeline', icon: ListChecks },
@@ -37,6 +38,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     const [isListening, setIsListening] = useState(false);
     const [micError, setMicError] = useState<string | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [selectedFileIntent, setSelectedFileIntent] = useState<'attachment' | 'thread' | 'court_order'>('attachment');
     // Client-only: avoids hydration mismatch since server has no SpeechRecognition
     const [isSpeechSupported, setIsSpeechSupported] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -103,12 +105,19 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
         if (disabled) return;
         // Stop mic before sending to prevent onresult from repopulating the field
         stopRecognition();
-        onSend(text || (selectedFile ? `Analyze this file: ${selectedFile.name}` : ''), selectedFile ?? undefined);
+        const fallbackMessage =
+            selectedFileIntent === 'court_order'
+                ? `Analyze this court order: ${selectedFile?.name ?? 'uploaded court order'}`
+                : selectedFileIntent === 'thread'
+                    ? `Analyze this uploaded thread: ${selectedFile?.name ?? 'uploaded thread'}`
+                    : `Analyze this file: ${selectedFile?.name ?? 'uploaded file'}`;
+        onSend(text || (selectedFile ? fallbackMessage : ''), selectedFile ?? undefined);
         updateInput('');
         setSelectedFile(null);
+        setSelectedFileIntent('attachment');
         prefixRef.current = '';
         dictatedRef.current = '';
-    }, [disabled, selectedFile, onSend, stopRecognition, updateInput]);
+    }, [disabled, selectedFile, selectedFileIntent, onSend, stopRecognition, updateInput]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         // Don't send during IME composition (Japanese/Chinese/Korean input)
@@ -211,6 +220,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
 
     // ── File attachment handler ──
     const handleFileSelect = useCallback(() => {
+        setSelectedFileIntent('attachment');
         fileInputRef.current?.click();
     }, []);
 
@@ -222,17 +232,18 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             if (fileInputRef.current) fileInputRef.current.value = '';
         };
 
-        const allowedTypes = [
+        const allowedTypes = new Set([
             'application/pdf',
             'application/msword',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'text/plain',
-            'image/jpeg',
-            'image/png',
-        ];
+        ]);
+        const allowedExtensions = ['.pdf', '.doc', '.docx', '.txt'];
+        const lowerName = file.name.toLowerCase();
+        const hasAllowedExtension = allowedExtensions.some((ext) => lowerName.endsWith(ext));
 
-        if (!allowedTypes.includes(file.type)) {
-            setMicError('Unsupported file type. Upload PDF, DOCX, TXT, JPG, or PNG.');
+        if (!allowedTypes.has(file.type) && !hasAllowedExtension) {
+            setMicError('Unsupported file type. Upload PDF, DOC, DOCX, or TXT.');
             resetInput();
             return;
         }
@@ -250,6 +261,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
 
     const removeFile = useCallback(() => {
         setSelectedFile(null);
+        setSelectedFileIntent('attachment');
     }, []);
 
 
@@ -257,11 +269,21 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     const micErrorId = micError ? `${baseId}-mic-error` : undefined;
 
     const handleQuickActionClick = useCallback((actionId: string) => {
+        if (actionId === 'analyze_court_order') {
+            setSelectedFileIntent('court_order');
+            if (fileInputRef.current) {
+                fileInputRef.current.accept = '.pdf,.doc,.docx,.txt';
+                fileInputRef.current.click();
+            }
+            return;
+        }
+
         if (onQuickAction) {
             onQuickAction(actionId);
         } else {
             // Autofill placeholder text if no handler
             const prefills: Record<string, string> = {
+                analyze_court_order: 'Analyze this court order: ',
                 analyze_thread: 'Analyze this thread: ',
                 draft_court: 'Draft court-ready language for: ',
                 build_timeline: 'Build a timeline from: ',
@@ -314,7 +336,8 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                     type="button"
                     onClick={() => {
                         if (fileInputRef.current) {
-                            fileInputRef.current.accept = '.pdf,.doc,.docx,.txt,.jpg,.jpeg,.png';
+                            setSelectedFileIntent('thread');
+                            fileInputRef.current.accept = '.pdf,.doc,.docx,.txt';
                             fileInputRef.current.click();
                         }
                     }}
@@ -328,6 +351,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                     type="button"
                     onClick={() => {
                         if (fileInputRef.current) {
+                            setSelectedFileIntent('court_order');
                             fileInputRef.current.accept = '.pdf,.doc,.docx,.txt';
                             fileInputRef.current.click();
                         }
@@ -365,7 +389,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                accept=".pdf,.doc,.docx,.txt"
                 onChange={handleFileChange}
             />
             <div

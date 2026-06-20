@@ -24,6 +24,17 @@ crons.interval(
 );
 
 /**
+ * Re-queue or finalize chat generation jobs whose worker lease expired.
+ * Convex scheduled actions are at-most-once, so chat jobs need app-level
+ * lease recovery to keep accepted turns from hanging forever.
+ */
+crons.interval(
+  'recover stale chat generation jobs',
+  { minutes: 1 },
+  internal.chatTurns.recoverStaleJobs,
+);
+
+/**
  * Purge expired export run and job records daily (30-day retention).
  * Only deletes terminal records (completed, failed, timeout).
  */

@@ -135,6 +135,9 @@ export default defineSchema({
         openaiConversationId: v.optional(v.string()),
         openaiLastResponseId: v.optional(v.string()),
         vectorStoreId: v.optional(v.string()),
+        activeTurnRequestId: v.optional(v.string()),
+        activeTurnStartedAt: v.optional(v.number()),
+        nextTurnNumber: v.optional(v.number()),
         routeMode: v.optional(v.union(
             v.literal('adaptive_chat'),
             v.literal('direct_legal_answer'),
@@ -156,12 +159,28 @@ export default defineSchema({
     // ═══ Messages ═══
     messages: defineTable({
         conversationId: v.id('conversations'),
+        userId: v.optional(v.id('users')),
+        turnId: v.optional(v.id('chatTurns')),
         role: v.union(v.literal('user'), v.literal('assistant')),
         content: v.string(),
+        status: v.optional(v.union(
+            v.literal('draft'),
+            v.literal('committed'),
+            v.literal('degraded'),
+            v.literal('failed'),
+            v.literal('deleted')
+        )),
+        turnNumber: v.optional(v.number()),
+        roleOrder: v.optional(v.number()),
+        version: v.optional(v.number()),
+        retryOfMessageId: v.optional(v.id('messages')),
+        supersededByMessageId: v.optional(v.id('messages')),
         metadata: v.optional(v.any()),
         /** Client-generated ID for idempotent persistence (prevents duplicate inserts on retry). */
         requestId: v.optional(v.string()),
         createdAt: v.number(),
+        updatedAt: v.optional(v.number()),
+        deletedAt: v.optional(v.number()),
         // ── NEW: Route mode + structured artifact storage ──
         mode: v.optional(v.union(
             v.literal('adaptive_chat'),
@@ -177,7 +196,112 @@ export default defineSchema({
         artifactsJson: v.optional(v.string()),
     })
         .index('by_conversation', ['conversationId'])
-        .index('by_conversation_requestId', ['conversationId', 'requestId']),
+        .index('by_conversation_requestId', ['conversationId', 'requestId'])
+        .index('by_conversation_turn', ['conversationId', 'turnNumber', 'roleOrder'])
+        .index('by_turn', ['turnId']),
+
+    chatTurns: defineTable({
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        requestId: v.string(),
+        message: v.string(),
+        turnNumber: v.number(),
+        mode: v.union(v.literal('send'), v.literal('retry'), v.literal('edit')),
+        status: v.union(
+            v.literal('accepted'),
+            v.literal('queued'),
+            v.literal('user_saved'),
+            v.literal('generating'),
+            v.literal('streaming'),
+            v.literal('assistant_draft_saved'),
+            v.literal('assistant_saved'),
+            v.literal('degraded_saved'),
+            v.literal('failed_retryable'),
+            v.literal('failed_final'),
+            v.literal('cancelled')
+        ),
+        routeMode: v.optional(v.union(
+            v.literal('adaptive_chat'),
+            v.literal('direct_legal_answer'),
+            v.literal('local_procedure'),
+            v.literal('document_analysis'),
+            v.literal('judge_lens_strategy'),
+            v.literal('court_ready_drafting'),
+            v.literal('pattern_analysis'),
+            v.literal('support_grounding'),
+            v.literal('safety_escalation')
+        )),
+        userMessageId: v.optional(v.id('messages')),
+        assistantMessageId: v.optional(v.id('messages')),
+        assistantDraftMessageId: v.optional(v.id('messages')),
+        retryOfTurnId: v.optional(v.id('chatTurns')),
+        retryOfAssistantMessageId: v.optional(v.id('messages')),
+        editOfUserMessageId: v.optional(v.id('messages')),
+        attempt: v.number(),
+        maxAttempts: v.number(),
+        provider: v.optional(v.string()),
+        model: v.optional(v.string()),
+        temperature: v.optional(v.number()),
+        providerResponseId: v.optional(v.string()),
+        userContextJson: v.optional(v.string()),
+        errorCode: v.optional(v.string()),
+        errorMessage: v.optional(v.string()),
+        errorRetryable: v.optional(v.boolean()),
+        finalEventSentAt: v.optional(v.number()),
+        clientAckedAt: v.optional(v.number()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+        startedAt: v.optional(v.number()),
+        completedAt: v.optional(v.number()),
+    })
+        .index('by_conversation', ['conversationId'])
+        .index('by_request', ['conversationId', 'requestId'])
+        .index('by_status', ['status'])
+        .index('by_conversation_turn', ['conversationId', 'turnNumber']),
+
+    chatGenerationJobs: defineTable({
+        turnId: v.id('chatTurns'),
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        requestId: v.string(),
+        status: v.union(
+            v.literal('queued'),
+            v.literal('leased'),
+            v.literal('running'),
+            v.literal('completed'),
+            v.literal('failed_retryable'),
+            v.literal('failed_final'),
+            v.literal('cancelled')
+        ),
+        attempt: v.number(),
+        maxAttempts: v.number(),
+        leaseOwner: v.optional(v.string()),
+        leaseExpiresAt: v.optional(v.number()),
+        leaseAvailableAt: v.optional(v.number()),
+        errorCode: v.optional(v.string()),
+        errorMessage: v.optional(v.string()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+        startedAt: v.optional(v.number()),
+        completedAt: v.optional(v.number()),
+    })
+        .index('by_turn', ['turnId'])
+        .index('by_request', ['conversationId', 'requestId'])
+        .index('by_status', ['status'])
+        .index('by_conversation_status', ['conversationId', 'status']),
+
+    chatRateLimitWindows: defineTable({
+        userId: v.id('users'),
+        key: v.string(),
+        windowStartMs: v.number(),
+        windowMs: v.number(),
+        count: v.number(),
+        limit: v.number(),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_user_key', ['userId', 'key'])
+        .index('by_updatedAt', ['updatedAt']),
 
     // ═══ Incidents (DocuVault) ═══
     incidents: defineTable({

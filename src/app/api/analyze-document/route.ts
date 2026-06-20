@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { parseLegalDocument } from '@/lib/nexx/parser';
-import { extractDocumentText } from '@/lib/nexx/documentExtraction';
+import { buildDocumentContextSnippet, extractDocumentText } from '@/lib/nexx/documentExtraction';
 
 export const maxDuration = 120;
 const MAX_ANALYSIS_CHARS = 100_000;
+const MAX_CHAT_CONTEXT_CHARS = 60_000;
 
 /**
  * Document Analysis API Route
@@ -21,6 +22,8 @@ export async function POST(req: NextRequest) {
   try {
     let filename = 'uploaded_document';
     let text: string | undefined;
+    let extractionMeta: Awaited<ReturnType<typeof extractDocumentText>> | undefined;
+    const extractOnly = req.nextUrl.searchParams.get('extractOnly') === '1';
 
     const contentType = req.headers.get('content-type') ?? '';
     if (contentType.includes('multipart/form-data')) {
@@ -31,6 +34,7 @@ export async function POST(req: NextRequest) {
       }
       filename = fileEntry.name || filename;
       const extraction = await extractDocumentText(fileEntry);
+      extractionMeta = extraction;
       if (!extraction.text) {
         return Response.json(
           { error: extraction.error || 'Could not extract readable text from the uploaded document' },
@@ -38,6 +42,20 @@ export async function POST(req: NextRequest) {
         );
       }
       text = extraction.text;
+      if (extractOnly) {
+        return Response.json({
+          ok: true,
+          partial: true,
+          filename,
+          extractedText: buildDocumentContextSnippet(text, MAX_CHAT_CONTEXT_CHARS),
+          extractionError: extraction.error,
+          extractionCharCount: text.length,
+          extractionMethod: extraction.method,
+          ocrAttempted: extraction.ocrAttempted ?? false,
+          pagesOcrProcessed: extraction.pagesOcrProcessed,
+          pagesTotal: extraction.pagesTotal,
+        });
+      }
     } else {
       let body: unknown;
       try {
@@ -72,6 +90,10 @@ export async function POST(req: NextRequest) {
       truncated: originalCharCount > MAX_ANALYSIS_CHARS,
       originalCharCount,
       analyzedCharCount: analysisText.length,
+      extractionMethod: extractionMeta?.method,
+      ocrAttempted: extractionMeta?.ocrAttempted ?? false,
+      pagesOcrProcessed: extractionMeta?.pagesOcrProcessed,
+      pagesTotal: extractionMeta?.pagesTotal,
     });
   } catch (error) {
     console.error('[AnalyzeDocument] Error:', error);

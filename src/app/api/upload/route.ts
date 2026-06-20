@@ -10,7 +10,7 @@ import type { Id } from '@convex/_generated/dataModel';
 export const maxDuration = 120;
 
 const MAX_PARSE_INPUT_CHARS = 8000;
-const MAX_CHAT_CONTEXT_CHARS = 12000;
+const MAX_CHAT_CONTEXT_CHARS = 60000;
 const MAX_INDEXED_TEXT_CHARS = 2_000_000;
 
 /**
@@ -117,6 +117,9 @@ export async function POST(req: NextRequest) {
     let openaiFileId: string | undefined;
     let openaiTextFileId: string | undefined;
     let createdStandaloneStoreId: string | undefined;
+    let metadata: Record<string, string> = { source: 'user_upload' };
+    let extraction: Awaited<ReturnType<typeof extractDocumentText>> | undefined;
+    let extractedText = '';
 
     try {
       // Mark as processing — inside the failure-handled block so the
@@ -125,6 +128,24 @@ export async function POST(req: NextRequest) {
         fileId: fileRecordId,
         status: 'processing',
       });
+
+      extraction = await extractDocumentText(file);
+      extractedText = extraction.text ?? '';
+
+      if (extractedText) {
+        try {
+          const parseInput = extractedText.length > MAX_PARSE_INPUT_CHARS
+            ? extractedText.slice(0, MAX_PARSE_INPUT_CHARS)
+            : extractedText;
+          const parsed = await parseLegalDocument({ filename: file.name, text: parseInput });
+          const fullMetadata = buildDocumentMetadata(parsed, userId, conversationId ?? undefined);
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { userId: _uid, conversationId: _cid, ...safeMetadata } = fullMetadata;
+          metadata = safeMetadata;
+        } catch (err) {
+          console.warn('[Upload] Metadata extraction failed:', err);
+        }
+      }
 
       if (typedConversationId) {
         // Check if conversation already has a store
@@ -175,28 +196,6 @@ export async function POST(req: NextRequest) {
         createdStandaloneStoreId = vectorStoreId;
       }
 
-      // Extract text for metadata and immediate chat grounding.
-      let metadata: Record<string, string> = { source: 'user_upload' };
-      const extraction = await extractDocumentText(file);
-      const extractedText = extraction.text;
-      if (extractedText) {
-        try {
-          // Truncate to parser limit so large documents degrade gracefully
-          const parseInput = extractedText.length > MAX_PARSE_INPUT_CHARS
-            ? extractedText.slice(0, MAX_PARSE_INPUT_CHARS)
-            : extractedText;
-          const parsed = await parseLegalDocument({ filename: file.name, text: parseInput });
-          // Strip internal IDs before sending to external provider
-          const fullMetadata = buildDocumentMetadata(parsed, userId, conversationId ?? undefined);
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { userId: _uid, conversationId: _cid, ...safeMetadata } = fullMetadata;
-          metadata = safeMetadata;
-        } catch (err) {
-          console.warn('[Upload] Metadata extraction failed:', err);
-          // Non-fatal — upload without metadata
-        }
-      }
-
       // Upload to OpenAI vector store (only non-identifying metadata)
       openaiFileId = await uploadToVectorStore(
         vectorStoreId,
@@ -244,12 +243,12 @@ export async function POST(req: NextRequest) {
         vectorStoreId,
         filename: file.name,
         extractedText: extractedText ? buildDocumentContextSnippet(extractedText, MAX_CHAT_CONTEXT_CHARS) : undefined,
-        extractionError: extraction.error,
+        extractionError: extraction?.error,
         extractionCharCount: extractedText?.length ?? 0,
-        extractionMethod: extraction.method,
-        ocrAttempted: extraction.ocrAttempted ?? false,
-        pagesOcrProcessed: extraction.pagesOcrProcessed,
-        pagesTotal: extraction.pagesTotal,
+        extractionMethod: extraction?.method,
+        ocrAttempted: extraction?.ocrAttempted ?? false,
+        pagesOcrProcessed: extraction?.pagesOcrProcessed,
+        pagesTotal: extraction?.pagesTotal,
       });
     } catch (error) {
       // Mark file as failed — include any provider IDs we already obtained
@@ -273,6 +272,28 @@ export async function POST(req: NextRequest) {
         } catch (cleanupErr) {
           console.error('[Upload] Failed to clean up standalone store:', cleanupErr);
         }
+      }
+
+      if (extractedText) {
+        console.error('[Upload] File indexing failed after text extraction:', error);
+        const indexingError = 'An error occurred while indexing the file';
+        return Response.json({
+          ok: true,
+          partial: true,
+          fileId: fileRecordId,
+          openaiFileId,
+          openaiTextFileId,
+          vectorStoreId,
+          filename: file.name,
+          extractedText: buildDocumentContextSnippet(extractedText, MAX_CHAT_CONTEXT_CHARS),
+          extractionError: extraction?.error,
+          extractionCharCount: extractedText.length,
+          extractionMethod: extraction?.method,
+          ocrAttempted: extraction?.ocrAttempted ?? false,
+          pagesOcrProcessed: extraction?.pagesOcrProcessed,
+          pagesTotal: extraction?.pagesTotal,
+          indexingError,
+        });
       }
 
       throw error;

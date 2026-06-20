@@ -66,6 +66,7 @@ export const _updateStatusInternal = internalMutation({
             v.literal('failed')
         ),
         openaiFileId: v.optional(v.string()),
+        openaiTextFileId: v.optional(v.string()),
         vectorStoreId: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
@@ -75,11 +76,13 @@ export const _updateStatusInternal = internalMutation({
         const patch: {
             status: 'uploaded' | 'processing' | 'ready' | 'failed';
             openaiFileId?: string;
+            openaiTextFileId?: string;
             vectorStoreId?: string;
         } = {
             status: args.status,
         };
         if (args.openaiFileId !== undefined) patch.openaiFileId = args.openaiFileId;
+        if (args.openaiTextFileId !== undefined) patch.openaiTextFileId = args.openaiTextFileId;
         if (args.vectorStoreId !== undefined) patch.vectorStoreId = args.vectorStoreId;
 
         await ctx.db.patch(args.fileId, patch);
@@ -101,6 +104,7 @@ export const updateStatus = action({
             v.literal('failed')
         ),
         openaiFileId: v.optional(v.string()),
+        openaiTextFileId: v.optional(v.string()),
         vectorStoreId: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
@@ -127,6 +131,7 @@ export const updateStatus = action({
             fileId: args.fileId,
             status: args.status,
             openaiFileId: args.openaiFileId,
+            openaiTextFileId: args.openaiTextFileId,
             vectorStoreId: args.vectorStoreId,
         });
     },

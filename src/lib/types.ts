@@ -80,6 +80,7 @@ export interface FileAttachment {
   filename: string;
   mimeType: string;
   openaiFileId?: string;
+  openaiTextFileId?: string;
   vectorStoreId?: string;
   status: 'uploaded' | 'processing' | 'ready' | 'failed';
 }
@@ -147,7 +148,8 @@ export interface VectorStoreFilter {
   jurisdiction?: string;
   childInitials?: string;
   dateRange?: { start: string; end: string };
-  source?: 'user_upload' | 'legal_retriever' | 'template_library';
+  source?: 'user_upload' | 'extracted_text' | 'legal_retriever' | 'template_library';
+  originalFilename?: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -18,6 +18,7 @@ type ChatUploadResponse = {
     error?: string;
     fileId?: string;
     openaiFileId?: string;
+    openaiTextFileId?: string;
     vectorStoreId?: string;
     filename?: string;
     extractedText?: string;
@@ -161,12 +162,15 @@ export default function ConversationPage() {
         const extractionNote = upload.extractionError
             ? `\n\nExtraction note: ${upload.extractionError} The file was still uploaded and indexed for retrieval.`
             : '';
+        const retrievalNote = upload.openaiTextFileId
+            ? '\nRetrieval: full extracted/OCR text was indexed as a companion text file. Use the extracted text first, then file search for details beyond the preview.'
+            : '\nRetrieval: original file was indexed for file search.';
 
         if (extractedText) {
-            return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}\nExtracted text preview:\n\n${extractedText}${extractionNote}`;
+            return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}${retrievalNote}\n\nExtracted text preview:\n\n${extractedText}${extractionNote}`;
         }
 
-        return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}\nThe document was uploaded and indexed for file search. Analyze it using the uploaded file contents.${extractionNote}`;
+        return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}${retrievalNote}\nThe document was uploaded and indexed for file search. Analyze it using the uploaded file contents.${extractionNote}`;
     }, []);
 
     /**

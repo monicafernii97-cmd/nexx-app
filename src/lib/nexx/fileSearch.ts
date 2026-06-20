@@ -3,7 +3,7 @@
  * Handles per-case vector store strategy.
  */
 
-import { openai } from '../openaiConversation';
+import { getOpenAIClient, openai } from '../openaiConversation';
 import type { VectorStoreFilter } from '../types';
 
 /**
@@ -11,7 +11,8 @@ import type { VectorStoreFilter } from '../types';
  * Each case gets its own vector store for isolation.
  */
 export async function createVectorStore(name: string): Promise<string> {
-  const store = await openai.vectorStores.create({ name });
+  const client = getOpenAIClient();
+  const store = await client.vectorStores.create({ name }, { timeout: 15_000 });
   return store.id;
 }
 
@@ -54,15 +55,16 @@ export async function uploadToVectorStore(
   }
 
   // Upload file to OpenAI
-  const uploadedFile = await openai.files.create({
+  const client = getOpenAIClient();
+  const uploadedFile = await client.files.create({
     file,
     purpose: 'assistants',
-  });
+  }, { timeout: 30_000 });
 
   // Attach to vector store with custom chunking + metadata
   // Legal documents benefit from smaller chunks (~800 tokens) vs default (4096)
   try {
-    await openai.vectorStores.files.createAndPoll(vectorStoreId, {
+    await client.vectorStores.files.createAndPoll(vectorStoreId, {
       file_id: uploadedFile.id,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ...(metadata ? { metadata: metadata as any } : {}),
@@ -73,11 +75,11 @@ export async function uploadToVectorStore(
           chunk_overlap_tokens: chunkOverlap,
         },
       },
-    });
+    }, { timeout: 45_000 });
   } catch (attachError) {
     // Clean up orphaned file to prevent storage leaks
     try {
-      await openai.files.delete(uploadedFile.id);
+      await client.files.delete(uploadedFile.id);
     } catch {
       console.warn('[FileSearch] Failed to clean up orphaned file:', uploadedFile.id);
     }

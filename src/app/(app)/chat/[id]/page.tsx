@@ -15,6 +15,7 @@ import type { ActionType, AnalysisStep } from '@/lib/ui-intelligence/types';
 
 type ChatUploadResponse = {
     ok?: boolean;
+    partial?: boolean;
     error?: string;
     fileId?: string;
     openaiFileId?: string;
@@ -28,6 +29,7 @@ type ChatUploadResponse = {
     ocrAttempted?: boolean;
     pagesOcrProcessed?: number;
     pagesTotal?: number;
+    indexingError?: string;
 };
 
 /** Premium full-screen chat interface for a single NEXX AI conversation. */
@@ -133,23 +135,58 @@ export default function ConversationPage() {
         nexDetectedPatterns: nexProfile?.detectedPatterns,
     }), [userProfile, nexProfile]);
 
-    const uploadFileForConversation = useCallback(async (file: File): Promise<ChatUploadResponse> => {
+    const extractFileForConversationFallback = useCallback(async (file: File): Promise<ChatUploadResponse> => {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('conversationId', conversationId);
 
-        const response = await fetch('/api/upload', {
+        const response = await fetch('/api/analyze-document?extractOnly=1', {
             method: 'POST',
             body: formData,
         });
         const data = await response.json().catch(() => ({})) as ChatUploadResponse;
 
         if (!response.ok || !data.ok) {
+            throw new Error(data.error || `Fallback extraction failed with status ${response.status}`);
+        }
+
+        return data;
+    }, []);
+
+    const uploadFileForConversation = useCallback(async (file: File): Promise<ChatUploadResponse> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('conversationId', conversationId);
+
+        let response: Response;
+        try {
+            response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData,
+            });
+        } catch (uploadError) {
+            const fallbackData = await extractFileForConversationFallback(file);
+            return {
+                ...fallbackData,
+                partial: true,
+                indexingError: uploadError instanceof Error ? uploadError.message : String(uploadError),
+            };
+        }
+        const data = await response.json().catch(() => ({})) as ChatUploadResponse;
+
+        if (!response.ok || !data.ok) {
+            if (response.status >= 500) {
+                const fallbackData = await extractFileForConversationFallback(file);
+                return {
+                    ...fallbackData,
+                    partial: true,
+                    indexingError: data.error || `Upload failed with status ${response.status}`,
+                };
+            }
             throw new Error(data.error || `Upload failed with status ${response.status}`);
         }
 
         return data;
-    }, [conversationId]);
+    }, [conversationId, extractFileForConversationFallback]);
 
     const buildUploadedFileMessage = useCallback((message: string, file: File, upload: ChatUploadResponse) => {
         const filename = upload.filename ?? file.name;
@@ -162,15 +199,20 @@ export default function ConversationPage() {
         const extractionNote = upload.extractionError
             ? `\n\nExtraction note: ${upload.extractionError} The file was still uploaded and indexed for retrieval.`
             : '';
-        const retrievalNote = upload.openaiTextFileId
+        const indexingNote = upload.indexingError
+            ? `\nIndexing note: file-search indexing did not finish, so this answer should rely on the extracted text included below. (${upload.indexingError})`
+            : '';
+        const retrievalNote = upload.indexingError
+            ? '\nRetrieval: extracted document text is included directly in this message; file search may not be available for this upload.'
+            : upload.openaiTextFileId
             ? '\nRetrieval: extracted/OCR text was indexed as a companion text file when available. Use the extracted text first, then file search for details beyond the preview.'
             : '\nRetrieval: original file was indexed for file search.';
 
         if (extractedText) {
-            return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}${retrievalNote}\n\nExtracted text preview:\n\n${extractedText}${extractionNote}`;
+            return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}${retrievalNote}${indexingNote}\n\nExtracted text preview:\n\n${extractedText}${extractionNote}`;
         }
 
-        return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}${retrievalNote}\nThe document was uploaded and indexed for file search. Analyze it using the uploaded file contents.${extractionNote}`;
+        return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}${retrievalNote}${indexingNote}\nThe document was uploaded and indexed for file search. Analyze it using the uploaded file contents.${extractionNote}`;
     }, []);
 
     /**

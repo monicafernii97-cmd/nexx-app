@@ -220,6 +220,7 @@ export default function ConversationPage() {
             return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}${retrievalNote}${indexingNote}\n\nExtracted text preview:\n\n${extractedText}${extractionNote}`;
         }
 
+        // Defensive guard for future callers; uploadFileForConversation rejects unreadable uploads before this builder runs.
         return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}${retrievalNote}${indexingNote}\nNo readable extracted text was available in this chat turn. Do not analyze the document unless file search returns relevant document text.${extractionNote}`;
     }, []);
 

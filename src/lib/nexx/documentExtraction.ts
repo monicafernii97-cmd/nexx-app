@@ -47,14 +47,14 @@ async function extractPdfTextWithOpenAIFileInput(buffer: Buffer): Promise<Docume
     };
   }
 
+  const { default: OpenAI } = await import('openai');
+  const client = new OpenAI({
+    apiKey,
+    maxRetries: 1,
+    timeout: PDF_FILE_EXTRACTION_TIMEOUT_MS,
+  });
   let uploadedFileId: string | undefined;
   try {
-    const { default: OpenAI } = await import('openai');
-    const client = new OpenAI({
-      apiKey,
-      maxRetries: 1,
-      timeout: PDF_FILE_EXTRACTION_TIMEOUT_MS,
-    });
     const uploadedFile = await client.files.create({
       file: new File([new Uint8Array(buffer)], 'uploaded-document.pdf', { type: PDF_MIME }),
       purpose: 'assistants',
@@ -109,9 +109,7 @@ async function extractPdfTextWithOpenAIFileInput(buffer: Buffer): Promise<Docume
   } finally {
     if (uploadedFileId) {
       try {
-        const { default: OpenAI } = await import('openai');
-        const cleanupClient = new OpenAI({ apiKey, maxRetries: 0, timeout: 10_000 });
-        await cleanupClient.files.delete(uploadedFileId);
+        await client.files.delete(uploadedFileId, { timeout: 10_000 });
       } catch (cleanupErr) {
         console.warn('[DocumentExtraction] Failed to clean up PDF extraction file:', uploadedFileId, cleanupErr);
       }

@@ -163,7 +163,7 @@ export default function ConversationPage() {
             ? `\n\nExtraction note: ${upload.extractionError} The file was still uploaded and indexed for retrieval.`
             : '';
         const retrievalNote = upload.openaiTextFileId
-            ? '\nRetrieval: full extracted/OCR text was indexed as a companion text file. Use the extracted text first, then file search for details beyond the preview.'
+            ? '\nRetrieval: extracted/OCR text was indexed as a companion text file when available. Use the extracted text first, then file search for details beyond the preview.'
             : '\nRetrieval: original file was indexed for file search.';
 
         if (extractedText) {

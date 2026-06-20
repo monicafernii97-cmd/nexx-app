@@ -209,12 +209,16 @@ export async function POST(req: NextRequest) {
           ? `${extractedText.slice(0, MAX_INDEXED_TEXT_CHARS).trim()}\n\n[Extracted text truncated after ${MAX_INDEXED_TEXT_CHARS.toLocaleString()} characters for indexing. Search the original uploaded file for later content.]`
           : extractedText;
 
-        openaiTextFileId = await uploadTextToVectorStore(
-          vectorStoreId,
-          file.name,
-          indexedText,
-          metadata
-        );
+        try {
+          openaiTextFileId = await uploadTextToVectorStore(
+            vectorStoreId,
+            file.name,
+            indexedText,
+            metadata
+          );
+        } catch (textIndexError) {
+          console.warn('[Upload] Companion text indexing failed:', textIndexError);
+        }
       }
 
       // Persist provider IDs immediately — if this fails, the catch

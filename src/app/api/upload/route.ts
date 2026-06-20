@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '@convex/_generated/api';
-import { createVectorStore, deleteVectorStore, uploadToVectorStore } from '@/lib/nexx/fileSearch';
+import { createVectorStore, deleteVectorStore, uploadTextToVectorStore, uploadToVectorStore } from '@/lib/nexx/fileSearch';
 import { parseLegalDocument, buildDocumentMetadata } from '@/lib/nexx/parser';
 import { extractDocumentText, buildDocumentContextSnippet } from '@/lib/nexx/documentExtraction';
 import type { Id } from '@convex/_generated/dataModel';
@@ -11,6 +11,7 @@ export const maxDuration = 120;
 
 const MAX_PARSE_INPUT_CHARS = 8000;
 const MAX_CHAT_CONTEXT_CHARS = 12000;
+const MAX_INDEXED_TEXT_CHARS = 2_000_000;
 
 /**
  * File Upload API Route
@@ -114,6 +115,7 @@ export async function POST(req: NextRequest) {
     // 'failed' status update for cleanup/audit/dedupe.
     let vectorStoreId: string | undefined;
     let openaiFileId: string | undefined;
+    let openaiTextFileId: string | undefined;
     let createdStandaloneStoreId: string | undefined;
 
     try {
@@ -202,6 +204,23 @@ export async function POST(req: NextRequest) {
         metadata
       );
 
+      if (extractedText) {
+        const indexedText = extractedText.length > MAX_INDEXED_TEXT_CHARS
+          ? `${extractedText.slice(0, MAX_INDEXED_TEXT_CHARS).trim()}\n\n[Extracted text truncated after ${MAX_INDEXED_TEXT_CHARS.toLocaleString()} characters for indexing. Search the original uploaded file for later content.]`
+          : extractedText;
+
+        try {
+          openaiTextFileId = await uploadTextToVectorStore(
+            vectorStoreId,
+            file.name,
+            indexedText,
+            metadata
+          );
+        } catch (textIndexError) {
+          console.warn('[Upload] Companion text indexing failed:', textIndexError);
+        }
+      }
+
       // Persist provider IDs immediately — if this fails, the catch
       // marks the row as 'failed' but the file is already indexed in the
       // vector store. The provider IDs are included in the 'failed' update
@@ -210,6 +229,7 @@ export async function POST(req: NextRequest) {
         fileId: fileRecordId,
         status: 'ready',
         openaiFileId,
+        openaiTextFileId,
         vectorStoreId,
       });
 
@@ -220,6 +240,7 @@ export async function POST(req: NextRequest) {
         ok: true,
         fileId: fileRecordId,
         openaiFileId,
+        openaiTextFileId,
         vectorStoreId,
         filename: file.name,
         extractedText: extractedText ? buildDocumentContextSnippet(extractedText, MAX_CHAT_CONTEXT_CHARS) : undefined,
@@ -238,6 +259,7 @@ export async function POST(req: NextRequest) {
           fileId: fileRecordId,
           status: 'failed',
           openaiFileId,
+          openaiTextFileId,
           vectorStoreId,
         });
       } catch (statusErr) {

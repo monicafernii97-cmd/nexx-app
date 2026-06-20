@@ -4,6 +4,7 @@ import { parseLegalDocument } from '@/lib/nexx/parser';
 import { extractDocumentText } from '@/lib/nexx/documentExtraction';
 
 export const maxDuration = 120;
+const MAX_ANALYSIS_CHARS = 100_000;
 
 /**
  * Document Analysis API Route
@@ -55,19 +56,23 @@ export async function POST(req: NextRequest) {
     if (!text || typeof text !== 'string') {
       return Response.json({ error: 'Document text is required' }, { status: 400 });
     }
-    if (text.length > 100_000) {
-      return Response.json(
-        { error: `Document text too long (max 100,000 chars, received ${text.length})` },
-        { status: 400 }
-      );
-    }
+    const originalCharCount = text.length;
+    const analysisText = originalCharCount > MAX_ANALYSIS_CHARS
+      ? text.slice(0, MAX_ANALYSIS_CHARS)
+      : text;
 
     const parsed = await parseLegalDocument({
       filename,
-      text,
+      text: analysisText,
     });
 
-    return Response.json({ ok: true, document: parsed });
+    return Response.json({
+      ok: true,
+      document: parsed,
+      truncated: originalCharCount > MAX_ANALYSIS_CHARS,
+      originalCharCount,
+      analyzedCharCount: analysisText.length,
+    });
   } catch (error) {
     console.error('[AnalyzeDocument] Error:', error);
     return Response.json({ error: 'Document analysis failed' }, { status: 500 });

@@ -31,6 +31,17 @@ const QUICK_ACTIONS = [
     { id: 'find_weak_points', label: 'Find Weak Points', icon: Crosshair },
 ] as const;
 
+/** Build the default prompt used when a file is sent without typed context. */
+function buildFileFallbackMessage(intent: 'attachment' | 'thread' | 'court_order', filename?: string) {
+    if (intent === 'court_order') {
+        return `Analyze this court order: ${filename ?? 'uploaded court order'}`;
+    }
+    if (intent === 'thread') {
+        return `Analyze this uploaded thread: ${filename ?? 'uploaded thread'}`;
+    }
+    return `Analyze this file: ${filename ?? 'uploaded file'}`;
+}
+
 /** Premium auto-resizing chat input bar with quick actions and voice input. */
 export default function ChatInput({ onSend, disabled, placeholder, onQuickAction }: ChatInputProps) {
     const [input, setInput] = useState('');
@@ -44,6 +55,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const autoSendFileIntentRef = useRef<'court_order' | null>(null);
     // Single source of truth for the current input value, readable from callbacks
     const inputRef = useRef('');
     // Text that existed before the current dictation session started
@@ -105,12 +117,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
         if (disabled) return;
         // Stop mic before sending to prevent onresult from repopulating the field
         stopRecognition();
-        const fallbackMessage =
-            selectedFileIntent === 'court_order'
-                ? `Analyze this court order: ${selectedFile?.name ?? 'uploaded court order'}`
-                : selectedFileIntent === 'thread'
-                    ? `Analyze this uploaded thread: ${selectedFile?.name ?? 'uploaded thread'}`
-                    : `Analyze this file: ${selectedFile?.name ?? 'uploaded file'}`;
+        const fallbackMessage = buildFileFallbackMessage(selectedFileIntent, selectedFile?.name);
         onSend(text || (selectedFile ? fallbackMessage : ''), selectedFile ?? undefined);
         updateInput('');
         setSelectedFile(null);
@@ -220,6 +227,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
 
     // ── File attachment handler ──
     const handleFileSelect = useCallback(() => {
+        autoSendFileIntentRef.current = null;
         setSelectedFileIntent('attachment');
         fileInputRef.current?.click();
     }, []);
@@ -227,6 +235,8 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        const autoSendIntent = autoSendFileIntentRef.current;
+        autoSendFileIntentRef.current = null;
 
         const resetInput = () => {
             if (fileInputRef.current) fileInputRef.current.value = '';
@@ -254,10 +264,21 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             return;
         }
 
+        if (autoSendIntent && !disabled) {
+            stopRecognition();
+            onSend(buildFileFallbackMessage(autoSendIntent, file.name), file);
+            updateInput('');
+            setSelectedFile(null);
+            setSelectedFileIntent('attachment');
+            setMicError(null);
+            resetInput();
+            return;
+        }
+
         setSelectedFile(file);
         setMicError(null);
         resetInput();
-    }, []);
+    }, [disabled, onSend, stopRecognition, updateInput]);
 
     const removeFile = useCallback(() => {
         setSelectedFile(null);
@@ -271,6 +292,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     const handleQuickActionClick = useCallback((actionId: string) => {
         if (actionId === 'analyze_court_order') {
             setSelectedFileIntent('court_order');
+            autoSendFileIntentRef.current = 'court_order';
             if (fileInputRef.current) {
                 fileInputRef.current.accept = '.pdf,.doc,.docx,.txt';
                 fileInputRef.current.click();
@@ -336,6 +358,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                     type="button"
                     onClick={() => {
                         if (fileInputRef.current) {
+                            autoSendFileIntentRef.current = null;
                             setSelectedFileIntent('thread');
                             fileInputRef.current.accept = '.pdf,.doc,.docx,.txt';
                             fileInputRef.current.click();
@@ -351,6 +374,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                     type="button"
                     onClick={() => {
                         if (fileInputRef.current) {
+                            autoSendFileIntentRef.current = null;
                             setSelectedFileIntent('court_order');
                             fileInputRef.current.accept = '.pdf,.doc,.docx,.txt';
                             fileInputRef.current.click();

@@ -88,6 +88,32 @@ export async function uploadToVectorStore(
 }
 
 /**
+ * Upload extracted/OCR text as a companion file for reliable retrieval.
+ *
+ * Scanned PDFs and complex legal PDFs can be hard for the original-file indexer
+ * to search. A normalized text companion gives file_search a clean fallback.
+ */
+export async function uploadTextToVectorStore(
+  vectorStoreId: string,
+  filename: string,
+  text: string,
+  metadata?: VectorStoreFilter
+): Promise<string> {
+  const safeBase = filename
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^a-z0-9._-]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'uploaded-document';
+  const textFile = new File([text], `${safeBase}.extracted.txt`, { type: 'text/plain' });
+
+  return uploadToVectorStore(vectorStoreId, textFile, {
+    ...metadata,
+    source: 'extracted_text',
+    originalFilename: filename,
+  });
+}
+
+/**
  * Search a vector store with optional metadata filters.
  */
 export async function searchVectorStore(args: {

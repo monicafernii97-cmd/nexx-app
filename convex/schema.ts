@@ -707,6 +707,7 @@ export default defineSchema({
         filename: v.string(),
         mimeType: v.string(),
         openaiFileId: v.optional(v.string()),
+        openaiTextFileId: v.optional(v.string()),
         vectorStoreId: v.optional(v.string()),
         status: v.union(
             v.literal('uploaded'),

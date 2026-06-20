@@ -17,6 +17,8 @@ export function buildFeatureToolPrompt(toolPlan: ToolPlan): string {
 ### File Search
 The user has uploaded documents to a vector store. You have access to file_search.
 - Use it when the user asks about "my order", "the document", or references specific filings.
+- Uploaded documents may include an extracted/OCR companion text file. Prefer that companion text when available because it is normalized for retrieval.
+- If the user's message includes an "Extracted text preview", analyze that text directly and use file_search to fill gaps beyond the preview.
 - Always cite which document you're referencing in your response.
 - If file search returns no relevant results, say so — don't make up content.`);
   }

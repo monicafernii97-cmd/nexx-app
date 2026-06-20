@@ -5,6 +5,7 @@ const TXT_MIME = 'text/plain';
 const MIN_MEANINGFUL_TEXT_CHARS = 80;
 const OCR_PAGE_LIMIT = 8;
 const OCR_IMAGE_WIDTH = 1400;
+const PDF_FILE_EXTRACTION_TIMEOUT_MS = 90_000;
 
 /** Structured extraction result used by upload and document-analysis routes. */
 export type DocumentExtractionResult = {
@@ -34,6 +35,86 @@ function isDocx(file: File) {
 /** Return true when a file should be handled as plain text. */
 function isText(file: File) {
   return file.type === TXT_MIME || file.name.toLowerCase().endsWith('.txt');
+}
+
+/** Ask OpenAI to read a PDF directly when local text extraction finds no selectable text. */
+async function extractPdfTextWithOpenAIFileInput(buffer: Buffer): Promise<DocumentExtractionResult> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return {
+      error: 'This PDF appears to have no selectable text, and AI PDF extraction is unavailable because OPENAI_API_KEY is not configured.',
+      ocrAttempted: false,
+    };
+  }
+
+  const { default: OpenAI } = await import('openai');
+  const client = new OpenAI({
+    apiKey,
+    maxRetries: 1,
+    timeout: PDF_FILE_EXTRACTION_TIMEOUT_MS,
+  });
+  let uploadedFileId: string | undefined;
+  try {
+    const uploadedFile = await client.files.create({
+      file: new File([new Uint8Array(buffer)], 'uploaded-document.pdf', { type: PDF_MIME }),
+      purpose: 'assistants',
+    }, { timeout: 30_000 });
+    uploadedFileId = uploadedFile.id;
+
+    const response = await client.responses.create({
+      model: 'gpt-5.4-mini',
+      input: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text: [
+                'Extract the readable text from this uploaded legal PDF.',
+                'Return only the document text as plain text.',
+                'Preserve captions, dates, party names, headings, numbered paragraphs, ordered provisions, deadlines, signatures, and tables.',
+                'Do not summarize, analyze, or add commentary.',
+                'If a word is unclear, write [unclear].',
+              ].join(' '),
+            },
+            {
+              type: 'input_file',
+              file_id: uploadedFile.id,
+            },
+          ],
+        },
+      ],
+      max_output_tokens: 20_000,
+    }, { timeout: PDF_FILE_EXTRACTION_TIMEOUT_MS });
+
+    const text = normalizeText(response.output_text ?? '');
+    if (!text) {
+      return {
+        error: 'AI PDF extraction completed but did not return readable text.',
+        ocrAttempted: true,
+      };
+    }
+
+    return {
+      text,
+      method: 'ocr',
+      ocrAttempted: true,
+    };
+  } catch (err) {
+    console.warn('[DocumentExtraction] OpenAI PDF file extraction failed:', err);
+    return {
+      error: 'AI PDF extraction failed for this PDF.',
+      ocrAttempted: true,
+    };
+  } finally {
+    if (uploadedFileId) {
+      try {
+        await client.files.delete(uploadedFileId, { timeout: 10_000 });
+      } catch (cleanupErr) {
+        console.warn('[DocumentExtraction] Failed to clean up PDF extraction file:', uploadedFileId, cleanupErr);
+      }
+    }
+  }
 }
 
 /** Render scanned PDF pages and OCR them with OpenAI vision. */
@@ -146,12 +227,19 @@ export async function extractDocumentText(file: File): Promise<DocumentExtractio
         return { text, method: 'text' };
       }
 
+      const fileInputExtraction = await extractPdfTextWithOpenAIFileInput(buffer);
+      if (fileInputExtraction.text) return fileInputExtraction;
+
       const ocr = await extractPdfTextFromImages(buffer);
       if (ocr.text) return ocr;
 
       return {
         ...ocr,
-        error: ocr.error ?? 'No selectable text was found in this PDF, and OCR could not extract readable text.',
+        error: [
+          'No selectable text was found in this PDF, and OCR could not extract readable text.',
+          fileInputExtraction.error,
+          ocr.error,
+        ].filter(Boolean).join(' '),
       };
     } catch (err) {
       console.warn('[DocumentExtraction] PDF text extraction failed:', err);

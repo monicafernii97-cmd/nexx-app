@@ -185,6 +185,14 @@ export default function ConversationPage() {
             throw new Error(data.error || `Upload failed with status ${response.status}`);
         }
 
+        if (!data.extractedText?.trim()) {
+            throw new Error(
+                data.extractionError
+                    ? `The file uploaded, but NEXX could not read its text yet: ${data.extractionError}`
+                    : 'The file uploaded, but NEXX could not read any text from it yet.'
+            );
+        }
+
         return data;
     }, [conversationId, extractFileForConversationFallback]);
 
@@ -212,7 +220,8 @@ export default function ConversationPage() {
             return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}${retrievalNote}${indexingNote}\n\nExtracted text preview:\n\n${extractedText}${extractionNote}`;
         }
 
-        return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}${retrievalNote}${indexingNote}\nThe document was uploaded and indexed for file search. Analyze it using the uploaded file contents.${extractionNote}`;
+        // Defensive guard for future callers; uploadFileForConversation rejects unreadable uploads before this builder runs.
+        return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}${retrievalNote}${indexingNote}\nNo readable extracted text was available in this chat turn. Do not analyze the document unless file search returns relevant document text.${extractionNote}`;
     }, []);
 
     /**

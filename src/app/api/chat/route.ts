@@ -1,33 +1,23 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { openai, ensureOpenAIConversation } from '@/lib/openaiConversation';
-import { classifyMessage } from '@/lib/nexx/router';
-import { buildSystemPolicyPrompt } from '@/lib/nexx/prompts/systemPrompt';
-import { buildDeveloperBehaviorPrompt } from '@/lib/nexx/prompts/developerPrompt';
-import { buildFeatureToolPrompt } from '@/lib/nexx/prompts/featurePrompt';
-import { buildArtifactPrompt } from '@/lib/nexx/prompts/artifactPrompt';
-import { buildContextPrompt, type ContextPacket } from '@/lib/nexx/prompts/contextPrompt';
-import { NEXX_RESPONSE_SCHEMA } from '@/lib/nexx/schemas';
-import { retrieveLocalSources } from '@/lib/nexx/legalRetriever';
-import { recoverStructuredOutput } from '@/lib/nexx/recovery/recoverStructuredOutput';
-import { suppressWeakArtifacts } from '@/lib/nexx/recovery/suppressWeakArtifacts';
-import { extractOutputText } from '@/lib/nexx/validation/nexxArtifacts';
-import { polishLegalResponse, injectConfidenceWarning } from '@/lib/nexx/postprocess';
-import { createEmptyTrace, finalizeTrace, serializeTrace } from '@/lib/nexx/debug/buildTrace';
-import { assessConfidence } from '@/lib/nexx/confidenceLayer';
-import { NEXX_FUNCTION_TOOLS, executeFunctionTool } from '@/lib/nexx/functionTools';
-import { persistAfterResponse } from '@/lib/nexx/persistAfterResponse';
-import { checkRateLimit } from '@/lib/rateLimit';
-import { getModelForRoute, getDailyLimit, type SubscriptionTier } from '@/lib/tiers';
-import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
-import type { NexxAssistantResponse, LocalCourtSource } from '@/lib/types';
-import type { CaseGraph } from '@/lib/nexx/caseGraph';
+import { classifyMessage } from '@/lib/nexx/router';
+import { getAuthenticatedConvexClient } from '@/lib/convexServer';
+import { getDailyLimit, getModelForRoute, type SubscriptionTier } from '@/lib/tiers';
 
 const MAX_MESSAGE_LENGTH = 100_000;
 
-/** Build a compact, content-based title for conversations that still use a placeholder. */
+/**
+ * Reliability-first chat admission route.
+ *
+ * This route only accepts and persists a chat turn, then lets Convex worker
+ * actions perform provider generation. The browser no longer owns generation,
+ * so disconnects, tab closes, and lost SSE final events cannot kill an
+ * accepted chat turn.
+ */
+export const maxDuration = 30;
+
 function buildConversationTitle(message: string) {
   const normalized = message.replace(/\s+/g, ' ').trim();
   if (!normalized) return 'New Chat';
@@ -37,635 +27,168 @@ function buildConversationTitle(message: string) {
   return compact.trim().length > 0 ? compact : 'New Chat';
 }
 
-/**
- * Vercel Pro: 300s timeout for AI responses.
- * Non-streaming structured output requires the full response before
- * parsing/recovery/validation can run.
- */
-export const maxDuration = 300;
+function isPlaceholderTitle(title: string | undefined) {
+  const currentTitle = (title ?? '').trim();
+  return currentTitle.length === 0 || currentTitle === 'New Conversation' || currentTitle === 'New Chat';
+}
 
-/**
- * NEXX Chat API Route — Full rewrite for Responses API
- * 
- * 18-step flow:
- * 1.  Parse body
- * 2.  Load conversation from Convex
- * 3.  ensureOpenAIConversation
- * 4.  Save openaiConversationId to Convex if first time
- * 5.  Create debug trace
- * 6.  Build context prompt
- * 7.  Build tools array
- * 8.  Call responses.create()
- * 9.  Process function calls (loop)
- * 10. Extract rawText
- * 11. Run recovery pipeline
- * 12. Run confidence assessment
- * 13. Save user message to Convex
- * 14. Save assistant message to Convex
- * 15. Save openaiLastResponseId
- * 16. Save debug trace
- * 17. persistAfterResponse (async)
- * 18. Return response
- */
 export async function POST(req: NextRequest) {
-  // ── Step 0: Auth guard ──
   const { userId: clerkUserId } = await auth();
   if (!clerkUserId) {
     return Response.json({ error: 'Authentication required' }, { status: 401 });
   }
 
-  const startTime = Date.now();
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const {
+    message,
+    conversationId,
+    userContext,
+    requestId,
+    persistUserMessage,
+    mode,
+    retryOfAssistantMessageId,
+    editOfUserMessageId,
+  } = body as {
+    message?: string;
+    conversationId?: string;
+    userContext?: Record<string, unknown>;
+    requestId?: string;
+    persistUserMessage?: boolean;
+    mode?: 'send' | 'retry' | 'edit';
+    retryOfAssistantMessageId?: string;
+    editOfUserMessageId?: string;
+  };
+
+  if (
+    typeof message !== 'string' ||
+    message.trim().length === 0 ||
+    message.length > MAX_MESSAGE_LENGTH
+  ) {
+    return Response.json({ error: 'Invalid message' }, { status: 400 });
+  }
+
+  if (typeof conversationId !== 'string' || conversationId.trim().length === 0) {
+    return Response.json({ error: 'conversationId is required' }, { status: 400 });
+  }
+
+  const turnRequestId =
+    typeof requestId === 'string' && requestId.trim().length > 0
+      ? requestId
+      : crypto.randomUUID();
+
+  const convex = await getAuthenticatedConvexClient();
+  const typedConversationId = conversationId as Id<'conversations'>;
+
+  let userRecord;
+  try {
+    userRecord = await convex.query(api.users.getByClerkId, { clerkId: clerkUserId });
+  } catch (error) {
+    console.warn('[Chat] Failed to fetch user record:', error);
+    return Response.json({ error: 'Failed to resolve user context' }, { status: 500 });
+  }
+
+  if (!userRecord) {
+    return Response.json({ error: 'User not found' }, { status: 403 });
+  }
+
+  let conversation;
+  try {
+    conversation = await convex.query(api.conversations.get, { id: typedConversationId });
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    if (errorMsg.includes('Not authorized') || errorMsg.includes('Not authenticated')) {
+      return Response.json({ error: 'Unauthorized access to conversation' }, { status: 403 });
+    }
+    return Response.json({ error: 'Conversation not found or inaccessible' }, { status: 404 });
+  }
+
+  const validTiers: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
+  const userTier: SubscriptionTier =
+    userRecord.subscriptionTier && validTiers.includes(userRecord.subscriptionTier as SubscriptionTier)
+      ? (userRecord.subscriptionTier as SubscriptionTier)
+      : 'free';
+
+  const routerResult = classifyMessage(message);
+  const routeModeToFeature: Record<
+    string,
+    'chat' | 'analysis' | 'judge_sim' | 'opposition_sim' | 'deep_draft' | 'memory' | 'confidence'
+  > = {
+    adaptive_chat: 'chat',
+    direct_legal_answer: 'chat',
+    local_procedure: 'chat',
+    document_analysis: 'analysis',
+    judge_lens_strategy: 'judge_sim',
+    court_ready_drafting: 'deep_draft',
+    pattern_analysis: 'analysis',
+    support_grounding: 'chat',
+    safety_escalation: 'chat',
+  };
+  const modelFeature = routeModeToFeature[routerResult.mode] ?? 'chat';
+  const model = getModelForRoute(userTier, modelFeature);
+  const dailyCap = getDailyLimit(userTier, model);
+
+  if (dailyCap !== -1) {
+    const rateLimit = await convex.mutation(api.chatRateLimits.consume, {
+      key: model.includes('pro') ? 'chat_message_5_4_pro' : 'chat_message_5_4',
+      limit: dailyCap,
+    });
+    if (!rateLimit.allowed) {
+      return Response.json(
+        { error: 'Daily message limit reached. Please upgrade your plan or try again tomorrow.' },
+        { status: 429 }
+      );
+    }
+  }
 
   try {
-    // ── Step 1: Parse body ──
-    let body: Record<string, unknown>;
-    try {
-      body = await req.json();
-    } catch {
-      return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
-
-    const {
+    const accepted = await convex.mutation(api.chatTurns.acceptChatTurn, {
+      conversationId: typedConversationId,
+      requestId: turnRequestId,
       message,
-      conversationId,
-      userContext,
-      requestId,
-    } = body as {
-      message?: string;
-      conversationId?: string;
-      userContext?: Record<string, unknown>;
-      requestId?: string;
-    };
-
-    if (
-      typeof message !== 'string' ||
-      message.trim().length === 0 ||
-      message.length > MAX_MESSAGE_LENGTH
-    ) {
-      return Response.json({ error: 'Invalid message' }, { status: 400 });
-    }
-
-    if (typeof conversationId !== 'string' || conversationId.trim().length === 0) {
-      return Response.json({ error: 'conversationId is required' }, { status: 400 });
-    }
-
-    // Use client-supplied requestId for retry de-duplication.
-    // Fall back to a fresh UUID when absent (first attempt).
-    const turnRequestId =
-      typeof requestId === 'string' && requestId.trim().length > 0
-        ? requestId
-        : crypto.randomUUID();
-
-    // ── Fetch user record + tier (fail-closed) ──
-    const convex = await getAuthenticatedConvexClient();
-    const validTiers: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
-    let userTier: SubscriptionTier = 'free';
-    let convexUserId: Id<'users'>;
-
-    let userRecord;
-    try {
-      userRecord = await convex.query(api.users.getByClerkId, { clerkId: clerkUserId });
-    } catch (err) {
-      console.warn('[Chat] Failed to fetch user record:', err);
-      return Response.json({ error: 'Failed to resolve user context' }, { status: 500 });
-    }
-
-    if (!userRecord) {
-      return Response.json({ error: 'User not found' }, { status: 403 });
-    }
-
-    // eslint-disable-next-line prefer-const
-    convexUserId = userRecord._id;
-    if (userRecord.subscriptionTier && validTiers.includes(userRecord.subscriptionTier as SubscriptionTier)) {
-      userTier = userRecord.subscriptionTier as SubscriptionTier;
-    }
-
-    // ── Router: classify the turn ──
-    const routerResult = classifyMessage(message);
-    const { mode: routeMode, toolPlan, temperature } = routerResult;
-
-    // ── Rate limit check (model-aware via router) ──
-    const routeModeToFeature: Record<string, 'chat' | 'analysis' | 'judge_sim' | 'opposition_sim' | 'deep_draft' | 'memory' | 'confidence'> = {
-      adaptive_chat: 'chat',
-      direct_legal_answer: 'chat',
-      local_procedure: 'chat',
-      document_analysis: 'analysis',
-      judge_lens_strategy: 'judge_sim',
-      court_ready_drafting: 'deep_draft',
-      pattern_analysis: 'analysis',
-      support_grounding: 'chat',
-      safety_escalation: 'chat',
-    };
-    const modelFeature = routeModeToFeature[routeMode] ?? 'chat';
-    const model = getModelForRoute(userTier, modelFeature);
-    const dailyCap = getDailyLimit(userTier, model);
-    if (dailyCap !== -1) {
-      const rateLimitKey = model.includes('pro') ? 'chat_message_5_4_pro' as const : 'chat_message_5_4' as const;
-      const rl = checkRateLimit(clerkUserId, rateLimitKey, dailyCap);
-      if (!rl.allowed) {
-        return Response.json(
-          { error: 'Daily message limit reached. Please upgrade your plan or try again tomorrow.' },
-          { status: 429 }
-        );
-      }
-    }
-
-    // ── Step 2: Load conversation from Convex ──
-    // api.conversations.get already throws for missing/unauthorized, so we
-    // map the error to the correct 4xx status instead of surfacing as 500.
-    const typedConversationId = conversationId as Id<'conversations'>;
-
-    let conversation;
-    try {
-      conversation = await convex.query(api.conversations.get, { id: typedConversationId });
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      if (errorMsg.includes('Not authorized') || errorMsg.includes('Not authenticated')) {
-        return Response.json({ error: 'Unauthorized access to conversation' }, { status: 403 });
-      }
-      // Treat everything else as not-found or server error
-      console.warn('[Chat] Failed to load conversation:', err);
-      return Response.json({ error: 'Conversation not found or inaccessible' }, { status: 404 });
-    }
-
-    const existingOpenAIConversationId = conversation.openaiConversationId ?? undefined;
-    const existingVectorStoreId = conversation.vectorStoreId ?? undefined;
-
-    // ── Step 3: Ensure OpenAI conversation (atomic compare-and-set) ──
-    // Create externally first, then atomically persist only if still empty.
-    // If another thread already persisted one, use that thread instead.
-    // The loser's orphan is an empty OpenAI conversation — harmless.
-    let openaiConversationId: string;
-    let isFirstTurn: boolean;
-
-    if (existingOpenAIConversationId) {
-      openaiConversationId = existingOpenAIConversationId;
-      isFirstTurn = false;
-    } else {
-      // Create the OpenAI conversation externally first
-      const candidateId = await ensureOpenAIConversation(undefined);
-
-      // Atomically persist — only wins if conversation.openaiConversationId is still empty
-      try {
-        const result = await convex.mutation(api.conversations.getOrSetOpenAIConversationId, {
-          conversationId: typedConversationId,
-          candidateOpenAIId: candidateId,
-        });
-        openaiConversationId = result.openaiConversationId;
-        isFirstTurn = result.wasSet; // Only true for the thread that won the race
-      } catch (err) {
-        console.error('[Chat] Failed to initialize conversation state:', err);
-        return Response.json(
-          { error: 'Failed to initialize conversation state' },
-          { status: 503 }
-        );
-      }
-    }
-
-    // ── Step 5: Create debug trace ──
-    const trace = createEmptyTrace({
-      route: '/api/chat',
-      routeMode,
+      mode: mode ?? (persistUserMessage === false ? 'retry' : 'send'),
+      routeMode: routerResult.mode,
       model,
-      temperature,
-      conversationId,
-      userId: clerkUserId,
-      userMessage: message.slice(0, 500),
+      temperature: routerResult.temperature,
+      userContextJson: userContext ? JSON.stringify(userContext) : undefined,
+      persistUserMessage: persistUserMessage !== false,
+      retryOfAssistantMessageId: retryOfAssistantMessageId
+        ? (retryOfAssistantMessageId as Id<'messages'>)
+        : undefined,
+      editOfUserMessageId: editOfUserMessageId ? (editOfUserMessageId as Id<'messages'>) : undefined,
     });
 
-    // ── Step 6: Build context prompt ──
-    const contextPacket: ContextPacket = {};
-
-    // Populate from userContext if available
-    if (userContext) {
-      contextPacket.userProfile = {
-        userName: userContext.userName as string | undefined,
-        state: userContext.state as string | undefined,
-        county: userContext.county as string | undefined,
-        custodyType: userContext.custodyType as string | undefined,
-        hasAttorney: userContext.hasAttorney as boolean | undefined,
-        children: userContext.children as { name: string; age: number }[] | undefined,
-      };
-
-      // NEX profile
-      if (userContext.nexNickname || userContext.nexManipulationTactics) {
-        contextPacket.nexProfile = {
-          nickname: userContext.nexNickname as string | undefined,
-          communicationStyle: userContext.nexCommunicationStyle as string | undefined,
-          manipulationTactics: userContext.nexManipulationTactics as string[] | undefined,
-          triggerPatterns: userContext.nexTriggerPatterns as string[] | undefined,
-          detectedPatterns: userContext.nexDetectedPatterns as string[] | undefined,
-        };
-      }
-    }
-
-    // Load conversation summary + case graph from Convex
-    let existingCaseGraph: CaseGraph | undefined;
-    let retrievedSources: LocalCourtSource[] = [];
-    try {
-      const [summaryDoc, caseGraphDoc] = await Promise.all([
-        convex.query(api.conversationSummaries.getByConversation, { conversationId: typedConversationId }),
-        convex.query(api.caseGraphs.getByUser, { userId: convexUserId }),
-      ]);
-
-      if (summaryDoc) {
-        try {
-          contextPacket.conversationSummary = JSON.parse(summaryDoc.summary);
-        } catch { /* invalid JSON — skip */ }
-      }
-
-      if (caseGraphDoc) {
-        try {
-          existingCaseGraph = JSON.parse(caseGraphDoc.graphJson);
-          contextPacket.caseGraph = existingCaseGraph;
-        } catch { /* invalid JSON — skip */ }
-      }
-    } catch {
-      // Non-fatal — continue without context
-    }
-
-    // ── Step 6b: Retrieve local court sources if router requests it ──
-    if (toolPlan.useLocalCourtRetriever && contextPacket.userProfile?.state) {
+    if (!accepted.duplicate && persistUserMessage !== false && isPlaceholderTitle(conversation.title)) {
       try {
-        retrievedSources = await retrieveLocalSources({
-          query: message,
-          state: contextPacket.userProfile.state,
-          county: contextPacket.userProfile.county,
+        await convex.mutation(api.conversations.updateTitle, {
+          id: typedConversationId,
+          title: buildConversationTitle(message),
         });
-        // Also inject into context packet for prompt building
-        contextPacket.localSources = retrievedSources;
-      } catch {
-        // Non-fatal — continue without court sources
+      } catch (titleError) {
+        console.warn('[Chat] Failed to update conversation title:', titleError);
       }
     }
 
-    // ── Step 7: Build tools array ──
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tools: any[] = [...NEXX_FUNCTION_TOOLS];
-
-    if (toolPlan.useFileSearch && existingVectorStoreId) {
-      // Build metadata filters from case context (Backend Gap #4)
-      // Filter keys must match VectorStoreFilter fields stored during upload
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const fileSearchFilters: Record<string, any> = {};
-      if (contextPacket.userProfile?.state) {
-        fileSearchFilters.jurisdiction = contextPacket.userProfile.state;
-      }
-
-      tools.push({
-        type: 'file_search',
-        vector_store_ids: [existingVectorStoreId],
-        ...(Object.keys(fileSearchFilters).length > 0
-          ? { filters: fileSearchFilters }
-          : {}),
-      });
-    }
-
-    if (toolPlan.useWebSearch) {
-      tools.push({ type: 'web_search_preview' });
-    }
-
-    // ── Step 8: Build prompts ──
-    const systemPrompt = buildSystemPolicyPrompt();
-    const developerPrompt = buildDeveloperBehaviorPrompt(routeMode);
-    const featurePrompt = buildFeatureToolPrompt(toolPlan);
-    const artifactPrompt = buildArtifactPrompt();
-    const contextPrompt = buildContextPrompt(contextPacket);
-
-    // Build input: only send full scaffolding on the FIRST turn.
-    // The Responses API persists system/developer messages in conversation
-    // history, so re-sending them on every turn causes duplicate instructions
-    // and inflates token usage. On subsequent turns we send only the dynamic
-    // context (which changes each turn) plus the user message.
-    // (isFirstTurn was determined in Step 3 from the compare-and-set result)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const input: any[] = isFirstTurn
-      ? [
-          { role: 'system', content: systemPrompt },
-          { role: 'developer', content: developerPrompt },
-          { role: 'developer', content: featurePrompt },
-          { role: 'developer', content: artifactPrompt },
-          { role: 'developer', content: contextPrompt },
-          { role: 'user', content: message },
-        ]
-      : [
-          // Dynamic context changes every turn (summary, case graph, sources)
-          { role: 'developer', content: contextPrompt },
-          { role: 'user', content: message },
-        ];
-
-    // ── Step 8b: Call responses.create() with streaming ──
-    // We use stream:true to send draft tokens to the client in real-time.
-    // json_schema structured output IS compatible with streaming —
-    // the model sends partial JSON chunks that accumulate into a valid
-    // schema-conforming response. Recovery pipeline runs post-stream as a
-    // safety net for partial/malformed completions.
-
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const streamResponse = await (openai.responses as any).create({
-            model,
-            reasoning: { effort: 'medium' },
-            temperature,
-            conversation: openaiConversationId,
-            input,
-            tools: tools.length > 0 ? tools : undefined,
-            // Structured output schema — compatible with streaming
-            text: { format: NEXX_RESPONSE_SCHEMA },
-            stream: true,
-          });
-
-          let accumulatedText = '';
-          let responseId: string | undefined;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          let lastResponse: any = null;
-
-          // Process the stream events
-          for await (const event of streamResponse) {
-            if (event.type === 'response.output_text.delta') {
-              // Stream delta to client
-              const delta = event.delta ?? '';
-              accumulatedText += delta;
-              controller.enqueue(encoder.encode(`event: delta\ndata: ${JSON.stringify(delta)}\n\n`));
-            } else if (event.type === 'response.completed') {
-              lastResponse = event.response;
-              responseId = event.response?.id;
-            }
-          }
-
-          // ── Step 9: Process function calls (loop) ──
-          // After streaming completes, check for function calls
-          const MAX_FUNCTION_CALL_ROUNDS = 5;
-          let rounds = 0;
-          let response = lastResponse;
-
-          while (response && rounds < MAX_FUNCTION_CALL_ROUNDS) {
-            const functionCalls = response.output?.filter(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (item: any) => item.type === 'function_call'
-            ) || [];
-
-            if (functionCalls.length === 0) break;
-
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const functionOutputs: any[] = [];
-            for (const fc of functionCalls) {
-              let parsedArgs: Record<string, unknown> = {};
-              try {
-                parsedArgs = JSON.parse(fc.arguments || '{}');
-              } catch { /* use empty args */ }
-
-              const result = await executeFunctionTool(
-                fc.name,
-                parsedArgs,
-                { convex, userId: convexUserId, conversationId: typedConversationId }
-              );
-
-              functionOutputs.push({
-                type: 'function_call_output',
-                call_id: fc.call_id,
-                output: JSON.stringify(result),
-              });
-
-              // Record tool run
-              try {
-                await convex.mutation(api.toolRuns.create, {
-                  conversationId: typedConversationId,
-                  toolType: fc.name,
-                  inputJson: JSON.stringify(parsedArgs),
-                  outputJson: JSON.stringify(result),
-                });
-              } catch { /* non-fatal */ }
-            }
-
-            // Re-call with function outputs (non-streaming for tool follow-ups)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            response = await (openai.responses as any).create({
-              model,
-              conversation: openaiConversationId,
-              input: functionOutputs,
-              tools: tools.length > 0 ? tools : undefined,
-              text: { format: NEXX_RESPONSE_SCHEMA },
-            });
-
-            // If function calls produced new text, update accumulated
-            if (response) {
-              const newText = extractOutputText(response);
-              if (newText && newText !== accumulatedText) {
-                accumulatedText = newText;
-              }
-              responseId = response.id ?? responseId;
-            }
-
-            rounds++;
-          }
-
-          // ── Step 10: Extract rawText ──
-          const rawText = accumulatedText || extractOutputText(response);
-
-          trace.generation = {
-            rawResponseText: rawText.slice(0, 5000),
-            parseSuccess: false,
-          };
-
-          // ── Step 11: Recovery pipeline ──
-          const recoveryResult = await recoverStructuredOutput(rawText, {
-            systemPrompt,
-            developerPrompt: [developerPrompt, featurePrompt, artifactPrompt, contextPrompt].join('\n\n'),
-            userPayload: { message },
-            model,
-          });
-
-          let parsedResponse: NexxAssistantResponse = recoveryResult.data;
-          trace.generation.parseSuccess = recoveryResult.stage !== 'fallback';
-          trace.recovery = {
-            used: recoveryResult.stage !== 'initial_parse',
-            stage: recoveryResult.stage,
-          };
-
-          // Suppress weak artifacts
-          parsedResponse = suppressWeakArtifacts(parsedResponse);
-
-          // Polish message
-          parsedResponse.message = polishLegalResponse(parsedResponse.message);
-
-          // ── Step 12: Confidence assessment ──
-          try {
-            const confidence = await assessConfidence(parsedResponse, retrievedSources, existingCaseGraph);
-            parsedResponse.artifacts.confidence = confidence;
-            parsedResponse.message = injectConfidenceWarning(parsedResponse.message, confidence);
-          } catch (err) {
-            console.warn('[Chat] Confidence assessment failed:', err);
-          }
-
-          // Record trace artifacts
-          trace.artifacts = {
-            draftReady: parsedResponse.artifacts.draftReady,
-            timelineReady: parsedResponse.artifacts.timelineReady,
-            exhibitReady: parsedResponse.artifacts.exhibitReady,
-            judgeSimulation: parsedResponse.artifacts.judgeSimulation,
-            oppositionSimulation: parsedResponse.artifacts.oppositionSimulation,
-            confidence: parsedResponse.artifacts.confidence,
-          };
-
-          const currentTitle = (conversation.title ?? '').trim();
-          const shouldUpdateConversationTitle =
-            isFirstTurn &&
-            (currentTitle.length === 0 ||
-              currentTitle === 'New Conversation' ||
-              currentTitle === 'New Chat');
-
-          // ── Step 13: Save user message to Convex ──
-          try {
-            await convex.mutation(api.messages.createMessage, {
-              conversationId: typedConversationId,
-              role: 'user',
-              content: message,
-              mode: routeMode,
-              requestId: `${turnRequestId}-user`,
-            });
-
-            if (shouldUpdateConversationTitle) {
-              try {
-                await convex.mutation(api.conversations.updateTitle, {
-                  id: typedConversationId,
-                  title: buildConversationTitle(message),
-                });
-              } catch (titleError) {
-                console.warn('[Chat] Failed to update conversation title:', titleError);
-              }
-            }
-          } catch (err) {
-            console.warn('[Chat] Failed to save user message:', err);
-          }
-
-          // ── Step 14: Save assistant message to Convex ──
-          try {
-            await convex.mutation(api.messages.createMessage, {
-              conversationId: typedConversationId,
-              role: 'assistant',
-              content: parsedResponse.message,
-              mode: routeMode,
-              artifactsJson: JSON.stringify(parsedResponse.artifacts),
-              requestId: `${turnRequestId}-assistant`,
-            });
-          } catch (err) {
-            console.warn('[Chat] Failed to save assistant message:', err);
-          }
-
-          // ── Step 15: Save openaiLastResponseId ──
-          if (responseId) {
-            try {
-              await convex.mutation(api.conversations.setLastResponseId, {
-                conversationId: typedConversationId,
-                openaiLastResponseId: responseId,
-              });
-            } catch { /* non-fatal */ }
-          }
-
-          // ── Step 16: Save debug trace ──
-          const finalTrace = finalizeTrace(trace, true, startTime);
-
-          // Capture token usage if available
-          if (response?.usage) {
-            finalTrace.performance = {
-              ...finalTrace.performance,
-              latencyMs: finalTrace.performance?.latencyMs ?? 0,
-              tokenUsage: {
-                promptTokens: response.usage.input_tokens ?? 0,
-                completionTokens: response.usage.output_tokens ?? 0,
-                totalTokens: (response.usage.input_tokens ?? 0) + (response.usage.output_tokens ?? 0),
-              },
-            };
-          }
-
-          try {
-            await convex.mutation(api.debugTraces.create, {
-              traceId: finalTrace.traceId,
-              route: '/api/chat',
-              routeMode,
-              conversationId: typedConversationId,
-              debugJson: serializeTrace(finalTrace),
-            });
-          } catch { /* non-fatal */ }
-
-          // ── Step 17: Send final payload via SSE event ──
-          // Uses SSE framing (event: type + data: json) instead of in-band
-          // sentinel strings, preventing collision with model output.
-          const finalPayload = JSON.stringify({
-            ok: true,
-            response: parsedResponse,
-            openaiConversationId,
-            routeMode,
-          });
-
-          controller.enqueue(encoder.encode(`event: final\ndata: ${finalPayload}\n\n`));
-          controller.close();
-
-          // ── Step 18: persistAfterResponse (fire-and-forget) ──
-          // Runs AFTER stream is closed so it doesn't block user-visible latency.
-          void (async () => {
-            try {
-              const allMessages = await convex.query(api.messages.list, { conversationId: typedConversationId });
-              const messageArray = allMessages.map((m: { role: string; content: string }) => ({
-                role: m.role,
-                content: m.content,
-              }));
-
-              await persistAfterResponse({
-                conversationId,
-                messages: messageArray,
-                messageCount: messageArray.length,
-                existingSummary: contextPacket.conversationSummary,
-                existingCaseGraph,
-                saveSummary: async (summary, turnCount) => {
-                  await convex.mutation(api.conversationSummaries.upsert, {
-                    conversationId: typedConversationId,
-                    summary: JSON.stringify(summary),
-                    turnCount,
-                  });
-                },
-                saveCaseGraph: async (graphJson) => {
-                  await convex.mutation(api.caseGraphs.upsert, {
-                    userId: convexUserId,
-                    graphJson,
-                  });
-                },
-              });
-            } catch (err) {
-              console.warn('[Chat] persistAfterResponse error:', err);
-            }
-          })();
-
-        } catch (error) {
-          console.error('[Chat] Streaming error:', error);
-          const errorPayload = JSON.stringify({
-            ok: false,
-            error: 'Failed to generate response',
-          });
-          controller.enqueue(encoder.encode(`event: final\ndata: ${errorPayload}\n\n`));
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
-    });
-
-  } catch (error) {
-    console.error('[Chat] API error:', error);
     return Response.json(
-      { error: 'Failed to generate response' },
-      { status: 500 }
+      {
+        ok: true,
+        accepted: true,
+        transport: 'realtime-db',
+        requestId: turnRequestId,
+        turn: accepted,
+      },
+      { status: 202 }
+    );
+  } catch (error) {
+    console.error('[Chat] Failed to accept chat turn:', error);
+    return Response.json(
+      { error: 'Unable to accept chat turn. Please try again.' },
+      { status: 503 }
     );
   }
 }
-

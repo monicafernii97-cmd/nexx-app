@@ -11,6 +11,7 @@
 import type { NexxAssistantResponse, RecoveryResult } from '../../types';
 import { validateAssistantResponse } from './validators';
 import { openai } from '../../openaiConversation';
+import { NEXX_RESPONSE_SCHEMA } from '../schemas';
 
 const EMPTY_ARTIFACTS = {
   draftReady: null,
@@ -73,34 +74,7 @@ export async function recoverStructuredOutput(
             content: `The previous response was not valid JSON. Please answer this question again with properly structured JSON output:\n\n${retryConfig.userPayload.message}`,
           },
         ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'nexx_assistant_response',
-            schema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                message: { type: 'string' },
-                artifacts: {
-                  type: 'object',
-                  additionalProperties: false,
-                  properties: {
-                    draftReady: { type: ['object', 'null'] },
-                    timelineReady: { type: ['object', 'null'] },
-                    exhibitReady: { type: ['object', 'null'] },
-                    judgeSimulation: { type: ['object', 'null'] },
-                    oppositionSimulation: { type: ['object', 'null'] },
-                    confidence: { type: ['object', 'null'] },
-                  },
-                  required: ['draftReady', 'timelineReady', 'exhibitReady',
-                             'judgeSimulation', 'oppositionSimulation', 'confidence'],
-                },
-              },
-              required: ['message', 'artifacts'],
-            },
-          },
-        },
+        text: { format: NEXX_RESPONSE_SCHEMA },
       });
 
       const retryText = retryResponse.output_text || retryResponse.output?.[0]?.content?.[0]?.text || '';

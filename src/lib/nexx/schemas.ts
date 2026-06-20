@@ -7,6 +7,113 @@
  * patterns, narrative, and reports.
  */
 
+const nullableString = { type: ['string', 'null'] } as const;
+
+const stringArray = {
+  type: 'array',
+  items: { type: 'string' },
+} as const;
+
+const draftReadySchema = {
+  type: ['object', 'null'],
+  additionalProperties: false,
+  properties: {
+    title: { type: 'string' },
+    body: { type: 'string' },
+    filingNotes: nullableString,
+  },
+  required: ['title', 'body', 'filingNotes'],
+} as const;
+
+const timelineReadySchema = {
+  type: ['object', 'null'],
+  additionalProperties: false,
+  properties: {
+    events: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          date: { type: 'string' },
+          description: { type: 'string' },
+          significance: nullableString,
+        },
+        required: ['date', 'description', 'significance'],
+      },
+    },
+  },
+  required: ['events'],
+} as const;
+
+const exhibitReadySchema = {
+  type: ['object', 'null'],
+  additionalProperties: false,
+  properties: {
+    exhibits: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          label: { type: 'string' },
+          description: { type: 'string' },
+          source: nullableString,
+        },
+        required: ['label', 'description', 'source'],
+      },
+    },
+  },
+  required: ['exhibits'],
+} as const;
+
+const judgeSimulationSchema = {
+  type: ['object', 'null'],
+  additionalProperties: false,
+  properties: {
+    credibilityScore: { type: 'number' },
+    neutralityScore: { type: 'number' },
+    clarityScore: { type: 'number' },
+    strengths: stringArray,
+    weaknesses: stringArray,
+    likelyCourtInterpretation: { type: 'string' },
+    improvementSuggestions: stringArray,
+  },
+  required: [
+    'credibilityScore',
+    'neutralityScore',
+    'clarityScore',
+    'strengths',
+    'weaknesses',
+    'likelyCourtInterpretation',
+    'improvementSuggestions',
+  ],
+} as const;
+
+const oppositionSimulationSchema = {
+  type: ['object', 'null'],
+  additionalProperties: false,
+  properties: {
+    likelyAttackPoints: stringArray,
+    framingRisks: stringArray,
+    whatNeedsTightening: stringArray,
+    preemptionSuggestions: stringArray,
+  },
+  required: ['likelyAttackPoints', 'framingRisks', 'whatNeedsTightening', 'preemptionSuggestions'],
+} as const;
+
+const confidenceSchema = {
+  type: ['object', 'null'],
+  additionalProperties: false,
+  properties: {
+    confidence: { type: 'string', enum: ['high', 'moderate', 'low'] },
+    basis: { type: 'string' },
+    evidenceSufficiency: { type: 'string' },
+    missingSupport: stringArray,
+  },
+  required: ['confidence', 'basis', 'evidenceSufficiency', 'missingSupport'],
+} as const;
+
 // ---------------------------------------------------------------------------
 // 1. Chat Response Schema (nexx_assistant_response)
 // ---------------------------------------------------------------------------
@@ -23,12 +130,12 @@ export const NEXX_RESPONSE_SCHEMA = {
         type: 'object',
         additionalProperties: false,
         properties: {
-          draftReady: { type: ['object', 'null'] },
-          timelineReady: { type: ['object', 'null'] },
-          exhibitReady: { type: ['object', 'null'] },
-          judgeSimulation: { type: ['object', 'null'] },
-          oppositionSimulation: { type: ['object', 'null'] },
-          confidence: { type: ['object', 'null'] },
+          draftReady: draftReadySchema,
+          timelineReady: timelineReadySchema,
+          exhibitReady: exhibitReadySchema,
+          judgeSimulation: judgeSimulationSchema,
+          oppositionSimulation: oppositionSimulationSchema,
+          confidence: confidenceSchema,
         },
         required: ['draftReady', 'timelineReady', 'exhibitReady',
                    'judgeSimulation', 'oppositionSimulation', 'confidence'],

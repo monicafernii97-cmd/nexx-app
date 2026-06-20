@@ -4,35 +4,13 @@ import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { api } from '@convex/_generated/api';
 import { createVectorStore, deleteVectorStore, uploadToVectorStore } from '@/lib/nexx/fileSearch';
 import { parseLegalDocument, buildDocumentMetadata } from '@/lib/nexx/parser';
+import { extractDocumentText, buildDocumentContextSnippet } from '@/lib/nexx/documentExtraction';
 import type { Id } from '@convex/_generated/dataModel';
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const MAX_PARSE_INPUT_CHARS = 8000;
-
-/**
- * Extract text from a file for metadata parsing.
- * Uses pdf-parse for PDFs (binary → text), and file.text() for plain text.
- * Returns undefined if extraction fails or file type is unsupported.
- */
-async function extractTextForMetadata(file: File): Promise<string | undefined> {
-  if (file.type === 'text/plain') {
-    return await file.text();
-  }
-  if (file.type === 'application/pdf') {
-    try {
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const { PDFParse } = await import('pdf-parse');
-      const pdf = new PDFParse({ data: new Uint8Array(buffer) });
-      const result = await pdf.getText();
-      return result.text;
-    } catch (err) {
-      console.warn('[Upload] PDF text extraction failed:', err);
-      return undefined;
-    }
-  }
-  return undefined;
-}
+const MAX_CHAT_CONTEXT_CHARS = 12000;
 
 /**
  * File Upload API Route
@@ -79,7 +57,10 @@ export async function POST(req: NextRequest) {
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
     ];
-    if (!allowedTypes.includes(file.type)) {
+    const allowedExtensions = ['.pdf', '.doc', '.docx', '.txt'];
+    const lowerName = file.name.toLowerCase();
+    const hasAllowedExtension = allowedExtensions.some((ext) => lowerName.endsWith(ext));
+    if (!allowedTypes.includes(file.type) && !hasAllowedExtension) {
       return Response.json(
         { error: 'Unsupported file type. Please upload PDF, DOC, DOCX, or TXT.' },
         { status: 400 }
@@ -192,9 +173,10 @@ export async function POST(req: NextRequest) {
         createdStandaloneStoreId = vectorStoreId;
       }
 
-      // Extract text for metadata (text files + PDFs using pdf-parse)
+      // Extract text for metadata and immediate chat grounding.
       let metadata: Record<string, string> = { source: 'user_upload' };
-      const extractedText = await extractTextForMetadata(file);
+      const extraction = await extractDocumentText(file);
+      const extractedText = extraction.text;
       if (extractedText) {
         try {
           // Truncate to parser limit so large documents degrade gracefully
@@ -240,6 +222,13 @@ export async function POST(req: NextRequest) {
         openaiFileId,
         vectorStoreId,
         filename: file.name,
+        extractedText: extractedText ? buildDocumentContextSnippet(extractedText, MAX_CHAT_CONTEXT_CHARS) : undefined,
+        extractionError: extraction.error,
+        extractionCharCount: extractedText?.length ?? 0,
+        extractionMethod: extraction.method,
+        ocrAttempted: extraction.ocrAttempted ?? false,
+        pagesOcrProcessed: extraction.pagesOcrProcessed,
+        pagesTotal: extraction.pagesTotal,
       });
     } catch (error) {
       // Mark file as failed — include any provider IDs we already obtained

@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { parseLegalDocument } from '@/lib/nexx/parser';
+import { extractDocumentText } from '@/lib/nexx/documentExtraction';
 
-export const maxDuration = 30;
+export const maxDuration = 120;
 
 /**
  * Document Analysis API Route
@@ -17,16 +18,39 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    let body: unknown;
-    try {
-      body = await req.json();
-    } catch {
-      return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+    let filename = 'uploaded_document';
+    let text: string | undefined;
+
+    const contentType = req.headers.get('content-type') ?? '';
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      const fileEntry = formData.get('file');
+      if (!(fileEntry instanceof File)) {
+        return Response.json({ error: 'No file provided' }, { status: 400 });
+      }
+      filename = fileEntry.name || filename;
+      const extraction = await extractDocumentText(fileEntry);
+      if (!extraction.text) {
+        return Response.json(
+          { error: extraction.error || 'Could not extract readable text from the uploaded document' },
+          { status: 422 }
+        );
+      }
+      text = extraction.text;
+    } else {
+      let body: unknown;
+      try {
+        body = await req.json();
+      } catch {
+        return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return Response.json({ error: 'Invalid request body' }, { status: 400 });
+      }
+      const jsonBody = body as { filename?: string; text?: string };
+      filename = jsonBody.filename || filename;
+      text = jsonBody.text;
     }
-    if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      return Response.json({ error: 'Invalid request body' }, { status: 400 });
-    }
-    const { filename, text } = body as { filename?: string; text?: string };
 
     if (!text || typeof text !== 'string') {
       return Response.json({ error: 'Document text is required' }, { status: 400 });
@@ -39,7 +63,7 @@ export async function POST(req: NextRequest) {
     }
 
     const parsed = await parseLegalDocument({
-      filename: filename || 'uploaded_document',
+      filename,
       text,
     });
 

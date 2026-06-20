@@ -11,8 +11,23 @@ import MessageBubble, { type ChatTheme } from '@/components/chat/MessageBubble';
 import ChatInput from '@/components/chat/ChatInput';
 import { WorkspaceClient } from '@/components/chat/WorkspaceClient';
 import { AnalysisStatusStrip, DEFAULT_ANALYSIS_STEPS, getStepsByElapsed } from '@/components/chat/AnalysisStatusStrip';
-import type { NexxAssistantResponse, RouteMode } from '@/lib/types';
 import type { ActionType, AnalysisStep } from '@/lib/ui-intelligence/types';
+
+type ChatUploadResponse = {
+    ok?: boolean;
+    error?: string;
+    fileId?: string;
+    openaiFileId?: string;
+    vectorStoreId?: string;
+    filename?: string;
+    extractedText?: string;
+    extractionError?: string;
+    extractionCharCount?: number;
+    extractionMethod?: 'text' | 'ocr';
+    ocrAttempted?: boolean;
+    pagesOcrProcessed?: number;
+    pagesTotal?: number;
+};
 
 /** Premium full-screen chat interface for a single NEXX AI conversation. */
 export default function ConversationPage() {
@@ -25,27 +40,21 @@ export default function ConversationPage() {
     // All hooks must be called unconditionally — use 'skip' when ID is invalid
     const conversation = useQuery(api.conversations.get, isValidId ? { id: conversationId } : 'skip');
     const messages = useQuery(api.messages.list, isValidId ? { conversationId } : 'skip');
+    const activeTurns = useQuery(api.chatTurns.activeForConversation, isValidId ? { conversationId } : 'skip');
     const userProfile = useQuery(api.users.me);
     const nexProfile = useQuery(api.nexProfiles.getByUser);
-    const sendMessage = useMutation(api.messages.send);
     const prepareRegenerate = useMutation(api.messages.prepareRegenerate);
     const archiveConversation = useMutation(api.conversations.archive);
 
     const [isStreaming, setIsStreaming] = useState(false);
     const [isPending, setIsPending] = useState(false);
     const [streamingContent, setStreamingContent] = useState('');
-    /** Tracks an assistant reply that was streamed but failed to persist. */
-    const [unsavedReply, setUnsavedReply] = useState<string | null>(null);
-    /** Tracks artifacts/mode/requestId for an unsaved reply so retry persistence restores the full message. */
-    const [unsavedResponseData, setUnsavedResponseData] = useState<{
-        requestId: string;
-        artifactsJson?: string;
-        mode?: RouteMode;
-    } | null>(null);
     const [analysisSteps, setAnalysisSteps] = useState<AnalysisStep[]>(DEFAULT_ANALYSIS_STEPS);
     const streamStartRef = useRef<number>(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const pendingInitialSentRef = useRef(false);
+    const hasActiveTurn = (activeTurns?.length ?? 0) > 0;
+    const isGenerating = isStreaming || hasActiveTurn;
 
     // ── Theme state (persisted to localStorage) ──
     const [theme, setTheme] = useState<ChatTheme>('dark');
@@ -76,7 +85,7 @@ export default function ConversationPage() {
 
     // Analysis step progression during streaming
     useEffect(() => {
-        if (!isStreaming) {
+        if (!isGenerating) {
             setAnalysisSteps(DEFAULT_ANALYSIS_STEPS);
             return;
         }
@@ -85,7 +94,7 @@ export default function ConversationPage() {
             setAnalysisSteps(getStepsByElapsed(elapsed));
         }, 500);
         return () => clearInterval(interval);
-    }, [isStreaming]);
+    }, [isGenerating]);
 
     // Auto-scroll to bottom on new messages
     useEffect(() => {
@@ -99,7 +108,7 @@ export default function ConversationPage() {
         }
     }, [isValidId, router]);
 
-    const isThreadReady = conversation !== undefined && messages !== undefined;
+    const isThreadReady = conversation !== undefined && messages !== undefined && activeTurns !== undefined;
 
     /** Build the user context payload sent to the chat API (shared between send/retry/edit). */
     const buildUserContext = useCallback(() => ({
@@ -123,17 +132,58 @@ export default function ConversationPage() {
         nexDetectedPatterns: nexProfile?.detectedPatterns,
     }), [userProfile, nexProfile]);
 
+    const uploadFileForConversation = useCallback(async (file: File): Promise<ChatUploadResponse> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('conversationId', conversationId);
+
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+        });
+        const data = await response.json().catch(() => ({})) as ChatUploadResponse;
+
+        if (!response.ok || !data.ok) {
+            throw new Error(data.error || `Upload failed with status ${response.status}`);
+        }
+
+        return data;
+    }, [conversationId]);
+
+    const buildUploadedFileMessage = useCallback((message: string, file: File, upload: ChatUploadResponse) => {
+        const filename = upload.filename ?? file.name;
+        const extractedText = upload.extractedText?.trim();
+        const methodLabel = upload.extractionMethod === 'ocr'
+            ? `\nExtraction method: OCR${upload.pagesOcrProcessed ? ` (${upload.pagesOcrProcessed}${upload.pagesTotal ? ` of ${upload.pagesTotal}` : ''} pages)` : ''}`
+            : upload.extractionMethod === 'text'
+                ? '\nExtraction method: embedded document text'
+                : '';
+        const extractionNote = upload.extractionError
+            ? `\n\nExtraction note: ${upload.extractionError} The file was still uploaded and indexed for retrieval.`
+            : '';
+
+        if (extractedText) {
+            return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}\nExtracted text preview:\n\n${extractedText}${extractionNote}`;
+        }
+
+        return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}\nThe document was uploaded and indexed for file search. Analyze it using the uploaded file contents.${extractionNote}`;
+    }, []);
+
     /**
-     * Call the NEXX chat API and handle the SSE streaming response.
-     *
-     * The server is the single persistence owner for both user and assistant
-     * messages (Steps 13 + 14 in route.ts). The client only needs to send
-     * the current user message + requestId for idempotent de-duplication.
+     * Accept a durable chat turn. Provider generation runs in a Convex worker;
+     * this page renders user, draft, final, and degraded messages from Convex.
      */
-    const callChatAPI = useCallback(async (message: string) => {
+    const callChatAPI = useCallback(async (
+        message: string,
+        options?: {
+            persistUserMessage?: boolean;
+            mode?: 'send' | 'retry' | 'edit';
+            retryOfAssistantMessageId?: Id<'messages'>;
+            editOfUserMessageId?: Id<'messages'>;
+        }
+    ) => {
         setIsStreaming(true);
         setStreamingContent('');
-        setUnsavedReply(null);
         streamStartRef.current = Date.now();
 
         const requestId = `${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -145,6 +195,10 @@ export default function ConversationPage() {
                 body: JSON.stringify({
                     message,
                     requestId,
+                    persistUserMessage: options?.persistUserMessage ?? true,
+                    mode: options?.mode ?? (options?.persistUserMessage === false ? 'retry' : 'send'),
+                    retryOfAssistantMessageId: options?.retryOfAssistantMessageId,
+                    editOfUserMessageId: options?.editOfUserMessageId,
                     userContext: buildUserContext(),
                     conversationId,
                 }),
@@ -152,131 +206,52 @@ export default function ConversationPage() {
 
             if (!response.ok) {
                 const errorText = await response.text().catch(() => '');
-                throw new Error(`Failed to get AI response: ${response.status} ${errorText}`);
+                throw new Error(`Failed to accept chat turn: ${response.status} ${errorText}`);
             }
 
-            // Handle SSE-framed streaming response
-            const reader = response.body?.getReader();
-            if (!reader) throw new Error('No response body');
-
-            const decoder = new TextDecoder();
-            let draftText = '';
-            let finalPayload: string | null = null;
-            let sseBuffer = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                    // Flush any remaining bytes from the decoder
-                    const remaining = decoder.decode(undefined, { stream: false });
-                    if (remaining) sseBuffer += remaining;
-                    break;
-                }
-
-                const chunk = decoder.decode(value, { stream: true });
-                sseBuffer += chunk;
-
-                // Parse complete SSE events (double newline delimited)
-                const events = sseBuffer.split('\n\n');
-                // Keep the last (possibly incomplete) chunk in the buffer
-                sseBuffer = events.pop() ?? '';
-
-                for (const eventBlock of events) {
-                    if (!eventBlock.trim()) continue;
-
-                    let eventType = '';
-                    let eventData = '';
-
-                    for (const line of eventBlock.split('\n')) {
-                        if (line.startsWith('event: ')) {
-                            eventType = line.slice(7).trim();
-                        } else if (line.startsWith('data: ')) {
-                            eventData = line.slice(6);
-                        }
-                    }
-
-                    if (eventType === 'delta' && eventData) {
-                        try {
-                            const delta = JSON.parse(eventData) as string;
-                            draftText += delta;
-                            setStreamingContent(draftText);
-                        } catch {
-                            // Non-JSON delta — append raw
-                            draftText += eventData;
-                            setStreamingContent(draftText);
-                        }
-                    } else if (eventType === 'final' && eventData) {
-                        finalPayload = eventData;
-                    }
-                }
+            const data = await response.json();
+            if (!data.ok || !data.accepted) {
+                throw new Error(data.error || 'Chat turn was not accepted');
             }
 
-            // Parse the final payload
-            let data: {
-                ok: boolean;
-                response?: NexxAssistantResponse;
-                routeMode?: string;
-                error?: string;
-            };
-
-            if (finalPayload) {
-                data = JSON.parse(finalPayload);
-            } else {
-                // Fallback: try parsing entire draft text as JSON
-                // This handles the case where SSE framing wasn't used
-                try {
-                    data = JSON.parse(draftText);
-                } catch {
-                    data = { ok: false, error: 'Failed to parse response' };
-                }
-            }
-
-            if (!data.ok || !data.response) {
-                throw new Error(data.error || 'Unknown error from chat API');
-            }
-
-            // Show the final polished content — server already persisted both messages
-            const fullContent = data.response.message;
-            setStreamingContent(fullContent);
-
-            // Clear streaming content after a brief delay so the Convex query
-            // has time to pick up the server-persisted messages
-            setTimeout(() => {
-                setStreamingContent('');
-                setUnsavedReply(null);
-                setUnsavedResponseData(null);
-            }, 500);
-
+            setStreamingContent('');
         } catch (error) {
             console.error('Chat API error:', error);
-            const fallbackContent = "I apologize, but I'm unable to process this right now due to a connection issue. Please try again. Your data remains secure.";
-            setUnsavedReply(fallbackContent);
-            setUnsavedResponseData({ requestId });
-            setStreamingContent(fallbackContent);
+            setStreamingContent('Message was not sent. Please try again.');
+            window.setTimeout(() => setStreamingContent(''), 4000);
             throw error;
         } finally {
             setIsStreaming(false);
         }
     }, [conversationId, buildUserContext]);
-
     /** Send a new user message and stream the AI response. */
     const handleSend = useCallback(
-        async (input: string) => {
-            // Block sends when there's an unsaved reply (UI/model context would diverge)
-            if (isStreaming || isPending || !isThreadReady || unsavedReply) return;
+        async (input: string, file?: File) => {
+            if (isGenerating || isPending || !isThreadReady) return;
             setIsPending(true);
 
             try {
+                let message = input;
+                if (file) {
+                    setStreamingContent(`Uploading ${file.name}...`);
+                    const upload = await uploadFileForConversation(file);
+                    message = buildUploadedFileMessage(input, file, upload);
+                    setStreamingContent('');
+                }
+
                 // Server handles user message persistence (Step 13 in route.ts).
                 // No client-side sendMessage needed — avoids duplicate writes.
-                await callChatAPI(input);
+                await callChatAPI(message);
             } catch (error) {
                 console.error('Send error:', error);
+                const message = error instanceof Error ? error.message : 'Upload or send failed. Please try again.';
+                setStreamingContent(message);
+                window.setTimeout(() => setStreamingContent(''), 5000);
             } finally {
                 setIsPending(false);
             }
         },
-        [isStreaming, isPending, isThreadReady, unsavedReply, callChatAPI]
+        [isGenerating, isPending, isThreadReady, uploadFileForConversation, buildUploadedFileMessage, callChatAPI]
     );
 
     useEffect(() => {
@@ -284,7 +259,7 @@ export default function ConversationPage() {
     }, [conversationId]);
 
     useEffect(() => {
-        if (pendingInitialSentRef.current || !isThreadReady || isStreaming || isPending || unsavedReply) return;
+        if (pendingInitialSentRef.current || !isThreadReady || isGenerating || isPending) return;
         if (typeof window === 'undefined') return;
 
         const initialMsgKey = `nexx_initial_msg_${String(conversationId)}`;
@@ -315,7 +290,7 @@ export default function ConversationPage() {
                 pendingInitialSentRef.current = false;
             }
         };
-    }, [conversationId, isThreadReady, isStreaming, isPending, unsavedReply, callChatAPI]);
+    }, [conversationId, isThreadReady, isGenerating, isPending, callChatAPI]);
 
     /**
      * Retry the last AI response — atomically deletes the assistant message
@@ -323,7 +298,7 @@ export default function ConversationPage() {
      */
     const handleRetry = useCallback(
         async (assistantMessageId: Id<'messages'>) => {
-            if (isStreaming || isPending || !messages) return;
+            if (isGenerating || isPending || !messages) return;
             setIsPending(true);
 
             try {
@@ -336,14 +311,18 @@ export default function ConversationPage() {
                 const lastUserMsg = [...history].reverse().find(m => m.role === 'user');
                 if (!lastUserMsg) throw new Error('No user message found for retry');
 
-                await callChatAPI(lastUserMsg.content);
+                await callChatAPI(lastUserMsg.content, {
+                    persistUserMessage: false,
+                    mode: 'retry',
+                    retryOfAssistantMessageId: assistantMessageId,
+                });
             } catch (error) {
                 console.error('Retry error:', error);
             } finally {
                 setIsPending(false);
             }
         },
-        [conversationId, messages, isStreaming, isPending, prepareRegenerate, callChatAPI]
+        [conversationId, messages, isGenerating, isPending, prepareRegenerate, callChatAPI]
     );
 
     /**
@@ -352,7 +331,7 @@ export default function ConversationPage() {
      */
     const handleEdit = useCallback(
         async (messageId: Id<'messages'>, newContent: string) => {
-            if (isStreaming || isPending || !messages) return;
+            if (isGenerating || isPending || !messages) return;
             setIsPending(true);
 
             try {
@@ -363,42 +342,19 @@ export default function ConversationPage() {
                 });
 
                 // For edits, the new content IS the message text
-                await callChatAPI(newContent);
+                await callChatAPI(newContent, {
+                    persistUserMessage: false,
+                    mode: 'edit',
+                    editOfUserMessageId: messageId,
+                });
             } catch (error) {
                 console.error('Edit error:', error);
             } finally {
                 setIsPending(false);
             }
         },
-        [conversationId, messages, isStreaming, isPending, prepareRegenerate, callChatAPI]
+        [conversationId, messages, isGenerating, isPending, prepareRegenerate, callChatAPI]
     );
-
-    /** Dismiss an unsaved reply, clearing it from the UI. */
-    const handleDismissUnsaved = useCallback(() => {
-        setUnsavedReply(null);
-        setUnsavedResponseData(null);
-        setStreamingContent('');
-    }, []);
-
-    /** Retry persisting the unsaved reply with full artifacts, mode, and requestId. */
-    const handleRetryPersist = useCallback(async () => {
-        if (!unsavedReply || !unsavedResponseData?.requestId) return;
-        try {
-            await sendMessage({
-                conversationId,
-                role: 'assistant',
-                content: unsavedReply,
-                requestId: unsavedResponseData.requestId,
-                artifactsJson: unsavedResponseData.artifactsJson,
-                mode: unsavedResponseData.mode,
-            });
-            setUnsavedReply(null);
-            setUnsavedResponseData(null);
-            setStreamingContent('');
-        } catch {
-            console.error('Retry persistence failed again');
-        }
-    }, [unsavedReply, unsavedResponseData, conversationId, sendMessage]);
 
     // Early return AFTER all hooks
     if (!isValidId) return null;
@@ -416,7 +372,7 @@ export default function ConversationPage() {
     };
 
     // Helper: determine if a message is the latest of its role
-    const lastAssistantId = messages ? [...messages].reverse().find((m) => m.role === 'assistant')?._id : undefined;
+    const lastAssistantId = messages ? [...messages].reverse().find((m) => m.role === 'assistant' && m.status !== 'draft')?._id : undefined;
     const lastUserId = messages ? [...messages].reverse().find((m) => m.role === 'user')?._id : undefined;
 
 
@@ -487,12 +443,12 @@ export default function ConversationPage() {
 
             {/* Analysis Status Strip */}
             <div className="px-4 lg:px-8">
-                <AnalysisStatusStrip steps={analysisSteps} visible={isStreaming} />
+                <AnalysisStatusStrip steps={analysisSteps} visible={isGenerating} />
             </div>
 
             {/* Messages Area */}
             <div className={`flex-1 overflow-y-auto w-full no-scrollbar pb-6 px-1 lg:px-6 relative scroll-smooth flex flex-col transition-colors duration-300 ${isLight ? 'bg-white' : ''}`}>
-                {messages?.length === 0 && !isStreaming && (
+                {messages?.length === 0 && !isGenerating && (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -525,10 +481,11 @@ export default function ConversationPage() {
                         key={msg._id}
                         role={msg.role}
                         content={msg.content}
+                        isStreaming={msg.status === 'draft'}
                         theme={theme}
                         artifactsJson={msg.artifactsJson}
                         onRetry={
-                            msg.role === 'assistant' && !isStreaming && !isPending && !unsavedReply
+                            msg.role === 'assistant' && msg.status !== 'draft' && !isGenerating && !isPending
                                 ? () => {
                                     // Confirm if retrying an older message (will delete later turns)
                                     if (msg._id !== lastAssistantId) {
@@ -540,7 +497,7 @@ export default function ConversationPage() {
                                 : undefined
                         }
                         onEdit={
-                            msg.role === 'user' && !isStreaming && !isPending && !unsavedReply
+                            msg.role === 'user' && !isGenerating && !isPending
                                 ? (newContent) => {
                                     // Confirm if editing an older message (will delete later turns)
                                     if (msg._id !== lastUserId) {
@@ -570,31 +527,11 @@ export default function ConversationPage() {
                         content={streamingContent}
                         isStreaming={isStreaming}
                         theme={theme}
-                        artifactsJson={unsavedResponseData?.artifactsJson}
                     />
                 )}
 
-                {/* Unsaved reply action bar */}
-                {unsavedReply && !isStreaming && (
-                    <div className={`flex items-center gap-2 px-6 py-2 text-xs font-semibold ${isLight ? 'text-amber-700' : 'text-amber-300'}`}>
-                        <span>⚠ Response could not be saved.</span>
-                        <button
-                            onClick={handleRetryPersist}
-                            className="underline hover:no-underline"
-                        >
-                            Retry
-                        </button>
-                        <button
-                            onClick={handleDismissUnsaved}
-                            className="underline hover:no-underline"
-                        >
-                            Dismiss
-                        </button>
-                    </div>
-                )}
-
                 {/* Loading indicator (Pre-stream) — now covered by AnalysisStatusStrip */}
-                {isStreaming && !streamingContent && (
+                {isGenerating && !streamingContent && (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -643,7 +580,7 @@ export default function ConversationPage() {
                     }`}>
                     <ChatInput
                         onSend={handleSend}
-                        disabled={isStreaming || isPending || !isThreadReady || !!unsavedReply}
+                        disabled={isGenerating || isPending || !isThreadReady}
                     />
                 </div>
                 <p className={`text-center text-[9px] font-bold tracking-widest uppercase mt-3 flex items-center justify-center ${isLight ? 'text-gray-400' : 'text-white/30'}`}>

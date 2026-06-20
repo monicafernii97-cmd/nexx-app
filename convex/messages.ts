@@ -2,6 +2,17 @@ import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { getAuthenticatedUserAndConversation } from './lib/auth';
 
+function isLegacyClientFailureMessage(msg: { role: 'user' | 'assistant'; content: string }) {
+    if (msg.role !== 'assistant') return false;
+
+    const normalized = msg.content.toLowerCase();
+    return (
+        normalized.includes("i apologize, but i'm unable to process this right now") &&
+        normalized.includes('connection issue') &&
+        normalized.includes('your data remains secure')
+    );
+}
+
 /** Shared validator for route mode — used by both `send` and `createMessage`. */
 const routeModeValidator = v.union(
     v.literal('adaptive_chat'),
@@ -35,6 +46,10 @@ export const send = mutation({
     },
     handler: async (ctx, args) => {
         await getAuthenticatedUserAndConversation(ctx, args.conversationId);
+
+        if (isLegacyClientFailureMessage(args)) {
+            return null;
+        }
 
         // Idempotency: use compound index for efficient lookup
         if (args.requestId) {
@@ -219,13 +234,27 @@ export const list = query({
             return [];
         }
 
-        return await ctx.db
+        const rows = await ctx.db
             .query('messages')
             .withIndex('by_conversation', (q) =>
                 q.eq('conversationId', args.conversationId)
             )
-            .order('asc')
-            .collect();
+            .order('desc')
+            .take(200);
+
+        return rows
+            .filter((msg) => msg.status !== 'deleted' && !isLegacyClientFailureMessage(msg))
+            .sort((a, b) => {
+                const aTurn = a.turnNumber ?? 0;
+                const bTurn = b.turnNumber ?? 0;
+                if (aTurn !== bTurn) return aTurn - bTurn;
+
+                const aRole = a.roleOrder ?? (a.role === 'user' ? 0 : 1);
+                const bRole = b.roleOrder ?? (b.role === 'user' ? 0 : 1);
+                if (aRole !== bRole) return aRole - bRole;
+
+                return a.createdAt - b.createdAt;
+            });
     },
 });
 
@@ -249,6 +278,10 @@ export const createMessage = mutation({
     handler: async (ctx, args) => {
         // Server-derived auth — NOT caller-supplied
         const { conversation } = await getAuthenticatedUserAndConversation(ctx, args.conversationId);
+
+        if (isLegacyClientFailureMessage(args)) {
+            return null;
+        }
 
         // De-dup: if requestId is provided, check for existing message
         if (args.requestId) {

@@ -389,7 +389,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                accept=".pdf,.doc,.docx,.txt"
                 onChange={handleFileChange}
             />
             <div

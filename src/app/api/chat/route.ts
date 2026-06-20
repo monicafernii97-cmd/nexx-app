@@ -18,6 +18,7 @@ const MAX_MESSAGE_LENGTH = 100_000;
  */
 export const maxDuration = 30;
 
+/** Build a short default title from the first accepted user message. */
 function buildConversationTitle(message: string) {
   const normalized = message.replace(/\s+/g, ' ').trim();
   if (!normalized) return 'New Chat';
@@ -27,11 +28,13 @@ function buildConversationTitle(message: string) {
   return compact.trim().length > 0 ? compact : 'New Chat';
 }
 
+/** Return true when a conversation title can be replaced by first-message text. */
 function isPlaceholderTitle(title: string | undefined) {
   const currentTitle = (title ?? '').trim();
   return currentTitle.length === 0 || currentTitle === 'New Conversation' || currentTitle === 'New Chat';
 }
 
+/** Accept a chat turn and enqueue provider generation in Convex. */
 export async function POST(req: NextRequest) {
   const { userId: clerkUserId } = await auth();
   if (!clerkUserId) {
@@ -133,18 +136,7 @@ export async function POST(req: NextRequest) {
   const model = getModelForRoute(userTier, modelFeature);
   const dailyCap = getDailyLimit(userTier, model);
 
-  if (dailyCap !== -1) {
-    const rateLimit = await convex.mutation(api.chatRateLimits.consume, {
-      key: model.includes('pro') ? 'chat_message_5_4_pro' : 'chat_message_5_4',
-      limit: dailyCap,
-    });
-    if (!rateLimit.allowed) {
-      return Response.json(
-        { error: 'Daily message limit reached. Please upgrade your plan or try again tomorrow.' },
-        { status: 429 }
-      );
-    }
-  }
+  const rateLimitKey = model.includes('pro') ? 'chat_message_5_4_pro' : 'chat_message_5_4';
 
   try {
     const accepted = await convex.mutation(api.chatTurns.acceptChatTurn, {
@@ -157,11 +149,20 @@ export async function POST(req: NextRequest) {
       temperature: routerResult.temperature,
       userContextJson: userContext ? JSON.stringify(userContext) : undefined,
       persistUserMessage: persistUserMessage !== false,
+      rateLimitKey,
+      rateLimit: dailyCap,
       retryOfAssistantMessageId: retryOfAssistantMessageId
         ? (retryOfAssistantMessageId as Id<'messages'>)
         : undefined,
       editOfUserMessageId: editOfUserMessageId ? (editOfUserMessageId as Id<'messages'>) : undefined,
     });
+
+    if (!accepted.accepted && 'rateLimited' in accepted && accepted.rateLimited) {
+      return Response.json(
+        { error: 'Daily message limit reached. Please upgrade your plan or try again tomorrow.' },
+        { status: 429 }
+      );
+    }
 
     if (!accepted.duplicate && persistUserMessage !== false && isPlaceholderTitle(conversation.title)) {
       try {

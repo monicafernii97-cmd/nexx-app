@@ -7,6 +7,7 @@ import { getAuthenticatedUserAndConversation } from './lib/auth';
 const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
 const JOB_RETRY_DELAY_MS = 5_000;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 const routeModeValidator = v.union(
     v.literal('adaptive_chat'),
@@ -22,6 +23,17 @@ const routeModeValidator = v.union(
 
 const turnModeValidator = v.union(v.literal('send'), v.literal('retry'), v.literal('edit'));
 
+/** Return the UTC midnight timestamp that anchors daily chat quota windows. */
+function utcDayStartMs(now: number) {
+    const date = new Date(now);
+    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
+/**
+ * Treat retryable failures as terminal for this worker attempt.
+ * The user can retry by creating a fresh turn, but this specific turn should
+ * leave the active-turn list so the composer can recover.
+ */
 function isTerminalTurnStatus(status: string) {
     return [
         'assistant_saved',
@@ -32,6 +44,7 @@ function isTerminalTurnStatus(status: string) {
     ].includes(status);
 }
 
+/** Build the stable request id used for an assistant message in a turn. */
 function assistantRequestId(requestId: string) {
     return `${requestId}-assistant`;
 }
@@ -47,6 +60,72 @@ const EMPTY_ARTIFACTS_JSON = JSON.stringify({
     confidence: null,
 });
 
+/** Consume one chat quota unit after duplicate-turn detection has completed. */
+async function consumeTurnRateLimit(
+    ctx: MutationCtx,
+    userId: Id<'users'>,
+    key: string,
+    limit: number,
+    now: number,
+    windowMs = ONE_DAY_MS
+) {
+    const windowStartMs = utcDayStartMs(now);
+    const resetInMs = Math.max(0, windowStartMs + windowMs - now);
+
+    if (limit === -1) {
+        return { allowed: true, current: 0, limit, resetInMs };
+    }
+
+    if (limit <= 0) {
+        return { allowed: false, current: 0, limit, resetInMs };
+    }
+
+    const existing = await ctx.db
+        .query('chatRateLimitWindows')
+        .withIndex('by_user_key', (q) => q.eq('userId', userId).eq('key', key))
+        .first();
+
+    if (!existing || existing.windowStartMs !== windowStartMs || existing.windowMs !== windowMs) {
+        const count = 1;
+        if (existing) {
+            await ctx.db.patch(existing._id, {
+                windowStartMs,
+                windowMs,
+                count,
+                limit,
+                updatedAt: now,
+            });
+        } else {
+            await ctx.db.insert('chatRateLimitWindows', {
+                userId,
+                key,
+                windowStartMs,
+                windowMs,
+                count,
+                limit,
+                createdAt: now,
+                updatedAt: now,
+            });
+        }
+
+        return { allowed: true, current: count, limit, resetInMs };
+    }
+
+    if (existing.count >= limit) {
+        return { allowed: false, current: existing.count, limit, resetInMs };
+    }
+
+    const count = existing.count + 1;
+    await ctx.db.patch(existing._id, {
+        count,
+        limit,
+        updatedAt: now,
+    });
+
+    return { allowed: true, current: count, limit, resetInMs };
+}
+
+/** Save a durable degraded assistant message when generation cannot complete. */
 async function saveDegradedAssistantForTurn(
     ctx: MutationCtx,
     turn: Doc<'chatTurns'>,
@@ -127,6 +206,7 @@ async function saveDegradedAssistantForTurn(
     return assistantMessageId;
 }
 
+/** Admit a user turn once, create its generation job, and skip duplicates safely. */
 export const acceptChatTurn = mutation({
     args: {
         conversationId: v.id('conversations'),
@@ -140,6 +220,9 @@ export const acceptChatTurn = mutation({
         persistUserMessage: v.optional(v.boolean()),
         retryOfAssistantMessageId: v.optional(v.id('messages')),
         editOfUserMessageId: v.optional(v.id('messages')),
+        rateLimitKey: v.optional(v.string()),
+        rateLimit: v.optional(v.number()),
+        rateLimitWindowMs: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
         const { user, conversation } = await getAuthenticatedUserAndConversation(ctx, args.conversationId);
@@ -167,6 +250,31 @@ export const acceptChatTurn = mutation({
                 userMessageId: existingTurn.userMessageId ?? null,
                 assistantMessageId: existingTurn.assistantMessageId ?? null,
             };
+        }
+
+        if (args.rateLimitKey && args.rateLimit !== undefined) {
+            const rateLimit = await consumeTurnRateLimit(
+                ctx,
+                user._id,
+                args.rateLimitKey,
+                args.rateLimit,
+                now,
+                args.rateLimitWindowMs
+            );
+
+            if (!rateLimit.allowed) {
+                return {
+                    accepted: false,
+                    duplicate: false,
+                    rateLimited: true,
+                    rateLimit,
+                    turnId: null,
+                    jobId: null,
+                    status: 'rate_limited',
+                    userMessageId: null,
+                    assistantMessageId: null,
+                };
+            }
         }
 
         const turnNumber = conversation.nextTurnNumber ?? (conversation.messageCount ?? 0) + 1;
@@ -252,6 +360,7 @@ export const acceptChatTurn = mutation({
     },
 });
 
+/** List non-terminal turns so the client can show generation state. */
 export const activeForConversation = query({
     args: { conversationId: v.id('conversations') },
     handler: async (ctx, args) => {
@@ -268,6 +377,7 @@ export const activeForConversation = query({
     },
 });
 
+/** Record that the client observed a turn update. */
 export const acknowledgeTurn = mutation({
     args: { turnId: v.id('chatTurns') },
     handler: async (ctx, args) => {
@@ -282,6 +392,7 @@ export const acknowledgeTurn = mutation({
     },
 });
 
+/** Lease one queued generation job while respecting per-conversation ordering. */
 export const leaseGenerationJob = internalMutation({
     args: {
         jobId: v.id('chatGenerationJobs'),
@@ -356,6 +467,7 @@ export const leaseGenerationJob = internalMutation({
     },
 });
 
+/** Load the prompt context needed by the worker for a specific turn. */
 export const getGenerationContext = internalQuery({
     args: { turnId: v.id('chatTurns') },
     handler: async (ctx, args) => {
@@ -402,6 +514,7 @@ export const getGenerationContext = internalQuery({
     },
 });
 
+/** Save or update a draft assistant message while the provider is streaming. */
 export const saveAssistantDraft = internalMutation({
     args: {
         jobId: v.id('chatGenerationJobs'),
@@ -453,6 +566,7 @@ export const saveAssistantDraft = internalMutation({
     },
 });
 
+/** Finalize a turn with a committed or degraded assistant message. */
 export const completeAssistant = internalMutation({
     args: {
         jobId: v.id('chatGenerationJobs'),
@@ -473,6 +587,7 @@ export const completeAssistant = internalMutation({
 
         const messageStatus = args.degraded ? 'degraded' : 'committed';
         let assistantMessageId = turn.assistantMessageId;
+        let shouldIncrementMessageCount = false;
 
         if (assistantMessageId) {
             await ctx.db.patch(assistantMessageId, {
@@ -488,6 +603,7 @@ export const completeAssistant = internalMutation({
             });
         } else if (turn.assistantDraftMessageId) {
             assistantMessageId = turn.assistantDraftMessageId;
+            shouldIncrementMessageCount = true;
             await ctx.db.patch(turn.assistantDraftMessageId, {
                 content: args.content,
                 status: messageStatus,
@@ -501,6 +617,7 @@ export const completeAssistant = internalMutation({
                 updatedAt: now,
             });
         } else {
+            shouldIncrementMessageCount = true;
             assistantMessageId = await ctx.db.insert('messages', {
                 conversationId: turn.conversationId,
                 userId: turn.userId,
@@ -550,7 +667,9 @@ export const completeAssistant = internalMutation({
                 activeTurnStartedAt: conversation.activeTurnRequestId === turn.requestId ? undefined : conversation.activeTurnStartedAt,
                 openaiLastResponseId: args.providerResponseId ?? conversation.openaiLastResponseId,
                 lastMessageAt: now,
-                messageCount: (conversation.messageCount ?? 0) + 1,
+                messageCount: shouldIncrementMessageCount
+                    ? (conversation.messageCount ?? 0) + 1
+                    : conversation.messageCount,
             });
         }
 
@@ -568,6 +687,7 @@ export const completeAssistant = internalMutation({
     },
 });
 
+/** Requeue or degrade expired jobs so conversations never stay stuck active. */
 export const recoverStaleJobs = internalMutation({
     args: {},
     handler: async (ctx) => {

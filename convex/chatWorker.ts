@@ -25,6 +25,7 @@ const PROVIDER_TIMEOUT_MS = 80_000;
 
 let cachedOpenAI: OpenAI | null = null;
 
+/** Return a cached OpenAI client configured for worker-side generation. */
 function getOpenAIClient() {
     if (!cachedOpenAI) {
         const apiKey = process.env.OPENAI_API_KEY;
@@ -34,10 +35,12 @@ function getOpenAIClient() {
     return cachedOpenAI;
 }
 
+/** Return false for model families that reject caller-supplied temperature. */
 function supportsTemperature(model: string): boolean {
-    return !model.startsWith('gpt-5');
+    return !['gpt-5', 'o1', 'o3', 'o4'].some((prefix) => model.startsWith(prefix));
 }
 
+/** Build the empty artifact envelope used for degraded responses. */
 function emptyArtifacts(): NexxAssistantResponse['artifacts'] {
     return {
         draftReady: null,
@@ -49,10 +52,12 @@ function emptyArtifacts(): NexxAssistantResponse['artifacts'] {
     };
 }
 
+/** Build a structured fallback response when provider generation fails. */
 function degradedResponse(message = DEGRADED_MESSAGE): NexxAssistantResponse {
     return { message, artifacts: emptyArtifacts() };
 }
 
+/** Normalize provider exceptions into retryable worker error metadata. */
 function normalizeProviderError(error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     const lower = message.toLowerCase();
@@ -73,6 +78,7 @@ function normalizeProviderError(error: unknown) {
     return { code: 'unknown', message, retryable: true };
 }
 
+/** Convert serialized browser context into the prompt packet format. */
 function buildUserContext(rawJson?: string): ContextPacket {
     if (!rawJson) return {};
 
@@ -125,6 +131,7 @@ type GenerationContext = {
     }>;
 };
 
+/** Build hosted tools for a route, including file search when a vector store exists. */
 function buildHostedTools(routerResult: ReturnType<typeof classifyMessage>, vectorStoreId?: string) {
     const tools: Array<Record<string, unknown>> = [];
 
@@ -156,6 +163,7 @@ type StreamingResponsesClient = {
     ) => Promise<AsyncIterable<ResponseStreamEvent>>;
 };
 
+/** Compose all system, developer, context, and recent-message inputs. */
 function buildInput(context: GenerationContext, routeMode: RouteMode, contextPrompt: string) {
     const systemPrompt = buildSystemPolicyPrompt();
     const developerPrompt = buildDeveloperBehaviorPrompt(routeMode);
@@ -191,6 +199,7 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
     };
 }
 
+/** Generate one assistant response with tool/model fallbacks and draft persistence. */
 async function generateWithFallbacks({
     ctx,
     context,
@@ -331,6 +340,7 @@ async function generateWithFallbacks({
     };
 }
 
+/** Persist a streaming draft chunk through Convex mutations. */
 async function saveDraft(ctx: ActionCtx, jobId: Id<'chatGenerationJobs'>, leaseOwner: string, content: string) {
     await ctx.runMutation(internal.chatTurns.saveAssistantDraft, {
         jobId,
@@ -339,6 +349,7 @@ async function saveDraft(ctx: ActionCtx, jobId: Id<'chatGenerationJobs'>, leaseO
     });
 }
 
+/** Lease and process one chat generation job from the Convex queue. */
 export const processChatGenerationJob = internalAction({
     args: { jobId: v.id('chatGenerationJobs') },
     handler: async (ctx, args) => {

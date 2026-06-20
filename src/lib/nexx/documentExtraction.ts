@@ -6,6 +6,7 @@ const MIN_MEANINGFUL_TEXT_CHARS = 80;
 const OCR_PAGE_LIMIT = 8;
 const OCR_IMAGE_WIDTH = 1400;
 
+/** Structured extraction result used by upload and document-analysis routes. */
 export type DocumentExtractionResult = {
   text?: string;
   error?: string;
@@ -15,22 +16,27 @@ export type DocumentExtractionResult = {
   pagesTotal?: number;
 };
 
+/** Normalize provider/parser text into a stable plain-text payload. */
 function normalizeText(text: string) {
   return text.replace(/\u0000/g, '').replace(/\r\n/g, '\n').trim();
 }
 
+/** Return true when a file should be treated as a PDF, even with missing MIME. */
 function isPdf(file: File) {
   return file.type === PDF_MIME || file.name.toLowerCase().endsWith('.pdf');
 }
 
+/** Return true when a file should be treated as DOCX, even with missing MIME. */
 function isDocx(file: File) {
   return file.type === DOCX_MIME || file.name.toLowerCase().endsWith('.docx');
 }
 
+/** Return true when a file should be handled as plain text. */
 function isText(file: File) {
   return file.type === TXT_MIME || file.name.toLowerCase().endsWith('.txt');
 }
 
+/** Render scanned PDF pages and OCR them with OpenAI vision. */
 async function extractPdfTextFromImages(buffer: Buffer): Promise<DocumentExtractionResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {

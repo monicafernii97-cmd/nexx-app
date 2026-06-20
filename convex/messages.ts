@@ -242,6 +242,9 @@ export const list = query({
             .order('desc')
             .take(200);
 
+        // Bound the DB read first, then filter soft-deleted and legacy client
+        // failure rows in memory. This keeps the query predictable while hiding
+        // stale transport-error artifacts from the chat transcript.
         return rows
             .filter((msg) => msg.status !== 'deleted' && !isLegacyClientFailureMessage(msg))
             .sort((a, b) => {

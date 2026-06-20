@@ -4,11 +4,13 @@ import { getAuthenticatedUser } from './lib/auth';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
+/** Return the UTC midnight timestamp that anchors a daily rate-limit window. */
 function utcDayStartMs(now: number) {
     const date = new Date(now);
     return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
+/** Consume one unit from the authenticated user's named rate-limit window. */
 export const consume = mutation({
     args: {
         key: v.string(),
@@ -37,16 +39,26 @@ export const consume = mutation({
 
         if (!existing || existing.windowStartMs !== windowStartMs || existing.windowMs !== windowMs) {
             const count = 1;
-            await ctx.db.insert('chatRateLimitWindows', {
-                userId: user._id,
-                key: args.key,
-                windowStartMs,
-                windowMs,
-                count,
-                limit: args.limit,
-                createdAt: now,
-                updatedAt: now,
-            });
+            if (existing) {
+                await ctx.db.patch(existing._id, {
+                    windowStartMs,
+                    windowMs,
+                    count,
+                    limit: args.limit,
+                    updatedAt: now,
+                });
+            } else {
+                await ctx.db.insert('chatRateLimitWindows', {
+                    userId: user._id,
+                    key: args.key,
+                    windowStartMs,
+                    windowMs,
+                    count,
+                    limit: args.limit,
+                    createdAt: now,
+                    updatedAt: now,
+                });
+            }
 
             return { allowed: true, current: count, limit: args.limit, resetInMs };
         }

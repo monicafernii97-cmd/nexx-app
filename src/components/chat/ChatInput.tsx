@@ -10,7 +10,7 @@ type SpeechRecognitionCtor = new () => SpeechRecognition;
 export type ComposerMode = 'general' | 'strategy' | 'judge_lens' | 'drafting' | 'timeline' | 'procedure';
 
 interface ChatInputProps {
-    onSend: (message: string, file?: File, mode?: ComposerMode) => void;
+    onSend: (message: string, file?: File, mode?: ComposerMode) => void | Promise<void>;
     disabled?: boolean;
     placeholder?: string;
     onQuickAction?: (action: string) => void;
@@ -111,20 +111,29 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
         setIsListening(false);
     }, []);
 
-    const handleSend = useCallback(() => {
+    const getSendErrorMessage = useCallback((error: unknown) => (
+        error instanceof Error ? error.message : 'Upload or send failed. Please try again.'
+    ), []);
+
+    const handleSend = useCallback(async () => {
         const text = inputRef.current.trim();
         if (!text && !selectedFile) return;
         if (disabled) return;
         // Stop mic before sending to prevent onresult from repopulating the field
         stopRecognition();
         const fallbackMessage = buildFileFallbackMessage(selectedFileIntent, selectedFile?.name);
-        onSend(text || (selectedFile ? fallbackMessage : ''), selectedFile ?? undefined);
-        updateInput('');
-        setSelectedFile(null);
-        setSelectedFileIntent('attachment');
-        prefixRef.current = '';
-        dictatedRef.current = '';
-    }, [disabled, selectedFile, selectedFileIntent, onSend, stopRecognition, updateInput]);
+        try {
+            await onSend(text || (selectedFile ? fallbackMessage : ''), selectedFile ?? undefined);
+            updateInput('');
+            setSelectedFile(null);
+            setSelectedFileIntent('attachment');
+            prefixRef.current = '';
+            dictatedRef.current = '';
+            setMicError(null);
+        } catch (error) {
+            setMicError(getSendErrorMessage(error));
+        }
+    }, [disabled, selectedFile, selectedFileIntent, onSend, stopRecognition, updateInput, getSendErrorMessage]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         // Don't send during IME composition (Japanese/Chinese/Korean input)
@@ -232,7 +241,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
         fileInputRef.current?.click();
     }, []);
 
-    const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         const autoSendIntent = autoSendFileIntentRef.current;
@@ -266,19 +275,26 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
 
         if (autoSendIntent && !disabled) {
             stopRecognition();
-            onSend(buildFileFallbackMessage(autoSendIntent, file.name), file);
-            updateInput('');
-            setSelectedFile(null);
-            setSelectedFileIntent('attachment');
-            setMicError(null);
-            resetInput();
+            try {
+                await onSend(buildFileFallbackMessage(autoSendIntent, file.name), file);
+                updateInput('');
+                setSelectedFile(null);
+                setSelectedFileIntent('attachment');
+                setMicError(null);
+            } catch (error) {
+                setSelectedFile(file);
+                setSelectedFileIntent(autoSendIntent);
+                setMicError(getSendErrorMessage(error));
+            } finally {
+                resetInput();
+            }
             return;
         }
 
         setSelectedFile(file);
         setMicError(null);
         resetInput();
-    }, [disabled, onSend, stopRecognition, updateInput]);
+    }, [disabled, onSend, stopRecognition, updateInput, getSendErrorMessage]);
 
     const removeFile = useCallback(() => {
         setSelectedFile(null);

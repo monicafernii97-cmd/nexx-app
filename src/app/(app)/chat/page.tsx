@@ -21,6 +21,7 @@ import ChatInput from '@/components/chat/ChatInput';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import { useWorkspace } from '@/lib/workspace-context';
 import { consumeCourtHandoff, buildHandoffPrompt, HANDOFF_FALLBACK_MESSAGE } from '@/lib/exports/courtHandoff';
+import { buildUploadedFileMessage, uploadFileForConversation } from '@/lib/chat/uploadClient';
 
 type ConversationDoc = Doc<'conversations'>;
 
@@ -93,19 +94,39 @@ function ChatListContent() {
     const archivedConversations = isLoadingConversations ? [] : conversations.filter((c) => c.status === 'archived');
     const totalConversations = activeConversations.length + archivedConversations.length;
 
-    const handleSendNewChat = async (message: string) => {
-        if (!activeCaseId || isCreating) return;
+    const handleSendNewChat = async (message: string, file?: File) => {
+        if (!activeCaseId) {
+            throw new Error('Workspace is still loading. Please try again in a moment.');
+        }
+        if (isCreating) {
+            throw new Error('A new chat is already opening. Please wait a moment.');
+        }
         setIsCreating(true);
+        let createdConversationId: Id<'conversations'> | null = null;
         try {
             const id = await createConversation({
                 title: buildConversationTitle(message),
                 mode: 'general',
                 caseId: activeCaseId,
             });
-            sessionStorage.setItem(`nexx_initial_msg_${String(id)}`, message);
+            createdConversationId = id;
+            let initialMessage = message;
+            if (file) {
+                const upload = await uploadFileForConversation(file, id);
+                initialMessage = buildUploadedFileMessage(message, file, upload);
+            }
+            sessionStorage.setItem(`nexx_initial_msg_${String(id)}`, initialMessage);
             router.push(`/chat/${id}`);
         } catch (error) {
             console.error('Failed to start conversation:', error);
+            if (createdConversationId) {
+                try {
+                    await removeConversation({ id: createdConversationId });
+                } catch (cleanupError) {
+                    console.warn('[ChatList] Failed to remove empty conversation after upload failure:', cleanupError);
+                }
+            }
+            throw error;
         } finally {
             setIsCreating(false);
         }

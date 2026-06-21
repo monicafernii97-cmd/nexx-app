@@ -48,6 +48,21 @@ export async function extractFileForConversationFallback(file: File): Promise<Ch
     return data;
 }
 
+/** Return fallback extraction data, preserving the original upload transport error if fallback also fails. */
+async function extractFallbackAfterUploadFailure(file: File, uploadError: unknown): Promise<ChatUploadResponse> {
+    try {
+        const fallbackData = await extractFileForConversationFallback(file);
+        assertReadableExtractedText(fallbackData);
+        return fallbackData;
+    } catch (fallbackError) {
+        const uploadMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
+        const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+        throw new Error(
+            `NEXX could not reach the upload service or fallback extractor. Upload error: ${uploadMessage}. Fallback error: ${fallbackMessage}.`
+        );
+    }
+}
+
 /** Upload, extract, index, and validate a chat attachment before creating the AI turn. */
 export async function uploadFileForConversation(
     file: File,
@@ -64,8 +79,7 @@ export async function uploadFileForConversation(
             body: formData,
         });
     } catch (uploadError) {
-        const fallbackData = await extractFileForConversationFallback(file);
-        assertReadableExtractedText(fallbackData);
+        const fallbackData = await extractFallbackAfterUploadFailure(file, uploadError);
         return {
             ...fallbackData,
             partial: true,
@@ -76,8 +90,7 @@ export async function uploadFileForConversation(
 
     if (!response.ok || !data.ok) {
         if (response.status >= 500) {
-            const fallbackData = await extractFileForConversationFallback(file);
-            assertReadableExtractedText(fallbackData);
+            const fallbackData = await extractFallbackAfterUploadFailure(file, data.error || `Upload failed with status ${response.status}`);
             return {
                 ...fallbackData,
                 partial: true,

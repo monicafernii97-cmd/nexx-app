@@ -56,6 +56,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const autoSendFileIntentRef = useRef<'court_order' | null>(null);
+    const sendInFlightRef = useRef(false);
     // Single source of truth for the current input value, readable from callbacks
     const inputRef = useRef('');
     // Text that existed before the current dictation session started
@@ -115,10 +116,16 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
         error instanceof Error ? error.message : 'Upload or send failed. Please try again.'
     ), []);
 
+    const focusComposer = useCallback(() => {
+        window.requestAnimationFrame(() => textareaRef.current?.focus());
+    }, []);
+
     const handleSend = useCallback(async () => {
         const text = inputRef.current.trim();
         if (!text && !selectedFile) return;
         if (disabled) return;
+        if (sendInFlightRef.current) return;
+        sendInFlightRef.current = true;
         // Stop mic before sending to prevent onresult from repopulating the field
         stopRecognition();
         const fallbackMessage = buildFileFallbackMessage(selectedFileIntent, selectedFile?.name);
@@ -132,8 +139,11 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             setMicError(null);
         } catch (error) {
             setMicError(getSendErrorMessage(error));
+            if (selectedFile) focusComposer();
+        } finally {
+            sendInFlightRef.current = false;
         }
-    }, [disabled, selectedFile, selectedFileIntent, onSend, stopRecognition, updateInput, getSendErrorMessage]);
+    }, [disabled, selectedFile, selectedFileIntent, onSend, stopRecognition, updateInput, getSendErrorMessage, focusComposer]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         // Don't send during IME composition (Japanese/Chinese/Korean input)
@@ -274,6 +284,11 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
         }
 
         if (autoSendIntent && !disabled) {
+            if (sendInFlightRef.current) {
+                resetInput();
+                return;
+            }
+            sendInFlightRef.current = true;
             stopRecognition();
             try {
                 await onSend(buildFileFallbackMessage(autoSendIntent, file.name), file);
@@ -285,7 +300,9 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                 setSelectedFile(file);
                 setSelectedFileIntent(autoSendIntent);
                 setMicError(getSendErrorMessage(error));
+                focusComposer();
             } finally {
+                sendInFlightRef.current = false;
                 resetInput();
             }
             return;
@@ -294,7 +311,8 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
         setSelectedFile(file);
         setMicError(null);
         resetInput();
-    }, [disabled, onSend, stopRecognition, updateInput, getSendErrorMessage]);
+        focusComposer();
+    }, [disabled, onSend, stopRecognition, updateInput, getSendErrorMessage, focusComposer]);
 
     const removeFile = useCallback(() => {
         setSelectedFile(null);

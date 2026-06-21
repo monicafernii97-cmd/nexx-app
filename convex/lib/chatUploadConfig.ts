@@ -41,8 +41,8 @@ export function validateChatUploadMetadata(args: {
   if (!filename) return { ok: false as const, error: 'File name is required.', extension };
   if (filename.length > 240) return { ok: false as const, error: 'File name is too long.', extension };
   if (args.byteSize <= 0) return { ok: false as const, error: 'File is empty.', extension };
-  if (!allowedMime && !allowedExtension) {
-    return { ok: false as const, error: 'Unsupported file type. Upload PDF, DOC, DOCX, or TXT.', extension };
+  if (!allowedMime || !allowedExtension) {
+    return { ok: false as const, error: 'Unsupported file type. Upload PDF, DOCX, or TXT.', extension };
   }
   if (args.byteSize > CHAT_UPLOAD_CONFIG.maxBytes) {
     return { ok: false as const, error: 'File too large. Maximum size is 25MB.', extension };

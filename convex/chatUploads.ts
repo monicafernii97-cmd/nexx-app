@@ -121,7 +121,14 @@ export const startUploadSession = mutation({
       .first();
 
     if (existing) {
-      if (existing.filename !== args.filename || existing.byteSize !== args.byteSize) {
+      if (
+        existing.filename !== args.filename ||
+        existing.byteSize !== args.byteSize ||
+        existing.conversationId !== args.conversationId ||
+        existing.caseId !== caseId ||
+        existing.intent !== args.intent ||
+        existing.mimeType !== (args.mimeType || 'application/octet-stream')
+      ) {
         throw new Error('Upload session key already belongs to a different file.');
       }
 
@@ -168,7 +175,6 @@ export const startUploadSession = mutation({
     console.info('[ChatUpload] session started', {
       uploadSessionId,
       conversationId: args.conversationId,
-      filename: args.filename,
       mimeType: args.mimeType,
       byteSize: args.byteSize,
       intent: args.intent,
@@ -226,7 +232,7 @@ export const attachStorageAndScheduleProcessing = mutation({
       status: nextStatus as Doc<'chatUploadSessions'>['status'],
       errorCode: undefined,
       errorMessage: undefined,
-      retryable: true,
+      retryable: !terminalSuccessStatuses.has(session.status),
       updatedAt: now,
     });
 
@@ -497,6 +503,7 @@ export const failProcessing = internalMutation({
 export const upsertProcessedUploadedFile = internalMutation({
   args: {
     uploadSessionId: v.id('chatUploadSessions'),
+    lockId: v.string(),
     status: v.union(v.literal('ready'), v.literal('partial')),
     fullTextStorageId: v.optional(v.id('_storage')),
     fullTextSha256: v.optional(v.string()),
@@ -517,6 +524,7 @@ export const upsertProcessedUploadedFile = internalMutation({
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.uploadSessionId);
     if (!session || !session.storageId) throw new Error('Upload session missing storage');
+    if (session.processingLockId !== args.lockId) throw new Error('Upload processing lock is no longer valid');
     const now = Date.now();
 
     if (session.uploadedFileId) {
@@ -593,6 +601,9 @@ export const validateAttachmentsForChat = query({
   handler: async (ctx, args) => {
     const clerkUserId = await getIdentityClerkId(ctx);
     await getAuthenticatedUserAndConversation(ctx, args.conversationId);
+    if (args.attachments.length > 5) {
+      throw new Error('Too many attachments for one chat turn.');
+    }
 
     const sanitized = [];
     for (const attachment of args.attachments) {

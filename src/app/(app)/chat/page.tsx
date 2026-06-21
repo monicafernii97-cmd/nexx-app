@@ -54,6 +54,7 @@ function ChatListContent() {
     const [deletingId, setDeletingId] = useState<Id<'conversations'> | null>(null);
     const handoffProcessedRef = useRef(false);
     const creatingRef = useRef(false);
+    const draftConversationIdRef = useRef<Id<'conversations'> | null>(null);
     const isHistoryOpen = searchParams.get('history') === '1';
 
     const setHistoryOpen = useCallback((open: boolean) => {
@@ -116,11 +117,12 @@ function ChatListContent() {
         setIsCreating(true);
         let createdConversationId: Id<'conversations'> | null = null;
         try {
-            const id = await createDraftConversation({
-                title: buildConversationTitle(message),
-                mode: 'general',
-                caseId: activeCaseId,
-            });
+            const id = draftConversationIdRef.current ?? await createDraftConversation({
+                    title: buildConversationTitle(message),
+                    mode: 'general',
+                    caseId: activeCaseId,
+                });
+            draftConversationIdRef.current = id;
             createdConversationId = id;
 
             let attachments: ChatAttachmentRef[] | undefined;
@@ -137,6 +139,7 @@ function ChatListContent() {
                     existingSession: fileState,
                     onProgress: uploadCallbacks?.onProgress,
                     onStatus: uploadCallbacks?.onStatus,
+                    onStorageReady: uploadCallbacks?.onStorageReady,
                 });
                 uploadCallbacks?.onComplete(upload);
                 attachments = [upload.attachmentRef];
@@ -167,6 +170,7 @@ function ChatListContent() {
             }
 
             await activateDraftConversation({ id });
+            draftConversationIdRef.current = null;
             router.push(`/chat/${id}`);
         } catch (error) {
             console.error('Failed to start conversation:', error);

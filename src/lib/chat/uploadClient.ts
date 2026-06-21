@@ -91,6 +91,7 @@ export type UploadFileForConversationArgs = {
   existingSession?: ChatComposerFileState | null;
   onProgress?: (progress: number) => void;
   onStatus?: (status: ChatComposerFileStatus) => void;
+  onStorageReady?: (ids: { uploadSessionId: string; storageId: string }) => void;
 };
 
 function normalizeStatus(status: string): ChatComposerFileStatus {
@@ -199,6 +200,7 @@ function uploadDirectlyToConvexStorage(args: {
 }): Promise<string> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    xhr.timeout = 120_000;
     xhr.open('POST', args.uploadUrl);
     xhr.setRequestHeader('Content-Type', args.file.type || 'application/octet-stream');
     xhr.upload.onprogress = (event) => {
@@ -300,6 +302,7 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
         file: args.file,
         onProgress: args.onProgress,
       });
+      args.onStorageReady?.({ uploadSessionId, storageId });
       args.onProgress?.(100);
     } catch (error) {
       args.onStatus?.('failed_storage_upload');

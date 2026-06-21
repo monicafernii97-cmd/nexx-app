@@ -37,9 +37,10 @@ function buildChatContextText(extractedText: string) {
     };
   }
 
-  const headLength = Math.floor(limit * 0.7);
-  const tailLength = Math.floor(limit * 0.3);
   const separator = '\n\n[...middle of document omitted for chat context limit...]\n\n';
+  const availableTextLength = Math.max(0, limit - separator.length);
+  const headLength = Math.floor(availableTextLength * 0.7);
+  const tailLength = availableTextLength - headLength;
   const chatContextText = [
     extractedText.slice(0, headLength).trim(),
     separator,
@@ -69,10 +70,12 @@ async function ensureVectorStore(ctx: ActionCtx, context: ProcessingContext): Pr
 
   if (result.wasSet) return externalStoreId;
 
-  try {
-    await deleteVectorStore(externalStoreId);
-  } catch {
-    // deleteVectorStore already treats cleanup as non-fatal.
+  if (result.vectorStoreId !== externalStoreId) {
+    try {
+      await deleteVectorStore(externalStoreId);
+    } catch {
+      // deleteVectorStore already treats cleanup as non-fatal.
+    }
   }
   return result.vectorStoreId;
 }
@@ -189,6 +192,7 @@ export const processStoredUpload = internalAction({
 
       const uploadedFileId = await ctx.runMutation(internal.chatUploads.upsertProcessedUploadedFile, {
         uploadSessionId: args.uploadSessionId,
+        lockId,
         status: indexingError ? 'partial' : 'ready',
         fullTextStorageId,
         fullTextSha256,

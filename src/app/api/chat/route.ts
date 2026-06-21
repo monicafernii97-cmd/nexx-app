@@ -147,7 +147,21 @@ export async function POST(req: NextRequest) {
       }) as ChatAttachmentRef[];
     } catch (error) {
       console.warn('[Chat] Attachment validation failed:', error);
-      return Response.json({ error: 'One or more attachments are not ready for chat.' }, { status: 400 });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isClientAttachmentError =
+        errorMessage.includes('Attachment') ||
+        errorMessage.includes('attachments') ||
+        errorMessage.includes('not ready') ||
+        errorMessage.includes('does not belong') ||
+        errorMessage.includes('Too many');
+      return Response.json(
+        {
+          error: isClientAttachmentError
+            ? 'One or more attachments are not ready for chat.'
+            : 'Unable to validate chat attachments. Please try again.',
+        },
+        { status: isClientAttachmentError ? 400 : 500 },
+      );
     }
   }
 

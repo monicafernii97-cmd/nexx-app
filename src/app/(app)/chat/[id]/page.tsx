@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
-import { Id } from '@convex/_generated/dataModel';
+import type { Id } from '@convex/_generated/dataModel';
 import { useParams, useRouter } from 'next/navigation';
 import { Archive, ClockCounterClockwise, Lock, Sun, Moon } from '@phosphor-icons/react';
 import MessageBubble, { type ChatTheme } from '@/components/chat/MessageBubble';
@@ -205,6 +205,7 @@ export default function ConversationPage() {
                         existingSession: fileState,
                         onProgress: uploadCallbacks?.onProgress,
                         onStatus: uploadCallbacks?.onStatus,
+                        onStorageReady: uploadCallbacks?.onStorageReady,
                     });
                     uploadCallbacks?.onComplete(upload);
                     attachments = [upload.attachmentRef];

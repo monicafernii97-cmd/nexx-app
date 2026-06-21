@@ -28,6 +28,7 @@ export type ComposerMode = 'general' | 'strategy' | 'judge_lens' | 'drafting' | 
 export type ChatInputUploadCallbacks = {
     onProgress: (progress: number) => void;
     onStatus: (status: ChatComposerFileStatus) => void;
+    onStorageReady: (ids: { uploadSessionId: string; storageId: string }) => void;
     onComplete: (upload: ChatUploadResponse) => void;
 };
 
@@ -69,7 +70,11 @@ function toUploadIntent(intent: FilePromptIntent): ChatUploadIntent {
 }
 
 function isBusyStatus(status: ChatComposerFileStatus) {
-    return status === 'uploading_to_storage' || status === 'processing_queued' || status === 'processing';
+    return status === 'session_created' || status === 'uploading_to_storage' || status === 'stored' || status === 'processing_queued' || status === 'processing';
+}
+
+function isNonRetryableFailure(status: ChatComposerFileStatus) {
+    return status === 'failed_empty_extraction';
 }
 
 function fileStatusLabel(state: ChatComposerFileState) {
@@ -123,6 +128,10 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     const makeUploadCallbacks = useCallback((): ChatInputUploadCallbacks => ({
         onProgress: (progress) => updateSelectedFileState({ progress }),
         onStatus: (status) => updateSelectedFileState({ status }),
+        onStorageReady: ({ uploadSessionId, storageId }) => updateSelectedFileState({
+            uploadSessionId,
+            storageId,
+        }),
         onComplete: (upload) => updateSelectedFileState({
             status: upload.status,
             progress: 100,
@@ -210,9 +219,15 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             if (selectedFileState) {
                 setSelectedFileState((current) => current ? {
                     ...current,
-                    status: current.attachmentRef ? current.status : current.storageId ? 'failed_processing' : 'failed_storage_upload',
+                    status: isNonRetryableFailure(current.status)
+                        ? current.status
+                        : current.attachmentRef
+                            ? current.status
+                            : current.storageId
+                                ? 'failed_processing'
+                                : 'failed_storage_upload',
                     error: message,
-                    retryable: true,
+                    retryable: isNonRetryableFailure(current.status) ? current.retryable : true,
                 } : current);
                 focusComposer();
             }
@@ -357,9 +372,15 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                 const message = getSendErrorMessage(error);
                 setSelectedFileState((current) => current ? {
                     ...current,
-                    status: current.attachmentRef ? current.status : current.storageId ? 'failed_processing' : 'failed_storage_upload',
+                    status: isNonRetryableFailure(current.status)
+                        ? current.status
+                        : current.attachmentRef
+                            ? current.status
+                            : current.storageId
+                                ? 'failed_processing'
+                                : 'failed_storage_upload',
                     error: message,
-                    retryable: true,
+                    retryable: isNonRetryableFailure(current.status) ? current.retryable : true,
                 } : {
                     ...nextFileState,
                     status: 'failed_storage_upload',
@@ -405,7 +426,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             setSelectedFileIntent('court_order');
             autoSendFileIntentRef.current = 'court_order';
             if (fileInputRef.current) {
-                fileInputRef.current.accept = '.pdf,.doc,.docx,.txt';
+                fileInputRef.current.accept = '.pdf,.docx,.txt';
                 fileInputRef.current.click();
             }
             return;
@@ -466,7 +487,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                         autoSendFileIntentRef.current = null;
                         setSelectedFileIntent('thread');
                         if (fileInputRef.current) {
-                            fileInputRef.current.accept = '.pdf,.doc,.docx,.txt';
+                            fileInputRef.current.accept = '.pdf,.docx,.txt';
                             fileInputRef.current.click();
                         }
                     }}
@@ -482,7 +503,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                         autoSendFileIntentRef.current = null;
                         setSelectedFileIntent('court_order');
                         if (fileInputRef.current) {
-                            fileInputRef.current.accept = '.pdf,.doc,.docx,.txt';
+                            fileInputRef.current.accept = '.pdf,.docx,.txt';
                             fileInputRef.current.click();
                         }
                     }}
@@ -506,7 +527,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                     <button
                         type="button"
                         onClick={removeFile}
-                        disabled={isFileBusy}
+                        disabled={isFileBusy || disabled}
                         className="ml-auto w-5 h-5 rounded-full bg-blue-100 hover:bg-blue-200 flex items-center justify-center transition-colors disabled:opacity-40"
                         aria-label="Remove attached file"
                     >
@@ -519,7 +540,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                accept=".pdf,.doc,.docx,.txt"
+                accept=".pdf,.docx,.txt"
                 onChange={handleFileChange}
             />
 

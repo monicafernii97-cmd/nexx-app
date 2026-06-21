@@ -84,6 +84,7 @@ function makeConvexClient(readyStatus: 'ready' | 'partial' = 'ready') {
 describe('uploadClient direct storage flow', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('uploads directly to Convex storage and returns an attachment ref', async () => {

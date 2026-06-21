@@ -39,7 +39,7 @@ export function getChatUploadExtension(filename: string) {
 export function isAllowedChatUploadType(file: Pick<File, 'name' | 'type'>) {
   const extension = getChatUploadExtension(file.name);
   return (
-    CHAT_UPLOAD_CONFIG.allowedMimeTypes.includes(file.type as (typeof CHAT_UPLOAD_CONFIG.allowedMimeTypes)[number]) ||
+    CHAT_UPLOAD_CONFIG.allowedMimeTypes.includes(file.type as (typeof CHAT_UPLOAD_CONFIG.allowedMimeTypes)[number]) &&
     CHAT_UPLOAD_CONFIG.allowedExtensions.includes(extension as (typeof CHAT_UPLOAD_CONFIG.allowedExtensions)[number])
   );
 }
@@ -48,7 +48,7 @@ export function validateChatUploadFile(file: Pick<File, 'name' | 'type' | 'size'
   if (!file.name.trim()) return 'File name is required.';
   if (file.name.length > 240) return 'File name is too long.';
   if (file.size <= 0) return 'File is empty.';
-  if (!isAllowedChatUploadType(file)) return 'Unsupported file type. Upload PDF, DOC, DOCX, or TXT.';
+  if (!isAllowedChatUploadType(file)) return 'Unsupported file type. Upload PDF, DOCX, or TXT.';
   if (file.size > CHAT_UPLOAD_CONFIG.maxBytes) return 'File too large. Maximum size is 25MB.';
   return null;
 }

@@ -255,7 +255,12 @@ export const acceptChatTurn = mutation({
                 throw new Error('Attachment is not ready or does not belong to this conversation.');
             }
             validatedAttachments.push({
-                ...attachment,
+                uploadedFileId: uploadedFile._id,
+                uploadSessionId: uploadedFile.uploadSessionId,
+                storageId: uploadedFile.storageId,
+                filename: uploadedFile.filename,
+                mimeType: uploadedFile.mimeType,
+                byteSize: uploadedFile.byteSize ?? attachment.byteSize,
                 status: uploadedFile.status as 'ready' | 'partial',
             });
         }

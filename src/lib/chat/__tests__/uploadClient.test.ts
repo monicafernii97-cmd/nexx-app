@@ -1,124 +1,203 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  buildUploadedFileMessage,
-  uploadFileForConversation,
-  type ChatUploadResponse,
-} from '../uploadClient';
+import { uploadFileForConversation, type ChatComposerFileState } from '../uploadClient';
 
-function makeFile() {
-  return new File(['dummy'], 'order.pdf', { type: 'application/pdf' });
+function makeFile(name = 'order.pdf', size = 5) {
+  return new File(['x'.repeat(size)], name, { type: 'application/pdf' });
 }
 
-function jsonResponse(body: unknown, init?: ResponseInit) {
-  return new Response(JSON.stringify(body), {
-    status: init?.status ?? 200,
-    headers: { 'content-type': 'application/json' },
-    ...init,
+function installSuccessfulXhr(storageId = 'storage-1') {
+  const instances: Array<{ url?: string; requestBody?: unknown }> = [];
+
+  class MockXMLHttpRequest {
+    status = 200;
+    responseText = JSON.stringify({ storageId });
+    upload = {} as XMLHttpRequestUpload;
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    onabort: (() => void) | null = null;
+    ontimeout: (() => void) | null = null;
+    url?: string;
+    requestBody?: unknown;
+
+    constructor() {
+      instances.push(this);
+    }
+
+    open(_method: string, url: string) {
+      this.url = url;
+    }
+
+    setRequestHeader() {}
+
+    send(body: unknown) {
+      this.requestBody = body;
+      queueMicrotask(() => this.onload?.());
+    }
+  }
+
+  vi.stubGlobal('XMLHttpRequest', MockXMLHttpRequest);
+  return instances;
+}
+
+function makeConvexClient(readyStatus: 'ready' | 'partial' = 'ready') {
+  const mutation = vi.fn(async (_ref: unknown, args: Record<string, unknown>) => {
+    if ('filename' in args) {
+      return {
+        uploadSessionId: 'session-1',
+        uploadUrl: 'https://convex-upload.test/file',
+        uploadUrlExpiresAt: Date.now() + 60_000,
+        status: 'awaiting_storage_upload',
+        filename: args.filename,
+        mimeType: args.mimeType,
+        byteSize: args.byteSize,
+        retryable: true,
+        processingAttempt: 0,
+      };
+    }
+
+    return {
+      uploadSessionId: args.uploadSessionId,
+      status: 'processing_queued',
+    };
   });
+
+  const query = vi.fn(async () => ({
+    uploadSessionId: 'session-1',
+    uploadedFileId: 'uploaded-1',
+    storageId: 'storage-1',
+    status: readyStatus,
+    filename: 'order.pdf',
+    mimeType: 'application/pdf',
+    byteSize: 5,
+    processingAttempt: 1,
+    retryable: false,
+    extractionPreview: 'Readable court order text.',
+    extractionCharCount: 27,
+    chatContextCharCount: 27,
+    contextTruncated: false,
+    extractionMethod: 'text',
+  })) as ReturnType<typeof vi.fn>;
+
+  return { mutation, query };
 }
 
-describe('uploadClient', () => {
+describe('uploadClient direct storage flow', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
-  it('returns successful upload data only when readable extracted text exists', async () => {
-    const payload: ChatUploadResponse = {
+  it('uploads directly to Convex storage and returns an attachment ref', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const xhrInstances = installSuccessfulXhr();
+    const convex = makeConvexClient();
+    const onProgress = vi.fn();
+    const onStatus = vi.fn();
+
+    const upload = await uploadFileForConversation({
+      convex: convex as never,
+      file: makeFile(),
+      conversationId: 'conversation-1',
+      intent: 'court_order',
+      clientUploadKey: 'client-upload-1',
+      onProgress,
+      onStatus,
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(xhrInstances[0]?.url).toBe('https://convex-upload.test/file');
+    expect(xhrInstances[0]?.requestBody).toBeInstanceOf(File);
+    expect(convex.mutation).toHaveBeenCalledTimes(2);
+    expect(convex.query).toHaveBeenCalledTimes(1);
+    expect(upload).toMatchObject({
       ok: true,
-      fileId: 'file-1',
-      filename: 'order.pdf',
-      extractedText: 'Readable court order text.',
-      extractionMethod: 'text',
+      uploadSessionId: 'session-1',
+      uploadedFileId: 'uploaded-1',
+      storageId: 'storage-1',
+      status: 'ready',
+      attachmentRef: {
+        uploadedFileId: 'uploaded-1',
+        uploadSessionId: 'session-1',
+        storageId: 'storage-1',
+        filename: 'order.pdf',
+        status: 'ready',
+      },
+    });
+    expect(onProgress).toHaveBeenCalledWith(100);
+    expect(onStatus).toHaveBeenCalledWith('uploading_to_storage');
+  });
+
+  it('reuses stored files on processing retry instead of uploading again', async () => {
+    const xhrInstances = installSuccessfulXhr();
+    const convex = makeConvexClient('partial');
+    convex.query
+      .mockResolvedValueOnce({
+        uploadSessionId: 'session-1',
+        storageId: 'storage-1',
+        status: 'failed_processing',
+        filename: 'order.pdf',
+        mimeType: 'application/pdf',
+        byteSize: 5,
+        processingAttempt: 1,
+        retryable: true,
+      })
+      .mockResolvedValueOnce({
+        uploadSessionId: 'session-1',
+        uploadedFileId: 'uploaded-1',
+        storageId: 'storage-1',
+        status: 'partial',
+        filename: 'order.pdf',
+        mimeType: 'application/pdf',
+        byteSize: 5,
+        processingAttempt: 2,
+        retryable: false,
+      });
+    const existingSession: ChatComposerFileState = {
+      file: makeFile(),
+      intent: 'attachment',
+      clientUploadKey: 'client-upload-1',
+      uploadSessionId: 'session-1',
+      storageId: 'storage-1',
+      status: 'failed_processing',
+      retryable: true,
     };
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(payload));
-    vi.stubGlobal('fetch', fetchMock);
 
-    await expect(uploadFileForConversation(makeFile(), 'conversation-1')).resolves.toMatchObject(payload);
-    expect(fetchMock).toHaveBeenCalledWith('/api/upload', expect.objectContaining({ method: 'POST' }));
+    const upload = await uploadFileForConversation({
+      convex: convex as never,
+      file: makeFile(),
+      conversationId: 'conversation-1',
+      intent: 'attachment',
+      clientUploadKey: 'client-upload-1',
+      existingSession,
+    });
+
+    expect(xhrInstances).toHaveLength(0);
+    expect(convex.mutation).toHaveBeenCalledTimes(1);
+    expect(upload.status).toBe('partial');
+    expect(upload.attachmentRef.status).toBe('partial');
   });
 
-  it('rejects a primary upload response with empty extracted text', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
-      ok: true,
+  it('throws a clear error when processing finishes with empty extraction', async () => {
+    installSuccessfulXhr();
+    const convex = makeConvexClient();
+    convex.query.mockResolvedValueOnce({
+      uploadSessionId: 'session-1',
+      storageId: 'storage-1',
+      status: 'failed_empty_extraction',
       filename: 'order.pdf',
-      extractedText: '   ',
-    })));
-
-    await expect(uploadFileForConversation(makeFile(), 'conversation-1'))
-      .rejects.toThrow(/^The file uploaded, but NEXX could not read any text from it yet\.$/);
-  });
-
-  it('falls back after an upload transport failure and marks the result partial', async () => {
-    const fetchMock = vi.fn()
-      .mockRejectedValueOnce(new Error('Failed to fetch'))
-      .mockResolvedValueOnce(jsonResponse({
-        ok: true,
-        filename: 'order.pdf',
-        extractedText: 'Fallback extracted text.',
-        extractionMethod: 'ocr',
-      }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(uploadFileForConversation(makeFile(), 'conversation-1')).resolves.toMatchObject({
-      partial: true,
-      extractedText: 'Fallback extracted text.',
-      indexingError: 'Failed to fetch',
-    });
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      '/api/analyze-document?extractOnly=1',
-      expect.objectContaining({ method: 'POST' }),
-    );
-  });
-
-  it('falls back after a 500 response and preserves indexing context', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(jsonResponse({ ok: false, error: 'provider unavailable' }, { status: 500 }))
-      .mockResolvedValueOnce(jsonResponse({
-        ok: true,
-        filename: 'order.pdf',
-        extractedText: 'Fallback text after 500.',
-      }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(uploadFileForConversation(makeFile(), 'conversation-1')).resolves.toMatchObject({
-      partial: true,
-      extractedText: 'Fallback text after 500.',
-      indexingError: 'provider unavailable',
-    });
-  });
-
-  it('combines upload and fallback failures when both requests fail', async () => {
-    const fetchMock = vi.fn()
-      .mockRejectedValueOnce(new Error('Failed to fetch'))
-      .mockResolvedValueOnce(jsonResponse({ ok: false, error: 'Fallback unavailable' }, { status: 503 }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(uploadFileForConversation(makeFile(), 'conversation-1'))
-      .rejects.toThrow(
-        'NEXX could not reach the upload service or fallback extractor. Upload error: Failed to fetch. Fallback error: Fallback unavailable.',
-      );
-  });
-
-  it('builds a chat message with extracted text and non-conflicting indexing notes', () => {
-    const message = buildUploadedFileMessage('Analyze this order', makeFile(), {
-      fileId: 'file-1',
-      filename: 'order.pdf',
-      extractedText: 'Court order body',
-      extractionMethod: 'ocr',
-      pagesOcrProcessed: 1,
-      pagesTotal: 2,
-      indexingError: 'Vector store timed out',
-      extractionError: 'OCR confidence warning',
+      mimeType: 'application/pdf',
+      byteSize: 5,
+      errorMessage: 'NEXX could not read any text from this file.',
+      retryable: false,
     });
 
-    expect(message).toContain('Uploaded document: order.pdf');
-    expect(message).toContain('File ID: file-1');
-    expect(message).toContain('Extraction method: OCR (1 of 2 pages)');
-    expect(message).toContain('Extracted text preview:');
-    expect(message).toContain('Court order body');
-    expect(message).toContain('file search may not be available');
-    expect(message).toContain('Indexing note: file-search indexing did not finish');
-    expect(message).not.toContain('was still uploaded and indexed');
+    await expect(uploadFileForConversation({
+      convex: convex as never,
+      file: makeFile(),
+      conversationId: 'conversation-1',
+      intent: 'court_order',
+      clientUploadKey: 'client-upload-1',
+    })).rejects.toThrow('NEXX could not read any text from this file.');
   });
 });

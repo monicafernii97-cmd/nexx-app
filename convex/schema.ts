@@ -127,7 +127,12 @@ export default defineSchema({
             v.literal('strategic'),
             v.literal('general')
         ),
-        status: v.union(v.literal('active'), v.literal('archived')),
+        status: v.union(
+            v.literal('active'),
+            v.literal('archived'),
+            v.literal('draft_uploading'),
+            v.literal('failed_upload')
+        ),
         messageCount: v.optional(v.number()),
         lastMessageAt: v.number(),
         createdAt: v.number(),
@@ -244,6 +249,7 @@ export default defineSchema({
         temperature: v.optional(v.number()),
         providerResponseId: v.optional(v.string()),
         userContextJson: v.optional(v.string()),
+        attachmentRefsJson: v.optional(v.string()),
         errorCode: v.optional(v.string()),
         errorMessage: v.optional(v.string()),
         errorRetryable: v.optional(v.boolean()),
@@ -289,6 +295,69 @@ export default defineSchema({
         .index('by_request', ['conversationId', 'requestId'])
         .index('by_status', ['status'])
         .index('by_conversation_status', ['conversationId', 'status']),
+
+    chatUploadSessions: defineTable({
+        clerkUserId: v.string(),
+        caseId: v.optional(v.id('cases')),
+        conversationId: v.optional(v.id('conversations')),
+        clientUploadKey: v.string(),
+        intent: v.union(v.literal('attachment'), v.literal('court_order')),
+        filename: v.string(),
+        mimeType: v.string(),
+        extension: v.string(),
+        byteSize: v.number(),
+        storageId: v.optional(v.id('_storage')),
+        storageSha256: v.optional(v.string()),
+        storageContentType: v.optional(v.string()),
+        storageSize: v.optional(v.number()),
+        uploadedFileId: v.optional(v.id('uploadedFiles')),
+        status: v.union(
+            v.literal('awaiting_storage_upload'),
+            v.literal('uploading_to_storage'),
+            v.literal('stored'),
+            v.literal('processing_queued'),
+            v.literal('processing'),
+            v.literal('ready'),
+            v.literal('partial'),
+            v.literal('failed_storage_upload'),
+            v.literal('failed_processing'),
+            v.literal('failed_empty_extraction'),
+            v.literal('stalled'),
+            v.literal('cancelled')
+        ),
+        uploadUrlIssuedAt: v.number(),
+        uploadUrlExpiresAt: v.number(),
+        processingAttempt: v.number(),
+        processingLockId: v.optional(v.string()),
+        processingStartedAt: v.optional(v.number()),
+        processingFinishedAt: v.optional(v.number()),
+        errorCode: v.optional(v.string()),
+        errorMessage: v.optional(v.string()),
+        retryable: v.boolean(),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_user_created', ['clerkUserId', 'createdAt'])
+        .index('by_user_client_key', ['clerkUserId', 'clientUploadKey'])
+        .index('by_conversation', ['conversationId'])
+        .index('by_storage', ['storageId'])
+        .index('by_status_updated', ['status', 'updatedAt']),
+
+    messageAttachments: defineTable({
+        messageId: v.optional(v.id('messages')),
+        turnId: v.optional(v.id('chatTurns')),
+        conversationId: v.id('conversations'),
+        uploadedFileId: v.id('uploadedFiles'),
+        uploadSessionId: v.id('chatUploadSessions'),
+        filename: v.string(),
+        mimeType: v.string(),
+        byteSize: v.number(),
+        status: v.union(v.literal('ready'), v.literal('partial'), v.literal('failed')),
+        createdAt: v.number(),
+    })
+        .index('by_message', ['messageId'])
+        .index('by_turn', ['turnId'])
+        .index('by_conversation', ['conversationId']),
 
     chatRateLimitWindows: defineTable({
         userId: v.id('users'),
@@ -704,20 +773,46 @@ export default defineSchema({
     uploadedFiles: defineTable({
         clerkUserId: v.string(),
         conversationId: v.optional(v.id('conversations')),
+        caseId: v.optional(v.id('cases')),
+        uploadSessionId: v.optional(v.id('chatUploadSessions')),
         filename: v.string(),
         mimeType: v.string(),
+        extension: v.optional(v.string()),
+        byteSize: v.optional(v.number()),
+        storageId: v.optional(v.id('_storage')),
+        storageSha256: v.optional(v.string()),
+        extractionMethod: v.optional(v.union(
+            v.literal('text'),
+            v.literal('ocr'),
+            v.literal('mixed')
+        )),
+        extractionCharCount: v.optional(v.number()),
+        chatContextText: v.optional(v.string()),
+        chatContextCharCount: v.optional(v.number()),
+        contextTruncated: v.optional(v.boolean()),
+        fullTextStorageId: v.optional(v.id('_storage')),
+        fullTextSha256: v.optional(v.string()),
         openaiFileId: v.optional(v.string()),
         openaiTextFileId: v.optional(v.string()),
         vectorStoreId: v.optional(v.string()),
+        extractionError: v.optional(v.string()),
+        indexingError: v.optional(v.string()),
+        ocrAttempted: v.optional(v.boolean()),
+        pagesOcrProcessed: v.optional(v.number()),
+        pagesTotal: v.optional(v.number()),
         status: v.union(
             v.literal('uploaded'),
             v.literal('processing'),
             v.literal('ready'),
+            v.literal('partial'),
             v.literal('failed')
         ),
         createdAt: v.number(),
+        updatedAt: v.optional(v.number()),
     }).index('by_clerkUserId', ['clerkUserId'])
-      .index('by_conversationId', ['conversationId']),
+      .index('by_conversationId', ['conversationId'])
+      .index('by_upload_session', ['uploadSessionId'])
+      .index('by_storage', ['storageId']),
 
     // ═══ NEW: Retrieved Sources (legal sources retrieved per conversation) ═══
     retrievedSources: defineTable({

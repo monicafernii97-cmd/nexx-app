@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { useMutation, useQuery } from 'convex/react';
+import { useConvex, useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Doc, Id } from '@convex/_generated/dataModel';
 import type { MouseEvent } from 'react';
@@ -17,11 +17,12 @@ import {
     X,
 } from '@phosphor-icons/react';
 import { formatDistanceToNow } from 'date-fns';
-import ChatInput from '@/components/chat/ChatInput';
+import ChatInput, { type ChatInputUploadCallbacks } from '@/components/chat/ChatInput';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import { useWorkspace } from '@/lib/workspace-context';
 import { consumeCourtHandoff, buildHandoffPrompt, HANDOFF_FALLBACK_MESSAGE } from '@/lib/exports/courtHandoff';
-import { buildUploadedFileMessage, uploadFileForConversation } from '@/lib/chat/uploadClient';
+import type { ChatAttachmentRef } from '@/lib/chat/uploadConfig';
+import { type ChatComposerFileState, uploadFileForConversation } from '@/lib/chat/uploadClient';
 
 type ConversationDoc = Doc<'conversations'>;
 
@@ -39,16 +40,21 @@ function ChatListContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { activeCaseId } = useWorkspace();
+    const convex = useConvex();
     const conversations = useQuery(
         api.conversations.list,
         activeCaseId ? { caseId: activeCaseId } : 'skip'
     );
     const createConversation = useMutation(api.conversations.create);
+    const createDraftConversation = useMutation(api.conversations.createDraftForUpload);
+    const activateDraftConversation = useMutation(api.conversations.activateDraft);
+    const markDraftUploadFailed = useMutation(api.conversations.markUploadFailed);
     const removeConversation = useMutation(api.conversations.remove);
     const [isCreating, setIsCreating] = useState(false);
     const [deletingId, setDeletingId] = useState<Id<'conversations'> | null>(null);
     const handoffProcessedRef = useRef(false);
     const creatingRef = useRef(false);
+    const draftConversationIdRef = useRef<Id<'conversations'> | null>(null);
     const isHistoryOpen = searchParams.get('history') === '1';
 
     const setHistoryOpen = useCallback((open: boolean) => {
@@ -95,7 +101,12 @@ function ChatListContent() {
     const archivedConversations = isLoadingConversations ? [] : conversations.filter((c) => c.status === 'archived');
     const totalConversations = activeConversations.length + archivedConversations.length;
 
-    const handleSendNewChat = async (message: string, file?: File) => {
+    const handleSendNewChat = async (
+        message: string,
+        fileState?: ChatComposerFileState,
+        _mode?: unknown,
+        uploadCallbacks?: ChatInputUploadCallbacks,
+    ) => {
         if (!activeCaseId) {
             throw new Error('Workspace is still loading. Please try again in a moment.');
         }
@@ -106,26 +117,68 @@ function ChatListContent() {
         setIsCreating(true);
         let createdConversationId: Id<'conversations'> | null = null;
         try {
-            const id = await createConversation({
-                title: buildConversationTitle(message),
-                mode: 'general',
-                caseId: activeCaseId,
-            });
+            const id = draftConversationIdRef.current ?? await createDraftConversation({
+                    title: buildConversationTitle(message),
+                    mode: 'general',
+                    caseId: activeCaseId,
+                });
+            draftConversationIdRef.current = id;
             createdConversationId = id;
-            let initialMessage = message;
-            if (file) {
-                const upload = await uploadFileForConversation(file, id);
-                initialMessage = buildUploadedFileMessage(message, file, upload);
+
+            let attachments: ChatAttachmentRef[] | undefined;
+            if (fileState?.attachmentRef) {
+                attachments = [fileState.attachmentRef];
+            } else if (fileState?.file) {
+                const upload = await uploadFileForConversation({
+                    convex,
+                    file: fileState.file,
+                    conversationId: id,
+                    caseId: activeCaseId,
+                    intent: fileState.intent,
+                    clientUploadKey: fileState.clientUploadKey,
+                    existingSession: fileState,
+                    onProgress: uploadCallbacks?.onProgress,
+                    onStatus: uploadCallbacks?.onStatus,
+                    onStorageReady: uploadCallbacks?.onStorageReady,
+                });
+                uploadCallbacks?.onComplete(upload);
+                attachments = [upload.attachmentRef];
             }
-            sessionStorage.setItem(`nexx_initial_msg_${String(id)}`, initialMessage);
+
+            const requestId = `${String(id)}-${crypto.randomUUID()}`;
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    conversationId: id,
+                    message,
+                    requestId,
+                    clientTurnId: requestId,
+                    attachments,
+                    persistUserMessage: true,
+                    mode: 'send',
+                }),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => '');
+                throw new Error(`Failed to accept chat turn: ${response.status} ${errorText}`);
+            }
+            const data = await response.json();
+            if (!data.ok || !data.accepted) {
+                throw new Error(data.error || 'Chat turn was not accepted');
+            }
+
+            await activateDraftConversation({ id });
+            draftConversationIdRef.current = null;
             router.push(`/chat/${id}`);
         } catch (error) {
             console.error('Failed to start conversation:', error);
             if (createdConversationId) {
                 try {
-                    await removeConversation({ id: createdConversationId });
+                    await markDraftUploadFailed({ id: createdConversationId });
                 } catch (cleanupError) {
-                    console.warn('[ChatList] Failed to remove empty conversation after upload failure:', cleanupError);
+                    console.warn('[ChatList] Failed to mark draft conversation after upload failure:', cleanupError);
                 }
             }
             throw error;

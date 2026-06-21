@@ -2,17 +2,18 @@
 
 import { motion } from 'framer-motion';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useMutation, useQuery } from 'convex/react';
+import { useConvex, useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
-import { Id } from '@convex/_generated/dataModel';
+import type { Id } from '@convex/_generated/dataModel';
 import { useParams, useRouter } from 'next/navigation';
 import { Archive, ClockCounterClockwise, Lock, Sun, Moon } from '@phosphor-icons/react';
 import MessageBubble, { type ChatTheme } from '@/components/chat/MessageBubble';
-import ChatInput from '@/components/chat/ChatInput';
+import ChatInput, { type ChatInputUploadCallbacks } from '@/components/chat/ChatInput';
 import { WorkspaceClient } from '@/components/chat/WorkspaceClient';
 import { AnalysisStatusStrip, DEFAULT_ANALYSIS_STEPS, getStepsByElapsed } from '@/components/chat/AnalysisStatusStrip';
 import type { ActionType, AnalysisStep } from '@/lib/ui-intelligence/types';
-import { buildUploadedFileMessage, uploadFileForConversation } from '@/lib/chat/uploadClient';
+import type { ChatAttachmentRef } from '@/lib/chat/uploadConfig';
+import { type ChatComposerFileState, uploadFileForConversation } from '@/lib/chat/uploadClient';
 
 /** Premium full-screen chat interface for a single NEXX AI conversation. */
 export default function ConversationPage() {
@@ -24,6 +25,7 @@ export default function ConversationPage() {
 
     // All hooks must be called unconditionally — use 'skip' when ID is invalid
     const conversation = useQuery(api.conversations.get, isValidId ? { id: conversationId } : 'skip');
+    const convex = useConvex();
     const messages = useQuery(api.messages.list, isValidId ? { conversationId } : 'skip');
     const activeTurns = useQuery(api.chatTurns.activeForConversation, isValidId ? { conversationId } : 'skip');
     const userProfile = useQuery(api.users.me);
@@ -128,6 +130,7 @@ export default function ConversationPage() {
             mode?: 'send' | 'retry' | 'edit';
             retryOfAssistantMessageId?: Id<'messages'>;
             editOfUserMessageId?: Id<'messages'>;
+            attachments?: ChatAttachmentRef[];
         }
     ) => {
         setIsStreaming(true);
@@ -143,10 +146,12 @@ export default function ConversationPage() {
                 body: JSON.stringify({
                     message,
                     requestId,
+                    clientTurnId: requestId,
                     persistUserMessage: options?.persistUserMessage ?? true,
                     mode: options?.mode ?? (options?.persistUserMessage === false ? 'retry' : 'send'),
                     retryOfAssistantMessageId: options?.retryOfAssistantMessageId,
                     editOfUserMessageId: options?.editOfUserMessageId,
+                    attachments: options?.attachments,
                     userContext: buildUserContext(),
                     conversationId,
                 }),
@@ -174,24 +179,42 @@ export default function ConversationPage() {
     }, [conversationId, buildUserContext]);
     /** Send a new user message and stream the AI response. */
     const handleSend = useCallback(
-        async (input: string, file?: File) => {
+        async (
+            input: string,
+            fileState?: ChatComposerFileState,
+            _mode?: unknown,
+            uploadCallbacks?: ChatInputUploadCallbacks,
+        ) => {
             if (isGenerating || isPending || !isThreadReady) {
                 throw new Error('Chat is still getting ready. Please try again in a moment.');
             }
             setIsPending(true);
 
             try {
-                let message = input;
-                if (file) {
-                    setStreamingContent(`Uploading ${file.name}...`);
-                    const upload = await uploadFileForConversation(file, conversationId);
-                    message = buildUploadedFileMessage(input, file, upload);
+                let attachments: ChatAttachmentRef[] | undefined;
+                if (fileState?.attachmentRef) {
+                    attachments = [fileState.attachmentRef];
+                } else if (fileState?.file) {
+                    setStreamingContent(`Uploading ${fileState.file.name}...`);
+                    const upload = await uploadFileForConversation({
+                        convex,
+                        file: fileState.file,
+                        conversationId,
+                        intent: fileState.intent,
+                        clientUploadKey: fileState.clientUploadKey,
+                        existingSession: fileState,
+                        onProgress: uploadCallbacks?.onProgress,
+                        onStatus: uploadCallbacks?.onStatus,
+                        onStorageReady: uploadCallbacks?.onStorageReady,
+                    });
+                    uploadCallbacks?.onComplete(upload);
+                    attachments = [upload.attachmentRef];
                     setStreamingContent('');
                 }
 
                 // Server handles user message persistence (Step 13 in route.ts).
                 // No client-side sendMessage needed — avoids duplicate writes.
-                await callChatAPI(message);
+                await callChatAPI(input, { attachments });
             } catch (error) {
                 console.error('Send error:', error);
                 const message = error instanceof Error ? error.message : 'Upload or send failed. Please try again.';
@@ -202,7 +225,7 @@ export default function ConversationPage() {
                 setIsPending(false);
             }
         },
-        [isGenerating, isPending, isThreadReady, conversationId, callChatAPI]
+        [isGenerating, isPending, isThreadReady, conversationId, convex, callChatAPI]
     );
 
     useEffect(() => {

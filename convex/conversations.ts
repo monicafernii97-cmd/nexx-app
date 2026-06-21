@@ -1,7 +1,7 @@
 import { mutation, query, internalMutation } from './_generated/server';
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
-import { getAuthenticatedUser, validateCaseOwnership } from './lib/auth';
+import { getAuthenticatedUser, getAuthenticatedUserAndConversation, validateCaseOwnership } from './lib/auth';
 
 /** Create a new conversation — auth-guarded */
 export const create = mutation({
@@ -126,7 +126,12 @@ export const deleteMessagesBatch = internalMutation({
 export const list = query({
     args: {
         status: v.optional(
-            v.union(v.literal('active'), v.literal('archived'))
+            v.union(
+                v.literal('active'),
+                v.literal('archived'),
+                v.literal('draft_uploading'),
+                v.literal('failed_upload')
+            )
         ),
         caseId: v.optional(v.id('cases')),
     },
@@ -149,11 +154,14 @@ export const list = query({
                 )
                 .order('desc')
                 .collect();
+            const visibleResults = args.status
+                ? results
+                : results.filter((c) => c.status === 'active' || c.status === 'archived');
             // Filter by status client-side when using case index
             if (args.status) {
-                return results.filter((c) => c.status === args.status);
+                return visibleResults.filter((c) => c.status === args.status);
             }
-            return results;
+            return visibleResults;
         }
 
         if (args.status) {
@@ -166,11 +174,77 @@ export const list = query({
                 .collect();
         }
 
-        return await ctx.db
+        const results = await ctx.db
             .query('conversations')
             .withIndex('by_user', (q) => q.eq('userId', user._id))
             .order('desc')
             .collect();
+        return results.filter((c) => c.status === 'active' || c.status === 'archived');
+    },
+});
+
+/** Create a hidden conversation used while a first-turn upload is processing. */
+export const createDraftForUpload = mutation({
+    args: {
+        title: v.string(),
+        mode: v.union(
+            v.literal('therapeutic'),
+            v.literal('legal'),
+            v.literal('strategic'),
+            v.literal('general')
+        ),
+        caseId: v.optional(v.id('cases')),
+    },
+    handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        if (args.caseId) {
+            await validateCaseOwnership(ctx, args.caseId, user._id);
+        }
+
+        return await ctx.db.insert('conversations', {
+            userId: user._id,
+            title: args.title,
+            mode: args.mode,
+            status: 'draft_uploading',
+            messageCount: 0,
+            lastMessageAt: Date.now(),
+            createdAt: Date.now(),
+            caseId: args.caseId,
+        });
+    },
+});
+
+/** Activate a hidden upload draft conversation after the first chat turn is accepted. */
+export const activateDraft = mutation({
+    args: { id: v.id('conversations') },
+    handler: async (ctx, args) => {
+        const { conversation } = await getAuthenticatedUserAndConversation(ctx, args.id);
+        if (conversation.status === 'active') return true;
+        if (conversation.status !== 'draft_uploading' && conversation.status !== 'failed_upload') {
+            throw new Error('Conversation is not an upload draft');
+        }
+        await ctx.db.patch(args.id, {
+            status: 'active',
+            lastMessageAt: Date.now(),
+        });
+        return true;
+    },
+});
+
+/** Mark an upload draft conversation as failed but retain it for retry. */
+export const markUploadFailed = mutation({
+    args: { id: v.id('conversations') },
+    handler: async (ctx, args) => {
+        const { conversation } = await getAuthenticatedUserAndConversation(ctx, args.id);
+        if (conversation.status === 'active') return true;
+        if (conversation.status !== 'draft_uploading' && conversation.status !== 'failed_upload') {
+            return true;
+        }
+        await ctx.db.patch(args.id, {
+            status: 'failed_upload',
+            lastMessageAt: Date.now(),
+        });
+        return true;
     },
 });
 
@@ -198,8 +272,6 @@ export const get = query({
 // ── NEW: Responses API + Conversations API state management ──
 // All mutations below derive the caller from ctx.auth (Clerk JWT),
 // NOT from caller-supplied args. This prevents forgery.
-
-import { getAuthenticatedUserAndConversation } from './lib/auth';
 
 /** Set the OpenAI Conversations API state on a conversation (called from the chat API route). */
 export const setOpenAIConversationState = mutation({

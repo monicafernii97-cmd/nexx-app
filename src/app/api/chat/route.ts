@@ -118,6 +118,14 @@ export async function POST(req: NextRequest) {
       : 'free';
 
   const routerResult = classifyMessage(message);
+  console.info('[Chat] Accepting chat turn', {
+    requestId: turnRequestId,
+    conversationIdPresent: Boolean(conversationId),
+    messageLength: message.length,
+    hasUploadedDocument: message.includes('Uploaded document:'),
+    hasExtractedTextPreview: message.includes('Extracted text preview:'),
+    routeMode: routerResult.mode,
+  });
   const routeModeToFeature: Record<
     string,
     'chat' | 'analysis' | 'judge_sim' | 'opposition_sim' | 'deep_draft' | 'memory' | 'confidence'

@@ -12,25 +12,7 @@ import ChatInput from '@/components/chat/ChatInput';
 import { WorkspaceClient } from '@/components/chat/WorkspaceClient';
 import { AnalysisStatusStrip, DEFAULT_ANALYSIS_STEPS, getStepsByElapsed } from '@/components/chat/AnalysisStatusStrip';
 import type { ActionType, AnalysisStep } from '@/lib/ui-intelligence/types';
-
-type ChatUploadResponse = {
-    ok?: boolean;
-    partial?: boolean;
-    error?: string;
-    fileId?: string;
-    openaiFileId?: string;
-    openaiTextFileId?: string;
-    vectorStoreId?: string;
-    filename?: string;
-    extractedText?: string;
-    extractionError?: string;
-    extractionCharCount?: number;
-    extractionMethod?: 'text' | 'ocr';
-    ocrAttempted?: boolean;
-    pagesOcrProcessed?: number;
-    pagesTotal?: number;
-    indexingError?: string;
-};
+import { buildUploadedFileMessage, uploadFileForConversation } from '@/lib/chat/uploadClient';
 
 /** Premium full-screen chat interface for a single NEXX AI conversation. */
 export default function ConversationPage() {
@@ -135,95 +117,6 @@ export default function ConversationPage() {
         nexDetectedPatterns: nexProfile?.detectedPatterns,
     }), [userProfile, nexProfile]);
 
-    const extractFileForConversationFallback = useCallback(async (file: File): Promise<ChatUploadResponse> => {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const response = await fetch('/api/analyze-document?extractOnly=1', {
-            method: 'POST',
-            body: formData,
-        });
-        const data = await response.json().catch(() => ({})) as ChatUploadResponse;
-
-        if (!response.ok || !data.ok) {
-            throw new Error(data.error || `Fallback extraction failed with status ${response.status}`);
-        }
-
-        return data;
-    }, []);
-
-    const uploadFileForConversation = useCallback(async (file: File): Promise<ChatUploadResponse> => {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('conversationId', conversationId);
-
-        let response: Response;
-        try {
-            response = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData,
-            });
-        } catch (uploadError) {
-            const fallbackData = await extractFileForConversationFallback(file);
-            return {
-                ...fallbackData,
-                partial: true,
-                indexingError: uploadError instanceof Error ? uploadError.message : String(uploadError),
-            };
-        }
-        const data = await response.json().catch(() => ({})) as ChatUploadResponse;
-
-        if (!response.ok || !data.ok) {
-            if (response.status >= 500) {
-                const fallbackData = await extractFileForConversationFallback(file);
-                return {
-                    ...fallbackData,
-                    partial: true,
-                    indexingError: data.error || `Upload failed with status ${response.status}`,
-                };
-            }
-            throw new Error(data.error || `Upload failed with status ${response.status}`);
-        }
-
-        if (!data.extractedText?.trim()) {
-            throw new Error(
-                data.extractionError
-                    ? `The file uploaded, but NEXX could not read its text yet: ${data.extractionError}`
-                    : 'The file uploaded, but NEXX could not read any text from it yet.'
-            );
-        }
-
-        return data;
-    }, [conversationId, extractFileForConversationFallback]);
-
-    const buildUploadedFileMessage = useCallback((message: string, file: File, upload: ChatUploadResponse) => {
-        const filename = upload.filename ?? file.name;
-        const extractedText = upload.extractedText?.trim();
-        const methodLabel = upload.extractionMethod === 'ocr'
-            ? `\nExtraction method: OCR${upload.pagesOcrProcessed ? ` (${upload.pagesOcrProcessed}${upload.pagesTotal ? ` of ${upload.pagesTotal}` : ''} pages)` : ''}`
-            : upload.extractionMethod === 'text'
-                ? '\nExtraction method: embedded document text'
-                : '';
-        const extractionNote = upload.extractionError
-            ? `\n\nExtraction note: ${upload.extractionError} The file was still uploaded and indexed for retrieval.`
-            : '';
-        const indexingNote = upload.indexingError
-            ? `\nIndexing note: file-search indexing did not finish, so this answer should rely on the extracted text included below. (${upload.indexingError})`
-            : '';
-        const retrievalNote = upload.indexingError
-            ? '\nRetrieval: extracted document text is included directly in this message; file search may not be available for this upload.'
-            : upload.openaiTextFileId
-            ? '\nRetrieval: extracted/OCR text was indexed as a companion text file when available. Use the extracted text first, then file search for details beyond the preview.'
-            : '\nRetrieval: original file was indexed for file search.';
-
-        if (extractedText) {
-            return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}${retrievalNote}${indexingNote}\n\nExtracted text preview:\n\n${extractedText}${extractionNote}`;
-        }
-
-        // Defensive guard for future callers; uploadFileForConversation rejects unreadable uploads before this builder runs.
-        return `${message}\n\nUploaded document: ${filename}\nFile ID: ${upload.fileId ?? 'pending'}${methodLabel}${retrievalNote}${indexingNote}\nNo readable extracted text was available in this chat turn. Do not analyze the document unless file search returns relevant document text.${extractionNote}`;
-    }, []);
-
     /**
      * Accept a durable chat turn. Provider generation runs in a Convex worker;
      * this page renders user, draft, final, and degraded messages from Convex.
@@ -282,14 +175,16 @@ export default function ConversationPage() {
     /** Send a new user message and stream the AI response. */
     const handleSend = useCallback(
         async (input: string, file?: File) => {
-            if (isGenerating || isPending || !isThreadReady) return;
+            if (isGenerating || isPending || !isThreadReady) {
+                throw new Error('Chat is still getting ready. Please try again in a moment.');
+            }
             setIsPending(true);
 
             try {
                 let message = input;
                 if (file) {
                     setStreamingContent(`Uploading ${file.name}...`);
-                    const upload = await uploadFileForConversation(file);
+                    const upload = await uploadFileForConversation(file, conversationId);
                     message = buildUploadedFileMessage(input, file, upload);
                     setStreamingContent('');
                 }
@@ -302,11 +197,12 @@ export default function ConversationPage() {
                 const message = error instanceof Error ? error.message : 'Upload or send failed. Please try again.';
                 setStreamingContent(message);
                 window.setTimeout(() => setStreamingContent(''), 5000);
+                throw error;
             } finally {
                 setIsPending(false);
             }
         },
-        [isGenerating, isPending, isThreadReady, uploadFileForConversation, buildUploadedFileMessage, callChatAPI]
+        [isGenerating, isPending, isThreadReady, conversationId, callChatAPI]
     );
 
     useEffect(() => {

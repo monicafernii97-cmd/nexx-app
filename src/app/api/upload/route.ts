@@ -34,6 +34,8 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'Authentication required' }, { status: 401 });
   }
 
+  const uploadRequestId = crypto.randomUUID();
+
   try {
     const formData = await req.formData();
 
@@ -50,6 +52,14 @@ export async function POST(req: NextRequest) {
 
     const file = fileEntry;
     const conversationId = conversationEntry;
+    const extension = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() : undefined;
+    console.info('[Upload] Received chat upload', {
+      uploadRequestId,
+      extension,
+      mimeType: file.type || 'unknown',
+      size: file.size,
+      hasConversationId: Boolean(conversationId),
+    });
 
     // Validate file type (OpenAI File Search supported formats only)
     const allowedTypes = [
@@ -131,6 +141,16 @@ export async function POST(req: NextRequest) {
 
       extraction = await extractDocumentText(file);
       extractedText = extraction.text ?? '';
+      console.info('[Upload] Extraction completed', {
+        uploadRequestId,
+        hasText: extractedText.trim().length > 0,
+        charCount: extractedText.length,
+        method: extraction.method ?? 'none',
+        ocrAttempted: extraction.ocrAttempted ?? false,
+        pagesOcrProcessed: extraction.pagesOcrProcessed,
+        pagesTotal: extraction.pagesTotal,
+        hasExtractionError: Boolean(extraction.error),
+      });
 
       if (extractedText) {
         try {
@@ -275,7 +295,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (extractedText) {
-        console.error('[Upload] File indexing failed after text extraction:', error);
+        console.error('[Upload] File indexing failed after text extraction:', { uploadRequestId, error });
         const indexingError = 'An error occurred while indexing the file';
         return Response.json({
           ok: true,
@@ -299,7 +319,7 @@ export async function POST(req: NextRequest) {
       throw error;
     }
   } catch (error) {
-    console.error('[Upload] Error:', error);
+    console.error('[Upload] Error:', { uploadRequestId, error });
     return Response.json({ error: 'Upload failed' }, { status: 500 });
   }
 }

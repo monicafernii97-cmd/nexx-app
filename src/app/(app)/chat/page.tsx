@@ -48,6 +48,7 @@ function ChatListContent() {
     const [isCreating, setIsCreating] = useState(false);
     const [deletingId, setDeletingId] = useState<Id<'conversations'> | null>(null);
     const handoffProcessedRef = useRef(false);
+    const creatingRef = useRef(false);
     const isHistoryOpen = searchParams.get('history') === '1';
 
     const setHistoryOpen = useCallback((open: boolean) => {
@@ -98,9 +99,10 @@ function ChatListContent() {
         if (!activeCaseId) {
             throw new Error('Workspace is still loading. Please try again in a moment.');
         }
-        if (isCreating) {
+        if (creatingRef.current) {
             throw new Error('A new chat is already opening. Please wait a moment.');
         }
+        creatingRef.current = true;
         setIsCreating(true);
         let createdConversationId: Id<'conversations'> | null = null;
         try {
@@ -128,6 +130,7 @@ function ChatListContent() {
             }
             throw error;
         } finally {
+            creatingRef.current = false;
             setIsCreating(false);
         }
     };

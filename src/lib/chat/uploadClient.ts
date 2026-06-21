@@ -19,6 +19,17 @@ export type ChatUploadResponse = {
     indexingError?: string;
 };
 
+/** Require extracted text before sending an upload-backed message to the assistant. */
+function assertReadableExtractedText(upload: ChatUploadResponse) {
+    if (upload.extractedText?.trim()) return;
+
+    throw new Error(
+        upload.extractionError
+            ? `The file uploaded, but NEXX could not read its text yet: ${upload.extractionError}`
+            : 'The file uploaded, but NEXX could not read any text from it yet.'
+    );
+}
+
 /** Extract readable document text without indexing, used when full upload/indexing is unavailable. */
 export async function extractFileForConversationFallback(file: File): Promise<ChatUploadResponse> {
     const formData = new FormData();
@@ -54,6 +65,7 @@ export async function uploadFileForConversation(
         });
     } catch (uploadError) {
         const fallbackData = await extractFileForConversationFallback(file);
+        assertReadableExtractedText(fallbackData);
         return {
             ...fallbackData,
             partial: true,
@@ -65,6 +77,7 @@ export async function uploadFileForConversation(
     if (!response.ok || !data.ok) {
         if (response.status >= 500) {
             const fallbackData = await extractFileForConversationFallback(file);
+            assertReadableExtractedText(fallbackData);
             return {
                 ...fallbackData,
                 partial: true,
@@ -74,13 +87,7 @@ export async function uploadFileForConversation(
         throw new Error(data.error || `Upload failed with status ${response.status}`);
     }
 
-    if (!data.extractedText?.trim()) {
-        throw new Error(
-            data.extractionError
-                ? `The file uploaded, but NEXX could not read its text yet: ${data.extractionError}`
-                : 'The file uploaded, but NEXX could not read any text from it yet.'
-        );
-    }
+    assertReadableExtractedText(data);
 
     return data;
 }
@@ -95,7 +102,7 @@ export function buildUploadedFileMessage(message: string, file: File, upload: Ch
             ? '\nExtraction method: embedded document text'
             : '';
     const extractionNote = upload.extractionError
-        ? `\n\nExtraction note: ${upload.extractionError} The file was still uploaded and indexed for retrieval.`
+        ? `\n\nExtraction note: ${upload.extractionError}`
         : '';
     const indexingNote = upload.indexingError
         ? `\nIndexing note: file-search indexing did not finish, so this answer should rely on the extracted text included below. (${upload.indexingError})`

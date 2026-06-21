@@ -8,6 +8,16 @@ import { getDailyLimit, getModelForRoute, type SubscriptionTier } from '@/lib/ti
 
 const MAX_MESSAGE_LENGTH = 100_000;
 
+type ChatAttachmentRef = {
+  uploadedFileId: string;
+  uploadSessionId: string;
+  storageId: string;
+  filename: string;
+  mimeType: string;
+  byteSize: number;
+  status: 'ready' | 'partial';
+};
+
 /**
  * Reliability-first chat admission route.
  *
@@ -53,19 +63,23 @@ export async function POST(req: NextRequest) {
     conversationId,
     userContext,
     requestId,
+    clientTurnId,
     persistUserMessage,
     mode,
     retryOfAssistantMessageId,
     editOfUserMessageId,
+    attachments,
   } = body as {
     message?: string;
     conversationId?: string;
     userContext?: Record<string, unknown>;
     requestId?: string;
+    clientTurnId?: string;
     persistUserMessage?: boolean;
     mode?: 'send' | 'retry' | 'edit';
     retryOfAssistantMessageId?: string;
     editOfUserMessageId?: string;
+    attachments?: ChatAttachmentRef[];
   };
 
   if (
@@ -83,6 +97,8 @@ export async function POST(req: NextRequest) {
   const turnRequestId =
     typeof requestId === 'string' && requestId.trim().length > 0
       ? requestId
+      : typeof clientTurnId === 'string' && clientTurnId.trim().length > 0
+      ? clientTurnId
       : crypto.randomUUID();
 
   const convex = await getAuthenticatedConvexClient();
@@ -111,19 +127,45 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'Conversation not found or inaccessible' }, { status: 404 });
   }
 
+  let sanitizedAttachments: ChatAttachmentRef[] = [];
+  if (attachments !== undefined) {
+    if (!Array.isArray(attachments) || attachments.length > 5) {
+      return Response.json({ error: 'Invalid attachments' }, { status: 400 });
+    }
+    try {
+      sanitizedAttachments = await convex.query(api.chatUploads.validateAttachmentsForChat, {
+        conversationId: typedConversationId,
+        attachments: attachments.map((attachment) => ({
+          uploadedFileId: attachment.uploadedFileId as Id<'uploadedFiles'>,
+          uploadSessionId: attachment.uploadSessionId as Id<'chatUploadSessions'>,
+          storageId: attachment.storageId as Id<'_storage'>,
+          filename: attachment.filename,
+          mimeType: attachment.mimeType,
+          byteSize: attachment.byteSize,
+          status: attachment.status,
+        })),
+      }) as ChatAttachmentRef[];
+    } catch (error) {
+      console.warn('[Chat] Attachment validation failed:', error);
+      return Response.json({ error: 'One or more attachments are not ready for chat.' }, { status: 400 });
+    }
+  }
+
   const validTiers: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
   const userTier: SubscriptionTier =
     userRecord.subscriptionTier && validTiers.includes(userRecord.subscriptionTier as SubscriptionTier)
       ? (userRecord.subscriptionTier as SubscriptionTier)
       : 'free';
 
-  const routerResult = classifyMessage(message);
+  const routerResult = sanitizedAttachments.length > 0
+    ? { ...classifyMessage(message), mode: 'document_analysis' as const }
+    : classifyMessage(message);
   console.info('[Chat] Accepting chat turn', {
     requestId: turnRequestId,
     conversationIdPresent: Boolean(conversationId),
     messageLength: message.length,
-    hasUploadedDocument: message.includes('Uploaded document:'),
-    hasExtractedTextPreview: message.includes('Extracted text preview:'),
+    attachmentCount: sanitizedAttachments.length,
+    attachmentStatuses: sanitizedAttachments.map((attachment) => attachment.status),
     routeMode: routerResult.mode,
   });
   const routeModeToFeature: Record<
@@ -156,6 +198,15 @@ export async function POST(req: NextRequest) {
       model,
       temperature: routerResult.temperature,
       userContextJson: userContext ? JSON.stringify(userContext) : undefined,
+      attachments: sanitizedAttachments.map((attachment) => ({
+        uploadedFileId: attachment.uploadedFileId as Id<'uploadedFiles'>,
+        uploadSessionId: attachment.uploadSessionId as Id<'chatUploadSessions'>,
+        storageId: attachment.storageId as Id<'_storage'>,
+        filename: attachment.filename,
+        mimeType: attachment.mimeType,
+        byteSize: attachment.byteSize,
+        status: attachment.status,
+      })),
       persistUserMessage: persistUserMessage !== false,
       rateLimitKey,
       rateLimit: dailyCap,

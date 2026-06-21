@@ -52,6 +52,17 @@ export async function POST(req: NextRequest) {
 
     const file = fileEntry;
     const conversationId = conversationEntry;
+    if (conversationId) {
+      return Response.json(
+        {
+          ok: false,
+          error:
+            'Chat uploads now use direct storage upload. This multipart endpoint is disabled for chat files.',
+        },
+        { status: 410 }
+      );
+    }
+
     const extension = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() : undefined;
     console.info('[Upload] Received chat upload', {
       uploadRequestId,

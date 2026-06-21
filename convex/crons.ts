@@ -35,6 +35,16 @@ crons.interval(
 );
 
 /**
+ * Mark stale chat upload processing as retryable and purge abandoned cancelled
+ * upload sessions. This keeps direct-storage uploads from wedging the composer.
+ */
+crons.interval(
+  'clean up stale chat uploads',
+  { minutes: 5 },
+  internal.chatUploads.cleanupStaleUploadSessions,
+);
+
+/**
  * Purge expired export run and job records daily (30-day retention).
  * Only deletes terminal records (completed, failed, timeout).
  */

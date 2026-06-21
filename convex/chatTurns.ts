@@ -23,6 +23,16 @@ const routeModeValidator = v.union(
 
 const turnModeValidator = v.union(v.literal('send'), v.literal('retry'), v.literal('edit'));
 
+const attachmentRefValidator = v.object({
+    uploadedFileId: v.id('uploadedFiles'),
+    uploadSessionId: v.id('chatUploadSessions'),
+    storageId: v.id('_storage'),
+    filename: v.string(),
+    mimeType: v.string(),
+    byteSize: v.number(),
+    status: v.union(v.literal('ready'), v.literal('partial')),
+});
+
 /** Return the UTC midnight timestamp that anchors daily chat quota windows. */
 function utcDayStartMs(now: number) {
     const date = new Date(now);
@@ -223,10 +233,32 @@ export const acceptChatTurn = mutation({
         rateLimitKey: v.optional(v.string()),
         rateLimit: v.optional(v.number()),
         rateLimitWindowMs: v.optional(v.number()),
+        attachments: v.optional(v.array(attachmentRefValidator)),
     },
     handler: async (ctx, args) => {
         const { user, conversation } = await getAuthenticatedUserAndConversation(ctx, args.conversationId);
+        if (!user.clerkId) throw new Error('Authenticated user is missing clerkId');
         const now = Date.now();
+        const attachments = args.attachments ?? [];
+        const validatedAttachments = [];
+
+        for (const attachment of attachments) {
+            const uploadedFile = await ctx.db.get(attachment.uploadedFileId);
+            if (
+                !uploadedFile ||
+                uploadedFile.clerkUserId !== user.clerkId ||
+                uploadedFile.conversationId !== args.conversationId ||
+                uploadedFile.uploadSessionId !== attachment.uploadSessionId ||
+                uploadedFile.storageId !== attachment.storageId ||
+                (uploadedFile.status !== 'ready' && uploadedFile.status !== 'partial')
+            ) {
+                throw new Error('Attachment is not ready or does not belong to this conversation.');
+            }
+            validatedAttachments.push({
+                ...attachment,
+                status: uploadedFile.status as 'ready' | 'partial',
+            });
+        }
 
         const existingTurn = await ctx.db
             .query('chatTurns')
@@ -297,6 +329,7 @@ export const acceptChatTurn = mutation({
             model: args.model,
             temperature: args.temperature,
             userContextJson: args.userContextJson,
+            attachmentRefsJson: validatedAttachments.length > 0 ? JSON.stringify(validatedAttachments) : undefined,
             createdAt: now,
             updatedAt: now,
         });
@@ -313,12 +346,37 @@ export const acceptChatTurn = mutation({
                 turnNumber,
                 roleOrder: 0,
                 version: 1,
-                metadata: { requestId: args.requestId },
+                metadata: {
+                    requestId: args.requestId,
+                    attachments: validatedAttachments.map((attachment) => ({
+                        uploadedFileId: attachment.uploadedFileId,
+                        uploadSessionId: attachment.uploadSessionId,
+                        filename: attachment.filename,
+                        mimeType: attachment.mimeType,
+                        byteSize: attachment.byteSize,
+                        status: attachment.status,
+                    })),
+                },
                 requestId: `${args.requestId}-user`,
                 createdAt: now,
                 updatedAt: now,
                 mode: args.routeMode,
             });
+
+            for (const attachment of validatedAttachments) {
+                await ctx.db.insert('messageAttachments', {
+                    messageId: userMessageId,
+                    turnId,
+                    conversationId: args.conversationId,
+                    uploadedFileId: attachment.uploadedFileId,
+                    uploadSessionId: attachment.uploadSessionId,
+                    filename: attachment.filename,
+                    mimeType: attachment.mimeType,
+                    byteSize: attachment.byteSize,
+                    status: attachment.status,
+                    createdAt: now,
+                });
+            }
         }
 
         const jobId = await ctx.db.insert('chatGenerationJobs', {
@@ -503,12 +561,38 @@ export const getGenerationContext = internalQuery({
             return a.createdAt - b.createdAt;
         });
 
+        const attachmentRows = await ctx.db
+            .query('messageAttachments')
+            .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
+            .collect();
+        const attachmentContexts = [];
+        for (const attachment of attachmentRows) {
+            const uploadedFile = await ctx.db.get(attachment.uploadedFileId);
+            if (!uploadedFile || (uploadedFile.status !== 'ready' && uploadedFile.status !== 'partial')) continue;
+            attachmentContexts.push({
+                uploadedFileId: uploadedFile._id,
+                uploadSessionId: attachment.uploadSessionId,
+                filename: uploadedFile.filename,
+                mimeType: uploadedFile.mimeType,
+                byteSize: uploadedFile.byteSize ?? attachment.byteSize,
+                status: uploadedFile.status,
+                extractionMethod: uploadedFile.extractionMethod,
+                extractionCharCount: uploadedFile.extractionCharCount,
+                chatContextText: uploadedFile.chatContextText,
+                chatContextCharCount: uploadedFile.chatContextCharCount,
+                contextTruncated: uploadedFile.contextTruncated,
+                indexingError: uploadedFile.indexingError,
+                extractionError: uploadedFile.extractionError,
+            });
+        }
+
         return {
             turn,
             conversation,
             user,
             summaryDoc,
             caseGraphDoc,
+            attachmentContexts,
             recentMessages: recentMessages.filter((m) => m.status !== 'deleted'),
         };
     },

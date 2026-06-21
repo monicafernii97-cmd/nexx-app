@@ -78,8 +78,10 @@ export const _updateStatusInternal = internalMutation({
             openaiFileId?: string;
             openaiTextFileId?: string;
             vectorStoreId?: string;
+            updatedAt: number;
         } = {
             status: args.status,
+            updatedAt: Date.now(),
         };
         if (args.openaiFileId !== undefined) patch.openaiFileId = args.openaiFileId;
         if (args.openaiTextFileId !== undefined) patch.openaiTextFileId = args.openaiTextFileId;

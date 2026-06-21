@@ -193,11 +193,13 @@ export const createDraftForUpload = mutation({
             v.literal('strategic'),
             v.literal('general')
         ),
-        caseId: v.id('cases'),
+        caseId: v.optional(v.id('cases')),
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
-        await validateCaseOwnership(ctx, args.caseId, user._id);
+        if (args.caseId) {
+            await validateCaseOwnership(ctx, args.caseId, user._id);
+        }
 
         return await ctx.db.insert('conversations', {
             userId: user._id,

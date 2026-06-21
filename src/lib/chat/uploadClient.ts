@@ -5,7 +5,7 @@ import {
   CHAT_UPLOAD_CONFIG,
   type ChatAttachmentRef,
   type ChatUploadIntent,
-  type ChatUploadStatus,
+  type ChatComposerFileStatus,
   validateChatUploadFile,
 } from './uploadConfig';
 
@@ -20,7 +20,7 @@ type UploadSessionSnapshot = {
   uploadUrlExpiresAt?: number;
   storageId?: string;
   uploadedFileId?: string;
-  status?: ChatUploadStatus | 'awaiting_storage_upload';
+  status?: ChatComposerFileStatus | 'awaiting_storage_upload';
   filename?: string;
   mimeType?: string;
   byteSize?: number;
@@ -49,7 +49,7 @@ export type ChatComposerFileState = {
   uploadUrlExpiresAt?: number;
   storageId?: string;
   uploadedFileId?: string;
-  status: ChatUploadStatus;
+  status: ChatComposerFileStatus;
   progress?: number;
   processingAttempt?: number;
   error?: string;
@@ -90,10 +90,10 @@ export type UploadFileForConversationArgs = {
   clientUploadKey: string;
   existingSession?: ChatComposerFileState | null;
   onProgress?: (progress: number) => void;
-  onStatus?: (status: ChatUploadStatus) => void;
+  onStatus?: (status: ChatComposerFileStatus) => void;
 };
 
-function normalizeStatus(status: string): ChatUploadStatus {
+function normalizeStatus(status: string): ChatComposerFileStatus {
   if (status === 'awaiting_storage_upload') return 'session_created';
   if (status === 'uploading_to_storage') return 'uploading_to_storage';
   if (status === 'stored') return 'stored';
@@ -105,6 +105,7 @@ function normalizeStatus(status: string): ChatUploadStatus {
   if (status === 'failed_processing') return 'failed_processing';
   if (status === 'failed_empty_extraction') return 'failed_empty_extraction';
   if (status === 'stalled') return 'stalled';
+  if (status === 'cancelled') return 'cancelled';
   return 'failed_processing';
 }
 
@@ -232,7 +233,7 @@ async function waitForUploadProcessing(args: {
   convex: ConvexClientLike;
   uploadSessionId: string;
   timeoutMs: number;
-  onStatus?: (status: ChatUploadStatus) => void;
+  onStatus?: (status: ChatComposerFileStatus) => void;
 }) {
   const startedAt = Date.now();
   let lastStatus: string | undefined;

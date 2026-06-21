@@ -1,23 +1,10 @@
-export const CHAT_UPLOAD_CONFIG = {
-  maxBytes: 25 * 1024 * 1024,
-  allowedMimeTypes: [
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'text/plain',
-  ],
-  allowedExtensions: ['pdf', 'doc', 'docx', 'txt'],
-  maxDirectChatContextChars: 60_000,
-  maxUploadResponsePreviewChars: 4_000,
-  uploadSessionTtlMs: 60 * 60 * 1000,
-  processingStaleAfterMs: 12 * 60 * 1000,
-  maxProcessingAttempts: 3,
-  uploadUrlTtlMs: 60 * 60 * 1000,
-} as const;
+import { CHAT_UPLOAD_CONFIG } from './uploadShared';
+
+export { CHAT_UPLOAD_CONFIG };
 
 export type ChatUploadIntent = 'attachment' | 'court_order';
 
-export type ChatUploadStatus =
+export type ChatComposerFileStatus =
   | 'idle'
   | 'selected'
   | 'session_created'
@@ -30,7 +17,8 @@ export type ChatUploadStatus =
   | 'failed_storage_upload'
   | 'failed_processing'
   | 'failed_empty_extraction'
-  | 'stalled';
+  | 'stalled'
+  | 'cancelled';
 
 export type ChatAttachmentRef = {
   uploadedFileId: string;

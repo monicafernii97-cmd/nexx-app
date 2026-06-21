@@ -18,7 +18,7 @@ import {
     FileArrowUp,
 } from '@phosphor-icons/react';
 import type { ChatComposerFileState, ChatUploadResponse } from '@/lib/chat/uploadClient';
-import { validateChatUploadFile, type ChatUploadIntent, type ChatUploadStatus } from '@/lib/chat/uploadConfig';
+import { validateChatUploadFile, type ChatUploadIntent, type ChatComposerFileStatus } from '@/lib/chat/uploadConfig';
 
 type SpeechRecognitionCtor = new () => SpeechRecognition;
 type FilePromptIntent = 'attachment' | 'thread' | 'court_order';
@@ -27,7 +27,7 @@ export type ComposerMode = 'general' | 'strategy' | 'judge_lens' | 'drafting' | 
 
 export type ChatInputUploadCallbacks = {
     onProgress: (progress: number) => void;
-    onStatus: (status: ChatUploadStatus) => void;
+    onStatus: (status: ChatComposerFileStatus) => void;
     onComplete: (upload: ChatUploadResponse) => void;
 };
 
@@ -68,7 +68,7 @@ function toUploadIntent(intent: FilePromptIntent): ChatUploadIntent {
     return intent === 'court_order' ? 'court_order' : 'attachment';
 }
 
-function isBusyStatus(status: ChatUploadStatus) {
+function isBusyStatus(status: ChatComposerFileStatus) {
     return status === 'uploading_to_storage' || status === 'processing_queued' || status === 'processing';
 }
 

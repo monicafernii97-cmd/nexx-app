@@ -78,7 +78,9 @@ describe('ChatInput file send flow', () => {
 
   it('builds intent-specific fallback prompts for file-only sends', () => {
     expect(buildFileFallbackMessage('attachment', 'order.pdf')).toBe('Analyze this file: order.pdf');
-    expect(buildFileFallbackMessage('court_order', 'order.pdf')).toBe('Analyze this court order: order.pdf');
+    expect(buildFileFallbackMessage('court_order', 'order.pdf')).toBe(
+      'Analyze this court order and extract the key obligations, deadlines, risks, and recommended next steps.',
+    );
     expect(buildFileFallbackMessage('thread', 'thread.txt')).toBe('Analyze this uploaded thread: thread.txt');
   });
 
@@ -111,7 +113,22 @@ describe('ChatInput file send flow', () => {
     });
 
     expect(onSend).toHaveBeenCalledTimes(1);
-    expect(onSend).toHaveBeenCalledWith('Analyze this file: order.pdf', file);
+    expect(onSend).toHaveBeenCalledWith(
+      'Analyze this file: order.pdf',
+      expect.objectContaining({
+        file,
+        intent: 'attachment',
+        status: 'selected',
+        clientUploadKey: expect.any(String),
+        retryable: true,
+      }),
+      undefined,
+      expect.objectContaining({
+        onProgress: expect.any(Function),
+        onStatus: expect.any(Function),
+        onComplete: expect.any(Function),
+      }),
+    );
     expect(container.textContent).not.toContain('order.pdf');
   });
 

@@ -284,6 +284,11 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
         }
 
         if (autoSendIntent && !disabled) {
+            if (sendInFlightRef.current) {
+                resetInput();
+                return;
+            }
+            sendInFlightRef.current = true;
             stopRecognition();
             try {
                 await onSend(buildFileFallbackMessage(autoSendIntent, file.name), file);
@@ -297,6 +302,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                 setMicError(getSendErrorMessage(error));
                 focusComposer();
             } finally {
+                sendInFlightRef.current = false;
                 resetInput();
             }
             return;

@@ -32,7 +32,7 @@ const QUICK_ACTIONS = [
 ] as const;
 
 /** Build the default prompt used when a file is sent without typed context. */
-function buildFileFallbackMessage(intent: 'attachment' | 'thread' | 'court_order', filename?: string) {
+export function buildFileFallbackMessage(intent: 'attachment' | 'thread' | 'court_order', filename?: string) {
     if (intent === 'court_order') {
         return `Analyze this court order: ${filename ?? 'uploaded court order'}`;
     }

@@ -77,14 +77,39 @@ function isNonRetryableFailure(status: ChatComposerFileStatus) {
     return status === 'failed_empty_extraction';
 }
 
+function isFailureStatus(status: ChatComposerFileStatus) {
+    return status === 'failed_storage_upload' ||
+        status === 'failed_processing' ||
+        status === 'failed_empty_extraction' ||
+        status === 'stalled' ||
+        status === 'cancelled';
+}
+
+function isBlockedFileState(state: ChatComposerFileState | null) {
+    if (!state) return false;
+    if (state.attachmentRef) return false;
+    return isNonRetryableFailure(state.status) || state.status === 'cancelled' || state.retryable === false;
+}
+
 function fileStatusLabel(state: ChatComposerFileState) {
     if (state.status === 'uploading_to_storage') return `${state.progress ?? 0}%`;
     if (state.status === 'processing_queued' || state.status === 'processing') return 'Processing';
     if (state.status === 'ready') return 'Ready';
     if (state.status === 'partial') return 'Text ready';
-    if (state.status.startsWith('failed')) return 'Retry';
-    if (state.status === 'stalled') return 'Retry';
-    return `${((state.file?.size ?? 0) / 1024).toFixed(0)}KB`;
+    if (isNonRetryableFailure(state.status) || state.retryable === false) return 'Replace file';
+    if (isFailureStatus(state.status)) return 'Retry';
+    return 'Attached';
+}
+
+function getUploadErrorDetails(error: unknown) {
+    const details = error as {
+        uploadStatus?: ChatComposerFileStatus;
+        retryable?: boolean;
+    };
+    return {
+        uploadStatus: details?.uploadStatus,
+        retryable: details?.retryable,
+    };
 }
 
 export default function ChatInput({ onSend, disabled, placeholder, onQuickAction }: ChatInputProps) {
@@ -106,6 +131,9 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
 
     const selectedFile = selectedFileState?.file ?? null;
     const isFileBusy = selectedFileState ? isBusyStatus(selectedFileState.status) : false;
+    const isFileBlocked = isBlockedFileState(selectedFileState);
+    const hasSendableFile = Boolean(selectedFileState && !isFileBusy && !isFileBlocked);
+    const canSubmit = Boolean(input.trim() || hasSendableFile) && !disabled && !isFileBusy && !isFileBlocked;
 
     const updateInput = useCallback((value: string) => {
         inputRef.current = value;
@@ -194,6 +222,11 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     const handleSend = useCallback(async () => {
         const text = inputRef.current.trim();
         if (!text && !selectedFileState) return;
+        if (isBlockedFileState(selectedFileState)) {
+            setMicError(selectedFileState?.error ?? 'NEXX could not read this file. Remove it or upload a readable PDF, DOCX, DOC, or TXT copy.');
+            focusComposer();
+            return;
+        }
         if (disabled || isFileBusy) return;
         if (sendInFlightRef.current) return;
         sendInFlightRef.current = true;
@@ -215,19 +248,20 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             setMicError(null);
         } catch (error) {
             const message = getSendErrorMessage(error);
+            const { uploadStatus, retryable } = getUploadErrorDetails(error);
             setMicError(message);
             if (selectedFileState) {
                 setSelectedFileState((current) => current ? {
                     ...current,
-                    status: isNonRetryableFailure(current.status)
+                    status: uploadStatus ?? (isNonRetryableFailure(current.status)
                         ? current.status
                         : current.attachmentRef
                             ? current.status
                             : current.storageId
                                 ? 'failed_processing'
-                                : 'failed_storage_upload',
+                                : 'failed_storage_upload'),
                     error: message,
-                    retryable: isNonRetryableFailure(current.status) ? current.retryable : true,
+                    retryable: retryable ?? (isNonRetryableFailure(uploadStatus ?? current.status) ? false : current.retryable),
                 } : current);
                 focusComposer();
             }
@@ -244,7 +278,6 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
         stopRecognition,
         updateInput,
         getSendErrorMessage,
-        updateSelectedFileState,
         focusComposer,
     ]);
 
@@ -370,22 +403,23 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                 setMicError(null);
             } catch (error) {
                 const message = getSendErrorMessage(error);
+                const { uploadStatus, retryable } = getUploadErrorDetails(error);
                 setSelectedFileState((current) => current ? {
                     ...current,
-                    status: isNonRetryableFailure(current.status)
+                    status: uploadStatus ?? (isNonRetryableFailure(current.status)
                         ? current.status
                         : current.attachmentRef
                             ? current.status
                             : current.storageId
                                 ? 'failed_processing'
-                                : 'failed_storage_upload',
+                                : 'failed_storage_upload'),
                     error: message,
-                    retryable: isNonRetryableFailure(current.status) ? current.retryable : true,
+                    retryable: retryable ?? (isNonRetryableFailure(uploadStatus ?? current.status) ? false : current.retryable),
                 } : {
                     ...nextFileState,
-                    status: 'failed_storage_upload',
+                    status: uploadStatus ?? 'failed_storage_upload',
                     error: message,
-                    retryable: true,
+                    retryable: retryable ?? !isNonRetryableFailure(uploadStatus ?? 'failed_storage_upload'),
                 });
                 setSelectedFileIntent(autoSendIntent);
                 setMicError(message);
@@ -462,7 +496,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
 
     return (
         <div className="relative space-y-2">
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar" style={{ scrollbarWidth: 'none' }}>
                 {QUICK_ACTIONS.map((action) => {
                     const Icon = action.icon;
                     return (
@@ -516,22 +550,42 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             </div>
 
             {selectedFileState?.file && (
-                <div className="flex items-center gap-2 px-4 py-2 mb-2 bg-blue-50 rounded-xl animate-in fade-in slide-in-from-bottom-2">
-                    <Paperclip size={14} className="text-blue-500 flex-shrink-0" />
-                    <span className="text-xs font-semibold text-blue-700 truncate max-w-[200px]">
+                <div className={`flex items-center gap-2 px-4 py-2 mb-2 rounded-xl border animate-in fade-in slide-in-from-bottom-2 ${
+                    isFileBlocked
+                        ? 'border-red-400/25 bg-red-500/10'
+                        : isFailureStatus(selectedFileState.status)
+                            ? 'border-amber-300/25 bg-amber-400/10'
+                            : 'border-white/10 bg-white/[0.075]'
+                }`}>
+                    <Paperclip size={14} className={`flex-shrink-0 ${
+                        isFileBlocked ? 'text-red-200' : isFailureStatus(selectedFileState.status) ? 'text-amber-200' : 'text-[var(--accent-icy)]'
+                    }`} />
+                    <span className="text-xs font-semibold text-white truncate max-w-[220px]">
                         {selectedFileState.file.name}
                     </span>
-                    <span className="text-[10px] text-blue-400">
+                    <span className={`text-[10px] font-bold uppercase tracking-wide ${
+                        isFileBlocked ? 'text-red-100/85' : isFailureStatus(selectedFileState.status) ? 'text-amber-100/85' : 'text-white/55'
+                    }`}>
                         {fileStatusLabel(selectedFileState)}
                     </span>
+                    {isFailureStatus(selectedFileState.status) && selectedFileState.retryable !== false && !isFileBusy && (
+                        <button
+                            type="button"
+                            onClick={handleSend}
+                            disabled={disabled}
+                            className="rounded-md border border-amber-200/25 bg-amber-200/10 px-2 py-1 text-[10px] font-bold text-amber-50 transition hover:bg-amber-200/20 disabled:opacity-40"
+                        >
+                            Retry
+                        </button>
+                    )}
                     <button
                         type="button"
                         onClick={removeFile}
                         disabled={isFileBusy || disabled}
-                        className="ml-auto w-5 h-5 rounded-full bg-blue-100 hover:bg-blue-200 flex items-center justify-center transition-colors disabled:opacity-40"
+                        className="ml-auto w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors disabled:opacity-40"
                         aria-label="Remove attached file"
                     >
-                        <X size={10} weight="bold" className="text-blue-600" />
+                        <X size={10} weight="bold" className="text-white/80" />
                     </button>
                 </div>
             )}
@@ -608,15 +662,15 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                     <button
                         type="button"
                         onClick={handleSend}
-                        disabled={(!input.trim() && !selectedFile) || disabled || isFileBusy}
+                        disabled={!canSubmit}
                         aria-label="Send message"
                         className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm ${
-                            (input.trim() || selectedFile) && !disabled && !isFileBusy
+                            canSubmit
                                 ? 'bg-[var(--accent-icy)] text-white hover:scale-105 hover:shadow-lg cursor-pointer'
                                 : 'bg-[var(--surface-elevated)] text-[var(--text-muted)]/30 cursor-not-allowed'
                         }`}
                     >
-                        <PaperPlaneRight size={18} weight={(input.trim() || selectedFile) && !disabled && !isFileBusy ? 'fill' : 'regular'} />
+                        <PaperPlaneRight size={18} weight={canSubmit ? 'fill' : 'regular'} />
                     </button>
                 </div>
             </div>

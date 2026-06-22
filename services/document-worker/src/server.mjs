@@ -15,8 +15,6 @@ const SOURCE_FETCH_TIMEOUT_MS = 30_000;
 const TIKA_FETCH_TIMEOUT_MS = 45_000;
 const MAX_JSON_BODY_BYTES = 64 * 1024;
 
-let cachedLibreOfficeVersion;
-
 function jsonResponse(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(body));
@@ -142,17 +140,14 @@ function runCommand(command, args, options) {
 }
 
 async function getLibreOfficeVersion() {
-  if (cachedLibreOfficeVersion !== undefined) return cachedLibreOfficeVersion;
   try {
     const result = await runCommand('soffice', ['--version'], {
       cwd: tmpdir(),
       env: process.env,
       timeoutMs: 5000,
     });
-    cachedLibreOfficeVersion = result.stdout.trim() || undefined;
-    return cachedLibreOfficeVersion;
+    return result.stdout.trim() || undefined;
   } catch {
-    cachedLibreOfficeVersion = undefined;
     return undefined;
   }
 }

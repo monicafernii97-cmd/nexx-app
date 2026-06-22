@@ -8,14 +8,20 @@ if (!url) {
 }
 
 const healthUrl = new URL('/health', url.replace(/\/+$/, '/'));
-const response = await fetch(healthUrl, {
-  signal: AbortSignal.timeout(10_000),
-});
 
-const body = await response.text();
-if (!response.ok) {
-  console.error(`Document worker health check failed with status ${response.status}: ${body}`);
+try {
+  const response = await fetch(healthUrl, {
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  const body = await response.text();
+  if (!response.ok) {
+    console.error(`Document worker health check failed with status ${response.status}: ${body}`);
+    process.exit(1);
+  }
+
+  console.log(body);
+} catch (error) {
+  console.error(`Document worker health check failed: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 }
-
-console.log(body);

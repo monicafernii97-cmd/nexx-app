@@ -92,13 +92,14 @@ function isBlockedFileState(state: ChatComposerFileState | null) {
 }
 
 function fileStatusLabel(state: ChatComposerFileState) {
+    if (state.status === 'session_created') return 'Starting upload';
     if (state.status === 'uploading_to_storage') return `${state.progress ?? 0}%`;
     if (state.status === 'processing_queued' || state.status === 'processing') return 'Processing';
     if (state.status === 'ready') return 'Ready';
     if (state.status === 'partial') return 'Text ready';
     if (isNonRetryableFailure(state.status) || state.retryable === false) return 'Replace file';
     if (isFailureStatus(state.status)) return 'Retry';
-    return 'Attached';
+    return 'Ready to send';
 }
 
 function getUploadErrorDetails(error: unknown) {
@@ -134,6 +135,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     const isFileBlocked = isBlockedFileState(selectedFileState);
     const hasSendableFile = Boolean(selectedFileState && !isFileBusy && !isFileBlocked);
     const canSubmit = Boolean(input.trim() || hasSendableFile) && !disabled && !isFileBusy && !isFileBlocked;
+    const canSendSelectedFile = Boolean(selectedFileState?.file && !isFileBusy && !isFileBlocked && !disabled);
 
     const updateInput = useCallback((value: string) => {
         inputRef.current = value;
@@ -227,7 +229,16 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             focusComposer();
             return;
         }
-        if (disabled || isFileBusy) return;
+        if (disabled) {
+            setMicError('Chat is still getting ready. Please try again in a moment.');
+            focusComposer();
+            return;
+        }
+        if (isFileBusy) {
+            setMicError('Your file is still uploading or processing. Please wait for it to finish.');
+            focusComposer();
+            return;
+        }
         if (sendInFlightRef.current) return;
         sendInFlightRef.current = true;
         stopRecognition();
@@ -281,12 +292,23 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
         focusComposer,
     ]);
 
+    const requestSend = useCallback(() => {
+        if (selectedFileState?.file && !selectedFileState.attachmentRef && !isFileBusy && !isFileBlocked && !disabled) {
+            setSelectedFileState((current) => current ? {
+                ...current,
+                status: 'session_created',
+                error: undefined,
+            } : current);
+        }
+        void handleSend();
+    }, [disabled, handleSend, isFileBlocked, isFileBusy, selectedFileState]);
+
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
-            handleSend();
+            requestSend();
         }
-    }, [handleSend]);
+    }, [requestSend]);
 
     const toggleListening = useCallback(() => {
         if (disabled) return;
@@ -389,7 +411,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             }
             sendInFlightRef.current = true;
             stopRecognition();
-            setSelectedFileState(nextFileState);
+            setSelectedFileState({ ...nextFileState, status: 'session_created' });
             try {
                 await onSend(
                     buildFileFallbackMessage(autoSendIntent, file.name),
@@ -571,11 +593,20 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                     {isFailureStatus(selectedFileState.status) && selectedFileState.retryable !== false && !isFileBusy && (
                         <button
                             type="button"
-                            onClick={handleSend}
+                            onClick={requestSend}
                             disabled={disabled}
                             className="rounded-md border border-amber-200/25 bg-amber-200/10 px-2 py-1 text-[10px] font-bold text-amber-50 transition hover:bg-amber-200/20 disabled:opacity-40"
                         >
                             Retry
+                        </button>
+                    )}
+                    {!isFailureStatus(selectedFileState.status) && canSendSelectedFile && (
+                        <button
+                            type="button"
+                            onClick={requestSend}
+                            className="rounded-md border border-sky-200/25 bg-sky-200/10 px-2 py-1 text-[10px] font-bold text-sky-50 transition hover:bg-sky-200/20"
+                        >
+                            Send file
                         </button>
                     )}
                     <button
@@ -661,7 +692,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                     </button>
                     <button
                         type="button"
-                        onClick={handleSend}
+                        onClick={requestSend}
                         disabled={!canSubmit}
                         aria-label="Send message"
                         className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm ${

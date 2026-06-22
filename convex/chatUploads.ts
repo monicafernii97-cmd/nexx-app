@@ -72,6 +72,8 @@ function toPublicSession(session: Doc<'chatUploadSessions'>, uploadUrl?: string)
     uploadSessionId: session._id,
     uploadUrl,
     uploadUrlExpiresAt: session.uploadUrlExpiresAt,
+    storageId: session.storageId,
+    uploadedFileId: session.uploadedFileId,
     existingStorageId: session.storageId,
     existingUploadedFileId: session.uploadedFileId,
     status: session.status,

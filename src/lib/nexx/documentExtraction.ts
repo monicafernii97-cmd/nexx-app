@@ -242,6 +242,8 @@ export async function extractDocumentText(
   }
 
   if (isPdf(file, detection)) {
+    let pdfParserError: string | undefined;
+
     try {
       const { PDFParse } = await import('pdf-parse');
       const pdf = new PDFParse({ data: new Uint8Array(buffer) });
@@ -250,30 +252,52 @@ export async function extractDocumentText(
       if (text.length >= MIN_MEANINGFUL_TEXT_CHARS) {
         return { text, method: 'pdf_text', detectedType: detection.detectedType, warnings: detection.warnings };
       }
-
-      const fileInputExtraction = await extractPdfTextWithOpenAIFileInput(buffer);
-      if (fileInputExtraction.text) {
-        return { ...fileInputExtraction, detectedType: detection.detectedType, warnings: detection.warnings };
-      }
-
-      const ocr = await extractPdfTextFromImages(buffer);
-      if (ocr.text) return { ...ocr, method: 'pdf_ocr', detectedType: detection.detectedType, warnings: detection.warnings };
-
-      return {
-        ...ocr,
-        errorCode: 'OCR_EMPTY',
-        detectedType: detection.detectedType,
-        warnings: detection.warnings,
-        error: [
-          'No selectable text was found in this PDF, and OCR could not extract readable text.',
-          fileInputExtraction.error,
-          ocr.error,
-        ].filter(Boolean).join(' '),
-      };
     } catch (err) {
       console.warn('[DocumentExtraction] PDF text extraction failed:', err);
-      return { error: 'PDF text extraction failed.', errorCode: 'CORRUPT_FILE', detectedType: detection.detectedType, warnings: detection.warnings };
+      pdfParserError = err instanceof Error ? err.message : String(err);
     }
+
+    const fileInputExtraction = await extractPdfTextWithOpenAIFileInput(buffer);
+    if (fileInputExtraction.text) {
+      return {
+        ...fileInputExtraction,
+        method: fileInputExtraction.method ?? 'pdf_file_input',
+        detectedType: detection.detectedType,
+        warnings: [
+          ...detection.warnings,
+          ...(pdfParserError ? ['PDF_LOCAL_TEXT_EXTRACTION_FAILED'] : []),
+        ],
+      };
+    }
+
+    const ocr = await extractPdfTextFromImages(buffer);
+    if (ocr.text) {
+      return {
+        ...ocr,
+        method: 'pdf_ocr',
+        detectedType: detection.detectedType,
+        warnings: [
+          ...detection.warnings,
+          ...(pdfParserError ? ['PDF_LOCAL_TEXT_EXTRACTION_FAILED'] : []),
+        ],
+      };
+    }
+
+    return {
+      ...ocr,
+      errorCode: 'OCR_EMPTY',
+      detectedType: detection.detectedType,
+      warnings: [
+        ...detection.warnings,
+        ...(pdfParserError ? ['PDF_LOCAL_TEXT_EXTRACTION_FAILED'] : []),
+      ],
+      error: [
+        'No selectable text was found in this PDF, and OCR could not extract readable text.',
+        pdfParserError ? `Local PDF parser failed: ${pdfParserError}` : undefined,
+        fileInputExtraction.error,
+        ocr.error,
+      ].filter(Boolean).join(' '),
+    };
   }
 
   if (isDocx(file, detection)) {

@@ -66,6 +66,7 @@ export type ChatComposerFileState = {
   file: File | null;
   intent: ChatUploadIntent;
   clientUploadKey: string;
+  clientTurnId: string;
   uploadSessionId?: string;
   uploadUrl?: string;
   uploadUrlExpiresAt?: number;

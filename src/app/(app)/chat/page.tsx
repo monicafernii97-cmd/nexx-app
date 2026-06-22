@@ -145,7 +145,7 @@ function ChatListContent() {
                 attachments = [upload.attachmentRef];
             }
 
-            const requestId = `${String(id)}-${crypto.randomUUID()}`;
+            const requestId = fileState?.clientTurnId ?? `${String(id)}-${crypto.randomUUID()}`;
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

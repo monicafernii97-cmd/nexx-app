@@ -325,6 +325,18 @@ const server = http.createServer(async (req, res) => {
     const result = await handleExtract(body);
     return jsonResponse(res, result.status === 'succeeded' ? 200 : 422, result);
   } catch (error) {
+    if (error instanceof Error && error.message === 'REQUEST_BODY_TOO_LARGE') {
+      return jsonResponse(res, 413, {
+        status: 'failed',
+        attachmentId: 'unknown',
+        error: {
+          code: 'FILE_TOO_LARGE',
+          userMessage: 'Document processing request was too large.',
+          internalSummary: 'Worker JSON request body exceeded maximum size.',
+        },
+        metadata: { workerVersion: WORKER_VERSION },
+      });
+    }
     return jsonResponse(res, 500, {
       status: 'failed',
       attachmentId: 'unknown',

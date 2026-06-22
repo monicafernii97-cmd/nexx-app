@@ -7,7 +7,8 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { CHAT_UPLOAD_CONFIG } from './lib/chatUploadConfig';
-import { extractDocumentText } from '../src/lib/nexx/documentExtraction';
+import { extractDocumentText, type DocumentExtractionResult } from '../src/lib/nexx/documentExtraction';
+import { detectDocumentType, type DocumentDetectionResult } from '../src/lib/nexx/documentTypeDetection';
 import { createVectorStore, deleteVectorStore, uploadTextToVectorStore, uploadToVectorStore } from '../src/lib/nexx/fileSearch';
 
 type ProcessingContext = {
@@ -21,6 +22,30 @@ type ProcessingActionResult = {
   status: string;
   partial?: boolean;
   error?: string;
+};
+
+type WorkerExtractionResponse = {
+  status: 'succeeded' | 'failed';
+  attachmentId: string;
+  detectedType?: string;
+  sha256?: string;
+  text?: string;
+  metadata?: {
+    charCount?: number;
+    pageCount?: number;
+    extractionMethod?: string;
+    hasOcr?: boolean;
+    warnings?: string[];
+    workerVersion?: string;
+    libreOfficeVersion?: string;
+    tikaVersion?: string;
+    tesseractVersion?: string;
+  };
+  error?: {
+    code: string;
+    userMessage: string;
+    internalSummary?: string;
+  };
 };
 
 function sha256Text(text: string) {
@@ -56,6 +81,179 @@ function buildChatContextText(extractedText: string) {
 
 function buildProcessingFile(blob: Blob, filename: string, mimeType: string) {
   return new File([blob], filename, { type: mimeType || blob.type || 'application/octet-stream' });
+}
+
+function getLegacyDocWorkerConfig() {
+  const enabled = process.env.ENABLE_LEGACY_DOC_EXTRACTION === 'true';
+  const url = process.env.DOCUMENT_WORKER_URL?.replace(/\/+$/, '');
+  const token = process.env.DOCUMENT_WORKER_TOKEN;
+  return { enabled, url, token };
+}
+
+function buildExtractionVersion(worker?: WorkerExtractionResponse['metadata']) {
+  return [
+    'nexx-extractor-v2',
+    worker?.workerVersion ? `worker:${worker.workerVersion}` : undefined,
+    worker?.libreOfficeVersion ? `libreoffice:${worker.libreOfficeVersion}` : undefined,
+    worker?.tikaVersion ? `tika:${worker.tikaVersion}` : undefined,
+    worker?.tesseractVersion ? `tesseract:${worker.tesseractVersion}` : undefined,
+  ].filter(Boolean).join(';');
+}
+
+async function extractLegacyDocWithWorker(
+  ctx: ActionCtx,
+  context: ProcessingContext,
+  detection: DocumentDetectionResult,
+): Promise<DocumentExtractionResult> {
+  const config = getLegacyDocWorkerConfig();
+  if (!config.enabled) {
+    return {
+      error: 'Legacy .doc support is being prepared. Please upload DOCX or PDF for now.',
+      errorCode: 'WORKER_UNAVAILABLE',
+      detectedType: 'doc',
+      warnings: detection.warnings,
+    };
+  }
+  if (!config.url || !config.token) {
+    return {
+      error: 'Document processing is temporarily unavailable. Please try again.',
+      errorCode: 'WORKER_UNAVAILABLE',
+      detectedType: 'doc',
+      warnings: detection.warnings,
+    };
+  }
+  if (!context.session.storageId) {
+    return {
+      error: 'Stored upload file is missing.',
+      errorCode: 'UNKNOWN_EXTRACTION_ERROR',
+      detectedType: 'doc',
+      warnings: detection.warnings,
+    };
+  }
+
+  const sourceUrl = await ctx.storage.getUrl(context.session.storageId);
+  if (!sourceUrl) {
+    return {
+      error: 'Document processing is temporarily unavailable. Please try again.',
+      errorCode: 'WORKER_UNAVAILABLE',
+      detectedType: 'doc',
+      warnings: detection.warnings,
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CHAT_UPLOAD_CONFIG.workerTimeoutMs);
+  try {
+    const response = await fetch(`${config.url}/v1/extract`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        jobId: String(context.session._id),
+        attachmentId: String(context.session._id),
+        tenantId: String(context.session.caseId ?? context.session.conversationId ?? context.session.clerkUserId),
+        userId: context.session.clerkUserId,
+        source: {
+          type: 'signed_url',
+          url: sourceUrl,
+          expiresAt: Date.now() + CHAT_UPLOAD_CONFIG.uploadUrlTtlMs,
+        },
+        originalFileName: context.session.filename,
+        declaredMimeType: context.session.mimeType,
+        declaredExtension: context.session.extension,
+        sizeBytes: context.session.byteSize,
+        options: {
+          allowedTypes: ['doc'],
+          enableLegacyDoc: true,
+          enableOcr: process.env.ENABLE_LEGACY_DOC_OCR === 'true',
+          rejectMacros: true,
+          maxSizeBytes: CHAT_UPLOAD_CONFIG.maxBytes,
+          timeoutMs: 60_000,
+        },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      return {
+        error: 'Document processing is temporarily unavailable. Please try again.',
+        errorCode: response.status >= 500 ? 'WORKER_UNAVAILABLE' : 'CONVERSION_FAILED',
+        detectedType: 'doc',
+        warnings: detection.warnings,
+      };
+    }
+
+    const json = await response.json() as WorkerExtractionResponse;
+    if (json.status === 'failed') {
+      return {
+        error: json.error?.userMessage ?? 'NEXX could not read this legacy DOC file.',
+        errorCode: (json.error?.code as DocumentExtractionResult['errorCode']) ?? 'CONVERSION_FAILED',
+        detectedType: 'doc',
+        warnings: [...detection.warnings, ...(json.metadata?.warnings ?? [])],
+      };
+    }
+
+    const text = json.text?.trim() ?? '';
+    if (!text) {
+      return {
+        error: 'NEXX could not find readable text in this document. Please upload a text-based DOCX/PDF or a clearer scan.',
+        errorCode: 'EXTRACTION_EMPTY',
+        detectedType: 'doc',
+        warnings: [...detection.warnings, ...(json.metadata?.warnings ?? [])],
+      };
+    }
+
+    return {
+      text,
+      method: json.metadata?.extractionMethod ?? 'doc_libreoffice_docx',
+      detectedType: 'doc',
+      ocrAttempted: json.metadata?.hasOcr,
+      warnings: [...detection.warnings, ...(json.metadata?.warnings ?? [])],
+      error: json.metadata?.hasOcr ? 'This document was read using OCR. Text may contain recognition errors.' : undefined,
+    };
+  } catch (error) {
+    return {
+      error: error instanceof DOMException && error.name === 'AbortError'
+        ? 'This document took too long to convert. Please upload a smaller DOCX or PDF version.'
+        : 'Document processing is temporarily unavailable. Please try again.',
+      errorCode: error instanceof DOMException && error.name === 'AbortError'
+        ? 'CONVERSION_TIMEOUT'
+        : 'WORKER_UNAVAILABLE',
+      detectedType: 'doc',
+      warnings: detection.warnings,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function extractStoredDocument(
+  ctx: ActionCtx,
+  context: ProcessingContext,
+  file: File,
+  buffer: Buffer,
+): Promise<DocumentExtractionResult> {
+  const detection = detectDocumentType(buffer, {
+    filename: context.session.filename,
+    mimeType: context.session.mimeType,
+  });
+
+  if (!detection.ok) {
+    return {
+      error: detection.userMessage ?? 'NEXX could not read this file.',
+      errorCode: detection.errorCode,
+      detectedType: detection.detectedType,
+      warnings: detection.warnings,
+    };
+  }
+
+  if (detection.detectedType === 'doc') {
+    return await extractLegacyDocWithWorker(ctx, context, detection);
+  }
+
+  return await extractDocumentText(file, { buffer, detection });
 }
 
 async function ensureVectorStore(ctx: ActionCtx, context: ProcessingContext): Promise<string> {
@@ -130,8 +328,9 @@ export const processStoredUpload = internalAction({
         throw new Error('Stored upload blob was not found.');
       }
 
-      const file = buildProcessingFile(blob, context.session.filename, context.session.mimeType);
-      const extraction = await extractDocumentText(file);
+      const buffer = Buffer.from(await blob.arrayBuffer());
+      const file = buildProcessingFile(new Blob([buffer], { type: context.session.mimeType }), context.session.filename, context.session.mimeType);
+      const extraction = await extractStoredDocument(ctx, context, file, buffer);
       const extractedText = extraction.text?.trim() ?? '';
 
       console.info('[ChatUpload] extraction completed', {
@@ -145,15 +344,22 @@ export const processStoredUpload = internalAction({
       });
 
       if (!extractedText) {
+        const retryableExtractionFailure =
+          extraction.errorCode === 'WORKER_UNAVAILABLE' ||
+          extraction.errorCode === 'CONVERSION_TIMEOUT';
         await ctx.runMutation(internal.chatUploads.failProcessing, {
           uploadSessionId: args.uploadSessionId,
           lockId,
-          status: 'failed_empty_extraction',
-          errorCode: 'empty_extraction',
+          status: retryableExtractionFailure ? 'failed_processing' : 'failed_empty_extraction',
+          errorCode: extraction.errorCode ?? 'empty_extraction',
           errorMessage: extraction.error || 'NEXX could not read any text from this file.',
-          retryable: false,
+          retryable: retryableExtractionFailure,
         });
-        return { ok: false, status: 'failed_empty_extraction', error: extraction.error };
+        return {
+          ok: false,
+          status: retryableExtractionFailure ? 'failed_processing' : 'failed_empty_extraction',
+          error: extraction.error,
+        };
       }
 
       const fullTextStorageId = await ctx.storage.store(
@@ -200,6 +406,9 @@ export const processStoredUpload = internalAction({
         chatContextCharCount: contextText.chatContextCharCount,
         contextTruncated: contextText.contextTruncated,
         extractionMethod: extraction.method,
+        detectedType: extraction.detectedType,
+        extractionWarnings: extraction.warnings,
+        extractionVersion: buildExtractionVersion(),
         extractionCharCount: extractedText.length,
         extractionError: extraction.error,
         indexingError,

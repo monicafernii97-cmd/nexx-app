@@ -1,0 +1,27 @@
+services:
+  document-worker:
+    build:
+      context: ./services/document-worker
+    environment:
+      DOCUMENT_WORKER_TOKEN: ${DOCUMENT_WORKER_TOKEN:-local-dev-token}
+      WORKER_VERSION: local-compose
+      PORT: 8080
+      TIKA_SERVER_URL: ${TIKA_SERVER_URL:-}
+    ports:
+      - "8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    mem_limit: 1536m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${PORT}/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

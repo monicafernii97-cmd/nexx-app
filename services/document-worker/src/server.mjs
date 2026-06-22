@@ -13,6 +13,7 @@ const TIKA_SERVER_URL = process.env.TIKA_SERVER_URL?.replace(/\/+$/, '');
 const CFB_MAGIC = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
 const SOURCE_FETCH_TIMEOUT_MS = 30_000;
 const TIKA_FETCH_TIMEOUT_MS = 45_000;
+const MAX_JSON_BODY_BYTES = 64 * 1024;
 
 function jsonResponse(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -34,7 +35,14 @@ function failure(attachmentId, code, userMessage, internalSummary, metadata = {}
 
 async function readJsonBody(req) {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let totalBytes = 0;
+  for await (const chunk of req) {
+    totalBytes += chunk.length;
+    if (totalBytes > MAX_JSON_BODY_BYTES) {
+      throw new Error('REQUEST_BODY_TOO_LARGE');
+    }
+    chunks.push(chunk);
+  }
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
@@ -299,7 +307,13 @@ async function handleExtract(body) {
 const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'GET' && req.url === '/health') {
-      return jsonResponse(res, 200, { ok: true, workerVersion: WORKER_VERSION });
+      const libreOfficeVersion = await getLibreOfficeVersion();
+      return jsonResponse(res, libreOfficeVersion ? 200 : 503, {
+        ok: Boolean(libreOfficeVersion),
+        workerVersion: WORKER_VERSION,
+        libreOfficeVersion,
+        tikaConfigured: Boolean(TIKA_SERVER_URL),
+      });
     }
     if (req.method !== 'POST' || req.url !== '/v1/extract') {
       return jsonResponse(res, 404, { error: 'Not found' });
@@ -311,6 +325,18 @@ const server = http.createServer(async (req, res) => {
     const result = await handleExtract(body);
     return jsonResponse(res, result.status === 'succeeded' ? 200 : 422, result);
   } catch (error) {
+    if (error instanceof Error && error.message === 'REQUEST_BODY_TOO_LARGE') {
+      return jsonResponse(res, 413, {
+        status: 'failed',
+        attachmentId: 'unknown',
+        error: {
+          code: 'FILE_TOO_LARGE',
+          userMessage: 'Document processing request was too large.',
+          internalSummary: 'Worker JSON request body exceeded maximum size.',
+        },
+        metadata: { workerVersion: WORKER_VERSION },
+      });
+    }
     return jsonResponse(res, 500, {
       status: 'failed',
       attachmentId: 'unknown',

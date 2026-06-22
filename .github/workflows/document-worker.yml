@@ -1,0 +1,67 @@
+name: Document Worker
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/document-worker/**"
+      - "docker-compose.document-worker.yml"
+      - ".github/workflows/document-worker.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/document-worker/**"
+      - "docker-compose.document-worker.yml"
+      - ".github/workflows/document-worker.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: document-worker-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-smoke:
+    name: Build & Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          persist-credentials: false
+
+      - name: Check worker syntax
+        run: npm ci --prefix services/document-worker && npm run check --prefix services/document-worker
+
+      - name: Build worker image
+        run: docker build -t nexx-document-worker:test services/document-worker
+
+      - name: Smoke test health endpoint
+        run: |
+          docker run -d --name nexx-document-worker -p 18080:8080 \
+            -e DOCUMENT_WORKER_TOKEN=test-token \
+            -e WORKER_VERSION=ci-${GITHUB_SHA} \
+            nexx-document-worker:test
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:18080/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs nexx-document-worker
+          exit 1
+
+      - name: Publish worker image to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}/document-worker"
+          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+          docker tag nexx-document-worker:test "${IMAGE}:latest"
+          docker tag nexx-document-worker:test "${IMAGE}:${GITHUB_SHA}"
+          docker push "${IMAGE}:latest"
+          docker push "${IMAGE}:${GITHUB_SHA}"

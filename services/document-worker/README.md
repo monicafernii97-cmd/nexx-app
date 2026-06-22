@@ -28,3 +28,23 @@ The worker accepts a signed source URL, validates that the file is a real
 Microsoft Word binary/OLE2 document, rejects macro/encrypted files, converts it
 with LibreOffice to DOCX, extracts text with Mammoth, and falls back to Tika
 when configured.
+
+## Local Smoke Test
+
+```bash
+DOCUMENT_WORKER_TOKEN=local-dev-token docker compose -f docker-compose.document-worker.yml up --build
+node scripts/check-document-worker.mjs http://127.0.0.1:8080
+```
+
+## Production Image
+
+The `Document Worker` GitHub Actions workflow builds and smoke-tests this image
+on PRs. On `main`, it publishes:
+
+```text
+ghcr.io/monicafernii97-cmd/nexx-app/document-worker:latest
+ghcr.io/monicafernii97-cmd/nexx-app/document-worker:<git-sha>
+```
+
+Deploy the SHA-pinned tag to the private container host, then configure Convex
+with the worker URL/token and enable the legacy DOC feature flag.

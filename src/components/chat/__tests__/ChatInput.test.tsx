@@ -166,6 +166,64 @@ describe('ChatInput file send flow', () => {
     expect(document.activeElement).toBe(input(container));
   });
 
+  it('allows Enter retry after a retryable file send failure', async () => {
+    const onSend = vi.fn()
+      .mockRejectedValueOnce(new Error('Temporary upload failure'))
+      .mockResolvedValueOnce(undefined);
+    const { container, root } = await renderChatInput(onSend);
+    roots.push(root);
+    const file = makeFile();
+
+    await act(async () => {
+      setFiles(fileInput(container), [file]);
+      fileInput(container).dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => {
+      sendButton(container).click();
+    });
+    expect(container.textContent).toContain('Retry');
+
+    await act(async () => {
+      input(container).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+
+    expect(onSend).toHaveBeenCalledTimes(2);
+    expect(container.textContent).not.toContain('order.pdf');
+  });
+
+  it('blocks non-readable file failures and asks the user to replace the file', async () => {
+    const onSend = vi.fn(async (_message, _fileState, _mode, callbacks) => {
+      callbacks?.onStatus('failed_empty_extraction');
+      const error = new Error('NEXX could not read any text from this file.') as Error & {
+        uploadStatus: string;
+        retryable: boolean;
+      };
+      error.uploadStatus = 'failed_empty_extraction';
+      error.retryable = false;
+      throw error;
+    });
+    const { container, root } = await renderChatInput(onSend);
+    roots.push(root);
+    const file = makeFile();
+
+    await act(async () => {
+      setFiles(fileInput(container), [file]);
+      fileInput(container).dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => {
+      sendButton(container).click();
+    });
+
+    expect(container.textContent).toContain('Replace file');
+    expect(sendButton(container).disabled).toBe(true);
+
+    await act(async () => {
+      input(container).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+
+    expect(onSend).toHaveBeenCalledTimes(1);
+  });
+
   it('blocks duplicate sends while the first send is in flight', async () => {
     const pending = deferred();
     const onSend = vi.fn().mockReturnValue(pending.promise);

@@ -42,6 +42,24 @@ type UploadSessionSnapshot = {
   extractionError?: string;
 };
 
+export class ChatUploadError extends Error {
+  uploadStatus?: ChatComposerFileStatus;
+  retryable?: boolean;
+  errorCode?: string;
+
+  constructor(message: string, options: {
+    uploadStatus?: ChatComposerFileStatus;
+    retryable?: boolean;
+    errorCode?: string;
+  } = {}) {
+    super(message);
+    this.name = 'ChatUploadError';
+    this.uploadStatus = options.uploadStatus;
+    this.retryable = options.retryable;
+    this.errorCode = options.errorCode;
+  }
+}
+
 export type ChatComposerFileState = {
   file: File | null;
   intent: ChatUploadIntent;
@@ -99,6 +117,7 @@ export type UploadFileForConversationArgs = {
 
 function normalizeStatus(status: string): ChatComposerFileStatus {
   if (status === 'awaiting_storage_upload') return 'session_created';
+  if (status === 'session_created') return 'session_created';
   if (status === 'uploading_to_storage') return 'uploading_to_storage';
   if (status === 'stored') return 'stored';
   if (status === 'processing_queued') return 'processing_queued';
@@ -114,16 +133,27 @@ function normalizeStatus(status: string): ChatComposerFileStatus {
 }
 
 function toUploadError(snapshot: UploadSessionSnapshot) {
-  if (snapshot.errorMessage) return new Error(snapshot.errorMessage);
+  const uploadStatus = typeof snapshot.status === 'string' ? normalizeStatus(snapshot.status) : undefined;
+  const retryable = snapshot.retryable ?? (
+    uploadStatus !== 'failed_empty_extraction' &&
+    uploadStatus !== 'cancelled'
+  );
+  const errorOptions = {
+    uploadStatus,
+    retryable,
+    errorCode: snapshot.errorCode,
+  };
+
+  if (snapshot.errorMessage) return new ChatUploadError(snapshot.errorMessage, errorOptions);
   switch (snapshot.status) {
     case 'failed_empty_extraction':
-      return new Error('NEXX could not read any text from this file.');
+      return new ChatUploadError('NEXX could not read any text from this file.', errorOptions);
     case 'failed_processing':
-      return new Error('NEXX could not finish processing this file. Please retry.');
+      return new ChatUploadError('NEXX could not finish processing this file. Please retry.', errorOptions);
     case 'stalled':
-      return new Error('File processing stalled. Please retry.');
+      return new ChatUploadError('File processing stalled. Please retry.', errorOptions);
     default:
-      return new Error('Upload did not finish. Please retry.');
+      return new ChatUploadError('Upload did not finish. Please retry.', errorOptions);
   }
 }
 
@@ -260,7 +290,8 @@ async function waitForUploadProcessing(args: {
       snapshot.status === 'failed_storage_upload' ||
       snapshot.status === 'failed_processing' ||
       snapshot.status === 'failed_empty_extraction' ||
-      snapshot.status === 'stalled'
+      snapshot.status === 'stalled' ||
+      snapshot.status === 'cancelled'
     ) {
       throw toUploadError(snapshot);
     }
@@ -320,6 +351,24 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
       storageId: storageId as Id<'_storage'>,
     });
   } else if (!session.uploadedFileId) {
+    const normalizedStatus = typeof session.status === 'string' ? normalizeStatus(session.status) : undefined;
+    if (
+      normalizedStatus === 'failed_empty_extraction' ||
+      normalizedStatus === 'cancelled' ||
+      session.retryable === false
+    ) {
+      throw toUploadError(session);
+    }
+    if (
+      typeof session.processingAttempt === 'number' &&
+      session.processingAttempt >= CHAT_UPLOAD_CONFIG.maxProcessingAttempts
+    ) {
+      throw new ChatUploadError('Maximum processing attempts reached.', {
+        uploadStatus: 'failed_processing',
+        retryable: false,
+        errorCode: session.errorCode,
+      });
+    }
     args.onStatus?.('processing_queued');
     await args.convex.mutation(api.chatUploads.retryProcessing, {
       uploadSessionId: uploadSessionId as Id<'chatUploadSessions'>,

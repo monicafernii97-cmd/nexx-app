@@ -293,7 +293,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     ]);
 
     const requestSend = useCallback(() => {
-        if (selectedFileState?.file && !selectedFileState.attachmentRef && !isFileBusy && !isFileBlocked) {
+        if (selectedFileState?.file && !selectedFileState.attachmentRef && !isFileBusy && !isFileBlocked && !disabled) {
             setSelectedFileState((current) => current ? {
                 ...current,
                 status: 'session_created',
@@ -301,7 +301,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             } : current);
         }
         void handleSend();
-    }, [handleSend, isFileBlocked, isFileBusy, selectedFileState]);
+    }, [disabled, handleSend, isFileBlocked, isFileBusy, selectedFileState]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {

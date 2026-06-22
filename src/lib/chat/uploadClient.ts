@@ -20,6 +20,8 @@ type UploadSessionSnapshot = {
   uploadUrlExpiresAt?: number;
   storageId?: string;
   uploadedFileId?: string;
+  existingStorageId?: string;
+  existingUploadedFileId?: string;
   status?: ChatComposerFileStatus | 'awaiting_storage_upload';
   filename?: string;
   mimeType?: string;
@@ -225,7 +227,12 @@ function parseSessionSnapshot(value: unknown): UploadSessionSnapshot {
   if (!value || typeof value !== 'object') {
     throw new Error('Upload session returned invalid data.');
   }
-  return value as UploadSessionSnapshot;
+  const snapshot = value as UploadSessionSnapshot;
+  return {
+    ...snapshot,
+    storageId: snapshot.storageId ?? snapshot.existingStorageId,
+    uploadedFileId: snapshot.uploadedFileId ?? snapshot.existingUploadedFileId,
+  };
 }
 
 function uploadDirectlyToConvexStorage(args: {

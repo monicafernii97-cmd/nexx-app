@@ -31,6 +31,12 @@ function sendButton(container: HTMLElement) {
   return container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement;
 }
 
+function buttonWithText(container: HTMLElement, text: string) {
+  return Array.from(container.querySelectorAll('button')).find((button) =>
+    button.textContent?.includes(text)
+  ) as HTMLButtonElement | undefined;
+}
+
 function setTextareaValue(target: HTMLTextAreaElement, value: string) {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
   descriptor?.set?.call(target, value);
@@ -130,6 +136,90 @@ describe('ChatInput file send flow', () => {
       }),
     );
     expect(container.textContent).not.toContain('order.pdf');
+  });
+
+  it('shows a chip-level Send file action for idle attached files', async () => {
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    const { container, root } = await renderChatInput(onSend);
+    roots.push(root);
+    const file = makeFile();
+
+    await act(async () => {
+      setFiles(fileInput(container), [file]);
+      fileInput(container).dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('Ready to send');
+    const chipSend = buttonWithText(container, 'Send file');
+    expect(chipSend).toBeTruthy();
+
+    await act(async () => {
+      chipSend?.click();
+    });
+
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(onSend).toHaveBeenCalledWith(
+      'Analyze this file: order.pdf',
+      expect.objectContaining({ file, status: 'selected' }),
+      undefined,
+      expect.any(Object),
+    );
+  });
+
+  it('leaves the idle attached state when upload callbacks report processing', async () => {
+    const pending = deferred();
+    const onSend = vi.fn((_message, _fileState, _mode, callbacks) => {
+      callbacks?.onStatus('processing');
+      return pending.promise;
+    });
+    const { container, root } = await renderChatInput(onSend);
+    roots.push(root);
+    const file = makeFile();
+
+    await act(async () => {
+      setFiles(fileInput(container), [file]);
+      fileInput(container).dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => {
+      buttonWithText(container, 'Send file')?.click();
+    });
+
+    expect(container.textContent).toContain('Processing');
+    expect(container.textContent).not.toContain('Ready to send');
+    expect(sendButton(container).disabled).toBe(true);
+
+    await act(async () => {
+      pending.resolve();
+      await pending.promise;
+    });
+  });
+
+  it('leaves the idle attached state immediately after Send file is clicked', async () => {
+    const pending = deferred();
+    const onSend = vi.fn(() => pending.promise);
+    const { container, root } = await renderChatInput(onSend);
+    roots.push(root);
+    const file = makeFile();
+
+    await act(async () => {
+      setFiles(fileInput(container), [file]);
+      fileInput(container).dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(container.textContent).toContain('Ready to send');
+
+    await act(async () => {
+      buttonWithText(container, 'Send file')?.click();
+      await Promise.resolve();
+    });
+
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(container.textContent).not.toContain('Ready to send');
+    expect(sendButton(container).disabled).toBe(true);
+
+    await act(async () => {
+      pending.resolve();
+      await pending.promise;
+    });
   });
 
   it('Shift+Enter does not send', async () => {

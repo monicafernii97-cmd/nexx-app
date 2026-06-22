@@ -178,6 +178,52 @@ describe('uploadClient direct storage flow', () => {
     expect(upload.attachmentRef.status).toBe('partial');
   });
 
+  it('normalizes resumed Convex sessions that use existing storage field names', async () => {
+    const xhrInstances = installSuccessfulXhr();
+    const mutation = vi.fn(async () => ({
+      uploadSessionId: 'session-1',
+      existingStorageId: 'storage-1',
+      existingUploadedFileId: 'uploaded-1',
+      status: 'ready',
+      filename: 'order.pdf',
+      mimeType: 'application/pdf',
+      byteSize: 5,
+      processingAttempt: 1,
+      retryable: false,
+    }));
+    const query = vi.fn(async () => ({
+      uploadSessionId: 'session-1',
+      existingStorageId: 'storage-1',
+      existingUploadedFileId: 'uploaded-1',
+      status: 'ready',
+      filename: 'order.pdf',
+      mimeType: 'application/pdf',
+      byteSize: 5,
+      processingAttempt: 1,
+      retryable: false,
+    }));
+
+    const upload = await uploadFileForConversation({
+      convex: { mutation, query } as never,
+      file: makeFile(),
+      conversationId: 'conversation-1',
+      intent: 'attachment',
+      clientUploadKey: 'client-upload-1',
+    });
+
+    expect(xhrInstances).toHaveLength(0);
+    expect(mutation).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(upload).toMatchObject({
+      uploadedFileId: 'uploaded-1',
+      storageId: 'storage-1',
+      attachmentRef: {
+        uploadedFileId: 'uploaded-1',
+        storageId: 'storage-1',
+      },
+    });
+  });
+
   it('throws a clear error when processing finishes with empty extraction', async () => {
     installSuccessfulXhr();
     const convex = makeConvexClient();

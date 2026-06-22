@@ -3,6 +3,8 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { getAuthenticatedUser, getAuthenticatedUserAndConversation, validateCaseOwnership } from './lib/auth';
 
+const UPLOAD_DRAFT_TTL_MS = 60 * 60 * 1000;
+
 /** Create a new conversation — auth-guarded */
 export const create = mutation({
     args: {
@@ -249,6 +251,36 @@ export const markUploadFailed = mutation({
 });
 
 /** Get a single conversation — auth-guarded */
+/** Purge abandoned hidden upload drafts that never accepted a chat turn. */
+export const cleanupStaleUploadDrafts = internalMutation({
+    args: {},
+    handler: async (ctx) => {
+        const cutoff = Date.now() - UPLOAD_DRAFT_TTL_MS;
+        const statuses = ['draft_uploading', 'failed_upload'] as const;
+        let deleted = 0;
+
+        for (const status of statuses) {
+            const staleDrafts = await ctx.db
+                .query('conversations')
+                .withIndex('by_status_lastMessage', (q) => q.eq('status', status).lt('lastMessageAt', cutoff))
+                .take(50);
+
+            for (const conversation of staleDrafts) {
+                if ((conversation.messageCount ?? 0) > 0) continue;
+                const messages = await ctx.db
+                    .query('messages')
+                    .withIndex('by_conversation', (q) => q.eq('conversationId', conversation._id))
+                    .take(1);
+                if (messages.length > 0) continue;
+                await ctx.db.delete(conversation._id);
+                deleted++;
+            }
+        }
+
+        return { deleted };
+    },
+});
+
 export const get = query({
     args: { id: v.id('conversations') },
     handler: async (ctx, args) => {

@@ -157,6 +157,7 @@ describe('uploadClient direct storage flow', () => {
       file: makeFile(),
       intent: 'attachment',
       clientUploadKey: 'client-upload-1',
+      clientTurnId: 'client-turn-1',
       uploadSessionId: 'session-1',
       storageId: 'storage-1',
       status: 'failed_processing',

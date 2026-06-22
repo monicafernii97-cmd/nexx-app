@@ -668,19 +668,31 @@ export const cleanupStaleUploadSessions = internalMutation({
       stalled++;
     }
 
-    const expired = await ctx.db
-      .query('chatUploadSessions')
-      .withIndex('by_status_updated', (q) => q.eq('status', 'cancelled'))
-      .take(50);
+    const cleanupStatuses = [
+      'awaiting_storage_upload',
+      'failed_storage_upload',
+      'failed_processing',
+      'failed_empty_extraction',
+      'stalled',
+      'cancelled',
+    ] as const;
 
     let deleted = 0;
-    for (const session of expired) {
-      if (now - session.updatedAt < CHAT_UPLOAD_CONFIG.uploadSessionTtlMs) continue;
-      if (session.storageId && !session.uploadedFileId) {
-        await ctx.storage.delete(session.storageId);
+    for (const status of cleanupStatuses) {
+      const expired = await ctx.db
+        .query('chatUploadSessions')
+        .withIndex('by_status_updated', (q) => q.eq('status', status))
+        .take(25);
+
+      for (const session of expired) {
+        if (now - session.updatedAt < CHAT_UPLOAD_CONFIG.uploadSessionTtlMs) continue;
+        if (session.uploadedFileId) continue;
+        if (session.storageId) {
+          await ctx.storage.delete(session.storageId);
+        }
+        await ctx.db.delete(session._id);
+        deleted++;
       }
-      await ctx.db.delete(session._id);
-      deleted++;
     }
 
     return { stalled, deleted };

@@ -44,6 +44,12 @@ crons.interval(
   internal.chatUploads.cleanupStaleUploadSessions,
 );
 
+crons.interval(
+  'clean up stale chat upload drafts',
+  { minutes: 5 },
+  internal.conversations.cleanupStaleUploadDrafts,
+);
+
 /**
  * Purge expired export run and job records daily (30-day retention).
  * Only deletes terminal records (completed, failed, timeout).

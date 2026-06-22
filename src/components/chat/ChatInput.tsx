@@ -150,6 +150,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
         file,
         intent: toUploadIntent(promptIntent),
         clientUploadKey: crypto.randomUUID(),
+        clientTurnId: crypto.randomUUID(),
         status: 'selected',
         progress: 0,
         retryable: true,

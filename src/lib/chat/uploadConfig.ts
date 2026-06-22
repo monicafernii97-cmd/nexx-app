@@ -38,16 +38,18 @@ export function getChatUploadExtension(filename: string) {
 
 export function isAllowedChatUploadType(file: Pick<File, 'name' | 'type'>) {
   const extension = getChatUploadExtension(file.name);
+  const mimeType = file.type || 'application/octet-stream';
+  const hasGenericMime = !file.type || mimeType === 'application/octet-stream';
   const isStandardType =
-    (extension === 'pdf' && file.type === 'application/pdf') ||
-    (extension === 'docx' && file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
-    (extension === 'txt' && file.type === 'text/plain');
+    (extension === 'pdf' && (mimeType === 'application/pdf' || hasGenericMime)) ||
+    (extension === 'docx' && (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || hasGenericMime)) ||
+    (extension === 'txt' && (mimeType === 'text/plain' || hasGenericMime));
 
   if (isStandardType) return true;
 
   if (isLegacyDocClientUploadEnabled()) {
     return (
-      CHAT_UPLOAD_CONFIG.legacyDocMimeTypes.includes(file.type as (typeof CHAT_UPLOAD_CONFIG.legacyDocMimeTypes)[number]) &&
+      (CHAT_UPLOAD_CONFIG.legacyDocMimeTypes.includes(mimeType as (typeof CHAT_UPLOAD_CONFIG.legacyDocMimeTypes)[number]) || hasGenericMime) &&
       CHAT_UPLOAD_CONFIG.legacyDocExtensions.includes(extension as (typeof CHAT_UPLOAD_CONFIG.legacyDocExtensions)[number])
     );
   }
@@ -65,8 +67,10 @@ export function getChatUploadAccept() {
 
 function looksLikeLegacyDoc(file: Pick<File, 'name' | 'type'>) {
   const extension = getChatUploadExtension(file.name);
+  const mimeType = file.type || 'application/octet-stream';
+  const hasGenericMime = !file.type || mimeType === 'application/octet-stream';
   return (
-    CHAT_UPLOAD_CONFIG.legacyDocMimeTypes.includes(file.type as (typeof CHAT_UPLOAD_CONFIG.legacyDocMimeTypes)[number]) &&
+    (CHAT_UPLOAD_CONFIG.legacyDocMimeTypes.includes(mimeType as (typeof CHAT_UPLOAD_CONFIG.legacyDocMimeTypes)[number]) || hasGenericMime) &&
     CHAT_UPLOAD_CONFIG.legacyDocExtensions.includes(extension as (typeof CHAT_UPLOAD_CONFIG.legacyDocExtensions)[number])
   );
 }

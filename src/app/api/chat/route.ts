@@ -18,6 +18,25 @@ type ChatAttachmentRef = {
   status: 'ready' | 'partial';
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isChatAttachmentRef(value: unknown): value is ChatAttachmentRef {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.uploadedFileId === 'string' &&
+    typeof value.uploadSessionId === 'string' &&
+    typeof value.storageId === 'string' &&
+    typeof value.filename === 'string' &&
+    typeof value.mimeType === 'string' &&
+    typeof value.byteSize === 'number' &&
+    Number.isFinite(value.byteSize) &&
+    value.byteSize > 0 &&
+    (value.status === 'ready' || value.status === 'partial')
+  );
+}
+
 /**
  * Reliability-first chat admission route.
  *
@@ -95,10 +114,10 @@ export async function POST(req: NextRequest) {
   }
 
   const turnRequestId =
-    typeof requestId === 'string' && requestId.trim().length > 0
-      ? requestId
-      : typeof clientTurnId === 'string' && clientTurnId.trim().length > 0
+    typeof clientTurnId === 'string' && clientTurnId.trim().length > 0
       ? clientTurnId
+      : typeof requestId === 'string' && requestId.trim().length > 0
+      ? requestId
       : crypto.randomUUID();
 
   const convex = await getAuthenticatedConvexClient();
@@ -129,7 +148,11 @@ export async function POST(req: NextRequest) {
 
   let sanitizedAttachments: ChatAttachmentRef[] = [];
   if (attachments !== undefined) {
-    if (!Array.isArray(attachments) || attachments.length > 5) {
+    if (
+      !Array.isArray(attachments) ||
+      attachments.length > 5 ||
+      attachments.some((attachment) => !isChatAttachmentRef(attachment))
+    ) {
       return Response.json({ error: 'Invalid attachments' }, { status: 400 });
     }
     try {
@@ -171,9 +194,11 @@ export async function POST(req: NextRequest) {
       ? (userRecord.subscriptionTier as SubscriptionTier)
       : 'free';
 
-  const routerResult = sanitizedAttachments.length > 0
-    ? { ...classifyMessage(message), mode: 'document_analysis' as const }
-    : classifyMessage(message);
+  const classified = classifyMessage(message);
+  const routerResult =
+    sanitizedAttachments.length > 0 && classified.mode !== 'safety_escalation'
+      ? { ...classified, mode: 'document_analysis' as const }
+      : classified;
   console.info('[Chat] Accepting chat turn', {
     requestId: turnRequestId,
     conversationIdPresent: Boolean(conversationId),

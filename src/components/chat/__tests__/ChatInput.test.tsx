@@ -126,6 +126,7 @@ describe('ChatInput file send flow', () => {
         intent: 'attachment',
         status: 'selected',
         clientUploadKey: expect.any(String),
+        clientTurnId: expect.any(String),
         retryable: true,
       }),
       undefined,

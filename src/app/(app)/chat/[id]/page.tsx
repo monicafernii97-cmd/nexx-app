@@ -131,13 +131,14 @@ export default function ConversationPage() {
             retryOfAssistantMessageId?: Id<'messages'>;
             editOfUserMessageId?: Id<'messages'>;
             attachments?: ChatAttachmentRef[];
+            clientTurnId?: string;
         }
     ) => {
         setIsStreaming(true);
         setStreamingContent('');
         streamStartRef.current = Date.now();
 
-        const requestId = `${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const requestId = options?.clientTurnId ?? `${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
         try {
             const response = await fetch('/api/chat', {
@@ -214,7 +215,7 @@ export default function ConversationPage() {
 
                 // Server handles user message persistence (Step 13 in route.ts).
                 // No client-side sendMessage needed — avoids duplicate writes.
-                await callChatAPI(input, { attachments });
+                await callChatAPI(input, { attachments, clientTurnId: fileState?.clientTurnId });
             } catch (error) {
                 console.error('Send error:', error);
                 const message = error instanceof Error ? error.message : 'Upload or send failed. Please try again.';

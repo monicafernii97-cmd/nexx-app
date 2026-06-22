@@ -22,7 +22,13 @@ describe('chat upload config', () => {
     expect(validateChatUploadFile(fileMetadata('order.doc', 'application/msword'))).toBeNull();
   });
 
-  it('requires MIME and extension to agree for standard files', () => {
+  it('allows standard files when browsers report generic MIME', () => {
+    expect(validateChatUploadFile(fileMetadata('order.pdf', 'application/octet-stream'))).toBeNull();
+    expect(validateChatUploadFile(fileMetadata('order.docx', ''))).toBeNull();
+    expect(validateChatUploadFile(fileMetadata('notes.txt', 'application/octet-stream'))).toBeNull();
+  });
+
+  it('still rejects explicit MIME and extension mismatches', () => {
     expect(validateChatUploadFile(fileMetadata('renamed.pdf', 'text/plain'))).toContain('Unsupported file type');
   });
 });

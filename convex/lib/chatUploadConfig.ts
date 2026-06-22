@@ -35,17 +35,19 @@ export function validateChatUploadMetadata(args: {
 }) {
   const filename = args.filename.trim();
   const extension = getChatUploadExtension(filename);
+  const mimeType = args.mimeType || 'application/octet-stream';
+  const hasGenericMime = !args.mimeType || mimeType === 'application/octet-stream';
   const allowedPair =
-    (extension === 'pdf' && args.mimeType === 'application/pdf') ||
-    (extension === 'docx' && args.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
-    (extension === 'txt' && args.mimeType === 'text/plain');
+    (extension === 'pdf' && (mimeType === 'application/pdf' || hasGenericMime)) ||
+    (extension === 'docx' && (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || hasGenericMime)) ||
+    (extension === 'txt' && (mimeType === 'text/plain' || hasGenericMime));
   const legacyDocMime = CHAT_UPLOAD_CONFIG.legacyDocMimeTypes.includes(
-    args.mimeType as (typeof CHAT_UPLOAD_CONFIG.legacyDocMimeTypes)[number],
+    mimeType as (typeof CHAT_UPLOAD_CONFIG.legacyDocMimeTypes)[number],
   );
   const legacyDocExtension = CHAT_UPLOAD_CONFIG.legacyDocExtensions.includes(
     extension as (typeof CHAT_UPLOAD_CONFIG.legacyDocExtensions)[number],
   );
-  const isLegacyDoc = legacyDocMime && legacyDocExtension;
+  const isLegacyDoc = (legacyDocMime || hasGenericMime) && legacyDocExtension;
 
   if (!filename) return { ok: false as const, error: 'File name is required.', extension };
   if (filename.length > 240) return { ok: false as const, error: 'File name is too long.', extension };
@@ -60,7 +62,7 @@ export function validateChatUploadMetadata(args: {
   if (!allowedPair) {
     if (
       isLegacyDocServerUploadEnabled() &&
-      legacyDocMime &&
+      (legacyDocMime || hasGenericMime) &&
       legacyDocExtension
     ) {
       if (args.byteSize > CHAT_UPLOAD_CONFIG.maxBytes) {

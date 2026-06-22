@@ -11,6 +11,8 @@ const TOKEN = process.env.DOCUMENT_WORKER_TOKEN;
 const WORKER_VERSION = process.env.WORKER_VERSION || 'nexx-doc-worker-0.1.0';
 const TIKA_SERVER_URL = process.env.TIKA_SERVER_URL?.replace(/\/+$/, '');
 const CFB_MAGIC = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+const SOURCE_FETCH_TIMEOUT_MS = 30_000;
+const TIKA_FETCH_TIMEOUT_MS = 45_000;
 
 function jsonResponse(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -177,6 +179,7 @@ async function extractWithTika(buffer) {
       'Content-Type': 'application/msword',
     },
     body: buffer,
+    signal: AbortSignal.timeout(TIKA_FETCH_TIMEOUT_MS),
   });
   if (!response.ok) return null;
   return normalizeText(await response.text());
@@ -191,11 +194,16 @@ async function handleExtract(body) {
   if (body?.source?.type !== 'signed_url' || !body.source.url) {
     return failure(attachmentId, 'UNKNOWN_EXTRACTION_ERROR', 'Document processing is temporarily unavailable. Please try again.', 'Missing signed source URL');
   }
+  if (!Number.isFinite(options.maxSizeBytes) || options.maxSizeBytes <= 0) {
+    return failure(attachmentId, 'UNKNOWN_EXTRACTION_ERROR', 'Document processing is temporarily unavailable. Please try again.', 'maxSizeBytes not provided');
+  }
   if (body.sizeBytes > options.maxSizeBytes) {
     return failure(attachmentId, 'FILE_TOO_LARGE', 'File too large. Maximum size is 25MB.', 'sizeBytes exceeded maxSizeBytes');
   }
 
-  const sourceResponse = await fetch(body.source.url);
+  const sourceResponse = await fetch(body.source.url, {
+    signal: AbortSignal.timeout(SOURCE_FETCH_TIMEOUT_MS),
+  });
   if (!sourceResponse.ok) {
     return failure(attachmentId, 'WORKER_UNAVAILABLE', 'Document processing is temporarily unavailable. Please try again.', `Source fetch failed ${sourceResponse.status}`);
   }

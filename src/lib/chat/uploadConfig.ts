@@ -66,7 +66,7 @@ export function getChatUploadAccept() {
 function looksLikeLegacyDoc(file: Pick<File, 'name' | 'type'>) {
   const extension = getChatUploadExtension(file.name);
   return (
-    CHAT_UPLOAD_CONFIG.legacyDocMimeTypes.includes(file.type as (typeof CHAT_UPLOAD_CONFIG.legacyDocMimeTypes)[number]) ||
+    CHAT_UPLOAD_CONFIG.legacyDocMimeTypes.includes(file.type as (typeof CHAT_UPLOAD_CONFIG.legacyDocMimeTypes)[number]) &&
     CHAT_UPLOAD_CONFIG.legacyDocExtensions.includes(extension as (typeof CHAT_UPLOAD_CONFIG.legacyDocExtensions)[number])
   );
 }

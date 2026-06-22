@@ -93,12 +93,48 @@ describe('detectDocumentType', () => {
     });
   });
 
+  it('accepts UTF-8 text files', () => {
+    const result = detectDocumentType(Buffer.from('Court order paragraph with readable text.'), {
+      filename: 'document.txt',
+      mimeType: 'text/plain',
+    });
+    expect(result).toMatchObject({ ok: true, detectedType: 'txt' });
+  });
+
+  it('warns when DOCX comments are present', () => {
+    const result = detectDocumentType(makeZip(['[Content_Types].xml', 'word/document.xml', 'word/comments.xml']), {
+      filename: 'order.docx',
+    });
+    expect(result).toMatchObject({ ok: true, detectedType: 'docx' });
+    expect(result.warnings).toContain('COMMENTS_DETECTED');
+  });
+
+  it('warns when DOCX revision parts are present', () => {
+    const result = detectDocumentType(makeZip(['[Content_Types].xml', 'word/document.xml', 'word/revisions/revision1.xml']), {
+      filename: 'order.docx',
+    });
+    expect(result).toMatchObject({ ok: true, detectedType: 'docx' });
+    expect(result.warnings).toContain('TRACKED_CHANGES_DETECTED');
+  });
+
   it('accepts true legacy Word binary documents only when Word streams exist', () => {
     const result = detectDocumentType(makeCfbWithStreams(['Root Entry', 'WordDocument', '1Table']), {
       filename: 'order.doc',
       mimeType: 'application/msword',
     });
     expect(result).toMatchObject({ ok: true, detectedType: 'doc' });
+  });
+
+  it('rejects encrypted legacy Word documents', () => {
+    const result = detectDocumentType(makeCfbWithStreams(['Root Entry', 'WordDocument', '1Table', 'EncryptionInfo']), {
+      filename: 'locked.doc',
+      mimeType: 'application/msword',
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      detectedType: 'doc',
+      errorCode: 'PASSWORD_PROTECTED',
+    });
   });
 
   it('rejects non-Word OLE files renamed to .doc', () => {
@@ -108,6 +144,7 @@ describe('detectDocumentType', () => {
     });
     expect(result).toMatchObject({
       ok: false,
+      detectedType: 'unsupported',
       errorCode: 'NOT_WORD_BINARY_DOC',
     });
   });

@@ -45,7 +45,7 @@ export function validateChatUploadMetadata(args: {
   const legacyDocExtension = CHAT_UPLOAD_CONFIG.legacyDocExtensions.includes(
     extension as (typeof CHAT_UPLOAD_CONFIG.legacyDocExtensions)[number],
   );
-  const isLegacyDoc = legacyDocMime || legacyDocExtension;
+  const isLegacyDoc = legacyDocMime && legacyDocExtension;
 
   if (!filename) return { ok: false as const, error: 'File name is required.', extension };
   if (filename.length > 240) return { ok: false as const, error: 'File name is too long.', extension };

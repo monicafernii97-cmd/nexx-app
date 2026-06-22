@@ -18,7 +18,7 @@ import {
     FileArrowUp,
 } from '@phosphor-icons/react';
 import type { ChatComposerFileState, ChatUploadResponse } from '@/lib/chat/uploadClient';
-import { validateChatUploadFile, type ChatUploadIntent, type ChatComposerFileStatus } from '@/lib/chat/uploadConfig';
+import { getChatUploadAccept, validateChatUploadFile, type ChatUploadIntent, type ChatComposerFileStatus } from '@/lib/chat/uploadConfig';
 
 type SpeechRecognitionCtor = new () => SpeechRecognition;
 type FilePromptIntent = 'attachment' | 'thread' | 'court_order';
@@ -426,7 +426,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             setSelectedFileIntent('court_order');
             autoSendFileIntentRef.current = 'court_order';
             if (fileInputRef.current) {
-                fileInputRef.current.accept = '.pdf,.docx,.txt';
+                fileInputRef.current.accept = getChatUploadAccept();
                 fileInputRef.current.click();
             }
             return;
@@ -487,7 +487,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                         autoSendFileIntentRef.current = null;
                         setSelectedFileIntent('thread');
                         if (fileInputRef.current) {
-                            fileInputRef.current.accept = '.pdf,.docx,.txt';
+                            fileInputRef.current.accept = getChatUploadAccept();
                             fileInputRef.current.click();
                         }
                     }}
@@ -503,7 +503,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                         autoSendFileIntentRef.current = null;
                         setSelectedFileIntent('court_order');
                         if (fileInputRef.current) {
-                            fileInputRef.current.accept = '.pdf,.docx,.txt';
+                            fileInputRef.current.accept = getChatUploadAccept();
                             fileInputRef.current.click();
                         }
                     }}
@@ -540,7 +540,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                accept=".pdf,.docx,.txt"
+                accept={getChatUploadAccept()}
                 onChange={handleFileChange}
             />
 

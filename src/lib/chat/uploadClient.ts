@@ -32,7 +32,9 @@ type UploadSessionSnapshot = {
   extractionCharCount?: number;
   chatContextCharCount?: number;
   contextTruncated?: boolean;
-  extractionMethod?: 'text' | 'ocr' | 'mixed';
+  extractionMethod?: string;
+  detectedType?: string;
+  extractionWarnings?: string[];
   ocrAttempted?: boolean;
   pagesOcrProcessed?: number;
   pagesTotal?: number;
@@ -72,7 +74,8 @@ export type ChatUploadResponse = {
   extractionCharCount?: number;
   chatContextCharCount?: number;
   contextTruncated?: boolean;
-  extractionMethod?: 'text' | 'ocr' | 'mixed';
+  extractionMethod?: string;
+  detectedType?: string;
   ocrAttempted?: boolean;
   pagesOcrProcessed?: number;
   pagesTotal?: number;
@@ -174,6 +177,7 @@ function buildChatUploadResponse(snapshot: UploadSessionSnapshot): ChatUploadRes
     chatContextCharCount: snapshot.chatContextCharCount,
     contextTruncated: snapshot.contextTruncated,
     extractionMethod: snapshot.extractionMethod,
+    detectedType: snapshot.detectedType,
     ocrAttempted: snapshot.ocrAttempted,
     pagesOcrProcessed: snapshot.pagesOcrProcessed,
     pagesTotal: snapshot.pagesTotal,
@@ -182,6 +186,7 @@ function buildChatUploadResponse(snapshot: UploadSessionSnapshot): ChatUploadRes
     warnings: [
       snapshot.indexingError ? `File search indexing did not finish: ${snapshot.indexingError}` : undefined,
       snapshot.extractionError ? `Extraction note: ${snapshot.extractionError}` : undefined,
+      ...(snapshot.extractionWarnings ?? []),
     ].filter(Boolean) as string[],
   };
 }

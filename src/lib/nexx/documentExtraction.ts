@@ -1,3 +1,5 @@
+import { detectDocumentType, type DetectedDocumentType, type DocumentDetectionResult, type ExtractionErrorCode } from './documentTypeDetection';
+
 const PDF_MIME = 'application/pdf';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const DOC_MIME = 'application/msword';
@@ -11,10 +13,13 @@ const PDF_FILE_EXTRACTION_TIMEOUT_MS = 90_000;
 export type DocumentExtractionResult = {
   text?: string;
   error?: string;
-  method?: 'text' | 'ocr';
+  errorCode?: ExtractionErrorCode;
+  method?: string;
+  detectedType?: DetectedDocumentType;
   ocrAttempted?: boolean;
   pagesOcrProcessed?: number;
   pagesTotal?: number;
+  warnings?: string[];
 };
 
 /** Normalize provider/parser text into a stable plain-text payload. */
@@ -23,18 +28,18 @@ function normalizeText(text: string) {
 }
 
 /** Return true when a file should be treated as a PDF, even with missing MIME. */
-function isPdf(file: File) {
-  return file.type === PDF_MIME || file.name.toLowerCase().endsWith('.pdf');
+function isPdf(file: File, detection?: DocumentDetectionResult) {
+  return detection?.detectedType === 'pdf' || file.type === PDF_MIME || file.name.toLowerCase().endsWith('.pdf');
 }
 
 /** Return true when a file should be treated as DOCX, even with missing MIME. */
-function isDocx(file: File) {
-  return file.type === DOCX_MIME || file.name.toLowerCase().endsWith('.docx');
+function isDocx(file: File, detection?: DocumentDetectionResult) {
+  return detection?.detectedType === 'docx' || file.type === DOCX_MIME || file.name.toLowerCase().endsWith('.docx');
 }
 
 /** Return true when a file should be handled as plain text. */
-function isText(file: File) {
-  return file.type === TXT_MIME || file.name.toLowerCase().endsWith('.txt');
+function isText(file: File, detection?: DocumentDetectionResult) {
+  return detection?.detectedType === 'txt' || file.type === TXT_MIME || file.name.toLowerCase().endsWith('.txt');
 }
 
 /** Ask OpenAI to read a PDF directly when local text extraction finds no selectable text. */
@@ -210,31 +215,55 @@ async function extractPdfTextFromImages(buffer: Buffer): Promise<DocumentExtract
  * and chat flows can distinguish "indexed, but no preview text" from a hard
  * upload failure.
  */
-export async function extractDocumentText(file: File): Promise<DocumentExtractionResult> {
-  if (isText(file)) {
-    const text = normalizeText(await file.text());
-    return text ? { text, method: 'text' } : { error: 'The text file is empty.' };
+export async function extractDocumentText(
+  file: File,
+  options: { buffer?: Buffer; detection?: DocumentDetectionResult } = {},
+): Promise<DocumentExtractionResult> {
+  const buffer = options.buffer ?? Buffer.from(await file.arrayBuffer());
+  const detection = options.detection ?? detectDocumentType(buffer, {
+    filename: file.name,
+    mimeType: file.type,
+  });
+
+  if (!detection.ok) {
+    return {
+      error: detection.userMessage ?? 'Unsupported document type.',
+      errorCode: detection.errorCode,
+      detectedType: detection.detectedType,
+      warnings: detection.warnings,
+    };
   }
 
-  if (isPdf(file)) {
+  if (isText(file, detection)) {
+    const text = normalizeText(await file.text());
+    return text
+      ? { text, method: 'txt', detectedType: detection.detectedType, warnings: detection.warnings }
+      : { error: 'The text file is empty.', errorCode: 'EXTRACTION_EMPTY', detectedType: detection.detectedType, warnings: detection.warnings };
+  }
+
+  if (isPdf(file, detection)) {
     try {
-      const buffer = Buffer.from(await file.arrayBuffer());
       const { PDFParse } = await import('pdf-parse');
       const pdf = new PDFParse({ data: new Uint8Array(buffer) });
       const result = await pdf.getText();
       const text = normalizeText(result.text ?? '');
       if (text.length >= MIN_MEANINGFUL_TEXT_CHARS) {
-        return { text, method: 'text' };
+        return { text, method: 'pdf_text', detectedType: detection.detectedType, warnings: detection.warnings };
       }
 
       const fileInputExtraction = await extractPdfTextWithOpenAIFileInput(buffer);
-      if (fileInputExtraction.text) return fileInputExtraction;
+      if (fileInputExtraction.text) {
+        return { ...fileInputExtraction, detectedType: detection.detectedType, warnings: detection.warnings };
+      }
 
       const ocr = await extractPdfTextFromImages(buffer);
-      if (ocr.text) return ocr;
+      if (ocr.text) return { ...ocr, method: 'pdf_ocr', detectedType: detection.detectedType, warnings: detection.warnings };
 
       return {
         ...ocr,
+        errorCode: 'OCR_EMPTY',
+        detectedType: detection.detectedType,
+        warnings: detection.warnings,
         error: [
           'No selectable text was found in this PDF, and OCR could not extract readable text.',
           fileInputExtraction.error,
@@ -243,30 +272,34 @@ export async function extractDocumentText(file: File): Promise<DocumentExtractio
       };
     } catch (err) {
       console.warn('[DocumentExtraction] PDF text extraction failed:', err);
-      return { error: 'PDF text extraction failed.' };
+      return { error: 'PDF text extraction failed.', errorCode: 'CORRUPT_FILE', detectedType: detection.detectedType, warnings: detection.warnings };
     }
   }
 
-  if (isDocx(file)) {
+  if (isDocx(file, detection)) {
     try {
-      const buffer = Buffer.from(await file.arrayBuffer());
       const mammoth = await import('mammoth');
       const result = await mammoth.extractRawText({ buffer });
       const text = normalizeText(result.value ?? '');
       return text
-        ? { text, method: 'text' }
-        : { error: 'No readable text was found in this DOCX file.' };
+        ? { text, method: 'docx_native', detectedType: detection.detectedType, warnings: detection.warnings }
+        : { error: 'No readable text was found in this DOCX file.', errorCode: 'EXTRACTION_EMPTY', detectedType: detection.detectedType, warnings: detection.warnings };
     } catch (err) {
       console.warn('[DocumentExtraction] DOCX text extraction failed:', err);
-      return { error: 'DOCX text extraction failed.' };
+      return { error: 'DOCX text extraction failed.', errorCode: 'CORRUPT_FILE', detectedType: detection.detectedType, warnings: detection.warnings };
     }
   }
 
-  if (file.type === DOC_MIME || file.name.toLowerCase().endsWith('.doc')) {
-    return { error: 'Legacy DOC files can be indexed, but text preview extraction is not available.' };
+  if (detection.detectedType === 'doc' || file.type === DOC_MIME || file.name.toLowerCase().endsWith('.doc')) {
+    return {
+      error: 'Legacy DOC files require the hardened document worker before they can be attached to chat.',
+      errorCode: 'WORKER_UNAVAILABLE',
+      detectedType: detection.detectedType,
+      warnings: detection.warnings,
+    };
   }
 
-  return { error: 'Unsupported document type.' };
+  return { error: 'Unsupported document type.', errorCode: 'UNSUPPORTED_FILE_TYPE', detectedType: detection.detectedType, warnings: detection.warnings };
 }
 
 export function buildDocumentContextSnippet(text: string, maxChars = 12000) {

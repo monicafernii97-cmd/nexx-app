@@ -310,6 +310,8 @@ export default defineSchema({
         storageSha256: v.optional(v.string()),
         storageContentType: v.optional(v.string()),
         storageSize: v.optional(v.number()),
+        detectedType: v.optional(v.string()),
+        extractionWarnings: v.optional(v.array(v.string())),
         uploadedFileId: v.optional(v.id('uploadedFiles')),
         status: v.union(
             v.literal('awaiting_storage_upload'),
@@ -781,11 +783,10 @@ export default defineSchema({
         byteSize: v.optional(v.number()),
         storageId: v.optional(v.id('_storage')),
         storageSha256: v.optional(v.string()),
-        extractionMethod: v.optional(v.union(
-            v.literal('text'),
-            v.literal('ocr'),
-            v.literal('mixed')
-        )),
+        detectedType: v.optional(v.string()),
+        extractionMethod: v.optional(v.string()),
+        extractionWarnings: v.optional(v.array(v.string())),
+        extractionVersion: v.optional(v.string()),
         extractionCharCount: v.optional(v.number()),
         chatContextText: v.optional(v.string()),
         chatContextCharCount: v.optional(v.number()),

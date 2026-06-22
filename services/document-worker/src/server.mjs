@@ -193,6 +193,23 @@ async function extractWithTika(buffer) {
   return normalizeText(await response.text());
 }
 
+async function getTikaStatus() {
+  if (!TIKA_SERVER_URL) return { configured: false, healthy: false };
+  try {
+    const response = await fetch(`${TIKA_SERVER_URL}/version`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!response.ok) return { configured: true, healthy: false };
+    return {
+      configured: true,
+      healthy: true,
+      version: normalizeText(await response.text()),
+    };
+  } catch {
+    return { configured: true, healthy: false };
+  }
+}
+
 async function handleExtract(body) {
   const attachmentId = body?.attachmentId || 'unknown';
   const options = body?.options ?? {};
@@ -308,11 +325,15 @@ const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'GET' && req.url === '/health') {
       const libreOfficeVersion = await getLibreOfficeVersion();
-      return jsonResponse(res, libreOfficeVersion ? 200 : 503, {
-        ok: Boolean(libreOfficeVersion),
+      const tika = await getTikaStatus();
+      const healthy = Boolean(libreOfficeVersion) && (!tika.configured || tika.healthy);
+      return jsonResponse(res, healthy ? 200 : 503, {
+        ok: healthy,
         workerVersion: WORKER_VERSION,
         libreOfficeVersion,
-        tikaConfigured: Boolean(TIKA_SERVER_URL),
+        tikaConfigured: tika.configured,
+        tikaHealthy: tika.healthy,
+        tikaVersion: tika.version,
       });
     }
     if (req.method !== 'POST' || req.url !== '/v1/extract') {

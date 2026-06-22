@@ -13,6 +13,9 @@ const TIKA_SERVER_URL = process.env.TIKA_SERVER_URL?.replace(/\/+$/, '');
 const CFB_MAGIC = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
 const SOURCE_FETCH_TIMEOUT_MS = 30_000;
 const TIKA_FETCH_TIMEOUT_MS = 45_000;
+const MAX_JSON_BODY_BYTES = 64 * 1024;
+
+let cachedLibreOfficeVersion;
 
 function jsonResponse(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -34,7 +37,14 @@ function failure(attachmentId, code, userMessage, internalSummary, metadata = {}
 
 async function readJsonBody(req) {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let totalBytes = 0;
+  for await (const chunk of req) {
+    totalBytes += chunk.length;
+    if (totalBytes > MAX_JSON_BODY_BYTES) {
+      throw new Error('REQUEST_BODY_TOO_LARGE');
+    }
+    chunks.push(chunk);
+  }
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
@@ -132,14 +142,17 @@ function runCommand(command, args, options) {
 }
 
 async function getLibreOfficeVersion() {
+  if (cachedLibreOfficeVersion !== undefined) return cachedLibreOfficeVersion;
   try {
     const result = await runCommand('soffice', ['--version'], {
       cwd: tmpdir(),
       env: process.env,
       timeoutMs: 5000,
     });
-    return result.stdout.trim() || undefined;
+    cachedLibreOfficeVersion = result.stdout.trim() || undefined;
+    return cachedLibreOfficeVersion;
   } catch {
+    cachedLibreOfficeVersion = undefined;
     return undefined;
   }
 }
@@ -299,7 +312,13 @@ async function handleExtract(body) {
 const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'GET' && req.url === '/health') {
-      return jsonResponse(res, 200, { ok: true, workerVersion: WORKER_VERSION });
+      const libreOfficeVersion = await getLibreOfficeVersion();
+      return jsonResponse(res, libreOfficeVersion ? 200 : 503, {
+        ok: Boolean(libreOfficeVersion),
+        workerVersion: WORKER_VERSION,
+        libreOfficeVersion,
+        tikaConfigured: Boolean(TIKA_SERVER_URL),
+      });
     }
     if (req.method !== 'POST' || req.url !== '/v1/extract') {
       return jsonResponse(res, 404, { error: 'Not found' });

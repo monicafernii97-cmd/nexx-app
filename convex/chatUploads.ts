@@ -21,6 +21,33 @@ type StorageMetadata = {
 };
 
 const uploadIntentValidator = v.union(v.literal('attachment'), v.literal('court_order'));
+const uploadDiagnosticsValidator = v.object({
+  sessionId: v.optional(v.string()),
+  attemptId: v.optional(v.string()),
+  clientUploadKey: v.optional(v.string()),
+  clientTurnId: v.optional(v.string()),
+  fileSize: v.optional(v.number()),
+  fileType: v.optional(v.string()),
+  fileExtension: v.optional(v.string()),
+  uploadUrlHost: v.optional(v.string()),
+  uploadUrlProtocol: v.optional(v.string()),
+  elapsedMs: v.optional(v.number()),
+  readyState: v.optional(v.number()),
+  status: v.optional(v.number()),
+  statusText: v.optional(v.string()),
+  loadedBytes: v.optional(v.number()),
+  totalBytes: v.optional(v.number()),
+  progressEvents: v.optional(v.number()),
+  lastProgressElapsedMs: v.optional(v.union(v.number(), v.null())),
+  onlineAtStart: v.optional(v.boolean()),
+  onlineAtEnd: v.optional(v.boolean()),
+  visibilityState: v.optional(v.string()),
+  effectiveType: v.optional(v.string()),
+  saveData: v.optional(v.boolean()),
+  eventType: v.optional(v.string()),
+  failureKind: v.optional(v.string()),
+  failureMessageSafe: v.optional(v.string()),
+});
 
 const terminalSuccessStatuses = new Set(['ready', 'partial']);
 const retryableProcessingStatuses = new Set([
@@ -70,6 +97,9 @@ async function validateScope(
 function toPublicSession(session: Doc<'chatUploadSessions'>, uploadUrl?: string) {
   return {
     uploadSessionId: session._id,
+    uploadAttemptId: session.currentAttemptId,
+    attemptId: session.currentAttemptId,
+    attemptNo: session.attemptNo,
     uploadUrl,
     uploadUrlExpiresAt: session.uploadUrlExpiresAt,
     storageId: session.storageId,
@@ -85,6 +115,48 @@ function toPublicSession(session: Doc<'chatUploadSessions'>, uploadUrl?: string)
     errorMessage: session.errorMessage,
     retryable: session.retryable,
   };
+}
+
+function getUploadUrlParts(uploadUrl: string) {
+  try {
+    const parsed = new URL(uploadUrl);
+    return {
+      uploadUrlHost: parsed.host,
+      uploadUrlProtocol: parsed.protocol,
+    };
+  } catch {
+    return {};
+  }
+}
+
+async function createUploadAttempt(
+  ctx: MutationCtx,
+  args: {
+    uploadSessionId: Id<'chatUploadSessions'>;
+    clerkUserId: string;
+    uploadUrl: string;
+    issuedAt: number;
+    expiresAt: number;
+    attemptNo: number;
+  },
+) {
+  const attemptId = await ctx.db.insert('chatUploadAttempts', {
+    uploadSessionId: args.uploadSessionId,
+    clerkUserId: args.clerkUserId,
+    attemptNo: args.attemptNo,
+    status: 'created',
+    ...getUploadUrlParts(args.uploadUrl),
+    uploadUrlIssuedAt: args.issuedAt,
+    uploadUrlExpiresAt: args.expiresAt,
+    createdAt: args.issuedAt,
+    updatedAt: args.issuedAt,
+  });
+  await ctx.db.patch(args.uploadSessionId, {
+    currentAttemptId: attemptId,
+    attemptNo: args.attemptNo,
+    updatedAt: args.issuedAt,
+  });
+  return attemptId;
 }
 
 /** Start or resume an idempotent direct-to-storage chat upload session. */
@@ -137,13 +209,28 @@ export const startUploadSession = mutation({
       if (!existing.storageId && existing.status !== 'cancelled') {
         const uploadUrl = await ctx.storage.generateUploadUrl();
         const now = Date.now();
+        const attemptNo = (existing.attemptNo ?? 0) + 1;
+        const uploadUrlExpiresAt = now + CHAT_UPLOAD_CONFIG.uploadUrlTtlMs;
+        const attemptId = await createUploadAttempt(ctx, {
+          uploadSessionId: existing._id,
+          clerkUserId: user.clerkId!,
+          uploadUrl,
+          issuedAt: now,
+          expiresAt: uploadUrlExpiresAt,
+          attemptNo,
+        });
         await ctx.db.patch(existing._id, {
           status: 'awaiting_storage_upload',
           uploadUrlIssuedAt: now,
-          uploadUrlExpiresAt: now + CHAT_UPLOAD_CONFIG.uploadUrlTtlMs,
+          uploadUrlExpiresAt,
+          currentAttemptId: attemptId,
+          attemptNo,
           retryable: true,
           errorCode: undefined,
           errorMessage: undefined,
+          lastFailureKind: undefined,
+          lastFailureMessageSafe: undefined,
+          lastFailureDiagnostics: undefined,
           updatedAt: now,
         });
         const refreshed = await ctx.db.get(existing._id);
@@ -155,6 +242,7 @@ export const startUploadSession = mutation({
 
     const now = Date.now();
     const uploadUrl = await ctx.storage.generateUploadUrl();
+    const uploadUrlExpiresAt = now + CHAT_UPLOAD_CONFIG.uploadUrlTtlMs;
     const uploadSessionId = await ctx.db.insert('chatUploadSessions', {
       clerkUserId: user.clerkId,
       caseId,
@@ -167,11 +255,19 @@ export const startUploadSession = mutation({
       byteSize: args.byteSize,
       status: 'awaiting_storage_upload',
       uploadUrlIssuedAt: now,
-      uploadUrlExpiresAt: now + CHAT_UPLOAD_CONFIG.uploadUrlTtlMs,
+      uploadUrlExpiresAt,
       processingAttempt: 0,
       retryable: true,
       createdAt: now,
       updatedAt: now,
+    });
+    const attemptId = await createUploadAttempt(ctx, {
+      uploadSessionId,
+      clerkUserId: user.clerkId,
+      uploadUrl,
+      issuedAt: now,
+      expiresAt: uploadUrlExpiresAt,
+      attemptNo: 1,
     });
 
     console.info('[ChatUpload] session started', {
@@ -184,7 +280,7 @@ export const startUploadSession = mutation({
 
     const session = await ctx.db.get(uploadSessionId);
     if (!session) throw new Error('Upload session was not created');
-    return toPublicSession(session, uploadUrl);
+    return toPublicSession({ ...session, currentAttemptId: attemptId, attemptNo: 1 }, uploadUrl);
   },
 });
 
@@ -192,11 +288,23 @@ export const startUploadSession = mutation({
 export const attachStorageAndScheduleProcessing = mutation({
   args: {
     uploadSessionId: v.id('chatUploadSessions'),
+    uploadAttemptId: v.optional(v.id('chatUploadAttempts')),
     storageId: v.id('_storage'),
   },
   handler: async (ctx, args) => {
-    const { session } = await getOwnedSession(ctx, args.uploadSessionId);
+    const { clerkUserId, session } = await getOwnedSession(ctx, args.uploadSessionId);
     if (session.status === 'cancelled') throw new Error('Upload session was cancelled');
+
+    if (args.uploadAttemptId) {
+      const attempt = await ctx.db.get(args.uploadAttemptId);
+      if (
+        !attempt ||
+        attempt.uploadSessionId !== args.uploadSessionId ||
+        attempt.clerkUserId !== clerkUserId
+      ) {
+        throw new Error('Upload attempt does not belong to this session.');
+      }
+    }
 
     if (session.storageId && session.storageId !== args.storageId) {
       throw new Error('Upload session already has a different storage file attached.');
@@ -237,6 +345,13 @@ export const attachStorageAndScheduleProcessing = mutation({
       retryable: !terminalSuccessStatuses.has(session.status),
       updatedAt: now,
     });
+    if (args.uploadAttemptId) {
+      await ctx.db.patch(args.uploadAttemptId, {
+        status: 'attached',
+        completedAt: now,
+        updatedAt: now,
+      });
+    }
 
     console.info('[ChatUpload] storage attached', {
       uploadSessionId: args.uploadSessionId,
@@ -252,6 +367,108 @@ export const attachStorageAndScheduleProcessing = mutation({
     }
 
     return { uploadSessionId: args.uploadSessionId, status: nextStatus };
+  },
+});
+
+/** Record safe, redacted browser upload diagnostics for support/debugging. */
+export const recordUploadClientEvent = mutation({
+  args: {
+    uploadSessionId: v.id('chatUploadSessions'),
+    uploadAttemptId: v.optional(v.id('chatUploadAttempts')),
+    eventType: v.union(
+      v.literal('storage_post_started'),
+      v.literal('storage_post_progress'),
+      v.literal('storage_post_failed'),
+      v.literal('storage_post_succeeded'),
+      v.literal('attach_started'),
+      v.literal('attach_failed'),
+      v.literal('processing_poll_timeout'),
+    ),
+    diagnostics: uploadDiagnosticsValidator,
+  },
+  handler: async (ctx, args) => {
+    const { clerkUserId, session } = await getOwnedSession(ctx, args.uploadSessionId);
+    const diagnostics = args.diagnostics;
+    const now = Date.now();
+
+    if (args.uploadAttemptId) {
+      const attempt = await ctx.db.get(args.uploadAttemptId);
+      if (
+        !attempt ||
+        attempt.uploadSessionId !== args.uploadSessionId ||
+        attempt.clerkUserId !== clerkUserId
+      ) {
+        throw new Error('Upload attempt does not belong to this session.');
+      }
+      const failed = args.eventType === 'storage_post_failed';
+      const succeeded = args.eventType === 'storage_post_succeeded';
+      const isStoragePostEvent = args.eventType.startsWith('storage_post_');
+      const status = failed
+        ? 'failed'
+        : succeeded
+          ? 'storage_returned'
+          : isStoragePostEvent
+            ? 'posting'
+            : attempt.status;
+      await ctx.db.patch(args.uploadAttemptId, {
+        status,
+        failureKind: failed && typeof diagnostics.failureKind === 'string' ? diagnostics.failureKind : undefined,
+        failureMessageSafe: failed && typeof diagnostics.failureMessageSafe === 'string' ? diagnostics.failureMessageSafe : undefined,
+        elapsedMs: typeof diagnostics.elapsedMs === 'number' ? diagnostics.elapsedMs : undefined,
+        loadedBytes: typeof diagnostics.loadedBytes === 'number' ? diagnostics.loadedBytes : undefined,
+        totalBytes: typeof diagnostics.totalBytes === 'number' ? diagnostics.totalBytes : undefined,
+        readyState: typeof diagnostics.readyState === 'number' ? diagnostics.readyState : undefined,
+        httpStatus: typeof diagnostics.status === 'number' ? diagnostics.status : undefined,
+        browserOnline: typeof diagnostics.onlineAtEnd === 'boolean' ? diagnostics.onlineAtEnd : undefined,
+        effectiveType: typeof diagnostics.effectiveType === 'string' ? diagnostics.effectiveType : undefined,
+        startedAt: attempt.startedAt ?? now,
+        completedAt: failed || succeeded ? now : attempt.completedAt,
+        updatedAt: now,
+      });
+    }
+
+    const failed = args.eventType === 'storage_post_failed';
+    const mayApplyStorageFailure =
+      failed &&
+      !session.storageId &&
+      (session.status === 'awaiting_storage_upload' ||
+        session.status === 'uploading_to_storage' ||
+        session.status === 'failed_storage_upload');
+    await ctx.db.patch(args.uploadSessionId, {
+      status: mayApplyStorageFailure
+        ? 'failed_storage_upload'
+        : session.status === 'awaiting_storage_upload'
+          ? 'uploading_to_storage'
+          : session.status,
+      lastClientEventAt: now,
+      lastProgressBytes: typeof diagnostics.loadedBytes === 'number' ? diagnostics.loadedBytes : session.lastProgressBytes,
+      lastProgressTotalBytes: typeof diagnostics.totalBytes === 'number' ? diagnostics.totalBytes : session.lastProgressTotalBytes,
+      lastFailureKind: mayApplyStorageFailure && typeof diagnostics.failureKind === 'string' ? diagnostics.failureKind : session.lastFailureKind,
+      lastFailureMessageSafe: mayApplyStorageFailure && typeof diagnostics.failureMessageSafe === 'string' ? diagnostics.failureMessageSafe : session.lastFailureMessageSafe,
+      lastFailureDiagnostics: mayApplyStorageFailure ? {
+        failureKind: diagnostics.failureKind,
+        failureMessageSafe: diagnostics.failureMessageSafe,
+        elapsedMs: diagnostics.elapsedMs,
+        readyState: diagnostics.readyState,
+        status: diagnostics.status,
+        statusText: diagnostics.statusText,
+        loadedBytes: diagnostics.loadedBytes,
+        totalBytes: diagnostics.totalBytes,
+        progressEvents: diagnostics.progressEvents,
+        lastProgressElapsedMs: diagnostics.lastProgressElapsedMs,
+        onlineAtStart: diagnostics.onlineAtStart,
+        onlineAtEnd: diagnostics.onlineAtEnd,
+        visibilityState: diagnostics.visibilityState,
+        effectiveType: diagnostics.effectiveType,
+        saveData: diagnostics.saveData,
+        uploadUrlHost: diagnostics.uploadUrlHost,
+        uploadUrlProtocol: diagnostics.uploadUrlProtocol,
+      } : session.lastFailureDiagnostics,
+      retryable: mayApplyStorageFailure ? true : session.retryable,
+      updatedAt: now,
+    });
+
+    return true;
   },
 });
 

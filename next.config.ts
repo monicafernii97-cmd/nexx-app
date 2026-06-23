@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
   // crashes with ERR_REQUIRE_ESM when loaded externally. The bundler
   // handles the ESM→CJS conversion correctly.
   serverExternalPackages: [
+    '@napi-rs/canvas',
     'puppeteer-core',
     '@sparticuz/chromium-min',
   ],

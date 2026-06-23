@@ -1,4 +1,5 @@
 import { detectDocumentType, type DetectedDocumentType, type DocumentDetectionResult, type ExtractionErrorCode } from './documentTypeDetection';
+import { ensurePdfRuntimeReady, isPdfRuntimeError } from './pdfRuntime';
 
 const PDF_MIME = 'application/pdf';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -133,6 +134,7 @@ async function extractPdfTextFromImages(buffer: Buffer): Promise<DocumentExtract
   }
 
   try {
+    await ensurePdfRuntimeReady();
     const { PDFParse } = await import('pdf-parse');
     const { default: OpenAI } = await import('openai');
     const pdf = new PDFParse({ data: new Uint8Array(buffer) });
@@ -201,6 +203,14 @@ async function extractPdfTextFromImages(buffer: Buffer): Promise<DocumentExtract
     };
   } catch (err) {
     console.warn('[DocumentExtraction] PDF OCR fallback failed:', err);
+    if (isPdfRuntimeError(err)) {
+      return {
+        error: 'OCR could not start because the PDF runtime is missing required parser/canvas dependencies.',
+        errorCode: err.errorCode,
+        ocrAttempted: false,
+        warnings: [err.kind],
+      };
+    }
     return {
       error: 'OCR fallback failed for this scanned PDF.',
       ocrAttempted: true,
@@ -243,8 +253,10 @@ export async function extractDocumentText(
 
   if (isPdf(file, detection)) {
     let pdfParserError: string | undefined;
+    let pdfParserRuntimeFailure: string | undefined;
 
     try {
+      await ensurePdfRuntimeReady();
       const { PDFParse } = await import('pdf-parse');
       const pdf = new PDFParse({ data: new Uint8Array(buffer) });
       const result = await pdf.getText();
@@ -255,6 +267,11 @@ export async function extractDocumentText(
     } catch (err) {
       console.warn('[DocumentExtraction] PDF text extraction failed:', err);
       pdfParserError = err instanceof Error ? err.message : String(err);
+      if (isPdfRuntimeError(err)) {
+        pdfParserRuntimeFailure = err.kind;
+      } else if (pdfParserError.includes('DOMMatrix is not defined')) {
+        pdfParserRuntimeFailure = 'runtime_missing_dommatrix';
+      }
     }
 
     const fileInputExtraction = await extractPdfTextWithOpenAIFileInput(buffer);
@@ -285,18 +302,27 @@ export async function extractDocumentText(
 
     return {
       ...ocr,
-      errorCode: 'OCR_EMPTY',
+      errorCode: pdfParserRuntimeFailure ? 'UNKNOWN_EXTRACTION_ERROR' : 'OCR_EMPTY',
       detectedType: detection.detectedType,
       warnings: [
         ...detection.warnings,
         ...(pdfParserError ? ['PDF_LOCAL_TEXT_EXTRACTION_FAILED'] : []),
+        ...(pdfParserRuntimeFailure ? [pdfParserRuntimeFailure] : []),
       ],
-      error: [
-        'No selectable text was found in this PDF, and OCR could not extract readable text.',
-        pdfParserError ? `Local PDF parser failed: ${pdfParserError}` : undefined,
-        fileInputExtraction.error,
-        ocr.error,
-      ].filter(Boolean).join(' '),
+      error: pdfParserRuntimeFailure
+        ? [
+          'The file uploaded, but our PDF processor could not read it because a required PDF runtime dependency is missing.',
+          'This is a system processing issue, not proof that your PDF has no selectable text.',
+          pdfParserError ? `Local PDF parser failed: ${pdfParserError}` : undefined,
+          fileInputExtraction.error,
+          ocr.error,
+        ].filter(Boolean).join(' ')
+        : [
+          'No selectable text was found in this PDF, and OCR could not extract readable text.',
+          pdfParserError ? `Local PDF parser failed: ${pdfParserError}` : undefined,
+          fileInputExtraction.error,
+          ocr.error,
+        ].filter(Boolean).join(' '),
     };
   }
 

@@ -22,7 +22,7 @@ import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
 import { useWorkspace } from '@/lib/workspace-context';
 import { consumeCourtHandoff, buildHandoffPrompt, HANDOFF_FALLBACK_MESSAGE } from '@/lib/exports/courtHandoff';
 import type { ChatAttachmentRef } from '@/lib/chat/uploadConfig';
-import { type ChatComposerFileState, uploadFileForConversation } from '@/lib/chat/uploadClient';
+import { recoverPendingChatUploadAttaches, type ChatComposerFileState, uploadFileForConversation } from '@/lib/chat/uploadClient';
 
 type ConversationDoc = Doc<'conversations'>;
 
@@ -100,6 +100,10 @@ function ChatListContent() {
     const activeConversations = isLoadingConversations ? [] : conversations.filter((c) => c.status === 'active');
     const archivedConversations = isLoadingConversations ? [] : conversations.filter((c) => c.status === 'archived');
     const totalConversations = activeConversations.length + archivedConversations.length;
+
+    useEffect(() => {
+        void recoverPendingChatUploadAttaches(convex);
+    }, [convex]);
 
     const handleSendNewChat = async (
         message: string,

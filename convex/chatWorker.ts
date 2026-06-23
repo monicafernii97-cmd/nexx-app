@@ -172,12 +172,13 @@ type AttachmentContext = {
     extractionError?: string;
 };
 
+/** Select a bounded, deduped set of uploaded documents to include in the model prompt. */
 function selectAttachmentContextsForPrompt(
     context: GenerationContext,
     routerResult: ReturnType<typeof classifyMessage>,
     routeMode: RouteMode
 ) {
-    const selected = [...(context.attachmentContexts ?? [])];
+    const selected = (context.attachmentContexts ?? []).slice(0, 3);
     const availableDocuments = context.availableDocumentContexts ?? [];
     const shouldLoadStoredDocuments =
         availableDocuments.length > 0 &&
@@ -188,6 +189,8 @@ function selectAttachmentContextsForPrompt(
     if (!shouldLoadStoredDocuments) return selected;
 
     const selectedIds = new Set(selected.map((attachment) => attachment.uploadedFileId));
+    if (selected.length >= 3) return selected;
+
     for (const attachment of availableDocuments) {
         if (selectedIds.has(attachment.uploadedFileId)) continue;
         selected.push(attachment);

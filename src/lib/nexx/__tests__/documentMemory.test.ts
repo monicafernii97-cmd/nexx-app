@@ -16,6 +16,8 @@ describe('messageReferencesStoredDocument', () => {
     'How are you today?',
     'How do I file in county court?',
     'Can you help me calm down before mediation?',
+    'What does custody law say in Texas?',
+    'What is the filing deadline in my county?',
   ])('does not over-trigger on unrelated messages: %s', (message) => {
     expect(messageReferencesStoredDocument(message)).toBe(false);
   });

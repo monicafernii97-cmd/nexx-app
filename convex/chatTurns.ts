@@ -70,6 +70,7 @@ const EMPTY_ARTIFACTS_JSON = JSON.stringify({
     confidence: null,
 });
 
+/** Normalize a ready uploaded file into the context shape consumed by the chat worker. */
 function buildUploadedFileContext(
     uploadedFile: Doc<'uploadedFiles'>,
     source: 'current_turn' | 'conversation_memory',

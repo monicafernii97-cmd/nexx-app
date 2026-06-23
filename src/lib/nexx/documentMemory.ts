@@ -5,8 +5,13 @@ const EXPLICIT_DOCUMENT_REFERENCE_PATTERNS = [
   /\b(according\s+to|based\s+on|from|in)\s+(the\s+)?(court\s+order|order|document|file|pdf|upload)\b/i,
 ];
 
+const DOCUMENT_CONTEXT_TERMS = String.raw`court\s+order|order|document|file|pdf|upload|page|paragraph|section|clause`;
+const DOCUMENT_CONTENT_TERMS = String.raw`deadline|due\s+date|obligation|requirement|custody|visitation|possession|conservatorship|injunction|restriction|signed|ordered`;
+
 const DOCUMENT_FOLLOW_UP_PATTERNS = [
-  /\b(deadline|due\s+date|obligation|requirement|custody|visitation|possession|conservatorship|injunction|restriction|clause|paragraph|section|page|signed|ordered)\b/i,
+  new RegExp(String.raw`\b(${DOCUMENT_CONTEXT_TERMS})\b.{0,80}\b(${DOCUMENT_CONTENT_TERMS})\b`, 'i'),
+  new RegExp(String.raw`\b(${DOCUMENT_CONTENT_TERMS})\b.{0,80}\b(${DOCUMENT_CONTEXT_TERMS})\b`, 'i'),
+  /\b(paragraph|section|page|clause)\s+(\d+|[ivxlcdm]+|[a-z])\b/i,
   /\b(what|when|where|who|does|did|can|should|must|shall).{0,80}\b(it|that|the\s+(order|document|file|pdf))\b/i,
   /\b(it|that|the\s+(order|document|file|pdf)).{0,80}\b(say|state|require|mean|allow|prohibit|mention|include)\b/i,
 ];

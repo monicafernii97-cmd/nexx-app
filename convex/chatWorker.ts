@@ -17,6 +17,7 @@ import { recoverStructuredOutput } from '../src/lib/nexx/recovery/recoverStructu
 import { suppressWeakArtifacts } from '../src/lib/nexx/recovery/suppressWeakArtifacts';
 import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
 import { polishLegalResponse } from '../src/lib/nexx/postprocess';
+import { toProviderInputMessages } from '../src/lib/nexx/providerInput';
 import type { NexxAssistantResponse, RouteMode } from '../src/lib/types';
 
 const DEGRADED_MESSAGE =
@@ -252,7 +253,7 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
     const artifactPrompt = buildArtifactPrompt();
     const attachmentContextPrompt = buildAttachmentContextPrompt(context);
 
-    const recentMessages = context.recentMessages
+    const recentMessagesWithMetadata = context.recentMessages
         .filter((message) => message.status !== 'draft' && message.status !== 'deleted')
         .slice(-20)
         .map((message) => ({
@@ -261,9 +262,11 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
             content: message.content,
         }));
 
-    if (!recentMessages.some((message) => message.role === 'user' && message.turnId === context.turn._id)) {
-        recentMessages.push({ turnId: context.turn._id, role: 'user', content: context.turn.message });
+    if (!recentMessagesWithMetadata.some((message) => message.role === 'user' && message.turnId === context.turn._id)) {
+        recentMessagesWithMetadata.push({ turnId: context.turn._id, role: 'user', content: context.turn.message });
     }
+
+    const recentMessages = toProviderInputMessages(recentMessagesWithMetadata);
 
     return {
         systemPrompt,

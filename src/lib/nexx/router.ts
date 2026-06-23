@@ -8,6 +8,7 @@
  */
 
 import type { RouteMode, ToolPlan, RouterResult } from '../types';
+import { messageReferencesStoredDocument } from './documentMemory';
 
 // ---------------------------------------------------------------------------
 // Keyword/pattern maps for Phase 1 heuristic classification
@@ -43,6 +44,7 @@ const PATTERN_ANALYSIS_PATTERNS = [
 
 const DOCUMENT_ANALYSIS_PATTERNS = [
   /\b(this\s+document|this\s+order|what\s+does.*say|interpret|analysis.*file|uploaded)\b/i,
+  /\b(court\s+order|uploaded\s+(document|file|pdf)|attached\s+(document|file|pdf)|shared\s+(document|file|pdf))\b/i,
 ];
 
 const SUPPORT_PATTERNS = [
@@ -85,10 +87,16 @@ export function classifyMessage(
   _activeMode?: RouteMode
 ): RouterResult {
   const text = message.toLowerCase();
+  const referencesStoredDocument = messageReferencesStoredDocument(message);
 
   // Safety-first: always check escalation first
   if (matchesAny(text, SAFETY_PATTERNS)) {
     return buildResult('safety_escalation');
+  }
+
+  // Document follow-ups should win over generic procedure terms like "deadline".
+  if (matchesAny(text, DOCUMENT_ANALYSIS_PATTERNS) || referencesStoredDocument) {
+    return buildResult('document_analysis');
   }
 
   // Local procedure — check BEFORE drafting so "how do I file" hits procedure

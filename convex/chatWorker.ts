@@ -18,6 +18,7 @@ import { suppressWeakArtifacts } from '../src/lib/nexx/recovery/suppressWeakArti
 import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
 import { polishLegalResponse } from '../src/lib/nexx/postprocess';
 import { toProviderInputMessages } from '../src/lib/nexx/providerInput';
+import { messageReferencesStoredDocument } from '../src/lib/nexx/documentMemory';
 import type { NexxAssistantResponse, RouteMode } from '../src/lib/types';
 
 const DEGRADED_MESSAGE =
@@ -142,23 +143,8 @@ type GenerationContext = {
     } | null;
     summaryDoc?: { summary: string } | null;
     caseGraphDoc?: { graphJson: string } | null;
-    attachmentContexts?: Array<{
-        uploadedFileId: string;
-        uploadSessionId: string;
-        filename: string;
-        mimeType: string;
-        byteSize: number;
-        status: 'ready' | 'partial' | 'uploaded' | 'processing' | 'failed';
-        detectedType?: string;
-        extractionMethod?: string;
-        extractionWarnings?: string[];
-        extractionCharCount?: number;
-        chatContextText?: string;
-        chatContextCharCount?: number;
-        contextTruncated?: boolean;
-        indexingError?: string;
-        extractionError?: string;
-    }>;
+    attachmentContexts?: AttachmentContext[];
+    availableDocumentContexts?: AttachmentContext[];
     recentMessages: Array<{
         turnId?: Id<'chatTurns'>;
         role: 'user' | 'assistant';
@@ -167,9 +153,53 @@ type GenerationContext = {
     }>;
 };
 
+type AttachmentContext = {
+    uploadedFileId: string;
+    uploadSessionId?: string;
+    filename: string;
+    mimeType: string;
+    byteSize: number;
+    status: 'ready' | 'partial' | 'uploaded' | 'processing' | 'failed';
+    source?: 'current_turn' | 'conversation_memory';
+    detectedType?: string;
+    extractionMethod?: string;
+    extractionWarnings?: string[];
+    extractionCharCount?: number;
+    chatContextText?: string;
+    chatContextCharCount?: number;
+    contextTruncated?: boolean;
+    indexingError?: string;
+    extractionError?: string;
+};
+
+function selectAttachmentContextsForPrompt(
+    context: GenerationContext,
+    routerResult: ReturnType<typeof classifyMessage>,
+    routeMode: RouteMode
+) {
+    const selected = [...(context.attachmentContexts ?? [])];
+    const availableDocuments = context.availableDocumentContexts ?? [];
+    const shouldLoadStoredDocuments =
+        availableDocuments.length > 0 &&
+        (routeMode === 'document_analysis' ||
+            routerResult.mode === 'document_analysis' ||
+            messageReferencesStoredDocument(context.turn.message));
+
+    if (!shouldLoadStoredDocuments) return selected;
+
+    const selectedIds = new Set(selected.map((attachment) => attachment.uploadedFileId));
+    for (const attachment of availableDocuments) {
+        if (selectedIds.has(attachment.uploadedFileId)) continue;
+        selected.push(attachment);
+        selectedIds.add(attachment.uploadedFileId);
+        if (selected.length >= 3) break;
+    }
+
+    return selected;
+}
+
 /** Build server-loaded document context from verified upload attachment refs. */
-function buildAttachmentContextPrompt(context: GenerationContext) {
-    const attachments = context.attachmentContexts ?? [];
+function buildAttachmentContextPrompt(attachments: AttachmentContext[]) {
     if (attachments.length === 0) return '';
 
     const blocks = attachments.map((attachment) => {
@@ -187,6 +217,9 @@ function buildAttachmentContextPrompt(context: GenerationContext) {
             'Uploaded document:',
             `Filename: ${attachment.filename}`,
             `File ID: ${attachment.uploadedFileId}`,
+            attachment.source === 'conversation_memory'
+                ? 'Source: stored conversation document memory from an earlier turn'
+                : 'Source: current chat turn attachment',
             `Detected type: ${attachment.detectedType ?? 'unknown'}`,
             `Extraction method: ${attachment.extractionMethod ?? 'unknown'}`,
             `Text length: ${attachment.extractionCharCount ?? 'unknown'}`,
@@ -251,7 +284,8 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
     const routerResult = classifyMessage(context.turn.message);
     const featurePrompt = buildFeatureToolPrompt(routerResult.toolPlan);
     const artifactPrompt = buildArtifactPrompt();
-    const attachmentContextPrompt = buildAttachmentContextPrompt(context);
+    const attachmentContexts = selectAttachmentContextsForPrompt(context, routerResult, routeMode);
+    const attachmentContextPrompt = buildAttachmentContextPrompt(attachmentContexts);
 
     const recentMessagesWithMetadata = context.recentMessages
         .filter((message) => message.status !== 'draft' && message.status !== 'deleted')
@@ -273,6 +307,7 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
         developerPrompt,
         featurePrompt,
         artifactPrompt,
+        attachmentContextPrompt,
         input: [
             { role: 'system', content: systemPrompt },
             { role: 'developer', content: developerPrompt },
@@ -323,8 +358,8 @@ async function generateWithFallbacks({
     }
 
     const contextPrompt = buildContextPrompt(contextPacket);
-    const attachmentContextPrompt = buildAttachmentContextPrompt(context);
     const promptBundle = buildInput(context, routeMode, contextPrompt);
+    const attachmentContextPrompt = promptBundle.attachmentContextPrompt;
     const hostedTools = buildHostedTools(routerResult, context.conversation?.vectorStoreId);
     const fileSearchOnlyTools =
         routerResult.toolPlan.useFileSearch && context.conversation?.vectorStoreId

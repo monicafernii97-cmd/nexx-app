@@ -70,6 +70,37 @@ const EMPTY_ARTIFACTS_JSON = JSON.stringify({
     confidence: null,
 });
 
+/** Normalize a ready uploaded file into the context shape consumed by the chat worker. */
+function buildUploadedFileContext(
+    uploadedFile: Doc<'uploadedFiles'>,
+    source: 'current_turn' | 'conversation_memory',
+    uploadSessionId = uploadedFile.uploadSessionId,
+    byteSize = uploadedFile.byteSize
+) {
+    if (!uploadSessionId || (uploadedFile.status !== 'ready' && uploadedFile.status !== 'partial')) {
+        return null;
+    }
+
+    return {
+        uploadedFileId: uploadedFile._id,
+        uploadSessionId,
+        filename: uploadedFile.filename,
+        mimeType: uploadedFile.mimeType,
+        byteSize: byteSize ?? 0,
+        status: uploadedFile.status,
+        source,
+        detectedType: uploadedFile.detectedType,
+        extractionMethod: uploadedFile.extractionMethod,
+        extractionWarnings: uploadedFile.extractionWarnings,
+        extractionCharCount: uploadedFile.extractionCharCount,
+        chatContextText: uploadedFile.chatContextText,
+        chatContextCharCount: uploadedFile.chatContextCharCount,
+        contextTruncated: uploadedFile.contextTruncated,
+        indexingError: uploadedFile.indexingError,
+        extractionError: uploadedFile.extractionError,
+    };
+}
+
 /** Consume one chat quota unit after duplicate-turn detection has completed. */
 async function consumeTurnRateLimit(
     ctx: MutationCtx,
@@ -574,24 +605,29 @@ export const getGenerationContext = internalQuery({
         const attachmentContexts = [];
         for (const attachment of attachmentRows) {
             const uploadedFile = await ctx.db.get(attachment.uploadedFileId);
-            if (!uploadedFile || (uploadedFile.status !== 'ready' && uploadedFile.status !== 'partial')) continue;
-            attachmentContexts.push({
-                uploadedFileId: uploadedFile._id,
-                uploadSessionId: attachment.uploadSessionId,
-                filename: uploadedFile.filename,
-                mimeType: uploadedFile.mimeType,
-                byteSize: uploadedFile.byteSize ?? attachment.byteSize,
-                status: uploadedFile.status,
-                detectedType: uploadedFile.detectedType,
-                extractionMethod: uploadedFile.extractionMethod,
-                extractionWarnings: uploadedFile.extractionWarnings,
-                extractionCharCount: uploadedFile.extractionCharCount,
-                chatContextText: uploadedFile.chatContextText,
-                chatContextCharCount: uploadedFile.chatContextCharCount,
-                contextTruncated: uploadedFile.contextTruncated,
-                indexingError: uploadedFile.indexingError,
-                extractionError: uploadedFile.extractionError,
-            });
+            if (!uploadedFile) continue;
+            const context = buildUploadedFileContext(
+                uploadedFile,
+                'current_turn',
+                attachment.uploadSessionId,
+                uploadedFile.byteSize ?? attachment.byteSize
+            );
+            if (context) attachmentContexts.push(context);
+        }
+
+        const currentAttachmentIds = new Set(attachmentContexts.map((attachment) => attachment.uploadedFileId));
+        const conversationUploadedFiles = await ctx.db
+            .query('uploadedFiles')
+            .withIndex('by_conversationId', (q) => q.eq('conversationId', turn.conversationId))
+            .order('desc')
+            .take(5);
+        const availableDocumentContexts = [];
+        for (const uploadedFile of conversationUploadedFiles) {
+            if (currentAttachmentIds.has(uploadedFile._id)) continue;
+            const context = buildUploadedFileContext(uploadedFile, 'conversation_memory');
+            if (context?.chatContextText?.trim()) {
+                availableDocumentContexts.push(context);
+            }
         }
 
         return {
@@ -601,6 +637,7 @@ export const getGenerationContext = internalQuery({
             summaryDoc,
             caseGraphDoc,
             attachmentContexts,
+            availableDocumentContexts,
             recentMessages: recentMessages.filter((m) => m.status !== 'deleted'),
         };
     },

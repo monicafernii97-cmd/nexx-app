@@ -194,6 +194,7 @@ async function saveDegradedAssistantForTurn(
     await ctx.db.patch(turn._id, {
         status: 'degraded_saved',
         assistantMessageId,
+        assistantDraftMessageId: undefined,
         errorCode,
         errorMessage,
         errorRetryable: true,

@@ -95,7 +95,13 @@ function buildUserContext(rawJson?: string): ContextPacket {
             },
         };
 
-        if (userContext.nexNickname || userContext.nexManipulationTactics) {
+        if (
+            userContext.nexNickname ||
+            userContext.nexCommunicationStyle ||
+            userContext.nexManipulationTactics ||
+            userContext.nexTriggerPatterns ||
+            userContext.nexDetectedPatterns
+        ) {
             contextPacket.nexProfile = {
                 nickname: userContext.nexNickname as string | undefined,
                 communicationStyle: userContext.nexCommunicationStyle as string | undefined,
@@ -123,6 +129,7 @@ function sanitizePromptMetadata(value?: string) {
 
 type GenerationContext = {
     turn: {
+        _id?: Id<'chatTurns'>;
         message: string;
         routeMode?: RouteMode;
         model?: string;
@@ -152,6 +159,7 @@ type GenerationContext = {
         extractionError?: string;
     }>;
     recentMessages: Array<{
+        turnId?: Id<'chatTurns'>;
         role: 'user' | 'assistant';
         content: string;
         status?: 'draft' | 'committed' | 'degraded' | 'failed' | 'deleted';
@@ -248,12 +256,13 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
         .filter((message) => message.status !== 'draft' && message.status !== 'deleted')
         .slice(-20)
         .map((message) => ({
+            turnId: message.turnId,
             role: message.role,
             content: message.content,
         }));
 
-    if (!recentMessages.some((message) => message.role === 'user' && message.content === context.turn.message)) {
-        recentMessages.push({ role: 'user', content: context.turn.message });
+    if (!recentMessages.some((message) => message.role === 'user' && message.turnId === context.turn._id)) {
+        recentMessages.push({ turnId: context.turn._id, role: 'user', content: context.turn.message });
     }
 
     return {

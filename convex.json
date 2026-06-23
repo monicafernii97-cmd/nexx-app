@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/convex/schemas/convex.schema.json",
+  "node": {
+    "externalPackages": [
+      "@napi-rs/canvas",
+      "mammoth",
+      "pdf-parse",
+      "pdfjs-dist"
+    ]
+  }
+}

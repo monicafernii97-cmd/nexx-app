@@ -314,6 +314,14 @@ export default defineSchema({
         detectedType: v.optional(v.string()),
         extractionWarnings: v.optional(v.array(v.string())),
         uploadedFileId: v.optional(v.id('uploadedFiles')),
+        currentAttemptId: v.optional(v.id('chatUploadAttempts')),
+        attemptNo: v.optional(v.number()),
+        lastClientEventAt: v.optional(v.number()),
+        lastProgressBytes: v.optional(v.number()),
+        lastProgressTotalBytes: v.optional(v.number()),
+        lastFailureKind: v.optional(v.string()),
+        lastFailureMessageSafe: v.optional(v.string()),
+        lastFailureDiagnostics: v.optional(v.any()),
         status: v.union(
             v.literal('awaiting_storage_upload'),
             v.literal('uploading_to_storage'),
@@ -344,6 +352,39 @@ export default defineSchema({
         .index('by_user_client_key', ['clerkUserId', 'clientUploadKey'])
         .index('by_conversation', ['conversationId'])
         .index('by_storage', ['storageId'])
+        .index('by_status_updated', ['status', 'updatedAt']),
+
+    chatUploadAttempts: defineTable({
+        uploadSessionId: v.id('chatUploadSessions'),
+        clerkUserId: v.string(),
+        attemptNo: v.number(),
+        status: v.union(
+            v.literal('created'),
+            v.literal('posting'),
+            v.literal('failed'),
+            v.literal('storage_returned'),
+            v.literal('attached')
+        ),
+        uploadUrlHost: v.optional(v.string()),
+        uploadUrlProtocol: v.optional(v.string()),
+        uploadUrlIssuedAt: v.number(),
+        uploadUrlExpiresAt: v.number(),
+        startedAt: v.optional(v.number()),
+        completedAt: v.optional(v.number()),
+        failureKind: v.optional(v.string()),
+        failureMessageSafe: v.optional(v.string()),
+        elapsedMs: v.optional(v.number()),
+        loadedBytes: v.optional(v.number()),
+        totalBytes: v.optional(v.number()),
+        readyState: v.optional(v.number()),
+        httpStatus: v.optional(v.number()),
+        browserOnline: v.optional(v.boolean()),
+        effectiveType: v.optional(v.string()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_session', ['uploadSessionId'])
+        .index('by_user_created', ['clerkUserId', 'createdAt'])
         .index('by_status_updated', ['status', 'updatedAt']),
 
     messageAttachments: defineTable({

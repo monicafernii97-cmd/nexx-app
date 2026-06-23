@@ -13,7 +13,7 @@ import { WorkspaceClient } from '@/components/chat/WorkspaceClient';
 import { AnalysisStatusStrip, DEFAULT_ANALYSIS_STEPS, getStepsByElapsed } from '@/components/chat/AnalysisStatusStrip';
 import type { ActionType, AnalysisStep } from '@/lib/ui-intelligence/types';
 import type { ChatAttachmentRef } from '@/lib/chat/uploadConfig';
-import { type ChatComposerFileState, uploadFileForConversation } from '@/lib/chat/uploadClient';
+import { recoverPendingChatUploadAttaches, type ChatComposerFileState, uploadFileForConversation } from '@/lib/chat/uploadClient';
 
 /** Premium full-screen chat interface for a single NEXX AI conversation. */
 export default function ConversationPage() {
@@ -96,6 +96,10 @@ export default function ConversationPage() {
     }, [isValidId, router]);
 
     const isThreadReady = conversation !== undefined && messages !== undefined && activeTurns !== undefined;
+
+    useEffect(() => {
+        void recoverPendingChatUploadAttaches(convex);
+    }, [convex]);
 
     /** Build the user context payload sent to the chat API (shared between send/retry/edit). */
     const buildUserContext = useCallback(() => ({

@@ -8,6 +8,10 @@ import {
   type ChatComposerFileStatus,
   validateChatUploadFile,
 } from './uploadConfig';
+import {
+  postFileToStorageWithDiagnostics,
+  type StorageUploadDiagnosticEvent,
+} from './uploadErrors';
 
 type ConvexClientLike = {
   mutation: ConvexReactClient['mutation'];
@@ -16,6 +20,9 @@ type ConvexClientLike = {
 
 type UploadSessionSnapshot = {
   uploadSessionId?: string;
+  uploadAttemptId?: string;
+  attemptId?: string;
+  attemptNo?: number;
   uploadUrl?: string;
   uploadUrlExpiresAt?: number;
   storageId?: string;
@@ -68,6 +75,8 @@ export type ChatComposerFileState = {
   clientUploadKey: string;
   clientTurnId: string;
   uploadSessionId?: string;
+  uploadAttemptId?: string;
+  attemptNo?: number;
   uploadUrl?: string;
   uploadUrlExpiresAt?: number;
   storageId?: string;
@@ -90,6 +99,8 @@ export type ChatUploadResponse = {
   mimeType: string;
   byteSize: number;
   status: 'ready' | 'partial';
+  uploadAttemptId?: string;
+  attemptNo?: number;
   attachmentRef: ChatAttachmentRef;
   extractionPreview?: string;
   extractionCharCount?: number;
@@ -117,6 +128,8 @@ export type UploadFileForConversationArgs = {
   onStatus?: (status: ChatComposerFileStatus) => void;
   onStorageReady?: (ids: { uploadSessionId: string; storageId: string }) => void;
 };
+
+const PENDING_ATTACH_PREFIX = 'pending-chat-upload:';
 
 function normalizeStatus(status: string): ChatComposerFileStatus {
   if (status === 'awaiting_storage_upload') return 'session_created';
@@ -204,6 +217,8 @@ function buildChatUploadResponse(snapshot: UploadSessionSnapshot): ChatUploadRes
     mimeType: snapshot.mimeType,
     byteSize: snapshot.byteSize,
     status: snapshot.status,
+    uploadAttemptId: snapshot.uploadAttemptId ?? snapshot.attemptId,
+    attemptNo: snapshot.attemptNo,
     attachmentRef,
     extractionPreview: snapshot.extractionPreview,
     extractionCharCount: snapshot.extractionCharCount,
@@ -231,47 +246,114 @@ function parseSessionSnapshot(value: unknown): UploadSessionSnapshot {
   const snapshot = value as UploadSessionSnapshot;
   return {
     ...snapshot,
+    uploadAttemptId: snapshot.uploadAttemptId ?? snapshot.attemptId,
     storageId: snapshot.storageId ?? snapshot.existingStorageId,
     uploadedFileId: snapshot.uploadedFileId ?? snapshot.existingUploadedFileId,
   };
 }
 
-function uploadDirectlyToConvexStorage(args: {
-  uploadUrl: string;
-  file: File;
-  onProgress?: (progress: number) => void;
-}): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.timeout = 120_000;
-    xhr.open('POST', args.uploadUrl);
-    xhr.setRequestHeader('Content-Type', args.file.type || 'application/octet-stream');
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        args.onProgress?.(Math.round((event.loaded / event.total) * 100));
-      }
-    };
-    xhr.onload = () => {
-      if (xhr.status < 200 || xhr.status >= 300) {
-        reject(new Error(`Storage upload failed with status ${xhr.status}`));
-        return;
-      }
-      try {
-        const json = JSON.parse(xhr.responseText) as { storageId?: string };
-        if (!json.storageId) {
-          reject(new Error('Storage upload completed but no storageId was returned.'));
-          return;
-        }
-        resolve(json.storageId);
-      } catch {
-        reject(new Error('Storage upload returned invalid JSON.'));
-      }
-    };
-    xhr.onerror = () => reject(new Error('Storage upload failed due to a network error.'));
-    xhr.onabort = () => reject(new Error('Storage upload was cancelled.'));
-    xhr.ontimeout = () => reject(new Error('Storage upload timed out.'));
-    xhr.send(args.file);
-  });
+function pendingAttachKey(uploadSessionId: string) {
+  return `${PENDING_ATTACH_PREFIX}${uploadSessionId}`;
+}
+
+function persistPendingAttach(args: {
+  uploadSessionId: string;
+  uploadAttemptId?: string;
+  storageId: string;
+  conversationId?: string;
+  clientUploadKey: string;
+  clientTurnId: string;
+}) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(pendingAttachKey(args.uploadSessionId), JSON.stringify({
+      ...args,
+      createdAt: Date.now(),
+    }));
+  } catch {
+    // localStorage recovery is best-effort only.
+  }
+}
+
+function clearPendingAttach(uploadSessionId: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(pendingAttachKey(uploadSessionId));
+  } catch {
+    // Ignore unavailable localStorage.
+  }
+}
+
+type PendingAttachRecord = {
+  uploadSessionId?: string;
+  uploadAttemptId?: string;
+  storageId?: string;
+  createdAt?: number;
+};
+
+export async function recoverPendingChatUploadAttaches(convex: ConvexClientLike) {
+  if (typeof window === 'undefined') return 0;
+  const now = Date.now();
+  let recovered = 0;
+  const keys: string[] = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (key?.startsWith(PENDING_ATTACH_PREFIX)) keys.push(key);
+  }
+
+  for (const key of keys) {
+    let record: PendingAttachRecord | null = null;
+    try {
+      record = JSON.parse(window.localStorage.getItem(key) ?? 'null') as PendingAttachRecord | null;
+    } catch {
+      window.localStorage.removeItem(key);
+      continue;
+    }
+
+    if (
+      !record?.uploadSessionId ||
+      !record.storageId ||
+      !record.createdAt ||
+      now - record.createdAt > 24 * 60 * 60 * 1000
+    ) {
+      window.localStorage.removeItem(key);
+      continue;
+    }
+
+    try {
+      await convex.mutation(api.chatUploads.attachStorageAndScheduleProcessing, {
+        uploadSessionId: record.uploadSessionId as Id<'chatUploadSessions'>,
+        uploadAttemptId: record.uploadAttemptId as Id<'chatUploadAttempts'> | undefined,
+        storageId: record.storageId as Id<'_storage'>,
+      });
+      window.localStorage.removeItem(key);
+      recovered += 1;
+    } catch {
+      // Leave the pending record for a later authenticated retry.
+    }
+  }
+
+  return recovered;
+}
+
+async function recordDiagnosticEvent(args: {
+  convex: ConvexClientLike;
+  event: StorageUploadDiagnosticEvent;
+}) {
+  try {
+    await args.convex.mutation(api.chatUploads.recordUploadClientEvent, {
+      uploadSessionId: args.event.diagnostics.sessionId as Id<'chatUploadSessions'>,
+      uploadAttemptId: (args.event.diagnostics.attemptId || undefined) as Id<'chatUploadAttempts'> | undefined,
+      eventType: args.event.type,
+      diagnostics: {
+        ...args.event.diagnostics,
+        failureKind: args.event.failureKind,
+        failureMessageSafe: args.event.failureMessageSafe,
+      },
+    });
+  } catch {
+    // Diagnostics must never block upload or retry.
+  }
 }
 
 async function waitForUploadProcessing(args: {
@@ -318,7 +400,7 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
 
   args.onStatus?.('session_created');
   const existing = args.existingSession;
-  const session = existing?.uploadSessionId
+  let session = existing?.uploadSessionId
     ? parseSessionSnapshot(await args.convex.query(api.chatUploads.getUploadSession, {
       uploadSessionId: existing.uploadSessionId as Id<'chatUploadSessions'>,
     }))
@@ -332,8 +414,27 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
       intent: args.intent,
     }));
 
+  if (
+    existing?.uploadSessionId &&
+    !session.storageId &&
+    session.status !== 'ready' &&
+    session.status !== 'partial'
+  ) {
+    session = parseSessionSnapshot(await args.convex.mutation(api.chatUploads.startUploadSession, {
+      conversationId: args.conversationId as Id<'conversations'> | undefined,
+      caseId: args.caseId as Id<'cases'> | undefined,
+      clientUploadKey: args.clientUploadKey,
+      filename: args.file.name,
+      mimeType: args.file.type || 'application/octet-stream',
+      byteSize: args.file.size,
+      intent: args.intent,
+    }));
+  }
+
   const uploadSessionId = session.uploadSessionId;
   if (!uploadSessionId) throw new Error('Upload session was not created.');
+  const uploadAttemptId = session.uploadAttemptId ?? session.attemptId ?? crypto.randomUUID();
+  const resolvedClientTurnId = existing?.clientTurnId ?? crypto.randomUUID();
   let storageId = session.storageId ?? existing?.storageId;
 
   if (!storageId) {
@@ -341,10 +442,27 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
     if (!uploadUrl) throw new Error('Upload URL was not created.');
     args.onStatus?.('uploading_to_storage');
     try {
-      storageId = await uploadDirectlyToConvexStorage({
+      const upload = await postFileToStorageWithDiagnostics({
         uploadUrl,
         file: args.file,
-        onProgress: args.onProgress,
+        sessionId: uploadSessionId,
+        attemptId: uploadAttemptId,
+        clientUploadKey: args.clientUploadKey,
+        clientTurnId: resolvedClientTurnId,
+        timeoutMs: 135_000,
+        onProgress: ({ percent }) => args.onProgress?.(percent),
+        onDiagnosticEvent: (event) => {
+          void recordDiagnosticEvent({ convex: args.convex, event });
+        },
+      });
+      storageId = upload.storageId;
+      persistPendingAttach({
+        uploadSessionId,
+        uploadAttemptId,
+        storageId,
+        conversationId: args.conversationId ? String(args.conversationId) : undefined,
+        clientUploadKey: args.clientUploadKey,
+        clientTurnId: resolvedClientTurnId,
       });
       args.onStorageReady?.({ uploadSessionId, storageId });
       args.onProgress?.(100);
@@ -356,8 +474,10 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
     args.onStatus?.('stored');
     await args.convex.mutation(api.chatUploads.attachStorageAndScheduleProcessing, {
       uploadSessionId: uploadSessionId as Id<'chatUploadSessions'>,
+      uploadAttemptId: uploadAttemptId as Id<'chatUploadAttempts'>,
       storageId: storageId as Id<'_storage'>,
     });
+    clearPendingAttach(uploadSessionId);
   } else if (!session.uploadedFileId) {
     const normalizedStatus = typeof session.status === 'string' ? normalizeStatus(session.status) : undefined;
     if (
@@ -393,6 +513,7 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
   return buildChatUploadResponse({
     ...ready,
     uploadSessionId,
+    uploadAttemptId,
     storageId,
   });
 }

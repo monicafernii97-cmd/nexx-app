@@ -8,6 +8,7 @@ import {
     type DocumentReferenceDetection,
 } from '../src/lib/nexx/documentReferenceDetection';
 import { normalizeDocumentAlias, selectStoredDocumentCandidates } from '../src/lib/nexx/documentSelection';
+import { retrieveRelevantDocumentChunks } from '../src/lib/nexx/documentChunkRetrieval';
 import {
     canUseDocumentMemoryCandidate,
     resolveDocumentMemorySource,
@@ -23,6 +24,8 @@ const DOCUMENT_RETRIEVAL_AUDIT_CLEANUP_BATCH_SIZE = 1000;
 const MAX_EXPLICIT_ALIAS_LOOKUP_TERMS = 60;
 const MAX_ALIAS_MATCHES_PER_TERM = 8;
 const MAX_EXPLICIT_ALIAS_MATCHED_FILES = 50;
+const MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE = 80;
+const MAX_RETRIEVED_CHUNKS_PER_FILE = 5;
 
 const routeModeValidator = v.union(
     v.literal('adaptive_chat'),
@@ -129,6 +132,44 @@ function buildUploadedFileContext(
         indexingError: uploadedFile.indexingError,
         extractionError: uploadedFile.extractionError,
     };
+}
+
+/** Load the highest-signal chunks for a selected uploaded document and this user turn. */
+async function getRelevantDocumentChunkContexts(
+    ctx: QueryCtx,
+    args: {
+        uploadedFileId: Id<'uploadedFiles'>;
+        message: string;
+        detection: DocumentReferenceDetection;
+    }
+) {
+    const chunks = await ctx.db
+        .query('documentChunks')
+        .withIndex('by_uploaded_file_chunk', (q) => q.eq('uploadedFileId', args.uploadedFileId))
+        .take(MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE);
+
+    return retrieveRelevantDocumentChunks({
+        message: args.message,
+        detection: args.detection,
+        maxChunks: MAX_RETRIEVED_CHUNKS_PER_FILE,
+        chunks: chunks.map((chunk) => ({
+            chunkId: chunk._id.toString(),
+            uploadedFileId: chunk.uploadedFileId.toString(),
+            chunkIndex: chunk.chunkIndex,
+            text: chunk.text,
+            textLength: chunk.textLength,
+            pageStart: chunk.pageStart,
+            pageEnd: chunk.pageEnd,
+            sectionHeading: chunk.sectionHeading,
+            extractionMethod: chunk.extractionMethod,
+            ocrConfidence: chunk.ocrConfidence,
+            warnings: chunk.warnings,
+        })),
+    }).map((chunk) => ({
+        ...chunk,
+        chunkId: chunk.chunkId as Id<'documentChunks'>,
+        uploadedFileId: chunk.uploadedFileId as Id<'uploadedFiles'>,
+    }));
 }
 
 function uniqueRecentUploadedFileIds(ids: Id<'uploadedFiles'>[]) {
@@ -774,6 +815,7 @@ export const getGenerationContext = internalQuery({
             return a.createdAt - b.createdAt;
         });
 
+        const documentReference = detectDocumentReference(turn.message);
         const attachmentRows = await ctx.db
             .query('messageAttachments')
             .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
@@ -788,11 +830,19 @@ export const getGenerationContext = internalQuery({
                 attachment.uploadSessionId,
                 uploadedFile.byteSize ?? attachment.byteSize
             );
-            if (context) attachmentContexts.push(context);
+            if (context) {
+                attachmentContexts.push({
+                    ...context,
+                    documentChunks: await getRelevantDocumentChunkContexts(ctx, {
+                        uploadedFileId: uploadedFile._id,
+                        message: turn.message,
+                        detection: documentReference,
+                    }),
+                });
+            }
         }
 
         const currentAttachmentIds = new Set(attachmentContexts.map((attachment) => attachment.uploadedFileId));
-        const documentReference = detectDocumentReference(turn.message);
         const documentState = await ctx.db
             .query('conversationDocumentState')
             .withIndex('by_conversation', (q) => q.eq('conversationId', turn.conversationId))
@@ -940,7 +990,14 @@ export const getGenerationContext = internalQuery({
             const source = memorySourceByUploadedFileId.get(uploadedFile._id.toString()) ?? 'conversation_memory';
             const context = buildUploadedFileContext(uploadedFile, source);
             if (context?.chatContextText?.trim()) {
-                availableDocumentContexts.push(context);
+                availableDocumentContexts.push({
+                    ...context,
+                    documentChunks: await getRelevantDocumentChunkContexts(ctx, {
+                        uploadedFileId: uploadedFile._id,
+                        message: turn.message,
+                        detection: documentReference,
+                    }),
+                });
             }
         }
 
@@ -964,6 +1021,7 @@ export const recordDocumentRetrievalAudit = internalMutation({
         detectionResultJson: v.string(),
         candidateUploadedFileIds: v.array(v.id('uploadedFiles')),
         selectedUploadedFileIds: v.array(v.id('uploadedFiles')),
+        selectedChunkIds: v.optional(v.array(v.id('documentChunks'))),
         selectedContextCount: v.number(),
         retrievalReason: v.union(
             v.literal('current_turn_attachment'),
@@ -987,6 +1045,11 @@ export const recordDocumentRetrievalAudit = internalMutation({
 
         const selectedUploadedFileIds = uniqueRecentUploadedFileIds(args.selectedUploadedFileIds);
         const candidateUploadedFileIds = uniqueRecentUploadedFileIds(args.candidateUploadedFileIds);
+        const selectedChunkIds = args.selectedChunkIds
+            ? Array.from(new Set(args.selectedChunkIds.map((id) => id.toString())))
+                .slice(0, 50)
+                .map((id) => id as Id<'documentChunks'>)
+            : undefined;
 
         await ctx.db.insert('documentRetrievalAudit', {
             conversationId: turn.conversationId,
@@ -997,6 +1060,7 @@ export const recordDocumentRetrievalAudit = internalMutation({
             detectionResultJson: args.detectionResultJson,
             candidateUploadedFileIds,
             selectedUploadedFileIds,
+            selectedChunkIds,
             selectedContextCount: args.selectedContextCount,
             retrievalReason: args.retrievalReason,
             createdAt: now,
@@ -1020,6 +1084,7 @@ export const recordDocumentAnswerEvidence = internalMutation({
         turnId: v.id('chatTurns'),
         assistantMessageId: v.id('messages'),
         sources: v.array(documentEvidenceSourceValidator),
+        usedChunkIds: v.optional(v.array(v.id('documentChunks'))),
     },
     handler: async (ctx, args) => {
         const turn = await ctx.db.get(args.turnId);
@@ -1090,6 +1155,23 @@ export const recordDocumentAnswerEvidence = internalMutation({
 
         const now = Date.now();
         const usedUploadedFileIds = verifiedSources.map((source) => source.uploadedFileId);
+        const allowedUploadedFileIds = new Set(usedUploadedFileIds.map((id) => id.toString()));
+        const usedChunkIds: Id<'documentChunks'>[] = [];
+        const seenChunkIds = new Set<string>();
+        for (const chunkId of args.usedChunkIds ?? []) {
+            const chunkIdString = chunkId.toString();
+            if (seenChunkIds.has(chunkIdString) || seenChunkIds.size >= 50) continue;
+            const chunk = await ctx.db.get(chunkId);
+            if (
+                !chunk ||
+                chunk.clerkUserId !== user.clerkId ||
+                !allowedUploadedFileIds.has(chunk.uploadedFileId.toString())
+            ) {
+                continue;
+            }
+            seenChunkIds.add(chunkIdString);
+            usedChunkIds.push(chunk._id);
+        }
         const existing = await ctx.db
             .query('documentAnswerEvidence')
             .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
@@ -1099,7 +1181,7 @@ export const recordDocumentAnswerEvidence = internalMutation({
             await ctx.db.patch(existing._id, {
                 assistantMessageId: assistantMessage._id,
                 usedUploadedFileIds,
-                usedChunkIds: [],
+                usedChunkIds,
                 sources: verifiedSources,
                 updatedAt: now,
             });
@@ -1111,7 +1193,7 @@ export const recordDocumentAnswerEvidence = internalMutation({
                 turnId: turn._id,
                 assistantMessageId: assistantMessage._id,
                 usedUploadedFileIds,
-                usedChunkIds: [],
+                usedChunkIds,
                 sources: verifiedSources,
                 createdAt: now,
                 updatedAt: now,
@@ -1131,6 +1213,7 @@ export const recordDocumentAnswerEvidence = internalMutation({
                     contextTruncated: source.contextTruncated,
                 })),
                 usedUploadedFileIds: usedUploadedFileIds.map((uploadedFileId) => uploadedFileId.toString()),
+                usedDocumentChunkIds: usedChunkIds.map((chunkId) => chunkId.toString()),
             },
             updatedAt: now,
         });

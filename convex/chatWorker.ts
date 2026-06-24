@@ -174,6 +174,23 @@ type AttachmentContext = {
     contextTruncated?: boolean;
     indexingError?: string;
     extractionError?: string;
+    documentChunks?: DocumentChunkContext[];
+};
+
+type DocumentChunkContext = {
+    chunkId: Id<'documentChunks'>;
+    uploadedFileId: Id<'uploadedFiles'>;
+    chunkIndex: number;
+    text: string;
+    textLength: number;
+    pageStart?: number;
+    pageEnd?: number;
+    sectionHeading?: string;
+    extractionMethod?: string;
+    ocrConfidence?: number;
+    warnings?: string[];
+    retrievalScore: number;
+    retrievalReasons: string[];
 };
 
 function escapeXmlAttribute(value?: string) {
@@ -191,6 +208,36 @@ function sanitizeDocumentContextText(value: string) {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
+}
+
+function uniqueDocumentChunkIds(attachments: AttachmentContext[]) {
+    return Array.from(new Set(
+        attachments.flatMap((attachment) =>
+            (attachment.documentChunks ?? []).map((chunk) => chunk.chunkId.toString())
+        )
+    )).map((chunkId) => chunkId as Id<'documentChunks'>);
+}
+
+function shouldPreferRetrievedChunks(detection: DocumentReferenceDetection) {
+    return detection.requiresExactText ||
+        detection.requiresPageOrSectionCitation ||
+        detection.referenceType === 'deadline_lookup' ||
+        detection.referenceType === 'section_lookup' ||
+        detection.referenceType === 'source_location_request';
+}
+
+function buildRetrievedChunkPrompt(chunks: DocumentChunkContext[]) {
+    if (chunks.length === 0) return '';
+
+    return [
+        '<RETRIEVED_CHUNKS>',
+        ...chunks.map((chunk) => [
+            `<CHUNK chunkId="${chunk.chunkId}" pageStart="${chunk.pageStart ?? ''}" pageEnd="${chunk.pageEnd ?? ''}" sectionHeading="${escapeXmlAttribute(chunk.sectionHeading)}" retrievalReasons="${escapeXmlAttribute(chunk.retrievalReasons.join(', '))}" extractionMethod="${escapeXmlAttribute(chunk.extractionMethod ?? 'unknown')}">`,
+            sanitizeDocumentContextText(chunk.text),
+            '</CHUNK>',
+        ].join('\n')),
+        '</RETRIEVED_CHUNKS>',
+    ].join('\n');
 }
 
 /** Select a bounded, deduped set of uploaded documents to include in the model prompt. */
@@ -227,6 +274,7 @@ function selectAttachmentContextsForPrompt(
 function buildAttachmentContextPrompt(attachments: AttachmentContext[], detection: DocumentReferenceDetection) {
     if (attachments.length === 0) return '';
 
+    const preferRetrievedChunks = shouldPreferRetrievedChunks(detection);
     const blocks = attachments.map((attachment) => {
         const sourceLabel = attachment.source === 'conversation_memory'
             ? 'stored conversation document memory'
@@ -236,7 +284,10 @@ function buildAttachmentContextPrompt(attachments: AttachmentContext[], detectio
                     ? 'stored user-private document memory'
                     : 'current chat turn attachment';
 
-        if (!attachment.chatContextText?.trim()) {
+        const retrievedChunkPrompt = buildRetrievedChunkPrompt(attachment.documentChunks ?? []);
+        const shouldIncludeFullContext = !preferRetrievedChunks || !retrievedChunkPrompt;
+
+        if (!attachment.chatContextText?.trim() && !retrievedChunkPrompt) {
             return [
                 `<DOCUMENT uploadedFileId="${attachment.uploadedFileId}" filename="${escapeXmlAttribute(attachment.filename)}" source="${sourceLabel}" status="${attachment.status}">`,
                 '<WARNINGS>No readable extracted context was available. Do not analyze this document unless file search returns relevant text.</WARNINGS>',
@@ -245,15 +296,20 @@ function buildAttachmentContextPrompt(attachments: AttachmentContext[], detectio
         }
 
         return [
-            `<DOCUMENT uploadedFileId="${attachment.uploadedFileId}" filename="${escapeXmlAttribute(attachment.filename)}" source="${sourceLabel}" status="${attachment.status}" detectedType="${escapeXmlAttribute(attachment.detectedType ?? 'unknown')}" extractionMethod="${escapeXmlAttribute(attachment.extractionMethod ?? 'unknown')}" textLength="${attachment.extractionCharCount ?? ''}" contextCharacters="${attachment.chatContextCharCount ?? attachment.chatContextText.length}" contextTruncated="${attachment.contextTruncated ? 'yes' : 'no'}">`,
+            `<DOCUMENT uploadedFileId="${attachment.uploadedFileId}" filename="${escapeXmlAttribute(attachment.filename)}" source="${sourceLabel}" status="${attachment.status}" detectedType="${escapeXmlAttribute(attachment.detectedType ?? 'unknown')}" extractionMethod="${escapeXmlAttribute(attachment.extractionMethod ?? 'unknown')}" textLength="${attachment.extractionCharCount ?? ''}" contextCharacters="${attachment.chatContextCharCount ?? attachment.chatContextText?.length ?? ''}" contextTruncated="${attachment.contextTruncated ? 'yes' : 'no'}">`,
             '<WARNINGS>',
             attachment.indexingError ? `Indexing note: ${sanitizePromptMetadata(attachment.indexingError)}` : undefined,
             attachment.extractionError ? `Extraction note: ${sanitizePromptMetadata(attachment.extractionError)}` : undefined,
             attachment.extractionWarnings?.length ? `Extraction warnings: ${sanitizePromptMetadata(attachment.extractionWarnings.join(', '))}` : 'None',
             '</WARNINGS>',
-            '<EXTRACTED_DOCUMENT_CONTEXT>',
-            sanitizeDocumentContextText(attachment.chatContextText),
-            '</EXTRACTED_DOCUMENT_CONTEXT>',
+            retrievedChunkPrompt || undefined,
+            shouldIncludeFullContext && attachment.chatContextText?.trim()
+                ? [
+                    '<EXTRACTED_DOCUMENT_CONTEXT>',
+                    sanitizeDocumentContextText(attachment.chatContextText),
+                    '</EXTRACTED_DOCUMENT_CONTEXT>',
+                ].join('\n')
+                : undefined,
             '</DOCUMENT>',
         ].filter(Boolean).join('\n');
     });
@@ -265,6 +321,7 @@ function buildAttachmentContextPrompt(attachments: AttachmentContext[], detectio
         'If the excerpts do not contain the answer, say the available extracted text does not show it.',
         'For court-order review, identify which document was reviewed and cite page/section/chunk metadata when available.',
         'Quote short exact phrases only when exact wording matters.',
+        preferRetrievedChunks ? 'Use the retrieved chunks first for this turn; they were selected from stored document memory for the user\'s specific question.' : undefined,
         detection.requiresExactText ? 'This turn requires exact wording: verify terms against the extracted text and do not infer missing words.' : undefined,
         detection.requiresPageOrSectionCitation ? 'This turn asks for source location: cite available page, section, paragraph, or document metadata when possible.' : undefined,
         '<DOCUMENT_CONTEXT>',
@@ -572,10 +629,12 @@ export const processChatGenerationJob = internalAction({
 
             if (lease.turnId && result.attachmentContexts.length > 0) {
                 try {
+                    const usedChunkIds = uniqueDocumentChunkIds(result.attachmentContexts);
                     if (!result.degraded && completion?.assistantMessageId) {
                         await ctx.runMutation(internal.chatTurns.recordDocumentAnswerEvidence, {
                             turnId: lease.turnId,
                             assistantMessageId: completion.assistantMessageId,
+                            usedChunkIds,
                             sources: result.attachmentContexts.map((attachment) => ({
                                 uploadedFileId: attachment.uploadedFileId,
                                 filename: attachment.filename,
@@ -602,6 +661,7 @@ export const processChatGenerationJob = internalAction({
                         detectionResultJson: JSON.stringify(result.documentReference),
                         candidateUploadedFileIds,
                         selectedUploadedFileIds,
+                        selectedChunkIds: usedChunkIds,
                         selectedContextCount: result.attachmentContexts.length,
                         retrievalReason: determineRetrievalReason(
                             result.attachmentContexts,

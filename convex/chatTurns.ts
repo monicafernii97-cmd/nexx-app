@@ -9,6 +9,7 @@ const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
 const JOB_RETRY_DELAY_MS = 5_000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const DOCUMENT_RETRIEVAL_AUDIT_RETENTION_MS = 30 * ONE_DAY_MS;
+const DOCUMENT_RETRIEVAL_AUDIT_CLEANUP_BATCH_SIZE = 1000;
 
 const routeModeValidator = v.union(
     v.literal('adaptive_chat'),
@@ -796,10 +797,14 @@ export const deleteExpiredDocumentRetrievalAudits = internalMutation({
             .query('documentRetrievalAudit')
             .withIndex('by_expiresAt')
             .filter((q) => q.lt(q.field('expiresAt'), now))
-            .take(500);
+            .take(DOCUMENT_RETRIEVAL_AUDIT_CLEANUP_BATCH_SIZE);
 
         for (const audit of expired) {
             await ctx.db.delete(audit._id);
+        }
+
+        if (expired.length === DOCUMENT_RETRIEVAL_AUDIT_CLEANUP_BATCH_SIZE) {
+            await ctx.scheduler.runAfter(0, internal.chatTurns.deleteExpiredDocumentRetrievalAudits, {});
         }
 
         return { deleted: expired.length };

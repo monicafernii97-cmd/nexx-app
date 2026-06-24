@@ -188,8 +188,9 @@ function sanitizeDocumentContextText(value: string) {
     return value
         .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ' ')
         .replace(/```/g, "'''")
-        .replace(/<\s*\//g, '&lt;/')
-        .replace(/<\s*(DOCUMENT_CONTEXT|DOCUMENT|EXTRACTED_DOCUMENT_CONTEXT|WARNINGS|CHUNK)\b/gi, '&lt;$1');
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }
 
 /** Select a bounded, deduped set of uploaded documents to include in the model prompt. */

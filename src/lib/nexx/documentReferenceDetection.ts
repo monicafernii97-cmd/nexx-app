@@ -76,6 +76,24 @@ const EXACT_TERMS = [
   'injunction',
 ];
 
+const HOLIDAY_POSSESSION_TERMS = [
+  'father\'s day',
+  'fathers day',
+  'mother\'s day',
+  'mothers day',
+  'thanksgiving',
+  'christmas',
+  'spring break',
+  'student holiday',
+  'teacher in-service',
+  'teacher in service',
+  'holiday possession',
+  'holiday schedule',
+  'extended summer',
+  'summer possession',
+  'weekend possession',
+];
+
 const SECTION_PATTERN = /\b(?:section|paragraph|page|clause)\s+([0-9]+|[ivxlcdm]+|[a-z])\b/gi;
 const DATE_PATTERN = /\b(?:\d{1,2}\/\d{1,2}\/\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:,\s*\d{4})?)\b/gi;
 const GENERIC_LEGAL_QUESTION_PATTERN =
@@ -87,8 +105,25 @@ function unique(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
+function normalizeTermSearch(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’']/g, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function matchesAnyTerm(text: string, terms: string[]) {
-  return terms.filter((term) => new RegExp(`\\b${term.replace(/\s+/g, '\\s+')}\\b`, 'i').test(text));
+  const normalizedText = normalizeTermSearch(text);
+  return terms.filter((term) => {
+    const normalizedTerm = normalizeTermSearch(term);
+    if (!normalizedTerm) return false;
+    return new RegExp(`\\b${normalizedTerm.replace(/\s+/g, '\\s+')}\\b`, 'i').test(normalizedText);
+  });
 }
 
 function detectDocumentTypes(text: string): DocumentType[] {
@@ -146,16 +181,20 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
   const requestedDocumentTypes = detectDocumentTypes(text);
   const deadlineTerms = matchesAnyTerm(lower, DEADLINE_TERMS);
   const exactTerms = matchesAnyTerm(lower, EXACT_TERMS);
+  const holidayTerms = matchesAnyTerm(lower, HOLIDAY_POSSESSION_TERMS);
   const hasImplicitFollowUp = IMPLICIT_FOLLOW_UP_PATTERNS.some((pattern) => pattern.test(text));
   const asksForQuote = /\b(?:quote|exact\s+(?:wording|words|language)|what\s+exact\s+words|word\s+for\s+word)\b/i.test(text);
   const asksForSource = /\b(?:where\s+(?:does|did)\s+it\s+say|where\s+exactly|what\s+page|show\s+me\s+where|cite)\b/i.test(text);
   const asksForComparison = /\b(?:compare|difference|different|amended|prior|previous|original)\b/i.test(text) && documentHints.length > 0;
   const asksForSpecificLocation = /\b(?:section|paragraph|page|clause)\s+([0-9]+|[ivxlcdm]+|[a-z])\b/i.test(text);
+  const hasHolidayPossessionSignal =
+    holidayTerms.length > 0 &&
+    /\b(?:possession|schedule|start|starts|begin|begins|end|ends|pickup|exchange|weekend|thursday|friday|saturday|sunday|provision|clause|paragraph)\b/i.test(text);
   const hasDocumentSignal = documentHints.length > 0 || requestedDocumentTypes.length > 0;
   const hasSectionSignal = requestedSections.length > 0 && (hasDocumentSignal || hasImplicitFollowUp || asksForSpecificLocation);
   const hasDeadlineSignal = deadlineTerms.length > 0 && (hasDocumentSignal || hasImplicitFollowUp);
   const hasExactSignal = (asksForQuote || /\b(?:does|did|is)\s+(?:it|the\s+(?:order|document|file|pdf)).{0,80}\b(?:say|use|mention|include)\b/i.test(text)) &&
-    (hasDocumentSignal || hasImplicitFollowUp || exactTerms.length > 0);
+    (hasDocumentSignal || hasImplicitFollowUp || exactTerms.length > 0 || hasHolidayPossessionSignal);
   const isGenericLegalQuestion =
     GENERIC_LEGAL_QUESTION_PATTERN.test(text) &&
     !EXPLICIT_STORED_DOCUMENT_SIGNAL_PATTERN.test(text);
@@ -166,12 +205,13 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
     !hasSectionSignal &&
     !hasDeadlineSignal &&
     !hasExactSignal &&
+    !hasHolidayPossessionSignal &&
     !asksForSource
   ) {
     return getBaseDetection();
   }
 
-  if (!(hasDocumentSignal || hasImplicitFollowUp || hasSectionSignal || hasDeadlineSignal || hasExactSignal || asksForSource)) {
+  if (!(hasDocumentSignal || hasImplicitFollowUp || hasSectionSignal || hasDeadlineSignal || hasExactSignal || hasHolidayPossessionSignal || asksForSource)) {
     return getBaseDetection();
   }
 
@@ -181,6 +221,7 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
   else if (hasExactSignal || asksForQuote) referenceType = asksForQuote ? 'quote_request' : 'terminology_check';
   else if (hasSectionSignal) referenceType = 'section_lookup';
   else if (hasDeadlineSignal) referenceType = 'deadline_lookup';
+  else if (hasHolidayPossessionSignal) referenceType = 'source_location_request';
   else if (documentHints.some((hint) => /\b(uploaded|attached|shared|prior|previous)\b/i.test(hint))) referenceType = 'explicit_prior_upload';
   else if (documentHints.length > 0) referenceType = 'active_document_followup';
 
@@ -194,7 +235,7 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
     confidence: hasDocumentSignal || requiresExactText ? 'high' : 'medium',
     referenceType,
     documentHints,
-    requestedTerms: unique([...deadlineTerms, ...exactTerms]),
+    requestedTerms: unique([...deadlineTerms, ...exactTerms, ...holidayTerms]),
     requestedSections,
     requestedDates,
     requestedDocumentTypes,

@@ -3,9 +3,11 @@ import type { DocumentReferenceDetection } from './documentReferenceDetection';
 export type DocumentChunkRetrievalReason =
   | 'exact_term'
   | 'deadline_pattern'
+  | 'holiday_possession'
   | 'heading_match'
   | 'page_match'
   | 'section_match'
+  | 'neighbor_context'
   | 'keyword_overlap'
   | 'early_context';
 
@@ -46,6 +48,30 @@ const DEADLINE_KEYWORDS = [
   'respond',
   'exchange',
   'payment',
+];
+
+const HOLIDAY_POSSESSION_KEYWORDS = [
+  'father\'s day',
+  'fathers day',
+  'father s day',
+  'mother\'s day',
+  'mothers day',
+  'mother s day',
+  'holiday possession',
+  'holiday schedule',
+  'student holiday',
+  'teacher in-service',
+  'teacher in service',
+  'spring break',
+  'thanksgiving',
+  'christmas',
+  'summer possession',
+  'extended summer',
+  'weekend possession',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
 ];
 
 const STOP_WORDS = new Set([
@@ -162,6 +188,50 @@ function buildSearchTerms(message: string, detection: DocumentReferenceDetection
   return unique([...requestedTerms, ...requestedDates, ...sectionTerms, ...messageTerms]);
 }
 
+function messageNeedsHolidayPossessionRetrieval(message: string, detection: DocumentReferenceDetection) {
+  return [...detection.requestedTerms, message].some((value) =>
+    /\b(?:father\s+s\s+day|fathers\s+day|father\s+day|mother\s+s\s+day|mothers\s+day|mother\s+day|holiday\s+(?:possession|schedule)|student\s+holiday|teacher\s+in\s+service|spring\s+break|thanksgiving|christmas|summer\s+possession|extended\s+summer)\b/i.test(normalizeText(value))
+  );
+}
+
+function addNeighborChunks(args: {
+  selected: RetrievedDocumentChunk[];
+  ranked: RetrievedDocumentChunk[];
+  maxChunks: number;
+}) {
+  if (args.selected.length >= args.maxChunks) return args.selected;
+
+  const byFileAndIndex = new Map(
+    args.ranked.map((chunk) => [`${chunk.uploadedFileId}:${chunk.chunkIndex}`, chunk])
+  );
+  const selectedIds = new Set(args.selected.map((chunk) => chunk.chunkId));
+  const anchors = args.selected.filter((chunk) =>
+    chunk.retrievalReasons.some((reason) =>
+      reason === 'exact_term' ||
+      reason === 'holiday_possession' ||
+      reason === 'page_match' ||
+      reason === 'section_match' ||
+      reason === 'heading_match' ||
+      reason === 'deadline_pattern'
+    )
+  );
+
+  for (const anchor of anchors) {
+    for (const neighborIndex of [anchor.chunkIndex - 1, anchor.chunkIndex + 1]) {
+      if (args.selected.length >= args.maxChunks) return args.selected;
+      const neighbor = byFileAndIndex.get(`${anchor.uploadedFileId}:${neighborIndex}`);
+      if (!neighbor || selectedIds.has(neighbor.chunkId)) continue;
+      selectedIds.add(neighbor.chunkId);
+      args.selected.push({
+        ...neighbor,
+        retrievalReasons: Array.from(new Set([...neighbor.retrievalReasons, 'neighbor_context'])),
+      });
+    }
+  }
+
+  return args.selected;
+}
+
 /** Rank stored document chunks for exact wording, deadline, section, page, and follow-up retrieval. */
 export function retrieveRelevantDocumentChunks(args: {
   message: string;
@@ -177,6 +247,7 @@ export function retrieveRelevantDocumentChunks(args: {
   const needsDeadline = args.detection.referenceType === 'deadline_lookup';
   const needsExact = args.detection.requiresExactText;
   const needsSection = args.detection.referenceType === 'section_lookup';
+  const needsHolidayPossession = messageNeedsHolidayPossessionRetrieval(args.message, args.detection);
 
   const ranked = args.chunks.map((chunk): RetrievedDocumentChunk => {
     const normalizedChunkText = normalizeText(chunk.text);
@@ -212,6 +283,14 @@ export function retrieveRelevantDocumentChunks(args: {
       }
     }
 
+    if (needsHolidayPossession) {
+      const holidayHits = HOLIDAY_POSSESSION_KEYWORDS.filter((term) => textContainsTerm(normalizedChunkText, normalizeText(term)));
+      if (holidayHits.length > 0) {
+        retrievalScore += 120 + holidayHits.length * 18;
+        retrievalReasons.push('holiday_possession');
+      }
+    }
+
     return {
       ...chunk,
       retrievalScore,
@@ -224,8 +303,19 @@ export function retrieveRelevantDocumentChunks(args: {
     return a.chunkIndex - b.chunkIndex;
   });
 
-  return ranked
+  const shouldExpandWithNeighbors =
+    needsExact || needsHolidayPossession || needsSection || needsDeadline || requestedPages.length > 0;
+  const initialChunkLimit = shouldExpandWithNeighbors
+    ? Math.max(1, args.maxChunks - 2)
+    : args.maxChunks;
+  const selected = ranked
     .filter((chunk, index) => index < args.maxChunks || chunk.retrievalScore > 40)
-    .slice(0, args.maxChunks)
+    .slice(0, initialChunkLimit);
+
+  const expanded = shouldExpandWithNeighbors
+    ? addNeighborChunks({ selected, ranked, maxChunks: args.maxChunks })
+    : selected;
+
+  return expanded
     .sort((a, b) => a.chunkIndex - b.chunkIndex);
 }

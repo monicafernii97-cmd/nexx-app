@@ -564,14 +564,14 @@ export const cancelUploadSession = mutation({
       return null;
     }
 
-    if (session.storageId) {
-      await ctx.storage.delete(session.storageId);
-    }
     await ctx.db.patch(args.uploadSessionId, {
       status: 'cancelled',
       retryable: false,
       updatedAt: Date.now(),
     });
+    if (session.storageId) {
+      await ctx.storage.delete(session.storageId);
+    }
     return null;
   },
 });

@@ -301,10 +301,20 @@ async function ensureVectorStore(ctx: ActionCtx, context: ProcessingContext): Pr
   if (existing) return existing;
 
   const externalStoreId = await createVectorStore(`nexx-vs-${crypto.randomUUID()}`);
-  const result = await ctx.runMutation(internal.chatUploads.setConversationVectorStoreForSession, {
-    uploadSessionId: context.session._id,
-    vectorStoreId: externalStoreId,
-  }) as { vectorStoreId: string; wasSet: boolean };
+  let result: { vectorStoreId: string; wasSet: boolean };
+  try {
+    result = await ctx.runMutation(internal.chatUploads.setConversationVectorStoreForSession, {
+      uploadSessionId: context.session._id,
+      vectorStoreId: externalStoreId,
+    }) as { vectorStoreId: string; wasSet: boolean };
+  } catch (error) {
+    try {
+      await deleteVectorStore(externalStoreId);
+    } catch {
+      // Preserve the original persistence failure; vector-store cleanup is best effort.
+    }
+    throw error;
+  }
 
   if (result.wasSet) return externalStoreId;
 

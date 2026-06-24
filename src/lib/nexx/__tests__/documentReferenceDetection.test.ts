@@ -30,6 +30,22 @@ describe('detectDocumentReference', () => {
     });
   });
 
+  it('detects holiday possession follow-ups with curly apostrophes', () => {
+    const detection = detectDocumentReference('For Father’s Day possession, does his time start Thursday?');
+
+    expect(detection).toMatchObject({
+      referencesDocument: true,
+      referenceType: 'source_location_request',
+      requiresExactText: true,
+      requiresPageOrSectionCitation: true,
+    });
+    expect(detection.requestedTerms).toContain('father\'s day');
+  });
+
+  it('does not treat a plain holiday date question as document retrieval', () => {
+    expect(detectDocumentReference('When is Father’s Day this year?').referencesDocument).toBe(false);
+  });
+
   it('detects section lookups', () => {
     expect(detectDocumentReference('Re-check section 7 of the order.')).toMatchObject({
       referencesDocument: true,

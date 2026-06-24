@@ -559,7 +559,7 @@ export const processChatGenerationJob = internalAction({
                 leaseOwner,
             });
 
-            await ctx.runMutation(internal.chatTurns.completeAssistant, {
+            const completion = await ctx.runMutation(internal.chatTurns.completeAssistant, {
                 jobId: args.jobId,
                 leaseOwner,
                 content: result.response.message,
@@ -572,6 +572,22 @@ export const processChatGenerationJob = internalAction({
 
             if (lease.turnId && result.attachmentContexts.length > 0) {
                 try {
+                    if (!result.degraded && completion?.assistantMessageId) {
+                        await ctx.runMutation(internal.chatTurns.recordDocumentAnswerEvidence, {
+                            turnId: lease.turnId,
+                            assistantMessageId: completion.assistantMessageId,
+                            sources: result.attachmentContexts.map((attachment) => ({
+                                uploadedFileId: attachment.uploadedFileId,
+                                filename: attachment.filename,
+                                source: attachment.source ?? 'current_turn',
+                                status: attachment.status,
+                                extractionMethod: attachment.extractionMethod,
+                                contextCharCount: attachment.chatContextCharCount ?? attachment.chatContextText?.length,
+                                contextTruncated: attachment.contextTruncated,
+                            })),
+                        });
+                    }
+
                     const auditRouteMode = (context.turn.routeMode ??
                         (result.documentReference.referencesDocument ? 'document_analysis' : 'adaptive_chat')) as RouteMode;
                     const selectedUploadedFileIds = result.attachmentContexts.map((attachment) => attachment.uploadedFileId);

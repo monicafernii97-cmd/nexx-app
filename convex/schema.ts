@@ -444,6 +444,72 @@ export default defineSchema({
         .index('by_user_created', ['userId', 'createdAt'])
         .index('by_expiresAt', ['expiresAt']),
 
+    documentAnswerEvidence: defineTable({
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        caseId: v.optional(v.id('cases')),
+        turnId: v.id('chatTurns'),
+        assistantMessageId: v.id('messages'),
+        usedUploadedFileIds: v.array(v.id('uploadedFiles')),
+        usedChunkIds: v.array(v.id('documentChunks')),
+        sources: v.array(v.object({
+            uploadedFileId: v.id('uploadedFiles'),
+            filename: v.string(),
+            source: v.union(
+                v.literal('current_turn'),
+                v.literal('conversation_memory'),
+                v.literal('case_memory'),
+                v.literal('user_private_memory')
+            ),
+            status: v.string(),
+            extractionMethod: v.optional(v.string()),
+            contextCharCount: v.optional(v.number()),
+            contextTruncated: v.optional(v.boolean()),
+        })),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_turn', ['turnId'])
+        .index('by_assistant_message', ['assistantMessageId'])
+        .index('by_conversation_created', ['conversationId', 'createdAt']),
+
+    documentReprocessJobs: defineTable({
+        uploadedFileId: v.id('uploadedFiles'),
+        requestedByUserId: v.id('users'),
+        clerkUserId: v.string(),
+        conversationId: v.optional(v.id('conversations')),
+        caseId: v.optional(v.id('cases')),
+        reason: v.union(
+            v.literal('user_requested'),
+            v.literal('partial_extraction'),
+            v.literal('failed_pages'),
+            v.literal('parser_upgrade'),
+            v.literal('ocr_upgrade'),
+            v.literal('embedding_upgrade'),
+            v.literal('admin_requested')
+        ),
+        status: v.union(
+            v.literal('queued'),
+            v.literal('running'),
+            v.literal('succeeded'),
+            v.literal('failed'),
+            v.literal('cancelled')
+        ),
+        attempt: v.number(),
+        maxAttempts: v.number(),
+        sourceExtractionVersion: v.optional(v.string()),
+        sourceChunkingVersion: v.optional(v.string()),
+        errorCode: v.optional(v.string()),
+        errorMessage: v.optional(v.string()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+        startedAt: v.optional(v.number()),
+        finishedAt: v.optional(v.number()),
+    })
+        .index('by_uploaded_file', ['uploadedFileId'])
+        .index('by_user_created', ['requestedByUserId', 'createdAt'])
+        .index('by_status_updated', ['status', 'updatedAt']),
+
     documentPages: defineTable({
         uploadedFileId: v.id('uploadedFiles'),
         clerkUserId: v.string(),

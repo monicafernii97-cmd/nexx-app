@@ -54,7 +54,7 @@ describe('renderer regression — multi-state pleadings', () => {
     expect(html).toContain('data-renderer="legal-document"');
     expect(html).toContain('margin: 60pt 72pt 72pt 72pt;');
     expect(html).toContain('font-size: 11pt;');
-    expect(html).toContain('family=Tinos');
+    expect(html).not.toContain('fonts.googleapis.com');
     expect(html).toContain('font-family: "Times New Roman", Tinos, Times, serif;');
     expect(html).toContain('width: 6.15in;');
     expect(html).toContain('line-height: 14.5pt;');

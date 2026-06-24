@@ -1,19 +1,6 @@
 import type { Metadata } from 'next';
-import { Outfit, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { ConvexClientProvider } from '@/lib/convex-provider';
-
-const outfit = Outfit({
-  subsets: ['latin'],
-  variable: '--font-outfit',
-  display: 'swap',
-});
-
-const playfair = Playfair_Display({
-  subsets: ['latin'],
-  variable: '--font-playfair',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   title: 'NEXX — Your Corner. Your Calm. Your Case.',
@@ -21,10 +8,10 @@ export const metadata: Metadata = {
   icons: { icon: '/favicon.ico' },
 };
 
-/** Root HTML layout with Outfit and Playfair Display fonts and Convex/Clerk providers. */
+/** Root HTML layout with Convex/Clerk providers and deterministic font fallbacks. */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${outfit.variable} ${playfair.variable} dark`} suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         {/* Prevent flash of wrong theme — runs before paint */}
         <script

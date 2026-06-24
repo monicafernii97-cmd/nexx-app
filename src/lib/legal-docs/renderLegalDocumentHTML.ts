@@ -55,8 +55,6 @@ export function renderLegalDocumentHTML(
 <meta charset="UTF-8" />
 <title>${esc(doc.title.main)}</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Tinos:wght@400;700&display=swap');
-
   @page {
     size: ${pageSize};
     margin: ${m.top}pt ${m.right}pt ${m.bottom}pt ${m.left}pt;
@@ -641,7 +639,8 @@ function esc(input: string): string {
  *
  * Vercel's Linux Chromium runtime may not have Microsoft Times New Roman
  * installed, so Texas-style pleadings keep Times New Roman first for local
- * Windows rendering and include Tinos as a metrically compatible web fallback.
+ * Windows rendering and include local/browser serif fallbacks without requiring
+ * live font downloads during PDF generation.
  */
 function legalFontFamily(profileFontFamily: string): string {
   const fallback = '"Times New Roman", Tinos, Times, serif';

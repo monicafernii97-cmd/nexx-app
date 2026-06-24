@@ -150,8 +150,9 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
   const asksForQuote = /\b(?:quote|exact\s+(?:wording|words|language)|what\s+exact\s+words|word\s+for\s+word)\b/i.test(text);
   const asksForSource = /\b(?:where\s+(?:does|did)\s+it\s+say|where\s+exactly|what\s+page|show\s+me\s+where|cite)\b/i.test(text);
   const asksForComparison = /\b(?:compare|difference|different|amended|prior|previous|original)\b/i.test(text) && documentHints.length > 0;
+  const asksForSpecificLocation = /\b(?:section|paragraph|page|clause)\s+([0-9]+|[ivxlcdm]+|[a-z])\b/i.test(text);
   const hasDocumentSignal = documentHints.length > 0 || requestedDocumentTypes.length > 0;
-  const hasSectionSignal = requestedSections.length > 0 && (hasDocumentSignal || hasImplicitFollowUp);
+  const hasSectionSignal = requestedSections.length > 0 && (hasDocumentSignal || hasImplicitFollowUp || asksForSpecificLocation);
   const hasDeadlineSignal = deadlineTerms.length > 0 && (hasDocumentSignal || hasImplicitFollowUp);
   const hasExactSignal = (asksForQuote || /\b(?:does|did|is)\s+(?:it|the\s+(?:order|document|file|pdf)).{0,80}\b(?:say|use|mention|include)\b/i.test(text)) &&
     (hasDocumentSignal || hasImplicitFollowUp || exactTerms.length > 0);

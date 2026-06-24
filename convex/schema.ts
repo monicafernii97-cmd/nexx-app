@@ -426,6 +426,7 @@ export default defineSchema({
         detectionResultJson: v.string(),
         candidateUploadedFileIds: v.array(v.id('uploadedFiles')),
         selectedUploadedFileIds: v.array(v.id('uploadedFiles')),
+        selectedChunkIds: v.optional(v.array(v.id('documentChunks'))),
         selectedContextCount: v.number(),
         retrievalReason: v.union(
             v.literal('current_turn_attachment'),

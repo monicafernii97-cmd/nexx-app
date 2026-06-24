@@ -54,6 +54,15 @@ describe('resolveDocumentMemorySource', () => {
 
     expect(result).toBeNull();
   });
+
+  it('rejects documents from a different conversation and a different case', () => {
+    const result = resolveDocumentMemorySource(
+      candidate({ conversationId: 'conversation_other', caseId: 'case_other' }),
+      scope
+    );
+
+    expect(result).toBeNull();
+  });
 });
 
 describe('canUseDocumentMemoryCandidate', () => {
@@ -63,4 +72,3 @@ describe('canUseDocumentMemoryCandidate', () => {
     expect(canUseDocumentMemoryCandidate(candidate({ status: 'partial' }), scope)).toBe(true);
   });
 });
-

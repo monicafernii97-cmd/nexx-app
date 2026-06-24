@@ -3,8 +3,11 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { getAuthenticatedUserAndConversation } from './lib/auth';
-import { detectDocumentReference } from '../src/lib/nexx/documentReferenceDetection';
-import { selectStoredDocumentCandidates } from '../src/lib/nexx/documentSelection';
+import {
+    detectDocumentReference,
+    type DocumentReferenceDetection,
+} from '../src/lib/nexx/documentReferenceDetection';
+import { normalizeDocumentAlias, selectStoredDocumentCandidates } from '../src/lib/nexx/documentSelection';
 import {
     canUseDocumentMemoryCandidate,
     resolveDocumentMemorySource,
@@ -17,6 +20,8 @@ const JOB_RETRY_DELAY_MS = 5_000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const DOCUMENT_RETRIEVAL_AUDIT_RETENTION_MS = 30 * ONE_DAY_MS;
 const DOCUMENT_RETRIEVAL_AUDIT_CLEANUP_BATCH_SIZE = 1000;
+const MAX_EXPLICIT_ALIAS_LOOKUP_TERMS = 60;
+const MAX_ALIAS_MATCHES_PER_TERM = 8;
 
 const routeModeValidator = v.union(
     v.literal('adaptive_chat'),
@@ -127,6 +132,70 @@ async function getDocumentAliases(ctx: QueryCtx, uploadedFileId: Id<'uploadedFil
         .withIndex('by_uploaded_file', (q) => q.eq('uploadedFileId', uploadedFileId))
         .collect();
     return aliases.map((alias) => alias.normalizedAlias);
+}
+
+function buildExplicitAliasLookupTerms(message: string, detection: DocumentReferenceDetection) {
+    const normalizedMessage = normalizeDocumentAlias(message);
+    const words = normalizedMessage.split(/\s+/).filter(Boolean);
+    const terms = new Set<string>();
+    const addTerm = (value: string) => {
+        const normalized = normalizeDocumentAlias(value);
+        if (normalized.split(/\s+/).filter(Boolean).length >= 2) terms.add(normalized);
+    };
+
+    detection.documentHints.forEach(addTerm);
+    detection.requestedDocumentTypes.forEach((type) => addTerm(type.replace(/_/g, ' ')));
+
+    for (let wordCount = Math.min(8, words.length); wordCount >= 2; wordCount -= 1) {
+        for (let start = 0; start <= words.length - wordCount; start += 1) {
+            addTerm(words.slice(start, start + wordCount).join(' '));
+            if (terms.size >= MAX_EXPLICIT_ALIAS_LOOKUP_TERMS) return Array.from(terms);
+        }
+    }
+
+    return Array.from(terms);
+}
+
+/** Load explicitly named stored documents that may be older than the normal recency window. */
+async function getExplicitAliasMatchedFiles(
+    ctx: QueryCtx,
+    args: {
+        clerkUserId: string;
+        caseId?: Id<'cases'>;
+        terms: string[];
+    }
+) {
+    const matchedFileIds = new Set<string>();
+    const matchedFiles: Doc<'uploadedFiles'>[] = [];
+    const addAliasMatches = async (aliases: Doc<'documentAliases'>[]) => {
+        for (const alias of aliases) {
+            const uploadedFileId = alias.uploadedFileId.toString();
+            if (matchedFileIds.has(uploadedFileId)) continue;
+            const uploadedFile = await ctx.db.get(alias.uploadedFileId);
+            if (!uploadedFile) continue;
+            matchedFileIds.add(uploadedFileId);
+            matchedFiles.push(uploadedFile);
+        }
+    };
+
+    for (const term of args.terms) {
+        const userAliases = await ctx.db
+            .query('documentAliases')
+            .withIndex('by_user_alias', (q) =>
+                q.eq('clerkUserId', args.clerkUserId).eq('normalizedAlias', term)
+            )
+            .take(MAX_ALIAS_MATCHES_PER_TERM);
+        await addAliasMatches(userAliases);
+
+        if (!args.caseId) continue;
+        const caseAliases = await ctx.db
+            .query('documentAliases')
+            .withIndex('by_case_alias', (q) => q.eq('caseId', args.caseId).eq('normalizedAlias', term))
+            .take(MAX_ALIAS_MATCHES_PER_TERM);
+        await addAliasMatches(caseAliases);
+    }
+
+    return matchedFiles;
 }
 
 async function upsertConversationDocumentState(
@@ -697,6 +766,7 @@ export const getGenerationContext = internalQuery({
         }
 
         const currentAttachmentIds = new Set(attachmentContexts.map((attachment) => attachment.uploadedFileId));
+        const documentReference = detectDocumentReference(turn.message);
         const documentState = await ctx.db
             .query('conversationDocumentState')
             .withIndex('by_conversation', (q) => q.eq('conversationId', turn.conversationId))
@@ -717,7 +787,15 @@ export const getGenerationContext = internalQuery({
         }
         const clerkUserId = user?.clerkId;
         const activeCaseId = conversation?.caseId;
-        const [conversationUploadedFiles, caseUploadedFiles, userPrivateUploadedFiles] = await Promise.all([
+        const aliasLookupTerms = documentReference.referencesDocument
+            ? buildExplicitAliasLookupTerms(turn.message, documentReference)
+            : [];
+        const [
+            conversationUploadedFiles,
+            caseUploadedFiles,
+            userPrivateUploadedFiles,
+            explicitAliasMatchedFiles,
+        ] = await Promise.all([
             ctx.db
                 .query('uploadedFiles')
                 .withIndex('by_conversationId', (q) => q.eq('conversationId', turn.conversationId))
@@ -741,9 +819,17 @@ export const getGenerationContext = internalQuery({
                     .order('desc')
                     .take(25)
                 : Promise.resolve([] as Doc<'uploadedFiles'>[]),
+            clerkUserId && aliasLookupTerms.length > 0
+                ? getExplicitAliasMatchedFiles(ctx, {
+                    clerkUserId,
+                    caseId: activeCaseId,
+                    terms: aliasLookupTerms,
+                })
+                : Promise.resolve([] as Doc<'uploadedFiles'>[]),
         ]);
         const candidateMemoryFiles = [
             ...rememberedUploadedFiles,
+            ...explicitAliasMatchedFiles,
             ...conversationUploadedFiles.filter((uploadedFile) =>
                 !rememberedUploadedFiles.some((remembered) => remembered._id === uploadedFile._id)
             ),
@@ -800,7 +886,6 @@ export const getGenerationContext = internalQuery({
             aliasesByUploadedFileId.set(uploadedFileId, aliases);
         }
 
-        const documentReference = detectDocumentReference(turn.message);
         const recentReferenceRankById = new Map(
             rememberedFileIds.map((uploadedFileId, index) => [uploadedFileId.toString(), index])
         );

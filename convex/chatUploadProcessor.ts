@@ -10,6 +10,7 @@ import { CHAT_UPLOAD_CONFIG } from './lib/chatUploadConfig';
 import { extractDocumentText, type DocumentExtractionResult } from '../src/lib/nexx/documentExtraction';
 import { detectDocumentType, type DocumentDetectionResult } from '../src/lib/nexx/documentTypeDetection';
 import { buildDocumentMemoryArtifacts, type DocumentMemoryArtifacts } from '../src/lib/nexx/documentChunking';
+import { buildDocumentAliases } from '../src/lib/nexx/documentSelection';
 import { createVectorStore, deleteVectorStore, uploadTextToVectorStore, uploadToVectorStore } from '../src/lib/nexx/fileSearch';
 
 type ProcessingContext = {
@@ -458,6 +459,23 @@ export const processStoredUpload = internalAction({
         openaiTextFileId,
         vectorStoreId,
       }) as Id<'uploadedFiles'>;
+
+      try {
+        await ctx.runMutation(internal.documentMemory.replaceDocumentAliases, {
+          uploadedFileId,
+          aliases: buildDocumentAliases({
+            filename: context.session.filename,
+            detectedType: extraction.detectedType,
+          }),
+        });
+      } catch (error) {
+        console.warn('[ChatUpload] document alias indexing failed', {
+          uploadSessionId: args.uploadSessionId,
+          uploadedFileId,
+          errorCode: 'document_alias_indexing_failed',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
 
       let memoryIndexingError: string | undefined;
       try {

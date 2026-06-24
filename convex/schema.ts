@@ -432,6 +432,8 @@ export default defineSchema({
             v.literal('active_document'),
             v.literal('recent_reference'),
             v.literal('conversation_memory'),
+            v.literal('case_memory'),
+            v.literal('user_private_memory'),
             v.literal('document_analysis_route')
         ),
         createdAt: v.number(),
@@ -959,6 +961,8 @@ export default defineSchema({
         updatedAt: v.optional(v.number()),
     }).index('by_clerkUserId', ['clerkUserId'])
       .index('by_conversationId', ['conversationId'])
+      .index('by_clerk_case', ['clerkUserId', 'caseId'])
+      .index('by_clerk_private_scope', ['clerkUserId', 'conversationId', 'caseId'])
       .index('by_upload_session', ['uploadSessionId'])
       .index('by_storage', ['storageId']),
 

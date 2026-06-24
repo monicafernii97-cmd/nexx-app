@@ -1,4 +1,5 @@
 import type { DocumentReferenceDetection, DocumentType } from './documentReferenceDetection';
+import type { DocumentMemorySource } from './documentAccess';
 
 /**
  * Provenance for aliases used during stored document recall.
@@ -16,6 +17,7 @@ export type StoredDocumentCandidateInput = {
   createdAt: number;
   detectedType?: string;
   aliases?: string[];
+  memorySource?: DocumentMemorySource;
   isActiveDocument?: boolean;
   recentReferenceRank?: number;
 };
@@ -25,6 +27,9 @@ export type StoredDocumentSelectionReason =
   | 'explicit_alias_match'
   | 'active_document'
   | 'recently_referenced'
+  | 'same_conversation'
+  | 'same_case'
+  | 'user_private_memory'
   | 'document_type_match'
   | 'recency';
 
@@ -126,6 +131,17 @@ export function selectStoredDocumentCandidates(args: {
     if (candidate.recentReferenceRank !== undefined) {
       score += Math.max(0, 80 - candidate.recentReferenceRank * 10);
       reasons.push('recently_referenced');
+    }
+
+    if (candidate.memorySource === 'conversation_memory') {
+      score += 45;
+      reasons.push('same_conversation');
+    } else if (candidate.memorySource === 'case_memory') {
+      score += 30;
+      reasons.push('same_case');
+    } else if (candidate.memorySource === 'user_private_memory') {
+      score += 5;
+      reasons.push('user_private_memory');
     }
 
     if (messageContainsAlias(normalizedMessage, filenameAlias) || messageContainsAlias(normalizedMessage, baseFilenameAlias)) {

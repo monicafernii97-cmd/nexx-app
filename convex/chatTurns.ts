@@ -5,6 +5,11 @@ import type { Doc, Id } from './_generated/dataModel';
 import { getAuthenticatedUserAndConversation } from './lib/auth';
 import { detectDocumentReference } from '../src/lib/nexx/documentReferenceDetection';
 import { selectStoredDocumentCandidates } from '../src/lib/nexx/documentSelection';
+import {
+    canUseDocumentMemoryCandidate,
+    resolveDocumentMemorySource,
+    type DocumentMemorySource,
+} from '../src/lib/nexx/documentAccess';
 
 const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
@@ -77,7 +82,7 @@ const EMPTY_ARTIFACTS_JSON = JSON.stringify({
 /** Normalize a ready uploaded file into the context shape consumed by the chat worker. */
 function buildUploadedFileContext(
     uploadedFile: Doc<'uploadedFiles'>,
-    source: 'current_turn' | 'conversation_memory',
+    source: 'current_turn' | DocumentMemorySource,
     uploadSessionId = uploadedFile.uploadSessionId,
     byteSize = uploadedFile.byteSize
 ) {
@@ -705,26 +710,84 @@ export const getGenerationContext = internalQuery({
             const uploadedFile = await ctx.db.get(uploadedFileId);
             if (
                 uploadedFile &&
-                uploadedFile.conversationId === turn.conversationId &&
                 uploadedFile.clerkUserId === user?.clerkId
             ) {
                 rememberedUploadedFiles.push(uploadedFile);
             }
         }
-        const conversationUploadedFiles = await ctx.db
-            .query('uploadedFiles')
-            .withIndex('by_conversationId', (q) => q.eq('conversationId', turn.conversationId))
-            .order('desc')
-            .take(25);
+        const clerkUserId = user?.clerkId;
+        const activeCaseId = conversation?.caseId;
+        const [conversationUploadedFiles, caseUploadedFiles, userPrivateUploadedFiles] = await Promise.all([
+            ctx.db
+                .query('uploadedFiles')
+                .withIndex('by_conversationId', (q) => q.eq('conversationId', turn.conversationId))
+                .order('desc')
+                .take(25),
+            clerkUserId && activeCaseId
+                ? ctx.db
+                    .query('uploadedFiles')
+                    .withIndex('by_clerk_case', (q) =>
+                        q.eq('clerkUserId', clerkUserId).eq('caseId', activeCaseId)
+                    )
+                    .order('desc')
+                    .take(25)
+                : Promise.resolve([] as Doc<'uploadedFiles'>[]),
+            clerkUserId
+                ? ctx.db
+                    .query('uploadedFiles')
+                    .withIndex('by_clerk_private_scope', (q) =>
+                        q.eq('clerkUserId', clerkUserId).eq('conversationId', undefined).eq('caseId', undefined)
+                    )
+                    .order('desc')
+                    .take(25)
+                : Promise.resolve([] as Doc<'uploadedFiles'>[]),
+        ]);
         const candidateMemoryFiles = [
             ...rememberedUploadedFiles,
             ...conversationUploadedFiles.filter((uploadedFile) =>
                 !rememberedUploadedFiles.some((remembered) => remembered._id === uploadedFile._id)
             ),
+            ...caseUploadedFiles,
+            ...userPrivateUploadedFiles,
         ].filter((uploadedFile) => !currentAttachmentIds.has(uploadedFile._id));
-        const rankableMemoryFiles = candidateMemoryFiles.filter((uploadedFile) =>
-            Boolean(buildUploadedFileContext(uploadedFile, 'conversation_memory')?.chatContextText?.trim())
-        );
+        const accessScope = clerkUserId
+            ? {
+                clerkUserId,
+                conversationId: turn.conversationId.toString(),
+                caseId: activeCaseId?.toString(),
+            }
+            : null;
+        const memorySourceByUploadedFileId = new Map<string, DocumentMemorySource>();
+        const seenCandidateFileIds = new Set<string>();
+        const accessibleMemoryFiles: Doc<'uploadedFiles'>[] = [];
+        for (const uploadedFile of candidateMemoryFiles) {
+            const uploadedFileId = uploadedFile._id.toString();
+            if (seenCandidateFileIds.has(uploadedFileId) || !accessScope) continue;
+            seenCandidateFileIds.add(uploadedFileId);
+            if (!canUseDocumentMemoryCandidate({
+                uploadedFileId,
+                clerkUserId: uploadedFile.clerkUserId,
+                conversationId: uploadedFile.conversationId?.toString(),
+                caseId: uploadedFile.caseId?.toString(),
+                status: uploadedFile.status,
+                chatContextText: uploadedFile.chatContextText,
+            }, accessScope)) {
+                continue;
+            }
+            const source = resolveDocumentMemorySource({
+                uploadedFileId,
+                clerkUserId: uploadedFile.clerkUserId,
+                conversationId: uploadedFile.conversationId?.toString(),
+                caseId: uploadedFile.caseId?.toString(),
+            }, accessScope);
+            if (!source) continue;
+            memorySourceByUploadedFileId.set(uploadedFileId, source);
+            accessibleMemoryFiles.push(uploadedFile);
+        }
+        const rankableMemoryFiles = accessibleMemoryFiles.filter((uploadedFile) => {
+            const source = memorySourceByUploadedFileId.get(uploadedFile._id.toString());
+            return source ? Boolean(buildUploadedFileContext(uploadedFile, source)?.chatContextText?.trim()) : false;
+        });
 
         const aliasesByUploadedFileId = new Map<string, string[]>();
         const aliasPairs = await Promise.all(
@@ -751,6 +814,7 @@ export const getGenerationContext = internalQuery({
                 createdAt: uploadedFile.createdAt,
                 detectedType: uploadedFile.detectedType,
                 aliases: aliasesByUploadedFileId.get(uploadedFile._id.toString()) ?? [],
+                memorySource: memorySourceByUploadedFileId.get(uploadedFile._id.toString()),
                 isActiveDocument: documentState?.activeUploadedFileId?.toString() === uploadedFile._id.toString(),
                 recentReferenceRank: recentReferenceRankById.get(uploadedFile._id.toString()),
             })),
@@ -762,7 +826,8 @@ export const getGenerationContext = internalQuery({
 
         const availableDocumentContexts = [];
         for (const uploadedFile of conversationMemoryFiles) {
-            const context = buildUploadedFileContext(uploadedFile, 'conversation_memory');
+            const source = memorySourceByUploadedFileId.get(uploadedFile._id.toString()) ?? 'conversation_memory';
+            const context = buildUploadedFileContext(uploadedFile, source);
             if (context?.chatContextText?.trim()) {
                 availableDocumentContexts.push(context);
             }
@@ -794,6 +859,8 @@ export const recordDocumentRetrievalAudit = internalMutation({
             v.literal('active_document'),
             v.literal('recent_reference'),
             v.literal('conversation_memory'),
+            v.literal('case_memory'),
+            v.literal('user_private_memory'),
             v.literal('document_analysis_route')
         ),
     },

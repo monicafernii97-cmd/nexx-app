@@ -164,7 +164,7 @@ type AttachmentContext = {
     mimeType: string;
     byteSize: number;
     status: 'ready' | 'partial' | 'uploaded' | 'processing' | 'failed';
-    source?: 'current_turn' | 'conversation_memory';
+    source?: 'current_turn' | 'conversation_memory' | 'case_memory' | 'user_private_memory';
     detectedType?: string;
     extractionMethod?: string;
     extractionWarnings?: string[];
@@ -230,7 +230,11 @@ function buildAttachmentContextPrompt(attachments: AttachmentContext[], detectio
     const blocks = attachments.map((attachment) => {
         const sourceLabel = attachment.source === 'conversation_memory'
             ? 'stored conversation document memory'
-            : 'current chat turn attachment';
+            : attachment.source === 'case_memory'
+                ? 'stored case document memory'
+                : attachment.source === 'user_private_memory'
+                    ? 'stored user-private document memory'
+                    : 'current chat turn attachment';
 
         if (!attachment.chatContextText?.trim()) {
             return [
@@ -356,6 +360,8 @@ function determineRetrievalReason(
 ) {
     if (selected.some((attachment) => attachment.source === 'current_turn')) return 'current_turn_attachment' as const;
     if (documentReference.referenceType === 'active_document_followup') return 'active_document' as const;
+    if (selected.some((attachment) => attachment.source === 'case_memory')) return 'case_memory' as const;
+    if (selected.some((attachment) => attachment.source === 'user_private_memory')) return 'user_private_memory' as const;
     if (documentReference.referencesDocument) return 'recent_reference' as const;
     if (routeMode === 'document_analysis') return 'document_analysis_route' as const;
     return 'conversation_memory' as const;

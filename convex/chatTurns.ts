@@ -121,6 +121,8 @@ function buildUploadedFileContext(
     return {
         uploadedFileId: uploadedFile._id,
         uploadSessionId,
+        storageId: uploadedFile.storageId,
+        storageSha256: uploadedFile.storageSha256,
         filename: uploadedFile.filename,
         mimeType: uploadedFile.mimeType,
         byteSize: byteSize ?? 0,

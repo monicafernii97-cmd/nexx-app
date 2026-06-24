@@ -166,6 +166,8 @@ type GenerationContext = {
 type AttachmentContext = {
     uploadedFileId: Id<'uploadedFiles'>;
     uploadSessionId?: Id<'chatUploadSessions'>;
+    storageId?: Id<'_storage'>;
+    storageSha256?: string;
     filename: string;
     mimeType: string;
     byteSize: number;
@@ -232,23 +234,10 @@ function shouldPreferRetrievedChunks(detection: DocumentReferenceDetection) {
         detection.referenceType === 'source_location_request';
 }
 
-function normalizeAttachmentFilename(filename: string) {
-    return filename
-        .toLowerCase()
-        .normalize('NFKD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/\.[a-z0-9]{1,8}$/i, '')
-        .replace(/[^a-z0-9]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
 function attachmentIdentityKey(attachment: AttachmentContext) {
-    return [
-        normalizeAttachmentFilename(attachment.filename),
-        attachment.byteSize || 0,
-        attachment.extractionCharCount || attachment.chatContextCharCount || 0,
-    ].join(':');
+    if (attachment.storageSha256) return `sha256:${attachment.storageSha256}`;
+    if (attachment.storageId) return `storage:${attachment.storageId.toString()}`;
+    return `uploaded:${attachment.uploadedFileId.toString()}`;
 }
 
 function buildRetrievedChunkPrompt(chunks: DocumentChunkContext[]) {

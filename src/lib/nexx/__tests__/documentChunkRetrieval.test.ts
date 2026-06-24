@@ -156,4 +156,37 @@ describe('retrieveRelevantDocumentChunks', () => {
     expect(result.map((chunk) => chunk.chunkId)).toContain('file-1-anchor');
     expect(result.map((chunk) => chunk.chunkId)).not.toContain('file-2-neighbor');
   });
+
+  it('boosts Saturday holiday-possession clauses', () => {
+    const saturdayChunks: DocumentChunkRetrievalCandidate[] = [
+      {
+        chunkId: 'generic-holiday',
+        uploadedFileId: 'file-1',
+        chunkIndex: 1,
+        text: 'The parties must comply with the holiday schedule in this order.',
+        textLength: 66,
+        sectionHeading: 'Holiday Schedule',
+        warnings: [],
+      },
+      {
+        chunkId: 'saturday-possession',
+        uploadedFileId: 'file-1',
+        chunkIndex: 2,
+        text: 'Holiday possession that begins on Saturday starts at 10:00 a.m. unless this order says otherwise.',
+        textLength: 99,
+        sectionHeading: 'Holiday Possession',
+        warnings: [],
+      },
+    ];
+    const detection = detectDocumentReference('What does the holiday possession schedule say about Saturday pickup?');
+    const result = retrieveRelevantDocumentChunks({
+      message: 'What does the holiday possession schedule say about Saturday pickup?',
+      detection,
+      chunks: saturdayChunks,
+      maxChunks: 1,
+    });
+
+    expect(result[0]?.chunkId).toBe('saturday-possession');
+    expect(result[0]?.retrievalReasons).toContain('holiday_possession');
+  });
 });

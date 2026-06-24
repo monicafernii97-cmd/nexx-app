@@ -70,6 +70,7 @@ const HOLIDAY_POSSESSION_KEYWORDS = [
   'weekend possession',
   'thursday',
   'friday',
+  'saturday',
   'sunday',
 ];
 

@@ -39,8 +39,23 @@ export type StoredDocumentSelection = {
   reasons: StoredDocumentSelectionReason[];
 };
 
+export type StoredDocumentAmbiguity = {
+  requiresClarification: true;
+  reason: 'multiple_matching_documents';
+  options: Array<{
+    uploadedFileId: string;
+    label: string;
+    filename: string;
+    createdAt: number;
+    memorySource?: DocumentMemorySource;
+    score: number;
+    reasons: StoredDocumentSelectionReason[];
+  }>;
+};
+
 const GENERIC_ORDER_ALIASES = ['the order', 'court order', 'uploaded order', 'uploaded court order'];
 const GENERIC_DOCUMENT_ALIASES = ['the document', 'uploaded document', 'the file', 'uploaded file', 'the pdf'];
+const AMBIGUITY_SCORE_MARGIN = 50;
 
 /** Normalize filenames, aliases, and user references into a comparable lowercase search key. */
 export function normalizeDocumentAlias(value: string) {
@@ -171,5 +186,65 @@ export function selectStoredDocumentCandidates(args: {
   return {
     selected: ranked.slice(0, args.maxDocuments),
     ranked,
+  };
+}
+
+/** Return true when ranking found a high-confidence document that should not trigger clarification. */
+function hasStrongSingleDocumentSignal(selection: StoredDocumentSelection) {
+  return selection.reasons.includes('active_document') || selection.reasons.includes('explicit_filename_match');
+}
+
+/** Return true for document references where choosing the wrong stored file would be risky. */
+function isClarificationSensitiveReference(detection: DocumentReferenceDetection) {
+  return detection.mayNeedClarification ||
+    detection.referenceType === 'explicit_prior_upload' ||
+    detection.referenceType === 'implicit_followup' ||
+    detection.referenceType === 'active_document_followup' ||
+    detection.referenceType === 'deadline_lookup' ||
+    detection.referenceType === 'section_lookup' ||
+    detection.referenceType === 'terminology_check' ||
+    detection.referenceType === 'quote_request' ||
+    detection.referenceType === 'source_location_request';
+}
+
+/** Identify when stored document recall should ask the user which document to use. */
+export function detectStoredDocumentAmbiguity(args: {
+  detection: DocumentReferenceDetection;
+  ranked: StoredDocumentSelection[];
+  candidates: StoredDocumentCandidateInput[];
+  maxOptions?: number;
+}): StoredDocumentAmbiguity | null {
+  if (!args.detection.referencesDocument || !isClarificationSensitiveReference(args.detection)) {
+    return null;
+  }
+
+  const [top, second] = args.ranked;
+  if (!top || !second) return null;
+  if (hasStrongSingleDocumentSignal(top)) return null;
+  if (top.score - second.score > AMBIGUITY_SCORE_MARGIN) return null;
+
+  const byId = new Map(args.candidates.map((candidate) => [candidate.uploadedFileId, candidate]));
+  const options = args.ranked
+    .filter((selection) => top.score - selection.score <= AMBIGUITY_SCORE_MARGIN)
+    .slice(0, args.maxOptions ?? 4)
+    .map((selection, index) => {
+      const candidate = byId.get(selection.uploadedFileId);
+      return {
+      uploadedFileId: selection.uploadedFileId,
+      label: `Document ${index + 1}`,
+      filename: candidate?.filename ?? 'Uploaded document',
+      createdAt: candidate?.createdAt ?? 0,
+      memorySource: candidate?.memorySource,
+      score: selection.score,
+      reasons: selection.reasons,
+      };
+    });
+
+  if (options.length < 2) return null;
+
+  return {
+    requiresClarification: true,
+    reason: 'multiple_matching_documents',
+    options,
   };
 }

@@ -19,6 +19,7 @@ import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
 import { polishLegalResponse } from '../src/lib/nexx/postprocess';
 import { toProviderInputMessages } from '../src/lib/nexx/providerInput';
 import { detectDocumentReference, type DocumentReferenceDetection } from '../src/lib/nexx/documentReferenceDetection';
+import type { StoredDocumentAmbiguity } from '../src/lib/nexx/documentSelection';
 import type { NexxAssistantResponse, RouteMode } from '../src/lib/types';
 
 const DEGRADED_MESSAGE =
@@ -147,6 +148,7 @@ type GenerationContext = {
         activeUploadedFileId?: Id<'uploadedFiles'>;
         lastReferencedUploadedFileIds?: Id<'uploadedFiles'>[];
     } | null;
+    documentAmbiguity?: StoredDocumentAmbiguity | null;
     attachmentContexts?: AttachmentContext[];
     availableDocumentContexts?: AttachmentContext[];
     recentMessages: Array<{
@@ -424,6 +426,53 @@ function determineRetrievalReason(
     return 'conversation_memory' as const;
 }
 
+/** Build the deterministic clarification message shown when stored document recall is ambiguous. */
+function buildDocumentAmbiguityMessage(ambiguity: StoredDocumentAmbiguity) {
+    const options = ambiguity.options
+        .map((option) => `- ${option.label}: ${formatDocumentAmbiguityFilename(option.filename)}${formatDocumentAmbiguityDetails(option)}`)
+        .join('\n');
+
+    return [
+        'I found multiple stored documents that could match that request.',
+        '',
+        'Please tell me which document to check by label or filename:',
+        options,
+    ].join('\n');
+}
+
+/** Collapse uploaded filenames into safe single-line labels for clarification prompts. */
+function formatDocumentAmbiguityFilename(filename: string) {
+    return filename.replace(/\s+/g, ' ').trim() || 'Untitled document';
+}
+
+/** Render stable, non-content metadata that helps users distinguish similar filenames. */
+function formatDocumentAmbiguityDetails(option: StoredDocumentAmbiguity['options'][number]) {
+    const details = [
+        option.memorySource ? option.memorySource.replace(/_/g, ' ') : undefined,
+        option.createdAt > 0 ? `uploaded ${new Date(option.createdAt).toISOString().slice(0, 10)}` : undefined,
+    ].filter(Boolean);
+
+    return details.length > 0 ? ` (${details.join(', ')})` : '';
+}
+
+/** Serialize ambiguity options for future UI affordances without blocking text rendering. */
+function buildDocumentAmbiguityMetadata(ambiguity: StoredDocumentAmbiguity) {
+    return JSON.stringify({
+        documentAmbiguity: {
+            requiresClarification: true,
+            reason: ambiguity.reason,
+            options: ambiguity.options.map((option) => ({
+                uploadedFileId: option.uploadedFileId,
+                label: option.label,
+                filename: option.filename,
+                createdAt: option.createdAt,
+                source: option.memorySource,
+                reasons: option.reasons,
+            })),
+        },
+    });
+}
+
 /** Generate one assistant response with tool/model fallbacks and draft persistence. */
 async function generateWithFallbacks({
     ctx,
@@ -606,6 +655,38 @@ export const processChatGenerationJob = internalAction({
                     errorCode: 'missing_generation_context',
                     errorMessage: 'Unable to load generation context.',
                 });
+                return null;
+            }
+
+            if (context.documentAmbiguity?.requiresClarification) {
+                const documentReference = detectDocumentReference(context.turn.message);
+                await ctx.runMutation(internal.chatTurns.completeAssistant, {
+                    jobId: args.jobId,
+                    leaseOwner,
+                    content: buildDocumentAmbiguityMessage(context.documentAmbiguity),
+                    artifactsJson: JSON.stringify(emptyArtifacts()),
+                    degraded: false,
+                    metadataJson: buildDocumentAmbiguityMetadata(context.documentAmbiguity),
+                });
+
+                if (lease.turnId) {
+                    try {
+                        await ctx.runMutation(internal.chatTurns.recordDocumentRetrievalAudit, {
+                            turnId: lease.turnId,
+                            detectionResultJson: JSON.stringify(documentReference),
+                            candidateUploadedFileIds: context.documentAmbiguity.options.map(
+                                (option) => option.uploadedFileId as Id<'uploadedFiles'>
+                            ),
+                            selectedUploadedFileIds: [],
+                            selectedChunkIds: [],
+                            selectedContextCount: 0,
+                            retrievalReason: 'ambiguous_document_selection',
+                        });
+                    } catch (auditError) {
+                        console.error('[ChatWorker] Failed to record ambiguous document retrieval audit', auditError);
+                    }
+                }
+
                 return null;
             }
 

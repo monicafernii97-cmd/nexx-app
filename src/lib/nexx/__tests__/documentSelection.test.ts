@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDocumentAliases, selectStoredDocumentCandidates } from '../documentSelection';
+import { buildDocumentAliases, detectStoredDocumentAmbiguity, selectStoredDocumentCandidates } from '../documentSelection';
 import { detectDocumentReference } from '../documentReferenceDetection';
 
 describe('buildDocumentAliases', () => {
@@ -111,5 +111,115 @@ describe('selectStoredDocumentCandidates', () => {
     });
     expect(result.selected[0].reasons).toContain('explicit_alias_match');
     expect(result.selected[0].reasons).toContain('user_private_memory');
+  });
+
+  it('asks for clarification when multiple stored orders are similarly plausible', () => {
+    const ambiguousCandidates = [
+      {
+        uploadedFileId: 'temporary',
+        filename: 'Temporary Orders.pdf',
+        createdAt: 300,
+        detectedType: 'court_order',
+        aliases: ['the order', 'court order'],
+        memorySource: 'conversation_memory' as const,
+      },
+      {
+        uploadedFileId: 'amended',
+        filename: 'Amended Temporary Orders.pdf',
+        createdAt: 290,
+        detectedType: 'court_order',
+        aliases: ['the order', 'court order'],
+        memorySource: 'conversation_memory' as const,
+      },
+    ];
+    const detection = detectDocumentReference('What deadlines are in the order?');
+    const result = selectStoredDocumentCandidates({
+      message: 'What deadlines are in the order?',
+      detection,
+      candidates: ambiguousCandidates,
+      maxDocuments: 2,
+    });
+
+    const ambiguity = detectStoredDocumentAmbiguity({
+      detection,
+      ranked: result.ranked,
+      candidates: ambiguousCandidates,
+    });
+
+    expect(ambiguity).toMatchObject({
+      requiresClarification: true,
+      reason: 'multiple_matching_documents',
+    });
+    expect(ambiguity?.options.map((option) => option.uploadedFileId)).toEqual(['temporary', 'amended']);
+    expect(ambiguity?.options.map((option) => option.label)).toEqual(['Document 1', 'Document 2']);
+    expect(ambiguity?.options[0]).toMatchObject({
+      createdAt: 300,
+      memorySource: 'conversation_memory',
+    });
+  });
+
+  it('does not ask for clarification when the active document is a strong match', () => {
+    const detection = detectDocumentReference('What deadlines are in it?');
+    const result = selectStoredDocumentCandidates({
+      message: 'What deadlines are in it?',
+      detection,
+      candidates,
+      maxDocuments: 2,
+    });
+
+    expect(detectStoredDocumentAmbiguity({
+      detection,
+      ranked: result.ranked,
+      candidates,
+    })).toBeNull();
+  });
+
+  it('does not ask for clarification when an explicit filename identifies the document', () => {
+    const detection = detectDocumentReference('Go back to Final Order.pdf and check the exchange section.');
+    const result = selectStoredDocumentCandidates({
+      message: 'Go back to Final Order.pdf and check the exchange section.',
+      detection,
+      candidates,
+      maxDocuments: 2,
+    });
+
+    expect(detectStoredDocumentAmbiguity({
+      detection,
+      ranked: result.ranked,
+      candidates,
+    })).toBeNull();
+  });
+
+  it('treats generic prior-upload references as ambiguity-sensitive', () => {
+    const genericUploadCandidates = [
+      {
+        uploadedFileId: 'first-upload',
+        filename: 'First Upload.pdf',
+        createdAt: 200,
+        aliases: ['uploaded document'],
+        memorySource: 'conversation_memory' as const,
+      },
+      {
+        uploadedFileId: 'second-upload',
+        filename: 'Second Upload.pdf',
+        createdAt: 190,
+        aliases: ['uploaded document'],
+        memorySource: 'conversation_memory' as const,
+      },
+    ];
+    const detection = detectDocumentReference('Please check the uploaded document again.');
+    const result = selectStoredDocumentCandidates({
+      message: 'Please check the uploaded document again.',
+      detection,
+      candidates: genericUploadCandidates,
+      maxDocuments: 2,
+    });
+
+    expect(detection.referenceType).toBe('explicit_prior_upload');
+    expect(detectStoredDocumentAmbiguity({
+      detection,
+      ranked: result.ranked,
+      candidates: genericUploadCandidates,
+    })?.options).toHaveLength(2);
   });
 });

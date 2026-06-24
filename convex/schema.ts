@@ -435,7 +435,8 @@ export default defineSchema({
             v.literal('conversation_memory'),
             v.literal('case_memory'),
             v.literal('user_private_memory'),
-            v.literal('document_analysis_route')
+            v.literal('document_analysis_route'),
+            v.literal('ambiguous_document_selection')
         ),
         createdAt: v.number(),
         expiresAt: v.number(),

@@ -42,7 +42,7 @@ export type DocumentReferenceDetection = {
 };
 
 const DOCUMENT_HINT_PATTERNS = [
-  /\b(?:uploaded|attached|shared|prior|previous|current|this|that|the)\s+(court\s+order|order|document|file|pdf|upload)\b/gi,
+  /\b((?:uploaded|attached|shared|prior|previous|current|this|that|the)\s+(?:court\s+order|order|document|file|pdf|upload))\b/gi,
   /\b(court\s+order|temporary\s+order|temporary\s+orders|amended\s+order|amended\s+temporary\s+order|final\s+order|parenting\s+plan|docket\s+sheet|exhibit|notice|motion|petition)\b/gi,
   /\b(?:refer\s+back|look\s+back|pull\s+up|open\s+(?:it|that|the\s+(?:file|document|order))|double[-\s]?check|verify|re-?read|review\s+again)\b/gi,
 ];
@@ -140,9 +140,6 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
   if (!text) return getBaseDetection();
 
   const lower = text.toLowerCase();
-  if (GENERIC_LEGAL_QUESTION_PATTERN.test(text) && !EXPLICIT_STORED_DOCUMENT_SIGNAL_PATTERN.test(text)) {
-    return getBaseDetection();
-  }
   const documentHints = collectPatternMatches(text, DOCUMENT_HINT_PATTERNS);
   const requestedSections = unique(Array.from(text.matchAll(SECTION_PATTERN)).map((match) => match[0]));
   const requestedDates = unique(Array.from(text.matchAll(DATE_PATTERN)).map((match) => match[0]));
@@ -158,6 +155,20 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
   const hasDeadlineSignal = deadlineTerms.length > 0 && (hasDocumentSignal || hasImplicitFollowUp);
   const hasExactSignal = (asksForQuote || /\b(?:does|did|is)\s+(?:it|the\s+(?:order|document|file|pdf)).{0,80}\b(?:say|use|mention|include)\b/i.test(text)) &&
     (hasDocumentSignal || hasImplicitFollowUp || exactTerms.length > 0);
+  const isGenericLegalQuestion =
+    GENERIC_LEGAL_QUESTION_PATTERN.test(text) &&
+    !EXPLICIT_STORED_DOCUMENT_SIGNAL_PATTERN.test(text);
+
+  if (
+    isGenericLegalQuestion &&
+    !hasImplicitFollowUp &&
+    !hasSectionSignal &&
+    !hasDeadlineSignal &&
+    !hasExactSignal &&
+    !asksForSource
+  ) {
+    return getBaseDetection();
+  }
 
   if (!(hasDocumentSignal || hasImplicitFollowUp || hasSectionSignal || hasDeadlineSignal || hasExactSignal || asksForSource)) {
     return getBaseDetection();

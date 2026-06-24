@@ -435,10 +435,12 @@ export default defineSchema({
             v.literal('document_analysis_route')
         ),
         createdAt: v.number(),
+        expiresAt: v.number(),
     })
         .index('by_conversation', ['conversationId'])
         .index('by_turn', ['turnId'])
-        .index('by_user_created', ['userId', 'createdAt']),
+        .index('by_user_created', ['userId', 'createdAt'])
+        .index('by_expiresAt', ['expiresAt']),
 
     chatRateLimitWindows: defineTable({
         userId: v.id('users'),

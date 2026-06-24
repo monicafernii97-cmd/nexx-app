@@ -13,6 +13,12 @@ crons.daily(
   internal.toolRuns.deleteExpired,
 );
 
+crons.daily(
+  'clean up expired document retrieval audits',
+  { hourUTC: 6, minuteUTC: 20 },
+  internal.chatTurns.deleteExpiredDocumentRetrievalAudits,
+);
+
 /**
  * Reap stale in_progress export runs and timed-out jobs every 5 minutes.
  * Any exportRun still in_progress after 10 minutes is marked failed with EXPORT_JOB_TIMEOUT.

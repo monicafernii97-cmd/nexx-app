@@ -7,6 +7,10 @@ describe('detectDocumentReference', () => {
       referencesDocument: true,
       referenceType: 'deadline_lookup',
     });
+    expect(detectDocumentReference('What are the deadlines in the order?')).toMatchObject({
+      referencesDocument: true,
+      referenceType: 'deadline_lookup',
+    });
   });
 
   it('detects exact terminology checks', () => {

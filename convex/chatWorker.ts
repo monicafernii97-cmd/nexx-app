@@ -184,6 +184,14 @@ function escapeXmlAttribute(value?: string) {
         .replace(/>/g, '&gt;') ?? '';
 }
 
+function sanitizeDocumentContextText(value: string) {
+    return value
+        .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ' ')
+        .replace(/```/g, "'''")
+        .replace(/<\s*\//g, '&lt;/')
+        .replace(/<\s*(DOCUMENT_CONTEXT|DOCUMENT|EXTRACTED_DOCUMENT_CONTEXT|WARNINGS|CHUNK)\b/gi, '&lt;$1');
+}
+
 /** Select a bounded, deduped set of uploaded documents to include in the model prompt. */
 function selectAttachmentContextsForPrompt(
     context: GenerationContext,
@@ -239,7 +247,7 @@ function buildAttachmentContextPrompt(attachments: AttachmentContext[], detectio
             attachment.extractionWarnings?.length ? `Extraction warnings: ${sanitizePromptMetadata(attachment.extractionWarnings.join(', '))}` : 'None',
             '</WARNINGS>',
             '<EXTRACTED_DOCUMENT_CONTEXT>',
-            attachment.chatContextText,
+            sanitizeDocumentContextText(attachment.chatContextText),
             '</EXTRACTED_DOCUMENT_CONTEXT>',
             '</DOCUMENT>',
         ].filter(Boolean).join('\n');
@@ -557,11 +565,14 @@ export const processChatGenerationJob = internalAction({
 
             if (lease.turnId && result.attachmentContexts.length > 0) {
                 try {
-                    const auditRouteMode = (context.turn.routeMode ?? classifyMessage(context.turn.message).mode) as RouteMode;
+                    const auditRouteMode = (context.turn.routeMode ??
+                        (result.documentReference.referencesDocument ? 'document_analysis' : 'adaptive_chat')) as RouteMode;
                     const selectedUploadedFileIds = result.attachmentContexts.map((attachment) => attachment.uploadedFileId);
                     const candidateUploadedFileIds = [
-                        ...(context.attachmentContexts ?? []).map((attachment) => attachment.uploadedFileId),
-                        ...(context.availableDocumentContexts ?? []).map((attachment) => attachment.uploadedFileId),
+                        ...new Set([
+                            ...(context.attachmentContexts ?? []).map((attachment) => attachment.uploadedFileId),
+                            ...(context.availableDocumentContexts ?? []).map((attachment) => attachment.uploadedFileId),
+                        ]),
                     ];
                     await ctx.runMutation(internal.chatTurns.recordDocumentRetrievalAudit, {
                         turnId: lease.turnId,

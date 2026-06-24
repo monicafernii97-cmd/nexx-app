@@ -8,6 +8,7 @@ const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
 const JOB_RETRY_DELAY_MS = 5_000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const DOCUMENT_RETRIEVAL_AUDIT_RETENTION_MS = 30 * ONE_DAY_MS;
 
 const routeModeValidator = v.union(
     v.literal('adaptive_chat'),
@@ -772,6 +773,7 @@ export const recordDocumentRetrievalAudit = internalMutation({
             selectedContextCount: args.selectedContextCount,
             retrievalReason: args.retrievalReason,
             createdAt: now,
+            expiresAt: now + DOCUMENT_RETRIEVAL_AUDIT_RETENTION_MS,
         });
 
         await upsertConversationDocumentState(ctx, {
@@ -783,6 +785,24 @@ export const recordDocumentRetrievalAudit = internalMutation({
         });
 
         return true;
+    },
+});
+
+export const deleteExpiredDocumentRetrievalAudits = internalMutation({
+    args: {},
+    handler: async (ctx) => {
+        const now = Date.now();
+        const expired = await ctx.db
+            .query('documentRetrievalAudit')
+            .withIndex('by_expiresAt')
+            .filter((q) => q.lt(q.field('expiresAt'), now))
+            .take(500);
+
+        for (const audit of expired) {
+            await ctx.db.delete(audit._id);
+        }
+
+        return { deleted: expired.length };
     },
 });
 

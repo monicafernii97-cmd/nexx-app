@@ -8,6 +8,8 @@ const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
 const JOB_RETRY_DELAY_MS = 5_000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const DOCUMENT_RETRIEVAL_AUDIT_RETENTION_MS = 30 * ONE_DAY_MS;
+const DOCUMENT_RETRIEVAL_AUDIT_CLEANUP_BATCH_SIZE = 1000;
 
 const routeModeValidator = v.union(
     v.literal('adaptive_chat'),
@@ -99,6 +101,61 @@ function buildUploadedFileContext(
         indexingError: uploadedFile.indexingError,
         extractionError: uploadedFile.extractionError,
     };
+}
+
+function uniqueRecentUploadedFileIds(ids: Id<'uploadedFiles'>[]) {
+    return Array.from(new Set(ids.map((id) => id.toString())))
+        .slice(0, 10)
+        .map((id) => id as Id<'uploadedFiles'>);
+}
+
+function messagePreview(message: string) {
+    return message.replace(/\s+/g, ' ').trim().slice(0, 300);
+}
+
+async function upsertConversationDocumentState(
+    ctx: MutationCtx,
+    args: {
+        conversationId: Id<'conversations'>;
+        userId: Id<'users'>;
+        uploadedFileIds: Id<'uploadedFiles'>[];
+        turnId?: Id<'chatTurns'>;
+        now: number;
+    }
+) {
+    if (args.uploadedFileIds.length === 0) return;
+
+    const existing = await ctx.db
+        .query('conversationDocumentState')
+        .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
+        .first();
+    const lastReferencedUploadedFileIds = uniqueRecentUploadedFileIds([
+        ...args.uploadedFileIds,
+        ...(existing?.lastReferencedUploadedFileIds ?? []),
+    ]);
+
+    if (existing) {
+        await ctx.db.patch(existing._id, {
+            activeUploadedFileId: args.uploadedFileIds[0],
+            lastReferencedUploadedFileIds,
+            lastDocumentAnalysisTurnId: args.turnId ?? existing.lastDocumentAnalysisTurnId,
+            lastDocumentReferenceAt: args.now,
+            updatedAt: args.now,
+        });
+        return;
+    }
+
+    await ctx.db.insert('conversationDocumentState', {
+        conversationId: args.conversationId,
+        userId: args.userId,
+        activeUploadedFileId: args.uploadedFileIds[0],
+        lastReferencedUploadedFileIds,
+        pinnedUploadedFileIds: [],
+        lastDocumentAnalysisTurnId: args.turnId,
+        lastDocumentReferenceAt: args.now,
+        createdAt: args.now,
+        updatedAt: args.now,
+    });
 }
 
 /** Consume one chat quota unit after duplicate-turn detection has completed. */
@@ -416,6 +473,14 @@ export const acceptChatTurn = mutation({
             }
         }
 
+        await upsertConversationDocumentState(ctx, {
+            conversationId: args.conversationId,
+            userId: user._id,
+            uploadedFileIds: validatedAttachments.map((attachment) => attachment.uploadedFileId),
+            turnId,
+            now,
+        });
+
         const jobId = await ctx.db.insert('chatGenerationJobs', {
             turnId,
             conversationId: args.conversationId,
@@ -616,13 +681,38 @@ export const getGenerationContext = internalQuery({
         }
 
         const currentAttachmentIds = new Set(attachmentContexts.map((attachment) => attachment.uploadedFileId));
+        const documentState = await ctx.db
+            .query('conversationDocumentState')
+            .withIndex('by_conversation', (q) => q.eq('conversationId', turn.conversationId))
+            .first();
+        const rememberedFileIds = uniqueRecentUploadedFileIds([
+            ...(documentState?.activeUploadedFileId ? [documentState.activeUploadedFileId] : []),
+            ...(documentState?.lastReferencedUploadedFileIds ?? []),
+        ]);
+        const rememberedUploadedFiles: Doc<'uploadedFiles'>[] = [];
+        for (const uploadedFileId of rememberedFileIds) {
+            const uploadedFile = await ctx.db.get(uploadedFileId);
+            if (
+                uploadedFile &&
+                uploadedFile.conversationId === turn.conversationId &&
+                uploadedFile.clerkUserId === user?.clerkId
+            ) {
+                rememberedUploadedFiles.push(uploadedFile);
+            }
+        }
         const conversationUploadedFiles = await ctx.db
             .query('uploadedFiles')
             .withIndex('by_conversationId', (q) => q.eq('conversationId', turn.conversationId))
             .order('desc')
             .take(5);
+        const conversationMemoryFiles = [
+            ...rememberedUploadedFiles,
+            ...conversationUploadedFiles.filter((uploadedFile) =>
+                !rememberedUploadedFiles.some((remembered) => remembered._id === uploadedFile._id)
+            ),
+        ];
         const availableDocumentContexts = [];
-        for (const uploadedFile of conversationUploadedFiles) {
+        for (const uploadedFile of conversationMemoryFiles) {
             if (currentAttachmentIds.has(uploadedFile._id)) continue;
             const context = buildUploadedFileContext(uploadedFile, 'conversation_memory');
             if (context?.chatContextText?.trim()) {
@@ -636,10 +726,88 @@ export const getGenerationContext = internalQuery({
             user,
             summaryDoc,
             caseGraphDoc,
+            conversationDocumentState: documentState,
             attachmentContexts,
             availableDocumentContexts,
             recentMessages: recentMessages.filter((m) => m.status !== 'deleted'),
         };
+    },
+});
+
+export const recordDocumentRetrievalAudit = internalMutation({
+    args: {
+        turnId: v.id('chatTurns'),
+        detectionResultJson: v.string(),
+        candidateUploadedFileIds: v.array(v.id('uploadedFiles')),
+        selectedUploadedFileIds: v.array(v.id('uploadedFiles')),
+        selectedContextCount: v.number(),
+        retrievalReason: v.union(
+            v.literal('current_turn_attachment'),
+            v.literal('active_document'),
+            v.literal('recent_reference'),
+            v.literal('conversation_memory'),
+            v.literal('document_analysis_route')
+        ),
+    },
+    handler: async (ctx, args) => {
+        const turn = await ctx.db.get(args.turnId);
+        if (!turn) return null;
+        const [conversation, user] = await Promise.all([
+            ctx.db.get(turn.conversationId),
+            ctx.db.get(turn.userId),
+        ]);
+        if (!conversation || !user) return null;
+        const now = Date.now();
+
+        const selectedUploadedFileIds = uniqueRecentUploadedFileIds(args.selectedUploadedFileIds);
+        const candidateUploadedFileIds = uniqueRecentUploadedFileIds(args.candidateUploadedFileIds);
+
+        await ctx.db.insert('documentRetrievalAudit', {
+            conversationId: turn.conversationId,
+            userId: turn.userId,
+            caseId: conversation.caseId,
+            turnId: turn._id,
+            messagePreview: messagePreview(turn.message),
+            detectionResultJson: args.detectionResultJson,
+            candidateUploadedFileIds,
+            selectedUploadedFileIds,
+            selectedContextCount: args.selectedContextCount,
+            retrievalReason: args.retrievalReason,
+            createdAt: now,
+            expiresAt: now + DOCUMENT_RETRIEVAL_AUDIT_RETENTION_MS,
+        });
+
+        await upsertConversationDocumentState(ctx, {
+            conversationId: turn.conversationId,
+            userId: turn.userId,
+            uploadedFileIds: selectedUploadedFileIds,
+            turnId: turn._id,
+            now,
+        });
+
+        return true;
+    },
+});
+
+export const deleteExpiredDocumentRetrievalAudits = internalMutation({
+    args: {},
+    handler: async (ctx) => {
+        const now = Date.now();
+        const expired = await ctx.db
+            .query('documentRetrievalAudit')
+            .withIndex('by_expiresAt')
+            .filter((q) => q.lt(q.field('expiresAt'), now))
+            .take(DOCUMENT_RETRIEVAL_AUDIT_CLEANUP_BATCH_SIZE);
+
+        for (const audit of expired) {
+            await ctx.db.delete(audit._id);
+        }
+
+        if (expired.length === DOCUMENT_RETRIEVAL_AUDIT_CLEANUP_BATCH_SIZE) {
+            await ctx.scheduler.runAfter(0, internal.chatTurns.deleteExpiredDocumentRetrievalAudits, {});
+        }
+
+        return { deleted: expired.length };
     },
 });
 

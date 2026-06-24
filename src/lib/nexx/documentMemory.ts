@@ -1,28 +1,6 @@
-const EXPLICIT_DOCUMENT_REFERENCE_PATTERNS = [
-  /\b(this|that|the|uploaded|attached|shared|prior|previous)\s+(court\s+order|order|document|file|pdf|upload)\b/i,
-  /\b(court\s+order|uploaded\s+(document|file|pdf)|attached\s+(document|file|pdf)|shared\s+(document|file|pdf))\b/i,
-  /\b(refer\s+back|look\s+back|pull\s+up|open\s+(it|that|the\s+(file|document|order))|double[-\s]?check|verify|re-?read|review\s+again)\b/i,
-  /\b(according\s+to|based\s+on|from|in)\s+(the\s+)?(court\s+order|order|document|file|pdf|upload)\b/i,
-];
-
-const DOCUMENT_CONTEXT_TERMS = String.raw`court\s+order|order|document|file|pdf|upload|page|paragraph|section|clause`;
-const DOCUMENT_CONTENT_TERMS = String.raw`deadline|due\s+date|obligation|requirement|custody|visitation|possession|conservatorship|injunction|restriction|signed|ordered`;
-
-const DOCUMENT_FOLLOW_UP_PATTERNS = [
-  new RegExp(String.raw`\b(${DOCUMENT_CONTEXT_TERMS})\b.{0,80}\b(${DOCUMENT_CONTENT_TERMS})\b`, 'i'),
-  new RegExp(String.raw`\b(${DOCUMENT_CONTENT_TERMS})\b.{0,80}\b(${DOCUMENT_CONTEXT_TERMS})\b`, 'i'),
-  /\b(paragraph|section|page|clause)\s+(\d+|[ivxlcdm]+|[a-z])\b/i,
-  /\b(what|when|where|who|does|did|can|should|must|shall).{0,80}\b(it|that|the\s+(order|document|file|pdf))\b/i,
-  /\b(it|that|the\s+(order|document|file|pdf)).{0,80}\b(say|state|require|mean|allow|prohibit|mention|include)\b/i,
-];
+import { detectDocumentReference } from './documentReferenceDetection';
 
 /** Return true when a later chat turn likely needs a stored uploaded document reloaded. */
 export function messageReferencesStoredDocument(message: string): boolean {
-  const normalized = message.trim();
-  if (!normalized) return false;
-
-  return (
-    EXPLICIT_DOCUMENT_REFERENCE_PATTERNS.some((pattern) => pattern.test(normalized)) ||
-    DOCUMENT_FOLLOW_UP_PATTERNS.some((pattern) => pattern.test(normalized))
-  );
+  return detectDocumentReference(message).referencesDocument;
 }

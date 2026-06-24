@@ -2,6 +2,8 @@
  * Shared types for the NEXX application
  */
 
+import type { DocumentReferenceDetection } from './nexx/documentReferenceDetection';
+
 // Re-export shared content bus types for convenience
 export type {
   TimelineEvent,
@@ -12,6 +14,7 @@ export type {
 
 // Re-export CaseGraph for convenience
 export type { CaseGraph } from './nexx/caseGraph';
+export type { DocumentReferenceDetection } from './nexx/documentReferenceDetection';
 
 // ---------------------------------------------------------------------------
 // Route Mode — the 9 modes the router can classify a turn into
@@ -48,6 +51,9 @@ export interface RouterResult {
   mode: RouteMode;
   toolPlan: ToolPlan;
   temperature: number;
+  documentReference?: DocumentReferenceDetection;
+  requiresDocumentRetrieval?: boolean;
+  requiresClarification?: boolean;
 }
 
 // ---------------------------------------------------------------------------

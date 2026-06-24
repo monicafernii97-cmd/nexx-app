@@ -17,6 +17,7 @@ interface MessageBubbleProps {
     content: string;
     isStreaming?: boolean;
     theme?: ChatTheme;
+    metadata?: unknown;
     /** Serialized JSON string of NexxArtifacts, attached to assistant messages. */
     artifactsJson?: string;
     /** Called when user clicks Retry on an assistant message. */
@@ -32,6 +33,16 @@ interface MessageBubbleProps {
     /** Handler for contextual actions from AssistantMessageCard. */
     onAction?: (action: ActionType, content?: string) => void;
 }
+
+type DocumentSourceMetadata = {
+    uploadedFileId: string;
+    filename: string;
+    source: 'current_turn' | 'conversation_memory' | 'case_memory' | 'user_private_memory';
+    status?: string;
+    extractionMethod?: string;
+    contextCharCount?: number;
+    contextTruncated?: boolean;
+};
 
 // ── Shared action button (declared OUTSIDE render to satisfy react-hooks/static-components) ──
 
@@ -59,6 +70,94 @@ function ActionButton({ onClick, label, isLight, children }: ActionButtonProps) 
 }
 
 // ── Artifact Validation ──
+
+function getDocumentSources(metadata: unknown) {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return [];
+    const rawSources = (metadata as Record<string, unknown>).documentSources;
+    if (!Array.isArray(rawSources)) return [];
+
+    return rawSources.flatMap((source): DocumentSourceMetadata[] => {
+        if (!source || typeof source !== 'object' || Array.isArray(source)) return [];
+        const record = source as Record<string, unknown>;
+        if (typeof record.uploadedFileId !== 'string' || typeof record.filename !== 'string') return [];
+        const sourceScope = typeof record.source === 'string' ? record.source : 'current_turn';
+        if (!['current_turn', 'conversation_memory', 'case_memory', 'user_private_memory'].includes(sourceScope)) {
+            return [];
+        }
+
+        return [{
+            uploadedFileId: record.uploadedFileId,
+            filename: record.filename,
+            source: sourceScope as DocumentSourceMetadata['source'],
+            status: typeof record.status === 'string' ? record.status : undefined,
+            extractionMethod: typeof record.extractionMethod === 'string' ? record.extractionMethod : undefined,
+            contextCharCount: typeof record.contextCharCount === 'number' ? record.contextCharCount : undefined,
+            contextTruncated: typeof record.contextTruncated === 'boolean' ? record.contextTruncated : undefined,
+        }];
+    }).slice(0, 4);
+}
+
+function getUsedChunkCount(metadata: unknown) {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return 0;
+    const rawChunkIds = (metadata as Record<string, unknown>).usedDocumentChunkIds;
+    return Array.isArray(rawChunkIds)
+        ? rawChunkIds.filter((chunkId) => typeof chunkId === 'string').length
+        : 0;
+}
+
+function getSourceLabel(source: DocumentSourceMetadata['source']) {
+    if (source === 'conversation_memory') return 'Conversation memory';
+    if (source === 'case_memory') return 'Case memory';
+    if (source === 'user_private_memory') return 'Private memory';
+    return 'Uploaded now';
+}
+
+function DocumentSourcesStrip({
+    sources,
+    chunkCount,
+    isLight,
+}: {
+    sources: DocumentSourceMetadata[];
+    chunkCount: number;
+    isLight: boolean;
+}) {
+    if (sources.length === 0) return null;
+
+    return (
+        <div className={`mt-3 rounded-lg border px-3 py-2 ${isLight
+            ? 'border-blue-100 bg-blue-50/70 text-blue-950'
+            : 'border-sky-300/15 bg-sky-300/10 text-sky-50'
+            }`}>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
+                <span className={isLight ? 'text-blue-700' : 'text-sky-200'}>Sources</span>
+                {chunkCount > 0 && (
+                    <span className={isLight ? 'text-blue-500' : 'text-sky-200/70'}>
+                        {chunkCount} retrieved chunk{chunkCount === 1 ? '' : 's'}
+                    </span>
+                )}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+                {sources.map((source) => (
+                    <div
+                        key={`${source.uploadedFileId}-${source.source}`}
+                        className={`inline-flex max-w-full items-center gap-2 rounded-md border px-2.5 py-1 text-xs ${isLight
+                            ? 'border-blue-200 bg-white text-blue-950'
+                            : 'border-white/10 bg-white/10 text-white'
+                            }`}
+                        title={`${source.filename} · ${getSourceLabel(source.source)}`}
+                    >
+                        <FileText size={13} weight="regular" className="shrink-0" />
+                        <span className="max-w-[220px] truncate font-semibold">{source.filename}</span>
+                        <span className={isLight ? 'text-blue-500' : 'text-white/55'}>{getSourceLabel(source.source)}</span>
+                        {source.contextTruncated && (
+                            <span className={isLight ? 'text-amber-600' : 'text-amber-200'}>Partial</span>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 /** Ensure a value is an array of strings, defaulting to [] on mismatch. */
 function ensureStringArray(val: unknown): string[] {
@@ -336,6 +435,7 @@ export default function MessageBubble({
     content,
     isStreaming,
     theme = 'dark',
+    metadata,
     artifactsJson,
     onRetry,
     onEdit,
@@ -369,6 +469,8 @@ export default function MessageBubble({
         artifacts.judgeSimulation ||
         artifacts.oppositionSimulation
     );
+    const documentSources = useMemo(() => getDocumentSources(metadata), [metadata]);
+    const usedChunkCount = useMemo(() => getUsedChunkCount(metadata), [metadata]);
 
     useEffect(() => {
         return () => {
@@ -537,6 +639,7 @@ export default function MessageBubble({
                             procedureInfo={procedureInfo}
                             onAction={(action, content) => onAction?.(action, content)}
                         />
+                        <DocumentSourcesStrip sources={documentSources} chunkCount={usedChunkCount} isLight={isLight} />
                         {content.trim() && (
                             <div className="mt-3">
                                 <PlayAloudButton text={content} />
@@ -562,6 +665,10 @@ export default function MessageBubble({
                 </div>
 
                 {/* ── Artifact Panels ── */}
+                {!isStreaming && (
+                    <DocumentSourcesStrip sources={documentSources} chunkCount={usedChunkCount} isLight={isLight} />
+                )}
+
                 {!isStreaming && content.trim() && (
                     <div className="mt-3">
                         <PlayAloudButton text={content} />

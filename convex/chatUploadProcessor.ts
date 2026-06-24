@@ -9,6 +9,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import { CHAT_UPLOAD_CONFIG } from './lib/chatUploadConfig';
 import { extractDocumentText, type DocumentExtractionResult } from '../src/lib/nexx/documentExtraction';
 import { detectDocumentType, type DocumentDetectionResult } from '../src/lib/nexx/documentTypeDetection';
+import { buildDocumentMemoryArtifacts, type DocumentMemoryArtifacts } from '../src/lib/nexx/documentChunking';
 import { createVectorStore, deleteVectorStore, uploadTextToVectorStore, uploadToVectorStore } from '../src/lib/nexx/fileSearch';
 
 type ProcessingContext = {
@@ -81,6 +82,44 @@ function buildChatContextText(extractedText: string) {
 
 function buildProcessingFile(blob: Blob, filename: string, mimeType: string) {
   return new File([blob], filename, { type: mimeType || blob.type || 'application/octet-stream' });
+}
+
+function chunkArray<T>(items: T[], batchSize: number) {
+  const batches: T[][] = [];
+  for (let index = 0; index < items.length; index += batchSize) {
+    batches.push(items.slice(index, index + batchSize));
+  }
+  return batches;
+}
+
+async function writeDocumentMemoryArtifacts(
+  ctx: ActionCtx,
+  uploadedFileId: Id<'uploadedFiles'>,
+  artifacts: DocumentMemoryArtifacts,
+) {
+  const batchSize = 40;
+  await ctx.runMutation(internal.documentMemory.resetDocumentMemory, { uploadedFileId });
+
+  for (const pages of chunkArray(artifacts.pages, batchSize)) {
+    await ctx.runMutation(internal.documentMemory.insertDocumentPageBatch, {
+      uploadedFileId,
+      pages,
+    });
+  }
+
+  for (const chunks of chunkArray(artifacts.chunks, batchSize)) {
+    await ctx.runMutation(internal.documentMemory.insertDocumentChunkBatch, {
+      uploadedFileId,
+      chunks,
+    });
+  }
+
+  await ctx.runMutation(internal.documentMemory.finalizeDocumentMemory, {
+    uploadedFileId,
+    pageCount: artifacts.pages.length,
+    chunkCount: artifacts.chunks.length,
+    chunkingVersion: artifacts.chunkingVersion,
+  });
 }
 
 function getLegacyDocWorkerConfig() {
@@ -420,13 +459,53 @@ export const processStoredUpload = internalAction({
         vectorStoreId,
       }) as Id<'uploadedFiles'>;
 
+      let memoryIndexingError: string | undefined;
+      try {
+        const documentMemory = buildDocumentMemoryArtifacts(extractedText);
+        await writeDocumentMemoryArtifacts(ctx, uploadedFileId, documentMemory);
+        console.info('[ChatUpload] document memory indexed', {
+          uploadSessionId: args.uploadSessionId,
+          uploadedFileId,
+          pageCount: documentMemory.pages.length,
+          chunkCount: documentMemory.chunks.length,
+          chunkingVersion: documentMemory.chunkingVersion,
+        });
+      } catch (error) {
+        memoryIndexingError = error instanceof Error ? error.message : String(error);
+        try {
+          await ctx.runMutation(internal.documentMemory.markDocumentMemoryFailed, {
+            uploadedFileId,
+          });
+        } catch (markError) {
+          console.warn('[ChatUpload] failed to persist document memory failure state', {
+            uploadSessionId: args.uploadSessionId,
+            uploadedFileId,
+            errorCode: 'document_memory_failure_mark_failed',
+            error: markError instanceof Error ? markError.message : String(markError),
+          });
+        }
+        console.warn('[ChatUpload] document memory indexing failed', {
+          uploadSessionId: args.uploadSessionId,
+          uploadedFileId,
+          errorCode: 'document_memory_indexing_failed',
+          error: memoryIndexingError,
+        });
+      }
+
+      const memoryIndexingUserMessage = memoryIndexingError
+        ? 'Document memory indexing did not finish.'
+        : undefined;
+
       await ctx.runMutation(internal.chatUploads.completeProcessing, {
         uploadSessionId: args.uploadSessionId,
         lockId,
-        status: indexingError ? 'partial' : 'ready',
-        partial: Boolean(indexingError),
+        status: indexingError || memoryIndexingError ? 'partial' : 'ready',
+        partial: Boolean(indexingError || memoryIndexingError),
         uploadedFileId,
-        indexingError,
+        indexingError: [
+          indexingError,
+          memoryIndexingUserMessage,
+        ].filter(Boolean).join('; ') || undefined,
       });
 
       console.info('[ChatUpload] ready', {
@@ -438,8 +517,8 @@ export const processStoredUpload = internalAction({
       return {
         ok: true,
         uploadedFileId,
-        status: indexingError ? 'partial' : 'ready',
-        partial: Boolean(indexingError),
+        status: indexingError || memoryIndexingError ? 'partial' : 'ready',
+        partial: Boolean(indexingError || memoryIndexingError),
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

@@ -462,6 +462,7 @@ export default function ConversationPage() {
                         content={msg.content}
                         isStreaming={msg.status === 'draft'}
                         theme={theme}
+                        metadata={msg.metadata}
                         artifactsJson={msg.artifactsJson}
                         onRetry={
                             msg.role === 'assistant' && msg.status !== 'draft' && !isGenerating && !isPending

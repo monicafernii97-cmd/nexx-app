@@ -8,7 +8,7 @@
  */
 
 import type { RouteMode, ToolPlan, RouterResult } from '../types';
-import { messageReferencesStoredDocument } from './documentMemory';
+import { detectDocumentReference, type DocumentReferenceDetection } from './documentReferenceDetection';
 
 // ---------------------------------------------------------------------------
 // Keyword/pattern maps for Phase 1 heuristic classification
@@ -43,7 +43,7 @@ const PATTERN_ANALYSIS_PATTERNS = [
 ];
 
 const DOCUMENT_ANALYSIS_PATTERNS = [
-  /\b(this\s+document|this\s+order|what\s+does.*say|interpret|analysis.*file|uploaded)\b/i,
+  /\b(this\s+document|this\s+order|what\s+does\s+(this|that|the)\s+(document|order|file|pdf)\s+say|interpret\s+(this|that|the)\s+(document|order|file|pdf)|analysis.*file|uploaded)\b/i,
   /\b(court\s+order|uploaded\s+(document|file|pdf)|attached\s+(document|file|pdf)|shared\s+(document|file|pdf))\b/i,
 ];
 
@@ -87,7 +87,7 @@ export function classifyMessage(
   _activeMode?: RouteMode
 ): RouterResult {
   const text = message.toLowerCase();
-  const referencesStoredDocument = messageReferencesStoredDocument(message);
+  const documentReference = detectDocumentReference(message);
 
   // Safety-first: always check escalation first
   if (matchesAny(text, SAFETY_PATTERNS)) {
@@ -95,8 +95,8 @@ export function classifyMessage(
   }
 
   // Document follow-ups should win over generic procedure terms like "deadline".
-  if (matchesAny(text, DOCUMENT_ANALYSIS_PATTERNS) || referencesStoredDocument) {
-    return buildResult('document_analysis');
+  if (matchesAny(text, DOCUMENT_ANALYSIS_PATTERNS) || documentReference.referencesDocument) {
+    return buildResult('document_analysis', documentReference);
   }
 
   // Local procedure — check BEFORE drafting so "how do I file" hits procedure
@@ -116,7 +116,7 @@ export function classifyMessage(
 
   // Document analysis
   if (matchesAny(text, DOCUMENT_ANALYSIS_PATTERNS)) {
-    return buildResult('document_analysis');
+    return buildResult('document_analysis', documentReference);
   }
 
   // Pattern analysis
@@ -152,10 +152,13 @@ function buildToolPlan(mode: RouteMode): ToolPlan {
   };
 }
 
-function buildResult(mode: RouteMode): RouterResult {
+function buildResult(mode: RouteMode, documentReference?: DocumentReferenceDetection): RouterResult {
   return {
     mode,
     toolPlan: buildToolPlan(mode),
     temperature: MODE_TEMPERATURES[mode],
+    documentReference,
+    requiresDocumentRetrieval: documentReference?.referencesDocument || undefined,
+    requiresClarification: documentReference?.mayNeedClarification || undefined,
   };
 }

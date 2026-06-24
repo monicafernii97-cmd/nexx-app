@@ -403,6 +403,43 @@ export default defineSchema({
         .index('by_turn', ['turnId'])
         .index('by_conversation', ['conversationId']),
 
+    conversationDocumentState: defineTable({
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        activeUploadedFileId: v.optional(v.id('uploadedFiles')),
+        lastReferencedUploadedFileIds: v.array(v.id('uploadedFiles')),
+        pinnedUploadedFileIds: v.array(v.id('uploadedFiles')),
+        lastDocumentAnalysisTurnId: v.optional(v.id('chatTurns')),
+        lastDocumentReferenceAt: v.optional(v.number()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_conversation', ['conversationId'])
+        .index('by_user_updated', ['userId', 'updatedAt']),
+
+    documentRetrievalAudit: defineTable({
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        caseId: v.optional(v.id('cases')),
+        turnId: v.id('chatTurns'),
+        messagePreview: v.string(),
+        detectionResultJson: v.string(),
+        candidateUploadedFileIds: v.array(v.id('uploadedFiles')),
+        selectedUploadedFileIds: v.array(v.id('uploadedFiles')),
+        selectedContextCount: v.number(),
+        retrievalReason: v.union(
+            v.literal('current_turn_attachment'),
+            v.literal('active_document'),
+            v.literal('recent_reference'),
+            v.literal('conversation_memory'),
+            v.literal('document_analysis_route')
+        ),
+        createdAt: v.number(),
+    })
+        .index('by_conversation', ['conversationId'])
+        .index('by_turn', ['turnId'])
+        .index('by_user_created', ['userId', 'createdAt']),
+
     chatRateLimitWindows: defineTable({
         userId: v.id('users'),
         key: v.string(),

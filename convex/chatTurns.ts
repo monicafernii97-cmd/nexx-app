@@ -22,6 +22,7 @@ const DOCUMENT_RETRIEVAL_AUDIT_RETENTION_MS = 30 * ONE_DAY_MS;
 const DOCUMENT_RETRIEVAL_AUDIT_CLEANUP_BATCH_SIZE = 1000;
 const MAX_EXPLICIT_ALIAS_LOOKUP_TERMS = 60;
 const MAX_ALIAS_MATCHES_PER_TERM = 8;
+const MAX_EXPLICIT_ALIAS_MATCHED_FILES = 50;
 
 const routeModeValidator = v.union(
     v.literal('adaptive_chat'),
@@ -169,6 +170,7 @@ async function getExplicitAliasMatchedFiles(
     const matchedFiles: Doc<'uploadedFiles'>[] = [];
     const addAliasMatches = async (aliases: Doc<'documentAliases'>[]) => {
         for (const alias of aliases) {
+            if (matchedFiles.length >= MAX_EXPLICIT_ALIAS_MATCHED_FILES) return;
             const uploadedFileId = alias.uploadedFileId.toString();
             if (matchedFileIds.has(uploadedFileId)) continue;
             const uploadedFile = await ctx.db.get(alias.uploadedFileId);
@@ -179,6 +181,7 @@ async function getExplicitAliasMatchedFiles(
     };
 
     for (const term of args.terms) {
+        if (matchedFiles.length >= MAX_EXPLICIT_ALIAS_MATCHED_FILES) break;
         const userAliases = await ctx.db
             .query('documentAliases')
             .withIndex('by_user_alias', (q) =>
@@ -187,6 +190,7 @@ async function getExplicitAliasMatchedFiles(
             .take(MAX_ALIAS_MATCHES_PER_TERM);
         await addAliasMatches(userAliases);
 
+        if (matchedFiles.length >= MAX_EXPLICIT_ALIAS_MATCHED_FILES) break;
         if (!args.caseId) continue;
         const caseAliases = await ctx.db
             .query('documentAliases')

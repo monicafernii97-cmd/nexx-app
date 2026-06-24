@@ -442,6 +442,48 @@ export default defineSchema({
         .index('by_user_created', ['userId', 'createdAt'])
         .index('by_expiresAt', ['expiresAt']),
 
+    documentPages: defineTable({
+        uploadedFileId: v.id('uploadedFiles'),
+        clerkUserId: v.string(),
+        conversationId: v.optional(v.id('conversations')),
+        caseId: v.optional(v.id('cases')),
+        pageNumber: v.number(),
+        text: v.string(),
+        textLength: v.number(),
+        extractionMethod: v.optional(v.string()),
+        ocrConfidence: v.optional(v.number()),
+        warnings: v.array(v.string()),
+        isSynthetic: v.boolean(),
+        createdAt: v.number(),
+    })
+        .index('by_uploaded_file_page', ['uploadedFileId', 'pageNumber'])
+        .index('by_conversation', ['conversationId'])
+        .index('by_case', ['caseId']),
+
+    documentChunks: defineTable({
+        uploadedFileId: v.id('uploadedFiles'),
+        clerkUserId: v.string(),
+        conversationId: v.optional(v.id('conversations')),
+        caseId: v.optional(v.id('cases')),
+        pageStart: v.optional(v.number()),
+        pageEnd: v.optional(v.number()),
+        sectionHeading: v.optional(v.string()),
+        chunkIndex: v.number(),
+        text: v.string(),
+        textLength: v.number(),
+        startChar: v.number(),
+        endChar: v.number(),
+        tokenCount: v.optional(v.number()),
+        extractionMethod: v.optional(v.string()),
+        ocrConfidence: v.optional(v.number()),
+        warnings: v.array(v.string()),
+        embeddingId: v.optional(v.string()),
+        createdAt: v.number(),
+    })
+        .index('by_uploaded_file_chunk', ['uploadedFileId', 'chunkIndex'])
+        .index('by_conversation', ['conversationId'])
+        .index('by_case', ['caseId']),
+
     chatRateLimitWindows: defineTable({
         userId: v.id('users'),
         key: v.string(),
@@ -872,6 +914,10 @@ export default defineSchema({
         chatContextText: v.optional(v.string()),
         chatContextCharCount: v.optional(v.number()),
         contextTruncated: v.optional(v.boolean()),
+        pageCount: v.optional(v.number()),
+        chunkCount: v.optional(v.number()),
+        chunkingVersion: v.optional(v.string()),
+        memoryIndexedAt: v.optional(v.number()),
         fullTextStorageId: v.optional(v.id('_storage')),
         fullTextSha256: v.optional(v.string()),
         openaiFileId: v.optional(v.string()),

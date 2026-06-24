@@ -7,7 +7,11 @@ import {
     detectDocumentReference,
     type DocumentReferenceDetection,
 } from '../src/lib/nexx/documentReferenceDetection';
-import { normalizeDocumentAlias, selectStoredDocumentCandidates } from '../src/lib/nexx/documentSelection';
+import {
+    detectStoredDocumentAmbiguity,
+    normalizeDocumentAlias,
+    selectStoredDocumentCandidates,
+} from '../src/lib/nexx/documentSelection';
 import { retrieveRelevantDocumentChunks } from '../src/lib/nexx/documentChunkRetrieval';
 import {
     canUseDocumentMemoryCandidate,
@@ -187,6 +191,17 @@ function asMetadataObject(metadata: unknown) {
     return metadata && typeof metadata === 'object' && !Array.isArray(metadata)
         ? metadata as Record<string, unknown>
         : {};
+}
+
+/** Parse optional assistant metadata JSON without letting malformed metadata break completion. */
+function metadataFromJson(metadataJson?: string) {
+    if (!metadataJson) return {};
+
+    try {
+        return asMetadataObject(JSON.parse(metadataJson));
+    } catch {
+        return {};
+    }
 }
 
 /** Load normalized aliases for a stored document before ranking it for recall. */
@@ -965,21 +980,29 @@ export const getGenerationContext = internalQuery({
         const recentReferenceRankById = new Map(
             rememberedFileIds.map((uploadedFileId, index) => [uploadedFileId.toString(), index])
         );
+        const storedDocumentCandidateInputs = rankableMemoryFiles.map((uploadedFile) => ({
+            uploadedFileId: uploadedFile._id.toString(),
+            filename: uploadedFile.filename,
+            createdAt: uploadedFile.createdAt,
+            detectedType: uploadedFile.detectedType,
+            aliases: aliasesByUploadedFileId.get(uploadedFile._id.toString()) ?? [],
+            memorySource: memorySourceByUploadedFileId.get(uploadedFile._id.toString()),
+            isActiveDocument: documentState?.activeUploadedFileId?.toString() === uploadedFile._id.toString(),
+            recentReferenceRank: recentReferenceRankById.get(uploadedFile._id.toString()),
+        }));
         const selectedStoredDocuments = selectStoredDocumentCandidates({
             message: turn.message,
             detection: documentReference,
             maxDocuments: 5,
-            candidates: rankableMemoryFiles.map((uploadedFile) => ({
-                uploadedFileId: uploadedFile._id.toString(),
-                filename: uploadedFile.filename,
-                createdAt: uploadedFile.createdAt,
-                detectedType: uploadedFile.detectedType,
-                aliases: aliasesByUploadedFileId.get(uploadedFile._id.toString()) ?? [],
-                memorySource: memorySourceByUploadedFileId.get(uploadedFile._id.toString()),
-                isActiveDocument: documentState?.activeUploadedFileId?.toString() === uploadedFile._id.toString(),
-                recentReferenceRank: recentReferenceRankById.get(uploadedFile._id.toString()),
-            })),
+            candidates: storedDocumentCandidateInputs,
         });
+        const documentAmbiguity = attachmentContexts.length === 0
+            ? detectStoredDocumentAmbiguity({
+                detection: documentReference,
+                ranked: selectedStoredDocuments.ranked,
+                candidates: storedDocumentCandidateInputs,
+            })
+            : null;
         const rankedStoredDocumentIds = selectedStoredDocuments.selected.map((selection) => selection.uploadedFileId);
         const conversationMemoryFiles = rankedStoredDocumentIds
             .map((uploadedFileId) => rankableMemoryFiles.find((candidate) => candidate._id.toString() === uploadedFileId))
@@ -1008,6 +1031,7 @@ export const getGenerationContext = internalQuery({
             summaryDoc,
             caseGraphDoc,
             conversationDocumentState: documentState,
+            documentAmbiguity,
             attachmentContexts,
             availableDocumentContexts,
             recentMessages: recentMessages.filter((m) => m.status !== 'deleted'),
@@ -1030,7 +1054,8 @@ export const recordDocumentRetrievalAudit = internalMutation({
             v.literal('conversation_memory'),
             v.literal('case_memory'),
             v.literal('user_private_memory'),
-            v.literal('document_analysis_route')
+            v.literal('document_analysis_route'),
+            v.literal('ambiguous_document_selection')
         ),
     },
     handler: async (ctx, args) => {
@@ -1307,6 +1332,7 @@ export const completeAssistant = internalMutation({
         degraded: v.optional(v.boolean()),
         errorCode: v.optional(v.string()),
         errorMessage: v.optional(v.string()),
+        metadataJson: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const now = Date.now();
@@ -1316,6 +1342,12 @@ export const completeAssistant = internalMutation({
         if (!turn) return null;
 
         const messageStatus = args.degraded ? 'degraded' : 'committed';
+        const metadata = {
+            ...metadataFromJson(args.metadataJson),
+            degraded: args.degraded ?? false,
+            errorCode: args.errorCode,
+            errorMessage: args.errorMessage,
+        };
         let assistantMessageId = turn.assistantMessageId;
         let shouldIncrementMessageCount = false;
 
@@ -1324,11 +1356,7 @@ export const completeAssistant = internalMutation({
                 content: args.content,
                 status: messageStatus,
                 artifactsJson: args.artifactsJson,
-                metadata: {
-                    degraded: args.degraded ?? false,
-                    errorCode: args.errorCode,
-                    errorMessage: args.errorMessage,
-                },
+                metadata,
                 updatedAt: now,
             });
         } else if (turn.assistantDraftMessageId) {
@@ -1339,11 +1367,7 @@ export const completeAssistant = internalMutation({
                 status: messageStatus,
                 artifactsJson: args.artifactsJson,
                 requestId: assistantRequestId(turn.requestId),
-                metadata: {
-                    degraded: args.degraded ?? false,
-                    errorCode: args.errorCode,
-                    errorMessage: args.errorMessage,
-                },
+                metadata,
                 updatedAt: now,
             });
         } else {
@@ -1360,11 +1384,7 @@ export const completeAssistant = internalMutation({
                 version: 1,
                 artifactsJson: args.artifactsJson,
                 requestId: assistantRequestId(turn.requestId),
-                metadata: {
-                    degraded: args.degraded ?? false,
-                    errorCode: args.errorCode,
-                    errorMessage: args.errorMessage,
-                },
+                metadata,
                 createdAt: now,
                 updatedAt: now,
                 mode: turn.routeMode,

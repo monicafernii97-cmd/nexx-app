@@ -36,6 +36,21 @@ const routeModeValidator = v.union(
     v.literal('safety_escalation')
 );
 
+const documentEvidenceSourceValidator = v.object({
+    uploadedFileId: v.id('uploadedFiles'),
+    filename: v.string(),
+    source: v.union(
+        v.literal('current_turn'),
+        v.literal('conversation_memory'),
+        v.literal('case_memory'),
+        v.literal('user_private_memory')
+    ),
+    status: v.string(),
+    extractionMethod: v.optional(v.string()),
+    contextCharCount: v.optional(v.number()),
+    contextTruncated: v.optional(v.boolean()),
+});
+
 const turnModeValidator = v.union(v.literal('send'), v.literal('retry'), v.literal('edit'));
 
 const attachmentRefValidator = v.object({
@@ -124,6 +139,13 @@ function uniqueRecentUploadedFileIds(ids: Id<'uploadedFiles'>[]) {
 
 function messagePreview(message: string) {
     return message.replace(/\s+/g, ' ').trim().slice(0, 300);
+}
+
+/** Preserve existing message metadata when adding structured document source summaries. */
+function asMetadataObject(metadata: unknown) {
+    return metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+        ? metadata as Record<string, unknown>
+        : {};
 }
 
 /** Load normalized aliases for a stored document before ranking it for recall. */
@@ -990,6 +1012,130 @@ export const recordDocumentRetrievalAudit = internalMutation({
         });
 
         return true;
+    },
+});
+
+export const recordDocumentAnswerEvidence = internalMutation({
+    args: {
+        turnId: v.id('chatTurns'),
+        assistantMessageId: v.id('messages'),
+        sources: v.array(documentEvidenceSourceValidator),
+    },
+    handler: async (ctx, args) => {
+        const turn = await ctx.db.get(args.turnId);
+        const assistantMessage = await ctx.db.get(args.assistantMessageId);
+        if (
+            !turn ||
+            !assistantMessage ||
+            assistantMessage.turnId !== turn._id ||
+            assistantMessage.conversationId !== turn.conversationId ||
+            turn.assistantMessageId !== assistantMessage._id ||
+            assistantMessage.role !== 'assistant'
+        ) {
+            return null;
+        }
+
+        const [conversation, user] = await Promise.all([
+            ctx.db.get(turn.conversationId),
+            ctx.db.get(turn.userId),
+        ]);
+        if (!conversation || !user?.clerkId) return null;
+
+        const seenUploadedFileIds = new Set<string>();
+        const verifiedSources = [];
+        for (const source of args.sources) {
+            const uploadedFileId = source.uploadedFileId.toString();
+            if (seenUploadedFileIds.has(uploadedFileId)) continue;
+            const uploadedFile = await ctx.db.get(source.uploadedFileId);
+            if (
+                !uploadedFile ||
+                uploadedFile.clerkUserId !== user.clerkId ||
+                (uploadedFile.status !== 'ready' && uploadedFile.status !== 'partial')
+            ) {
+                continue;
+            }
+            if (
+                source.source === 'current_turn' &&
+                !(await ctx.db
+                    .query('messageAttachments')
+                    .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
+                    .filter((q) => q.eq(q.field('uploadedFileId'), uploadedFile._id))
+                    .first())
+            ) {
+                continue;
+            }
+            if (source.source === 'conversation_memory' && uploadedFile.conversationId !== turn.conversationId) {
+                continue;
+            }
+            if (source.source === 'case_memory' && (!conversation.caseId || uploadedFile.caseId !== conversation.caseId)) {
+                continue;
+            }
+            if (source.source === 'user_private_memory' && (uploadedFile.conversationId || uploadedFile.caseId)) {
+                continue;
+            }
+
+            seenUploadedFileIds.add(uploadedFileId);
+            verifiedSources.push({
+                uploadedFileId: uploadedFile._id,
+                filename: uploadedFile.filename,
+                source: source.source,
+                status: uploadedFile.status,
+                extractionMethod: uploadedFile.extractionMethod,
+                contextCharCount: source.contextCharCount ?? uploadedFile.chatContextCharCount,
+                contextTruncated: source.contextTruncated ?? uploadedFile.contextTruncated,
+            });
+        }
+
+        if (verifiedSources.length === 0) return null;
+
+        const now = Date.now();
+        const usedUploadedFileIds = verifiedSources.map((source) => source.uploadedFileId);
+        const existing = await ctx.db
+            .query('documentAnswerEvidence')
+            .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
+            .first();
+
+        if (existing) {
+            await ctx.db.patch(existing._id, {
+                assistantMessageId: assistantMessage._id,
+                usedUploadedFileIds,
+                usedChunkIds: [],
+                sources: verifiedSources,
+                updatedAt: now,
+            });
+        } else {
+            await ctx.db.insert('documentAnswerEvidence', {
+                conversationId: turn.conversationId,
+                userId: turn.userId,
+                caseId: conversation.caseId,
+                turnId: turn._id,
+                assistantMessageId: assistantMessage._id,
+                usedUploadedFileIds,
+                usedChunkIds: [],
+                sources: verifiedSources,
+                createdAt: now,
+                updatedAt: now,
+            });
+        }
+
+        await ctx.db.patch(assistantMessage._id, {
+            metadata: {
+                ...asMetadataObject(assistantMessage.metadata),
+                documentSources: verifiedSources.map((source) => ({
+                    uploadedFileId: source.uploadedFileId.toString(),
+                    filename: source.filename,
+                    source: source.source,
+                    status: source.status,
+                    extractionMethod: source.extractionMethod,
+                    contextCharCount: source.contextCharCount,
+                    contextTruncated: source.contextTruncated,
+                })),
+                usedUploadedFileIds: usedUploadedFileIds.map((uploadedFileId) => uploadedFileId.toString()),
+            },
+            updatedAt: now,
+        });
+
+        return { sourceCount: verifiedSources.length };
     },
 });
 

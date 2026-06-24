@@ -28,6 +28,7 @@ import type * as crons from "../crons.js";
 import type * as debugTraces from "../debugTraces.js";
 import type * as detectedPatterns from "../detectedPatterns.js";
 import type * as documentMemory from "../documentMemory.js";
+import type * as documentReprocessJobs from "../documentReprocessJobs.js";
 import type * as documents from "../documents.js";
 import type * as exportJobs from "../exportJobs.js";
 import type * as exportOverrides from "../exportOverrides.js";
@@ -78,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   debugTraces: typeof debugTraces;
   detectedPatterns: typeof detectedPatterns;
   documentMemory: typeof documentMemory;
+  documentReprocessJobs: typeof documentReprocessJobs;
   documents: typeof documents;
   exportJobs: typeof exportJobs;
   exportOverrides: typeof exportOverrides;

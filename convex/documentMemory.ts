@@ -25,12 +25,25 @@ const chunkArtifactValidator = v.object({
   warnings: v.array(v.string()),
 });
 
+const aliasArtifactValidator = v.object({
+  alias: v.string(),
+  normalizedAlias: v.string(),
+  source: v.union(
+    v.literal('filename'),
+    v.literal('document_type'),
+    v.literal('assistant_reference'),
+    v.literal('system_generated'),
+  ),
+});
+
+/** Keep document memory writes bounded so large uploads cannot exceed Convex mutation limits. */
 function assertBatchSize(length: number) {
   if (length > DOCUMENT_MEMORY_BATCH_LIMIT) {
     throw new Error(`Document memory batch exceeded ${DOCUMENT_MEMORY_BATCH_LIMIT} records`);
   }
 }
 
+/** Validate chunk offsets and page ranges before storing retrieval artifacts. */
 function assertChunkRange(chunk: {
   startChar: number;
   endChar: number;
@@ -182,6 +195,40 @@ export const finalizeDocumentMemory = internalMutation({
     });
 
     return { pageCount: args.pageCount, chunkCount: args.chunkCount };
+  },
+});
+
+/** Replace the generated alias set for a processed upload without touching its extracted text memory. */
+export const replaceDocumentAliases = internalMutation({
+  args: {
+    uploadedFileId: v.id('uploadedFiles'),
+    aliases: v.array(aliasArtifactValidator),
+  },
+  handler: async (ctx, args) => {
+    assertBatchSize(args.aliases.length);
+    const uploadedFile = await ctx.db.get(args.uploadedFileId);
+    if (!uploadedFile) throw new Error('Uploaded file not found');
+    const existing = await ctx.db
+      .query('documentAliases')
+      .withIndex('by_uploaded_file', (q) => q.eq('uploadedFileId', args.uploadedFileId))
+      .collect();
+    for (const alias of existing) await ctx.db.delete(alias._id);
+
+    const now = Date.now();
+    for (const alias of args.aliases) {
+      await ctx.db.insert('documentAliases', {
+        uploadedFileId: args.uploadedFileId,
+        clerkUserId: uploadedFile.clerkUserId,
+        conversationId: uploadedFile.conversationId,
+        caseId: uploadedFile.caseId,
+        alias: alias.alias,
+        normalizedAlias: alias.normalizedAlias,
+        source: alias.source,
+        createdAt: now,
+      });
+    }
+
+    return { inserted: args.aliases.length, deleted: existing.length };
   },
 });
 

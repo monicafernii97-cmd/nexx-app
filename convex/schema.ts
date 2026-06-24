@@ -484,6 +484,26 @@ export default defineSchema({
         .index('by_conversation', ['conversationId'])
         .index('by_case', ['caseId']),
 
+    documentAliases: defineTable({
+        uploadedFileId: v.id('uploadedFiles'),
+        clerkUserId: v.string(),
+        conversationId: v.optional(v.id('conversations')),
+        caseId: v.optional(v.id('cases')),
+        alias: v.string(),
+        normalizedAlias: v.string(),
+        source: v.union(
+            v.literal('filename'),
+            v.literal('document_type'),
+            v.literal('assistant_reference'),
+            v.literal('system_generated')
+        ),
+        createdAt: v.number(),
+    })
+        .index('by_uploaded_file', ['uploadedFileId'])
+        .index('by_conversation_alias', ['conversationId', 'normalizedAlias'])
+        .index('by_case_alias', ['caseId', 'normalizedAlias'])
+        .index('by_user_alias', ['clerkUserId', 'normalizedAlias']),
+
     chatRateLimitWindows: defineTable({
         userId: v.id('users'),
         key: v.string(),

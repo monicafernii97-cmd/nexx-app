@@ -1,8 +1,10 @@
-import { internalMutation, internalQuery, mutation, query, type MutationCtx } from './_generated/server';
+import { internalMutation, internalQuery, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { getAuthenticatedUserAndConversation } from './lib/auth';
+import { detectDocumentReference } from '../src/lib/nexx/documentReferenceDetection';
+import { selectStoredDocumentCandidates } from '../src/lib/nexx/documentSelection';
 
 const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
@@ -111,6 +113,15 @@ function uniqueRecentUploadedFileIds(ids: Id<'uploadedFiles'>[]) {
 
 function messagePreview(message: string) {
     return message.replace(/\s+/g, ' ').trim().slice(0, 300);
+}
+
+/** Load normalized aliases for a stored document before ranking it for recall. */
+async function getDocumentAliases(ctx: QueryCtx, uploadedFileId: Id<'uploadedFiles'>) {
+    const aliases = await ctx.db
+        .query('documentAliases')
+        .withIndex('by_uploaded_file', (q) => q.eq('uploadedFileId', uploadedFileId))
+        .collect();
+    return aliases.map((alias) => alias.normalizedAlias);
 }
 
 async function upsertConversationDocumentState(
@@ -704,16 +715,53 @@ export const getGenerationContext = internalQuery({
             .query('uploadedFiles')
             .withIndex('by_conversationId', (q) => q.eq('conversationId', turn.conversationId))
             .order('desc')
-            .take(5);
-        const conversationMemoryFiles = [
+            .take(25);
+        const candidateMemoryFiles = [
             ...rememberedUploadedFiles,
             ...conversationUploadedFiles.filter((uploadedFile) =>
                 !rememberedUploadedFiles.some((remembered) => remembered._id === uploadedFile._id)
             ),
-        ];
+        ].filter((uploadedFile) => !currentAttachmentIds.has(uploadedFile._id));
+        const rankableMemoryFiles = candidateMemoryFiles.filter((uploadedFile) =>
+            Boolean(buildUploadedFileContext(uploadedFile, 'conversation_memory')?.chatContextText?.trim())
+        );
+
+        const aliasesByUploadedFileId = new Map<string, string[]>();
+        const aliasPairs = await Promise.all(
+            rankableMemoryFiles.map(async (uploadedFile) => [
+                uploadedFile._id.toString(),
+                await getDocumentAliases(ctx, uploadedFile._id),
+            ] as const)
+        );
+        for (const [uploadedFileId, aliases] of aliasPairs) {
+            aliasesByUploadedFileId.set(uploadedFileId, aliases);
+        }
+
+        const documentReference = detectDocumentReference(turn.message);
+        const recentReferenceRankById = new Map(
+            rememberedFileIds.map((uploadedFileId, index) => [uploadedFileId.toString(), index])
+        );
+        const selectedStoredDocuments = selectStoredDocumentCandidates({
+            message: turn.message,
+            detection: documentReference,
+            maxDocuments: 5,
+            candidates: rankableMemoryFiles.map((uploadedFile) => ({
+                uploadedFileId: uploadedFile._id.toString(),
+                filename: uploadedFile.filename,
+                createdAt: uploadedFile.createdAt,
+                detectedType: uploadedFile.detectedType,
+                aliases: aliasesByUploadedFileId.get(uploadedFile._id.toString()) ?? [],
+                isActiveDocument: documentState?.activeUploadedFileId?.toString() === uploadedFile._id.toString(),
+                recentReferenceRank: recentReferenceRankById.get(uploadedFile._id.toString()),
+            })),
+        });
+        const rankedStoredDocumentIds = selectedStoredDocuments.selected.map((selection) => selection.uploadedFileId);
+        const conversationMemoryFiles = rankedStoredDocumentIds
+            .map((uploadedFileId) => rankableMemoryFiles.find((candidate) => candidate._id.toString() === uploadedFileId))
+            .filter((uploadedFile): uploadedFile is Doc<'uploadedFiles'> => Boolean(uploadedFile));
+
         const availableDocumentContexts = [];
         for (const uploadedFile of conversationMemoryFiles) {
-            if (currentAttachmentIds.has(uploadedFile._id)) continue;
             const context = buildUploadedFileContext(uploadedFile, 'conversation_memory');
             if (context?.chatContextText?.trim()) {
                 availableDocumentContexts.push(context);

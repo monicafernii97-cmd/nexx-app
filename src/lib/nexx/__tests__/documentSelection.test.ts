@@ -23,6 +23,7 @@ describe('selectStoredDocumentCandidates', () => {
       createdAt: 300,
       detectedType: 'court_order',
       aliases: ['final order', 'the order'],
+      memorySource: 'conversation_memory' as const,
     },
     {
       uploadedFileId: 'older-temporary',
@@ -30,6 +31,7 @@ describe('selectStoredDocumentCandidates', () => {
       createdAt: 200,
       detectedType: 'court_order',
       aliases: ['temporary orders', 'the order'],
+      memorySource: 'case_memory' as const,
       isActiveDocument: true,
     },
     {
@@ -38,6 +40,7 @@ describe('selectStoredDocumentCandidates', () => {
       createdAt: 100,
       detectedType: 'exhibit',
       aliases: ['exhibit a'],
+      memorySource: 'user_private_memory' as const,
     },
   ];
 
@@ -93,5 +96,20 @@ describe('selectStoredDocumentCandidates', () => {
 
     expect(result.selected).toHaveLength(0);
     expect(result.ranked).toHaveLength(candidates.length);
+  });
+
+  it('uses memory source as a tiebreaker without overriding explicit matches', () => {
+    const result = selectStoredDocumentCandidates({
+      message: 'Please pull exhibit a.',
+      detection: detectDocumentReference('Please pull exhibit a.'),
+      candidates,
+      maxDocuments: 2,
+    });
+
+    expect(result.selected[0]).toMatchObject({
+      uploadedFileId: 'old-exhibit',
+    });
+    expect(result.selected[0].reasons).toContain('explicit_alias_match');
+    expect(result.selected[0].reasons).toContain('user_private_memory');
   });
 });

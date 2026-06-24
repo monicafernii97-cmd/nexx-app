@@ -78,4 +78,82 @@ describe('retrieveRelevantDocumentChunks', () => {
     expect(result[0]?.chunkId).toBe('chunk-2');
     expect(result[0]?.retrievalReasons).toContain('page_match');
   });
+
+  it('prioritizes holiday possession clauses and includes neighboring context', () => {
+    const holidayChunks: DocumentChunkRetrievalCandidate[] = [
+      ...chunks,
+      {
+        chunkId: 'chunk-4',
+        uploadedFileId: 'file-1',
+        chunkIndex: 20,
+        text: 'Other holiday provisions may not interfere with Father’s Day possession.',
+        textLength: 71,
+        sectionHeading: 'General Holiday Rules',
+        warnings: [],
+      },
+      {
+        chunkId: 'chunk-5',
+        uploadedFileId: 'file-1',
+        chunkIndex: 21,
+        text: 'Father’s Day possession begins at 6:00 p.m. on the Friday before Father’s Day and ends at 6:00 p.m. on Father’s Day.',
+        textLength: 123,
+        sectionHeading: 'Father’s Day',
+        warnings: [],
+      },
+      {
+        chunkId: 'chunk-6',
+        uploadedFileId: 'file-1',
+        chunkIndex: 22,
+        text: 'This holiday possession period controls over regular weekend possession.',
+        textLength: 72,
+        sectionHeading: 'Father’s Day continued',
+        warnings: [],
+      },
+    ];
+    const detection = detectDocumentReference('For Father’s Day possession, does his time start Thursday?');
+    const result = retrieveRelevantDocumentChunks({
+      message: 'For Father’s Day possession, does his time start Thursday?',
+      detection,
+      chunks: holidayChunks,
+      maxChunks: 4,
+    });
+
+    expect(result.map((chunk) => chunk.chunkId)).toContain('chunk-5');
+    expect(result.map((chunk) => chunk.chunkId)).toContain('chunk-6');
+    expect(result.find((chunk) => chunk.chunkId === 'chunk-5')?.retrievalReasons).toContain('holiday_possession');
+    expect(result.find((chunk) => chunk.chunkId === 'chunk-6')?.retrievalReasons).toContain('neighbor_context');
+  });
+
+  it('does not attach neighbor chunks from a different uploaded file', () => {
+    const collisionChunks: DocumentChunkRetrievalCandidate[] = [
+      {
+        chunkId: 'file-1-anchor',
+        uploadedFileId: 'file-1',
+        chunkIndex: 7,
+        text: 'Father’s Day possession begins at 6:00 p.m. on Friday.',
+        textLength: 62,
+        sectionHeading: 'Father’s Day',
+        warnings: [],
+      },
+      {
+        chunkId: 'file-2-neighbor',
+        uploadedFileId: 'file-2',
+        chunkIndex: 8,
+        text: 'This unrelated document chunk should not be pulled as a neighbor.',
+        textLength: 65,
+        sectionHeading: 'Other Document',
+        warnings: [],
+      },
+    ];
+    const detection = detectDocumentReference('For Father’s Day possession, does his time start Thursday?');
+    const result = retrieveRelevantDocumentChunks({
+      message: 'For Father’s Day possession, does his time start Thursday?',
+      detection,
+      chunks: collisionChunks,
+      maxChunks: 3,
+    });
+
+    expect(result.map((chunk) => chunk.chunkId)).toContain('file-1-anchor');
+    expect(result.map((chunk) => chunk.chunkId)).not.toContain('file-2-neighbor');
+  });
 });

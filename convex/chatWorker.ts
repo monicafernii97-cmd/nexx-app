@@ -232,6 +232,25 @@ function shouldPreferRetrievedChunks(detection: DocumentReferenceDetection) {
         detection.referenceType === 'source_location_request';
 }
 
+function normalizeAttachmentFilename(filename: string) {
+    return filename
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\.[a-z0-9]{1,8}$/i, '')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function attachmentIdentityKey(attachment: AttachmentContext) {
+    return [
+        normalizeAttachmentFilename(attachment.filename),
+        attachment.byteSize || 0,
+        attachment.extractionCharCount || attachment.chatContextCharCount || 0,
+    ].join(':');
+}
+
 function buildRetrievedChunkPrompt(chunks: DocumentChunkContext[]) {
     if (chunks.length === 0) return '';
 
@@ -252,7 +271,23 @@ function selectAttachmentContextsForPrompt(
     routerResult: ReturnType<typeof classifyMessage>,
     routeMode: RouteMode
 ) {
-    const selected = (context.attachmentContexts ?? []).slice(0, 3);
+    const selected: AttachmentContext[] = [];
+    const selectedIds = new Set<string>();
+    const selectedIdentityKeys = new Set<string>();
+    const addAttachment = (attachment: AttachmentContext) => {
+        const uploadedFileId = attachment.uploadedFileId.toString();
+        const identityKey = attachmentIdentityKey(attachment);
+        if (selectedIds.has(uploadedFileId) || selectedIdentityKeys.has(identityKey)) return;
+        selected.push(attachment);
+        selectedIds.add(uploadedFileId);
+        selectedIdentityKeys.add(identityKey);
+    };
+
+    for (const attachment of context.attachmentContexts ?? []) {
+        if (selected.length >= 3) break;
+        addAttachment(attachment);
+    }
+
     const availableDocuments = context.availableDocumentContexts ?? [];
     const shouldLoadStoredDocuments =
         availableDocuments.length > 0 &&
@@ -263,13 +298,10 @@ function selectAttachmentContextsForPrompt(
 
     if (!shouldLoadStoredDocuments) return selected;
 
-    const selectedIds = new Set(selected.map((attachment) => attachment.uploadedFileId));
     if (selected.length >= 3) return selected;
 
     for (const attachment of availableDocuments) {
-        if (selectedIds.has(attachment.uploadedFileId)) continue;
-        selected.push(attachment);
-        selectedIds.add(attachment.uploadedFileId);
+        addAttachment(attachment);
         if (selected.length >= 3) break;
     }
 

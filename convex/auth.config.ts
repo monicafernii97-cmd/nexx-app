@@ -1,4 +1,4 @@
-const clerkDomain = process.env.CLERK_ISSUER_DOMAIN;
+const clerkDomain = process.env.CLERK_ISSUER_DOMAIN?.trim();
 if (!clerkDomain) {
     throw new Error(
         'Missing CLERK_ISSUER_DOMAIN environment variable. ' +

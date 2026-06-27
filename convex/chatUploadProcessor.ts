@@ -68,11 +68,14 @@ function buildChatContextText(extractedText: string) {
   const availableTextLength = Math.max(0, limit - separator.length);
   const headLength = Math.floor(availableTextLength * 0.7);
   const tailLength = availableTextLength - headLength;
-  const chatContextText = [
+  const chatContextSegments = [
     extractedText.slice(0, headLength).trim(),
     separator,
-    extractedText.slice(-tailLength).trim(),
-  ].join('');
+  ];
+  if (tailLength > 0) {
+    chatContextSegments.push(extractedText.slice(-tailLength).trim());
+  }
+  const chatContextText = chatContextSegments.join('');
 
   return {
     chatContextText,

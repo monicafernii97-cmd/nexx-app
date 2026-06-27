@@ -209,6 +209,13 @@ function escapeXmlAttribute(value?: string) {
         .replace(/>/g, '&gt;') ?? '';
 }
 
+function escapeXmlText(value?: string) {
+    return sanitizePromptMetadata(value)
+        ?.replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;') ?? '';
+}
+
 function sanitizeDocumentContextText(value: string) {
     return value
         .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ' ')
@@ -325,9 +332,9 @@ function buildAttachmentContextPrompt(attachments: AttachmentContext[], detectio
         return [
             `<DOCUMENT uploadedFileId="${attachment.uploadedFileId}" filename="${escapeXmlAttribute(attachment.filename)}" source="${sourceLabel}" status="${attachment.status}" detectedType="${escapeXmlAttribute(attachment.detectedType ?? 'unknown')}" extractionMethod="${escapeXmlAttribute(attachment.extractionMethod ?? 'unknown')}" textLength="${attachment.extractionCharCount ?? ''}" contextCharacters="${attachment.chatContextCharCount ?? attachment.chatContextText?.length ?? ''}" contextTruncated="${attachment.contextTruncated ? 'yes' : 'no'}">`,
             '<WARNINGS>',
-            attachment.indexingError ? `Indexing note: ${sanitizePromptMetadata(attachment.indexingError)}` : undefined,
-            attachment.extractionError ? `Extraction note: ${sanitizePromptMetadata(attachment.extractionError)}` : undefined,
-            attachment.extractionWarnings?.length ? `Extraction warnings: ${sanitizePromptMetadata(attachment.extractionWarnings.join(', '))}` : 'None',
+            attachment.indexingError ? `Indexing note: ${escapeXmlText(attachment.indexingError)}` : undefined,
+            attachment.extractionError ? `Extraction note: ${escapeXmlText(attachment.extractionError)}` : undefined,
+            attachment.extractionWarnings?.length ? `Extraction warnings: ${escapeXmlText(attachment.extractionWarnings.join(', '))}` : 'None',
             '</WARNINGS>',
             retrievedChunkPrompt || undefined,
             shouldIncludeFullContext && attachment.chatContextText?.trim()

@@ -1,6 +1,77 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
+const confidentialityLevelValidator = v.union(
+    v.literal('normal'),
+    v.literal('sensitive'),
+    v.literal('sealed'),
+    v.literal('privileged'),
+    v.literal('attorney_client'),
+    v.literal('restricted')
+);
+
+const documentMemoryGenerationStatusValidator = v.union(
+    v.literal('building'),
+    v.literal('validating'),
+    v.literal('active'),
+    v.literal('retired'),
+    v.literal('failed'),
+    v.literal('cancelled')
+);
+
+const documentMemoryGenerationReasonValidator = v.union(
+    v.literal('initial_upload'),
+    v.literal('manual_reprocess'),
+    v.literal('ocr_upgrade'),
+    v.literal('chunking_upgrade'),
+    v.literal('embedding_upgrade'),
+    v.literal('migration')
+);
+
+const documentBlockTypeValidator = v.union(
+    v.literal('title'),
+    v.literal('text'),
+    v.literal('list'),
+    v.literal('table'),
+    v.literal('image'),
+    v.literal('caption'),
+    v.literal('header'),
+    v.literal('footer'),
+    v.literal('signature'),
+    v.literal('equation'),
+    v.literal('aside_text'),
+    v.literal('references'),
+    v.literal('other')
+);
+
+const documentCanonicalSourceValidator = v.union(
+    v.literal('native'),
+    v.literal('ocr'),
+    v.literal('hybrid'),
+    v.literal('manual')
+);
+
+const documentArtifactSourceValidator = v.union(
+    v.literal('native'),
+    v.literal('mistral_ocr_4'),
+    v.literal('hybrid'),
+    v.literal('manual')
+);
+
+const extractionAttemptStatusValidator = v.union(
+    v.literal('started'),
+    v.literal('succeeded'),
+    v.literal('empty'),
+    v.literal('failed'),
+    v.literal('cancelled')
+);
+
+const providerUsageStatusValidator = v.union(
+    v.literal('started'),
+    v.literal('succeeded'),
+    v.literal('failed')
+);
+
 export default defineSchema({
     // ═══ Users ═══
     users: defineTable({
@@ -475,6 +546,180 @@ export default defineSchema({
         .index('by_assistant_message', ['assistantMessageId'])
         .index('by_conversation_created', ['conversationId', 'createdAt']),
 
+    chatAnswerSources: defineTable({
+        orgId: v.optional(v.string()),
+        accountId: v.optional(v.string()),
+        matterId: v.optional(v.string()),
+        clerkUserId: v.string(),
+        conversationId: v.id('conversations'),
+        caseId: v.optional(v.id('cases')),
+        turnId: v.id('chatTurns'),
+        messageId: v.optional(v.id('messages')),
+        answerId: v.optional(v.string()),
+        uploadedFileId: v.id('uploadedFiles'),
+        memoryGenerationId: v.id('documentMemoryGenerations'),
+        chunkId: v.id('documentChunks'),
+        pageStart: v.optional(v.number()),
+        pageEnd: v.optional(v.number()),
+        blockIds: v.array(v.id('documentBlocks')),
+        quotedText: v.string(),
+        quotedTextHash: v.optional(v.string()),
+        relevanceScore: v.optional(v.number()),
+        rerankScore: v.optional(v.number()),
+        citationVerifierStatus: v.union(
+            v.literal('verified'),
+            v.literal('partial'),
+            v.literal('failed')
+        ),
+        createdAt: v.number(),
+    })
+        .index('by_turn', ['turnId'])
+        .index('by_message', ['messageId'])
+        .index('by_file_generation', ['uploadedFileId', 'memoryGenerationId'])
+        .index('by_conversation_created', ['conversationId', 'createdAt'])
+        .index('by_clerk_created', ['clerkUserId', 'createdAt']),
+
+    retrievalRuns: defineTable({
+        orgId: v.optional(v.string()),
+        accountId: v.optional(v.string()),
+        matterId: v.optional(v.string()),
+        clerkUserId: v.string(),
+        userId: v.id('users'),
+        conversationId: v.optional(v.id('conversations')),
+        caseId: v.optional(v.id('cases')),
+        turnId: v.optional(v.id('chatTurns')),
+        messageId: v.optional(v.id('messages')),
+        queryPreview: v.string(),
+        queryType: v.union(
+            v.literal('quote'),
+            v.literal('summary'),
+            v.literal('comparison'),
+            v.literal('interpretation'),
+            v.literal('timeline'),
+            v.literal('metadata'),
+            v.literal('not_found')
+        ),
+        filtersJson: v.optional(v.string()),
+        vectorResultCount: v.number(),
+        keywordResultCount: v.number(),
+        exactMatchResultCount: v.number(),
+        finalContextChunkIds: v.array(v.id('documentChunks')),
+        authorizationRecheckPassed: v.boolean(),
+        citationVerifierPassed: v.boolean(),
+        createdAt: v.number(),
+    })
+        .index('by_turn', ['turnId'])
+        .index('by_message', ['messageId'])
+        .index('by_user_created', ['userId', 'createdAt'])
+        .index('by_conversation_created', ['conversationId', 'createdAt'])
+        .index('by_case_created', ['caseId', 'createdAt']),
+
+    auditEvents: defineTable({
+        orgId: v.optional(v.string()),
+        accountId: v.optional(v.string()),
+        matterId: v.optional(v.string()),
+        actorUserId: v.optional(v.id('users')),
+        clerkUserId: v.optional(v.string()),
+        eventType: v.union(
+            v.literal('file_uploaded'),
+            v.literal('file_viewed'),
+            v.literal('file_downloaded'),
+            v.literal('file_deleted'),
+            v.literal('ocr_started'),
+            v.literal('ocr_completed'),
+            v.literal('ocr_failed'),
+            v.literal('generation_created'),
+            v.literal('generation_validated'),
+            v.literal('generation_activated'),
+            v.literal('generation_failed'),
+            v.literal('chat_question_asked'),
+            v.literal('chat_answer_generated'),
+            v.literal('citation_opened'),
+            v.literal('access_denied'),
+            v.literal('permission_changed')
+        ),
+        uploadedFileId: v.optional(v.id('uploadedFiles')),
+        memoryGenerationId: v.optional(v.id('documentMemoryGenerations')),
+        conversationId: v.optional(v.id('conversations')),
+        caseId: v.optional(v.id('cases')),
+        turnId: v.optional(v.id('chatTurns')),
+        messageId: v.optional(v.id('messages')),
+        ipAddress: v.optional(v.string()),
+        userAgent: v.optional(v.string()),
+        metadataRedacted: v.optional(v.any()),
+        createdAt: v.number(),
+    })
+        .index('by_file_created', ['uploadedFileId', 'createdAt'])
+        .index('by_generation_created', ['memoryGenerationId', 'createdAt'])
+        .index('by_actor_created', ['actorUserId', 'createdAt'])
+        .index('by_event_created', ['eventType', 'createdAt'])
+        .index('by_org_created', ['orgId', 'createdAt']),
+
+    providerUsageEvents: defineTable({
+        orgId: v.optional(v.string()),
+        accountId: v.optional(v.string()),
+        matterId: v.optional(v.string()),
+        clerkUserId: v.optional(v.string()),
+        uploadedFileId: v.optional(v.id('uploadedFiles')),
+        memoryGenerationId: v.optional(v.id('documentMemoryGenerations')),
+        provider: v.union(
+            v.literal('mistral'),
+            v.literal('openai'),
+            v.literal('anthropic'),
+            v.literal('internal')
+        ),
+        endpoint: v.union(
+            v.literal('ocr'),
+            v.literal('embeddings'),
+            v.literal('chat'),
+            v.literal('rerank')
+        ),
+        model: v.string(),
+        payloadClassification: confidentialityLevelValidator,
+        zdrRequired: v.boolean(),
+        zdrConfirmed: v.boolean(),
+        inputTokens: v.optional(v.number()),
+        outputTokens: v.optional(v.number()),
+        pagesProcessed: v.optional(v.number()),
+        bytesProcessed: v.optional(v.number()),
+        estimatedCostUsd: v.optional(v.number()),
+        status: providerUsageStatusValidator,
+        providerRequestId: v.optional(v.string()),
+        errorCode: v.optional(v.string()),
+        errorMessage: v.optional(v.string()),
+        createdAt: v.number(),
+    })
+        .index('by_file_created', ['uploadedFileId', 'createdAt'])
+        .index('by_generation_created', ['memoryGenerationId', 'createdAt'])
+        .index('by_provider_created', ['provider', 'createdAt'])
+        .index('by_org_created', ['orgId', 'createdAt']),
+
+    reviewFlags: defineTable({
+        orgId: v.optional(v.string()),
+        accountId: v.optional(v.string()),
+        matterId: v.optional(v.string()),
+        clerkUserId: v.string(),
+        uploadedFileId: v.optional(v.id('uploadedFiles')),
+        memoryGenerationId: v.optional(v.id('documentMemoryGenerations')),
+        pageId: v.optional(v.id('documentPages')),
+        chunkId: v.optional(v.id('documentChunks')),
+        flagType: v.union(
+            v.literal('low_confidence_ocr'),
+            v.literal('missing_citation'),
+            v.literal('provider_policy_blocked'),
+            v.literal('manual_review_required'),
+            v.literal('generation_validation_failed')
+        ),
+        severity: v.union(v.literal('low'), v.literal('medium'), v.literal('high')),
+        message: v.string(),
+        resolvedAt: v.optional(v.number()),
+        createdAt: v.number(),
+    })
+        .index('by_file_created', ['uploadedFileId', 'createdAt'])
+        .index('by_generation_created', ['memoryGenerationId', 'createdAt'])
+        .index('by_clerk_created', ['clerkUserId', 'createdAt'])
+        .index('by_type_created', ['flagType', 'createdAt']),
+
     documentReprocessJobs: defineTable({
         uploadedFileId: v.id('uploadedFiles'),
         requestedByUserId: v.id('users'),
@@ -512,34 +757,259 @@ export default defineSchema({
         .index('by_user_created', ['requestedByUserId', 'createdAt'])
         .index('by_status_updated', ['status', 'updatedAt']),
 
+    documentMemoryGenerations: defineTable({
+        orgId: v.optional(v.string()),
+        accountId: v.optional(v.string()),
+        matterId: v.optional(v.string()),
+        clerkUserId: v.string(),
+        conversationId: v.optional(v.id('conversations')),
+        caseId: v.optional(v.id('cases')),
+        uploadedFileId: v.id('uploadedFiles'),
+        generationNumber: v.number(),
+        status: documentMemoryGenerationStatusValidator,
+        sourceFileHash: v.optional(v.string()),
+        reason: documentMemoryGenerationReasonValidator,
+        extractionPlan: v.object({
+            nativeExtraction: v.boolean(),
+            mistralOcr: v.boolean(),
+            ocrModel: v.optional(v.string()),
+            includeBlocks: v.optional(v.boolean()),
+            tableFormat: v.optional(v.union(v.literal('html'), v.literal('markdown'))),
+            confidenceGranularity: v.optional(v.union(v.literal('page'), v.literal('word'))),
+        }),
+        counts: v.object({
+            pagesExpected: v.optional(v.number()),
+            pagesStored: v.optional(v.number()),
+            blocksStored: v.optional(v.number()),
+            chunksStored: v.optional(v.number()),
+            embeddingsStored: v.optional(v.number()),
+        }),
+        qualitySummary: v.object({
+            averageConfidence: v.optional(v.number()),
+            minConfidence: v.optional(v.number()),
+            lowConfidencePageCount: v.optional(v.number()),
+            warnings: v.array(v.string()),
+        }),
+        validation: v.object({
+            passed: v.boolean(),
+            checks: v.array(v.string()),
+            failedChecks: v.array(v.string()),
+        }),
+        createdByUserId: v.optional(v.id('users')),
+        createdAt: v.number(),
+        activatedAt: v.optional(v.number()),
+        retiredAt: v.optional(v.number()),
+        failedAt: v.optional(v.number()),
+        failedReason: v.optional(v.string()),
+    })
+        .index('by_file_status', ['uploadedFileId', 'status'])
+        .index('by_file_generation', ['uploadedFileId', 'generationNumber'])
+        .index('by_clerk_status', ['clerkUserId', 'status'])
+        .index('by_case_status', ['caseId', 'status'])
+        .index('by_org_status', ['orgId', 'status']),
+
+    documentExtractionAttempts: defineTable({
+        orgId: v.optional(v.string()),
+        accountId: v.optional(v.string()),
+        matterId: v.optional(v.string()),
+        clerkUserId: v.string(),
+        caseId: v.optional(v.id('cases')),
+        uploadedFileId: v.id('uploadedFiles'),
+        memoryGenerationId: v.id('documentMemoryGenerations'),
+        extractor: v.union(
+            v.literal('native_pdf'),
+            v.literal('native_docx'),
+            v.literal('native_txt'),
+            v.literal('mistral_ocr_4'),
+            v.literal('manual_upload'),
+            v.literal('migration')
+        ),
+        extractorVersion: v.optional(v.string()),
+        provider: v.optional(v.union(v.literal('internal'), v.literal('mistral'))),
+        modelId: v.optional(v.string()),
+        modelVersion: v.optional(v.string()),
+        status: extractionAttemptStatusValidator,
+        startedAt: v.number(),
+        finishedAt: v.optional(v.number()),
+        pageCountAttempted: v.number(),
+        pageCountSucceeded: v.number(),
+        averageConfidence: v.optional(v.number()),
+        minConfidence: v.optional(v.number()),
+        warnings: v.array(v.string()),
+        errorCode: v.optional(v.string()),
+        errorMessage: v.optional(v.string()),
+        providerRequestId: v.optional(v.string()),
+        usagePages: v.optional(v.number()),
+        usageBytes: v.optional(v.number()),
+        estimatedCostUsd: v.optional(v.number()),
+        requestConfigRedacted: v.optional(v.any()),
+        createdAt: v.number(),
+    })
+        .index('by_generation', ['memoryGenerationId'])
+        .index('by_file_created', ['uploadedFileId', 'createdAt'])
+        .index('by_status_created', ['status', 'createdAt'])
+        .index('by_clerk_created', ['clerkUserId', 'createdAt']),
+
+    fileAccessGrants: defineTable({
+        orgId: v.optional(v.string()),
+        clerkUserId: v.string(),
+        caseId: v.optional(v.id('cases')),
+        uploadedFileId: v.id('uploadedFiles'),
+        subjectType: v.union(
+            v.literal('user'),
+            v.literal('role'),
+            v.literal('team'),
+            v.literal('org')
+        ),
+        subjectId: v.string(),
+        permissions: v.object({
+            view: v.boolean(),
+            chat: v.boolean(),
+            download: v.boolean(),
+            reprocess: v.boolean(),
+            delete: v.boolean(),
+            share: v.boolean(),
+        }),
+        grantedByUserId: v.optional(v.id('users')),
+        expiresAt: v.optional(v.number()),
+        revokedAt: v.optional(v.number()),
+        createdAt: v.number(),
+    })
+        .index('by_file', ['uploadedFileId'])
+        .index('by_subject', ['subjectType', 'subjectId'])
+        .index('by_clerk_file', ['clerkUserId', 'uploadedFileId'])
+        .index('by_org_file', ['orgId', 'uploadedFileId']),
+
     documentPages: defineTable({
         uploadedFileId: v.id('uploadedFiles'),
+        memoryGenerationId: v.optional(v.id('documentMemoryGenerations')),
+        orgId: v.optional(v.string()),
+        accountId: v.optional(v.string()),
+        matterId: v.optional(v.string()),
         clerkUserId: v.string(),
         conversationId: v.optional(v.id('conversations')),
         caseId: v.optional(v.id('cases')),
         pageNumber: v.number(),
+        sourcePageIndex: v.optional(v.number()),
         text: v.string(),
+        nativeText: v.optional(v.string()),
+        ocrMarkdown: v.optional(v.string()),
+        canonicalText: v.optional(v.string()),
+        canonicalSource: v.optional(documentCanonicalSourceValidator),
+        headerText: v.optional(v.string()),
+        footerText: v.optional(v.string()),
         textLength: v.number(),
+        dimensions: v.optional(v.object({
+            width: v.number(),
+            height: v.number(),
+            dpi: v.optional(v.number()),
+        })),
         extractionMethod: v.optional(v.string()),
         ocrConfidence: v.optional(v.number()),
+        confidence: v.optional(v.object({
+            average: v.optional(v.number()),
+            minimum: v.optional(v.number()),
+        })),
         warnings: v.array(v.string()),
         isSynthetic: v.boolean(),
+        textHash: v.optional(v.string()),
         createdAt: v.number(),
     })
         .index('by_uploaded_file_page', ['uploadedFileId', 'pageNumber'])
+        .index('by_generation_page', ['memoryGenerationId', 'pageNumber'])
+        .index('by_file_generation', ['uploadedFileId', 'memoryGenerationId'])
         .index('by_conversation', ['conversationId'])
+        .index('by_case', ['caseId']),
+
+    documentBlocks: defineTable({
+        orgId: v.optional(v.string()),
+        accountId: v.optional(v.string()),
+        matterId: v.optional(v.string()),
+        clerkUserId: v.string(),
+        conversationId: v.optional(v.id('conversations')),
+        caseId: v.optional(v.id('cases')),
+        uploadedFileId: v.id('uploadedFiles'),
+        memoryGenerationId: v.id('documentMemoryGenerations'),
+        pageId: v.id('documentPages'),
+        pageNumber: v.number(),
+        blockIndex: v.number(),
+        type: documentBlockTypeValidator,
+        text: v.string(),
+        normalizedText: v.string(),
+        bbox: v.optional(v.object({
+            topLeftX: v.number(),
+            topLeftY: v.number(),
+            bottomRightX: v.number(),
+            bottomRightY: v.number(),
+        })),
+        confidence: v.optional(v.number()),
+        source: documentArtifactSourceValidator,
+        isSubstantive: v.boolean(),
+        sectionHeading: v.optional(v.string()),
+        paragraphNumber: v.optional(v.string()),
+        tableId: v.optional(v.id('documentTables')),
+        textHash: v.optional(v.string()),
+        createdAt: v.number(),
+    })
+        .index('by_generation_page_block', ['memoryGenerationId', 'pageNumber', 'blockIndex'])
+        .index('by_file_generation', ['uploadedFileId', 'memoryGenerationId'])
+        .index('by_page', ['pageId'])
+        .index('by_case', ['caseId']),
+
+    documentTables: defineTable({
+        orgId: v.optional(v.string()),
+        accountId: v.optional(v.string()),
+        matterId: v.optional(v.string()),
+        clerkUserId: v.string(),
+        conversationId: v.optional(v.id('conversations')),
+        caseId: v.optional(v.id('cases')),
+        uploadedFileId: v.id('uploadedFiles'),
+        memoryGenerationId: v.id('documentMemoryGenerations'),
+        pageId: v.id('documentPages'),
+        blockId: v.optional(v.id('documentBlocks')),
+        pageNumber: v.number(),
+        tableIndex: v.number(),
+        html: v.optional(v.string()),
+        markdown: v.optional(v.string()),
+        plainText: v.string(),
+        rowCount: v.optional(v.number()),
+        columnCount: v.optional(v.number()),
+        bbox: v.optional(v.object({
+            topLeftX: v.number(),
+            topLeftY: v.number(),
+            bottomRightX: v.number(),
+            bottomRightY: v.number(),
+        })),
+        confidence: v.optional(v.number()),
+        warnings: v.array(v.string()),
+        createdAt: v.number(),
+    })
+        .index('by_generation_page_table', ['memoryGenerationId', 'pageNumber', 'tableIndex'])
+        .index('by_file_generation', ['uploadedFileId', 'memoryGenerationId'])
+        .index('by_page', ['pageId'])
         .index('by_case', ['caseId']),
 
     documentChunks: defineTable({
         uploadedFileId: v.id('uploadedFiles'),
+        memoryGenerationId: v.optional(v.id('documentMemoryGenerations')),
+        orgId: v.optional(v.string()),
+        accountId: v.optional(v.string()),
+        matterId: v.optional(v.string()),
         clerkUserId: v.string(),
         conversationId: v.optional(v.id('conversations')),
         caseId: v.optional(v.id('cases')),
         pageStart: v.optional(v.number()),
         pageEnd: v.optional(v.number()),
+        blockIds: v.optional(v.array(v.id('documentBlocks'))),
+        tableIds: v.optional(v.array(v.id('documentTables'))),
         sectionHeading: v.optional(v.string()),
+        paragraphRange: v.optional(v.string()),
+        citationLabel: v.optional(v.string()),
         chunkIndex: v.number(),
         text: v.string(),
+        chunkText: v.optional(v.string()),
+        normalizedText: v.optional(v.string()),
+        searchText: v.optional(v.string()),
         textLength: v.number(),
         startChar: v.number(),
         endChar: v.number(),
@@ -548,11 +1018,95 @@ export default defineSchema({
         ocrConfidence: v.optional(v.number()),
         warnings: v.array(v.string()),
         embeddingId: v.optional(v.string()),
+        embedding: v.optional(v.array(v.number())),
+        embeddingModel: v.optional(v.string()),
+        embeddingVersion: v.optional(v.string()),
+        textHash: v.optional(v.string()),
+        retrievalMetadata: v.optional(v.object({
+            containsTable: v.boolean(),
+            containsSignature: v.boolean(),
+            containsDate: v.boolean(),
+            containsDeadline: v.boolean(),
+            containsMoney: v.boolean(),
+            containsPartyName: v.boolean(),
+            containsOrderLanguage: v.boolean(),
+        })),
         createdAt: v.number(),
     })
         .index('by_uploaded_file_chunk', ['uploadedFileId', 'chunkIndex'])
+        .index('by_generation_chunk', ['memoryGenerationId', 'chunkIndex'])
+        .index('by_file_generation', ['uploadedFileId', 'memoryGenerationId'])
         .index('by_conversation', ['conversationId'])
-        .index('by_case', ['caseId']),
+        .index('by_case', ['caseId'])
+        .searchIndex('by_search_text', {
+            searchField: 'searchText',
+            filterFields: ['clerkUserId', 'caseId', 'uploadedFileId', 'memoryGenerationId'],
+        }),
+
+    documentLegalMetadata: defineTable({
+        orgId: v.optional(v.string()),
+        accountId: v.optional(v.string()),
+        matterId: v.optional(v.string()),
+        clerkUserId: v.string(),
+        conversationId: v.optional(v.id('conversations')),
+        caseId: v.optional(v.id('cases')),
+        uploadedFileId: v.id('uploadedFiles'),
+        memoryGenerationId: v.id('documentMemoryGenerations'),
+        documentType: v.union(
+            v.literal('order'),
+            v.literal('judgment'),
+            v.literal('motion'),
+            v.literal('notice'),
+            v.literal('petition'),
+            v.literal('exhibit'),
+            v.literal('transcript'),
+            v.literal('agreement'),
+            v.literal('unknown')
+        ),
+        courtName: v.optional(v.string()),
+        jurisdiction: v.optional(v.string()),
+        county: v.optional(v.string()),
+        state: v.optional(v.string()),
+        caseNumber: v.optional(v.string()),
+        judge: v.optional(v.string()),
+        clerk: v.optional(v.string()),
+        parties: v.array(v.object({
+            name: v.string(),
+            role: v.optional(v.string()),
+        })),
+        dateFiled: v.optional(v.string()),
+        dateEntered: v.optional(v.string()),
+        dateSigned: v.optional(v.string()),
+        hearingDates: v.optional(v.array(v.string())),
+        deadlines: v.optional(v.array(v.object({
+            label: v.string(),
+            date: v.optional(v.string()),
+            sourcePage: v.number(),
+            sourceBlockIds: v.array(v.id('documentBlocks')),
+            confidence: v.number(),
+        }))),
+        orderSummary: v.optional(v.object({
+            granted: v.optional(v.array(v.string())),
+            denied: v.optional(v.array(v.string())),
+            obligations: v.optional(v.array(v.string())),
+            restrictions: v.optional(v.array(v.string())),
+        })),
+        containsSignature: v.boolean(),
+        containsSeal: v.boolean(),
+        containsHandwriting: v.boolean(),
+        containsTables: v.boolean(),
+        containsRedactions: v.boolean(),
+        containsLowConfidenceText: v.boolean(),
+        extractedBy: v.union(v.literal('rules'), v.literal('ai'), v.literal('hybrid')),
+        confidence: v.number(),
+        sourceBlockIds: v.array(v.id('documentBlocks')),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_uploaded_file', ['uploadedFileId'])
+        .index('by_generation', ['memoryGenerationId'])
+        .index('by_case', ['caseId'])
+        .index('by_document_type', ['clerkUserId', 'documentType']),
 
     documentAliases: defineTable({
         uploadedFileId: v.id('uploadedFiles'),
@@ -986,17 +1540,40 @@ export default defineSchema({
 
     // ═══ NEW: Uploaded Files (metadata for user-uploaded documents) ═══
     uploadedFiles: defineTable({
+        orgId: v.optional(v.string()),
+        accountId: v.optional(v.string()),
+        matterId: v.optional(v.string()),
         clerkUserId: v.string(),
         conversationId: v.optional(v.id('conversations')),
         caseId: v.optional(v.id('cases')),
         uploadSessionId: v.optional(v.id('chatUploadSessions')),
         filename: v.string(),
+        displayFileName: v.optional(v.string()),
         mimeType: v.string(),
         extension: v.optional(v.string()),
         byteSize: v.optional(v.number()),
+        sha256Hash: v.optional(v.string()),
+        storageProvider: v.optional(v.union(
+            v.literal('convex'),
+            v.literal('s3'),
+            v.literal('r2'),
+            v.literal('gcs')
+        )),
+        storageKey: v.optional(v.string()),
+        storageRegion: v.optional(v.string()),
+        encryptionKeyId: v.optional(v.string()),
         storageId: v.optional(v.id('_storage')),
         storageSha256: v.optional(v.string()),
+        confidentialityLevel: v.optional(confidentialityLevelValidator),
+        directUrlAllowed: v.optional(v.boolean()),
         detectedType: v.optional(v.string()),
+        documentTypeHint: v.optional(v.string()),
+        uploadSource: v.optional(v.union(
+            v.literal('user'),
+            v.literal('admin'),
+            v.literal('api'),
+            v.literal('migration')
+        )),
         extractionMethod: v.optional(v.string()),
         extractionWarnings: v.optional(v.array(v.string())),
         extractionVersion: v.optional(v.string()),
@@ -1013,6 +1590,8 @@ export default defineSchema({
         openaiFileId: v.optional(v.string()),
         openaiTextFileId: v.optional(v.string()),
         vectorStoreId: v.optional(v.string()),
+        activeMemoryGenerationId: v.optional(v.id('documentMemoryGenerations')),
+        latestGenerationNumber: v.optional(v.number()),
         extractionError: v.optional(v.string()),
         indexingError: v.optional(v.string()),
         ocrAttempted: v.optional(v.boolean()),
@@ -1023,16 +1602,22 @@ export default defineSchema({
             v.literal('processing'),
             v.literal('ready'),
             v.literal('partial'),
-            v.literal('failed')
+            v.literal('failed'),
+            v.literal('quarantined'),
+            v.literal('deleted')
         ),
         createdAt: v.number(),
         updatedAt: v.optional(v.number()),
+        deletedAt: v.optional(v.number()),
     }).index('by_clerkUserId', ['clerkUserId'])
       .index('by_conversationId', ['conversationId'])
       .index('by_clerk_case', ['clerkUserId', 'caseId'])
       .index('by_clerk_private_scope', ['clerkUserId', 'conversationId', 'caseId'])
       .index('by_upload_session', ['uploadSessionId'])
-      .index('by_storage', ['storageId']),
+      .index('by_storage', ['storageId'])
+      .index('by_active_generation', ['activeMemoryGenerationId'])
+      .index('by_org_hash', ['orgId', 'sha256Hash'])
+      .index('by_org_matter_status', ['orgId', 'matterId', 'status']),
 
     // ═══ NEW: Retrieved Sources (legal sources retrieved per conversation) ═══
     retrievedSources: defineTable({

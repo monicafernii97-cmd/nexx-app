@@ -58,6 +58,16 @@ const documentArtifactSourceValidator = v.union(
     v.literal('manual')
 );
 
+const documentRetrievalMetadataValidator = v.object({
+    containsTable: v.boolean(),
+    containsSignature: v.boolean(),
+    containsDate: v.boolean(),
+    containsDeadline: v.boolean(),
+    containsMoney: v.boolean(),
+    containsPartyName: v.boolean(),
+    containsOrderLanguage: v.boolean(),
+});
+
 const extractionAttemptStatusValidator = v.union(
     v.literal('started'),
     v.literal('succeeded'),
@@ -891,6 +901,8 @@ export default defineSchema({
         caseId: v.optional(v.id('cases')),
         pageNumber: v.number(),
         sourcePageIndex: v.optional(v.number()),
+        startChar: v.optional(v.number()),
+        endChar: v.optional(v.number()),
         text: v.string(),
         nativeText: v.optional(v.string()),
         ocrMarkdown: v.optional(v.string()),
@@ -936,6 +948,8 @@ export default defineSchema({
         type: documentBlockTypeValidator,
         text: v.string(),
         normalizedText: v.string(),
+        startChar: v.optional(v.number()),
+        endChar: v.optional(v.number()),
         bbox: v.optional(v.object({
             topLeftX: v.number(),
             topLeftY: v.number(),
@@ -947,7 +961,10 @@ export default defineSchema({
         isSubstantive: v.boolean(),
         sectionHeading: v.optional(v.string()),
         paragraphNumber: v.optional(v.string()),
+        tableIndex: v.optional(v.number()),
         tableId: v.optional(v.id('documentTables')),
+        retrievalMetadata: v.optional(documentRetrievalMetadataValidator),
+        warnings: v.optional(v.array(v.string())),
         textHash: v.optional(v.string()),
         createdAt: v.number(),
     })
@@ -1022,15 +1039,7 @@ export default defineSchema({
         embeddingModel: v.optional(v.string()),
         embeddingVersion: v.optional(v.string()),
         textHash: v.optional(v.string()),
-        retrievalMetadata: v.optional(v.object({
-            containsTable: v.boolean(),
-            containsSignature: v.boolean(),
-            containsDate: v.boolean(),
-            containsDeadline: v.boolean(),
-            containsMoney: v.boolean(),
-            containsPartyName: v.boolean(),
-            containsOrderLanguage: v.boolean(),
-        })),
+        retrievalMetadata: v.optional(documentRetrievalMetadataValidator),
         createdAt: v.number(),
     })
         .index('by_uploaded_file_chunk', ['uploadedFileId', 'chunkIndex'])

@@ -456,9 +456,10 @@ export const validateAndActivateGeneration = internalMutation({
       block.clerkUserId === uploadedFile.clerkUserId
     );
     const blockIds = new Set(generationBlocks.map((block) => block._id.toString()));
-    const chunkBlockRefsValid = generationChunks.every((chunk) =>
-      (chunk.blockIds ?? []).every((blockId) => blockIds.has(blockId.toString()))
-    );
+    const chunkBlockRefsValid = generationChunks.every((chunk) => {
+      const chunkBlockIds = chunk.blockIds ?? [];
+      return chunkBlockIds.length > 0 && chunkBlockIds.every((blockId) => blockIds.has(blockId.toString()));
+    });
     if (allBlocksMatch && chunkBlockRefsValid) {
       checks.push('block_integrity');
     } else {

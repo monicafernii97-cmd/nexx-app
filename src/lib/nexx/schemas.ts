@@ -170,14 +170,9 @@ const legalDocumentAnswerSchema = {
           'sourceId',
           'fileId',
           'fileName',
-          'memoryGenerationId',
           'chunkId',
-          'pageStart',
-          'pageEnd',
           'blockIds',
           'quotedText',
-          'confidence',
-          'warning',
         ],
       },
     },
@@ -185,7 +180,7 @@ const legalDocumentAnswerSchema = {
     unsupportedClaims: { type: 'array', items: { type: 'string' } },
     notFoundReason: { type: ['string', 'null'] },
   },
-  required: ['answerType', 'answer', 'claims', 'citations', 'warnings', 'unsupportedClaims', 'notFoundReason'],
+  required: ['answerType', 'answer', 'claims', 'citations', 'warnings', 'unsupportedClaims'],
 } as const;
 
 // ---------------------------------------------------------------------------

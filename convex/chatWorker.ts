@@ -925,6 +925,7 @@ function shouldRequireDocumentAnswer(args: {
     routeMode: RouteMode;
 }) {
     return args.attachmentContexts.length > 0 &&
+        args.sourcePackets.length > 0 &&
         (
             args.routeMode === 'document_analysis' ||
             args.documentReference.referencesDocument ||
@@ -1236,16 +1237,29 @@ async function generateWithFallbacks({
                 documentReference: promptBundle.documentReference,
                 routeMode,
             });
+            const optionalDocumentAnswerPresent = !requiresDocumentAnswer && Boolean(parsedResponse.documentAnswer);
             let citationVerification = verifyLegalDocumentAnswer(
                 parsedResponse.documentAnswer,
                 promptBundle.documentSourcePackets,
                 {
-                    requiresDocumentAnswer,
-                    requiresCitation: requiresDocumentAnswer,
+                    requiresDocumentAnswer: requiresDocumentAnswer || optionalDocumentAnswerPresent,
+                    requiresCitation: requiresDocumentAnswer || optionalDocumentAnswerPresent,
                 }
             );
 
-            if (!citationVerification.passed) {
+            if (!citationVerification.passed && !requiresDocumentAnswer) {
+                parsedResponse = { ...parsedResponse, documentAnswer: null };
+                citationVerification = verifyLegalDocumentAnswer(
+                    parsedResponse.documentAnswer,
+                    promptBundle.documentSourcePackets,
+                    {
+                        requiresDocumentAnswer: false,
+                        requiresCitation: false,
+                    }
+                );
+            }
+
+            if (!citationVerification.passed && requiresDocumentAnswer) {
                 const repairedResponse = await repairCitationLockedResponse({
                     client,
                     model: step.model,
@@ -1271,7 +1285,7 @@ async function generateWithFallbacks({
                 }
             }
 
-            if (!citationVerification.passed) {
+            if (!citationVerification.passed && requiresDocumentAnswer) {
                 parsedResponse = citationLockedFallbackResponse(citationVerification.errors);
                 citationVerification = verifyLegalDocumentAnswer(
                     parsedResponse.documentAnswer,

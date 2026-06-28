@@ -57,6 +57,26 @@ export type LegalDocumentSourcePacket = {
   warning?: string;
 };
 
+const LEGAL_DOCUMENT_ANSWER_TYPES = new Set<LegalDocumentAnswerType>([
+  'direct_quote',
+  'summary',
+  'comparison',
+  'interpretation',
+  'timeline',
+  'metadata',
+  'not_found',
+  'needs_review',
+]);
+
+const LEGAL_DOCUMENT_CLAIM_TYPES = new Set<LegalDocumentClaimType>([
+  'document_fact',
+  'quote',
+  'summary',
+  'comparison',
+  'interpretation',
+  'procedural',
+]);
+
 export type LegalDocumentAnswerVerification = {
   passed: boolean;
   errors: string[];
@@ -111,7 +131,7 @@ export function fuzzyTextContains(sourceText: string, quotedText: string) {
 export function validateLegalDocumentAnswerShape(value: unknown): value is LegalDocumentAnswer {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const answer = value as Partial<LegalDocumentAnswer>;
-  if (typeof answer.answerType !== 'string') return false;
+  if (typeof answer.answerType !== 'string' || !LEGAL_DOCUMENT_ANSWER_TYPES.has(answer.answerType as LegalDocumentAnswerType)) return false;
   if (typeof answer.answer !== 'string') return false;
   if (!Array.isArray(answer.claims)) return false;
   if (!Array.isArray(answer.citations)) return false;
@@ -132,6 +152,7 @@ export function validateLegalDocumentAnswerShape(value: unknown): value is Legal
     typeof claim === 'object' &&
     typeof claim.claim === 'string' &&
     typeof claim.claimType === 'string' &&
+    LEGAL_DOCUMENT_CLAIM_TYPES.has(claim.claimType as LegalDocumentClaimType) &&
     Array.isArray(claim.sourceIds) &&
     claim.sourceIds.every((sourceId) => typeof sourceId === 'string')
   ) && answer.citations.every((citation) =>
@@ -143,7 +164,32 @@ export function validateLegalDocumentAnswerShape(value: unknown): value is Legal
     typeof citation.chunkId === 'string' &&
     Array.isArray(citation.blockIds) &&
     citation.blockIds.every((blockId) => typeof blockId === 'string') &&
-    typeof citation.quotedText === 'string'
+    typeof citation.quotedText === 'string' &&
+    (
+      citation.memoryGenerationId === undefined ||
+      citation.memoryGenerationId === null ||
+      typeof citation.memoryGenerationId === 'string'
+    ) &&
+    (
+      citation.pageStart === undefined ||
+      citation.pageStart === null ||
+      typeof citation.pageStart === 'number'
+    ) &&
+    (
+      citation.pageEnd === undefined ||
+      citation.pageEnd === null ||
+      typeof citation.pageEnd === 'number'
+    ) &&
+    (
+      citation.confidence === undefined ||
+      citation.confidence === null ||
+      typeof citation.confidence === 'number'
+    ) &&
+    (
+      citation.warning === undefined ||
+      citation.warning === null ||
+      typeof citation.warning === 'string'
+    )
   );
 }
 

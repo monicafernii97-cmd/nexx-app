@@ -567,7 +567,7 @@ export default defineSchema({
         messageId: v.optional(v.id('messages')),
         answerId: v.optional(v.string()),
         uploadedFileId: v.id('uploadedFiles'),
-        memoryGenerationId: v.id('documentMemoryGenerations'),
+        memoryGenerationId: v.optional(v.id('documentMemoryGenerations')),
         chunkId: v.id('documentChunks'),
         pageStart: v.optional(v.number()),
         pageEnd: v.optional(v.number()),

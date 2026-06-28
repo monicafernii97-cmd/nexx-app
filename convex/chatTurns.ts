@@ -1483,43 +1483,45 @@ export const recordDocumentAnswerEvidence = internalMutation({
             updatedAt: now,
         });
 
-        const existingAnswerSources = await ctx.db
-            .query('chatAnswerSources')
-            .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
-            .collect();
-        for (const source of existingAnswerSources) {
-            await ctx.db.delete(source._id);
-        }
+        if (args.verifiedCitations !== undefined) {
+            const existingAnswerSources = await ctx.db
+                .query('chatAnswerSources')
+                .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
+                .collect();
+            for (const source of existingAnswerSources) {
+                await ctx.db.delete(source._id);
+            }
 
-        const seenCitationKeys = new Set<string>();
-        for (const citation of args.verifiedCitations ?? []) {
-            const citationKey = `${citation.sourceId}:${citation.chunkId.toString()}`;
-            if (seenCitationKeys.has(citationKey) || seenCitationKeys.size >= 50) continue;
-            const verified = verifiedChunks.get(citation.chunkId.toString());
-            if (!verified?.chunk.memoryGenerationId) continue;
-            seenCitationKeys.add(citationKey);
-            await ctx.db.insert('chatAnswerSources', {
-                orgId: verified.chunk.orgId,
-                accountId: verified.chunk.accountId,
-                matterId: verified.chunk.matterId,
-                clerkUserId: user.clerkId,
-                conversationId: turn.conversationId,
-                caseId: conversation.caseId,
-                turnId: turn._id,
-                messageId: assistantMessage._id,
-                answerId: args.answerId,
-                uploadedFileId: verified.uploadedFile._id,
-                memoryGenerationId: verified.chunk.memoryGenerationId,
-                chunkId: verified.chunk._id,
-                pageStart: verified.chunk.pageStart,
-                pageEnd: verified.chunk.pageEnd,
-                blockIds: verified.chunk.blockIds ?? [],
-                quotedText: citation.quotedText.slice(0, 2_000),
-                relevanceScore: undefined,
-                rerankScore: undefined,
-                citationVerifierStatus: citation.citationVerifierStatus,
-                createdAt: now,
-            });
+            const seenCitationKeys = new Set<string>();
+            for (const citation of args.verifiedCitations) {
+                const citationKey = `${citation.sourceId}:${citation.chunkId.toString()}`;
+                if (seenCitationKeys.has(citationKey) || seenCitationKeys.size >= 50) continue;
+                const verified = verifiedChunks.get(citation.chunkId.toString());
+                if (!verified) continue;
+                seenCitationKeys.add(citationKey);
+                await ctx.db.insert('chatAnswerSources', {
+                    orgId: verified.chunk.orgId,
+                    accountId: verified.chunk.accountId,
+                    matterId: verified.chunk.matterId,
+                    clerkUserId: user.clerkId,
+                    conversationId: turn.conversationId,
+                    caseId: conversation.caseId,
+                    turnId: turn._id,
+                    messageId: assistantMessage._id,
+                    answerId: args.answerId,
+                    uploadedFileId: verified.uploadedFile._id,
+                    memoryGenerationId: verified.chunk.memoryGenerationId,
+                    chunkId: verified.chunk._id,
+                    pageStart: verified.chunk.pageStart,
+                    pageEnd: verified.chunk.pageEnd,
+                    blockIds: verified.chunk.blockIds ?? [],
+                    quotedText: citation.quotedText.slice(0, 2_000),
+                    relevanceScore: undefined,
+                    rerankScore: undefined,
+                    citationVerifierStatus: citation.citationVerifierStatus,
+                    createdAt: now,
+                });
+            }
         }
 
         return { sourceCount: verifiedSources.length };

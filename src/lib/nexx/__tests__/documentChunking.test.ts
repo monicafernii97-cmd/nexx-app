@@ -86,6 +86,14 @@ describe('buildDocumentMemoryArtifacts', () => {
     });
   });
 
+  it('does not treat modal may as a date while preserving May dates', () => {
+    const modalMay = buildDocumentMemoryArtifacts('ORDER\n\nThe respondent may file a response after service.');
+    const dateMay = buildDocumentMemoryArtifacts('ORDER\n\nThe respondent shall appear no later than May 7, 2026.');
+
+    expect(modalMay.chunks[0].retrievalMetadata.containsDate).toBe(false);
+    expect(dateMay.chunks[0].retrievalMetadata.containsDate).toBe(true);
+  });
+
   it('returns empty artifacts for blank extracted text', () => {
     const result = buildDocumentMemoryArtifacts('   \n\n ');
 

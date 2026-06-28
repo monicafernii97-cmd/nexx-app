@@ -162,7 +162,8 @@ function retrievalMetadataForText(text: string): DocumentRetrievalMetadata {
   return {
     containsTable: looksLikeTable(text),
     containsSignature: /\b(signature|signed|signed\s+this|judge presiding|district judge|notary|approved\s+as\s+to\s+form)\b/i.test(text),
-    containsDate: /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(text),
+    containsDate:
+      /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b(?:january|february|march|april|june|july|august|september|october|november|december)\b|\bmay\s+\d{1,2}(?:,\s*\d{4})?\b/i.test(text),
     containsDeadline: /\b(?:deadline|due|no later than|on or before|shall file|shall serve|must file|must serve|business days|calendar days|within\s+\d+\s+(?:business\s+|calendar\s+)?days?|\d+\s+(?:business\s+|calendar\s+)?days?)\b/i.test(text),
     containsMoney: /\$\s?\d|\b(?:dollars|fees|payment|arrears|support|sanctions|costs)\b/i.test(text),
     containsPartyName: /\b(?:petitioner|respondent|father|mother|parent|plaintiff|defendant|movant|child(?:ren)?)\b/i.test(text),

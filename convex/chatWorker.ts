@@ -1314,6 +1314,13 @@ async function generateWithFallbacks({
                 documentReference: promptBundle.documentReference,
             };
         } catch (error) {
+            const normalized = normalizeProviderError(error);
+            console.warn('[ChatWorker] Provider generation attempt failed', {
+                model: step.model,
+                errorCode: normalized.code,
+                errorMessage: normalized.message,
+                rawMessage: normalized.rawMessage.slice(0, 500),
+            });
             lastError = error;
         }
     }
@@ -1524,6 +1531,13 @@ export const processChatGenerationJob = internalAction({
                 }
             }
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('[ChatWorker] Worker failed before completion', {
+                jobId: args.jobId,
+                turnId: lease.turnId,
+                errorMessage: errorMessage.slice(0, 500),
+                stack: error instanceof Error ? error.stack?.slice(0, 1200) : undefined,
+            });
             const normalized = {
                 code: 'worker_internal_error',
                 message: 'The response worker failed before completion.',

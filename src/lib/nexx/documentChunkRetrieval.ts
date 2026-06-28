@@ -25,6 +25,8 @@ export type DocumentChunkRetrievalMetadata = {
 export type DocumentChunkRetrievalCandidate = {
   chunkId: string;
   uploadedFileId: string;
+  memoryGenerationId?: string;
+  blockIds?: string[];
   chunkIndex: number;
   text: string;
   textLength: number;

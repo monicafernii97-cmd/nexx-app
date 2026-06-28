@@ -1,3 +1,5 @@
+import { validateLegalDocumentAnswerShape } from '../legalDocumentAnswer';
+
 /**
  * Response validators for the recovery pipeline.
  * Checks structural validity of parsed responses.
@@ -29,6 +31,9 @@ export function validateAssistantResponse(parsed: unknown): boolean {
     const val = artifacts[key];
     if (val !== null && (typeof val !== 'object' || Array.isArray(val))) return false;
   }
+
+  if (!('documentAnswer' in obj)) return false;
+  if (obj.documentAnswer !== null && !validateLegalDocumentAnswerShape(obj.documentAnswer)) return false;
 
   return true;
 }

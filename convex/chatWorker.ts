@@ -18,6 +18,12 @@ import { suppressWeakArtifacts } from '../src/lib/nexx/recovery/suppressWeakArti
 import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
 import { polishLegalResponse } from '../src/lib/nexx/postprocess';
 import {
+    type LegalDocumentAnswer,
+    type LegalDocumentAnswerVerification,
+    type LegalDocumentSourcePacket,
+    verifyLegalDocumentAnswer,
+} from '../src/lib/nexx/legalDocumentAnswer';
+import {
     messageExplicitlyRequestsPastedDocumentText,
     prepareRecentMessagesForDocumentRecall,
     toProviderInputMessages,
@@ -61,7 +67,7 @@ function emptyArtifacts(): NexxAssistantResponse['artifacts'] {
 
 /** Build a structured fallback response when provider generation fails. */
 function degradedResponse(message = DEGRADED_MESSAGE): NexxAssistantResponse {
-    return { message, artifacts: emptyArtifacts() };
+    return { message, artifacts: emptyArtifacts(), documentAnswer: null };
 }
 
 /** Normalize provider exceptions into retryable worker error metadata. */
@@ -421,6 +427,8 @@ type AttachmentContext = {
 type DocumentChunkContext = {
     chunkId: Id<'documentChunks'>;
     uploadedFileId: Id<'uploadedFiles'>;
+    memoryGenerationId?: string;
+    blockIds?: string[];
     chunkIndex: number;
     text: string;
     textLength: number;
@@ -433,6 +441,8 @@ type DocumentChunkContext = {
     retrievalScore: number;
     retrievalReasons: string[];
 };
+
+type VerifiedDocumentCitation = LegalDocumentAnswerVerification['verifiedCitations'][number];
 
 function escapeXmlAttribute(value?: string) {
     return sanitizePromptMetadata(value)
@@ -562,16 +572,61 @@ function mergeAttachmentContext(existing: AttachmentContext, incoming: Attachmen
     };
 }
 
-function buildRetrievedChunkPrompt(chunks: DocumentChunkContext[]) {
+function buildDocumentSourcePackets(attachments: AttachmentContext[]): LegalDocumentSourcePacket[] {
+    const packets: LegalDocumentSourcePacket[] = [];
+    const seenChunkIds = new Set<string>();
+
+    for (const attachment of attachments) {
+        for (const chunk of attachment.documentChunks ?? []) {
+            const chunkId = chunk.chunkId.toString();
+            if (seenChunkIds.has(chunkId)) continue;
+            seenChunkIds.add(chunkId);
+            packets.push({
+                sourceId: `src_${String(packets.length + 1).padStart(3, '0')}`,
+                fileId: attachment.uploadedFileId.toString(),
+                fileName: attachment.filename,
+                memoryGenerationId: chunk.memoryGenerationId,
+                chunkId,
+                pageStart: chunk.pageStart,
+                pageEnd: chunk.pageEnd,
+                blockIds: chunk.blockIds ?? [],
+                sectionHeading: chunk.sectionHeading,
+                text: chunk.text,
+                confidence: chunk.ocrConfidence,
+                warning: [
+                    attachment.status === 'partial' ? 'Document extraction is partial.' : undefined,
+                    ...(chunk.warnings ?? []),
+                ].filter(Boolean).join(' '),
+            });
+        }
+    }
+
+    return packets;
+}
+
+function buildRetrievedChunkPrompt(chunks: DocumentChunkContext[], sourcePackets: LegalDocumentSourcePacket[]) {
     if (chunks.length === 0) return '';
+
+    const packetsByChunkId = new Map(sourcePackets.map((packet) => [packet.chunkId, packet]));
 
     return [
         '<RETRIEVED_CHUNKS>',
-        ...chunks.map((chunk) => [
-            `<CHUNK chunkId="${chunk.chunkId}" pageStart="${chunk.pageStart ?? ''}" pageEnd="${chunk.pageEnd ?? ''}" sectionHeading="${escapeXmlAttribute(chunk.sectionHeading)}" retrievalReasons="${escapeXmlAttribute(chunk.retrievalReasons.join(', '))}" extractionMethod="${escapeXmlAttribute(chunk.extractionMethod ?? 'unknown')}">`,
+        ...chunks.map((chunk) => {
+            const sourcePacket = packetsByChunkId.get(chunk.chunkId.toString());
+            return [
+            `<CHUNK sourceId="${escapeXmlAttribute(sourcePacket?.sourceId)}" chunkId="${chunk.chunkId}" fileId="${escapeXmlAttribute(sourcePacket?.fileId)}" memoryGenerationId="${escapeXmlAttribute(sourcePacket?.memoryGenerationId)}" pageStart="${chunk.pageStart ?? ''}" pageEnd="${chunk.pageEnd ?? ''}" sectionHeading="${escapeXmlAttribute(chunk.sectionHeading)}" retrievalReasons="${escapeXmlAttribute(chunk.retrievalReasons.join(', '))}" extractionMethod="${escapeXmlAttribute(chunk.extractionMethod ?? 'unknown')}" confidence="${chunk.ocrConfidence ?? ''}">`,
+            `SOURCE_ID: ${sourcePacket?.sourceId ?? ''}`,
+            `FILE: ${sourcePacket?.fileName ?? ''}`,
+            `FILE_ID: ${sourcePacket?.fileId ?? ''}`,
+            `GENERATION_ID: ${sourcePacket?.memoryGenerationId ?? ''}`,
+            `CHUNK_ID: ${chunk.chunkId}`,
+            `PAGES: ${chunk.pageStart ?? ''}${chunk.pageEnd && chunk.pageEnd !== chunk.pageStart ? `-${chunk.pageEnd}` : ''}`,
+            `BLOCK_IDS: ${(sourcePacket?.blockIds ?? []).join(', ')}`,
+            'TEXT:',
             sanitizeDocumentContextText(chunk.text),
             '</CHUNK>',
-        ].join('\n')),
+        ].join('\n');
+        }),
         '</RETRIEVED_CHUNKS>',
     ].join('\n');
 }
@@ -620,7 +675,11 @@ function selectAttachmentContextsForPrompt(
 }
 
 /** Build server-loaded document context from verified upload attachment refs. */
-function buildAttachmentContextPrompt(attachments: AttachmentContext[], detection: DocumentReferenceDetection) {
+function buildAttachmentContextPrompt(
+    attachments: AttachmentContext[],
+    detection: DocumentReferenceDetection,
+    sourcePackets: LegalDocumentSourcePacket[]
+) {
     if (attachments.length === 0) return '';
 
     const preferRetrievedChunks = shouldPreferRetrievedChunks(detection);
@@ -633,7 +692,7 @@ function buildAttachmentContextPrompt(attachments: AttachmentContext[], detectio
                     ? 'stored user-private document memory'
                     : 'current chat turn attachment';
 
-        const retrievedChunkPrompt = buildRetrievedChunkPrompt(attachment.documentChunks ?? []);
+        const retrievedChunkPrompt = buildRetrievedChunkPrompt(attachment.documentChunks ?? [], sourcePackets);
         const shouldIncludeFullContext = !preferRetrievedChunks || !retrievedChunkPrompt;
 
         if (!attachment.chatContextText?.trim() && !retrievedChunkPrompt) {
@@ -672,6 +731,9 @@ function buildAttachmentContextPrompt(attachments: AttachmentContext[], detectio
         'If the excerpts do not contain the answer, say the available extracted text does not show it.',
         'For court-order review, identify which document was reviewed and cite page/section/chunk metadata when available.',
         'Quote short exact phrases only when exact wording matters.',
+        'When you make document-specific claims, fill documentAnswer with claims and citations that use only the SOURCE_ID values shown in retrieved chunks.',
+        'Every document_fact, quote, summary, or comparison claim in documentAnswer.claims must include at least one valid sourceId.',
+        'Every documentAnswer.citation quotedText must be copied from the cited SOURCE_ID text. If the source packets do not support the answer, set documentAnswer.answerType to "not_found".',
         preferRetrievedChunks ? 'Use the retrieved chunks first for this turn; they were selected from stored document memory for the user\'s specific question.' : undefined,
         detection.requiresExactText ? 'This turn requires exact wording: verify terms against the extracted text and do not infer missing words.' : undefined,
         detection.requiresPageOrSectionCitation ? 'This turn asks for source location: cite available page, section, paragraph, or document metadata when possible.' : undefined,
@@ -722,7 +784,12 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
     const featurePrompt = buildFeatureToolPrompt(routerResult.toolPlan);
     const artifactPrompt = buildArtifactPrompt();
     const attachmentContexts = selectAttachmentContextsForPrompt(context, routerResult, routeMode);
-    const attachmentContextPrompt = buildAttachmentContextPrompt(attachmentContexts, documentReference);
+    const documentSourcePackets = buildDocumentSourcePackets(attachmentContexts);
+    const attachmentContextPrompt = buildAttachmentContextPrompt(
+        attachmentContexts,
+        documentReference,
+        documentSourcePackets
+    );
     const shouldUseUploadedDocumentMemory =
         attachmentContexts.length > 0 &&
         (routeMode === 'document_analysis' ||
@@ -777,6 +844,7 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
         artifactPrompt,
         attachmentContextPrompt,
         attachmentContexts,
+        documentSourcePackets,
         documentReference,
         input: [
             { role: 'system', content: systemPrompt },
@@ -851,6 +919,150 @@ function buildDocumentAmbiguityMetadata(ambiguity: StoredDocumentAmbiguity) {
             })),
         },
     });
+}
+
+function shouldRequireDocumentAnswer(args: {
+    sourcePackets: LegalDocumentSourcePacket[];
+    attachmentContexts: AttachmentContext[];
+    documentReference: DocumentReferenceDetection;
+    routeMode: RouteMode;
+}) {
+    return args.sourcePackets.length > 0 &&
+        args.attachmentContexts.length > 0 &&
+        (
+            args.routeMode === 'document_analysis' ||
+            args.documentReference.referencesDocument ||
+            args.documentReference.requiresExactText ||
+            args.documentReference.requiresPageOrSectionCitation
+        );
+}
+
+function sourceCitationLabel(packet: LegalDocumentSourcePacket) {
+    const pageLabel = packet.pageStart
+        ? `p. ${packet.pageStart}${packet.pageEnd && packet.pageEnd !== packet.pageStart ? `-${packet.pageEnd}` : ''}`
+        : 'page metadata unavailable';
+    const sectionLabel = packet.sectionHeading ? `, ${packet.sectionHeading}` : '';
+    return `${packet.fileName}, ${pageLabel}${sectionLabel}`;
+}
+
+function clippedQuote(value: string) {
+    const normalized = value.replace(/\s+/g, ' ').trim();
+    if (normalized.length <= 260) return normalized;
+    return `${normalized.slice(0, 257).trim()}...`;
+}
+
+function renderCitationLockedDocumentMessage(
+    response: NexxAssistantResponse,
+    sourcePackets: LegalDocumentSourcePacket[]
+) {
+    const answer = response.documentAnswer;
+    if (!answer) return response;
+
+    const packetsBySourceId = new Map(sourcePackets.map((packet) => [packet.sourceId, packet]));
+    const sourceLines = answer.citations
+        .map((citation) => {
+            const packet = packetsBySourceId.get(citation.sourceId);
+            if (!packet) return null;
+            const quote = clippedQuote(citation.quotedText);
+            return `- ${sourceCitationLabel(packet)} (${citation.sourceId}): "${quote}"`;
+        })
+        .filter((line): line is string => Boolean(line));
+    const confidenceWarnings = answer.citations
+        .map((citation) => packetsBySourceId.get(citation.sourceId))
+        .filter((packet): packet is LegalDocumentSourcePacket => Boolean(packet))
+        .filter((packet) => (packet.confidence !== undefined && packet.confidence < 0.85) || Boolean(packet.warning))
+        .map((packet) => `${packet.sourceId}: ${packet.warning || 'OCR confidence is below the high-confidence threshold.'}`);
+    const warnings = Array.from(new Set([...answer.warnings, ...confidenceWarnings]))
+        .filter((warning) => warning.trim().length > 0)
+        .slice(0, 5);
+    const baseAnswer = answer.answer.trim() || response.message;
+
+    return {
+        ...response,
+        message: [
+            baseAnswer,
+            sourceLines.length > 0 ? ['Sources', ...sourceLines].join('\n') : undefined,
+            warnings.length > 0 ? ['Warnings', ...warnings.map((warning) => `- ${warning}`)].join('\n') : undefined,
+        ].filter(Boolean).join('\n\n'),
+    };
+}
+
+function citationLockedFallbackResponse(errors: string[]): NexxAssistantResponse {
+    const message = [
+        'I could not verify this answer from the retrieved uploaded document sources.',
+        'I do not want to guess from the order without a verified source. Please ask me to re-check a specific page, section, or phrase, or reprocess the document if the extracted text is incomplete.',
+    ].join(' ');
+
+    return {
+        message,
+        artifacts: emptyArtifacts(),
+        documentAnswer: {
+            answerType: 'not_found',
+            answer: message,
+            claims: [],
+            citations: [],
+            warnings: ['Citation verifier blocked the draft answer.'],
+            unsupportedClaims: [],
+            notFoundReason: errors.slice(0, 5).join(' | ') || 'citation_verifier_failed',
+        },
+    };
+}
+
+async function repairCitationLockedResponse(args: {
+    client: OpenAI;
+    model: string;
+    userMessage: string;
+    promptBundle: ReturnType<typeof buildInput>;
+    originalResponse: NexxAssistantResponse;
+    verifierErrors: string[];
+}) {
+    try {
+        const repairResponse = await (args.client.responses as unknown as {
+            create: (
+                params: Record<string, unknown>,
+                options?: { timeout?: number; maxRetries?: number }
+            ) => Promise<Record<string, unknown>>;
+        }).create(
+            {
+                model: args.model,
+                input: [
+                    ...args.promptBundle.input,
+                    {
+                        role: 'developer',
+                        content: [
+                            'The citation verifier rejected the previous document answer.',
+                            `Verifier errors: ${args.verifierErrors.slice(0, 8).join(' | ')}`,
+                            'Repair the answer using only the existing SOURCE_ID values from the document context.',
+                            'If the available source packets do not support the answer, set documentAnswer.answerType to "not_found" and do not make unsupported document claims.',
+                            'Return valid JSON matching the required schema.',
+                            `Rejected response JSON: ${JSON.stringify(args.originalResponse).slice(0, 8_000)}`,
+                        ].join('\n'),
+                    },
+                ],
+                text: { format: NEXX_RESPONSE_SCHEMA },
+            },
+            { timeout: PROVIDER_TIMEOUT_MS, maxRetries: 0 }
+        );
+        const repairText = typeof repairResponse.output_text === 'string'
+            ? repairResponse.output_text
+            : extractOutputText(repairResponse);
+        const recovered = await recoverStructuredOutput(repairText, {
+            systemPrompt: args.promptBundle.systemPrompt,
+            developerPrompt: [
+                args.promptBundle.developerPrompt,
+                args.promptBundle.featurePrompt,
+                args.promptBundle.artifactPrompt,
+                args.promptBundle.attachmentContextPrompt,
+            ].join('\n\n'),
+            userPayload: { message: args.userMessage },
+            model: args.model,
+            requestOptions: { timeout: PROVIDER_TIMEOUT_MS, maxRetries: 0 },
+        });
+        return recovered.stage === 'fallback' ? null : suppressWeakArtifacts(recovered.data);
+    } catch (error) {
+        console.error('[ChatWorker] Citation repair failed', error);
+        return null;
+    }
 }
 
 /** Generate one assistant response with tool/model fallbacks and draft persistence. */
@@ -1013,7 +1225,60 @@ async function generateWithFallbacks({
                 continue;
             }
 
-            const parsedResponse = suppressWeakArtifacts(recoveryResult.data);
+            let parsedResponse = suppressWeakArtifacts(recoveryResult.data);
+            const requiresDocumentAnswer = shouldRequireDocumentAnswer({
+                sourcePackets: promptBundle.documentSourcePackets,
+                attachmentContexts: promptBundle.attachmentContexts,
+                documentReference: promptBundle.documentReference,
+                routeMode,
+            });
+            let citationVerification = verifyLegalDocumentAnswer(
+                parsedResponse.documentAnswer,
+                promptBundle.documentSourcePackets,
+                {
+                    requiresDocumentAnswer,
+                    requiresCitation: requiresDocumentAnswer,
+                }
+            );
+
+            if (!citationVerification.passed) {
+                const repairedResponse = await repairCitationLockedResponse({
+                    client,
+                    model: step.model,
+                    userMessage: context.turn.message,
+                    promptBundle,
+                    originalResponse: parsedResponse,
+                    verifierErrors: citationVerification.errors,
+                });
+                if (repairedResponse) {
+                    const repairedVerification = verifyLegalDocumentAnswer(
+                        repairedResponse.documentAnswer,
+                        promptBundle.documentSourcePackets,
+                        {
+                            requiresDocumentAnswer,
+                            requiresCitation: requiresDocumentAnswer,
+                        }
+                    );
+                    if (repairedVerification.passed) {
+                        parsedResponse = repairedResponse;
+                        citationVerification = repairedVerification;
+                    }
+                }
+            }
+
+            if (!citationVerification.passed) {
+                parsedResponse = citationLockedFallbackResponse(citationVerification.errors);
+                citationVerification = verifyLegalDocumentAnswer(
+                    parsedResponse.documentAnswer,
+                    promptBundle.documentSourcePackets,
+                    {
+                        requiresDocumentAnswer: false,
+                        requiresCitation: false,
+                    }
+                );
+            }
+
+            parsedResponse = renderCitationLockedDocumentMessage(parsedResponse, promptBundle.documentSourcePackets);
             parsedResponse.message = polishLegalResponse(parsedResponse.message);
 
             return {
@@ -1021,7 +1286,9 @@ async function generateWithFallbacks({
                 responseId,
                 model: step.model,
                 degraded: false,
+                citationVerification,
                 attachmentContexts: promptBundle.attachmentContexts,
+                documentSourcePackets: promptBundle.documentSourcePackets,
                 documentReference: promptBundle.documentReference,
             };
         } catch (error) {
@@ -1037,7 +1304,13 @@ async function generateWithFallbacks({
         degraded: true,
         errorCode: normalized.code,
         errorMessage: normalized.message,
+        citationVerification: {
+            passed: false,
+            errors: [normalized.message],
+            verifiedCitations: [],
+        } satisfies LegalDocumentAnswerVerification,
         attachmentContexts: promptBundle.attachmentContexts,
+        documentSourcePackets: promptBundle.documentSourcePackets,
         documentReference: promptBundle.documentReference,
     };
 }
@@ -1161,7 +1434,14 @@ export const processChatGenerationJob = internalAction({
                         const evidenceResult = await ctx.runMutation(internal.chatTurns.recordDocumentAnswerEvidence, {
                             turnId: lease.turnId,
                             assistantMessageId: completion.assistantMessageId,
+                            answerId: result.responseId,
                             usedChunkIds,
+                            verifiedCitations: result.citationVerification.verifiedCitations.map((citation) => ({
+                                sourceId: citation.sourceId,
+                                chunkId: citation.chunkId as Id<'documentChunks'>,
+                                quotedText: citation.quotedText,
+                                citationVerifierStatus: citation.citationVerifierStatus,
+                            })),
                             sources: result.attachmentContexts.map((attachment) => ({
                                 uploadedFileId: attachment.uploadedFileId,
                                 filename: attachment.filename,
@@ -1172,7 +1452,11 @@ export const processChatGenerationJob = internalAction({
                                 contextTruncated: attachment.contextTruncated,
                             })),
                         });
-                        citationVerifierPassed = usedChunkIds.length > 0 && Boolean(evidenceResult?.sourceCount);
+                        citationVerifierPassed =
+                            result.citationVerification.passed &&
+                            result.citationVerification.verifiedCitations.length > 0 &&
+                            usedChunkIds.length > 0 &&
+                            Boolean(evidenceResult?.sourceCount);
                     } catch (evidenceError) {
                         console.error('[ChatWorker] Failed to record document answer evidence', evidenceError);
                     }

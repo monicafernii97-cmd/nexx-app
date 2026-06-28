@@ -114,6 +114,80 @@ const confidenceSchema = {
   required: ['confidence', 'basis', 'evidenceSufficiency', 'missingSupport'],
 } as const;
 
+const legalDocumentAnswerSchema = {
+  type: ['object', 'null'],
+  additionalProperties: false,
+  properties: {
+    answerType: {
+      type: 'string',
+      enum: [
+        'direct_quote',
+        'summary',
+        'comparison',
+        'interpretation',
+        'timeline',
+        'metadata',
+        'not_found',
+        'needs_review',
+      ],
+    },
+    answer: { type: 'string' },
+    claims: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          claim: { type: 'string' },
+          claimType: {
+            type: 'string',
+            enum: ['document_fact', 'quote', 'summary', 'comparison', 'interpretation', 'procedural'],
+          },
+          sourceIds: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['claim', 'claimType', 'sourceIds'],
+      },
+    },
+    citations: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          sourceId: { type: 'string' },
+          fileId: { type: 'string' },
+          fileName: { type: 'string' },
+          memoryGenerationId: { type: ['string', 'null'] },
+          chunkId: { type: 'string' },
+          pageStart: { type: ['number', 'null'] },
+          pageEnd: { type: ['number', 'null'] },
+          blockIds: { type: 'array', items: { type: 'string' } },
+          quotedText: { type: 'string' },
+          confidence: { type: ['number', 'null'] },
+          warning: { type: ['string', 'null'] },
+        },
+        required: [
+          'sourceId',
+          'fileId',
+          'fileName',
+          'memoryGenerationId',
+          'chunkId',
+          'pageStart',
+          'pageEnd',
+          'blockIds',
+          'quotedText',
+          'confidence',
+          'warning',
+        ],
+      },
+    },
+    warnings: { type: 'array', items: { type: 'string' } },
+    unsupportedClaims: { type: 'array', items: { type: 'string' } },
+    notFoundReason: { type: ['string', 'null'] },
+  },
+  required: ['answerType', 'answer', 'claims', 'citations', 'warnings', 'unsupportedClaims', 'notFoundReason'],
+} as const;
+
 // ---------------------------------------------------------------------------
 // 1. Chat Response Schema (nexx_assistant_response)
 // ---------------------------------------------------------------------------
@@ -140,8 +214,9 @@ export const NEXX_RESPONSE_SCHEMA = {
         required: ['draftReady', 'timelineReady', 'exhibitReady',
                    'judgeSimulation', 'oppositionSimulation', 'confidence'],
       },
+      documentAnswer: legalDocumentAnswerSchema,
     },
-    required: ['message', 'artifacts'],
+    required: ['message', 'artifacts', 'documentAnswer'],
   },
 };
 

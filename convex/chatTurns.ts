@@ -73,6 +73,13 @@ const documentEvidenceSourceValidator = v.object({
     contextTruncated: v.optional(v.boolean()),
 });
 
+const verifiedDocumentCitationValidator = v.object({
+    sourceId: v.string(),
+    chunkId: v.id('documentChunks'),
+    quotedText: v.string(),
+    citationVerifierStatus: v.union(v.literal('verified'), v.literal('partial')),
+});
+
 const turnModeValidator = v.union(v.literal('send'), v.literal('retry'), v.literal('edit'));
 
 const attachmentRefValidator = v.object({
@@ -164,6 +171,8 @@ function documentChunkCandidate(chunk: Doc<'documentChunks'>) {
     return {
         chunkId: chunk._id.toString(),
         uploadedFileId: chunk.uploadedFileId.toString(),
+        memoryGenerationId: chunk.memoryGenerationId?.toString(),
+        blockIds: chunk.blockIds?.map((blockId) => blockId.toString()),
         chunkIndex: chunk.chunkIndex,
         text: chunk.chunkText ?? chunk.text,
         textLength: chunk.textLength,
@@ -1325,8 +1334,10 @@ export const recordDocumentAnswerEvidence = internalMutation({
     args: {
         turnId: v.id('chatTurns'),
         assistantMessageId: v.id('messages'),
+        answerId: v.optional(v.string()),
         sources: v.array(documentEvidenceSourceValidator),
         usedChunkIds: v.optional(v.array(v.id('documentChunks'))),
+        verifiedCitations: v.optional(v.array(verifiedDocumentCitationValidator)),
     },
     handler: async (ctx, args) => {
         const turn = await ctx.db.get(args.turnId);
@@ -1399,6 +1410,10 @@ export const recordDocumentAnswerEvidence = internalMutation({
         const usedUploadedFileIds = verifiedSources.map((source) => source.uploadedFileId);
         const allowedUploadedFileIds = new Set(usedUploadedFileIds.map((id) => id.toString()));
         const usedChunkIds: Id<'documentChunks'>[] = [];
+        const verifiedChunks = new Map<string, {
+            chunk: Doc<'documentChunks'>;
+            uploadedFile: Doc<'uploadedFiles'>;
+        }>();
         const seenChunkIds = new Set<string>();
         for (const chunkId of args.usedChunkIds ?? []) {
             const chunkIdString = chunkId.toString();
@@ -1416,6 +1431,7 @@ export const recordDocumentAnswerEvidence = internalMutation({
             }
             seenChunkIds.add(chunkIdString);
             usedChunkIds.push(chunk._id);
+            verifiedChunks.set(chunkIdString, { chunk, uploadedFile });
         }
         const existing = await ctx.db
             .query('documentAnswerEvidence')
@@ -1462,6 +1478,45 @@ export const recordDocumentAnswerEvidence = internalMutation({
             },
             updatedAt: now,
         });
+
+        const existingAnswerSources = await ctx.db
+            .query('chatAnswerSources')
+            .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
+            .collect();
+        for (const source of existingAnswerSources) {
+            await ctx.db.delete(source._id);
+        }
+
+        const seenCitationKeys = new Set<string>();
+        for (const citation of args.verifiedCitations ?? []) {
+            const citationKey = `${citation.sourceId}:${citation.chunkId.toString()}`;
+            if (seenCitationKeys.has(citationKey) || seenCitationKeys.size >= 50) continue;
+            const verified = verifiedChunks.get(citation.chunkId.toString());
+            if (!verified?.chunk.memoryGenerationId) continue;
+            seenCitationKeys.add(citationKey);
+            await ctx.db.insert('chatAnswerSources', {
+                orgId: verified.chunk.orgId,
+                accountId: verified.chunk.accountId,
+                matterId: verified.chunk.matterId,
+                clerkUserId: user.clerkId,
+                conversationId: turn.conversationId,
+                caseId: conversation.caseId,
+                turnId: turn._id,
+                messageId: assistantMessage._id,
+                answerId: args.answerId,
+                uploadedFileId: verified.uploadedFile._id,
+                memoryGenerationId: verified.chunk.memoryGenerationId,
+                chunkId: verified.chunk._id,
+                pageStart: verified.chunk.pageStart,
+                pageEnd: verified.chunk.pageEnd,
+                blockIds: verified.chunk.blockIds ?? [],
+                quotedText: citation.quotedText.slice(0, 2_000),
+                relevanceScore: undefined,
+                rerankScore: undefined,
+                citationVerifierStatus: citation.citationVerifierStatus,
+                createdAt: now,
+            });
+        }
 
         return { sourceCount: verifiedSources.length };
     },

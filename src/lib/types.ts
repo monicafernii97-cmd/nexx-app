@@ -3,6 +3,7 @@
  */
 
 import type { DocumentReferenceDetection } from './nexx/documentReferenceDetection';
+import type { LegalDocumentAnswer } from './nexx/legalDocumentAnswer';
 
 // Re-export shared content bus types for convenience
 export type {
@@ -76,6 +77,7 @@ export interface NexxArtifacts {
 export interface NexxAssistantResponse {
   message: string;
   artifacts: NexxArtifacts;
+  documentAnswer: LegalDocumentAnswer | null;
 }
 
 // ---------------------------------------------------------------------------

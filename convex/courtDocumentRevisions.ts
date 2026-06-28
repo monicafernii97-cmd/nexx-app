@@ -6,7 +6,54 @@
  */
 
 import { v } from 'convex/values';
-import { mutation, query } from './_generated/server';
+import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
+import type { Doc } from './_generated/dataModel';
+
+async function getAuthenticatedUser(ctx: MutationCtx | QueryCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error('Not authenticated');
+
+  const user = await ctx.db
+    .query('users')
+    .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
+    .unique();
+  if (!user) throw new Error('User not found');
+  return user;
+}
+
+async function getOwnedDraft(
+  ctx: MutationCtx | QueryCtx,
+  documentId: string,
+  userId: Doc<'users'>['_id'],
+) {
+  const draft = await ctx.db
+    .query('courtDocumentDrafts')
+    .withIndex('by_documentId', (q) => q.eq('documentId', documentId))
+    .unique();
+  if (!draft || draft.userId !== userId) {
+    throw new Error('Not authorized');
+  }
+  return draft;
+}
+
+async function getOwnedSection(
+  ctx: MutationCtx | QueryCtx,
+  documentId: string,
+  sectionId: string,
+  userId: Doc<'users'>['_id'],
+) {
+  await getOwnedDraft(ctx, documentId, userId);
+  const section = await ctx.db
+    .query('courtDocumentSections')
+    .withIndex('by_document_section', (q) =>
+      q.eq('documentId', documentId).eq('sectionId', sectionId),
+    )
+    .unique();
+  if (!section || section.userId !== userId) {
+    throw new Error('Not authorized');
+  }
+  return section;
+}
 
 // ═══════════════════════════════════════════════════════════════
 // Create
@@ -28,14 +75,8 @@ export const create = mutation({
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error('Not authenticated');
-
-    const user = await ctx.db
-      .query('users')
-      .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
-      .unique();
-    if (!user) throw new Error('User not found');
+    const user = await getAuthenticatedUser(ctx);
+    await getOwnedSection(ctx, args.documentId, args.sectionId, user._id);
 
     return await ctx.db.insert('courtDocumentRevisions', {
       documentId: args.documentId,
@@ -62,8 +103,13 @@ export const listBySection = query({
     sectionId: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
+    let user: Doc<'users'>;
+    try {
+      user = await getAuthenticatedUser(ctx);
+      await getOwnedSection(ctx, args.documentId, args.sectionId, user._id);
+    } catch {
+      return [];
+    }
 
     return await ctx.db
       .query('courtDocumentRevisions')
@@ -78,8 +124,13 @@ export const listBySection = query({
 export const listByDocument = query({
   args: { documentId: v.string() },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
+    let user: Doc<'users'>;
+    try {
+      user = await getAuthenticatedUser(ctx);
+      await getOwnedDraft(ctx, args.documentId, user._id);
+    } catch {
+      return [];
+    }
 
     return await ctx.db
       .query('courtDocumentRevisions')

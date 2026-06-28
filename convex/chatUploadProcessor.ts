@@ -99,12 +99,54 @@ function chunkArray<T>(items: T[], batchSize: number) {
 function extractionAttemptExtractor(args: {
   detectedType?: string;
   extension: string;
-}): 'native_pdf' | 'native_docx' | 'native_txt' | 'manual_upload' {
+  extractionMethod?: string;
+  ocrProvider?: DocumentExtractionResult['ocrProvider'];
+}): 'native_pdf' | 'native_docx' | 'native_txt' | 'mistral_ocr_4' | 'manual_upload' {
+  if (args.ocrProvider === 'mistral' || args.extractionMethod === 'mistral_ocr_4') {
+    return 'mistral_ocr_4';
+  }
   const type = (args.detectedType || args.extension).toLowerCase();
   if (type === 'pdf') return 'native_pdf';
   if (type === 'docx') return 'native_docx';
   if (type === 'txt' || type === 'text') return 'native_txt';
   return 'manual_upload';
+}
+
+function usedMistralOcr(extraction: DocumentExtractionResult) {
+  return extraction.ocrProvider === 'mistral' || extraction.method === 'mistral_ocr_4';
+}
+
+function extractionAttemptProvider(extraction: DocumentExtractionResult) {
+  return usedMistralOcr(extraction) ? 'mistral' as const : 'internal' as const;
+}
+
+function extractionPlanForResult(extraction: DocumentExtractionResult) {
+  const usedMistral = usedMistralOcr(extraction);
+  return {
+    nativeExtraction: true,
+    mistralOcr: usedMistral,
+    ocrModel: extraction.ocrModel,
+    includeBlocks: usedMistral ? true : false,
+    tableFormat: usedMistral ? 'html' as const : undefined,
+    confidenceGranularity: usedMistral ? 'page' as const : undefined,
+  };
+}
+
+function extractionRequestConfigRedacted(extraction: DocumentExtractionResult) {
+  const usedMistral = usedMistralOcr(extraction);
+  return {
+    detectedType: extraction.detectedType,
+    extractionMethod: extraction.method,
+    ocrAttempted: extraction.ocrAttempted ?? false,
+    ocrProvider: extraction.ocrProvider,
+    ocrModel: extraction.ocrModel,
+    ocrRequestMode: extraction.ocrRequestMode,
+    includeBlocks: usedMistral ? true : undefined,
+    tableFormat: usedMistral ? 'html' : undefined,
+    confidenceGranularity: usedMistral ? 'page' : undefined,
+    blocksDetected: extraction.ocrBlocksDetected,
+    tablesDetected: extraction.ocrTablesDetected,
+  };
 }
 
 async function writeDocumentMemoryArtifacts(
@@ -123,9 +165,7 @@ async function writeDocumentMemoryArtifacts(
     pagesExpected: extraction.pagesTotal ?? artifacts.pages.length,
     warnings: artifacts.warnings,
     extractionPlan: {
-      nativeExtraction: true,
-      mistralOcr: false,
-      includeBlocks: false,
+      ...extractionPlanForResult(extraction),
     },
   }) as {
     memoryGenerationId: Id<'documentMemoryGenerations'>;
@@ -140,23 +180,28 @@ async function writeDocumentMemoryArtifacts(
       extractor: extractionAttemptExtractor({
         detectedType: extraction.detectedType,
         extension: context.session.extension,
+        extractionMethod: extraction.method,
+        ocrProvider: extraction.ocrProvider,
       }),
       extractorVersion: buildExtractionVersion(),
-      provider: 'internal',
+      provider: extractionAttemptProvider(extraction),
+      modelId: extraction.ocrModel,
+      modelVersion: extraction.ocrModel,
       status: artifacts.pages.length > 0 && artifacts.chunks.length > 0 ? 'succeeded' : 'empty',
       startedAt: extractionStartedAt,
       finishedAt: Date.now(),
       pageCountAttempted: extraction.pagesTotal ?? artifacts.pages.length,
       pageCountSucceeded: extraction.pagesOcrProcessed ?? artifacts.pages.length,
+      averageConfidence: extraction.ocrAverageConfidence,
+      minConfidence: extraction.ocrMinConfidence,
       warnings: extraction.warnings ?? [],
       errorCode: extraction.errorCode,
       errorMessage: extraction.error,
-      usageBytes: context.session.byteSize,
-      requestConfigRedacted: {
-        detectedType: extraction.detectedType,
-        extractionMethod: extraction.method,
-        ocrAttempted: extraction.ocrAttempted ?? false,
-      },
+      providerRequestId: extraction.ocrProviderRequestId,
+      usagePages: extraction.ocrUsagePages,
+      usageBytes: extraction.ocrUsageBytes ?? context.session.byteSize,
+      estimatedCostUsd: extraction.estimatedOcrCostUsd,
+      requestConfigRedacted: extractionRequestConfigRedacted(extraction),
     });
 
     for (const pages of chunkArray(artifacts.pages, batchSize)) {

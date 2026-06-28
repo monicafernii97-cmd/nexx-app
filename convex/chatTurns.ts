@@ -264,14 +264,16 @@ async function getActiveUserChatGrants(
         )
         .collect();
 
-    return grants.filter((grant) => {
+    const activeGrants = grants.filter((grant) => {
         if (!grant.permissions.chat) return false;
         if (grant.revokedAt !== undefined) return false;
         if (grant.expiresAt !== undefined && grant.expiresAt <= now) return false;
         if (grant.caseId && args.caseId && grant.caseId !== args.caseId) return false;
         if (grant.caseId && !args.caseId) return false;
         return true;
-    }).slice(0, args.limit ?? 100);
+    });
+
+    return args.limit === undefined ? activeGrants : activeGrants.slice(0, args.limit);
 }
 
 async function hasActiveUserChatGrant(
@@ -296,7 +298,7 @@ async function getGrantedUploadedFilesForChat(
         caseId?: Id<'cases'>;
     }
 ) {
-    const grants = await getActiveUserChatGrants(ctx, args);
+    const grants = await getActiveUserChatGrants(ctx, { ...args, limit: 100 });
     const seen = new Set<string>();
     const files: Doc<'uploadedFiles'>[] = [];
 

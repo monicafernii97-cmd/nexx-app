@@ -30,6 +30,7 @@ export type StoredDocumentSelectionReason =
   | 'same_conversation'
   | 'same_case'
   | 'user_private_memory'
+  | 'shared_memory'
   | 'document_type_match'
   | 'recency';
 
@@ -157,6 +158,9 @@ export function selectStoredDocumentCandidates(args: {
     } else if (candidate.memorySource === 'user_private_memory') {
       score += 5;
       reasons.push('user_private_memory');
+    } else if (candidate.memorySource === 'shared_memory') {
+      score += 20;
+      reasons.push('shared_memory');
     }
 
     if (messageContainsAlias(normalizedMessage, filenameAlias) || messageContainsAlias(normalizedMessage, baseFilenameAlias)) {

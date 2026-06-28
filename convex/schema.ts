@@ -516,6 +516,7 @@ export default defineSchema({
             v.literal('conversation_memory'),
             v.literal('case_memory'),
             v.literal('user_private_memory'),
+            v.literal('shared_memory'),
             v.literal('document_analysis_route'),
             v.literal('ambiguous_document_selection')
         ),
@@ -542,7 +543,8 @@ export default defineSchema({
                 v.literal('current_turn'),
                 v.literal('conversation_memory'),
                 v.literal('case_memory'),
-                v.literal('user_private_memory')
+                v.literal('user_private_memory'),
+                v.literal('shared_memory')
             ),
             status: v.string(),
             extractionMethod: v.optional(v.string()),

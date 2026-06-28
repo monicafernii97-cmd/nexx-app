@@ -425,14 +425,21 @@ export const generateExportUploadUrl = mutation({
 // Get storage URL (for download route)
 // ---------------------------------------------------------------------------
 
-/** Resolve a storage ID to a signed download URL. */
+/** Resolve an owned export to a signed download URL. */
 export const getStorageUrl = query({
     args: {
-        storageId: v.id('_storage'),
+        exportId: v.id('generatedDocuments'),
     },
-    handler: async (ctx, { storageId }) => {
-        await getAuthenticatedUser(ctx);
-        return await ctx.storage.getUrl(storageId);
+    handler: async (ctx, { exportId }) => {
+        const user = await getAuthenticatedUser(ctx);
+        const doc = await ctx.db.get(exportId);
+
+        if (!doc || doc.userId !== user._id) {
+            throw new Error('Export not found or access denied');
+        }
+        if (!doc.storageId) return null;
+
+        return await ctx.storage.getUrl(doc.storageId);
     },
 });
 

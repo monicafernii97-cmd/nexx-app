@@ -445,7 +445,47 @@ export const validateAndActivateGeneration = internalMutation({
       failedChecks.push('chunk_integrity');
     }
 
-    if (allPagesMatch && allChunksMatch) {
+    const generationBlocks = await ctx.db
+      .query('documentBlocks')
+      .withIndex('by_file_generation', (q) =>
+        q.eq('uploadedFileId', args.uploadedFileId).eq('memoryGenerationId', args.memoryGenerationId)
+      )
+      .collect();
+    const allBlocksMatch = generationBlocks.every((block) =>
+      block.uploadedFileId === args.uploadedFileId &&
+      block.clerkUserId === uploadedFile.clerkUserId
+    );
+    const blockIds = new Set(generationBlocks.map((block) => block._id.toString()));
+    const chunkBlockRefsValid = generationChunks.every((chunk) =>
+      (chunk.blockIds ?? []).every((blockId) => blockIds.has(blockId.toString()))
+    );
+    if (allBlocksMatch && chunkBlockRefsValid) {
+      checks.push('block_integrity');
+    } else {
+      failedChecks.push('block_integrity');
+    }
+
+    const generationTables = await ctx.db
+      .query('documentTables')
+      .withIndex('by_file_generation', (q) =>
+        q.eq('uploadedFileId', args.uploadedFileId).eq('memoryGenerationId', args.memoryGenerationId)
+      )
+      .collect();
+    const allTablesMatch = generationTables.every((table) =>
+      table.uploadedFileId === args.uploadedFileId &&
+      table.clerkUserId === uploadedFile.clerkUserId
+    );
+    const tableIds = new Set(generationTables.map((table) => table._id.toString()));
+    const chunkTableRefsValid = generationChunks.every((chunk) =>
+      (chunk.tableIds ?? []).every((tableId) => tableIds.has(tableId.toString()))
+    );
+    if (allTablesMatch && chunkTableRefsValid) {
+      checks.push('table_integrity');
+    } else {
+      failedChecks.push('table_integrity');
+    }
+
+    if (allPagesMatch && allChunksMatch && allBlocksMatch && allTablesMatch) {
       checks.push('tenant_integrity');
     } else {
       failedChecks.push('tenant_integrity');
@@ -458,6 +498,7 @@ export const validateAndActivateGeneration = internalMutation({
         counts: {
           ...generation.counts,
           pagesStored: args.pageCount,
+          blocksStored: generationBlocks.length,
           chunksStored: args.chunkCount,
         },
         qualitySummary: {
@@ -488,6 +529,7 @@ export const validateAndActivateGeneration = internalMutation({
       counts: {
         ...generation.counts,
         pagesStored: args.pageCount,
+        blocksStored: generationBlocks.length,
         chunksStored: args.chunkCount,
       },
       qualitySummary: {
@@ -759,25 +801,49 @@ export const cleanupRetiredGeneration = internalMutation({
     }
 
     const maxRecords = boundedRecordLimit('maxRecords', args.maxRecords, 100, MAX_CLEANUP_RECORDS);
-    const pages = await ctx.db
-      .query('documentPages')
-      .withIndex('by_generation_page', (q) => q.eq('memoryGenerationId', args.memoryGenerationId))
+    const chunks = await ctx.db
+      .query('documentChunks')
+      .withIndex('by_generation_chunk', (q) => q.eq('memoryGenerationId', args.memoryGenerationId))
       .take(maxRecords);
-    for (const page of pages) await ctx.db.delete(page._id);
-
-    const remaining = Math.max(0, maxRecords - pages.length);
-    const chunks = remaining > 0
-      ? await ctx.db
-        .query('documentChunks')
-        .withIndex('by_generation_chunk', (q) => q.eq('memoryGenerationId', args.memoryGenerationId))
-        .take(remaining)
-      : [];
     for (const chunk of chunks) await ctx.db.delete(chunk._id);
+
+    const remainingAfterChunks = Math.max(0, maxRecords - chunks.length);
+    const tables = remainingAfterChunks > 0
+      ? await ctx.db
+        .query('documentTables')
+        .withIndex('by_file_generation', (q) =>
+          q.eq('uploadedFileId', args.uploadedFileId).eq('memoryGenerationId', args.memoryGenerationId)
+        )
+        .take(remainingAfterChunks)
+      : [];
+    for (const table of tables) await ctx.db.delete(table._id);
+
+    const remainingAfterTables = Math.max(0, remainingAfterChunks - tables.length);
+    const blocks = remainingAfterTables > 0
+      ? await ctx.db
+        .query('documentBlocks')
+        .withIndex('by_file_generation', (q) =>
+          q.eq('uploadedFileId', args.uploadedFileId).eq('memoryGenerationId', args.memoryGenerationId)
+        )
+        .take(remainingAfterTables)
+      : [];
+    for (const block of blocks) await ctx.db.delete(block._id);
+
+    const remainingAfterBlocks = Math.max(0, remainingAfterTables - blocks.length);
+    const pages = remainingAfterBlocks > 0
+      ? await ctx.db
+        .query('documentPages')
+        .withIndex('by_generation_page', (q) => q.eq('memoryGenerationId', args.memoryGenerationId))
+        .take(remainingAfterBlocks)
+      : [];
+    for (const page of pages) await ctx.db.delete(page._id);
 
     return {
       deletedPages: pages.length,
+      deletedBlocks: blocks.length,
+      deletedTables: tables.length,
       deletedChunks: chunks.length,
-      hasMore: pages.length + chunks.length >= maxRecords,
+      hasMore: pages.length + blocks.length + tables.length + chunks.length >= maxRecords,
     };
   },
 });

@@ -67,11 +67,25 @@ describe('retrieveRelevantDocumentChunks', () => {
   });
 
   it('honors explicit page requests', () => {
+    const pageDisambiguationChunks: DocumentChunkRetrievalCandidate[] = [
+      ...chunks,
+      {
+        chunkId: 'chunk-4',
+        uploadedFileId: 'file-1',
+        chunkIndex: 3,
+        text: 'Exchange terms are summarized again in a later section.',
+        textLength: 55,
+        pageStart: 7,
+        pageEnd: 7,
+        sectionHeading: 'Possession and Exchange',
+        warnings: [],
+      },
+    ];
     const detection = detectDocumentReference('what does page 3 say about exchanges?');
     const result = retrieveRelevantDocumentChunks({
       message: 'what does page 3 say about exchanges?',
       detection,
-      chunks,
+      chunks: pageDisambiguationChunks,
       maxChunks: 1,
     });
 

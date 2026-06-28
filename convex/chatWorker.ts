@@ -1319,7 +1319,6 @@ async function generateWithFallbacks({
                 model: step.model,
                 errorCode: normalized.code,
                 errorMessage: normalized.message,
-                rawMessage: normalized.rawMessage.slice(0, 500),
             });
             lastError = error;
         }
@@ -1531,12 +1530,12 @@ export const processChatGenerationJob = internalAction({
                 }
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const loggedError = normalizeProviderError(error);
             console.error('[ChatWorker] Worker failed before completion', {
                 jobId: args.jobId,
                 turnId: lease.turnId,
-                errorMessage: errorMessage.slice(0, 500),
-                stack: error instanceof Error ? error.stack?.slice(0, 1200) : undefined,
+                errorCode: loggedError.code,
+                errorMessage: loggedError.message,
             });
             const normalized = {
                 code: 'worker_internal_error',

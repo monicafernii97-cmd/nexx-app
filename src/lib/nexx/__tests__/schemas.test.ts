@@ -11,7 +11,10 @@ function collectObjectsWithMissingRequiredKeys(schema: unknown, path = '$'): str
     items?: unknown;
   };
   const missing: string[] = [];
-  if (node.properties && (node.type === 'object' || node.type === undefined)) {
+  const isObjectSchema = node.type === 'object' ||
+    (Array.isArray(node.type) && node.type.includes('object')) ||
+    (node.type === undefined && Boolean(node.properties));
+  if (node.properties && isObjectSchema) {
     const required = Array.isArray(node.required) ? new Set(node.required) : new Set();
     for (const key of Object.keys(node.properties)) {
       if (!required.has(key)) {

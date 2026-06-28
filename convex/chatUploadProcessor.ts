@@ -50,6 +50,23 @@ type WorkerExtractionResponse = {
   };
 };
 
+type StoredDocumentPageRef = {
+  pageNumber: number;
+  pageId: Id<'documentPages'>;
+};
+
+type StoredDocumentBlockRef = {
+  blockIndex: number;
+  pageNumber: number;
+  blockId: Id<'documentBlocks'>;
+};
+
+type StoredDocumentTableRef = {
+  tableIndex: number;
+  pageNumber: number;
+  tableId: Id<'documentTables'>;
+};
+
 function sha256Text(text: string) {
   return createHash('sha256').update(text).digest('hex');
 }
@@ -94,6 +111,24 @@ function chunkArray<T>(items: T[], batchSize: number) {
     batches.push(items.slice(index, index + batchSize));
   }
   return batches;
+}
+
+function uniqueNumbers(numbers: number[]) {
+  return Array.from(new Set(numbers));
+}
+
+function pageRefsForPageNumbers(pageRefs: StoredDocumentPageRef[], pageNumbers: number[]) {
+  const neededPageNumbers = new Set(pageNumbers);
+  return pageRefs.filter((pageRef) => neededPageNumbers.has(pageRef.pageNumber));
+}
+
+function blockRefsForTables(blockRefs: StoredDocumentBlockRef[], tables: DocumentMemoryArtifacts['tables']) {
+  const needed = new Set(
+    tables
+      .filter((table) => table.blockIndex !== undefined)
+      .map((table) => `${table.pageNumber}:${table.blockIndex}`),
+  );
+  return blockRefs.filter((blockRef) => needed.has(`${blockRef.pageNumber}:${blockRef.blockIndex}`));
 }
 
 function extractionAttemptExtractor(args: {
@@ -204,15 +239,62 @@ async function writeDocumentMemoryArtifacts(
       requestConfigRedacted: extractionRequestConfigRedacted(extraction),
     });
 
+    const storedPageRefs: StoredDocumentPageRef[] = [];
     for (const pages of chunkArray(artifacts.pages, batchSize)) {
-      await ctx.runMutation(internal.documentMemory.insertDocumentPageBatch, {
+      const result = await ctx.runMutation(internal.documentMemory.insertDocumentPageBatch, {
         uploadedFileId,
         memoryGenerationId: generation.memoryGenerationId,
         pages,
-      });
+      }) as { pages: StoredDocumentPageRef[] };
+      storedPageRefs.push(...result.pages);
     }
 
-    for (const chunks of chunkArray(artifacts.chunks, batchSize)) {
+    const storedBlockRefs: StoredDocumentBlockRef[] = [];
+    for (const blocks of chunkArray(artifacts.blocks, batchSize)) {
+      const result = await ctx.runMutation(internal.documentMemory.insertDocumentBlockBatch, {
+        uploadedFileId,
+        memoryGenerationId: generation.memoryGenerationId,
+        pageRefs: pageRefsForPageNumbers(storedPageRefs, uniqueNumbers(blocks.map((block) => block.pageNumber))),
+        blocks,
+      }) as { blocks: StoredDocumentBlockRef[] };
+      storedBlockRefs.push(...result.blocks);
+    }
+    const blockIdByIndex = new Map(storedBlockRefs.map((block) => [block.blockIndex, block.blockId]));
+
+    const storedTableRefs: StoredDocumentTableRef[] = [];
+    for (const tables of chunkArray(artifacts.tables, batchSize)) {
+      const result = await ctx.runMutation(internal.documentMemory.insertDocumentTableBatch, {
+        uploadedFileId,
+        memoryGenerationId: generation.memoryGenerationId,
+        pageRefs: pageRefsForPageNumbers(storedPageRefs, uniqueNumbers(tables.map((table) => table.pageNumber))),
+        blockRefs: blockRefsForTables(storedBlockRefs, tables),
+        tables,
+      }) as { tables: StoredDocumentTableRef[] };
+      storedTableRefs.push(...result.tables);
+    }
+    const tableIdByIndex = new Map(storedTableRefs.map((table) => [table.tableIndex, table.tableId]));
+
+    const chunksForStorage = artifacts.chunks.map((chunk) => {
+      const { blockIndexes, tableIndexes, ...chunkWithoutLocalRefs } = chunk;
+      const localBlockIndexes = uniqueNumbers(blockIndexes ?? []);
+      const localTableIndexes = uniqueNumbers(tableIndexes ?? []);
+      const missingBlockIndexes = localBlockIndexes.filter((blockIndex) => !blockIdByIndex.has(blockIndex));
+      const missingTableIndexes = localTableIndexes.filter((tableIndex) => !tableIdByIndex.has(tableIndex));
+
+      if (missingBlockIndexes.length > 0 || missingTableIndexes.length > 0) {
+        throw new Error(
+          `Document memory chunk references missing persisted artifacts: blocks=${missingBlockIndexes.join(',')}; tables=${missingTableIndexes.join(',')}`,
+        );
+      }
+
+      return {
+        ...chunkWithoutLocalRefs,
+        blockIds: localBlockIndexes.map((blockIndex) => blockIdByIndex.get(blockIndex)!),
+        tableIds: localTableIndexes.map((tableIndex) => tableIdByIndex.get(tableIndex)!),
+      };
+    });
+
+    for (const chunks of chunkArray(chunksForStorage, batchSize)) {
       await ctx.runMutation(internal.documentMemory.insertDocumentChunkBatch, {
         uploadedFileId,
         memoryGenerationId: generation.memoryGenerationId,

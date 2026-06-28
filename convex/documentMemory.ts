@@ -9,7 +9,63 @@ const pageArtifactValidator = v.object({
   pageNumber: v.number(),
   text: v.string(),
   textLength: v.number(),
+  startChar: v.optional(v.number()),
+  endChar: v.optional(v.number()),
   isSynthetic: v.boolean(),
+  warnings: v.array(v.string()),
+});
+
+const retrievalMetadataValidator = v.object({
+  containsTable: v.boolean(),
+  containsSignature: v.boolean(),
+  containsDate: v.boolean(),
+  containsDeadline: v.boolean(),
+  containsMoney: v.boolean(),
+  containsPartyName: v.boolean(),
+  containsOrderLanguage: v.boolean(),
+});
+
+const blockTypeValidator = v.union(
+  v.literal('title'),
+  v.literal('text'),
+  v.literal('list'),
+  v.literal('table'),
+  v.literal('image'),
+  v.literal('caption'),
+  v.literal('header'),
+  v.literal('footer'),
+  v.literal('signature'),
+  v.literal('equation'),
+  v.literal('aside_text'),
+  v.literal('references'),
+  v.literal('other'),
+);
+
+const blockArtifactValidator = v.object({
+  blockIndex: v.number(),
+  pageNumber: v.number(),
+  type: blockTypeValidator,
+  text: v.string(),
+  normalizedText: v.string(),
+  startChar: v.optional(v.number()),
+  endChar: v.optional(v.number()),
+  isSubstantive: v.boolean(),
+  sectionHeading: v.optional(v.string()),
+  paragraphNumber: v.optional(v.string()),
+  tableIndex: v.optional(v.number()),
+  retrievalMetadata: retrievalMetadataValidator,
+  warnings: v.array(v.string()),
+});
+
+const tableArtifactValidator = v.object({
+  tableIndex: v.number(),
+  pageNumber: v.number(),
+  blockIndex: v.optional(v.number()),
+  html: v.optional(v.string()),
+  markdown: v.optional(v.string()),
+  plainText: v.string(),
+  rowCount: v.optional(v.number()),
+  columnCount: v.optional(v.number()),
   warnings: v.array(v.string()),
 });
 
@@ -20,9 +76,14 @@ const chunkArtifactValidator = v.object({
   startChar: v.number(),
   endChar: v.number(),
   tokenCount: v.number(),
+  blockIds: v.optional(v.array(v.id('documentBlocks'))),
+  tableIds: v.optional(v.array(v.id('documentTables'))),
   sectionHeading: v.optional(v.string()),
   pageStart: v.optional(v.number()),
   pageEnd: v.optional(v.number()),
+  paragraphRange: v.optional(v.string()),
+  citationLabel: v.optional(v.string()),
+  retrievalMetadata: v.optional(retrievalMetadataValidator),
   warnings: v.array(v.string()),
 });
 
@@ -69,6 +130,19 @@ function canonicalSourceForUploadedFile(uploadedFile: {
 }) {
   if (uploadedFile.extractionMethod?.toLowerCase().includes('ocr') || uploadedFile.ocrAttempted) {
     return 'ocr' as const;
+  }
+  return 'native' as const;
+}
+
+function artifactSourceForUploadedFile(uploadedFile: {
+  ocrAttempted?: boolean;
+  extractionMethod?: string;
+}) {
+  if (uploadedFile.extractionMethod === 'mistral_ocr_4') {
+    return 'mistral_ocr_4' as const;
+  }
+  if (uploadedFile.extractionMethod?.toLowerCase().includes('ocr') || uploadedFile.ocrAttempted) {
+    return 'hybrid' as const;
   }
   return 'native' as const;
 }
@@ -180,9 +254,13 @@ export const insertDocumentPageBatch = internalMutation({
     await getOptionalGeneration(ctx, args.uploadedFileId, args.memoryGenerationId);
     const now = Date.now();
     const canonicalSource = canonicalSourceForUploadedFile(uploadedFile);
+    const inserted: Array<{
+      pageNumber: number;
+      pageId: Id<'documentPages'>;
+    }> = [];
 
     for (const page of args.pages) {
-      await ctx.db.insert('documentPages', {
+      const pageId = await ctx.db.insert('documentPages', {
         uploadedFileId: args.uploadedFileId,
         memoryGenerationId: args.memoryGenerationId,
         orgId: uploadedFile.orgId,
@@ -193,6 +271,8 @@ export const insertDocumentPageBatch = internalMutation({
         caseId: uploadedFile.caseId,
         pageNumber: page.pageNumber,
         sourcePageIndex: page.pageNumber - 1,
+        startChar: page.startChar,
+        endChar: page.endChar,
         text: page.text,
         textLength: page.textLength,
         nativeText: canonicalSource === 'native' ? page.text : undefined,
@@ -204,9 +284,152 @@ export const insertDocumentPageBatch = internalMutation({
         isSynthetic: page.isSynthetic,
         createdAt: now,
       });
+      inserted.push({ pageNumber: page.pageNumber, pageId });
     }
 
-    return { inserted: args.pages.length };
+    return { inserted: inserted.length, pages: inserted };
+  },
+});
+
+export const insertDocumentBlockBatch = internalMutation({
+  args: {
+    uploadedFileId: v.id('uploadedFiles'),
+    memoryGenerationId: v.id('documentMemoryGenerations'),
+    pageRefs: v.array(v.object({
+      pageNumber: v.number(),
+      pageId: v.id('documentPages'),
+    })),
+    blocks: v.array(blockArtifactValidator),
+  },
+  handler: async (ctx, args) => {
+    assertBatchSize(args.blocks.length);
+    const uploadedFile = await ctx.db.get(args.uploadedFileId);
+    if (!uploadedFile) throw new Error('Uploaded file not found');
+    await getOptionalGeneration(ctx, args.uploadedFileId, args.memoryGenerationId);
+    const pageIdByNumber = new Map(args.pageRefs.map((page) => [page.pageNumber, page.pageId]));
+    const now = Date.now();
+    const source = artifactSourceForUploadedFile(uploadedFile);
+    const inserted: Array<{
+      blockIndex: number;
+      pageNumber: number;
+      blockId: Id<'documentBlocks'>;
+    }> = [];
+
+    for (const block of args.blocks) {
+      const pageId = pageIdByNumber.get(block.pageNumber);
+      if (!pageId) {
+        throw new Error(`Document block page ${block.pageNumber} was not stored for this generation`);
+      }
+      const blockId = await ctx.db.insert('documentBlocks', {
+        orgId: uploadedFile.orgId,
+        accountId: uploadedFile.accountId,
+        matterId: uploadedFile.matterId,
+        clerkUserId: uploadedFile.clerkUserId,
+        conversationId: uploadedFile.conversationId,
+        caseId: uploadedFile.caseId,
+        uploadedFileId: args.uploadedFileId,
+        memoryGenerationId: args.memoryGenerationId,
+        pageId,
+        pageNumber: block.pageNumber,
+        blockIndex: block.blockIndex,
+        type: block.type,
+        text: block.text,
+        normalizedText: block.normalizedText,
+        startChar: block.startChar,
+        endChar: block.endChar,
+        source,
+        isSubstantive: block.isSubstantive,
+        sectionHeading: block.sectionHeading,
+        paragraphNumber: block.paragraphNumber,
+        tableIndex: block.tableIndex,
+        retrievalMetadata: block.retrievalMetadata,
+        warnings: block.warnings,
+        textHash: undefined,
+        createdAt: now,
+      });
+      inserted.push({
+        blockIndex: block.blockIndex,
+        pageNumber: block.pageNumber,
+        blockId,
+      });
+    }
+
+    return { inserted: inserted.length, blocks: inserted };
+  },
+});
+
+export const insertDocumentTableBatch = internalMutation({
+  args: {
+    uploadedFileId: v.id('uploadedFiles'),
+    memoryGenerationId: v.id('documentMemoryGenerations'),
+    pageRefs: v.array(v.object({
+      pageNumber: v.number(),
+      pageId: v.id('documentPages'),
+    })),
+    blockRefs: v.array(v.object({
+      blockIndex: v.number(),
+      pageNumber: v.number(),
+      blockId: v.id('documentBlocks'),
+    })),
+    tables: v.array(tableArtifactValidator),
+  },
+  handler: async (ctx, args) => {
+    assertBatchSize(args.tables.length);
+    const uploadedFile = await ctx.db.get(args.uploadedFileId);
+    if (!uploadedFile) throw new Error('Uploaded file not found');
+    await getOptionalGeneration(ctx, args.uploadedFileId, args.memoryGenerationId);
+    const pageIdByNumber = new Map(args.pageRefs.map((page) => [page.pageNumber, page.pageId]));
+    const blockKey = (pageNumber: number, blockIndex: number) => `${pageNumber}:${blockIndex}`;
+    const blockIdByPageAndIndex = new Map(
+      args.blockRefs.map((block) => [blockKey(block.pageNumber, block.blockIndex), block.blockId]),
+    );
+    const now = Date.now();
+    const inserted: Array<{
+      tableIndex: number;
+      pageNumber: number;
+      tableId: Id<'documentTables'>;
+    }> = [];
+
+    for (const table of args.tables) {
+      const pageId = pageIdByNumber.get(table.pageNumber);
+      if (!pageId) {
+        throw new Error(`Document table page ${table.pageNumber} was not stored for this generation`);
+      }
+      const blockId = table.blockIndex !== undefined
+        ? blockIdByPageAndIndex.get(blockKey(table.pageNumber, table.blockIndex))
+        : undefined;
+      if (table.blockIndex !== undefined && !blockId) {
+        throw new Error(`Document table block ${table.blockIndex} on page ${table.pageNumber} was not stored for this generation`);
+      }
+      const tableId = await ctx.db.insert('documentTables', {
+        orgId: uploadedFile.orgId,
+        accountId: uploadedFile.accountId,
+        matterId: uploadedFile.matterId,
+        clerkUserId: uploadedFile.clerkUserId,
+        conversationId: uploadedFile.conversationId,
+        caseId: uploadedFile.caseId,
+        uploadedFileId: args.uploadedFileId,
+        memoryGenerationId: args.memoryGenerationId,
+        pageId,
+        blockId,
+        pageNumber: table.pageNumber,
+        tableIndex: table.tableIndex,
+        html: table.html,
+        markdown: table.markdown,
+        plainText: table.plainText,
+        rowCount: table.rowCount,
+        columnCount: table.columnCount,
+        warnings: table.warnings,
+        createdAt: now,
+      });
+      inserted.push({
+        tableIndex: table.tableIndex,
+        pageNumber: table.pageNumber,
+        tableId,
+      });
+    }
+
+    return { inserted: inserted.length, tables: inserted };
   },
 });
 
@@ -236,6 +459,8 @@ export const insertDocumentChunkBatch = internalMutation({
         caseId: uploadedFile.caseId,
         pageStart: chunk.pageStart,
         pageEnd: chunk.pageEnd,
+        blockIds: chunk.blockIds?.length ? chunk.blockIds : undefined,
+        tableIds: chunk.tableIds?.length ? chunk.tableIds : undefined,
         sectionHeading: chunk.sectionHeading,
         chunkIndex: chunk.chunkIndex,
         text: chunk.text,
@@ -248,12 +473,12 @@ export const insertDocumentChunkBatch = internalMutation({
         textLength: chunk.textLength,
         startChar: chunk.startChar,
         endChar: chunk.endChar,
-        paragraphRange: undefined,
-        citationLabel: buildCitationLabel(uploadedFile.filename, chunk),
+        paragraphRange: chunk.paragraphRange,
+        citationLabel: chunk.citationLabel ?? buildCitationLabel(uploadedFile.filename, chunk),
         tokenCount: chunk.tokenCount,
         extractionMethod: uploadedFile.extractionMethod,
         warnings: chunk.warnings,
-        retrievalMetadata: retrievalMetadataForText(chunk.text),
+        retrievalMetadata: chunk.retrievalMetadata ?? retrievalMetadataForText(chunk.text),
         createdAt: now,
       });
     }

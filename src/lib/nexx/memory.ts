@@ -60,7 +60,10 @@ ${existingContext}`,
 
   const text = response.output_text || '';
   try {
-    return JSON.parse(text) as ConversationSummary;
+    return {
+      ...(JSON.parse(text) as Omit<ConversationSummary, 'turnCount'>),
+      turnCount: args.messages.length,
+    };
   } catch {
     return {
       decisions: [],

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { detectDocumentReference } from '../documentReferenceDetection';
-import { retrieveRelevantDocumentChunks, type DocumentChunkRetrievalCandidate } from '../documentChunkRetrieval';
+import {
+  buildDocumentChunkSearchQuery,
+  retrieveRelevantDocumentChunks,
+  type DocumentChunkRetrievalCandidate,
+} from '../documentChunkRetrieval';
 
 const chunks: DocumentChunkRetrievalCandidate[] = [
   {
@@ -39,6 +43,18 @@ const chunks: DocumentChunkRetrievalCandidate[] = [
 ];
 
 describe('retrieveRelevantDocumentChunks', () => {
+  it('builds a compact full-text query from exact terms and sections', () => {
+    const detection = detectDocumentReference('Does section 7 say shall or may about Father day possession?');
+    const query = buildDocumentChunkSearchQuery(
+      'Does section 7 say shall or may about Father day possession?',
+      detection
+    );
+
+    expect(query).toContain('shall');
+    expect(query).toContain('may');
+    expect(query.length).toBeLessThanOrEqual(400);
+  });
+
   it('prioritizes exact terminology matches over early context', () => {
     const detection = detectDocumentReference('does it say shall or may?');
     const result = retrieveRelevantDocumentChunks({
@@ -202,5 +218,115 @@ describe('retrieveRelevantDocumentChunks', () => {
 
     expect(result[0]?.chunkId).toBe('saturday-possession');
     expect(result[0]?.retrievalReasons).toContain('holiday_possession');
+  });
+
+  it('uses retrieval metadata to surface table-heavy payment chunks', () => {
+    const tableChunks: DocumentChunkRetrievalCandidate[] = [
+      {
+        chunkId: 'narrative',
+        uploadedFileId: 'file-1',
+        chunkIndex: 0,
+        text: 'The order includes general background about the parties.',
+        textLength: 58,
+        sectionHeading: 'Background',
+        warnings: [],
+      },
+      {
+        chunkId: 'payment-table',
+        uploadedFileId: 'file-1',
+        chunkIndex: 12,
+        text: 'Monthly support schedule: January $500, February $500, March $500.',
+        textLength: 70,
+        sectionHeading: 'Support Schedule',
+        retrievalMetadata: {
+          containsTable: true,
+          containsMoney: true,
+        },
+        warnings: [],
+      },
+    ];
+    const detection = detectDocumentReference('What does the payment table say?');
+    const result = retrieveRelevantDocumentChunks({
+      message: 'What does the payment table say?',
+      detection,
+      chunks: tableChunks,
+      maxChunks: 1,
+    });
+
+    expect(result[0]?.chunkId).toBe('payment-table');
+    expect(result[0]?.retrievalReasons).toContain('metadata_match');
+  });
+
+  it('expands neighbor context around metadata-ranked chunks', () => {
+    const tableChunks: DocumentChunkRetrievalCandidate[] = [
+      {
+        chunkId: 'payment-table',
+        uploadedFileId: 'file-1',
+        chunkIndex: 12,
+        text: 'Monthly support schedule: January $500, February $500, March $500.',
+        textLength: 70,
+        sectionHeading: 'Support Schedule',
+        retrievalMetadata: {
+          containsTable: true,
+          containsMoney: true,
+        },
+        warnings: [],
+      },
+      {
+        chunkId: 'payment-table-note',
+        uploadedFileId: 'file-1',
+        chunkIndex: 13,
+        text: 'Payments are due on the first day of each month unless the order states otherwise.',
+        textLength: 83,
+        sectionHeading: 'Support Schedule Continued',
+        warnings: [],
+      },
+    ];
+    const detection = detectDocumentReference('What does the payment table say?');
+    const result = retrieveRelevantDocumentChunks({
+      message: 'What does the payment table say?',
+      detection,
+      chunks: tableChunks,
+      maxChunks: 2,
+    });
+
+    expect(result.map((chunk) => chunk.chunkId)).toEqual(['payment-table', 'payment-table-note']);
+    expect(result.find((chunk) => chunk.chunkId === 'payment-table-note')?.retrievalReasons).toContain('neighbor_context');
+  });
+
+  it('uses order-language metadata for broad order questions', () => {
+    const orderLanguageChunks: DocumentChunkRetrievalCandidate[] = [
+      {
+        chunkId: 'background',
+        uploadedFileId: 'file-1',
+        chunkIndex: 0,
+        text: 'The parties appeared and announced ready.',
+        textLength: 41,
+        sectionHeading: 'Appearances',
+        warnings: [],
+      },
+      {
+        chunkId: 'ordered-relief',
+        uploadedFileId: 'file-1',
+        chunkIndex: 9,
+        text: 'It is ordered that Respondent shall surrender the passports by Friday.',
+        textLength: 72,
+        sectionHeading: 'Orders',
+        retrievalMetadata: {
+          containsOrderLanguage: true,
+        },
+        warnings: [],
+      },
+    ];
+    const detection = detectDocumentReference('What does the order say?');
+    const result = retrieveRelevantDocumentChunks({
+      message: 'What does the order say?',
+      detection,
+      chunks: orderLanguageChunks,
+      maxChunks: 1,
+    });
+
+    expect(result[0]?.chunkId).toBe('ordered-relief');
+    expect(result[0]?.retrievalReasons).toContain('metadata_match');
   });
 });

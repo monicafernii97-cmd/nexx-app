@@ -7,9 +7,20 @@ export type DocumentChunkRetrievalReason =
   | 'heading_match'
   | 'page_match'
   | 'section_match'
+  | 'metadata_match'
   | 'neighbor_context'
   | 'keyword_overlap'
   | 'early_context';
+
+export type DocumentChunkRetrievalMetadata = {
+  containsTable?: boolean;
+  containsSignature?: boolean;
+  containsDate?: boolean;
+  containsDeadline?: boolean;
+  containsMoney?: boolean;
+  containsPartyName?: boolean;
+  containsOrderLanguage?: boolean;
+};
 
 export type DocumentChunkRetrievalCandidate = {
   chunkId: string;
@@ -24,6 +35,7 @@ export type DocumentChunkRetrievalCandidate = {
   extractionMethod?: string;
   ocrConfidence?: number;
   warnings?: string[];
+  retrievalMetadata?: DocumentChunkRetrievalMetadata;
 };
 
 export type RetrievedDocumentChunk = DocumentChunkRetrievalCandidate & {
@@ -188,6 +200,23 @@ function buildSearchTerms(message: string, detection: DocumentReferenceDetection
   return unique([...requestedTerms, ...requestedDates, ...sectionTerms, ...messageTerms]);
 }
 
+/** Build a compact full-text query for the Convex search index before in-memory reranking. */
+export function buildDocumentChunkSearchQuery(message: string, detection: DocumentReferenceDetection) {
+  const prioritizedTerms = [
+    ...normalizeTerms(detection.requestedTerms),
+    ...normalizeTerms(detection.requestedDates),
+    ...extractSectionTerms(detection.requestedSections),
+  ];
+  const terms = unique([
+    ...prioritizedTerms,
+    ...buildSearchTerms(message, detection),
+  ])
+    .filter((term) => term.length >= 3)
+    .slice(0, detection.requiresExactText ? 18 : 24);
+
+  return terms.join(' ').slice(0, 400).trim();
+}
+
 function messageNeedsHolidayPossessionRetrieval(message: string, detection: DocumentReferenceDetection) {
   return [...detection.requestedTerms, message].some((value) =>
     /\b(?:father\s+s\s+day|fathers\s+day|father\s+day|mother\s+s\s+day|mothers\s+day|mother\s+day|holiday\s+(?:possession|schedule)|student\s+holiday|teacher\s+in\s+service|spring\s+break|thanksgiving|christmas|summer\s+possession|extended\s+summer)\b/i.test(normalizeText(value))
@@ -212,7 +241,8 @@ function addNeighborChunks(args: {
       reason === 'page_match' ||
       reason === 'section_match' ||
       reason === 'heading_match' ||
-      reason === 'deadline_pattern'
+      reason === 'deadline_pattern' ||
+      reason === 'metadata_match'
     )
   );
 
@@ -248,10 +278,16 @@ export function retrieveRelevantDocumentChunks(args: {
   const needsExact = args.detection.requiresExactText;
   const needsSection = args.detection.referenceType === 'section_lookup';
   const needsHolidayPossession = messageNeedsHolidayPossessionRetrieval(args.message, args.detection);
+  const hasOrderLanguageIntent = /\b(?:order|ordered|orders|shall|must|restrained|granted|denied|requires?|requirement)\b/i.test(args.message);
+  const asksForTables = /\b(?:table|schedule|calendar|chart|row|column|amounts?|payments?|fees?|arrears)\b/i.test(args.message);
+  const asksForMoney = /\b(?:money|amount|payment|fee|fees|arrears|support|reimburse|costs?|dollars?|\$)\b/i.test(args.message);
+  const asksForSignature = /\b(?:signed|signature|judge|entered|filed|clerk|seal)\b/i.test(args.message);
+  const needsMetadataContext = asksForTables || asksForMoney || asksForSignature || hasOrderLanguageIntent;
 
   const ranked = args.chunks.map((chunk): RetrievedDocumentChunk => {
     const normalizedChunkText = normalizeText(chunk.text);
     const normalizedHeading = normalizeText(chunk.sectionHeading ?? '');
+    const metadata = chunk.retrievalMetadata;
     let retrievalScore = Math.max(0, 20 - chunk.chunkIndex);
     const retrievalReasons: DocumentChunkRetrievalReason[] = ['early_context'];
 
@@ -281,6 +317,10 @@ export function retrieveRelevantDocumentChunks(args: {
         retrievalScore += 80 + deadlineHits.length * 12;
         retrievalReasons.push('deadline_pattern');
       }
+      if (metadata?.containsDeadline || metadata?.containsDate) {
+        retrievalScore += metadata.containsDeadline ? 95 : 45;
+        retrievalReasons.push('metadata_match');
+      }
     }
 
     if (needsHolidayPossession) {
@@ -289,6 +329,26 @@ export function retrieveRelevantDocumentChunks(args: {
         retrievalScore += 120 + holidayHits.length * 18;
         retrievalReasons.push('holiday_possession');
       }
+    }
+
+    if (metadata?.containsTable && asksForTables) {
+      retrievalScore += 65;
+      retrievalReasons.push('metadata_match');
+    }
+
+    if (metadata?.containsMoney && asksForMoney) {
+      retrievalScore += 65;
+      retrievalReasons.push('metadata_match');
+    }
+
+    if (metadata?.containsSignature && asksForSignature) {
+      retrievalScore += 70;
+      retrievalReasons.push('metadata_match');
+    }
+
+    if (metadata?.containsOrderLanguage && (needsExact || hasOrderLanguageIntent)) {
+      retrievalScore += 38;
+      retrievalReasons.push('metadata_match');
     }
 
     return {
@@ -304,7 +364,7 @@ export function retrieveRelevantDocumentChunks(args: {
   });
 
   const shouldExpandWithNeighbors =
-    needsExact || needsHolidayPossession || needsSection || needsDeadline || requestedPages.length > 0;
+    needsExact || needsHolidayPossession || needsSection || needsDeadline || needsMetadataContext || requestedPages.length > 0;
   const initialChunkLimit = shouldExpandWithNeighbors
     ? Math.max(1, args.maxChunks - 2)
     : args.maxChunks;

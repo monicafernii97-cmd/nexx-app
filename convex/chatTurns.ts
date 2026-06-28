@@ -32,6 +32,7 @@ import {
     fixedWindowStartMs,
     userSubscriptionTier,
 } from './lib/chatRateLimitPolicy';
+import { normalizeReviewFlagMessage, sanitizeAuditMetadata } from './lib/documentTelemetry';
 
 const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
@@ -110,6 +111,83 @@ function isTerminalTurnStatus(status: string) {
 /** Build the stable request id used for an assistant message in a turn. */
 function assistantRequestId(requestId: string) {
     return `${requestId}-assistant`;
+}
+
+async function insertChatAuditEvent(
+    ctx: MutationCtx,
+    args: {
+        eventType: 'chat_question_asked' | 'chat_answer_generated' | 'access_denied';
+        user: Doc<'users'>;
+        conversationId: Id<'conversations'>;
+        caseId?: Id<'cases'>;
+        turnId?: Id<'chatTurns'>;
+        messageId?: Id<'messages'>;
+        metadataRedacted?: unknown;
+    }
+) {
+    await ctx.db.insert('auditEvents', {
+        actorUserId: args.user._id,
+        clerkUserId: args.user.clerkId,
+        eventType: args.eventType,
+        conversationId: args.conversationId,
+        caseId: args.caseId,
+        turnId: args.turnId,
+        messageId: args.messageId,
+        metadataRedacted: sanitizeAuditMetadata(args.metadataRedacted),
+        createdAt: Date.now(),
+    });
+}
+
+async function insertOpenReviewFlagOnce(
+    ctx: MutationCtx,
+    args: {
+        orgId?: string;
+        accountId?: string;
+        matterId?: string;
+        clerkUserId: string;
+        uploadedFileId: Id<'uploadedFiles'>;
+        memoryGenerationId?: Id<'documentMemoryGenerations'>;
+        caseId?: Id<'cases'>;
+        chunkId?: Id<'documentChunks'>;
+        flagType:
+            | 'low_confidence_ocr'
+            | 'missing_citation'
+            | 'provider_policy_blocked'
+            | 'manual_review_required'
+            | 'generation_validation_failed';
+        severity: 'low' | 'medium' | 'high';
+        message: string;
+        createdAt: number;
+    }
+) {
+    const existing = await ctx.db
+        .query('reviewFlags')
+        .withIndex('by_clerk_created', (q) => q.eq('clerkUserId', args.clerkUserId))
+        .filter((q) => q.and(
+            q.eq(q.field('uploadedFileId'), args.uploadedFileId),
+            q.eq(q.field('memoryGenerationId'), args.memoryGenerationId),
+            q.eq(q.field('caseId'), args.caseId),
+            q.eq(q.field('chunkId'), args.chunkId),
+            q.eq(q.field('flagType'), args.flagType),
+            q.eq(q.field('resolvedAt'), undefined)
+        ))
+        .first();
+    if (existing) return existing._id;
+
+    return await ctx.db.insert('reviewFlags', {
+        orgId: args.orgId,
+        accountId: args.accountId,
+        matterId: args.matterId,
+        clerkUserId: args.clerkUserId,
+        uploadedFileId: args.uploadedFileId,
+        memoryGenerationId: args.memoryGenerationId,
+        caseId: args.caseId,
+        chunkId: args.chunkId,
+        flagType: args.flagType,
+        severity: args.severity,
+        message: normalizeReviewFlagMessage(args.message),
+        createdAt: args.createdAt,
+    });
 }
 
 const DEGRADED_MESSAGE =
@@ -822,6 +900,22 @@ export const acceptChatTurn = mutation({
             routeMode: args.routeMode,
         });
 
+        await insertChatAuditEvent(ctx, {
+            eventType: 'chat_question_asked',
+            user,
+            conversationId: args.conversationId,
+            caseId: conversation.caseId,
+            turnId,
+            messageId: userMessageId,
+            metadataRedacted: {
+                requestId: args.requestId,
+                mode: args.mode ?? 'send',
+                routeMode: args.routeMode,
+                attachmentCount: validatedAttachments.length,
+                persistedUserMessage: shouldPersistUserMessage,
+            },
+        });
+
         await ctx.scheduler.runAfter(0, internal.chatWorker.processChatGenerationJob, { jobId });
 
         return {
@@ -1484,6 +1578,26 @@ export const recordDocumentAnswerEvidence = internalMutation({
         });
 
         if (args.verifiedCitations !== undefined) {
+            if (args.verifiedCitations.length === 0 && usedChunkIds.length > 0) {
+                const firstVerifiedChunk = verifiedChunks.get(usedChunkIds[0].toString());
+                if (firstVerifiedChunk) {
+                    await insertOpenReviewFlagOnce(ctx, {
+                        orgId: firstVerifiedChunk.chunk.orgId,
+                        accountId: firstVerifiedChunk.chunk.accountId,
+                        matterId: firstVerifiedChunk.chunk.matterId,
+                        clerkUserId: user.clerkId,
+                        uploadedFileId: firstVerifiedChunk.uploadedFile._id,
+                        memoryGenerationId: firstVerifiedChunk.chunk.memoryGenerationId,
+                        caseId: conversation.caseId,
+                        chunkId: firstVerifiedChunk.chunk._id,
+                        flagType: 'missing_citation',
+                        severity: 'high',
+                        message: 'A document answer used retrieved chunks, but no citations were verified. Review the answer before relying on it.',
+                        createdAt: now,
+                    });
+                }
+            }
+
             const existingAnswerSources = await ctx.db
                 .query('chatAnswerSources')
                 .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
@@ -1493,6 +1607,7 @@ export const recordDocumentAnswerEvidence = internalMutation({
             }
 
             const seenCitationKeys = new Set<string>();
+            let partialCitationFlagInserted = false;
             for (const citation of args.verifiedCitations) {
                 const citationKey = `${citation.sourceId}:${citation.chunkId.toString()}`;
                 if (seenCitationKeys.has(citationKey) || seenCitationKeys.size >= 50) continue;
@@ -1521,6 +1636,23 @@ export const recordDocumentAnswerEvidence = internalMutation({
                     citationVerifierStatus: citation.citationVerifierStatus,
                     createdAt: now,
                 });
+                if (citation.citationVerifierStatus === 'partial' && !partialCitationFlagInserted) {
+                    partialCitationFlagInserted = true;
+                    await insertOpenReviewFlagOnce(ctx, {
+                        orgId: verified.chunk.orgId,
+                        accountId: verified.chunk.accountId,
+                        matterId: verified.chunk.matterId,
+                        clerkUserId: user.clerkId,
+                        uploadedFileId: verified.uploadedFile._id,
+                        memoryGenerationId: verified.chunk.memoryGenerationId,
+                        caseId: conversation.caseId,
+                        chunkId: verified.chunk._id,
+                        flagType: 'low_confidence_ocr',
+                        severity: 'medium',
+                        message: 'An answer citation was verified only partially because the source confidence is below the high-confidence threshold. Verify the original page before relying on this answer.',
+                        createdAt: now,
+                    });
+                }
             }
         }
 
@@ -1702,7 +1834,10 @@ export const completeAssistant = internalMutation({
             updatedAt: now,
         });
 
-        const conversation = await ctx.db.get(turn.conversationId);
+        const [conversation, user] = await Promise.all([
+            ctx.db.get(turn.conversationId),
+            ctx.db.get(turn.userId),
+        ]);
         if (conversation) {
             await ctx.db.patch(turn.conversationId, {
                 activeTurnRequestId: conversation.activeTurnRequestId === turn.requestId ? undefined : conversation.activeTurnRequestId,
@@ -1712,6 +1847,26 @@ export const completeAssistant = internalMutation({
                 messageCount: shouldIncrementMessageCount
                     ? (conversation.messageCount ?? 0) + 1
                     : conversation.messageCount,
+            });
+        }
+
+        if (conversation && user?.clerkId) {
+            await insertChatAuditEvent(ctx, {
+                eventType: 'chat_answer_generated',
+                user,
+                conversationId: turn.conversationId,
+                caseId: conversation.caseId,
+                turnId: turn._id,
+                messageId: assistantMessageId,
+                metadataRedacted: {
+                    requestId: turn.requestId,
+                    routeMode: turn.routeMode,
+                    model: turn.model,
+                    degraded: args.degraded ?? false,
+                    errorCode: args.errorCode,
+                    errorCategory: args.errorCode ? 'provider_or_worker_error' : 'none',
+                    messageStatus,
+                },
             });
         }
 

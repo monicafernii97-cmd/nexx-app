@@ -128,6 +128,37 @@ describe('verifyLegalDocumentAnswer', () => {
     expect(result.passed).toBe(false);
   });
 
+  it('allows OCR-style punctuation differences when quote words remain in order', () => {
+    const result = verifyLegalDocumentAnswer(answer({
+      citations: [{
+        ...answer().citations[0],
+        quotedText: 'Respondent shall pay 500 no later than June 14 2026',
+      }],
+    }), sourcePackets, {
+      requiresDocumentAnswer: true,
+      requiresCitation: true,
+    });
+
+    expect(result.passed).toBe(true);
+  });
+
+  it('blocks loose quotes stitched from non-contiguous source text', () => {
+    const result = verifyLegalDocumentAnswer(answer({
+      citations: [{
+        ...answer().citations[0],
+        quotedText: 'Respondent shall pay $500 June 14 2026',
+      }],
+    }), [{
+      ...sourcePackets[0],
+      text: 'Respondent shall pay $500. The exchange location is described separately. The deadline is June 14, 2026.',
+    }], {
+      requiresDocumentAnswer: true,
+      requiresCitation: true,
+    });
+
+    expect(result.passed).toBe(false);
+  });
+
   it('allows not-found answers without citations when the sources do not support the answer', () => {
     const result = verifyLegalDocumentAnswer(answer({
       answerType: 'not_found',

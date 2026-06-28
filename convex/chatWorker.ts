@@ -728,6 +728,7 @@ function buildAttachmentContextPrompt(
         'When uploaded document memory is present, it is the source of truth for document re-analysis. Do not rely on older pasted order text in chat history unless the user explicitly asks you to analyze that pasted text.',
         'Do not describe uploaded document memory as "the text you provided" or "pasted text"; identify the uploaded document by filename/source instead.',
         'If the excerpts do not contain the answer, say the available extracted text does not show it.',
+        'If SOURCE_ID chunks are present for a document, make document-specific claims about that document only from those SOURCE_ID chunks. Uncited extracted context is not enough for a document-specific claim for that document.',
         'For court-order review, identify which document was reviewed and cite page/section/chunk metadata when available.',
         'Quote short exact phrases only when exact wording matters.',
         'When you make document-specific claims, fill documentAnswer with claims and citations that use only the SOURCE_ID values shown in retrieved chunks.',

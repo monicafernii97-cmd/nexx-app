@@ -6,6 +6,21 @@
 import { getOpenAIClient, openai } from '../openaiConversation';
 import type { VectorStoreFilter } from '../types';
 
+type VectorStoreFileAttributes = Record<string, string | number | boolean>;
+
+export function toVectorStoreFileAttributes(metadata?: VectorStoreFilter): VectorStoreFileAttributes | undefined {
+  if (!metadata) return undefined;
+
+  const attributes = Object.entries(metadata).reduce<VectorStoreFileAttributes>((acc, [key, value]) => {
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      acc[key] = typeof value === 'string' ? value.slice(0, 512) : value;
+    }
+    return acc;
+  }, {});
+
+  return Object.keys(attributes).length > 0 ? attributes : undefined;
+}
+
 /**
  * Create a new vector store for a case/conversation.
  * Each case gets its own vector store for isolation.
@@ -61,13 +76,13 @@ export async function uploadToVectorStore(
     purpose: 'assistants',
   }, { timeout: 30_000 });
 
-  // Attach to vector store with custom chunking + metadata
+  // Attach to vector store with custom chunking + attributes.
   // Legal documents benefit from smaller chunks (~800 tokens) vs default (4096)
+  const attributes = toVectorStoreFileAttributes(metadata);
   try {
     await client.vectorStores.files.createAndPoll(vectorStoreId, {
       file_id: uploadedFile.id,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ...(metadata ? { metadata: metadata as any } : {}),
+      ...(attributes ? { attributes } : {}),
       chunking_strategy: {
         type: 'static',
         static: {

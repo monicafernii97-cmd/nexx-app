@@ -101,9 +101,29 @@ function normalizeForFuzzyMatch(value: string) {
     .toLowerCase()
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
+    .replace(/[‐‑‒–—―]/g, '-')
     .replace(/[\u0000-\u001f\u007f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function normalizeWordsForCitation(value: string) {
+  return normalizeForFuzzyMatch(value)
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function contiguousWindowCoverage(sourceWords: string[], quoteWords: string[]) {
+  if (quoteWords.length === 0 || quoteWords.length > sourceWords.length) return 0;
+
+  let bestCoverage = 0;
+  for (let index = 0; index <= sourceWords.length - quoteWords.length; index += 1) {
+    const window = sourceWords.slice(index, index + quoteWords.length);
+    const matchedWords = quoteWords.filter((word, wordIndex) => window[wordIndex] === word).length;
+    bestCoverage = Math.max(bestCoverage, matchedWords / quoteWords.length);
+  }
+  return bestCoverage;
 }
 
 export function fuzzyTextContains(sourceText: string, quotedText: string) {
@@ -123,6 +143,12 @@ export function fuzzyTextContains(sourceText: string, quotedText: string) {
     const window = sourceWords.slice(index, index + quoteWords.length);
     const matchedWords = quoteWords.filter((word, wordIndex) => window[wordIndex] === word).length;
     if (matchedWords / quoteWords.length >= 0.92) return true;
+  }
+
+  const looseQuoteWords = normalizeWordsForCitation(quotedText);
+  if (looseQuoteWords.length >= 5) {
+    const looseSourceWords = normalizeWordsForCitation(sourceText);
+    if (contiguousWindowCoverage(looseSourceWords, looseQuoteWords) >= 0.92) return true;
   }
 
   return false;

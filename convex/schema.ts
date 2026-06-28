@@ -617,12 +617,14 @@ export default defineSchema({
         authorizationRecheckPassed: v.boolean(),
         citationVerifierPassed: v.boolean(),
         createdAt: v.number(),
+        expiresAt: v.number(),
     })
         .index('by_turn', ['turnId'])
         .index('by_message', ['messageId'])
         .index('by_user_created', ['userId', 'createdAt'])
         .index('by_conversation_created', ['conversationId', 'createdAt'])
-        .index('by_case_created', ['caseId', 'createdAt']),
+        .index('by_case_created', ['caseId', 'createdAt'])
+        .index('by_expiresAt', ['expiresAt']),
 
     auditEvents: defineTable({
         orgId: v.optional(v.string()),

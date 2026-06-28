@@ -70,19 +70,50 @@ function normalizeProviderError(error: unknown) {
     const lower = message.toLowerCase();
 
     if (lower.includes('rate limit') || lower.includes('429')) {
-        return { code: 'provider_rate_limit', message, retryable: true };
+        return {
+            code: 'provider_rate_limit',
+            message: 'The model provider rate-limited this response.',
+            rawMessage: message,
+            retryable: true,
+        };
     }
     if (lower.includes('timeout') || lower.includes('timed out')) {
-        return { code: 'provider_timeout', message, retryable: true };
+        return {
+            code: 'provider_timeout',
+            message: 'The model provider timed out while generating this response.',
+            rawMessage: message,
+            retryable: true,
+        };
     }
     if (lower.includes('overloaded') || lower.includes('503') || lower.includes('unavailable')) {
-        return { code: 'provider_unavailable', message, retryable: true };
+        return {
+            code: 'provider_unavailable',
+            message: 'The model provider was temporarily unavailable.',
+            rawMessage: message,
+            retryable: true,
+        };
     }
     if (lower.includes('schema') || lower.includes('json')) {
-        return { code: 'provider_schema_error', message, retryable: true };
+        return {
+            code: 'provider_schema_error',
+            message: 'The model provider returned a response that could not be parsed safely.',
+            rawMessage: message,
+            retryable: true,
+        };
     }
 
-    return { code: 'unknown', message, retryable: true };
+    return {
+        code: 'unknown',
+        message: 'The model provider failed before the response could be completed.',
+        rawMessage: message,
+        retryable: true,
+    };
+}
+
+function isProviderGenerationError(error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return /\b(?:provider|model|rate limit|429|overloaded|503|unavailable|structured_output)\b/i
+        .test(message);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -435,6 +466,33 @@ function uniqueDocumentChunkIds(attachments: AttachmentContext[]) {
     )).map((chunkId) => chunkId as Id<'documentChunks'>);
 }
 
+function retrievalQueryTypeForDetection(
+    detection: DocumentReferenceDetection,
+    routeMode: RouteMode
+): 'quote' | 'summary' | 'comparison' | 'interpretation' | 'timeline' | 'metadata' | 'not_found' {
+    if (detection.referenceType === 'comparison_request') return 'comparison';
+    if (
+        detection.referenceType === 'quote_request' ||
+        detection.referenceType === 'terminology_check' ||
+        detection.requiresExactText
+    ) {
+        return 'quote';
+    }
+    if (detection.referenceType === 'metadata_lookup') return 'metadata';
+    if (detection.referenceType === 'deadline_lookup' || detection.requestedDates.length > 0) return 'timeline';
+    if (routeMode === 'document_analysis' || detection.referencesDocument) return 'interpretation';
+    return 'summary';
+}
+
+function documentRetrievalRunCounts(attachments: AttachmentContext[]) {
+    const chunks = attachments.flatMap((attachment) => attachment.documentChunks ?? []);
+    return {
+        vectorResultCount: 0,
+        keywordResultCount: chunks.length,
+        exactMatchResultCount: chunks.filter((chunk) => chunk.retrievalReasons.includes('exact_term')).length,
+    };
+}
+
 function shouldPreferRetrievedChunks(detection: DocumentReferenceDetection) {
     return detection.requiresExactText ||
         detection.requiresPageOrSectionCitation ||
@@ -447,6 +505,61 @@ function attachmentIdentityKey(attachment: AttachmentContext) {
     if (attachment.storageSha256) return `sha256:${attachment.storageSha256}`;
     if (attachment.storageId) return `storage:${attachment.storageId.toString()}`;
     return `uploaded:${attachment.uploadedFileId.toString()}`;
+}
+
+function attachmentContextRichness(attachment: AttachmentContext) {
+    const chunks = attachment.documentChunks ?? [];
+    const chunkScore = chunks.length * 1_000;
+    const citedChunkScore = chunks.filter((chunk) => chunk.pageStart || chunk.pageEnd || chunk.sectionHeading).length * 150;
+    const contextScore = attachment.chatContextText?.trim()
+        ? Math.min(attachment.chatContextText.length, 60_000) / 100
+        : 0;
+    const warningPenalty = attachment.status === 'partial' ? -20 : 0;
+    return chunkScore + citedChunkScore + contextScore + warningPenalty;
+}
+
+function mergeAttachmentContext(existing: AttachmentContext, incoming: AttachmentContext) {
+    const incomingIsRicher = attachmentContextRichness(incoming) > attachmentContextRichness(existing);
+    if (existing.uploadedFileId.toString() !== incoming.uploadedFileId.toString()) {
+        // Same storage can back multiple upload records; never mix chunk/source IDs across those records.
+        if (existing.source === 'current_turn' || incoming.source === 'current_turn') {
+            return existing.source === 'current_turn' ? existing : incoming;
+        }
+        return incomingIsRicher ? incoming : existing;
+    }
+
+    const richer = incomingIsRicher ? incoming : existing;
+    const fallback = incomingIsRicher ? existing : incoming;
+    const mergedChunks = new Map<string, DocumentChunkContext>();
+    for (const chunk of [...(fallback.documentChunks ?? []), ...(richer.documentChunks ?? [])]) {
+        const chunkId = chunk.chunkId.toString();
+        const previous = mergedChunks.get(chunkId);
+        if (!previous) {
+            mergedChunks.set(chunkId, chunk);
+            continue;
+        }
+        mergedChunks.set(chunkId, {
+            ...(chunk.retrievalScore > previous.retrievalScore ? chunk : previous),
+            retrievalScore: Math.max(previous.retrievalScore, chunk.retrievalScore),
+            retrievalReasons: Array.from(new Set([...previous.retrievalReasons, ...chunk.retrievalReasons])),
+        });
+    }
+
+    const contextSource = richer.chatContextText?.trim() ? richer : fallback;
+
+    return {
+        ...fallback,
+        ...richer,
+        source: existing.source === 'current_turn' || incoming.source === 'current_turn'
+            ? 'current_turn'
+            : richer.source ?? fallback.source,
+        chatContextText: contextSource.chatContextText,
+        chatContextCharCount: contextSource.chatContextCharCount ?? contextSource.chatContextText?.length,
+        contextTruncated: contextSource.contextTruncated,
+        documentChunks: Array.from(mergedChunks.values()).sort(
+            (a, b) => b.retrievalScore - a.retrievalScore || a.chunkIndex - b.chunkIndex
+        ),
+    };
 }
 
 function buildRetrievedChunkPrompt(chunks: DocumentChunkContext[]) {
@@ -470,20 +583,23 @@ function selectAttachmentContextsForPrompt(
     routeMode: RouteMode
 ) {
     const selected: AttachmentContext[] = [];
-    const selectedIds = new Set<string>();
-    const selectedIdentityKeys = new Set<string>();
-    const addAttachment = (attachment: AttachmentContext) => {
+    const addAttachment = (attachment: AttachmentContext, allowNew: boolean) => {
         const uploadedFileId = attachment.uploadedFileId.toString();
         const identityKey = attachmentIdentityKey(attachment);
-        if (selectedIds.has(uploadedFileId) || selectedIdentityKeys.has(identityKey)) return;
+        const existingIndex = selected.findIndex((existing) =>
+            existing.uploadedFileId.toString() === uploadedFileId ||
+            attachmentIdentityKey(existing) === identityKey
+        );
+        if (existingIndex >= 0) {
+            selected[existingIndex] = mergeAttachmentContext(selected[existingIndex], attachment);
+            return;
+        }
+        if (!allowNew) return;
         selected.push(attachment);
-        selectedIds.add(uploadedFileId);
-        selectedIdentityKeys.add(identityKey);
     };
 
     for (const attachment of context.attachmentContexts ?? []) {
-        if (selected.length >= 3) break;
-        addAttachment(attachment);
+        addAttachment(attachment, selected.length < 3);
     }
 
     const availableDocuments = context.availableDocumentContexts ?? [];
@@ -496,11 +612,8 @@ function selectAttachmentContextsForPrompt(
 
     if (!shouldLoadStoredDocuments) return selected;
 
-    if (selected.length >= 3) return selected;
-
     for (const attachment of availableDocuments) {
-        addAttachment(attachment);
-        if (selected.length >= 3) break;
+        addAttachment(attachment, selected.length < 3);
     }
 
     return selected;
@@ -618,16 +731,34 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
     const preservePastedHistory = messageExplicitlyRequestsPastedDocumentText(context.turn.message);
 
     const recentMessagesWithMetadata = context.recentMessages
-        .filter((message) => message.status !== 'draft' && message.status !== 'deleted')
+        .filter((message) =>
+            message.status === undefined ||
+            message.status === 'committed' ||
+            message.status === 'degraded'
+        )
         .slice(-20)
         .map((message) => ({
             turnId: message.turnId,
             role: message.role,
             content: message.content,
+            status: message.status,
         }));
 
-    if (!recentMessagesWithMetadata.some((message) => message.role === 'user' && message.turnId === context.turn._id)) {
-        recentMessagesWithMetadata.push({ turnId: context.turn._id, role: 'user', content: context.turn.message });
+    const hasCurrentTurn =
+        context.turn._id !== undefined &&
+        recentMessagesWithMetadata.some((message) =>
+            message.role === 'user' &&
+            message.turnId === context.turn._id &&
+            (message.status === undefined || message.status === 'committed' || message.status === 'degraded')
+        );
+
+    if (!hasCurrentTurn) {
+        recentMessagesWithMetadata.push({
+            turnId: context.turn._id,
+            role: 'user',
+            content: context.turn.message,
+            status: 'committed',
+        });
     }
 
     const recentMessages = toProviderInputMessages(prepareRecentMessagesForDocumentRecall(
@@ -872,7 +1003,15 @@ async function generateWithFallbacks({
                 ].join('\n\n'),
                 userPayload: { message: context.turn.message },
                 model: step.model,
+                requestOptions: { timeout: PROVIDER_TIMEOUT_MS, maxRetries: 0 },
             });
+
+            if (recoveryResult.stage === 'fallback') {
+                lastError = new Error(
+                    'structured_output_recovery_failed: Provider response could not be parsed into the required schema.'
+                );
+                continue;
+            }
 
             const parsedResponse = suppressWeakArtifacts(recoveryResult.data);
             parsedResponse.message = polishLegalResponse(parsedResponse.message);
@@ -954,19 +1093,23 @@ export const processChatGenerationJob = internalAction({
 
                 if (lease.turnId) {
                     try {
-                        await ctx.runMutation(internal.chatTurns.recordDocumentRetrievalAudit, {
+                        await ctx.runMutation(internal.chatTurns.recordRetrievalRun, {
                             turnId: lease.turnId,
-                            detectionResultJson: JSON.stringify(documentReference),
-                            candidateUploadedFileIds: context.documentAmbiguity.options.map(
-                                (option) => option.uploadedFileId as Id<'uploadedFiles'>
-                            ),
-                            selectedUploadedFileIds: [],
-                            selectedChunkIds: [],
-                            selectedContextCount: 0,
-                            retrievalReason: 'ambiguous_document_selection',
+                            queryType: retrievalQueryTypeForDetection(documentReference, 'document_analysis'),
+                            filtersJson: JSON.stringify({
+                                candidateUploadedFileIds: context.documentAmbiguity.options.map(
+                                    (option) => option.uploadedFileId
+                                ),
+                                ambiguity: 'requires_clarification',
+                            }),
+                            vectorResultCount: 0,
+                            keywordResultCount: 0,
+                            exactMatchResultCount: 0,
+                            finalContextChunkIds: [],
+                            citationVerifierPassed: false,
                         });
                     } catch (auditError) {
-                        console.error('[ChatWorker] Failed to record ambiguous document retrieval audit', auditError);
+                        console.error('[ChatWorker] Failed to record ambiguous document retrieval run', auditError);
                     }
                 }
 
@@ -991,11 +1134,31 @@ export const processChatGenerationJob = internalAction({
                 errorMessage: result.errorMessage,
             });
 
-            if (lease.turnId && result.attachmentContexts.length > 0) {
-                try {
-                    const usedChunkIds = uniqueDocumentChunkIds(result.attachmentContexts);
-                    if (!result.degraded && completion?.assistantMessageId) {
-                        await ctx.runMutation(internal.chatTurns.recordDocumentAnswerEvidence, {
+            const shouldRecordDocumentRetrievalRun = Boolean(
+                lease.turnId &&
+                (
+                    result.attachmentContexts.length > 0 ||
+                    result.documentReference.referencesDocument ||
+                    (context.attachmentContexts?.length ?? 0) > 0
+                )
+            );
+
+            if (lease.turnId && shouldRecordDocumentRetrievalRun) {
+                const usedChunkIds = uniqueDocumentChunkIds(result.attachmentContexts);
+                const auditRouterResult = classifyMessage(context.turn.message);
+                const auditRouteMode = (context.turn.routeMode ?? auditRouterResult.mode) as RouteMode;
+                const selectedUploadedFileIds = result.attachmentContexts.map((attachment) => attachment.uploadedFileId);
+                const candidateUploadedFileIds = [
+                    ...new Set([
+                        ...(context.attachmentContexts ?? []).map((attachment) => attachment.uploadedFileId),
+                        ...(context.availableDocumentContexts ?? []).map((attachment) => attachment.uploadedFileId),
+                    ]),
+                ];
+
+                let citationVerifierPassed = false;
+                if (result.attachmentContexts.length > 0 && !result.degraded && completion?.assistantMessageId) {
+                    try {
+                        const evidenceResult = await ctx.runMutation(internal.chatTurns.recordDocumentAnswerEvidence, {
                             turnId: lease.turnId,
                             assistantMessageId: completion.assistantMessageId,
                             usedChunkIds,
@@ -1009,36 +1172,56 @@ export const processChatGenerationJob = internalAction({
                                 contextTruncated: attachment.contextTruncated,
                             })),
                         });
+                        citationVerifierPassed = usedChunkIds.length > 0 && Boolean(evidenceResult?.sourceCount);
+                    } catch (evidenceError) {
+                        console.error('[ChatWorker] Failed to record document answer evidence', evidenceError);
                     }
+                }
 
-                    const auditRouteMode = (context.turn.routeMode ??
-                        (result.documentReference.referencesDocument ? 'document_analysis' : 'adaptive_chat')) as RouteMode;
-                    const selectedUploadedFileIds = result.attachmentContexts.map((attachment) => attachment.uploadedFileId);
-                    const candidateUploadedFileIds = [
-                        ...new Set([
-                            ...(context.attachmentContexts ?? []).map((attachment) => attachment.uploadedFileId),
-                            ...(context.availableDocumentContexts ?? []).map((attachment) => attachment.uploadedFileId),
-                        ]),
-                    ];
-                    await ctx.runMutation(internal.chatTurns.recordDocumentRetrievalAudit, {
+                if (result.attachmentContexts.length > 0) {
+                    try {
+                        await ctx.runMutation(internal.chatTurns.recordDocumentRetrievalAudit, {
+                            turnId: lease.turnId,
+                            detectionResultJson: JSON.stringify(result.documentReference),
+                            candidateUploadedFileIds,
+                            selectedUploadedFileIds,
+                            selectedChunkIds: usedChunkIds,
+                            selectedContextCount: result.attachmentContexts.length,
+                            retrievalReason: determineRetrievalReason(
+                                result.attachmentContexts,
+                                result.documentReference,
+                                auditRouteMode
+                            ),
+                        });
+                    } catch (auditError) {
+                        console.error('[ChatWorker] Failed to record document retrieval audit', auditError);
+                    }
+                }
+
+                try {
+                    await ctx.runMutation(internal.chatTurns.recordRetrievalRun, {
                         turnId: lease.turnId,
-                        detectionResultJson: JSON.stringify(result.documentReference),
-                        candidateUploadedFileIds,
-                        selectedUploadedFileIds,
-                        selectedChunkIds: usedChunkIds,
-                        selectedContextCount: result.attachmentContexts.length,
-                        retrievalReason: determineRetrievalReason(
-                            result.attachmentContexts,
-                            result.documentReference,
-                            auditRouteMode
-                        ),
+                        queryType: result.attachmentContexts.length > 0
+                            ? retrievalQueryTypeForDetection(result.documentReference, auditRouteMode)
+                            : 'not_found',
+                        filtersJson: JSON.stringify({
+                            candidateUploadedFileIds: candidateUploadedFileIds.map((id) => id.toString()),
+                            selectedUploadedFileIds: selectedUploadedFileIds.map((id) => id.toString()),
+                            routeMode: auditRouteMode,
+                        }),
+                        ...documentRetrievalRunCounts(result.attachmentContexts),
+                        finalContextChunkIds: usedChunkIds,
+                        citationVerifierPassed,
                     });
                 } catch (auditError) {
-                    console.error('[ChatWorker] Failed to record document retrieval audit', auditError);
+                    console.error('[ChatWorker] Failed to record document retrieval run', auditError);
                 }
             }
         } catch (error) {
-            const normalized = normalizeProviderError(error);
+            const normalized = {
+                code: 'worker_internal_error',
+                message: 'The response worker failed before completion.',
+            };
             await ctx.runMutation(internal.chatTurns.completeAssistant, {
                 jobId: args.jobId,
                 leaseOwner,

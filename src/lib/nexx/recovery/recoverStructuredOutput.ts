@@ -27,6 +27,10 @@ interface RetryConfig {
   developerPrompt: string;
   userPayload: { message: string };
   model: string;
+  requestOptions?: {
+    timeout?: number;
+    maxRetries?: number;
+  };
 }
 
 /**
@@ -64,18 +68,21 @@ export async function recoverStructuredOutput(
   if (retryConfig) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const retryResponse = await (openai.responses as any).create({
-        model: retryConfig.model,
-        input: [
-          { role: 'system', content: retryConfig.systemPrompt },
-          { role: 'developer', content: retryConfig.developerPrompt },
-          {
-            role: 'user',
-            content: `The previous response was not valid JSON. Please answer this question again with properly structured JSON output:\n\n${retryConfig.userPayload.message}`,
-          },
-        ],
-        text: { format: NEXX_RESPONSE_SCHEMA },
-      });
+      const retryResponse = await (openai.responses as any).create(
+        {
+          model: retryConfig.model,
+          input: [
+            { role: 'system', content: retryConfig.systemPrompt },
+            { role: 'developer', content: retryConfig.developerPrompt },
+            {
+              role: 'user',
+              content: `The previous response was not valid JSON. Please answer this question again with properly structured JSON output:\n\n${retryConfig.userPayload.message}`,
+            },
+          ],
+          text: { format: NEXX_RESPONSE_SCHEMA },
+        },
+        retryConfig.requestOptions
+      );
 
       const retryText = retryResponse.output_text || retryResponse.output?.[0]?.content?.[0]?.text || '';
       const parsed = JSON.parse(retryText);

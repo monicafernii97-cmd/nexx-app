@@ -55,6 +55,14 @@ async function getOwnedSection(
   return section;
 }
 
+function isExpectedAuthError(error: unknown) {
+  return error instanceof Error && (
+    error.message === 'Not authenticated' ||
+    error.message === 'User not found' ||
+    error.message === 'Not authorized'
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Create
 // ═══════════════════════════════════════════════════════════════
@@ -107,8 +115,9 @@ export const listBySection = query({
     try {
       user = await getAuthenticatedUser(ctx);
       await getOwnedSection(ctx, args.documentId, args.sectionId, user._id);
-    } catch {
-      return [];
+    } catch (error) {
+      if (isExpectedAuthError(error)) return [];
+      throw error;
     }
 
     return await ctx.db
@@ -128,8 +137,9 @@ export const listByDocument = query({
     try {
       user = await getAuthenticatedUser(ctx);
       await getOwnedDraft(ctx, args.documentId, user._id);
-    } catch {
-      return [];
+    } catch (error) {
+      if (isExpectedAuthError(error)) return [];
+      throw error;
     }
 
     return await ctx.db

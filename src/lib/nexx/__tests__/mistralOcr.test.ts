@@ -91,10 +91,10 @@ describe('mistralOcr', () => {
     const result = await extractPdfTextWithMistralOcr({
       buffer: Buffer.from('%PDF-1.7\nbody'),
       filename: 'order.pdf',
-      mimeType: 'application/pdf',
+      mimeType: 'application/octet-stream',
     });
 
-    expect(result.text).toContain('[Page 0]');
+    expect(result.text).toContain('[Page 1]');
     expect(result.text).toContain('Father shall pay support by Friday.');
     expect(result.method).toBe('mistral_ocr_4');
     expect(result.ocrProvider).toBe('mistral');

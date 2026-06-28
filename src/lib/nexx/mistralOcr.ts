@@ -110,7 +110,7 @@ function countPageItems<T extends 'blocks' | 'tables'>(pages: MistralOcrPage[], 
 }
 
 function buildPageText(page: MistralOcrPage) {
-  const pageNumber = typeof page.index === 'number' ? page.index : undefined;
+  const pageNumber = typeof page.index === 'number' ? page.index + 1 : undefined;
   const content = normalizeText(page.markdown ?? page.text ?? '');
   const header = normalizeText(page.header ?? '');
   const footer = normalizeText(page.footer ?? '');
@@ -190,7 +190,6 @@ export async function extractPdfTextWithMistralOcr(args: {
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
-  const mimeType = args.mimeType || 'application/pdf';
   const startedAt = Date.now();
 
   try {
@@ -204,7 +203,7 @@ export async function extractPdfTextWithMistralOcr(args: {
         model: config.model,
         document: {
           type: 'document_url',
-          document_url: `data:${mimeType};base64,${args.buffer.toString('base64')}`,
+          document_url: `data:application/pdf;base64,${args.buffer.toString('base64')}`,
         },
         include_blocks: true,
         table_format: 'html',

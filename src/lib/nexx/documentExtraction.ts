@@ -299,6 +299,7 @@ export async function extractDocumentText(
           return {
             text,
             method: 'pdf_text',
+            ocrAttempted: true,
             detectedType: detection.detectedType,
             warnings: [
               ...detection.warnings,

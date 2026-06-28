@@ -75,6 +75,21 @@ async function getOwnedSession(
   return { clerkUserId, session };
 }
 
+async function hasRetryableIndexingPartial(
+  ctx: QueryCtx | MutationCtx,
+  session: Doc<'chatUploadSessions'>,
+) {
+  if (session.status !== 'partial' || !session.uploadedFileId || !session.storageId) return false;
+  const uploadedFile = await ctx.db.get(session.uploadedFileId);
+  return Boolean(
+    uploadedFile &&
+    uploadedFile.uploadSessionId === session._id &&
+    uploadedFile.storageId === session.storageId &&
+    uploadedFile.status === 'partial' &&
+    uploadedFile.indexingError
+  );
+}
+
 async function validateScope(
   ctx: QueryCtx | MutationCtx,
   args: {
@@ -521,7 +536,8 @@ export const retryProcessing = mutation({
   handler: async (ctx, args) => {
     const { session } = await getOwnedSession(ctx, args.uploadSessionId);
     if (!session.storageId) throw new Error('No stored file is available to process.');
-    if (!retryableProcessingStatuses.has(session.status)) {
+    const retryableIndexingPartial = await hasRetryableIndexingPartial(ctx, session);
+    if (!retryableProcessingStatuses.has(session.status) && !retryableIndexingPartial) {
       if (terminalSuccessStatuses.has(session.status)) {
         return { uploadSessionId: args.uploadSessionId, status: session.status };
       }
@@ -621,7 +637,8 @@ export const claimProcessingLock = internalMutation({
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.uploadSessionId);
     if (!session) return { status: 'missing' as const };
-    if (terminalSuccessStatuses.has(session.status)) {
+    const retryableIndexingPartial = await hasRetryableIndexingPartial(ctx, session);
+    if (terminalSuccessStatuses.has(session.status) && !retryableIndexingPartial) {
       return { status: 'already_done' as const, uploadedFileId: session.uploadedFileId };
     }
     if (!session.storageId) return { status: 'missing_storage' as const };
@@ -633,7 +650,11 @@ export const claimProcessingLock = internalMutation({
       now - session.processingStartedAt < CHAT_UPLOAD_CONFIG.processingStaleAfterMs;
     if (freshProcessing) return { status: 'already_processing' as const };
 
-    if (!retryableProcessingStatuses.has(session.status) && session.status !== 'awaiting_storage_upload') {
+    if (
+      !retryableProcessingStatuses.has(session.status) &&
+      !retryableIndexingPartial &&
+      session.status !== 'awaiting_storage_upload'
+    ) {
       return { status: 'not_retryable' as const, currentStatus: session.status };
     }
     if (session.processingAttempt >= CHAT_UPLOAD_CONFIG.maxProcessingAttempts) {

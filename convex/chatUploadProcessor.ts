@@ -96,34 +96,110 @@ function chunkArray<T>(items: T[], batchSize: number) {
   return batches;
 }
 
+function extractionAttemptExtractor(args: {
+  detectedType?: string;
+  extension: string;
+}): 'native_pdf' | 'native_docx' | 'native_txt' | 'manual_upload' {
+  const type = (args.detectedType || args.extension).toLowerCase();
+  if (type === 'pdf') return 'native_pdf';
+  if (type === 'docx') return 'native_docx';
+  if (type === 'txt' || type === 'text') return 'native_txt';
+  return 'manual_upload';
+}
+
 async function writeDocumentMemoryArtifacts(
   ctx: ActionCtx,
+  context: ProcessingContext,
   uploadedFileId: Id<'uploadedFiles'>,
   artifacts: DocumentMemoryArtifacts,
+  extraction: DocumentExtractionResult,
+  extractionStartedAt: number,
 ) {
   const batchSize = 40;
-  await ctx.runMutation(internal.documentMemory.resetDocumentMemory, { uploadedFileId });
-
-  for (const pages of chunkArray(artifacts.pages, batchSize)) {
-    await ctx.runMutation(internal.documentMemory.insertDocumentPageBatch, {
-      uploadedFileId,
-      pages,
-    });
-  }
-
-  for (const chunks of chunkArray(artifacts.chunks, batchSize)) {
-    await ctx.runMutation(internal.documentMemory.insertDocumentChunkBatch, {
-      uploadedFileId,
-      chunks,
-    });
-  }
-
-  await ctx.runMutation(internal.documentMemory.finalizeDocumentMemory, {
+  const generation = await ctx.runMutation(internal.documentMemoryGenerations.createGeneration, {
     uploadedFileId,
-    pageCount: artifacts.pages.length,
-    chunkCount: artifacts.chunks.length,
-    chunkingVersion: artifacts.chunkingVersion,
-  });
+    reason: 'initial_upload',
+    sourceFileHash: context.session.storageSha256,
+    pagesExpected: extraction.pagesTotal ?? artifacts.pages.length,
+    warnings: artifacts.warnings,
+    extractionPlan: {
+      nativeExtraction: true,
+      mistralOcr: false,
+      includeBlocks: false,
+    },
+  }) as {
+    memoryGenerationId: Id<'documentMemoryGenerations'>;
+    generationNumber: number;
+  };
+  let generationMarkedFailed = false;
+
+  try {
+    await ctx.runMutation(internal.documentMemoryGenerations.recordExtractionAttempt, {
+      uploadedFileId,
+      memoryGenerationId: generation.memoryGenerationId,
+      extractor: extractionAttemptExtractor({
+        detectedType: extraction.detectedType,
+        extension: context.session.extension,
+      }),
+      extractorVersion: buildExtractionVersion(),
+      provider: 'internal',
+      status: artifacts.pages.length > 0 && artifacts.chunks.length > 0 ? 'succeeded' : 'empty',
+      startedAt: extractionStartedAt,
+      finishedAt: Date.now(),
+      pageCountAttempted: extraction.pagesTotal ?? artifacts.pages.length,
+      pageCountSucceeded: extraction.pagesOcrProcessed ?? artifacts.pages.length,
+      warnings: extraction.warnings ?? [],
+      errorCode: extraction.errorCode,
+      errorMessage: extraction.error,
+      usageBytes: context.session.byteSize,
+      requestConfigRedacted: {
+        detectedType: extraction.detectedType,
+        extractionMethod: extraction.method,
+        ocrAttempted: extraction.ocrAttempted ?? false,
+      },
+    });
+
+    for (const pages of chunkArray(artifacts.pages, batchSize)) {
+      await ctx.runMutation(internal.documentMemory.insertDocumentPageBatch, {
+        uploadedFileId,
+        memoryGenerationId: generation.memoryGenerationId,
+        pages,
+      });
+    }
+
+    for (const chunks of chunkArray(artifacts.chunks, batchSize)) {
+      await ctx.runMutation(internal.documentMemory.insertDocumentChunkBatch, {
+        uploadedFileId,
+        memoryGenerationId: generation.memoryGenerationId,
+        chunks,
+      });
+    }
+
+    const activation = await ctx.runMutation(internal.documentMemoryGenerations.validateAndActivateGeneration, {
+      uploadedFileId,
+      memoryGenerationId: generation.memoryGenerationId,
+      pageCount: artifacts.pages.length,
+      chunkCount: artifacts.chunks.length,
+      chunkingVersion: artifacts.chunkingVersion,
+      warnings: artifacts.warnings,
+    }) as { activated: boolean; failedChecks: string[] };
+
+    if (!activation.activated) {
+      generationMarkedFailed = true;
+      throw new Error(`Document memory generation validation failed: ${activation.failedChecks.join(', ')}`);
+    }
+  } catch (error) {
+    if (!generationMarkedFailed) {
+      await ctx.runMutation(internal.documentMemoryGenerations.failGeneration, {
+        uploadedFileId,
+        memoryGenerationId: generation.memoryGenerationId,
+        failedReason: error instanceof Error ? error.message : String(error),
+      });
+    }
+    throw error;
+  }
+
+  return generation;
 }
 
 function getLegacyDocWorkerConfig() {
@@ -383,6 +459,7 @@ export const processStoredUpload = internalAction({
 
       const buffer = Buffer.from(await blob.arrayBuffer());
       const file = buildProcessingFile(new Blob([buffer], { type: context.session.mimeType }), context.session.filename, context.session.mimeType);
+      const extractionStartedAt = Date.now();
       const extraction = await extractStoredDocument(ctx, context, file, buffer);
       const extractedText = extraction.text?.trim() ?? '';
 
@@ -493,7 +570,7 @@ export const processStoredUpload = internalAction({
       let memoryIndexingError: string | undefined;
       try {
         const documentMemory = buildDocumentMemoryArtifacts(extractedText);
-        await writeDocumentMemoryArtifacts(ctx, uploadedFileId, documentMemory);
+        await writeDocumentMemoryArtifacts(ctx, context, uploadedFileId, documentMemory, extraction, extractionStartedAt);
         console.info('[ChatUpload] document memory indexed', {
           uploadSessionId: args.uploadSessionId,
           uploadedFileId,

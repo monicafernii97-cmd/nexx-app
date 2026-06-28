@@ -1,5 +1,6 @@
-import { internalMutation } from './_generated/server';
+import { internalMutation, type MutationCtx } from './_generated/server';
 import { v } from 'convex/values';
+import type { Id } from './_generated/dataModel';
 
 const DOCUMENT_MEMORY_BATCH_LIMIT = 50;
 const DOCUMENT_MEMORY_RESET_BATCH_LIMIT = 100;
@@ -62,6 +63,63 @@ function assertChunkRange(chunk: {
   }
 }
 
+function canonicalSourceForUploadedFile(uploadedFile: {
+  ocrAttempted?: boolean;
+  extractionMethod?: string;
+}) {
+  if (uploadedFile.extractionMethod?.toLowerCase().includes('ocr') || uploadedFile.ocrAttempted) {
+    return 'ocr' as const;
+  }
+  return 'native' as const;
+}
+
+function buildCitationLabel(filename: string, chunk: {
+  chunkIndex: number;
+  pageStart?: number;
+  pageEnd?: number;
+  sectionHeading?: string;
+}) {
+  const pageLabel = chunk.pageStart !== undefined && chunk.pageEnd !== undefined
+    ? chunk.pageStart === chunk.pageEnd
+      ? `p. ${chunk.pageStart}`
+      : `pp. ${chunk.pageStart}-${chunk.pageEnd}`
+    : 'stored text';
+  return [
+    filename,
+    pageLabel,
+    chunk.sectionHeading,
+    `chunk ${chunk.chunkIndex + 1}`,
+  ].filter(Boolean).join(', ');
+}
+
+function retrievalMetadataForText(text: string) {
+  return {
+    containsTable: /\|.+\||\t/.test(text),
+    containsSignature: /\b(signature|signed|judge|notary)\b/i.test(text),
+    containsDate: /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(text),
+    containsDeadline: /\b(deadline|due|within|no later than|on or before|shall file|shall serve)\b/i.test(text),
+    containsMoney: /\$\s?\d|\b(?:dollars|fees|payment|arrears|support)\b/i.test(text),
+    containsPartyName: /\b(?:petitioner|respondent|father|mother|parent|plaintiff|defendant)\b/i.test(text),
+    containsOrderLanguage: /\b(?:ordered|shall|must|restrained|granted|denied|injunction)\b/i.test(text),
+  };
+}
+
+async function getOptionalGeneration(
+  ctx: MutationCtx,
+  uploadedFileId: Id<'uploadedFiles'>,
+  memoryGenerationId?: Id<'documentMemoryGenerations'>,
+) {
+  if (!memoryGenerationId) return null;
+  const generation = await ctx.db.get(memoryGenerationId);
+  if (!generation || generation.uploadedFileId !== uploadedFileId) {
+    throw new Error('Document memory generation not found for uploaded file');
+  }
+  if (generation.status !== 'building') {
+    throw new Error(`Cannot write document memory artifacts to ${generation.status} generation`);
+  }
+  return generation;
+}
+
 export const resetDocumentMemory = internalMutation({
   args: {
     uploadedFileId: v.id('uploadedFiles'),
@@ -69,6 +127,9 @@ export const resetDocumentMemory = internalMutation({
   handler: async (ctx, args) => {
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
     if (!uploadedFile) throw new Error('Uploaded file not found');
+    if (uploadedFile.activeMemoryGenerationId) {
+      throw new Error('Cannot reset generation-aware document memory; retire or replace a generation instead');
+    }
 
     let deletedPages = 0;
     while (true) {
@@ -109,23 +170,35 @@ export const resetDocumentMemory = internalMutation({
 export const insertDocumentPageBatch = internalMutation({
   args: {
     uploadedFileId: v.id('uploadedFiles'),
+    memoryGenerationId: v.optional(v.id('documentMemoryGenerations')),
     pages: v.array(pageArtifactValidator),
   },
   handler: async (ctx, args) => {
     assertBatchSize(args.pages.length);
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
     if (!uploadedFile) throw new Error('Uploaded file not found');
+    await getOptionalGeneration(ctx, args.uploadedFileId, args.memoryGenerationId);
     const now = Date.now();
+    const canonicalSource = canonicalSourceForUploadedFile(uploadedFile);
 
     for (const page of args.pages) {
       await ctx.db.insert('documentPages', {
         uploadedFileId: args.uploadedFileId,
+        memoryGenerationId: args.memoryGenerationId,
+        orgId: uploadedFile.orgId,
+        accountId: uploadedFile.accountId,
+        matterId: uploadedFile.matterId,
         clerkUserId: uploadedFile.clerkUserId,
         conversationId: uploadedFile.conversationId,
         caseId: uploadedFile.caseId,
         pageNumber: page.pageNumber,
+        sourcePageIndex: page.pageNumber - 1,
         text: page.text,
         textLength: page.textLength,
+        nativeText: canonicalSource === 'native' ? page.text : undefined,
+        ocrMarkdown: canonicalSource === 'ocr' ? page.text : undefined,
+        canonicalText: page.text,
+        canonicalSource,
         extractionMethod: uploadedFile.extractionMethod,
         warnings: page.warnings,
         isSynthetic: page.isSynthetic,
@@ -140,18 +213,24 @@ export const insertDocumentPageBatch = internalMutation({
 export const insertDocumentChunkBatch = internalMutation({
   args: {
     uploadedFileId: v.id('uploadedFiles'),
+    memoryGenerationId: v.optional(v.id('documentMemoryGenerations')),
     chunks: v.array(chunkArtifactValidator),
   },
   handler: async (ctx, args) => {
     assertBatchSize(args.chunks.length);
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
     if (!uploadedFile) throw new Error('Uploaded file not found');
+    await getOptionalGeneration(ctx, args.uploadedFileId, args.memoryGenerationId);
     const now = Date.now();
 
     for (const chunk of args.chunks) {
       assertChunkRange(chunk);
       await ctx.db.insert('documentChunks', {
         uploadedFileId: args.uploadedFileId,
+        memoryGenerationId: args.memoryGenerationId,
+        orgId: uploadedFile.orgId,
+        accountId: uploadedFile.accountId,
+        matterId: uploadedFile.matterId,
         clerkUserId: uploadedFile.clerkUserId,
         conversationId: uploadedFile.conversationId,
         caseId: uploadedFile.caseId,
@@ -160,12 +239,21 @@ export const insertDocumentChunkBatch = internalMutation({
         sectionHeading: chunk.sectionHeading,
         chunkIndex: chunk.chunkIndex,
         text: chunk.text,
+        chunkText: chunk.text,
+        normalizedText: chunk.text.replace(/\s+/g, ' ').trim(),
+        searchText: [
+          chunk.sectionHeading,
+          chunk.text,
+        ].filter(Boolean).join('\n\n'),
         textLength: chunk.textLength,
         startChar: chunk.startChar,
         endChar: chunk.endChar,
+        paragraphRange: undefined,
+        citationLabel: buildCitationLabel(uploadedFile.filename, chunk),
         tokenCount: chunk.tokenCount,
         extractionMethod: uploadedFile.extractionMethod,
         warnings: chunk.warnings,
+        retrievalMetadata: retrievalMetadataForText(chunk.text),
         createdAt: now,
       });
     }

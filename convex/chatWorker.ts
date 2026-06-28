@@ -85,36 +85,238 @@ function normalizeProviderError(error: unknown) {
     return { code: 'unknown', message, retryable: true };
 }
 
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : undefined;
+}
+
+function asString(value: unknown): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    const sanitized = sanitizePromptMetadata(value);
+    return sanitized && sanitized.length > 0 ? sanitized : undefined;
+}
+
+function asBoolean(value: unknown): boolean | undefined {
+    return typeof value === 'boolean' ? value : undefined;
+}
+
+function asStringArray(value: unknown, maxItems = 50): string[] | undefined {
+    if (!Array.isArray(value)) return undefined;
+    const items = value
+        .slice(0, maxItems)
+        .map((item) => asString(item))
+        .filter((item): item is string => Boolean(item));
+    return items.length > 0 ? items : undefined;
+}
+
+function asOpenIssueStatus(value: unknown): 'active' | 'pending' | 'resolved' | undefined {
+    return value === 'active' || value === 'pending' || value === 'resolved'
+        ? value
+        : undefined;
+}
+
+function asChildren(value: unknown): { name: string; age: number }[] | undefined {
+    if (!Array.isArray(value)) return undefined;
+    const children = value
+        .slice(0, 20)
+        .map((item) => {
+            const child = asRecord(item);
+            const name = asString(child?.name);
+            const age = child?.age;
+            if (!name || typeof age !== 'number' || !Number.isFinite(age) || age < 0) {
+                return null;
+            }
+            return { name, age };
+        })
+        .filter((child): child is { name: string; age: number } => child !== null);
+    return children.length > 0 ? children : undefined;
+}
+
+function sanitizeConversationSummary(value: unknown): ContextPacket['conversationSummary'] | undefined {
+    const summary = asRecord(value);
+    if (!summary) return undefined;
+
+    const decisions = asStringArray(summary.decisions) ?? [];
+    const keyFacts = asStringArray(summary.keyFacts) ?? [];
+    const dates = asStringArray(summary.dates) ?? [];
+    const goals = asStringArray(summary.goals) ?? [];
+    const unresolvedQuestions = asStringArray(summary.unresolvedQuestions) ?? [];
+    const turnCount =
+        typeof summary.turnCount === 'number' && Number.isFinite(summary.turnCount) && summary.turnCount >= 0
+            ? Math.floor(summary.turnCount)
+            : 0;
+
+    if (
+        decisions.length === 0 &&
+        keyFacts.length === 0 &&
+        dates.length === 0 &&
+        goals.length === 0 &&
+        unresolvedQuestions.length === 0
+    ) {
+        return undefined;
+    }
+
+    return {
+        decisions,
+        keyFacts,
+        dates,
+        goals,
+        unresolvedQuestions,
+        turnCount,
+    };
+}
+
+function sanitizeCaseGraph(value: unknown): ContextPacket['caseGraph'] | undefined {
+    const graph = asRecord(value);
+    if (!graph) return undefined;
+
+    const jurisdictionRaw = asRecord(graph.jurisdiction);
+    const jurisdiction = {
+        state: asString(jurisdictionRaw?.state),
+        county: asString(jurisdictionRaw?.county),
+        courtType: asString(jurisdictionRaw?.courtType),
+        caseNumber: asString(jurisdictionRaw?.caseNumber),
+        judgeAssigned: asString(jurisdictionRaw?.judgeAssigned),
+    };
+
+    const currentOrders = Array.isArray(graph.currentOrders)
+        ? graph.currentOrders
+            .slice(0, 25)
+            .map((item) => {
+                const order = asRecord(item);
+                const orderType = asString(order?.orderType);
+                if (!orderType) return null;
+                return {
+                    orderType,
+                    issuedDate: asString(order?.issuedDate),
+                    keyProvisions: asStringArray(order?.keyProvisions) ?? [],
+                    expiresDate: asString(order?.expiresDate),
+                };
+            })
+            .filter((item): item is NonNullable<typeof item> => item !== null)
+        : [];
+
+    const openIssues = Array.isArray(graph.openIssues)
+        ? graph.openIssues
+            .slice(0, 25)
+            .map((item) => {
+                const issue = asRecord(item);
+                const issueText = asString(issue?.issue);
+                if (!issueText) return null;
+                return {
+                    issue: issueText,
+                    userGoal: asString(issue?.userGoal),
+                    status: asOpenIssueStatus(issue?.status),
+                    pendingRelief: asString(issue?.pendingRelief),
+                };
+            })
+            .filter((item): item is NonNullable<typeof item> => item !== null)
+        : [];
+
+    const evidenceThemes = Array.isArray(graph.evidenceThemes)
+        ? graph.evidenceThemes
+            .slice(0, 25)
+            .map((item) => {
+                const theme = asRecord(item);
+                const themeText = asString(theme?.theme);
+                if (!themeText) return null;
+                return {
+                    theme: themeText,
+                    strongPoints: asStringArray(theme?.strongPoints) ?? [],
+                    weakPoints: asStringArray(theme?.weakPoints) ?? [],
+                    keyDates: asStringArray(theme?.keyDates),
+                };
+            })
+            .filter((item): item is NonNullable<typeof item> => item !== null)
+        : [];
+
+    const proceduralRaw = asRecord(graph.proceduralState);
+    const proceduralState = {
+        nextHearing: asString(proceduralRaw?.nextHearing),
+        pendingMotions: asStringArray(proceduralRaw?.pendingMotions),
+        discoveryStatus: asString(proceduralRaw?.discoveryStatus),
+        filingDeadlines: asStringArray(proceduralRaw?.filingDeadlines),
+    };
+
+    if (
+        !jurisdiction.state &&
+        !jurisdiction.county &&
+        currentOrders.length === 0 &&
+        openIssues.length === 0 &&
+        evidenceThemes.length === 0 &&
+        !proceduralState.nextHearing &&
+        !proceduralState.pendingMotions?.length
+    ) {
+        return undefined;
+    }
+
+    return {
+        jurisdiction,
+        parties: {},
+        children: [],
+        custodyStructure: {},
+        currentOrders,
+        openIssues,
+        timeline: [],
+        evidenceThemes,
+        communicationPatterns: [],
+        proceduralState,
+    };
+}
+
+function parseContextJson<T>(rawJson: string, sanitizer: (value: unknown) => T | undefined): T | undefined {
+    try {
+        return sanitizer(JSON.parse(rawJson));
+    } catch {
+        return undefined;
+    }
+}
+
 /** Convert serialized browser context into the prompt packet format. */
 function buildUserContext(rawJson?: string): ContextPacket {
     if (!rawJson) return {};
 
     try {
-        const userContext = JSON.parse(rawJson) as Record<string, unknown>;
-        const contextPacket: ContextPacket = {
-            userProfile: {
-                userName: userContext.userName as string | undefined,
-                state: userContext.state as string | undefined,
-                county: userContext.county as string | undefined,
-                custodyType: userContext.custodyType as string | undefined,
-                hasAttorney: userContext.hasAttorney as boolean | undefined,
-                children: userContext.children as { name: string; age: number }[] | undefined,
-            },
-        };
+        const userContext = asRecord(JSON.parse(rawJson));
+        if (!userContext) return {};
 
+        const userProfile = {
+            userName: asString(userContext.userName),
+            state: asString(userContext.state),
+            county: asString(userContext.county),
+            custodyType: asString(userContext.custodyType),
+            hasAttorney: asBoolean(userContext.hasAttorney),
+            children: asChildren(userContext.children),
+        };
+        const contextPacket: ContextPacket = {};
         if (
-            userContext.nexNickname ||
-            userContext.nexCommunicationStyle ||
-            userContext.nexManipulationTactics ||
-            userContext.nexTriggerPatterns ||
-            userContext.nexDetectedPatterns
+            userProfile.userName ||
+            userProfile.state ||
+            userProfile.county ||
+            userProfile.custodyType ||
+            userProfile.hasAttorney !== undefined ||
+            userProfile.children?.length
+        ) {
+            contextPacket.userProfile = userProfile;
+        }
+
+        const nexProfile = {
+            nickname: asString(userContext.nexNickname),
+            communicationStyle: asString(userContext.nexCommunicationStyle),
+            manipulationTactics: asStringArray(userContext.nexManipulationTactics),
+            triggerPatterns: asStringArray(userContext.nexTriggerPatterns),
+            detectedPatterns: asStringArray(userContext.nexDetectedPatterns),
+        };
+        if (
+            nexProfile.nickname ||
+            nexProfile.communicationStyle ||
+            nexProfile.manipulationTactics?.length ||
+            nexProfile.triggerPatterns?.length ||
+            nexProfile.detectedPatterns?.length
         ) {
             contextPacket.nexProfile = {
-                nickname: userContext.nexNickname as string | undefined,
-                communicationStyle: userContext.nexCommunicationStyle as string | undefined,
-                manipulationTactics: userContext.nexManipulationTactics as string[] | undefined,
-                triggerPatterns: userContext.nexTriggerPatterns as string[] | undefined,
-                detectedPatterns: userContext.nexDetectedPatterns as string[] | undefined,
+                ...nexProfile,
             };
         }
 
@@ -541,18 +743,16 @@ async function generateWithFallbacks({
 
     const contextPacket = buildUserContext(context.turn.userContextJson);
     if (context.summaryDoc) {
-        try {
-            contextPacket.conversationSummary = JSON.parse(context.summaryDoc.summary);
-        } catch {
-            // Ignore corrupt summary JSON.
-        }
+        contextPacket.conversationSummary = parseContextJson(
+            context.summaryDoc.summary,
+            sanitizeConversationSummary,
+        );
     }
     if (context.caseGraphDoc) {
-        try {
-            contextPacket.caseGraph = JSON.parse(context.caseGraphDoc.graphJson);
-        } catch {
-            // Ignore corrupt graph JSON.
-        }
+        contextPacket.caseGraph = parseContextJson(
+            context.caseGraphDoc.graphJson,
+            sanitizeCaseGraph,
+        );
     }
 
     const contextPrompt = buildContextPrompt(contextPacket);
@@ -602,10 +802,23 @@ async function generateWithFallbacks({
             let lastResponse: unknown = null;
             let lastDraftLength = 0;
             let lastDraftSavedAt = Date.now();
+            let completedCleanly = false;
 
             for await (const event of streamResponse) {
-                if (event.type === 'response.output_text.delta') {
-                    const delta = event.delta ?? '';
+                const streamEvent = event as {
+                    type: string;
+                    delta?: string;
+                    response?: {
+                        id?: string;
+                        status?: string;
+                        error?: { message?: string; code?: string };
+                        incomplete_details?: { reason?: string };
+                    };
+                    error?: { message?: string; code?: string };
+                    message?: string;
+                };
+                if (streamEvent.type === 'response.output_text.delta') {
+                    const delta = streamEvent.delta ?? '';
                     accumulatedText += delta;
 
                     const now = Date.now();
@@ -618,10 +831,33 @@ async function generateWithFallbacks({
                         lastDraftSavedAt = now;
                         await saveDraft(ctx, jobId, leaseOwner, accumulatedText);
                     }
-                } else if (event.type === 'response.completed') {
-                    lastResponse = event.response;
-                    responseId = event.response?.id;
+                } else if (streamEvent.type === 'response.completed') {
+                    lastResponse = streamEvent.response;
+                    responseId = streamEvent.response?.id;
+                    completedCleanly = true;
+                } else if (streamEvent.type === 'response.failed') {
+                    throw new Error(
+                        streamEvent.response?.error?.message ??
+                        `Provider stream failed${streamEvent.response?.status ? ` with status ${streamEvent.response.status}` : ''}`,
+                    );
+                } else if (streamEvent.type === 'response.incomplete') {
+                    throw new Error(
+                        `Provider stream incomplete${streamEvent.response?.incomplete_details?.reason
+                            ? `: ${streamEvent.response.incomplete_details.reason}`
+                            : ''
+                        }`,
+                    );
+                } else if (streamEvent.type === 'error') {
+                    throw new Error(
+                        streamEvent.error?.message ??
+                        streamEvent.message ??
+                        'Provider stream emitted an error event',
+                    );
                 }
+            }
+
+            if (!completedCleanly) {
+                throw new Error('Provider stream ended before completion');
             }
 
             const rawText = accumulatedText || extractOutputText(lastResponse);

@@ -4,7 +4,7 @@ import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { classifyMessage } from '@/lib/nexx/router';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
-import { getDailyLimit, getModelForRoute, type SubscriptionTier } from '@/lib/tiers';
+import { getModelForRoute, type SubscriptionTier } from '@/lib/tiers';
 
 const MAX_MESSAGE_LENGTH = 100_000;
 
@@ -223,9 +223,6 @@ export async function POST(req: NextRequest) {
   };
   const modelFeature = routeModeToFeature[routerResult.mode] ?? 'chat';
   const model = getModelForRoute(userTier, modelFeature);
-  const dailyCap = getDailyLimit(userTier, model);
-
-  const rateLimitKey = model.includes('pro') ? 'chat_message_5_4_pro' : 'chat_message_5_4';
 
   try {
     const accepted = await convex.mutation(api.chatTurns.acceptChatTurn, {
@@ -247,8 +244,6 @@ export async function POST(req: NextRequest) {
         status: attachment.status,
       })),
       persistUserMessage: persistUserMessage !== false,
-      rateLimitKey,
-      rateLimit: dailyCap,
       retryOfAssistantMessageId: retryOfAssistantMessageId
         ? (retryOfAssistantMessageId as Id<'messages'>)
         : undefined,

@@ -18,6 +18,16 @@ import {
     resolveDocumentMemorySource,
     type DocumentMemorySource,
 } from '../src/lib/nexx/documentAccess';
+import {
+    getDailyLimit,
+    PRIMARY_MODEL,
+} from '../src/lib/tiers';
+import {
+    CHAT_RATE_LIMIT_WINDOW_MS,
+    chatRateLimitKeyForModel,
+    fixedWindowStartMs,
+    userSubscriptionTier,
+} from './lib/chatRateLimitPolicy';
 
 const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
@@ -69,12 +79,6 @@ const attachmentRefValidator = v.object({
     byteSize: v.number(),
     status: v.union(v.literal('ready'), v.literal('partial')),
 });
-
-/** Return the UTC midnight timestamp that anchors daily chat quota windows. */
-function utcDayStartMs(now: number) {
-    const date = new Date(now);
-    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-}
 
 /**
  * Treat retryable failures as terminal for this worker attempt.
@@ -149,10 +153,22 @@ async function getRelevantDocumentChunkContexts(
         detection: DocumentReferenceDetection;
     }
 ) {
-    const chunks = await ctx.db
-        .query('documentChunks')
-        .withIndex('by_uploaded_file_chunk', (q) => q.eq('uploadedFileId', args.uploadedFileId))
-        .take(MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE);
+    const uploadedFile = await ctx.db.get(args.uploadedFileId);
+    if (!uploadedFile) return [];
+
+    const chunks = uploadedFile.activeMemoryGenerationId
+        ? await ctx.db
+            .query('documentChunks')
+            .withIndex('by_file_generation', (q) =>
+                q
+                    .eq('uploadedFileId', args.uploadedFileId)
+                    .eq('memoryGenerationId', uploadedFile.activeMemoryGenerationId)
+            )
+            .take(MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE)
+        : await ctx.db
+            .query('documentChunks')
+            .withIndex('by_uploaded_file_chunk', (q) => q.eq('uploadedFileId', args.uploadedFileId))
+            .take(MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE);
 
     return retrieveRelevantDocumentChunks({
         message: args.message,
@@ -162,7 +178,7 @@ async function getRelevantDocumentChunkContexts(
             chunkId: chunk._id.toString(),
             uploadedFileId: chunk.uploadedFileId.toString(),
             chunkIndex: chunk.chunkIndex,
-            text: chunk.text,
+            text: chunk.chunkText ?? chunk.text,
             textLength: chunk.textLength,
             pageStart: chunk.pageStart,
             pageEnd: chunk.pageEnd,
@@ -334,9 +350,12 @@ async function consumeTurnRateLimit(
     key: string,
     limit: number,
     now: number,
-    windowMs = ONE_DAY_MS
+    windowMs = CHAT_RATE_LIMIT_WINDOW_MS
 ) {
-    const windowStartMs = utcDayStartMs(now);
+    if (!Number.isInteger(windowMs) || windowMs <= 0) {
+        throw new Error('Rate-limit window must be a positive integer');
+    }
+    const windowStartMs = fixedWindowStartMs(now, windowMs);
     const resetInMs = Math.max(0, windowStartMs + windowMs - now);
 
     if (limit === -1) {
@@ -390,6 +409,15 @@ async function consumeTurnRateLimit(
     });
 
     return { allowed: true, current: count, limit, resetInMs };
+}
+
+function rateLimitPolicyForTurn(user: Doc<'users'>, model?: string) {
+    const resolvedModel = model || PRIMARY_MODEL;
+    return {
+        key: chatRateLimitKeyForModel(resolvedModel),
+        limit: getDailyLimit(userSubscriptionTier(user), resolvedModel),
+        windowMs: CHAT_RATE_LIMIT_WINDOW_MS,
+    };
 }
 
 /** Save a durable degraded assistant message when generation cannot complete. */
@@ -488,9 +516,6 @@ export const acceptChatTurn = mutation({
         persistUserMessage: v.optional(v.boolean()),
         retryOfAssistantMessageId: v.optional(v.id('messages')),
         editOfUserMessageId: v.optional(v.id('messages')),
-        rateLimitKey: v.optional(v.string()),
-        rateLimit: v.optional(v.number()),
-        rateLimitWindowMs: v.optional(v.number()),
         attachments: v.optional(v.array(attachmentRefValidator)),
     },
     handler: async (ctx, args) => {
@@ -547,29 +572,28 @@ export const acceptChatTurn = mutation({
             };
         }
 
-        if (args.rateLimitKey && args.rateLimit !== undefined) {
-            const rateLimit = await consumeTurnRateLimit(
-                ctx,
-                user._id,
-                args.rateLimitKey,
-                args.rateLimit,
-                now,
-                args.rateLimitWindowMs
-            );
+        const rateLimitPolicy = rateLimitPolicyForTurn(user, args.model);
+        const rateLimit = await consumeTurnRateLimit(
+            ctx,
+            user._id,
+            rateLimitPolicy.key,
+            rateLimitPolicy.limit,
+            now,
+            rateLimitPolicy.windowMs
+        );
 
-            if (!rateLimit.allowed) {
-                return {
-                    accepted: false,
-                    duplicate: false,
-                    rateLimited: true,
-                    rateLimit,
-                    turnId: null,
-                    jobId: null,
-                    status: 'rate_limited',
-                    userMessageId: null,
-                    assistantMessageId: null,
-                };
-            }
+        if (!rateLimit.allowed) {
+            return {
+                accepted: false,
+                duplicate: false,
+                rateLimited: true,
+                rateLimit,
+                turnId: null,
+                jobId: null,
+                status: 'rate_limited',
+                userMessageId: null,
+                assistantMessageId: null,
+            };
         }
 
         const turnNumber = conversation.nextTurnNumber ?? (conversation.messageCount ?? 0) + 1;

@@ -14,12 +14,12 @@ This checklist tracks the phased implementation of the legal-document evidence e
 
 ## Phase 2: Generation-Aware Processing
 
-- [ ] Create generation creation and validation mutations.
-- [ ] Write pages/chunks into hidden building generations.
-- [ ] Activate a validated generation atomically.
-- [ ] Keep the old active generation live if reprocessing fails.
-- [ ] Add migration/backfill support for current documents.
-- [ ] Add cleanup for retired generations.
+- [x] Create generation creation and validation mutations.
+- [x] Write pages/chunks into hidden building generations.
+- [x] Activate a validated generation atomically.
+- [x] Keep the old active generation live if reprocessing fails.
+- [x] Add migration/backfill support for current documents.
+- [x] Add cleanup for retired generations.
 
 ## Phase 3: Mistral OCR 4 Adapter
 

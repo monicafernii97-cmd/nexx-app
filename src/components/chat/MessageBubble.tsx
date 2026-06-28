@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Check, ArrowsClockwise, PencilSimple, X, PaperPlaneRight, CaretDown, Scales, Sword, FileText, CalendarBlank, ListBullets } from '@phosphor-icons/react';
+import { Copy, Check, ArrowsClockwise, PencilSimple, X, PaperPlaneRight, CaretDown, Scales, Sword, FileText, CalendarBlank, ListBullets, Quotes, ShieldCheck, WarningCircle } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, useCallback, useMemo, useId } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -42,6 +42,20 @@ type DocumentSourceMetadata = {
     extractionMethod?: string;
     contextCharCount?: number;
     contextTruncated?: boolean;
+};
+
+type DocumentCitationMetadata = {
+    chatAnswerSourceId: string;
+    uploadedFileId: string;
+    filename: string;
+    chunkId: string;
+    memoryGenerationId?: string;
+    pageStart?: number;
+    pageEnd?: number;
+    pageLabel?: string;
+    citationLabel?: string;
+    quotedText: string;
+    citationVerifierStatus: 'verified' | 'partial' | 'failed';
 };
 
 // ── Shared action button (declared OUTSIDE render to satisfy react-hooks/static-components) ──
@@ -97,6 +111,47 @@ function getDocumentSources(metadata: unknown) {
     }).slice(0, 4);
 }
 
+function getDocumentCitations(metadata: unknown) {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return [];
+    const rawCitations = (metadata as Record<string, unknown>).documentCitations;
+    if (!Array.isArray(rawCitations)) return [];
+
+    return rawCitations.flatMap((citation): DocumentCitationMetadata[] => {
+        if (!citation || typeof citation !== 'object' || Array.isArray(citation)) return [];
+        const record = citation as Record<string, unknown>;
+        if (
+            typeof record.chatAnswerSourceId !== 'string' ||
+            typeof record.uploadedFileId !== 'string' ||
+            typeof record.filename !== 'string' ||
+            typeof record.chunkId !== 'string' ||
+            typeof record.quotedText !== 'string'
+        ) {
+            return [];
+        }
+        const rawStatus = typeof record.citationVerifierStatus === 'string'
+            ? record.citationVerifierStatus
+            : undefined;
+        const status: DocumentCitationMetadata['citationVerifierStatus'] =
+            rawStatus === 'verified' || rawStatus === 'partial' || rawStatus === 'failed'
+                ? rawStatus
+                : 'failed';
+
+        return [{
+            chatAnswerSourceId: record.chatAnswerSourceId,
+            uploadedFileId: record.uploadedFileId,
+            filename: record.filename,
+            chunkId: record.chunkId,
+            memoryGenerationId: typeof record.memoryGenerationId === 'string' ? record.memoryGenerationId : undefined,
+            pageStart: typeof record.pageStart === 'number' ? record.pageStart : undefined,
+            pageEnd: typeof record.pageEnd === 'number' ? record.pageEnd : undefined,
+            pageLabel: typeof record.pageLabel === 'string' ? record.pageLabel : undefined,
+            citationLabel: typeof record.citationLabel === 'string' ? record.citationLabel : undefined,
+            quotedText: record.quotedText,
+            citationVerifierStatus: status as DocumentCitationMetadata['citationVerifierStatus'],
+        }];
+    }).slice(0, 12);
+}
+
 function getUsedChunkCount(metadata: unknown) {
     if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return 0;
     const rawChunkIds = (metadata as Record<string, unknown>).usedDocumentChunkIds;
@@ -112,16 +167,27 @@ function getSourceLabel(source: DocumentSourceMetadata['source']) {
     return 'Uploaded now';
 }
 
-function DocumentSourcesStrip({
+function statusLabel(status: DocumentCitationMetadata['citationVerifierStatus']) {
+    if (status === 'partial') return 'Partial';
+    if (status === 'failed') return 'Unverified';
+    return 'Verified';
+}
+
+function DocumentEvidencePanel({
     sources,
+    citations,
     chunkCount,
     isLight,
 }: {
     sources: DocumentSourceMetadata[];
+    citations: DocumentCitationMetadata[];
     chunkCount: number;
     isLight: boolean;
 }) {
-    if (sources.length === 0) return null;
+    const [openCitationId, setOpenCitationId] = useState<string | null>(null);
+    const verifiedCitationCount = citations.filter((citation) => citation.citationVerifierStatus === 'verified').length;
+
+    if (sources.length === 0 && citations.length === 0 && chunkCount === 0) return null;
 
     return (
         <div className={`mt-3 rounded-lg border px-3 py-2 ${isLight
@@ -130,12 +196,68 @@ function DocumentSourcesStrip({
             }`}>
             <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
                 <span className={isLight ? 'text-blue-700' : 'text-sky-200'}>Sources</span>
-                {chunkCount > 0 && (
+                {citations.length > 0 ? (
+                    <span className={isLight ? 'text-blue-500' : 'text-sky-200/70'}>
+                        {verifiedCitationCount === citations.length
+                            ? `${citations.length} verified citation${citations.length === 1 ? '' : 's'}`
+                            : `${verifiedCitationCount} verified / ${citations.length} citation${citations.length === 1 ? '' : 's'}`}
+                    </span>
+                ) : chunkCount > 0 && (
                     <span className={isLight ? 'text-blue-500' : 'text-sky-200/70'}>
                         {chunkCount} retrieved chunk{chunkCount === 1 ? '' : 's'}
                     </span>
                 )}
             </div>
+            {citations.length > 0 && (
+                <div className="mt-2 space-y-2">
+                    {citations.map((citation, index) => {
+                        const citationId = `${citation.chatAnswerSourceId}:${citation.chunkId}`;
+                        const isOpen = openCitationId === citationId;
+                        const status = statusLabel(citation.citationVerifierStatus);
+                        return (
+                            <div
+                                key={citationId}
+                                className={`rounded-md border ${isLight ? 'border-blue-200 bg-white' : 'border-white/10 bg-white/10'}`}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenCitationId(isOpen ? null : citationId)}
+                                    className={`flex w-full items-start gap-2 px-2.5 py-2 text-left text-xs transition-colors ${isLight ? 'text-blue-950 hover:bg-blue-50' : 'text-white hover:bg-white/10'}`}
+                                    aria-expanded={isOpen}
+                                >
+                                    <Quotes size={14} weight="duotone" className="mt-0.5 shrink-0" />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate font-semibold">
+                                            {index + 1}. {citation.filename}
+                                        </span>
+                                        <span className={isLight ? 'text-blue-500' : 'text-white/55'}>
+                                            {citation.citationLabel || citation.pageLabel || 'Page metadata unavailable'}
+                                        </span>
+                                    </span>
+                                    <span className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${citation.citationVerifierStatus === 'failed'
+                                        ? isLight ? 'bg-rose-100 text-rose-700' : 'bg-rose-300/15 text-rose-100'
+                                        : citation.citationVerifierStatus === 'partial'
+                                            ? isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-300/15 text-amber-100'
+                                            : isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-300/15 text-emerald-100'
+                                        }`}>
+                                        {citation.citationVerifierStatus === 'verified'
+                                            ? <ShieldCheck size={11} weight="fill" />
+                                            : <WarningCircle size={11} weight="fill" />}
+                                        {status}
+                                    </span>
+                                </button>
+                                {isOpen && (
+                                    <div className={`border-t px-3 py-2 text-xs leading-relaxed ${isLight ? 'border-blue-100 text-blue-950/80' : 'border-white/10 text-white/75'}`}>
+                                        <p className="whitespace-pre-wrap break-words">
+                                            “{citation.quotedText}”
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
             <div className="mt-2 flex flex-wrap gap-2">
                 {sources.map((source) => (
                     <div
@@ -470,6 +592,7 @@ export default function MessageBubble({
         artifacts.oppositionSimulation
     );
     const documentSources = useMemo(() => getDocumentSources(metadata), [metadata]);
+    const documentCitations = useMemo(() => getDocumentCitations(metadata), [metadata]);
     const usedChunkCount = useMemo(() => getUsedChunkCount(metadata), [metadata]);
 
     useEffect(() => {
@@ -639,7 +762,7 @@ export default function MessageBubble({
                             procedureInfo={procedureInfo}
                             onAction={(action, content) => onAction?.(action, content)}
                         />
-                        <DocumentSourcesStrip sources={documentSources} chunkCount={usedChunkCount} isLight={isLight} />
+                        <DocumentEvidencePanel sources={documentSources} citations={documentCitations} chunkCount={usedChunkCount} isLight={isLight} />
                         {content.trim() && (
                             <div className="mt-3">
                                 <PlayAloudButton text={content} />
@@ -666,7 +789,7 @@ export default function MessageBubble({
 
                 {/* ── Artifact Panels ── */}
                 {!isStreaming && (
-                    <DocumentSourcesStrip sources={documentSources} chunkCount={usedChunkCount} isLight={isLight} />
+                    <DocumentEvidencePanel sources={documentSources} citations={documentCitations} chunkCount={usedChunkCount} isLight={isLight} />
                 )}
 
                 {!isStreaming && content.trim() && (

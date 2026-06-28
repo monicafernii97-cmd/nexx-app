@@ -7,6 +7,7 @@
 
 import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
+import { validateCaseOwnership } from './lib/auth';
 
 // ═══════════════════════════════════════════════════════════════
 // Create
@@ -36,6 +37,8 @@ export const create = mutation({
       .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
       .unique();
     if (!user) throw new Error('User not found');
+
+    await validateCaseOwnership(ctx, args.caseId, user._id);
 
     const now = Date.now();
     const id = await ctx.db.insert('courtDocumentDrafts', {

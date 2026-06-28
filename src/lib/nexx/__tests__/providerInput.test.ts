@@ -119,4 +119,44 @@ describe('toProviderInputMessages', () => {
       { role: 'assistant', content: 'Prior answer.' },
     ]);
   });
+
+  it('does not forward draft, failed, or deleted messages to the provider', () => {
+    expect(
+      toProviderInputMessages([
+        {
+          turnId: 'turn-1',
+          role: 'user',
+          content: 'Committed user message.',
+          status: 'committed',
+        },
+        {
+          turnId: 'turn-2',
+          role: 'assistant',
+          content: 'Draft assistant text.',
+          status: 'draft',
+        },
+        {
+          turnId: 'turn-3',
+          role: 'assistant',
+          content: 'Failed assistant text.',
+          status: 'failed',
+        },
+        {
+          turnId: 'turn-4',
+          role: 'user',
+          content: 'Deleted user text.',
+          status: 'deleted',
+        },
+        {
+          turnId: 'turn-5',
+          role: 'assistant',
+          content: 'Degraded but sendable answer.',
+          status: 'degraded',
+        },
+      ])
+    ).toEqual([
+      { role: 'user', content: 'Committed user message.' },
+      { role: 'assistant', content: 'Degraded but sendable answer.' },
+    ]);
+  });
 });

@@ -1,5 +1,6 @@
 import { detectDocumentType, type DetectedDocumentType, type DocumentDetectionResult, type ExtractionErrorCode } from './documentTypeDetection';
 import { ensurePdfRuntimeReady, isPdfRuntimeError } from './pdfRuntime';
+import { extractPdfTextWithMistralOcr, shouldTryMistralOcrForPdf } from './mistralOcr';
 
 const PDF_MIME = 'application/pdf';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -21,6 +22,17 @@ export type DocumentExtractionResult = {
   pagesOcrProcessed?: number;
   pagesTotal?: number;
   warnings?: string[];
+  ocrProvider?: 'mistral';
+  ocrModel?: string;
+  ocrRequestMode?: 'base64_stateless';
+  ocrAverageConfidence?: number;
+  ocrMinConfidence?: number;
+  ocrUsagePages?: number;
+  ocrUsageBytes?: number;
+  estimatedOcrCostUsd?: number;
+  ocrBlocksDetected?: number;
+  ocrTablesDetected?: number;
+  ocrProviderRequestId?: string;
 };
 
 /** Normalize provider/parser text into a stable plain-text payload. */
@@ -254,6 +266,7 @@ export async function extractDocumentText(
   if (isPdf(file, detection)) {
     let pdfParserError: string | undefined;
     let pdfParserRuntimeFailure: string | undefined;
+    let mistralOcrError: string | undefined;
 
     try {
       await ensurePdfRuntimeReady();
@@ -262,6 +275,39 @@ export async function extractDocumentText(
       const result = await pdf.getText();
       const text = normalizeText(result.text ?? '');
       if (text.length >= MIN_MEANINGFUL_TEXT_CHARS) {
+        if (shouldTryMistralOcrForPdf({
+          nativeTextLength: text.length,
+          nativeSucceeded: true,
+        })) {
+          const mistralOcr = await extractPdfTextWithMistralOcr({
+            buffer,
+            filename: file.name,
+            mimeType: file.type,
+          });
+          if (mistralOcr.text) {
+            return {
+              ...mistralOcr,
+              detectedType: detection.detectedType,
+              warnings: [
+                ...detection.warnings,
+                'NATIVE_PDF_TEXT_AVAILABLE_MISTRAL_OCR4_USED_FOR_STRUCTURE',
+                ...(mistralOcr.warnings ?? []),
+              ],
+            };
+          }
+          mistralOcrError = mistralOcr.error;
+          return {
+            text,
+            method: 'pdf_text',
+            ocrAttempted: true,
+            detectedType: detection.detectedType,
+            warnings: [
+              ...detection.warnings,
+              'MISTRAL_OCR4_FAILED_FALLING_BACK_TO_NATIVE_TEXT',
+              ...(mistralOcr.warnings ?? []),
+            ],
+          };
+        }
         return { text, method: 'pdf_text', detectedType: detection.detectedType, warnings: detection.warnings };
       }
     } catch (err) {
@@ -274,11 +320,34 @@ export async function extractDocumentText(
       }
     }
 
+    if (shouldTryMistralOcrForPdf({
+      nativeTextLength: 0,
+      parserFailed: Boolean(pdfParserError),
+    })) {
+      const mistralOcr = await extractPdfTextWithMistralOcr({
+        buffer,
+        filename: file.name,
+        mimeType: file.type,
+      });
+      if (mistralOcr.text) {
+        return {
+          ...mistralOcr,
+          detectedType: detection.detectedType,
+          warnings: [
+            ...detection.warnings,
+            ...(pdfParserError ? ['PDF_LOCAL_TEXT_EXTRACTION_FAILED'] : []),
+            ...(mistralOcr.warnings ?? []),
+          ],
+        };
+      }
+      mistralOcrError = mistralOcr.error;
+    }
+
     const fileInputExtraction = await extractPdfTextWithOpenAIFileInput(buffer);
     if (fileInputExtraction.text) {
       return {
         ...fileInputExtraction,
-        method: fileInputExtraction.method ?? 'pdf_file_input',
+        method: 'pdf_file_input',
         detectedType: detection.detectedType,
         warnings: [
           ...detection.warnings,
@@ -314,12 +383,14 @@ export async function extractDocumentText(
           'The file uploaded, but our PDF processor could not read it because a required PDF runtime dependency is missing.',
           'This is a system processing issue, not proof that your PDF has no selectable text.',
           pdfParserError ? `Local PDF parser failed: ${pdfParserError}` : undefined,
+          mistralOcrError,
           fileInputExtraction.error,
           ocr.error,
         ].filter(Boolean).join(' ')
         : [
           'No selectable text was found in this PDF, and OCR could not extract readable text.',
           pdfParserError ? `Local PDF parser failed: ${pdfParserError}` : undefined,
+          mistralOcrError,
           fileInputExtraction.error,
           ocr.error,
         ].filter(Boolean).join(' '),

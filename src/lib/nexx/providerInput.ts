@@ -80,5 +80,11 @@ export function prepareRecentMessagesForDocumentRecall(
 
 /** Strip internal metadata before sending messages to the model provider. */
 export function toProviderInputMessages(messages: InternalRecentMessage[]): ProviderInputMessage[] {
-  return messages.map(({ role, content }) => ({ role, content }));
+  return messages
+    .filter((message) => (
+      message.status === undefined ||
+      message.status === 'committed' ||
+      message.status === 'degraded'
+    ))
+    .map(({ role, content }) => ({ role, content }));
 }

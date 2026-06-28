@@ -13,6 +13,19 @@ function isLegacyClientFailureMessage(msg: { role: 'user' | 'assistant'; content
     );
 }
 
+function asMetadataObject(metadata: unknown) {
+    return metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+        ? metadata as Record<string, unknown>
+        : {};
+}
+
+function pageLabel(pageStart?: number, pageEnd?: number) {
+    if (pageStart === undefined || pageStart === null) return undefined;
+    return pageEnd !== undefined && pageEnd !== null && pageEnd !== pageStart
+        ? `pp. ${pageStart}-${pageEnd}`
+        : `p. ${pageStart}`;
+}
+
 /** Shared validator for route mode — used by both `send` and `createMessage`. */
 const routeModeValidator = v.union(
     v.literal('adaptive_chat'),
@@ -245,7 +258,7 @@ export const list = query({
         // Bound the DB read first, then filter soft-deleted and legacy client
         // failure rows in memory. This keeps the query predictable while hiding
         // stale transport-error artifacts from the chat transcript.
-        return rows
+        const visibleRows = rows
             .filter((msg) => msg.status !== 'deleted' && !isLegacyClientFailureMessage(msg))
             .sort((a, b) => {
                 const aTurn = a.turnNumber ?? 0;
@@ -258,6 +271,124 @@ export const list = query({
 
                 return a.createdAt - b.createdAt;
             });
+
+        const assistantMessageIds = new Set(
+            visibleRows
+                .filter((message) => message.role === 'assistant')
+                .map((message) => message._id.toString())
+        );
+        const answerSourceEntries = assistantMessageIds.size > 0
+            ? await Promise.all(
+                visibleRows
+                    .filter((message) => message.role === 'assistant')
+                    .map(async (message) => [
+                        message._id.toString(),
+                        await ctx.db
+                            .query('chatAnswerSources')
+                            .withIndex('by_message', (q) => q.eq('messageId', message._id))
+                            .take(50),
+                    ] as const)
+            )
+            : [];
+        const scopedAnswerSources = answerSourceEntries
+            .flatMap(([, sources]) => sources)
+            .filter((source) =>
+                source.messageId &&
+                assistantMessageIds.has(source.messageId.toString()) &&
+                source.conversationId === args.conversationId &&
+                source.clerkUserId === user.clerkId
+            );
+        const uniqueUploadedFileSources = scopedAnswerSources.filter(
+            (source, index, sources) =>
+                sources.findIndex((candidate) => candidate.uploadedFileId.toString() === source.uploadedFileId.toString()) === index
+        );
+        const uniqueChunkSources = scopedAnswerSources.filter(
+            (source, index, sources) =>
+                sources.findIndex((candidate) => candidate.chunkId.toString() === source.chunkId.toString()) === index
+        );
+        const [uploadedFileEntries, chunkEntries] = await Promise.all([
+            Promise.all(uniqueUploadedFileSources.map(async (source) =>
+                [source.uploadedFileId.toString(), await ctx.db.get(source.uploadedFileId)] as const
+            )),
+            Promise.all(uniqueChunkSources.map(async (source) =>
+                [source.chunkId.toString(), await ctx.db.get(source.chunkId)] as const
+            )),
+        ]);
+        const uploadedFilesById = new Map(uploadedFileEntries);
+        const chunksById = new Map(chunkEntries);
+        const sourcesByMessageId = new Map<string, typeof scopedAnswerSources>();
+        for (const source of scopedAnswerSources) {
+            if (!source.messageId) continue;
+            const messageId = source.messageId.toString();
+            sourcesByMessageId.set(messageId, [...(sourcesByMessageId.get(messageId) ?? []), source]);
+        }
+
+        return visibleRows.map((message) => {
+            if (message.role !== 'assistant') return message;
+
+            const answerSources = sourcesByMessageId.get(message._id.toString()) ?? [];
+            if (answerSources.length === 0) return message;
+
+            const citations: Array<{
+                chatAnswerSourceId: string;
+                uploadedFileId: string;
+                filename: string;
+                chunkId: string;
+                memoryGenerationId?: string;
+                pageStart?: number;
+                pageEnd?: number;
+                pageLabel?: string;
+                citationLabel?: string;
+                quotedText: string;
+                citationVerifierStatus: 'verified' | 'partial' | 'failed';
+            }> = [];
+
+            for (const source of answerSources.slice(0, 50)) {
+                if (
+                    source.conversationId !== args.conversationId ||
+                    source.messageId !== message._id ||
+                    source.clerkUserId !== user.clerkId
+                ) {
+                    continue;
+                }
+
+                const uploadedFile = uploadedFilesById.get(source.uploadedFileId.toString());
+                const chunk = chunksById.get(source.chunkId.toString());
+                if (
+                    !uploadedFile ||
+                    uploadedFile.clerkUserId !== user.clerkId ||
+                    !chunk ||
+                    chunk.uploadedFileId !== uploadedFile._id ||
+                    chunk.clerkUserId !== user.clerkId
+                ) {
+                    continue;
+                }
+
+                citations.push({
+                    chatAnswerSourceId: source._id.toString(),
+                    uploadedFileId: uploadedFile._id.toString(),
+                    filename: uploadedFile.filename,
+                    chunkId: source.chunkId.toString(),
+                    memoryGenerationId: source.memoryGenerationId?.toString(),
+                    pageStart: source.pageStart,
+                    pageEnd: source.pageEnd,
+                    pageLabel: pageLabel(source.pageStart, source.pageEnd),
+                    citationLabel: chunk.citationLabel,
+                    quotedText: source.quotedText,
+                    citationVerifierStatus: source.citationVerifierStatus,
+                });
+            }
+
+            if (citations.length === 0) return message;
+
+            return {
+                ...message,
+                metadata: {
+                    ...asMetadataObject(message.metadata),
+                    documentCitations: citations,
+                },
+            };
+        });
     },
 });
 

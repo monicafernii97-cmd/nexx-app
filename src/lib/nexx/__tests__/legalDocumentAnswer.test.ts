@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type LegalDocumentAnswer,
   type LegalDocumentSourcePacket,
+  validateLegalDocumentAnswerShape,
   verifyLegalDocumentAnswer,
 } from '../legalDocumentAnswer';
 
@@ -98,6 +99,20 @@ describe('verifyLegalDocumentAnswer', () => {
     expect(result.errors.join(' ')).toContain('not found');
   });
 
+  it('blocks reordered quotes even when the same words appear in the source packet', () => {
+    const result = verifyLegalDocumentAnswer(answer({
+      citations: [{
+        ...answer().citations[0],
+        quotedText: 'June 14 2026 Respondent $500 shall pay no later than',
+      }],
+    }), sourcePackets, {
+      requiresDocumentAnswer: true,
+      requiresCitation: true,
+    });
+
+    expect(result.passed).toBe(false);
+  });
+
   it('allows not-found answers without citations when the sources do not support the answer', () => {
     const result = verifyLegalDocumentAnswer(answer({
       answerType: 'not_found',
@@ -111,5 +126,16 @@ describe('verifyLegalDocumentAnswer', () => {
     });
 
     expect(result.passed).toBe(true);
+  });
+
+  it('rejects malformed warning and not-found fields in documentAnswer shape validation', () => {
+    expect(validateLegalDocumentAnswerShape({
+      ...answer(),
+      warnings: [42],
+    })).toBe(false);
+    expect(validateLegalDocumentAnswerShape({
+      ...answer(),
+      notFoundReason: { code: 'bad_shape' },
+    })).toBe(false);
   });
 });

@@ -96,9 +96,16 @@ export function fuzzyTextContains(sourceText: string, quotedText: string) {
   const quoteWords = quote.split(/\s+/).filter(Boolean);
   if (quoteWords.length < 5) return false;
 
-  const sourceWords = new Set(source.split(/\s+/).filter(Boolean));
-  const matchedWords = quoteWords.filter((word) => sourceWords.has(word)).length;
-  return matchedWords / quoteWords.length >= 0.86;
+  const sourceWords = source.split(/\s+/).filter(Boolean);
+  if (quoteWords.length > sourceWords.length) return false;
+
+  for (let index = 0; index <= sourceWords.length - quoteWords.length; index += 1) {
+    const window = sourceWords.slice(index, index + quoteWords.length);
+    const matchedWords = quoteWords.filter((word, wordIndex) => window[wordIndex] === word).length;
+    if (matchedWords / quoteWords.length >= 0.92) return true;
+  }
+
+  return false;
 }
 
 export function validateLegalDocumentAnswerShape(value: unknown): value is LegalDocumentAnswer {
@@ -110,6 +117,15 @@ export function validateLegalDocumentAnswerShape(value: unknown): value is Legal
   if (!Array.isArray(answer.citations)) return false;
   if (!Array.isArray(answer.warnings)) return false;
   if (!Array.isArray(answer.unsupportedClaims)) return false;
+  if (!answer.warnings.every((warning) => typeof warning === 'string')) return false;
+  if (!answer.unsupportedClaims.every((claim) => typeof claim === 'string')) return false;
+  if (
+    answer.notFoundReason !== undefined &&
+    answer.notFoundReason !== null &&
+    typeof answer.notFoundReason !== 'string'
+  ) {
+    return false;
+  }
 
   return answer.claims.every((claim) =>
     claim &&

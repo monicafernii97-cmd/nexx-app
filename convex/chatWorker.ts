@@ -18,7 +18,6 @@ import { suppressWeakArtifacts } from '../src/lib/nexx/recovery/suppressWeakArti
 import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
 import { polishLegalResponse } from '../src/lib/nexx/postprocess';
 import {
-    type LegalDocumentAnswer,
     type LegalDocumentAnswerVerification,
     type LegalDocumentSourcePacket,
     verifyLegalDocumentAnswer,
@@ -442,8 +441,6 @@ type DocumentChunkContext = {
     retrievalReasons: string[];
 };
 
-type VerifiedDocumentCitation = LegalDocumentAnswerVerification['verifiedCitations'][number];
-
 function escapeXmlAttribute(value?: string) {
     return sanitizePromptMetadata(value)
         ?.replace(/&/g, '&amp;')
@@ -616,7 +613,7 @@ function buildRetrievedChunkPrompt(chunks: DocumentChunkContext[], sourcePackets
             return [
             `<CHUNK sourceId="${escapeXmlAttribute(sourcePacket?.sourceId)}" chunkId="${chunk.chunkId}" fileId="${escapeXmlAttribute(sourcePacket?.fileId)}" memoryGenerationId="${escapeXmlAttribute(sourcePacket?.memoryGenerationId)}" pageStart="${chunk.pageStart ?? ''}" pageEnd="${chunk.pageEnd ?? ''}" sectionHeading="${escapeXmlAttribute(chunk.sectionHeading)}" retrievalReasons="${escapeXmlAttribute(chunk.retrievalReasons.join(', '))}" extractionMethod="${escapeXmlAttribute(chunk.extractionMethod ?? 'unknown')}" confidence="${chunk.ocrConfidence ?? ''}">`,
             `SOURCE_ID: ${sourcePacket?.sourceId ?? ''}`,
-            `FILE: ${sourcePacket?.fileName ?? ''}`,
+            `FILE: ${escapeXmlText(sourcePacket?.fileName ?? '')}`,
             `FILE_ID: ${sourcePacket?.fileId ?? ''}`,
             `GENERATION_ID: ${sourcePacket?.memoryGenerationId ?? ''}`,
             `CHUNK_ID: ${chunk.chunkId}`,
@@ -732,7 +729,7 @@ function buildAttachmentContextPrompt(
         'For court-order review, identify which document was reviewed and cite page/section/chunk metadata when available.',
         'Quote short exact phrases only when exact wording matters.',
         'When you make document-specific claims, fill documentAnswer with claims and citations that use only the SOURCE_ID values shown in retrieved chunks.',
-        'Every document_fact, quote, summary, or comparison claim in documentAnswer.claims must include at least one valid sourceId.',
+        'Every document_fact, quote, summary, comparison, or interpretation claim in documentAnswer.claims must include at least one valid sourceId.',
         'Every documentAnswer.citation quotedText must be copied from the cited SOURCE_ID text. If the source packets do not support the answer, set documentAnswer.answerType to "not_found".',
         preferRetrievedChunks ? 'Use the retrieved chunks first for this turn; they were selected from stored document memory for the user\'s specific question.' : undefined,
         detection.requiresExactText ? 'This turn requires exact wording: verify terms against the extracted text and do not infer missing words.' : undefined,
@@ -927,8 +924,7 @@ function shouldRequireDocumentAnswer(args: {
     documentReference: DocumentReferenceDetection;
     routeMode: RouteMode;
 }) {
-    return args.sourcePackets.length > 0 &&
-        args.attachmentContexts.length > 0 &&
+    return args.attachmentContexts.length > 0 &&
         (
             args.routeMode === 'document_analysis' ||
             args.documentReference.referencesDocument ||
@@ -1058,7 +1054,15 @@ async function repairCitationLockedResponse(args: {
             model: args.model,
             requestOptions: { timeout: PROVIDER_TIMEOUT_MS, maxRetries: 0 },
         });
-        return recovered.stage === 'fallback' ? null : suppressWeakArtifacts(recovered.data);
+        const responseId =
+            typeof repairResponse.id === 'string'
+                ? repairResponse.id
+                : typeof (repairResponse.response as { id?: unknown } | undefined)?.id === 'string'
+                    ? (repairResponse.response as { id: string }).id
+                    : undefined;
+        return recovered.stage === 'fallback'
+            ? null
+            : { response: suppressWeakArtifacts(recovered.data), responseId };
     } catch (error) {
         console.error('[ChatWorker] Citation repair failed', error);
         return null;
@@ -1141,7 +1145,7 @@ async function generateWithFallbacks({
             );
 
             let accumulatedText = '';
-            let responseId: string | undefined;
+                let responseId: string | undefined;
             let lastResponse: unknown = null;
             let lastDraftLength = 0;
             let lastDraftSavedAt = Date.now();
@@ -1252,7 +1256,7 @@ async function generateWithFallbacks({
                 });
                 if (repairedResponse) {
                     const repairedVerification = verifyLegalDocumentAnswer(
-                        repairedResponse.documentAnswer,
+                        repairedResponse.response.documentAnswer,
                         promptBundle.documentSourcePackets,
                         {
                             requiresDocumentAnswer,
@@ -1260,7 +1264,8 @@ async function generateWithFallbacks({
                         }
                     );
                     if (repairedVerification.passed) {
-                        parsedResponse = repairedResponse;
+                        parsedResponse = repairedResponse.response;
+                        responseId = repairedResponse.responseId ?? responseId;
                         citationVerification = repairedVerification;
                     }
                 }

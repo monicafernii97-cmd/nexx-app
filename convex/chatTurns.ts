@@ -1415,7 +1415,11 @@ export const recordDocumentAnswerEvidence = internalMutation({
             uploadedFile: Doc<'uploadedFiles'>;
         }>();
         const seenChunkIds = new Set<string>();
-        for (const chunkId of args.usedChunkIds ?? []) {
+        const chunkIdsToValidate = [
+            ...(args.verifiedCitations ?? []).map((citation) => citation.chunkId),
+            ...(args.usedChunkIds ?? []),
+        ];
+        for (const chunkId of chunkIdsToValidate) {
             const chunkIdString = chunkId.toString();
             if (seenChunkIds.has(chunkIdString) || seenChunkIds.size >= 50) continue;
             const chunk = await ctx.db.get(chunkId);

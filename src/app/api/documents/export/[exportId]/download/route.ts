@@ -47,7 +47,7 @@ export async function GET(
 
         // ── Get signed storage URL ──
         const storageUrl = await convex.query(api.generatedDocumentsExport.getStorageUrl, {
-            storageId: doc.storageId,
+            exportId: exportId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
         });
 
         if (!storageUrl) {

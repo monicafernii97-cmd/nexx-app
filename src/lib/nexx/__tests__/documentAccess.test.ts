@@ -55,6 +55,15 @@ describe('resolveDocumentMemorySource', () => {
     expect(result).toBeNull();
   });
 
+  it('classifies explicitly granted documents as shared memory', () => {
+    const result = resolveDocumentMemorySource(
+      candidate({ clerkUserId: 'user_b', conversationId: 'conversation_other' }),
+      { ...scope, grantedUploadedFileIds: ['file_1'] }
+    );
+
+    expect(result).toBe('shared_memory');
+  });
+
   it('rejects documents from a different conversation and a different case', () => {
     const result = resolveDocumentMemorySource(
       candidate({ conversationId: 'conversation_other', caseId: 'case_other' }),
@@ -70,5 +79,13 @@ describe('canUseDocumentMemoryCandidate', () => {
     expect(canUseDocumentMemoryCandidate(candidate({ status: 'processing' }), scope)).toBe(false);
     expect(canUseDocumentMemoryCandidate(candidate({ chatContextText: '   ' }), scope)).toBe(false);
     expect(canUseDocumentMemoryCandidate(candidate({ status: 'partial' }), scope)).toBe(true);
+  });
+
+  it('allows active generation-backed chunks even without legacy chatContextText', () => {
+    expect(canUseDocumentMemoryCandidate(candidate({
+      chatContextText: undefined,
+      activeMemoryGenerationId: 'generation_1',
+      chunkCount: 3,
+    }), scope)).toBe(true);
   });
 });

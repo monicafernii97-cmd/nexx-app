@@ -99,6 +99,21 @@ describe('verifyLegalDocumentAnswer', () => {
     expect(result.errors.join(' ')).toContain('not found');
   });
 
+  it('blocks generation-backed citations that omit the memory generation id', () => {
+    const result = verifyLegalDocumentAnswer(answer({
+      citations: [{
+        ...answer().citations[0],
+        memoryGenerationId: null,
+      }],
+    }), sourcePackets, {
+      requiresDocumentAnswer: true,
+      requiresCitation: true,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.errors.join(' ')).toContain('generation missing');
+  });
+
   it('blocks reordered quotes even when the same words appear in the source packet', () => {
     const result = verifyLegalDocumentAnswer(answer({
       citations: [{

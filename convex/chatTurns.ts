@@ -66,7 +66,8 @@ const documentEvidenceSourceValidator = v.object({
         v.literal('current_turn'),
         v.literal('conversation_memory'),
         v.literal('case_memory'),
-        v.literal('user_private_memory')
+        v.literal('user_private_memory'),
+        v.literal('shared_memory')
     ),
     status: v.string(),
     extractionMethod: v.optional(v.string()),
@@ -242,7 +243,79 @@ function uploadedFileAccessCandidate(uploadedFile: Doc<'uploadedFiles'>) {
         caseId: uploadedFile.caseId?.toString(),
         status: uploadedFile.status,
         chatContextText: uploadedFile.chatContextText,
+        activeMemoryGenerationId: uploadedFile.activeMemoryGenerationId?.toString(),
+        chunkCount: uploadedFile.chunkCount,
     };
+}
+
+async function getActiveUserChatGrants(
+    ctx: QueryCtx | MutationCtx,
+    args: {
+        clerkUserId: string;
+        caseId?: Id<'cases'>;
+        limit?: number;
+    }
+) {
+    const now = Date.now();
+    const grants = await ctx.db
+        .query('fileAccessGrants')
+        .withIndex('by_subject', (q) =>
+            q.eq('subjectType', 'user').eq('subjectId', args.clerkUserId)
+        )
+        .take(args.limit ?? 100);
+
+    return grants.filter((grant) => {
+        if (!grant.permissions.chat) return false;
+        if (grant.revokedAt !== undefined) return false;
+        if (grant.expiresAt !== undefined && grant.expiresAt <= now) return false;
+        if (grant.caseId && args.caseId && grant.caseId !== args.caseId) return false;
+        if (grant.caseId && !args.caseId) return false;
+        return true;
+    });
+}
+
+async function hasActiveUserChatGrant(
+    ctx: QueryCtx | MutationCtx,
+    args: {
+        clerkUserId: string;
+        uploadedFileId: Id<'uploadedFiles'>;
+        caseId?: Id<'cases'>;
+    }
+) {
+    const grants = await getActiveUserChatGrants(ctx, {
+        clerkUserId: args.clerkUserId,
+        caseId: args.caseId,
+    });
+    return grants.some((grant) => grant.uploadedFileId === args.uploadedFileId);
+}
+
+async function getGrantedUploadedFilesForChat(
+    ctx: QueryCtx,
+    args: {
+        clerkUserId: string;
+        caseId?: Id<'cases'>;
+    }
+) {
+    const grants = await getActiveUserChatGrants(ctx, args);
+    const seen = new Set<string>();
+    const files: Doc<'uploadedFiles'>[] = [];
+
+    for (const grant of grants) {
+        const uploadedFileId = grant.uploadedFileId.toString();
+        if (seen.has(uploadedFileId)) continue;
+        seen.add(uploadedFileId);
+        const uploadedFile = await ctx.db.get(grant.uploadedFileId);
+        if (!uploadedFile) continue;
+        if (uploadedFile.deletedAt || uploadedFile.status === 'deleted' || uploadedFile.status === 'quarantined') continue;
+        if (args.caseId) {
+            if (uploadedFile.caseId && uploadedFile.caseId !== args.caseId) continue;
+        } else if (uploadedFile.caseId) {
+            continue;
+        }
+        files.push(uploadedFile);
+    }
+
+    return files;
 }
 
 function documentChunkCandidate(chunk: Doc<'documentChunks'>) {
@@ -1078,10 +1151,18 @@ export const getGenerationContext = internalQuery({
         const documentReference = detectDocumentReference(turn.message);
         const clerkUserId = user.clerkId;
         const activeCaseId = conversation.caseId;
+        const grantedUploadedFiles = clerkUserId
+            ? await getGrantedUploadedFilesForChat(ctx, {
+                clerkUserId,
+                caseId: activeCaseId,
+            })
+            : [];
+        const grantedUploadedFileIds = grantedUploadedFiles.map((uploadedFile) => uploadedFile._id.toString());
         const accessScope = {
             clerkUserId,
             conversationId: turn.conversationId.toString(),
             caseId: activeCaseId?.toString(),
+            grantedUploadedFileIds,
         };
         const attachmentRows = await ctx.db
             .query('messageAttachments')
@@ -1124,7 +1205,8 @@ export const getGenerationContext = internalQuery({
             const uploadedFile = await ctx.db.get(uploadedFileId);
             if (
                 uploadedFile &&
-                uploadedFile.clerkUserId === user?.clerkId
+                (uploadedFile.clerkUserId === user?.clerkId ||
+                    grantedUploadedFileIds.includes(uploadedFile._id.toString()))
             ) {
                 rememberedUploadedFiles.push(uploadedFile);
             }
@@ -1177,6 +1259,7 @@ export const getGenerationContext = internalQuery({
             ),
             ...caseUploadedFiles,
             ...userPrivateUploadedFiles,
+            ...grantedUploadedFiles,
         ].filter((uploadedFile) => !currentAttachmentIds.has(uploadedFile._id));
         const memorySourceByUploadedFileId = new Map<string, DocumentMemorySource>();
         const seenCandidateFileIds = new Set<string>();
@@ -1192,6 +1275,8 @@ export const getGenerationContext = internalQuery({
                 caseId: uploadedFile.caseId?.toString(),
                 status: uploadedFile.status,
                 chatContextText: uploadedFile.chatContextText,
+                activeMemoryGenerationId: uploadedFile.activeMemoryGenerationId?.toString(),
+                chunkCount: uploadedFile.chunkCount,
             }, accessScope)) {
                 continue;
             }
@@ -1200,6 +1285,10 @@ export const getGenerationContext = internalQuery({
                 clerkUserId: uploadedFile.clerkUserId,
                 conversationId: uploadedFile.conversationId?.toString(),
                 caseId: uploadedFile.caseId?.toString(),
+                status: uploadedFile.status,
+                chatContextText: uploadedFile.chatContextText,
+                activeMemoryGenerationId: uploadedFile.activeMemoryGenerationId?.toString(),
+                chunkCount: uploadedFile.chunkCount,
             }, accessScope);
             if (!source) continue;
             memorySourceByUploadedFileId.set(uploadedFileId, source);
@@ -1207,7 +1296,12 @@ export const getGenerationContext = internalQuery({
         }
         const rankableMemoryFiles = accessibleMemoryFiles.filter((uploadedFile) => {
             const source = memorySourceByUploadedFileId.get(uploadedFile._id.toString());
-            return source ? Boolean(buildUploadedFileContext(uploadedFile, source)?.chatContextText?.trim()) : false;
+            return source
+                ? Boolean(
+                    buildUploadedFileContext(uploadedFile, source)?.chatContextText?.trim() ||
+                    (uploadedFile.activeMemoryGenerationId && (uploadedFile.chunkCount ?? 0) > 0)
+                )
+                : false;
         });
 
         const aliasesByUploadedFileId = new Map<string, string[]>();
@@ -1299,6 +1393,7 @@ export const recordDocumentRetrievalAudit = internalMutation({
             v.literal('conversation_memory'),
             v.literal('case_memory'),
             v.literal('user_private_memory'),
+            v.literal('shared_memory'),
             v.literal('document_analysis_route'),
             v.literal('ambiguous_document_selection')
         ),
@@ -1459,9 +1554,16 @@ export const recordDocumentAnswerEvidence = internalMutation({
             const uploadedFileId = source.uploadedFileId.toString();
             if (seenUploadedFileIds.has(uploadedFileId)) continue;
             const uploadedFile = await ctx.db.get(source.uploadedFileId);
+            const hasSharedGrant = uploadedFile && source.source === 'shared_memory'
+                ? await hasActiveUserChatGrant(ctx, {
+                    clerkUserId: user.clerkId,
+                    uploadedFileId: uploadedFile._id,
+                    caseId: conversation.caseId,
+                })
+                : false;
             if (
                 !uploadedFile ||
-                uploadedFile.clerkUserId !== user.clerkId ||
+                (uploadedFile.clerkUserId !== user.clerkId && !hasSharedGrant) ||
                 (uploadedFile.status !== 'ready' && uploadedFile.status !== 'partial')
             ) {
                 continue;
@@ -1483,6 +1585,13 @@ export const recordDocumentAnswerEvidence = internalMutation({
                 continue;
             }
             if (source.source === 'user_private_memory' && (uploadedFile.conversationId || uploadedFile.caseId)) {
+                continue;
+            }
+            if (
+                source.source === 'shared_memory' &&
+                uploadedFile.clerkUserId !== user.clerkId &&
+                !hasSharedGrant
+            ) {
                 continue;
             }
 

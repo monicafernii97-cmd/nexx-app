@@ -248,7 +248,9 @@ export function verifyLegalDocumentAnswer(
     if (source.chunkId !== citation.chunkId) {
       errors.push(`Citation chunk mismatch for ${citation.sourceId}.`);
     }
-    if (citation.memoryGenerationId && source.memoryGenerationId && citation.memoryGenerationId !== source.memoryGenerationId) {
+    if (source.memoryGenerationId && !citation.memoryGenerationId) {
+      errors.push(`Citation generation missing for ${citation.sourceId}.`);
+    } else if (citation.memoryGenerationId && source.memoryGenerationId && citation.memoryGenerationId !== source.memoryGenerationId) {
       errors.push(`Citation generation mismatch for ${citation.sourceId}.`);
     }
     if (!fuzzyTextContains(source.text, citation.quotedText)) {

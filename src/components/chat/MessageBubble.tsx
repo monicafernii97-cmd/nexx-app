@@ -37,7 +37,7 @@ interface MessageBubbleProps {
 type DocumentSourceMetadata = {
     uploadedFileId: string;
     filename: string;
-    source: 'current_turn' | 'conversation_memory' | 'case_memory' | 'user_private_memory';
+    source: 'current_turn' | 'conversation_memory' | 'case_memory' | 'user_private_memory' | 'shared_memory';
     status?: string;
     extractionMethod?: string;
     contextCharCount?: number;
@@ -95,7 +95,7 @@ function getDocumentSources(metadata: unknown) {
         const record = source as Record<string, unknown>;
         if (typeof record.uploadedFileId !== 'string' || typeof record.filename !== 'string') return [];
         const sourceScope = typeof record.source === 'string' ? record.source : 'current_turn';
-        if (!['current_turn', 'conversation_memory', 'case_memory', 'user_private_memory'].includes(sourceScope)) {
+        if (!['current_turn', 'conversation_memory', 'case_memory', 'user_private_memory', 'shared_memory'].includes(sourceScope)) {
             return [];
         }
 
@@ -164,6 +164,7 @@ function getSourceLabel(source: DocumentSourceMetadata['source']) {
     if (source === 'conversation_memory') return 'Conversation memory';
     if (source === 'case_memory') return 'Case memory';
     if (source === 'user_private_memory') return 'Private memory';
+    if (source === 'shared_memory') return 'Shared memory';
     return 'Uploaded now';
 }
 

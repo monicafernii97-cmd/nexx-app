@@ -113,6 +113,27 @@ describe('selectStoredDocumentCandidates', () => {
     expect(result.selected[0].reasons).toContain('user_private_memory');
   });
 
+  it('scores shared memory as its own source class', () => {
+    const result = selectStoredDocumentCandidates({
+      message: 'Please review the shared final order.',
+      detection: detectDocumentReference('Please review the shared final order.'),
+      candidates: [{
+        uploadedFileId: 'shared-final',
+        filename: 'Shared Final Order.pdf',
+        createdAt: 400,
+        detectedType: 'court_order',
+        aliases: ['shared final order'],
+        memorySource: 'shared_memory' as const,
+      }],
+      maxDocuments: 1,
+    });
+
+    expect(result.selected[0]).toMatchObject({
+      uploadedFileId: 'shared-final',
+    });
+    expect(result.selected[0].reasons).toContain('shared_memory');
+  });
+
   it('asks for clarification when multiple stored orders are similarly plausible', () => {
     const ambiguousCandidates = [
       {

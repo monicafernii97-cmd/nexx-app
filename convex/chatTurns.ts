@@ -201,6 +201,52 @@ function chunkMatchesActiveDocumentMemory(chunk: Doc<'documentChunks'>, uploaded
     return !chunk.memoryGenerationId;
 }
 
+async function getContinuityChunksForSearchHits(
+    ctx: QueryCtx,
+    args: {
+        uploadedFile: Doc<'uploadedFiles'>;
+        searchChunks: Doc<'documentChunks'>[];
+        generationId?: Id<'documentMemoryGenerations'>;
+    }
+) {
+    if (args.searchChunks.length === 0) {
+        return args.generationId
+            ? await ctx.db
+                .query('documentChunks')
+                .withIndex('by_file_generation', (q) =>
+                    q
+                        .eq('uploadedFileId', args.uploadedFile._id)
+                        .eq('memoryGenerationId', args.generationId)
+                )
+                .take(MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE)
+            : await ctx.db
+                .query('documentChunks')
+                .withIndex('by_uploaded_file_chunk', (q) => q.eq('uploadedFileId', args.uploadedFile._id))
+                .take(MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE);
+    }
+
+    const continuityChunks: Doc<'documentChunks'>[] = [];
+    for (const chunk of args.searchChunks) {
+        const windowChunks = await ctx.db
+            .query('documentChunks')
+            .withIndex('by_uploaded_file_chunk', (q) =>
+                q
+                    .eq('uploadedFileId', args.uploadedFile._id)
+                    .gte('chunkIndex', Math.max(0, chunk.chunkIndex - 1))
+                    .lte('chunkIndex', chunk.chunkIndex + 1)
+            )
+            .filter((q) =>
+                args.generationId
+                    ? q.eq(q.field('memoryGenerationId'), args.generationId)
+                    : q.eq(q.field('memoryGenerationId'), undefined)
+            )
+            .take(3);
+        continuityChunks.push(...windowChunks);
+    }
+
+    return mergeDocumentChunkDocs(continuityChunks);
+}
+
 /** Load the highest-signal chunks for a selected uploaded document and this user turn. */
 async function getRelevantDocumentChunkContexts(
     ctx: QueryCtx,
@@ -234,19 +280,11 @@ async function getRelevantDocumentChunkContexts(
             )
             .take(MAX_DOCUMENT_CHUNKS_FROM_SEARCH_PER_FILE)
         : [];
-    const continuityChunks = generationId
-        ? await ctx.db
-            .query('documentChunks')
-            .withIndex('by_file_generation', (q) =>
-                q
-                    .eq('uploadedFileId', args.uploadedFileId)
-                    .eq('memoryGenerationId', generationId)
-            )
-            .take(MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE)
-        : await ctx.db
-            .query('documentChunks')
-            .withIndex('by_uploaded_file_chunk', (q) => q.eq('uploadedFileId', args.uploadedFileId))
-            .take(MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE);
+    const continuityChunks = await getContinuityChunksForSearchHits(ctx, {
+        uploadedFile,
+        searchChunks,
+        generationId,
+    });
 
     const chunks = mergeDocumentChunkDocs([...searchChunks, ...continuityChunks])
         .filter((chunk) => chunkMatchesActiveDocumentMemory(chunk, uploadedFile));

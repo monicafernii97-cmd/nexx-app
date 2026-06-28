@@ -174,6 +174,12 @@ function extractSectionTerms(sections: string[]) {
   );
 }
 
+function extractLocationIdentifierTerms(value: string) {
+  return unique(Array.from(value.matchAll(/\b(?:page|section|paragraph|para|clause)\s+([a-z]?\d+[a-z]?)\b/gi))
+    .map((match) => normalizeText(match[1]))
+    .filter(Boolean));
+}
+
 function textContainsTerm(normalizedTextValue: string, normalizedTerm: string) {
   if (!normalizedTerm) return false;
   const escaped = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
@@ -192,12 +198,13 @@ function buildSearchTerms(message: string, detection: DocumentReferenceDetection
   const requestedTerms = normalizeTerms(detection.requestedTerms);
   const requestedDates = normalizeTerms(detection.requestedDates);
   const sectionTerms = extractSectionTerms(detection.requestedSections);
+  const locationIdentifierTerms = extractLocationIdentifierTerms(message);
 
   if (detection.referenceType === 'deadline_lookup') {
-    return unique([...requestedTerms, ...requestedDates, ...sectionTerms, ...DEADLINE_KEYWORDS, ...messageTerms]);
+    return unique([...requestedTerms, ...requestedDates, ...sectionTerms, ...locationIdentifierTerms, ...DEADLINE_KEYWORDS, ...messageTerms]);
   }
 
-  return unique([...requestedTerms, ...requestedDates, ...sectionTerms, ...messageTerms]);
+  return unique([...requestedTerms, ...requestedDates, ...sectionTerms, ...locationIdentifierTerms, ...messageTerms]);
 }
 
 /** Build a compact full-text query for the Convex search index before in-memory reranking. */
@@ -206,15 +213,28 @@ export function buildDocumentChunkSearchQuery(message: string, detection: Docume
     ...normalizeTerms(detection.requestedTerms),
     ...normalizeTerms(detection.requestedDates),
     ...extractSectionTerms(detection.requestedSections),
+    ...extractLocationIdentifierTerms(message),
   ];
   const terms = unique([
     ...prioritizedTerms,
     ...buildSearchTerms(message, detection),
   ])
-    .filter((term) => term.length >= 3)
+    .filter((term) => term.length >= 3 || /^\d+$/.test(term))
     .slice(0, detection.requiresExactText ? 18 : 24);
 
   return terms.join(' ').slice(0, 400).trim();
+}
+
+function canAnchorNeighborExpansion(chunk: RetrievedDocumentChunk) {
+  return chunk.retrievalReasons.some((reason) =>
+    reason === 'exact_term' ||
+    reason === 'holiday_possession' ||
+    reason === 'page_match' ||
+    reason === 'section_match' ||
+    reason === 'heading_match' ||
+    reason === 'deadline_pattern' ||
+    reason === 'metadata_match'
+  );
 }
 
 function messageNeedsHolidayPossessionRetrieval(message: string, detection: DocumentReferenceDetection) {
@@ -234,17 +254,7 @@ function addNeighborChunks(args: {
     args.ranked.map((chunk) => [`${chunk.uploadedFileId}:${chunk.chunkIndex}`, chunk])
   );
   const selectedIds = new Set(args.selected.map((chunk) => chunk.chunkId));
-  const anchors = args.selected.filter((chunk) =>
-    chunk.retrievalReasons.some((reason) =>
-      reason === 'exact_term' ||
-      reason === 'holiday_possession' ||
-      reason === 'page_match' ||
-      reason === 'section_match' ||
-      reason === 'heading_match' ||
-      reason === 'deadline_pattern' ||
-      reason === 'metadata_match'
-    )
-  );
+  const anchors = args.selected.filter(canAnchorNeighborExpansion);
 
   for (const anchor of anchors) {
     for (const neighborIndex of [anchor.chunkIndex - 1, anchor.chunkIndex + 1]) {
@@ -363,16 +373,17 @@ export function retrieveRelevantDocumentChunks(args: {
     return a.chunkIndex - b.chunkIndex;
   });
 
+  const neighborCandidates = ranked.filter((chunk, index) => index < args.maxChunks || chunk.retrievalScore > 40);
   const shouldExpandWithNeighbors =
     needsExact || needsHolidayPossession || needsSection || needsDeadline || needsMetadataContext || requestedPages.length > 0;
-  const initialChunkLimit = shouldExpandWithNeighbors
+  const hasNeighborAnchor = shouldExpandWithNeighbors && neighborCandidates.some(canAnchorNeighborExpansion);
+  const initialChunkLimit = hasNeighborAnchor
     ? Math.max(1, args.maxChunks - 2)
     : args.maxChunks;
-  const selected = ranked
-    .filter((chunk, index) => index < args.maxChunks || chunk.retrievalScore > 40)
+  const selected = neighborCandidates
     .slice(0, initialChunkLimit);
 
-  const expanded = shouldExpandWithNeighbors
+  const expanded = hasNeighborAnchor
     ? addNeighborChunks({ selected, ranked, maxChunks: args.maxChunks })
     : selected;
 

@@ -112,7 +112,7 @@ function normalizeProviderError(error: unknown) {
 
 function isProviderGenerationError(error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    return /\b(?:provider|model|rate limit|429|timeout|timed out|overloaded|503|unavailable|schema|json|structured_output)\b/i
+    return /\b(?:provider|model|rate limit|429|overloaded|503|unavailable|structured_output)\b/i
         .test(message);
 }
 
@@ -545,15 +545,17 @@ function mergeAttachmentContext(existing: AttachmentContext, incoming: Attachmen
         });
     }
 
+    const contextSource = richer.chatContextText?.trim() ? richer : fallback;
+
     return {
         ...fallback,
         ...richer,
         source: existing.source === 'current_turn' || incoming.source === 'current_turn'
             ? 'current_turn'
             : richer.source ?? fallback.source,
-        chatContextText: richer.chatContextText?.trim() ? richer.chatContextText : fallback.chatContextText,
-        chatContextCharCount: richer.chatContextCharCount ?? fallback.chatContextCharCount,
-        contextTruncated: richer.contextTruncated ?? fallback.contextTruncated,
+        chatContextText: contextSource.chatContextText,
+        chatContextCharCount: contextSource.chatContextCharCount ?? contextSource.chatContextText?.length,
+        contextTruncated: contextSource.contextTruncated,
         documentChunks: Array.from(mergedChunks.values()).sort(
             (a, b) => b.retrievalScore - a.retrievalScore || a.chunkIndex - b.chunkIndex
         ),
@@ -1170,7 +1172,7 @@ export const processChatGenerationJob = internalAction({
                                 contextTruncated: attachment.contextTruncated,
                             })),
                         });
-                        citationVerifierPassed = Boolean(evidenceResult?.sourceCount);
+                        citationVerifierPassed = usedChunkIds.length > 0 && Boolean(evidenceResult?.sourceCount);
                     } catch (evidenceError) {
                         console.error('[ChatWorker] Failed to record document answer evidence', evidenceError);
                     }
@@ -1216,12 +1218,10 @@ export const processChatGenerationJob = internalAction({
                 }
             }
         } catch (error) {
-            const normalized = isProviderGenerationError(error)
-                ? normalizeProviderError(error)
-                : {
-                    code: 'worker_internal_error',
-                    message: 'The response worker failed before completion.',
-                };
+            const normalized = {
+                code: 'worker_internal_error',
+                message: 'The response worker failed before completion.',
+            };
             await ctx.runMutation(internal.chatTurns.completeAssistant, {
                 jobId: args.jobId,
                 leaseOwner,

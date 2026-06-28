@@ -52,6 +52,7 @@ describe('retrieveRelevantDocumentChunks', () => {
 
     expect(query).toContain('shall');
     expect(query).toContain('may');
+    expect(query).toContain('7');
     expect(query.length).toBeLessThanOrEqual(400);
   });
 
@@ -255,6 +256,38 @@ describe('retrieveRelevantDocumentChunks', () => {
 
     expect(result[0]?.chunkId).toBe('payment-table');
     expect(result[0]?.retrievalReasons).toContain('metadata_match');
+  });
+
+  it('does not reserve neighbor slots when no selected chunk can anchor expansion', () => {
+    const keywordOnlyChunks: DocumentChunkRetrievalCandidate[] = [
+      {
+        chunkId: 'payment-overview',
+        uploadedFileId: 'file-1',
+        chunkIndex: 12,
+        text: 'The payment schedule is described in ordinary text without table metadata.',
+        textLength: 73,
+        sectionHeading: 'Support',
+        warnings: [],
+      },
+      {
+        chunkId: 'payment-followup',
+        uploadedFileId: 'file-1',
+        chunkIndex: 19,
+        text: 'Additional payment timing details appear in this later paragraph.',
+        textLength: 66,
+        sectionHeading: 'Support',
+        warnings: [],
+      },
+    ];
+    const detection = detectDocumentReference('What does the payment table say?');
+    const result = retrieveRelevantDocumentChunks({
+      message: 'What does the payment table say?',
+      detection,
+      chunks: keywordOnlyChunks,
+      maxChunks: 2,
+    });
+
+    expect(result.map((chunk) => chunk.chunkId)).toEqual(['payment-overview', 'payment-followup']);
   });
 
   it('expands neighbor context around metadata-ranked chunks', () => {

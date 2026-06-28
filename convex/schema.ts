@@ -617,7 +617,7 @@ export default defineSchema({
         authorizationRecheckPassed: v.boolean(),
         citationVerifierPassed: v.boolean(),
         createdAt: v.number(),
-        expiresAt: v.optional(v.number()),
+        expiresAt: v.number(),
     })
         .index('by_turn', ['turnId'])
         .index('by_message', ['messageId'])

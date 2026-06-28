@@ -664,6 +664,8 @@ export default defineSchema({
         .index('by_file_created', ['uploadedFileId', 'createdAt'])
         .index('by_generation_created', ['memoryGenerationId', 'createdAt'])
         .index('by_actor_created', ['actorUserId', 'createdAt'])
+        .index('by_clerk_created', ['clerkUserId', 'createdAt'])
+        .index('by_case_created', ['caseId', 'createdAt'])
         .index('by_event_created', ['eventType', 'createdAt'])
         .index('by_org_created', ['orgId', 'createdAt']),
 
@@ -674,6 +676,7 @@ export default defineSchema({
         clerkUserId: v.optional(v.string()),
         uploadedFileId: v.optional(v.id('uploadedFiles')),
         memoryGenerationId: v.optional(v.id('documentMemoryGenerations')),
+        caseId: v.optional(v.id('cases')),
         provider: v.union(
             v.literal('mistral'),
             v.literal('openai'),
@@ -703,6 +706,8 @@ export default defineSchema({
     })
         .index('by_file_created', ['uploadedFileId', 'createdAt'])
         .index('by_generation_created', ['memoryGenerationId', 'createdAt'])
+        .index('by_clerk_created', ['clerkUserId', 'createdAt'])
+        .index('by_case_created', ['caseId', 'createdAt'])
         .index('by_provider_created', ['provider', 'createdAt'])
         .index('by_org_created', ['orgId', 'createdAt']),
 
@@ -713,6 +718,7 @@ export default defineSchema({
         clerkUserId: v.string(),
         uploadedFileId: v.optional(v.id('uploadedFiles')),
         memoryGenerationId: v.optional(v.id('documentMemoryGenerations')),
+        caseId: v.optional(v.id('cases')),
         pageId: v.optional(v.id('documentPages')),
         chunkId: v.optional(v.id('documentChunks')),
         flagType: v.union(
@@ -730,6 +736,8 @@ export default defineSchema({
         .index('by_file_created', ['uploadedFileId', 'createdAt'])
         .index('by_generation_created', ['memoryGenerationId', 'createdAt'])
         .index('by_clerk_created', ['clerkUserId', 'createdAt'])
+        .index('by_clerk_resolved_created', ['clerkUserId', 'resolvedAt', 'createdAt'])
+        .index('by_case_created', ['caseId', 'createdAt'])
         .index('by_type_created', ['flagType', 'createdAt']),
 
     documentReprocessJobs: defineTable({

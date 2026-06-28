@@ -1,6 +1,14 @@
 import { internalMutation, type MutationCtx } from './_generated/server';
 import { v } from 'convex/values';
 import type { Id } from './_generated/dataModel';
+import {
+  normalizeReviewFlagMessage,
+  requiresZdrForClassification,
+  sanitizeAuditMetadata,
+  sanitizeTelemetryString,
+  severityForConfidence,
+  shouldFlagLowConfidenceOcr,
+} from './lib/documentTelemetry';
 
 const MAX_BACKFILL_RECORDS = 5000;
 const MAX_CLEANUP_RECORDS = 500;
@@ -126,33 +134,6 @@ function hasContiguousIntegerCoverage(values: number[], start: number, count: nu
   return true;
 }
 
-function sanitizeAuditString(value: string) {
-  return value
-    .replace(/[\u0000-\u001f\u007f]/g, ' ')
-    .replace(/[<>]/g, '')
-    .slice(0, 240)
-    .trim();
-}
-
-function sanitizeAuditMetadata(value: unknown) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
-  const clean: Record<string, string | number | boolean | null> = {};
-  for (const [key, raw] of Object.entries(value).slice(0, 20)) {
-    const safeKey = sanitizeAuditString(key).slice(0, 64);
-    if (!safeKey) continue;
-    if (typeof raw === 'string') {
-      clean[safeKey] = sanitizeAuditString(raw);
-    } else if (typeof raw === 'number' && Number.isFinite(raw)) {
-      clean[safeKey] = raw;
-    } else if (typeof raw === 'boolean' || raw === null) {
-      clean[safeKey] = raw;
-    } else if (raw !== undefined) {
-      clean[safeKey] = sanitizeAuditString(String(raw));
-    }
-  }
-  return clean;
-}
-
 async function insertAuditEvent(
   ctx: MutationCtx,
   args: {
@@ -177,6 +158,58 @@ async function insertAuditEvent(
     metadataRedacted: sanitizeAuditMetadata(args.metadataRedacted),
     createdAt: Date.now(),
   });
+}
+
+async function insertReviewFlag(
+  ctx: MutationCtx,
+  args: {
+    flagType:
+      | 'low_confidence_ocr'
+      | 'missing_citation'
+      | 'provider_policy_blocked'
+      | 'manual_review_required'
+      | 'generation_validation_failed';
+    severity: 'low' | 'medium' | 'high';
+    message: string;
+    uploadedFileId: Id<'uploadedFiles'>;
+    memoryGenerationId?: Id<'documentMemoryGenerations'>;
+    clerkUserId: string;
+    caseId?: Id<'cases'>;
+    orgId?: string;
+    accountId?: string;
+    matterId?: string;
+  },
+) {
+  const existing = await ctx.db
+    .query('reviewFlags')
+    .withIndex('by_file_created', (q) => q.eq('uploadedFileId', args.uploadedFileId))
+    .filter((q) => q.and(
+      q.eq(q.field('memoryGenerationId'), args.memoryGenerationId),
+      q.eq(q.field('flagType'), args.flagType),
+      q.eq(q.field('resolvedAt'), undefined)
+    ))
+    .first();
+  if (existing) return existing._id;
+
+  await ctx.db.insert('reviewFlags', {
+    orgId: args.orgId,
+    accountId: args.accountId,
+    matterId: args.matterId,
+    clerkUserId: args.clerkUserId,
+    uploadedFileId: args.uploadedFileId,
+    memoryGenerationId: args.memoryGenerationId,
+    caseId: args.caseId,
+    flagType: args.flagType,
+    severity: args.severity,
+    message: normalizeReviewFlagMessage(args.message),
+    createdAt: Date.now(),
+  });
+}
+
+function providerUsageStatusForExtraction(status: 'started' | 'succeeded' | 'empty' | 'failed' | 'cancelled') {
+  if (status === 'started') return 'started' as const;
+  if (status === 'succeeded') return 'succeeded' as const;
+  return 'failed' as const;
 }
 
 export const createGeneration = internalMutation({
@@ -292,7 +325,8 @@ export const recordExtractionAttempt = internalMutation({
     assertOptionalConfidence('averageConfidence', args.averageConfidence);
     assertOptionalConfidence('minConfidence', args.minConfidence);
 
-    return await ctx.db.insert('documentExtractionAttempts', {
+    const requestConfigRedacted = sanitizeAuditMetadata(args.requestConfigRedacted);
+    const attemptId = await ctx.db.insert('documentExtractionAttempts', {
       orgId: uploadedFile.orgId,
       accountId: uploadedFile.accountId,
       matterId: uploadedFile.matterId,
@@ -319,9 +353,78 @@ export const recordExtractionAttempt = internalMutation({
       usagePages: args.usagePages,
       usageBytes: args.usageBytes,
       estimatedCostUsd: args.estimatedCostUsd,
-      requestConfigRedacted: args.requestConfigRedacted,
+      requestConfigRedacted,
       createdAt: Date.now(),
     });
+
+    if (args.provider) {
+      const payloadClassification = uploadedFile.confidentialityLevel ?? 'normal';
+      const zdrRequired = requiresZdrForClassification(payloadClassification);
+      const requestMode = requestConfigRedacted?.ocrRequestMode;
+      await ctx.db.insert('providerUsageEvents', {
+        orgId: uploadedFile.orgId,
+        accountId: uploadedFile.accountId,
+        matterId: uploadedFile.matterId,
+        clerkUserId: uploadedFile.clerkUserId,
+        uploadedFileId: args.uploadedFileId,
+        memoryGenerationId: args.memoryGenerationId,
+        caseId: uploadedFile.caseId,
+        provider: args.provider === 'mistral' ? 'mistral' : 'internal',
+        endpoint: 'ocr',
+        model: args.modelId ?? args.extractor,
+        payloadClassification,
+        zdrRequired,
+        zdrConfirmed: !zdrRequired || args.provider !== 'mistral' || requestMode === 'base64_stateless',
+        pagesProcessed: args.usagePages ?? args.pageCountSucceeded,
+        bytesProcessed: args.usageBytes,
+        estimatedCostUsd: args.estimatedCostUsd,
+        status: providerUsageStatusForExtraction(args.status),
+        providerRequestId: args.providerRequestId,
+        errorCode: args.errorCode,
+        errorMessage: args.errorMessage ? sanitizeTelemetryString(args.errorMessage) : undefined,
+        createdAt: Date.now(),
+      });
+    }
+
+    if (shouldFlagLowConfidenceOcr({
+      extractor: args.extractor,
+      minConfidence: args.minConfidence,
+      warnings: args.warnings,
+    })) {
+      await insertReviewFlag(ctx, {
+        flagType: 'low_confidence_ocr',
+        severity: severityForConfidence(args.minConfidence),
+        message: args.minConfidence !== undefined
+          ? `OCR confidence dropped to ${Math.round(args.minConfidence * 100)}%. Verify cited pages before relying on this document.`
+          : 'OCR returned low-confidence warnings. Verify cited pages before relying on this document.',
+        uploadedFileId: args.uploadedFileId,
+        memoryGenerationId: args.memoryGenerationId,
+        clerkUserId: uploadedFile.clerkUserId,
+        caseId: uploadedFile.caseId,
+        orgId: uploadedFile.orgId,
+        accountId: uploadedFile.accountId,
+        matterId: uploadedFile.matterId,
+      });
+    }
+
+    if (args.status === 'failed' || args.status === 'empty') {
+      await insertReviewFlag(ctx, {
+        flagType: 'manual_review_required',
+        severity: args.status === 'empty' ? 'high' : 'medium',
+        message: args.status === 'empty'
+          ? 'Document extraction completed without usable text. This file cannot support chat answers until reprocessed or replaced.'
+          : `Document extraction failed with ${args.errorCode ?? 'UNKNOWN_EXTRACTION_ERROR'}.`,
+        uploadedFileId: args.uploadedFileId,
+        memoryGenerationId: args.memoryGenerationId,
+        clerkUserId: uploadedFile.clerkUserId,
+        caseId: uploadedFile.caseId,
+        orgId: uploadedFile.orgId,
+        accountId: uploadedFile.accountId,
+        matterId: uploadedFile.matterId,
+      });
+    }
+
+    return attemptId;
   },
 });
 
@@ -371,6 +474,21 @@ export const failGeneration = internalMutation({
         failedReason: args.failedReason,
         failedChecks: mergedFailedChecks,
       },
+    });
+    const reviewFlagMessage = mergedFailedChecks.length > 0
+      ? `Document memory generation failed validation checks: ${mergedFailedChecks.join(', ')}`
+      : 'Document memory generation failed and requires review.';
+    await insertReviewFlag(ctx, {
+      flagType: 'generation_validation_failed',
+      severity: 'high',
+      message: reviewFlagMessage,
+      uploadedFileId: args.uploadedFileId,
+      memoryGenerationId: args.memoryGenerationId,
+      clerkUserId: uploadedFile.clerkUserId,
+      caseId: uploadedFile.caseId,
+      orgId: uploadedFile.orgId,
+      accountId: uploadedFile.accountId,
+      matterId: uploadedFile.matterId,
     });
     return true;
   },
@@ -522,6 +640,18 @@ export const validateAndActivateGeneration = internalMutation({
         caseId: uploadedFile.caseId,
         metadataRedacted: { failedChecks },
       });
+      await insertReviewFlag(ctx, {
+        flagType: 'generation_validation_failed',
+        severity: 'high',
+        message: `Document memory generation failed validation checks: ${failedChecks.join(', ')}`,
+        uploadedFileId: args.uploadedFileId,
+        memoryGenerationId: args.memoryGenerationId,
+        clerkUserId: uploadedFile.clerkUserId,
+        caseId: uploadedFile.caseId,
+        orgId: uploadedFile.orgId,
+        accountId: uploadedFile.accountId,
+        matterId: uploadedFile.matterId,
+      });
       return { activated: false, failedChecks };
     }
 
@@ -571,6 +701,18 @@ export const validateAndActivateGeneration = internalMutation({
         clerkUserId: uploadedFile.clerkUserId,
         caseId: uploadedFile.caseId,
         metadataRedacted: { failedChecks: 'stale_generation' },
+      });
+      await insertReviewFlag(ctx, {
+        flagType: 'generation_validation_failed',
+        severity: 'medium',
+        message: 'Document memory generation was not activated because a newer generation already exists.',
+        uploadedFileId: args.uploadedFileId,
+        memoryGenerationId: args.memoryGenerationId,
+        clerkUserId: uploadedFile.clerkUserId,
+        caseId: uploadedFile.caseId,
+        orgId: uploadedFile.orgId,
+        accountId: uploadedFile.accountId,
+        matterId: uploadedFile.matterId,
       });
       return { activated: false, failedChecks: ['stale_generation'] };
     }

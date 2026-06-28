@@ -21,8 +21,13 @@ import {
 import {
     getDailyLimit,
     PRIMARY_MODEL,
-    type SubscriptionTier,
 } from '../src/lib/tiers';
+import {
+    CHAT_RATE_LIMIT_WINDOW_MS,
+    chatRateLimitKeyForModel,
+    fixedWindowStartMs,
+    userSubscriptionTier,
+} from './lib/chatRateLimitPolicy';
 
 const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
@@ -74,10 +79,6 @@ const attachmentRefValidator = v.object({
     byteSize: v.number(),
     status: v.union(v.literal('ready'), v.literal('partial')),
 });
-
-function fixedWindowStartMs(now: number, windowMs: number) {
-    return Math.floor(now / windowMs) * windowMs;
-}
 
 /**
  * Treat retryable failures as terminal for this worker attempt.
@@ -349,7 +350,7 @@ async function consumeTurnRateLimit(
     key: string,
     limit: number,
     now: number,
-    windowMs = ONE_DAY_MS
+    windowMs = CHAT_RATE_LIMIT_WINDOW_MS
 ) {
     if (!Number.isInteger(windowMs) || windowMs <= 0) {
         throw new Error('Rate-limit window must be a positive integer');
@@ -410,20 +411,12 @@ async function consumeTurnRateLimit(
     return { allowed: true, current: count, limit, resetInMs };
 }
 
-function userSubscriptionTier(user: Doc<'users'>): SubscriptionTier {
-    return user.subscriptionTier === 'pro' ||
-        user.subscriptionTier === 'premium' ||
-        user.subscriptionTier === 'executive'
-        ? user.subscriptionTier
-        : 'free';
-}
-
 function rateLimitPolicyForTurn(user: Doc<'users'>, model?: string) {
     const resolvedModel = model || PRIMARY_MODEL;
     return {
-        key: resolvedModel.includes('pro') ? 'chat_message_5_4_pro' : 'chat_message_5_4',
+        key: chatRateLimitKeyForModel(resolvedModel),
         limit: getDailyLimit(userSubscriptionTier(user), resolvedModel),
-        windowMs: ONE_DAY_MS,
+        windowMs: CHAT_RATE_LIMIT_WINDOW_MS,
     };
 }
 

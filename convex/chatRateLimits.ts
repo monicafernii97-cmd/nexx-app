@@ -5,22 +5,13 @@ import {
     getDailyLimit,
     PRIMARY_MODEL,
     PRO_MODEL,
-    type SubscriptionTier,
 } from '../src/lib/tiers';
+import { CHAT_RATE_LIMIT_WINDOW_MS, fixedWindowStartMs, userSubscriptionTier } from './lib/chatRateLimitPolicy';
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-function fixedWindowStartMs(now: number, windowMs: number) {
-    return Math.floor(now / windowMs) * windowMs;
-}
-
-function userSubscriptionTier(user: { subscriptionTier?: string }): SubscriptionTier {
-    return user.subscriptionTier === 'pro' ||
-        user.subscriptionTier === 'premium' ||
-        user.subscriptionTier === 'executive'
-        ? user.subscriptionTier
-        : 'free';
-}
+const CHAT_RATE_LIMIT_KEY_VALIDATOR = v.union(
+    v.literal('chat_message_5_4'),
+    v.literal('chat_message_5_4_pro'),
+);
 
 function rateLimitPolicyForKey(user: { subscriptionTier?: string }, key: string) {
     const model = key === 'chat_message_5_4_pro'
@@ -32,14 +23,14 @@ function rateLimitPolicyForKey(user: { subscriptionTier?: string }, key: string)
     return {
         key,
         limit: getDailyLimit(userSubscriptionTier(user), model),
-        windowMs: ONE_DAY_MS,
+        windowMs: CHAT_RATE_LIMIT_WINDOW_MS,
     };
 }
 
 /** Consume one unit from the authenticated user's named rate-limit window. */
 export const consume = mutation({
     args: {
-        key: v.string(),
+        key: CHAT_RATE_LIMIT_KEY_VALIDATOR,
     },
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);

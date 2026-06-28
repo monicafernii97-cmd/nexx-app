@@ -114,6 +114,9 @@ async function getOptionalGeneration(
   if (!generation || generation.uploadedFileId !== uploadedFileId) {
     throw new Error('Document memory generation not found for uploaded file');
   }
+  if (generation.status !== 'building') {
+    throw new Error(`Cannot write document memory artifacts to ${generation.status} generation`);
+  }
   return generation;
 }
 

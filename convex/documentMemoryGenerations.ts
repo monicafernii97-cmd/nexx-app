@@ -116,6 +116,16 @@ function boundedRecordLimit(name: string, value: number | undefined, fallback: n
   return resolved;
 }
 
+function hasContiguousIntegerCoverage(values: number[], start: number, count: number) {
+  if (values.length !== count) return false;
+  const seen = new Set(values);
+  if (seen.size !== count) return false;
+  for (let offset = 0; offset < count; offset += 1) {
+    if (!seen.has(start + offset)) return false;
+  }
+  return true;
+}
+
 function sanitizeAuditString(value: string) {
   return value
     .replace(/[\u0000-\u001f\u007f]/g, ' ')
@@ -271,7 +281,7 @@ export const recordExtractionAttempt = internalMutation({
 
     assertNonNegativeInteger('pageCountAttempted', args.pageCountAttempted);
     assertNonNegativeInteger('pageCountSucceeded', args.pageCountSucceeded);
-    if (args.pageCountSucceeded > args.pageCountAttempted && args.pageCountAttempted > 0) {
+    if (args.pageCountSucceeded > args.pageCountAttempted) {
       throw new Error('pageCountSucceeded cannot exceed pageCountAttempted');
     }
     if (args.usagePages !== undefined) assertNonNegativeInteger('usagePages', args.usagePages);
@@ -405,7 +415,12 @@ export const validateAndActivateGeneration = internalMutation({
       page.uploadedFileId === args.uploadedFileId &&
       page.clerkUserId === uploadedFile.clerkUserId
     );
-    if (generationPages.length === args.pageCount && allPagesMatch) {
+    const hasPageIndexCoverage = hasContiguousIntegerCoverage(
+      generationPages.map((page) => page.pageNumber),
+      1,
+      args.pageCount,
+    );
+    if (generationPages.length === args.pageCount && allPagesMatch && hasPageIndexCoverage) {
       checks.push('page_coverage');
     } else {
       failedChecks.push('page_coverage');
@@ -419,7 +434,12 @@ export const validateAndActivateGeneration = internalMutation({
       chunk.uploadedFileId === args.uploadedFileId &&
       chunk.clerkUserId === uploadedFile.clerkUserId
     );
-    if (generationChunks.length === args.chunkCount && allChunksMatch) {
+    const hasChunkIndexCoverage = hasContiguousIntegerCoverage(
+      generationChunks.map((chunk) => chunk.chunkIndex),
+      0,
+      args.chunkCount,
+    );
+    if (generationChunks.length === args.chunkCount && allChunksMatch && hasChunkIndexCoverage) {
       checks.push('chunk_integrity');
     } else {
       failedChecks.push('chunk_integrity');

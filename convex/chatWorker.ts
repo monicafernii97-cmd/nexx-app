@@ -104,9 +104,9 @@ function asBoolean(value: unknown): boolean | undefined {
 function asStringArray(value: unknown, maxItems = 50): string[] | undefined {
     if (!Array.isArray(value)) return undefined;
     const items = value
+        .slice(0, maxItems)
         .map((item) => asString(item))
-        .filter((item): item is string => Boolean(item))
-        .slice(0, maxItems);
+        .filter((item): item is string => Boolean(item));
     return items.length > 0 ? items : undefined;
 }
 
@@ -119,6 +119,7 @@ function asOpenIssueStatus(value: unknown): 'active' | 'pending' | 'resolved' | 
 function asChildren(value: unknown): { name: string; age: number }[] | undefined {
     if (!Array.isArray(value)) return undefined;
     const children = value
+        .slice(0, 20)
         .map((item) => {
             const child = asRecord(item);
             const name = asString(child?.name);
@@ -128,8 +129,7 @@ function asChildren(value: unknown): { name: string; age: number }[] | undefined
             }
             return { name, age };
         })
-        .filter((child): child is { name: string; age: number } => child !== null)
-        .slice(0, 20);
+        .filter((child): child is { name: string; age: number } => child !== null);
     return children.length > 0 ? children : undefined;
 }
 
@@ -182,6 +182,7 @@ function sanitizeCaseGraph(value: unknown): ContextPacket['caseGraph'] | undefin
 
     const currentOrders = Array.isArray(graph.currentOrders)
         ? graph.currentOrders
+            .slice(0, 25)
             .map((item) => {
                 const order = asRecord(item);
                 const orderType = asString(order?.orderType);
@@ -194,11 +195,11 @@ function sanitizeCaseGraph(value: unknown): ContextPacket['caseGraph'] | undefin
                 };
             })
             .filter((item): item is NonNullable<typeof item> => item !== null)
-            .slice(0, 25)
         : [];
 
     const openIssues = Array.isArray(graph.openIssues)
         ? graph.openIssues
+            .slice(0, 25)
             .map((item) => {
                 const issue = asRecord(item);
                 const issueText = asString(issue?.issue);
@@ -211,11 +212,11 @@ function sanitizeCaseGraph(value: unknown): ContextPacket['caseGraph'] | undefin
                 };
             })
             .filter((item): item is NonNullable<typeof item> => item !== null)
-            .slice(0, 25)
         : [];
 
     const evidenceThemes = Array.isArray(graph.evidenceThemes)
         ? graph.evidenceThemes
+            .slice(0, 25)
             .map((item) => {
                 const theme = asRecord(item);
                 const themeText = asString(theme?.theme);
@@ -228,7 +229,6 @@ function sanitizeCaseGraph(value: unknown): ContextPacket['caseGraph'] | undefin
                 };
             })
             .filter((item): item is NonNullable<typeof item> => item !== null)
-            .slice(0, 25)
         : [];
 
     const proceduralRaw = asRecord(graph.proceduralState);
@@ -802,10 +802,23 @@ async function generateWithFallbacks({
             let lastResponse: unknown = null;
             let lastDraftLength = 0;
             let lastDraftSavedAt = Date.now();
+            let completedCleanly = false;
 
             for await (const event of streamResponse) {
-                if (event.type === 'response.output_text.delta') {
-                    const delta = event.delta ?? '';
+                const streamEvent = event as {
+                    type: string;
+                    delta?: string;
+                    response?: {
+                        id?: string;
+                        status?: string;
+                        error?: { message?: string; code?: string };
+                        incomplete_details?: { reason?: string };
+                    };
+                    error?: { message?: string; code?: string };
+                    message?: string;
+                };
+                if (streamEvent.type === 'response.output_text.delta') {
+                    const delta = streamEvent.delta ?? '';
                     accumulatedText += delta;
 
                     const now = Date.now();
@@ -818,10 +831,33 @@ async function generateWithFallbacks({
                         lastDraftSavedAt = now;
                         await saveDraft(ctx, jobId, leaseOwner, accumulatedText);
                     }
-                } else if (event.type === 'response.completed') {
-                    lastResponse = event.response;
-                    responseId = event.response?.id;
+                } else if (streamEvent.type === 'response.completed') {
+                    lastResponse = streamEvent.response;
+                    responseId = streamEvent.response?.id;
+                    completedCleanly = true;
+                } else if (streamEvent.type === 'response.failed') {
+                    throw new Error(
+                        streamEvent.response?.error?.message ??
+                        `Provider stream failed${streamEvent.response?.status ? ` with status ${streamEvent.response.status}` : ''}`,
+                    );
+                } else if (streamEvent.type === 'response.incomplete') {
+                    throw new Error(
+                        `Provider stream incomplete${streamEvent.response?.incomplete_details?.reason
+                            ? `: ${streamEvent.response.incomplete_details.reason}`
+                            : ''
+                        }`,
+                    );
+                } else if (streamEvent.type === 'error') {
+                    throw new Error(
+                        streamEvent.error?.message ??
+                        streamEvent.message ??
+                        'Provider stream emitted an error event',
+                    );
                 }
+            }
+
+            if (!completedCleanly) {
+                throw new Error('Provider stream ended before completion');
             }
 
             const rawText = accumulatedText || extractOutputText(lastResponse);

@@ -39,6 +39,7 @@ import type * as generatedDocuments from "../generatedDocuments.js";
 import type * as generatedDocumentsExport from "../generatedDocumentsExport.js";
 import type * as incidents from "../incidents.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_chatRateLimitPolicy from "../lib/chatRateLimitPolicy.js";
 import type * as lib_chatUploadConfig from "../lib/chatUploadConfig.js";
 import type * as lib_exportConfig from "../lib/exportConfig.js";
 import type * as messages from "../messages.js";
@@ -91,6 +92,7 @@ declare const fullApi: ApiFromModules<{
   generatedDocumentsExport: typeof generatedDocumentsExport;
   incidents: typeof incidents;
   "lib/auth": typeof lib_auth;
+  "lib/chatRateLimitPolicy": typeof lib_chatRateLimitPolicy;
   "lib/chatUploadConfig": typeof lib_chatUploadConfig;
   "lib/exportConfig": typeof lib_exportConfig;
   messages: typeof messages;

@@ -298,7 +298,7 @@ async function getGrantedUploadedFilesForChat(
         caseId?: Id<'cases'>;
     }
 ) {
-    const grants = await getActiveUserChatGrants(ctx, { ...args, limit: 100 });
+    const grants = await getActiveUserChatGrants(ctx, args);
     const seen = new Set<string>();
     const files: Doc<'uploadedFiles'>[] = [];
 

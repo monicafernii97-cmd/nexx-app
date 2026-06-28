@@ -41,6 +41,7 @@ export function resolveDocumentMemorySource(
   const isOwner = candidate.clerkUserId === scope.clerkUserId;
   const isGranted = scope.grantedUploadedFileIds?.includes(candidate.uploadedFileId) ?? false;
   if (!isOwner && !isGranted) return null;
+  if (!isOwner) return 'shared_memory';
 
   if (candidate.conversationId === scope.conversationId) {
     return 'conversation_memory';
@@ -51,10 +52,10 @@ export function resolveDocumentMemorySource(
   }
 
   if (!candidate.conversationId && !candidate.caseId) {
-    return isOwner ? 'user_private_memory' : 'shared_memory';
+    return 'user_private_memory';
   }
 
-  return isGranted ? 'shared_memory' : null;
+  return null;
 }
 
 /** Enforce ownership, scope, and readable-context requirements before a document can be recalled. */

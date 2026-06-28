@@ -262,7 +262,7 @@ async function getActiveUserChatGrants(
         .withIndex('by_subject', (q) =>
             q.eq('subjectType', 'user').eq('subjectId', args.clerkUserId)
         )
-        .take(args.limit ?? 100);
+        .collect();
 
     return grants.filter((grant) => {
         if (!grant.permissions.chat) return false;
@@ -271,7 +271,7 @@ async function getActiveUserChatGrants(
         if (grant.caseId && args.caseId && grant.caseId !== args.caseId) return false;
         if (grant.caseId && !args.caseId) return false;
         return true;
-    });
+    }).slice(0, args.limit ?? 100);
 }
 
 async function hasActiveUserChatGrant(
@@ -1350,7 +1350,13 @@ export const getGenerationContext = internalQuery({
         for (const uploadedFile of conversationMemoryFiles) {
             const source = memorySourceByUploadedFileId.get(uploadedFile._id.toString()) ?? 'conversation_memory';
             const context = buildUploadedFileContext(uploadedFile, source);
-            if (context?.chatContextText?.trim()) {
+            if (
+                context &&
+                (
+                    context.chatContextText?.trim() ||
+                    (uploadedFile.activeMemoryGenerationId && (uploadedFile.chunkCount ?? 0) > 0)
+                )
+            ) {
                 availableDocumentContexts.push({
                     ...context,
                     documentChunks: await getRelevantDocumentChunkContexts(ctx, {
@@ -1479,6 +1485,10 @@ export const recordRetrievalRun = internalMutation({
             clerkUserId: user.clerkId,
             conversationId: turn.conversationId.toString(),
             caseId: conversation.caseId?.toString(),
+            grantedUploadedFileIds: (await getActiveUserChatGrants(ctx, {
+                clerkUserId: user.clerkId,
+                caseId: conversation.caseId,
+            })).map((grant) => grant.uploadedFileId.toString()),
         };
         let authorizationRecheckPassed = true;
         for (const chunkId of uniqueChunkIds) {
@@ -1630,7 +1640,7 @@ export const recordDocumentAnswerEvidence = internalMutation({
             if (
                 !chunk ||
                 !uploadedFile ||
-                chunk.clerkUserId !== user.clerkId ||
+                chunk.clerkUserId !== uploadedFile.clerkUserId ||
                 !allowedUploadedFileIds.has(chunk.uploadedFileId.toString()) ||
                 !chunkMatchesActiveDocumentMemory(chunk, uploadedFile)
             ) {

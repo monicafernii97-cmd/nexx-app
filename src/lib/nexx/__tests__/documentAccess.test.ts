@@ -64,6 +64,19 @@ describe('resolveDocumentMemorySource', () => {
     expect(result).toBe('shared_memory');
   });
 
+  it('keeps granted cross-user same-scope documents labeled as shared memory', () => {
+    const grantedScope = { ...scope, grantedUploadedFileIds: ['file_1'] };
+
+    expect(resolveDocumentMemorySource(
+      candidate({ clerkUserId: 'user_b', conversationId: 'conversation_current', caseId: 'case_current' }),
+      grantedScope
+    )).toBe('shared_memory');
+    expect(resolveDocumentMemorySource(
+      candidate({ clerkUserId: 'user_b', conversationId: 'conversation_prior', caseId: 'case_current' }),
+      grantedScope
+    )).toBe('shared_memory');
+  });
+
   it('rejects documents from a different conversation and a different case', () => {
     const result = resolveDocumentMemorySource(
       candidate({ conversationId: 'conversation_other', caseId: 'case_other' }),

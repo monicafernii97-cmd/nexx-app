@@ -17,7 +17,7 @@ vi.mock('@/hooks/useTTSPlayer', () => ({
   }),
 }));
 
-async function renderMessage(metadata: unknown) {
+async function renderMessage(metadata: unknown, artifactsJson?: string) {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -28,6 +28,7 @@ async function renderMessage(metadata: unknown) {
         role="assistant"
         content="The order requires payment by Friday."
         metadata={metadata}
+        artifactsJson={artifactsJson}
       />
     );
   });
@@ -73,11 +74,16 @@ describe('MessageBubble document evidence panel', () => {
     });
     roots.push(root);
 
-    expect(container.textContent).toContain('1 verified citation');
+    expect(container.textContent).toContain('1 cited passage');
     expect(container.textContent).toContain('Final Order.pdf');
     expect(container.textContent).toContain('p. 4');
-    expect(container.textContent).toContain('Verified');
+    expect(container.textContent).toContain('Source');
+    expect(container.textContent).toContain('Case document');
     expect(container.textContent).not.toContain('Respondent shall pay by Friday.');
+    expect(container.textContent).not.toContain('retrieved chunk');
+    expect(container.textContent).not.toContain('Conversation memory');
+    expect(container.textContent).not.toContain('Uploaded now');
+    expect(container.textContent).not.toContain('Partial');
 
     const citationButton = Array.from(container.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Final Order.pdf')
@@ -90,5 +96,39 @@ describe('MessageBubble document evidence panel', () => {
 
     expect(citationButton?.getAttribute('aria-expanded')).toBe('true');
     expect(container.textContent).toContain('Respondent shall pay by Friday.');
+  });
+
+  it('does not render legacy confidence artifacts to the user', async () => {
+    const { container, root } = await renderMessage(
+      {
+        documentSources: [{
+          uploadedFileId: 'file_123',
+          filename: 'Final Order.pdf',
+          source: 'conversation_memory',
+          status: 'partial',
+          contextTruncated: true,
+        }],
+        usedDocumentChunkIds: ['chunk_1', 'chunk_2', 'chunk_3'],
+      },
+      JSON.stringify({
+        confidence: {
+          confidence: 'high',
+          basis: 'Internal source review',
+          evidenceSufficiency: 'Enough support',
+          missingSupport: [],
+        },
+      })
+    );
+    roots.push(root);
+
+    expect(container.textContent).toContain('Final Order.pdf');
+    expect(container.textContent).toContain('Saved in this chat');
+    expect(container.textContent).toContain('Extracted text may be incomplete');
+    expect(container.textContent).not.toMatch(/high confidence/i);
+    expect(container.textContent).not.toContain('Internal source review');
+    expect(container.textContent).not.toContain('Enough support');
+    expect(container.textContent).not.toContain('retrieved chunk');
+    expect(container.textContent).not.toContain('Conversation memory');
+    expect(container.textContent).not.toContain('Partial');
   });
 });

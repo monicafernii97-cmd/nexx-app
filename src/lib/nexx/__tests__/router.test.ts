@@ -9,7 +9,9 @@ describe('classifyMessage document follow-ups', () => {
     'Does it say shall or may?',
     'Compare this amended order to the prior order.',
   ])('routes stored-document references to document analysis: %s', (message) => {
-    expect(classifyMessage(message).mode).toBe('document_analysis');
+    const result = classifyMessage(message);
+    expect(result.mode).toBe('document_analysis');
+    expect(result.toolPlan.useWebSearch).toBe(true);
   });
 
   it.each([
@@ -17,5 +19,12 @@ describe('classifyMessage document follow-ups', () => {
     'How do I file a motion?',
   ])('does not route generic legal questions to document analysis: %s', (message) => {
     expect(classifyMessage(message).mode).not.toBe('document_analysis');
+  });
+
+  it('routes holiday-status questions to legal answer mode with web verification available', () => {
+    const result = classifyMessage('Is Father\'s Day a federal holiday?');
+
+    expect(result.mode).toBe('direct_legal_answer');
+    expect(result.toolPlan.useWebSearch).toBe(true);
   });
 });

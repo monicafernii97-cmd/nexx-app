@@ -7,7 +7,7 @@
  * - Full original text with highlight
  * - Classification breakdown (scores for each type)
  * - Why it was assigned to this section (top 3 section scores)
- * - Confidence indicator with explanation
+ * - Review-strength indicator with explanation
  * - Extracted signals (dates, court terms, emotion words, etc.)
  * - Quick actions: edit text, exclude item
  */
@@ -76,7 +76,7 @@ function ScoreBar({ label, score, color, isTop }: { label: string; score: number
  * TraceSidebar — Source traceability panel for a selected review item.
  *
  * Shows original text, "Why this section?" explanation, classification
- * scores, confidence analysis, and court-safe preview with inline editing.
+ * scores, review-strength analysis, and court-safe preview with inline editing.
  */
 export default function TraceSidebar({ item, onClose, onEditText, onExclude, onTextChange }: TraceSidebarProps) {
     const [isEditing, setIsEditing] = useState(false);
@@ -222,7 +222,7 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude, onT
                         ) : (
                             <p className="text-[11px] text-white/50 leading-relaxed">
                                 Dominant type <span className="text-white/70 font-semibold">{item.dominantType}</span> with{' '}
-                                <span className="text-white/70 font-semibold">{Math.round(item.confidence * 100)}%</span> confidence
+                                <span className="text-white/70 font-semibold">{Math.round(item.confidence * 100)}%</span> match strength
                                 matched this section&apos;s classification rules.
                             </p>
                         )}
@@ -260,10 +260,10 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude, onT
                     </p>
                 </section>
 
-                {/* ── Confidence Detail ── */}
+                {/* ── Review Strength Detail ── */}
                 <section>
                     <h3 className="text-[11px] font-bold tracking-[0.15em] uppercase text-white/40 mb-3">
-                        Confidence Analysis
+                        Review Strength
                     </h3>
                     <div className={`p-3 rounded-xl border ${
                         item.confidence >= 0.8
@@ -282,7 +282,7 @@ export default function TraceSidebar({ item, onClose, onEditText, onExclude, onT
                                 item.confidence >= 0.8 ? 'text-emerald-400' :
                                 item.confidence >= 0.5 ? 'text-amber-400' : 'text-rose-400'
                             }`}>
-                                {Math.round(item.confidence * 100)}% — {getConfidenceExplanation(item.confidence)}
+                                {Math.round(item.confidence * 100)}% - {getReviewStrengthExplanation(item.confidence)}
                             </span>
                         </div>
                         <p className="text-[11px] text-white/50 leading-relaxed">
@@ -322,11 +322,11 @@ function formatSectionName(sectionId: string): string {
         .replace(/\b\w/g, c => c.toUpperCase());
 }
 
-/** Map a confidence value (0-1) to a human-readable label. */
-function getConfidenceExplanation(confidence: number): string {
-    if (confidence >= 0.8) return 'High Confidence';
-    if (confidence >= 0.5) return 'Medium Confidence';
-    return 'Low Confidence';
+/** Map a review score (0-1) to a human-readable label. */
+function getReviewStrengthExplanation(confidence: number): string {
+    if (confidence >= 0.8) return 'Strong match';
+    if (confidence >= 0.5) return 'Review recommended';
+    return 'Needs manual review';
 }
 
 /** Map a SentenceType to its display color for score bars and badges. */

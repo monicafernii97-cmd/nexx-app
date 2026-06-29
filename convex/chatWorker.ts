@@ -32,7 +32,7 @@ import type { StoredDocumentAmbiguity } from '../src/lib/nexx/documentSelection'
 import type { NexxAssistantResponse, RouteMode } from '../src/lib/types';
 
 const DEGRADED_MESSAGE =
-    'I saved your message, but NEXX could not finish the response right now. Please retry this turn in a moment.';
+    'I saved your message, but the response did not finish. Please retry this turn in a moment.';
 const PROVIDER_TIMEOUT_MS = 80_000;
 
 let cachedOpenAI: OpenAI | null = null;
@@ -952,6 +952,27 @@ function clippedQuote(value: string) {
     return `${normalized.slice(0, 257).trim()}...`;
 }
 
+function userFacingDocumentWarning(value: string) {
+    const sanitized = value
+        .replace(/\bPAGE_BOUNDARIES_UNAVAILABLE\b/gi, '')
+        .replace(/\bSOURCE_ID\b/gi, '')
+        .replace(/\bsource[_\s-]?id\b/gi, '')
+        .replace(/\bsrc_\d+\b/gi, '')
+        .replace(/\b\d+\s+retrieved chunks?\b/gi, '')
+        .replace(/\bcitation(?:[_\s-]?|(?=Verifier))verifier(?:[_\s-]?(?:failed|blocked|failure))?[^.]*\.?/gi, '')
+        .replace(/\bcitationVerifier(?:Failed|Blocked|Failure)?\b/g, '')
+        .replace(/\bOCR confidence[^.]*\.?/gi, '')
+        .replace(/\s+([,.;:])/g, '$1')
+        .replace(/^[\s,.;:|/-]+|[\s,.;:|/-]+$/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (!sanitized || /^(source|warning|none)$/i.test(sanitized)) {
+        return null;
+    }
+    return sanitized;
+}
+
 function renderCitationLockedDocumentMessage(
     response: NexxAssistantResponse,
     sourcePackets: LegalDocumentSourcePacket[]
@@ -965,16 +986,16 @@ function renderCitationLockedDocumentMessage(
             const packet = packetsBySourceId.get(citation.sourceId);
             if (!packet) return null;
             const quote = clippedQuote(citation.quotedText);
-            return `- ${sourceCitationLabel(packet)} (${citation.sourceId}): "${quote}"`;
+            return `- ${sourceCitationLabel(packet)}: "${quote}"`;
         })
         .filter((line): line is string => Boolean(line));
-    const confidenceWarnings = answer.citations
+    const extractionWarnings = answer.citations
         .map((citation) => packetsBySourceId.get(citation.sourceId))
         .filter((packet): packet is LegalDocumentSourcePacket => Boolean(packet))
         .filter((packet) => (packet.confidence !== undefined && packet.confidence < 0.85) || Boolean(packet.warning))
-        .map((packet) => `${packet.sourceId}: ${packet.warning || 'OCR confidence is below the high-confidence threshold.'}`);
-    const warnings = Array.from(new Set([...answer.warnings, ...confidenceWarnings]))
-        .filter((warning) => warning.trim().length > 0)
+        .map(() => 'Some extracted text may be imperfect. Verify exact wording in the original document before relying on it.');
+    const warnings = Array.from(new Set([...answer.warnings.map(userFacingDocumentWarning), ...extractionWarnings]))
+        .filter((warning): warning is string => Boolean(warning && warning.trim().length > 0))
         .slice(0, 5);
     const baseAnswer = answer.answer.trim() || response.message;
 
@@ -990,8 +1011,8 @@ function renderCitationLockedDocumentMessage(
 
 function citationLockedFallbackResponse(errors: string[]): NexxAssistantResponse {
     const message = [
-        'I could not verify this answer from the retrieved uploaded document sources.',
-        'I do not want to guess from the order without a verified source. Please ask me to re-check a specific page, section, or phrase, or reprocess the document if the extracted text is incomplete.',
+        'I cannot safely support every part of that answer from the uploaded document text yet.',
+        'I will not guess from the order. Ask me to re-check a specific page, section, or phrase, or reprocess the document if the extracted text looks incomplete.',
     ].join(' ');
 
     return {
@@ -1002,7 +1023,7 @@ function citationLockedFallbackResponse(errors: string[]): NexxAssistantResponse
             answer: message,
             claims: [],
             citations: [],
-            warnings: ['Citation verifier blocked the draft answer.'],
+            warnings: ['The available document text did not support a complete answer.'],
             unsupportedClaims: [],
             notFoundReason: errors.slice(0, 5).join(' | ') || 'citation_verifier_failed',
         },

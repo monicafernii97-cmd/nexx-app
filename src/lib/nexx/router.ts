@@ -130,7 +130,7 @@ export function classifyMessage(
   }
 
   // Default: check if it's clearly a legal question
-  if (/\b(law|legal|statute|code|section|rights?|custody|visitation|child\s+support)\b/i.test(text)) {
+  if (/\b(law|legal|statute|code|section|rights?|custody|visitation|child\s+support|federal\s+holiday|state\s+holiday|local\s+holiday)\b/i.test(text)) {
     return buildResult('direct_legal_answer');
   }
 
@@ -145,7 +145,7 @@ export function classifyMessage(
 function buildToolPlan(mode: RouteMode): ToolPlan {
   return {
     useFileSearch: ['document_analysis', 'court_ready_drafting', 'judge_lens_strategy', 'pattern_analysis'].includes(mode),
-    useWebSearch: ['local_procedure', 'direct_legal_answer'].includes(mode),
+    useWebSearch: ['local_procedure', 'direct_legal_answer', 'document_analysis'].includes(mode),
     useCodeInterpreter: ['pattern_analysis', 'document_analysis'].includes(mode),
     useLocalCourtRetriever: ['local_procedure', 'direct_legal_answer', 'court_ready_drafting'].includes(mode),
     needsClarification: false, // Set by the model if needed

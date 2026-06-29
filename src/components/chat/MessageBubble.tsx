@@ -5,7 +5,7 @@ import { Copy, Check, ArrowsClockwise, PencilSimple, X, PaperPlaneRight, CaretDo
 import { useEffect, useRef, useState, useCallback, useMemo, useId } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { NexxArtifacts, LegalConfidence, JudgeSimulationResult, OppositionSimulationResult } from '@/lib/types';
+import type { NexxArtifacts, JudgeSimulationResult, OppositionSimulationResult } from '@/lib/types';
 import { PlayAloudButton } from '@/components/voice';
 import { AssistantMessageCard } from './AssistantMessageCard';
 import type { AssistantResponseViewModel, ActionType, DetectedPattern, LocalProcedureInfo } from '@/lib/ui-intelligence/types';
@@ -152,43 +152,33 @@ function getDocumentCitations(metadata: unknown) {
     }).slice(0, 12);
 }
 
-function getUsedChunkCount(metadata: unknown) {
-    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return 0;
-    const rawChunkIds = (metadata as Record<string, unknown>).usedDocumentChunkIds;
-    return Array.isArray(rawChunkIds)
-        ? rawChunkIds.filter((chunkId) => typeof chunkId === 'string').length
-        : 0;
-}
-
 function getSourceLabel(source: DocumentSourceMetadata['source']) {
-    if (source === 'conversation_memory') return 'Conversation memory';
-    if (source === 'case_memory') return 'Case memory';
-    if (source === 'user_private_memory') return 'Private memory';
-    if (source === 'shared_memory') return 'Shared memory';
-    return 'Uploaded now';
+    if (source === 'case_memory') return 'Case document';
+    if (source === 'user_private_memory') return 'Saved document';
+    if (source === 'shared_memory') return 'Shared document';
+    if (source === 'conversation_memory') return 'Saved in this chat';
+    return 'Uploaded document';
 }
 
-function statusLabel(status: DocumentCitationMetadata['citationVerifierStatus']) {
-    if (status === 'partial') return 'Partial';
-    if (status === 'failed') return 'Unverified';
-    return 'Verified';
+function citationBadge(status: DocumentCitationMetadata['citationVerifierStatus']) {
+    if (status === 'failed') return 'Needs review';
+    if (status === 'partial') return 'Check wording';
+    return 'Source';
 }
 
 function DocumentEvidencePanel({
     sources,
     citations,
-    chunkCount,
     isLight,
 }: {
     sources: DocumentSourceMetadata[];
     citations: DocumentCitationMetadata[];
-    chunkCount: number;
     isLight: boolean;
 }) {
     const [openCitationId, setOpenCitationId] = useState<string | null>(null);
-    const verifiedCitationCount = citations.filter((citation) => citation.citationVerifierStatus === 'verified').length;
+    const hasLimitedText = sources.some((source) => source.contextTruncated);
 
-    if (sources.length === 0 && citations.length === 0 && chunkCount === 0) return null;
+    if (sources.length === 0 && citations.length === 0) return null;
 
     return (
         <div className={`mt-3 rounded-lg border px-3 py-2 ${isLight
@@ -197,15 +187,14 @@ function DocumentEvidencePanel({
             }`}>
             <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
                 <span className={isLight ? 'text-blue-700' : 'text-sky-200'}>Sources</span>
-                {citations.length > 0 ? (
+                {citations.length > 0 && (
                     <span className={isLight ? 'text-blue-500' : 'text-sky-200/70'}>
-                        {verifiedCitationCount === citations.length
-                            ? `${citations.length} verified citation${citations.length === 1 ? '' : 's'}`
-                            : `${verifiedCitationCount} verified / ${citations.length} citation${citations.length === 1 ? '' : 's'}`}
+                        {citations.length} cited passage{citations.length === 1 ? '' : 's'}
                     </span>
-                ) : chunkCount > 0 && (
-                    <span className={isLight ? 'text-blue-500' : 'text-sky-200/70'}>
-                        {chunkCount} retrieved chunk{chunkCount === 1 ? '' : 's'}
+                )}
+                {hasLimitedText && (
+                    <span className={isLight ? 'text-amber-600' : 'text-amber-200'}>
+                        Extracted text may be incomplete
                     </span>
                 )}
             </div>
@@ -214,7 +203,7 @@ function DocumentEvidencePanel({
                     {citations.map((citation, index) => {
                         const citationId = `${citation.chatAnswerSourceId}:${citation.chunkId}`;
                         const isOpen = openCitationId === citationId;
-                        const status = statusLabel(citation.citationVerifierStatus);
+                        const status = citationBadge(citation.citationVerifierStatus);
                         return (
                             <div
                                 key={citationId}
@@ -272,9 +261,6 @@ function DocumentEvidencePanel({
                         <FileText size={13} weight="regular" className="shrink-0" />
                         <span className="max-w-[220px] truncate font-semibold">{source.filename}</span>
                         <span className={isLight ? 'text-blue-500' : 'text-white/55'}>{getSourceLabel(source.source)}</span>
-                        {source.contextTruncated && (
-                            <span className={isLight ? 'text-amber-600' : 'text-amber-200'}>Partial</span>
-                        )}
                     </div>
                 ))}
             </div>
@@ -345,62 +331,6 @@ function normalizeNexxArtifacts(parsed: unknown): NexxArtifacts | null {
 }
 
 // ── Artifact Sub-Components ──
-
-/** Confidence badge — colored pill with tooltip. */
-function ConfidenceBadge({ confidence, isLight }: { confidence: LegalConfidence; isLight: boolean }) {
-    const colorMap = {
-        high: { bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', text: 'text-emerald-600', dot: 'bg-emerald-500' },
-        moderate: { bg: 'bg-amber-500/15', border: 'border-amber-500/30', text: 'text-amber-600', dot: 'bg-amber-500' },
-        low: { bg: 'bg-red-500/15', border: 'border-red-500/30', text: 'text-red-500', dot: 'bg-red-500' },
-    };
-    const c = colorMap[confidence.confidence] ?? colorMap.moderate;
-    const [showTooltip, setShowTooltip] = useState(false);
-    const tooltipId = useId();
-
-    return (
-        <div className="relative inline-block">
-            <button
-                type="button"
-                onClick={() => setShowTooltip(!showTooltip)}
-                aria-expanded={showTooltip}
-                aria-controls={tooltipId}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase border ${c.bg} ${c.border} ${c.text} transition-all hover:scale-105 cursor-pointer`}
-                aria-label={`Confidence: ${confidence.confidence}`}
-            >
-                <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
-                {confidence.confidence} confidence
-            </button>
-            <AnimatePresence>
-                {showTooltip && (
-                    <motion.div
-                        id={tooltipId}
-                        role="tooltip"
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        className={`absolute z-30 left-0 top-full mt-2 w-72 rounded-xl p-3 text-xs shadow-lg border ${isLight
-                            ? 'bg-white border-gray-200 text-gray-700'
-                            : 'bg-[#0A1128] border-white/20 text-white/80'
-                            }`}
-                    >
-                        <p className="font-semibold mb-1">{confidence.basis}</p>
-                        <p className="opacity-70 mb-2">{confidence.evidenceSufficiency}</p>
-                        {confidence.missingSupport.length > 0 && (
-                            <div>
-                                <p className="font-semibold text-[10px] uppercase tracking-wider opacity-50 mb-1">Missing Support</p>
-                                <ul className="list-disc pl-3 space-y-0.5 opacity-70">
-                                    {confidence.missingSupport.map((item, i) => (
-                                        <li key={i}>{item}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
-    );
-}
 
 /** Collapsible artifact panel with icon, label, and content. */
 function ArtifactPanel({
@@ -585,7 +515,6 @@ export default function MessageBubble({
     }, [artifactsJson]);
 
     const hasAnyArtifact = artifacts && (
-        artifacts.confidence ||
         artifacts.draftReady ||
         artifacts.timelineReady ||
         artifacts.exhibitReady ||
@@ -594,7 +523,6 @@ export default function MessageBubble({
     );
     const documentSources = useMemo(() => getDocumentSources(metadata), [metadata]);
     const documentCitations = useMemo(() => getDocumentCitations(metadata), [metadata]);
-    const usedChunkCount = useMemo(() => getUsedChunkCount(metadata), [metadata]);
 
     useEffect(() => {
         return () => {
@@ -763,7 +691,7 @@ export default function MessageBubble({
                             procedureInfo={procedureInfo}
                             onAction={(action, content) => onAction?.(action, content)}
                         />
-                        <DocumentEvidencePanel sources={documentSources} citations={documentCitations} chunkCount={usedChunkCount} isLight={isLight} />
+                        <DocumentEvidencePanel sources={documentSources} citations={documentCitations} isLight={isLight} />
                         {content.trim() && (
                             <div className="mt-3">
                                 <PlayAloudButton text={content} />
@@ -772,13 +700,6 @@ export default function MessageBubble({
                     </>
                 ) : (
                     <>
-                {/* Confidence badge — rendered above the message */}
-                {artifacts?.confidence && (
-                    <div className="mb-2">
-                        <ConfidenceBadge confidence={artifacts.confidence} isLight={isLight} />
-                    </div>
-                )}
-
                 <div className={`text-[15px] leading-7 font-normal prose max-w-none w-full break-words ${isLight
                     ? 'text-gray-800 prose-blue'
                     : 'text-white/90 prose-invert'
@@ -790,7 +711,7 @@ export default function MessageBubble({
 
                 {/* ── Artifact Panels ── */}
                 {!isStreaming && (
-                    <DocumentEvidencePanel sources={documentSources} citations={documentCitations} chunkCount={usedChunkCount} isLight={isLight} />
+                    <DocumentEvidencePanel sources={documentSources} citations={documentCitations} isLight={isLight} />
                 )}
 
                 {!isStreaming && content.trim() && (

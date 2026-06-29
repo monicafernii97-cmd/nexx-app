@@ -436,6 +436,7 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
   const uploadAttemptId = session.uploadAttemptId ?? session.attemptId ?? crypto.randomUUID();
   const resolvedClientTurnId = existing?.clientTurnId ?? crypto.randomUUID();
   let storageId = session.storageId ?? existing?.storageId;
+  const retryableIndexingPartial = session.status === 'partial' && Boolean(session.indexingError);
 
   if (!storageId) {
     const uploadUrl = session.uploadUrl ?? existing?.uploadUrl;
@@ -478,12 +479,12 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
       storageId: storageId as Id<'_storage'>,
     });
     clearPendingAttach(uploadSessionId);
-  } else if (!session.uploadedFileId) {
+  } else if (!session.uploadedFileId || retryableIndexingPartial) {
     const normalizedStatus = typeof session.status === 'string' ? normalizeStatus(session.status) : undefined;
     if (
       normalizedStatus === 'failed_empty_extraction' ||
       normalizedStatus === 'cancelled' ||
-      session.retryable === false
+      (session.retryable === false && !retryableIndexingPartial)
     ) {
       throw toUploadError(session);
     }

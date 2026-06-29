@@ -215,6 +215,62 @@ describe('uploadClient direct storage flow', () => {
     expect(upload.attachmentRef.status).toBe('partial');
   });
 
+  it('retries partial sessions with indexing errors without uploading again', async () => {
+    const xhrInstances = installSuccessfulXhr();
+    const convex = makeConvexClient('ready');
+    convex.query
+      .mockResolvedValueOnce({
+        uploadSessionId: 'session-1',
+        uploadedFileId: 'uploaded-1',
+        storageId: 'storage-1',
+        status: 'partial',
+        filename: 'order.pdf',
+        mimeType: 'application/pdf',
+        byteSize: 5,
+        processingAttempt: 1,
+        retryable: false,
+        indexingError: "400 Unknown parameter: 'metadata'.",
+      })
+      .mockResolvedValueOnce({
+        uploadSessionId: 'session-1',
+        uploadedFileId: 'uploaded-1',
+        storageId: 'storage-1',
+        status: 'ready',
+        filename: 'order.pdf',
+        mimeType: 'application/pdf',
+        byteSize: 5,
+        processingAttempt: 2,
+        retryable: false,
+      });
+
+    const upload = await uploadFileForConversation({
+      convex: convex as never,
+      file: makeFile(),
+      conversationId: 'conversation-1',
+      intent: 'attachment',
+      clientUploadKey: 'client-upload-1',
+      existingSession: {
+        file: makeFile(),
+        intent: 'attachment',
+        clientUploadKey: 'client-upload-1',
+        clientTurnId: 'client-turn-1',
+        uploadSessionId: 'session-1',
+        storageId: 'storage-1',
+        uploadedFileId: 'uploaded-1',
+        status: 'partial',
+        error: "400 Unknown parameter: 'metadata'.",
+        retryable: false,
+      },
+    });
+
+    expect(xhrInstances).toHaveLength(0);
+    expect(convex.mutation).toHaveBeenCalledTimes(1);
+    expect(convex.mutation).toHaveBeenCalledWith(expect.anything(), {
+      uploadSessionId: 'session-1',
+    });
+    expect(upload.status).toBe('ready');
+  });
+
   it('mints a fresh upload URL when retrying a failed storage upload', async () => {
     const xhrInstances = installSuccessfulXhr();
     const convex = makeConvexClient();

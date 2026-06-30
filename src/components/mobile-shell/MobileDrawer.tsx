@@ -3,8 +3,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { X } from 'lucide-react';
-import { useFocusTrap } from '@/hooks/useFocusTrap';
-import { usePreventBodyScroll } from '@/lib/mobile/usePreventBodyScroll';
+import { useMobileOverlay } from '@/lib/mobile/useMobileOverlay';
 
 export type MobileDrawerItem = {
   label: string;
@@ -26,12 +25,9 @@ export function MobileDrawer({
   items,
   onClose,
 }: MobileDrawerProps) {
-  const drawerRef = useFocusTrap(isOpen, onClose);
-  usePreventBodyScroll(isOpen);
+  const { dialogRef: drawerRef, titleId } = useMobileOverlay(isOpen, onClose);
 
   if (!isOpen) return null;
-
-  const titleId = `mobile-drawer-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
   return (
     <div className="fixed inset-0 z-50">
@@ -47,17 +43,17 @@ export function MobileDrawer({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="absolute inset-y-0 left-0 flex w-[min(320px,86vw)] flex-col border-r border-neutral-200 bg-white p-4 text-neutral-900 shadow-2xl outline-none"
+        className="absolute inset-y-0 left-0 flex w-[min(320px,86vw)] flex-col border-r border-neutral-200 bg-white p-4 text-neutral-900 shadow-2xl outline-none dark:border-white/10 dark:bg-neutral-950 dark:text-neutral-50"
       >
         <div className="mb-4 flex h-12 items-center justify-between">
-          <h2 id={titleId} className="text-base font-semibold text-neutral-900">
+          <h2 id={titleId} className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
             {title}
           </h2>
           <button
             type="button"
             aria-label="Close navigation"
             onClick={onClose}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-neutral-700 active:bg-neutral-100"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-neutral-700 active:bg-neutral-100 dark:text-neutral-200 dark:active:bg-white/10"
           >
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
@@ -70,11 +66,11 @@ export function MobileDrawer({
               onClick={onClose}
               className={`flex min-h-12 items-center gap-3 rounded-2xl px-3 text-sm font-medium ${
                 item.isActive
-                  ? 'bg-neutral-100 text-neutral-950'
-                  : 'text-neutral-700 active:bg-neutral-100'
+                  ? 'bg-neutral-100 text-neutral-950 dark:bg-white/10 dark:text-neutral-50'
+                  : 'text-neutral-700 active:bg-neutral-100 dark:text-neutral-300 dark:active:bg-white/10'
               }`}
             >
-              {item.icon ? <span className="text-neutral-500">{item.icon}</span> : null}
+              {item.icon ? <span className="text-neutral-500 dark:text-neutral-400">{item.icon}</span> : null}
               <span>{item.label}</span>
             </Link>
           ))}

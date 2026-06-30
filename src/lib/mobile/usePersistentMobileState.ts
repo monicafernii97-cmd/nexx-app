@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type PersistentStateOptions<T> = {
   key: string;
@@ -13,28 +13,55 @@ export function usePersistentMobileState<T>({
   initialValue,
   enabled = true,
 }: PersistentStateOptions<T>) {
-  const [value, setValue] = useState<T>(() => {
-    if (!enabled || typeof window === 'undefined') return initialValue;
-
-    try {
-      const stored = window.localStorage.getItem(key);
-      return stored ? (JSON.parse(stored) as T) : initialValue;
-    } catch {
-      return initialValue;
-    }
-  });
+  const [value, setValue] = useState<T>(initialValue);
+  const [hasHydrated, setHasHydrated] = useState(false);
+  const skipNextWriteRef = useRef(false);
 
   useEffect(() => {
-    if (!enabled) return;
+    let cancelled = false;
+
+    queueMicrotask(() => {
+      if (cancelled) return;
+
+      if (!enabled) {
+        setHasHydrated(true);
+        return;
+      }
+
+      try {
+        const stored = window.localStorage.getItem(key);
+        if (stored) {
+          setValue(JSON.parse(stored) as T);
+        }
+      } catch {
+        // Fall back to the provided initial value if storage is unavailable.
+      } finally {
+        setHasHydrated(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, key]);
+
+  useEffect(() => {
+    if (!enabled || !hasHydrated) return;
+
+    if (skipNextWriteRef.current) {
+      skipNextWriteRef.current = false;
+      return;
+    }
 
     try {
       window.localStorage.setItem(key, JSON.stringify(value));
     } catch {
       // Persistence is best-effort. The UI should still work without storage.
     }
-  }, [enabled, key, value]);
+  }, [enabled, hasHydrated, key, value]);
 
   const clear = useCallback(() => {
+    skipNextWriteRef.current = true;
     try {
       window.localStorage.removeItem(key);
     } catch {
@@ -47,7 +74,7 @@ export function usePersistentMobileState<T>({
     value,
     setValue,
     clear,
-    hasHydrated: true,
+    hasHydrated,
   };
 }
 

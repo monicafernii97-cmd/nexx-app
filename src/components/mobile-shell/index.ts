@@ -7,4 +7,4 @@ export * from './MobileFilterChips';
 export * from './MobileFullScreenDialog';
 export * from './MobileSkeletonCard';
 export * from './MobileTopBar';
-
+export { useMobileOverlay } from '@/lib/mobile/useMobileOverlay';

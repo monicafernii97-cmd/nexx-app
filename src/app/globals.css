@@ -12,6 +12,7 @@
 
 html {
   font-size: 16px;
+  overflow-x: hidden;
 }
 
 /* ═══════════════════════════════════════════
@@ -213,6 +214,13 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ═══ Intelligence Typography Hierarchy ═══ */

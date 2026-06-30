@@ -1,0 +1,64 @@
+'use client';
+
+import type { ReactNode } from 'react';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { usePreventBodyScroll } from '@/lib/mobile/usePreventBodyScroll';
+
+type MobileBottomSheetProps = {
+  isOpen: boolean;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  footer?: ReactNode;
+  onClose: () => void;
+};
+
+export function MobileBottomSheet({
+  isOpen,
+  title,
+  description,
+  children,
+  footer,
+  onClose,
+}: MobileBottomSheetProps) {
+  const dialogRef = useFocusTrap(isOpen, onClose);
+  usePreventBodyScroll(isOpen);
+
+  if (!isOpen) return null;
+
+  const titleId = `mobile-sheet-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <button
+        type="button"
+        aria-label="Close dialog"
+        className="absolute inset-0 bg-black/30"
+        onClick={onClose}
+      />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="fixed inset-x-0 bottom-0 mx-auto max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 pb-[calc(env(safe-area-inset-bottom)+20px)] text-neutral-900 shadow-2xl outline-none"
+      >
+        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-neutral-300" />
+        <div className="mb-5">
+          <h2 id={titleId} className="text-lg font-semibold text-neutral-900">
+            {title}
+          </h2>
+          {description ? (
+            <p className="mt-2 text-sm leading-6 text-neutral-600">
+              {description}
+            </p>
+          ) : null}
+        </div>
+        <div className="space-y-5">{children}</div>
+        {footer ? <div className="mt-6">{footer}</div> : null}
+      </div>
+    </div>
+  );
+}
+

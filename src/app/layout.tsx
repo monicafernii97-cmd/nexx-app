@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { ConvexClientProvider } from '@/lib/convex-provider';
 
@@ -6,6 +6,12 @@ export const metadata: Metadata = {
   title: 'NEXX — Your Corner. Your Calm. Your Case.',
   description: 'AI-powered legal counsel, emotional support, and strategic empowerment for parents navigating co-parenting with a narcissistic ex.',
   icons: { icon: '/favicon.ico' },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 };
 
 /** Root HTML layout with Convex/Clerk providers and deterministic font fallbacks. */

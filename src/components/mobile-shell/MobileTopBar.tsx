@@ -10,6 +10,7 @@ type MobileTopBarProps = {
   onTitleAction?: () => void;
 };
 
+/** Sticky 64px mobile top bar with fixed side controls and truncating title. */
 export function MobileTopBar({
   title,
   left,
@@ -47,6 +48,7 @@ export function MobileTopBar({
   );
 }
 
+/** Thumb-sized icon button with the contract-required accessible label. */
 export function MobileIconButton({
   label,
   children,
@@ -69,4 +71,3 @@ export function MobileIconButton({
     </button>
   );
 }
-

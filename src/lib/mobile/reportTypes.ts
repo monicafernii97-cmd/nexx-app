@@ -43,6 +43,7 @@ export type DocumentDraft = {
 
 export type ReportBuildState = 'idle' | 'building' | 'success' | 'error';
 
+/** Creates the contract default payload for mobile report generation. */
 export const defaultMobileReportPayload = (
   caseId: string,
 ): BuildReportPayload => ({
@@ -52,4 +53,3 @@ export const defaultMobileReportPayload = (
   patternHandling: 'include_supported_only',
   source: 'workspace_mobile',
 });
-

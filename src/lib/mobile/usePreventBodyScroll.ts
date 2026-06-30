@@ -6,6 +6,7 @@ let lockCount = 0;
 let originalOverflow = '';
 let originalPaddingRight = '';
 
+/** Locks body scrolling while one or more mobile overlays are open. */
 export function usePreventBodyScroll(isLocked: boolean) {
   useEffect(() => {
     if (!isLocked) return;

@@ -5,6 +5,7 @@ type MobileSkeletonCardProps = {
   className?: string;
 };
 
+/** Skeleton card matching the shape of mobile content cards. */
 export function MobileSkeletonCard({ lines = 3, className = '' }: MobileSkeletonCardProps) {
   return (
     <div

@@ -8,6 +8,7 @@ type PersistentStateOptions<T> = {
   enabled?: boolean;
 };
 
+/** Persists small mobile UI state in localStorage after client hydration. */
 export function usePersistentMobileState<T>({
   key,
   initialValue,
@@ -77,4 +78,3 @@ export function usePersistentMobileState<T>({
     hasHydrated,
   };
 }
-

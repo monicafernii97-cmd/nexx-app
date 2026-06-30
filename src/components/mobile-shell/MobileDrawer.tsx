@@ -19,6 +19,7 @@ type MobileDrawerProps = {
   onClose: () => void;
 };
 
+/** Accessible slide-out mobile navigation drawer with focus and scroll handling. */
 export function MobileDrawer({
   isOpen,
   title = 'Nexproof',
@@ -64,6 +65,7 @@ export function MobileDrawer({
               key={item.href}
               href={item.href}
               onClick={onClose}
+              aria-current={item.isActive ? 'page' : undefined}
               className={`flex min-h-12 items-center gap-3 rounded-2xl px-3 text-sm font-medium ${
                 item.isActive
                   ? 'bg-neutral-100 text-neutral-950 dark:bg-white/10 dark:text-neutral-50'

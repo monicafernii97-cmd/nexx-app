@@ -7,6 +7,7 @@ type MobileFilterChipsProps = {
   ariaLabel: string;
 };
 
+/** Horizontally scrolling single-select mobile filter chips. */
 export function MobileFilterChips({
   options,
   selected,

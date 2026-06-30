@@ -8,6 +8,7 @@ type MobileErrorStateProps = {
   action?: ReactNode;
 };
 
+/** Calm recoverable mobile error state card with optional retry action. */
 export function MobileErrorState({
   title = "We couldn't load this section.",
   message,

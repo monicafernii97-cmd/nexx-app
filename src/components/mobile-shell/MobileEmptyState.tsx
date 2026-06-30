@@ -8,6 +8,7 @@ type MobileEmptyStateProps = {
   action?: ReactNode;
 };
 
+/** Calm mobile empty state card with optional next action. */
 export function MobileEmptyState({ title, description, action }: MobileEmptyStateProps) {
   return (
     <section className="rounded-2xl border border-neutral-200 bg-white p-5 text-neutral-900 shadow-sm dark:border-white/10 dark:bg-neutral-950 dark:text-neutral-50">

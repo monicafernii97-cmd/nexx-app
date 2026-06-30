@@ -7,6 +7,7 @@ type MobileBottomActionBarProps = {
   className?: string;
 };
 
+/** Safe-area aware fixed bottom action container for mobile primary actions. */
 export function MobileBottomActionBar({
   children,
   className = '',
@@ -20,6 +21,7 @@ export function MobileBottomActionBar({
   );
 }
 
+/** Contract-sized filled primary action button for mobile flows. */
 export function MobilePrimaryActionButton({
   children,
   onClick,
@@ -43,6 +45,7 @@ export function MobilePrimaryActionButton({
   );
 }
 
+/** Contract-sized outlined secondary action button for paired mobile actions. */
 export function MobileSecondaryActionButton({
   children,
   onClick,
@@ -65,4 +68,3 @@ export function MobileSecondaryActionButton({
     </button>
   );
 }
-

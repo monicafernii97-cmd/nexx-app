@@ -12,6 +12,7 @@ type MobileBottomSheetProps = {
   onClose: () => void;
 };
 
+/** Accessible safe-area aware bottom sheet for short mobile configuration flows. */
 export function MobileBottomSheet({
   isOpen,
   title,
@@ -21,6 +22,7 @@ export function MobileBottomSheet({
   onClose,
 }: MobileBottomSheetProps) {
   const { dialogRef, titleId } = useMobileOverlay(isOpen, onClose);
+  const descriptionId = description ? `${titleId}-description` : undefined;
 
   if (!isOpen) return null;
 
@@ -37,6 +39,7 @@ export function MobileBottomSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={descriptionId}
         tabIndex={-1}
         className="fixed inset-x-0 bottom-0 mx-auto max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 pb-[calc(env(safe-area-inset-bottom)+20px)] text-neutral-900 shadow-2xl outline-none dark:border dark:border-white/10 dark:bg-neutral-950 dark:text-neutral-50"
       >
@@ -46,7 +49,7 @@ export function MobileBottomSheet({
             {title}
           </h2>
           {description ? (
-            <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">
+            <p id={descriptionId} className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">
               {description}
             </p>
           ) : null}

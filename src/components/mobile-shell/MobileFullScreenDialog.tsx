@@ -12,6 +12,7 @@ type MobileFullScreenDialogProps = {
   onClose: () => void;
 };
 
+/** Full-screen mobile dialog shell for long editing or preview workflows. */
 export function MobileFullScreenDialog({
   isOpen,
   title,

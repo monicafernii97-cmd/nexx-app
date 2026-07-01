@@ -10,14 +10,12 @@ import {
   type MobileDrawerItem,
 } from '@/components/mobile-shell';
 import type { MobileCaseWorkspaceData } from '@/lib/mobile/caseWorkspaceData';
-import {
-  MobileCaseSnapshotCard,
-  MobileFactsCarousel,
-  MobileGenerateReportBar,
-  MobileNarrativePreview,
-  MobilePatternsSection,
-  MobileTimelineSnapshot,
-} from './index';
+import { MobileCaseSnapshotCard } from './MobileCaseSnapshotCard';
+import { MobileFactsCarousel } from './MobileFactsCarousel';
+import { MobileGenerateReportBar } from './MobileGenerateReportBar';
+import { MobileNarrativePreview } from './MobileNarrativePreview';
+import { MobilePatternsSection } from './MobilePatternsSection';
+import { MobileTimelineSnapshot } from './MobileTimelineSnapshot';
 
 type MobileCaseWorkspaceProps = {
   data: MobileCaseWorkspaceData;
@@ -50,15 +48,16 @@ export function MobileCaseWorkspace({ data }: MobileCaseWorkspaceProps) {
     <div className="light min-h-dvh bg-neutral-50 text-neutral-900">
       <MobileTopBar
         title={data.caseName}
-        titleActionLabel="Select case"
-        onTitleAction={() => undefined}
         left={
           <MobileIconButton label="Open menu" onClick={() => setIsDrawerOpen(true)}>
             <Menu aria-hidden="true" className="h-5 w-5" />
           </MobileIconButton>
         }
         right={
-          <MobileIconButton label="More actions">
+          <MobileIconButton
+            label="Open case navigation"
+            onClick={() => setIsDrawerOpen(true)}
+          >
             <MoreHorizontal aria-hidden="true" className="h-5 w-5" />
           </MobileIconButton>
         }
@@ -87,7 +86,11 @@ export function MobileCaseWorkspace({ data }: MobileCaseWorkspaceProps) {
 
       <MobileGenerateReportBar
         onGenerateReport={() => {
-          router.push(`/case/${data.caseId}/workspace?report=1`);
+          const searchParams = new URLSearchParams({
+            source: 'workspace_mobile',
+            caseId: data.caseId,
+          });
+          router.push(`/docuvault?${searchParams.toString()}`);
         }}
       />
     </div>
@@ -112,7 +115,10 @@ export function MobileCaseDetailTopBar({ title, caseId }: MobileCaseDetailTopBar
         </MobileIconButton>
       }
       right={
-        <MobileIconButton label="More actions">
+        <MobileIconButton
+          label="Open workspace"
+          onClick={() => router.push(`/case/${caseId}/workspace`)}
+        >
           <BriefcaseBusiness aria-hidden="true" className="h-5 w-5" />
         </MobileIconButton>
       }

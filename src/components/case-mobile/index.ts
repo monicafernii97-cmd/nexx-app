@@ -1,5 +1,5 @@
 export * from './MobileCaseSnapshotCard';
-export * from './MobileCaseWorkspace';
+export { MobileCaseWorkspace, MobileCaseDetailTopBar } from './MobileCaseWorkspace';
 export * from './MobileFactsCarousel';
 export * from './MobileFactsList';
 export * from './MobileFullSummaryScreen';

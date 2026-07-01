@@ -12,7 +12,7 @@ export function MobileNarrativePreview({ caseId, previewText }: MobileNarrativeP
       <h2 className="text-base font-semibold">Case Summary</h2>
       <div className="relative mt-4 max-h-[8.75rem] overflow-hidden">
         <p className="line-clamp-5 text-sm leading-7 text-neutral-700">{previewText}</p>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-white to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-linear-to-t from-white to-transparent" />
       </div>
       <Link
         href={`/case/${caseId}/workspace/summary`}
@@ -23,4 +23,3 @@ export function MobileNarrativePreview({ caseId, previewText }: MobileNarrativeP
     </section>
   );
 }
-

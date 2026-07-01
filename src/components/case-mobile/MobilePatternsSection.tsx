@@ -28,8 +28,11 @@ export function MobilePatternsSection({ patterns }: MobilePatternsSectionProps) 
               </div>
               <p className="mt-2 text-sm leading-6 text-neutral-700">{pattern.summary}</p>
               <div className="mt-3 space-y-2">
-                {pattern.supportingEvents.slice(0, 3).map((event) => (
-                  <p key={`${event.date}-${event.description}`} className="text-xs leading-5 text-neutral-600">
+                {pattern.supportingEvents.slice(0, 3).map((event, index) => (
+                  <p
+                    key={event.id ?? `${event.date}-${event.description}-${index}`}
+                    className="text-xs leading-5 text-neutral-600"
+                  >
                     {event.date} - {event.description}
                   </p>
                 ))}
@@ -44,4 +47,3 @@ export function MobilePatternsSection({ patterns }: MobilePatternsSectionProps) 
     </section>
   );
 }
-

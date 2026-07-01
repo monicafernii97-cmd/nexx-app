@@ -12,6 +12,7 @@ export type MobileTimelineEvent = {
   title: string;
   description?: string;
   sourceType: 'message' | 'timeline' | 'pin' | 'court_note' | 'document';
+  category?: 'message' | 'court' | 'call' | 'exchange' | 'evidence' | 'general';
   sourceCount?: number;
 };
 

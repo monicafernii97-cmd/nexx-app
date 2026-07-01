@@ -42,6 +42,7 @@ const sampleTimeline: MobileTimelineEvent[] = [
     title: 'Hearing scheduled',
     description: 'A hearing date was added to the case timeline.',
     sourceType: 'court_note',
+    category: 'court',
     sourceCount: 1,
   },
   {
@@ -50,6 +51,7 @@ const sampleTimeline: MobileTimelineEvent[] = [
     title: 'Call conflict during homework',
     description: 'A documented call overlapped with the evening routine.',
     sourceType: 'message',
+    category: 'call',
     sourceCount: 2,
   },
   {
@@ -58,6 +60,7 @@ const sampleTimeline: MobileTimelineEvent[] = [
     title: 'Exchange logistics issue',
     description: 'Exchange timing details changed close to the scheduled time.',
     sourceType: 'timeline',
+    category: 'exchange',
     sourceCount: 2,
   },
   {
@@ -66,6 +69,7 @@ const sampleTimeline: MobileTimelineEvent[] = [
     title: 'Document uploaded',
     description: 'A court order was added as a source for review.',
     sourceType: 'document',
+    category: 'evidence',
     sourceCount: 1,
   },
 ];
@@ -82,11 +86,13 @@ const samplePatterns: MobilePattern[] = [
         date: 'Mar 03',
         description: 'Call overlapped with routine transition time.',
         sourceType: 'message',
+        id: 'supporting-event-call-mar-03',
       },
       {
         date: 'Mar 10',
         description: 'Call timing interfered with homework flow.',
         sourceType: 'message',
+        id: 'supporting-event-call-mar-10',
       },
     ],
   },
@@ -113,4 +119,3 @@ export function getMobileCaseWorkspaceData(caseId: string): MobileCaseWorkspaceD
     ].join('\n\n'),
   };
 }
-

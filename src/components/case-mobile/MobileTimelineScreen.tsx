@@ -12,10 +12,12 @@ const filters = ['All', 'Messages', 'Court', 'Calls', 'Exchange', 'Evidence'];
 
 function eventMatchesFilter(event: MobileTimelineEvent, filter: string) {
   if (filter === 'All') return true;
-  if (filter === 'Messages') return event.sourceType === 'message';
-  if (filter === 'Court') return event.sourceType === 'court_note' || event.sourceType === 'document';
-  if (filter === 'Evidence') return event.sourceType === 'document';
-  return event.title.toLowerCase().includes(filter.toLowerCase());
+  if (filter === 'Messages') return event.category === 'message' || event.sourceType === 'message';
+  if (filter === 'Court') return event.category === 'court' || event.sourceType === 'court_note';
+  if (filter === 'Calls') return event.category === 'call';
+  if (filter === 'Exchange') return event.category === 'exchange';
+  if (filter === 'Evidence') return event.category === 'evidence' || event.sourceType === 'document';
+  return false;
 }
 
 /** Full mobile timeline with horizontal filters and source-backed event cards. */
@@ -55,4 +57,3 @@ export function MobileTimelineScreen({ events }: MobileTimelineScreenProps) {
     </div>
   );
 }
-

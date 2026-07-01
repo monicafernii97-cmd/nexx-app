@@ -56,7 +56,8 @@ export const mobileDocuVaultSectionSeeds: Array<
 
 /** Stable local-storage identity for a mobile draft. */
 export function getMobileDraftStorageIdentity(caseId: string, draftId?: string) {
-  return draftId ?? `mobile-draft-${caseId}`;
+  const normalizedDraftId = draftId?.trim();
+  return normalizedDraftId || `mobile-draft-${caseId}`;
 }
 
 /** Local-storage key for the persisted mobile DocuVault draft. */
@@ -107,20 +108,21 @@ export function getMobileSectionStatusLabel(status: DocumentSectionStatus) {
 
 /** Build the canonical DocuVault preview route for a saved mobile draft. */
 export function buildMobilePreviewHref(caseId: string, draft: DocumentDraft) {
-  const params = new URLSearchParams({
-    draftId: draft.id,
-    outputType: draft.documentType,
-  });
-  return `/case/${caseId}/docuvault/preview?${params.toString()}`;
+  return `/case/${caseId}/docuvault/preview?${buildMobileDraftParams(draft)}`;
 }
 
 /** Build the canonical DocuVault outline route for a saved mobile draft. */
 export function buildMobileDocuVaultHref(caseId: string, draft: DocumentDraft) {
+  return `/case/${caseId}/docuvault?${buildMobileDraftParams(draft)}`;
+}
+
+/** Build the shared draft identity query string for mobile DocuVault routes. */
+function buildMobileDraftParams(draft: DocumentDraft) {
   const params = new URLSearchParams({
     draftId: draft.id,
     outputType: draft.documentType,
   });
-  return `/case/${caseId}/docuvault?${params.toString()}`;
+  return params.toString();
 }
 
 /** Flatten section text for device share and clipboard fallbacks. */

@@ -87,15 +87,15 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 
 ## Phase 5 - Preview and Export PR
 
-- [ ] Add `/case/[caseId]/docuvault/preview`.
-- [ ] Lazy-load PDF preview surface.
-- [ ] Add preview loading state.
-- [ ] Add preview error/retry state.
-- [ ] Add empty draft state.
-- [ ] Keep back navigation returning to DocuVault.
-- [ ] Add export bottom sheet.
-- [ ] Add export loading/success/error/retry states.
-- [ ] Preserve draft on export failure.
+- [x] Add `/case/[caseId]/docuvault/preview`.
+- [x] Lazy-load PDF preview surface.
+- [x] Add preview loading state.
+- [x] Add preview error/retry state.
+- [x] Add empty draft state.
+- [x] Keep back navigation returning to DocuVault.
+- [x] Add export bottom sheet.
+- [x] Add export loading/success/error/retry states.
+- [x] Preserve draft on export failure.
 - [ ] Run typecheck/build and review loop.
 - [ ] Merge PR to `main`.
 

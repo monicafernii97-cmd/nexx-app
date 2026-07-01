@@ -66,23 +66,23 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 - [x] Update backend/report adapter to return or map a stable `reportDraftId`.
 - [x] Route on success to `/case/[caseId]/docuvault?source=workspace&prefill=1&draftId=...`.
 - [x] Add analytics events without sensitive text.
-- [ ] Run typecheck/build and review loop.
-- [ ] Merge PR to `main`.
+- [x] Run typecheck/build and review loop.
+- [x] Merge PR to `main`.
 
 ## Phase 4 - DocuVault Mobile Handoff PR
 
-- [ ] Add `/case/[caseId]/docuvault`.
-- [ ] Implement sticky DocuVault top bar.
-- [ ] Implement prefill confirmation banner.
-- [ ] Implement document type card.
-- [ ] Implement source-backed reassurance note.
-- [ ] Implement document outline sections: Overview, Key Facts, Timeline Summary, Observed Patterns, Open Questions, Source Notes.
-- [ ] Add calm Ready/Review/Empty status badges.
-- [ ] Add sticky Preview PDF / Export bar.
-- [ ] Add full-screen section editor.
-- [ ] Protect unsaved edits with confirmation.
-- [ ] Preserve local unsaved text and offer restore.
-- [ ] Run typecheck/build and review loop.
+- [x] Add `/case/[caseId]/docuvault`.
+- [x] Implement sticky DocuVault top bar.
+- [x] Implement prefill confirmation banner.
+- [x] Implement document type card.
+- [x] Implement source-backed reassurance note.
+- [x] Implement document outline sections: Overview, Key Facts, Timeline Summary, Observed Patterns, Open Questions, Source Notes.
+- [x] Add calm Ready/Review/Empty status badges.
+- [x] Add sticky Preview PDF / Export bar.
+- [x] Add full-screen section editor.
+- [x] Protect unsaved edits with confirmation.
+- [x] Preserve local unsaved text and offer restore.
+- [x] Run typecheck/build and review loop.
 - [ ] Merge PR to `main`.
 
 ## Phase 5 - Preview and Export PR

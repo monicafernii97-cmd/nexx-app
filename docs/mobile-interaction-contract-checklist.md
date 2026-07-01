@@ -82,7 +82,7 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 - [x] Add full-screen section editor.
 - [x] Protect unsaved edits with confirmation.
 - [x] Preserve local unsaved text and offer restore.
-- [ ] Run typecheck/build and review loop.
+- [x] Run typecheck/build and review loop.
 - [ ] Merge PR to `main`.
 
 ## Phase 5 - Preview and Export PR

@@ -9,7 +9,7 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 - [x] Confirm current app is desktop-first and lacks the `/case/[caseId]/*` mobile route family.
 - [x] Confirm existing report flow uses `/api/workspace/report` but does not yet return the contract `reportDraftId` handoff.
 - [x] Confirm reusable focus trap exists at `src/hooks/useFocusTrap.ts`.
-- [ ] Track each implementation phase through PR, review, merge, and deployment.
+- [x] Track each implementation phase through PR, review, merge, and deployment.
 
 ## Phase 1 - Mobile Foundation PR
 
@@ -27,7 +27,7 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 - [x] Add reusable bottom action bar.
 - [x] Add mobile empty, error, skeleton, and filter chip components.
 - [x] Run typecheck/build.
-- [ ] Run CodeRabbit CLI review on the PR diff.
+- [x] Attempt CodeRabbit CLI review on the PR diff; local CLI was blocked by missing WSL distribution, so GitHub CodeRabbit review was used for the merge gate.
 - [x] Open ready-for-review GitHub PR.
 - [x] Address actionable GitHub/CodeRabbit feedback.
 - [x] Merge PR to `main`.
@@ -47,7 +47,7 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 - [x] Implement case summary preview with gradient fade.
 - [x] Implement full summary route/screen.
 - [x] Implement sticky Generate Report CTA.
-- [ ] Verify 320px to 430px layout behavior.
+- [x] Verify 320px to 430px layout behavior.
 - [x] Run typecheck/build and review loop.
 - [x] Merge PR to `main`.
 
@@ -110,7 +110,7 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 - [x] Add `/case/[caseId]/settings`.
 - [x] Add grouped settings rows with 48px targets.
 - [x] Run typecheck/build and review loop.
-- [ ] Merge PR to `main`.
+- [x] Merge PR to `main`.
 
 ## Phase 7 - State, Offline, QA, and Performance PR
 
@@ -131,21 +131,21 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 - [x] Add no-horizontal-overflow checks.
 - [x] Confirm workspace avoids hidden desktop rendering on mobile.
 - [x] Run typecheck/build/test and review loop.
-- [ ] Merge PR to `main`.
+- [x] Merge PR to `main`.
 
 ## Final Acceptance
 
-- [ ] Full mobile flow works: Workspace -> Generate Report -> DocuVault -> Edit -> Preview -> Export.
-- [ ] No horizontal page overflow exists at supported widths.
-- [ ] All tap targets are at least 44px.
-- [ ] Sticky bottom bars respect safe areas.
-- [ ] Final content is not hidden behind sticky actions.
-- [ ] Mobile is single-column and calm.
-- [ ] No desktop right rail appears on mobile workspace.
-- [ ] Loading, empty, error, retry, and offline states exist where applicable.
-- [ ] Dialogs, drawers, sheets, and editors are accessible.
-- [ ] User edits are protected from accidental loss.
-- [ ] Report generation returns or uses a saved draft id.
-- [ ] DocuVault handoff is continuous.
-- [ ] PDF preview and export have complete failure handling.
-- [ ] Production deployment is live.
+- [x] Full mobile flow works: Workspace -> Generate Report -> DocuVault -> Edit -> Preview -> Export.
+- [x] No horizontal page overflow exists at supported widths.
+- [x] All tap targets are at least 44px.
+- [x] Sticky bottom bars respect safe areas.
+- [x] Final content is not hidden behind sticky actions.
+- [x] Mobile is single-column and calm.
+- [x] No desktop right rail appears on mobile workspace.
+- [x] Loading, empty, error, retry, and offline states exist where applicable.
+- [x] Dialogs, drawers, sheets, and editors are accessible.
+- [x] User edits are protected from accidental loss.
+- [x] Report generation returns or uses a saved draft id.
+- [x] DocuVault handoff is continuous.
+- [x] PDF preview and export have complete failure handling.
+- [x] Production deployment is live.

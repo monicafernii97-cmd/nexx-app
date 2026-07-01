@@ -28,9 +28,9 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 - [x] Add mobile empty, error, skeleton, and filter chip components.
 - [x] Run typecheck/build.
 - [ ] Run CodeRabbit CLI review on the PR diff.
-- [ ] Open ready-for-review GitHub PR.
-- [ ] Address actionable GitHub/CodeRabbit feedback.
-- [ ] Merge PR to `main`.
+- [x] Open ready-for-review GitHub PR.
+- [x] Address actionable GitHub/CodeRabbit feedback.
+- [x] Merge PR to `main`.
 
 ## Phase 2 - Workspace Mobile Route PR
 
@@ -83,7 +83,7 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 - [x] Protect unsaved edits with confirmation.
 - [x] Preserve local unsaved text and offer restore.
 - [x] Run typecheck/build and review loop.
-- [ ] Merge PR to `main`.
+- [x] Merge PR to `main`.
 
 ## Phase 5 - Preview and Export PR
 
@@ -97,7 +97,7 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 - [x] Add export loading/success/error/retry states.
 - [x] Preserve draft on export failure.
 - [x] Run typecheck/build and review loop.
-- [ ] Merge PR to `main`.
+- [x] Merge PR to `main`.
 
 ## Phase 6 - Utility Mobile Screens PR
 

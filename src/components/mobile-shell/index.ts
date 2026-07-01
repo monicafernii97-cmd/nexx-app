@@ -7,5 +7,6 @@ export * from './MobileErrorState';
 export * from './MobileFilterChips';
 export * from './MobileFullScreenDialog';
 export * from './MobileSkeletonCard';
+export * from './MobileOfflineBanner';
 export * from './MobileTopBar';
 export { useMobileOverlay } from '@/lib/mobile/useMobileOverlay';

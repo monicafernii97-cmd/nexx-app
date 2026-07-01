@@ -8,10 +8,12 @@ import {
   MobileBottomSheet,
   MobileEmptyState,
   MobileFilterChips,
+  MobileOfflineBanner,
   MobilePrimaryActionButton,
 } from '@/components/mobile-shell';
 import type { MobileEvidenceItem, MobileEvidenceType } from '@/lib/mobile/caseUtilityData';
 import { trackMobileEvent } from '@/lib/mobile/mobileAnalytics';
+import { usePersistentMobileState } from '@/lib/mobile/usePersistentMobileState';
 
 type MobileEvidenceScreenProps = {
   caseId: string;
@@ -79,7 +81,13 @@ function AddEvidenceOption({
 
 /** Source-material review screen with filters and an accessible Add Evidence sheet. */
 export function MobileEvidenceScreen({ caseId, evidence }: MobileEvidenceScreenProps) {
-  const [selectedFilter, setSelectedFilter] = useState('All');
+  const {
+    value: selectedFilter,
+    setValue: setSelectedFilter,
+  } = usePersistentMobileState<string>({
+    key: `mobile-evidence-filter:${caseId}`,
+    initialValue: 'All',
+  });
   const [search, setSearch] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [selectedAddAction, setSelectedAddAction] = useState<string | null>(null);
@@ -100,6 +108,7 @@ export function MobileEvidenceScreen({ caseId, evidence }: MobileEvidenceScreenP
 
   return (
     <>
+      <MobileOfflineBanner caseId={caseId} />
       <main className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4">
         <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
           <label htmlFor="mobile-evidence-search" className="text-xs font-medium text-neutral-500">

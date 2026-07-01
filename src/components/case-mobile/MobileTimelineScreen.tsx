@@ -1,10 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { MobileFilterChips } from '@/components/mobile-shell';
 import type { MobileTimelineEvent } from '@/lib/mobile/mobileTypes';
+import { usePersistentMobileState } from '@/lib/mobile/usePersistentMobileState';
 
 type MobileTimelineScreenProps = {
+  caseId: string;
   events: MobileTimelineEvent[];
 };
 
@@ -21,8 +23,14 @@ function eventMatchesFilter(event: MobileTimelineEvent, filter: string) {
 }
 
 /** Full mobile timeline with horizontal filters and source-backed event cards. */
-export function MobileTimelineScreen({ events }: MobileTimelineScreenProps) {
-  const [selectedFilter, setSelectedFilter] = useState('All');
+export function MobileTimelineScreen({ caseId, events }: MobileTimelineScreenProps) {
+  const {
+    value: selectedFilter,
+    setValue: setSelectedFilter,
+  } = usePersistentMobileState<string>({
+    key: `mobile-timeline-filter:${caseId}`,
+    initialValue: 'All',
+  });
   const filteredEvents = useMemo(
     () => events.filter((event) => eventMatchesFilter(event, selectedFilter)),
     [events, selectedFilter],

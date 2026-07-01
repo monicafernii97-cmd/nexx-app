@@ -8,6 +8,7 @@ import {
   MobileEmptyState,
   MobileErrorState,
   MobileIconButton,
+  MobileOfflineBanner,
   MobileSkeletonCard,
   MobileTopBar,
 } from '@/components/mobile-shell';
@@ -52,6 +53,17 @@ export function MobilePDFPreview({ caseId, draftId, outputType = 'both' }: Mobil
   const docuVaultHref = buildMobileDocuVaultHref(caseId, draft);
   const previewHref = buildMobilePreviewHref(caseId, draft);
   const hasContent = mobileDraftHasContent(draft);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        `mobile-preview-return:${caseId}`,
+        docuVaultHref,
+      );
+    } catch {
+      // Preview return location is best-effort.
+    }
+  }, [caseId, docuVaultHref]);
 
   useEffect(() => {
     const startedAt = performance.now();
@@ -105,6 +117,7 @@ export function MobilePDFPreview({ caseId, draftId, outputType = 'both' }: Mobil
           </MobileIconButton>
         }
       />
+      <MobileOfflineBanner caseId={caseId} />
 
       <main className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4">
         {previewState === 'loading' ? (

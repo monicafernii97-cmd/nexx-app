@@ -1,4 +1,4 @@
-import { MobileCaseUtilityTopBar } from '@/components/mobile-shell';
+import { MobileCaseUtilityTopBar, MobileOfflineBanner } from '@/components/mobile-shell';
 import { MobileReportsScreen } from '@/components/reports-mobile';
 import { getMobileCaseUtilityData } from '@/lib/mobile/caseUtilityData';
 
@@ -14,6 +14,7 @@ export default async function MobileReportsPage({ params }: MobileReportsPagePro
   return (
     <div className="light min-h-dvh bg-neutral-50 text-neutral-900">
       <MobileCaseUtilityTopBar title="Reports" caseId={caseId} />
+      <MobileOfflineBanner caseId={caseId} />
       <MobileReportsScreen key={caseId} caseId={caseId} reports={data.reports} />
     </div>
   );

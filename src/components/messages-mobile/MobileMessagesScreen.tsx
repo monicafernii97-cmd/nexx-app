@@ -5,10 +5,13 @@ import {
   MobileBottomSheet,
   MobileEmptyState,
   MobileFilterChips,
+  MobileOfflineBanner,
 } from '@/components/mobile-shell';
 import type { MobileMessageEvidence } from '@/lib/mobile/caseUtilityData';
+import { usePersistentMobileState } from '@/lib/mobile/usePersistentMobileState';
 
 type MobileMessagesScreenProps = {
+  caseId: string;
   messages: MobileMessageEvidence[];
 };
 
@@ -37,8 +40,14 @@ function messageMatchesSearch(message: MobileMessageEvidence, search: string) {
 }
 
 /** Focused message-evidence review screen with search, filters, and detail view. */
-export function MobileMessagesScreen({ messages }: MobileMessagesScreenProps) {
-  const [selectedFilter, setSelectedFilter] = useState('All');
+export function MobileMessagesScreen({ caseId, messages }: MobileMessagesScreenProps) {
+  const {
+    value: selectedFilter,
+    setValue: setSelectedFilter,
+  } = usePersistentMobileState<string>({
+    key: `mobile-message-filter:${caseId}`,
+    initialValue: 'All',
+  });
   const [search, setSearch] = useState('');
   const [selectedMessage, setSelectedMessage] = useState<MobileMessageEvidence | null>(null);
 
@@ -52,6 +61,7 @@ export function MobileMessagesScreen({ messages }: MobileMessagesScreenProps) {
 
   return (
     <>
+      <MobileOfflineBanner caseId={caseId} />
       <main className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pb-[calc(3rem+env(safe-area-inset-bottom))] pt-4">
         <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
           <label htmlFor="mobile-message-search" className="text-xs font-medium text-neutral-500">

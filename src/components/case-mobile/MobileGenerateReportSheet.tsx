@@ -62,6 +62,26 @@ function createClientBuildId(caseId: string) {
   return `mobile-report-${caseId}-${Date.now().toString(36)}-${randomPart}`;
 }
 
+/** Persist report-build progress for interruption recovery and retry diagnostics. */
+function persistReportBuildProgress(
+  caseId: string,
+  state: ReportBuildState,
+  clientBuildId?: string,
+) {
+  try {
+    window.localStorage.setItem(
+      `mobile-report-build-progress:${caseId}`,
+      JSON.stringify({
+        state,
+        clientBuildId,
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+  } catch {
+    // Build progress persistence is best-effort.
+  }
+}
+
 /** Semantic radio row with the contract-required 44px minimum hit area. */
 function RadioRow<T extends string>({
   name,
@@ -163,6 +183,7 @@ export function MobileGenerateReportSheet({
     }, REPORT_BUILD_TIMEOUT_MS);
 
     setBuildState('building');
+    persistReportBuildProgress(caseId, 'building', clientBuildId);
     setErrorMessage('');
     trackMobileEvent('mobile_report_build_started', { caseId });
 
@@ -183,6 +204,7 @@ export function MobileGenerateReportSheet({
       }
 
       setBuildState('success');
+      persistReportBuildProgress(caseId, 'success', clientBuildId);
       trackMobileEvent('mobile_report_build_succeeded', {
         caseId,
         draftId: result.reportDraftId,
@@ -214,6 +236,7 @@ export function MobileGenerateReportSheet({
       const didTimeout = abortReasonRef.current === 'timeout';
       const fallbackMessage = "We couldn't build the draft. Your selections are saved. Try again.";
       setBuildState('error');
+      persistReportBuildProgress(caseId, 'error', clientBuildId);
       setErrorMessage(
         didTimeout
           ? "We couldn't build the draft before the connection timed out. Your selections are saved. Try again."

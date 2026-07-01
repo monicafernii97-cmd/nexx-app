@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   MobileBottomActionBar,
   MobileFullScreenDialog,
@@ -138,9 +138,27 @@ export function MobileDocuVaultDraftReview({
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const activeSection = draft.sections.find((section) => section.id === activeSectionId) ?? null;
   const isDirty = Boolean(activeSection && editorText !== activeSection.body);
+  const unsavedWriteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingUnsavedEditRef = useRef<UnsavedSectionEdit | null>(null);
+
+  /** Cancel any pending localStorage write for active editor text. */
+  const cancelPendingUnsavedWrite = useCallback(() => {
+    if (unsavedWriteTimeoutRef.current) {
+      clearTimeout(unsavedWriteTimeoutRef.current);
+      unsavedWriteTimeoutRef.current = null;
+    }
+    pendingUnsavedEditRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cancelPendingUnsavedWrite();
+    };
+  }, [cancelPendingUnsavedWrite]);
 
   /** Open an outline section in the full-screen mobile editor. */
   const openEditor = (section: DocumentSection, restoredBody?: string) => {
+    cancelPendingUnsavedWrite();
     setActiveSectionId(section.id);
     setEditorText(restoredBody ?? section.body);
     setShowDiscardConfirm(false);
@@ -150,16 +168,27 @@ export function MobileDocuVaultDraftReview({
   const updateEditorText = (value: string) => {
     setEditorText(value);
     if (!activeSection) return;
-    setUnsavedEdit({
+    pendingUnsavedEditRef.current = {
       sectionId: activeSection.id,
       title: activeSection.title,
       body: value,
-    });
+    };
+    if (unsavedWriteTimeoutRef.current) {
+      clearTimeout(unsavedWriteTimeoutRef.current);
+    }
+    unsavedWriteTimeoutRef.current = setTimeout(() => {
+      if (pendingUnsavedEditRef.current) {
+        setUnsavedEdit(pendingUnsavedEditRef.current);
+      }
+      pendingUnsavedEditRef.current = null;
+      unsavedWriteTimeoutRef.current = null;
+    }, 300);
   };
 
   /** Save the active section back into the persisted mobile draft. */
   const saveSection = () => {
     if (!activeSection) return;
+    cancelPendingUnsavedWrite();
     const now = new Date().toISOString();
     setDraft({
       ...draft,
@@ -186,6 +215,7 @@ export function MobileDocuVaultDraftReview({
       setShowDiscardConfirm(true);
       return;
     }
+    cancelPendingUnsavedWrite();
     clearUnsavedEdit();
     setActiveSectionId(null);
   };
@@ -357,6 +387,7 @@ export function MobileDocuVaultDraftReview({
                 type="button"
                 className="inline-flex min-h-11 flex-1 items-center justify-center rounded-2xl border border-neutral-300 px-4 text-sm font-semibold text-neutral-800 active:bg-neutral-100"
                 onClick={() => {
+                  cancelPendingUnsavedWrite();
                   clearUnsavedEdit();
                   setActiveSectionId(null);
                   setShowDiscardConfirm(false);

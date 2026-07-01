@@ -34,6 +34,7 @@ export default async function MobileDocuVaultPage({
     <div className="light min-h-dvh bg-neutral-50 text-neutral-900">
       <MobileCaseDetailTopBar title="DocuVault" caseId={caseId} />
       <MobileDocuVaultDraftReview
+        key={draftId ?? caseId}
         caseId={caseId}
         documentType={documentType}
         documentTypeLabel={documentTypeLabel}

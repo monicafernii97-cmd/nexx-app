@@ -6,13 +6,16 @@ import {
   MobileBottomActionBar,
   MobileFullScreenDialog,
 } from '@/components/mobile-shell';
-import type {
-  DocumentDraft,
-  DocumentSection,
-  DocumentSectionStatus,
-  ReportOutputType,
-} from '@/lib/mobile/reportTypes';
+import {
+  buildMobilePreviewHref,
+  createInitialMobileDraft,
+  getMobileDraftStorageKey,
+  getMobileSectionStatusLabel,
+  getMobileUnsavedDraftStorageKey,
+} from '@/lib/mobile/docuvaultDraft';
+import type { DocumentDraft, DocumentSection, ReportOutputType } from '@/lib/mobile/reportTypes';
 import { usePersistentMobileState } from '@/lib/mobile/usePersistentMobileState';
+import { MobileExportSheet } from './MobileExportSheet';
 
 type UnsavedSectionEdit = {
   sectionId: string;
@@ -28,82 +31,6 @@ type MobileDocuVaultDraftReviewProps = {
   hasWorkspaceDraft: boolean;
 };
 
-const sectionSeeds: Array<Pick<DocumentSection, 'id' | 'title' | 'status' | 'sourceCount'> & {
-  body: string;
-}> = [
-  {
-    id: 'overview',
-    title: 'Overview',
-    status: 'ready',
-    sourceCount: 3,
-    body: 'Summarize the main issue, the current posture, and the most important source-backed facts from the workspace.',
-  },
-  {
-    id: 'key-facts',
-    title: 'Key Facts',
-    status: 'ready',
-    sourceCount: 5,
-    body: 'List the strongest saved facts in short, factual language. Keep each point tied to source material.',
-  },
-  {
-    id: 'timeline-summary',
-    title: 'Timeline Summary',
-    status: 'needs_review',
-    sourceCount: 4,
-    body: 'Organize the most important timeline events in chronological order and check dates before export.',
-  },
-  {
-    id: 'observed-patterns',
-    title: 'Observed Patterns',
-    status: 'needs_review',
-    sourceCount: 2,
-    body: 'Include only repeated, source-backed patterns. Avoid dramatic labels or unsupported conclusions.',
-  },
-  {
-    id: 'open-questions',
-    title: 'Open Questions',
-    status: 'ready',
-    sourceCount: 0,
-    body: 'Capture missing facts, unclear dates, and anything that should be verified before court use.',
-  },
-  {
-    id: 'source-notes',
-    title: 'Source Notes',
-    status: 'ready',
-    sourceCount: 6,
-    body: 'Preserve the source-backed basis for the draft so preview and export can remain traceable.',
-  },
-];
-
-/** Create the first mobile document draft from workspace handoff state. */
-function createInitialDraft(
-  caseId: string,
-  documentType: ReportOutputType,
-  draftId?: string,
-): DocumentDraft {
-  const now = new Date().toISOString();
-  return {
-    id: draftId ?? `mobile-draft-${caseId}`,
-    caseId,
-    documentType,
-    status: 'draft',
-    source: 'workspace',
-    sections: sectionSeeds.map((section) => ({
-      ...section,
-      preview: section.body,
-    })),
-    createdAt: now,
-    updatedAt: now,
-  };
-}
-
-/** Render contract status labels without warning-heavy styling. */
-function getStatusLabel(status: DocumentSectionStatus) {
-  if (status === 'needs_review') return 'Review';
-  if (status === 'empty') return 'Empty';
-  return 'Ready';
-}
-
 /** Mobile DocuVault draft review surface with editable outline sections. */
 export function MobileDocuVaultDraftReview({
   caseId,
@@ -112,10 +39,10 @@ export function MobileDocuVaultDraftReview({
   draftId,
   hasWorkspaceDraft,
 }: MobileDocuVaultDraftReviewProps) {
-  const draftStorageKey = `mobile-docuvault-draft:${draftId ?? caseId}`;
-  const unsavedStorageKey = `mobile-docuvault-unsaved:${draftId ?? caseId}`;
+  const draftStorageKey = getMobileDraftStorageKey(caseId, draftId);
+  const unsavedStorageKey = getMobileUnsavedDraftStorageKey(caseId, draftId);
   const initialDraft = useMemo(
-    () => createInitialDraft(caseId, documentType, draftId),
+    () => createInitialMobileDraft(caseId, documentType, draftId),
     [caseId, documentType, draftId],
   );
   const {
@@ -136,8 +63,10 @@ export function MobileDocuVaultDraftReview({
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [editorText, setEditorText] = useState('');
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
   const activeSection = draft.sections.find((section) => section.id === activeSectionId) ?? null;
   const isDirty = Boolean(activeSection && editorText !== activeSection.body);
+  const previewHref = buildMobilePreviewHref(caseId, draft);
   const unsavedWriteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUnsavedEditRef = useRef<UnsavedSectionEdit | null>(null);
 
@@ -301,7 +230,7 @@ export function MobileDocuVaultDraftReview({
               <div className="flex items-start justify-between gap-3">
                 <h2 className="text-sm font-semibold text-neutral-900">{section.title}</h2>
                 <span className="rounded-full border border-neutral-300 bg-neutral-50 px-2.5 py-1 text-[11px] font-semibold text-neutral-700">
-                  {getStatusLabel(section.status)}
+                  {getMobileSectionStatusLabel(section.status)}
                 </span>
               </div>
               <p className="mt-2 line-clamp-3 text-sm leading-6 text-neutral-600">
@@ -322,7 +251,7 @@ export function MobileDocuVaultDraftReview({
       <MobileBottomActionBar>
         <div className="flex gap-3">
           <Link
-            href={`/case/${caseId}/docuvault/preview?draftId=${encodeURIComponent(draft.id)}`}
+            href={previewHref}
             className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl border border-neutral-300 px-4 text-sm font-semibold text-neutral-800 active:bg-neutral-100"
           >
             Preview PDF
@@ -330,11 +259,27 @@ export function MobileDocuVaultDraftReview({
           <button
             type="button"
             className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-neutral-900 px-4 text-sm font-semibold text-white active:bg-neutral-800"
+            onClick={() => setIsExportOpen(true)}
           >
             Export
           </button>
         </div>
       </MobileBottomActionBar>
+
+      <MobileExportSheet
+        isOpen={isExportOpen}
+        caseId={caseId}
+        draft={draft}
+        previewHref={previewHref}
+        onClose={() => setIsExportOpen(false)}
+        onMarkExported={() =>
+          setDraft({
+            ...draft,
+            status: 'exported',
+            updatedAt: new Date().toISOString(),
+          })
+        }
+      />
 
       <MobileFullScreenDialog
         isOpen={Boolean(activeSection)}

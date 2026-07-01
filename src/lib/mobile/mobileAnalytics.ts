@@ -6,7 +6,12 @@ type MobileAnalyticsEvent =
   | 'mobile_report_build_started'
   | 'mobile_report_build_succeeded'
   | 'mobile_report_build_failed'
-  | 'mobile_docuvault_opened_from_workspace';
+  | 'mobile_docuvault_opened_from_workspace'
+  | 'mobile_pdf_preview_opened'
+  | 'mobile_pdf_preview_failed'
+  | 'mobile_export_started'
+  | 'mobile_export_succeeded'
+  | 'mobile_export_failed';
 
 type MobileAnalyticsMetadata = {
   caseId?: string;

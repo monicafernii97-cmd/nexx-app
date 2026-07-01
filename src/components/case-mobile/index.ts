@@ -4,6 +4,7 @@ export * from './MobileFactsCarousel';
 export * from './MobileFactsList';
 export * from './MobileFullSummaryScreen';
 export * from './MobileGenerateReportBar';
+export * from './MobileGenerateReportSheet';
 export * from './MobileNarrativePreview';
 export * from './MobilePatternsSection';
 export * from './MobileTimelineSnapshot';

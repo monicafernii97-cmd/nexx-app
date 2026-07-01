@@ -11,9 +11,11 @@ import {
   type MobileDrawerItem,
 } from '@/components/mobile-shell';
 import type { MobileCaseWorkspaceData } from '@/lib/mobile/caseWorkspaceData';
+import { trackMobileEvent } from '@/lib/mobile/mobileAnalytics';
 import { MobileCaseSnapshotCard } from './MobileCaseSnapshotCard';
 import { MobileFactsCarousel } from './MobileFactsCarousel';
 import { MobileGenerateReportBar } from './MobileGenerateReportBar';
+import { MobileGenerateReportSheet } from './MobileGenerateReportSheet';
 import { MobileNarrativePreview } from './MobileNarrativePreview';
 import { MobilePatternsSection } from './MobilePatternsSection';
 import { MobileTimelineSnapshot } from './MobileTimelineSnapshot';
@@ -44,6 +46,7 @@ function buildDrawerItems(caseId: string, active: string): MobileDrawerItem[] {
 export function MobileCaseWorkspace({ data }: MobileCaseWorkspaceProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isActionsOpen, setIsActionsOpen] = useState(false);
+  const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
   const router = useRouter();
   const openDocuVault = () => {
     const searchParams = new URLSearchParams({
@@ -103,6 +106,12 @@ export function MobileCaseWorkspace({ data }: MobileCaseWorkspaceProps) {
         </div>
       </MobileBottomSheet>
 
+      <MobileGenerateReportSheet
+        caseId={data.caseId}
+        isOpen={isReportSheetOpen}
+        onClose={() => setIsReportSheetOpen(false)}
+      />
+
       <main className="mx-auto flex w-full max-w-md flex-col gap-5 px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4">
         <MobileCaseSnapshotCard
           title={data.caseName}
@@ -118,7 +127,10 @@ export function MobileCaseWorkspace({ data }: MobileCaseWorkspaceProps) {
       </main>
 
       <MobileGenerateReportBar
-        onGenerateReport={openDocuVault}
+        onGenerateReport={() => {
+          trackMobileEvent('mobile_generate_report_tapped', { caseId: data.caseId });
+          setIsReportSheetOpen(true);
+        }}
       />
     </div>
   );

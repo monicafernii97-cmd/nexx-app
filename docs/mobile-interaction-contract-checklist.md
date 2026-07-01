@@ -49,23 +49,23 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 - [x] Implement sticky Generate Report CTA.
 - [ ] Verify 320px to 430px layout behavior.
 - [x] Run typecheck/build and review loop.
-- [ ] Merge PR to `main`.
+- [x] Merge PR to `main`.
 
 ## Phase 3 - Generate Report Mobile Flow PR
 
-- [ ] Implement Generate Report bottom sheet.
-- [ ] Add semantic radio groups for output, tone, and pattern handling.
-- [ ] Default output to `both`.
-- [ ] Default tone to `neutral`.
-- [ ] Default patterns to `include_supported_only`.
-- [ ] Add idle/building/success/error state machine.
-- [ ] Prevent duplicate submissions.
-- [ ] Preserve selections on failure.
-- [ ] Add retry behavior.
-- [ ] Add mobile payload builder with `source: "workspace_mobile"`.
-- [ ] Update backend/report adapter to return or map a stable `reportDraftId`.
-- [ ] Route on success to `/case/[caseId]/docuvault?source=workspace&prefill=1&draftId=...`.
-- [ ] Add analytics events without sensitive text.
+- [x] Implement Generate Report bottom sheet.
+- [x] Add semantic radio groups for output, tone, and pattern handling.
+- [x] Default output to `both`.
+- [x] Default tone to `neutral`.
+- [x] Default patterns to `include_supported_only`.
+- [x] Add idle/building/success/error state machine.
+- [x] Prevent duplicate submissions.
+- [x] Preserve selections on failure.
+- [x] Add retry behavior.
+- [x] Add mobile payload builder with `source: "workspace_mobile"`.
+- [x] Update backend/report adapter to return or map a stable `reportDraftId`.
+- [x] Route on success to `/case/[caseId]/docuvault?source=workspace&prefill=1&draftId=...`.
+- [x] Add analytics events without sensitive text.
 - [ ] Run typecheck/build and review loop.
 - [ ] Merge PR to `main`.
 

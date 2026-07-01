@@ -16,6 +16,7 @@ type MobileAnalyticsMetadata = {
   screenWidthBucket?: string;
 };
 
+/** Group viewport widths into the mobile QA buckets from the contract. */
 function getScreenWidthBucket() {
   if (typeof window === 'undefined') return undefined;
   const width = window.innerWidth;

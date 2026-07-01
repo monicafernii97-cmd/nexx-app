@@ -54,6 +54,7 @@ const patternOptions: Array<{ value: PatternHandling; label: string }> = [
   { value: 'exclude_patterns', label: 'Exclude patterns' },
 ];
 
+/** Semantic radio row with the contract-required 44px minimum hit area. */
 function RadioRow<T extends string>({
   name,
   value,
@@ -116,6 +117,7 @@ export function MobileGenerateReportSheet({
     trackMobileEvent('mobile_report_sheet_opened', { caseId });
   }, [caseId, isOpen]);
 
+  /** Persist one mobile report option while keeping required payload fields intact. */
   const updatePayload = <K extends keyof BuildReportPayload>(
     key: K,
     value: BuildReportPayload[K],
@@ -128,6 +130,7 @@ export function MobileGenerateReportSheet({
     });
   };
 
+  /** Build the report draft, require a saved draft id, and hand off to DocuVault. */
   const buildReport = async () => {
     if (isBuilding) return;
 
@@ -188,6 +191,7 @@ export function MobileGenerateReportSheet({
     }
   };
 
+  /** Close the sheet only when a report build is not actively in flight. */
   const closeSheet = () => {
     if (isBuilding) return;
     setBuildState('idle');

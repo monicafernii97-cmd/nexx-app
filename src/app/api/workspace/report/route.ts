@@ -66,6 +66,7 @@ function formatWorkspaceReport(report: WorkspaceReport): string {
     ].filter(Boolean).join('\n\n');
 }
 
+/** Create an idempotency-safe operation id from report content and options. */
 function createStableReportOperationId(...parts: string[]) {
     const input = parts.join('\u001f');
     let hash = 5381;
@@ -75,6 +76,7 @@ function createStableReportOperationId(...parts: string[]) {
     return `${parts[0]}-${(hash >>> 0).toString(36)}`;
 }
 
+/** Normalize desktop and mobile output type names into the shared API enum. */
 function normalizeOutputType(value: unknown, defaultValue: OutputType): OutputType | null {
     const mobileMap: Record<ReportOutputType, OutputType> = {
         summary_pdf: 'summary',
@@ -88,6 +90,7 @@ function normalizeOutputType(value: unknown, defaultValue: OutputType): OutputTy
     return value === undefined || value === null ? defaultValue : null;
 }
 
+/** Normalize desktop and mobile tone names into the shared API enum. */
 function normalizeTone(value: unknown, defaultValue: ToneType): ToneType | null {
     const mobileMap: Record<ReportTone, ToneType> = {
         neutral: 'neutral_concise',
@@ -101,6 +104,7 @@ function normalizeTone(value: unknown, defaultValue: ToneType): ToneType | null 
     return value === undefined || value === null ? defaultValue : null;
 }
 
+/** Normalize desktop and mobile pattern handling names into the shared API enum. */
 function normalizePatternHandling(value: unknown, defaultValue: PatternHandling): PatternHandling | null {
     const mobileMap: Record<MobilePatternHandling, PatternHandling> = {
         include_supported_only: 'include_supported',

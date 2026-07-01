@@ -17,6 +17,12 @@ import { usePersistentMobileState } from '@/lib/mobile/usePersistentMobileState'
 
 const REPORT_BUILD_TIMEOUT_MS = 75_000;
 
+type PersistedReportBuildProgress = {
+  state: ReportBuildState;
+  clientBuildId?: string;
+  updatedAt?: string;
+};
+
 type MobileGenerateReportSheetProps = {
   caseId: string;
   isOpen: boolean;
@@ -82,6 +88,31 @@ function persistReportBuildProgress(
   }
 }
 
+/** Read the last interrupted report-build state for mobile recovery. */
+function readReportBuildProgress(caseId: string): PersistedReportBuildProgress | null {
+  try {
+    const raw = window.localStorage.getItem(`mobile-report-build-progress:${caseId}`);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<PersistedReportBuildProgress>;
+    if (
+      parsed.state === 'idle' ||
+      parsed.state === 'building' ||
+      parsed.state === 'success' ||
+      parsed.state === 'error'
+    ) {
+      return {
+        state: parsed.state,
+        clientBuildId: parsed.clientBuildId,
+        updatedAt: parsed.updatedAt,
+      };
+    }
+  } catch {
+    // Build progress restoration is best-effort.
+  }
+  return null;
+}
+
 /** Semantic radio row with the contract-required 44px minimum hit area. */
 function RadioRow<T extends string>({
   name,
@@ -140,11 +171,40 @@ export function MobileGenerateReportSheet({
   const [errorMessage, setErrorMessage] = useState('');
   const abortControllerRef = useRef<AbortController | null>(null);
   const abortReasonRef = useRef<'cancelled' | 'timeout' | null>(null);
+  const restoredClientBuildIdRef = useRef<string | undefined>(undefined);
   const isBuilding = buildState === 'building';
+
+  const updateBuildState = (
+    nextState: ReportBuildState,
+    clientBuildId?: string,
+  ) => {
+    setBuildState(nextState);
+    persistReportBuildProgress(caseId, nextState, clientBuildId);
+  };
 
   useEffect(() => {
     if (!isOpen) return;
     trackMobileEvent('mobile_report_sheet_opened', { caseId });
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+
+      const progress = readReportBuildProgress(caseId);
+      if (!progress || progress.state === 'idle' || progress.state === 'success') return;
+
+      restoredClientBuildIdRef.current = progress.clientBuildId;
+      setBuildState('error');
+      setErrorMessage(
+        progress.state === 'building'
+          ? 'Your last report build was interrupted. Your selections are saved. Try again.'
+          : "We couldn't build the draft. Your selections are saved. Try again.",
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [caseId, isOpen]);
 
   /** Persist one mobile report option while keeping required payload fields intact. */
@@ -165,7 +225,9 @@ export function MobileGenerateReportSheet({
     if (isBuilding) return;
 
     const startedAt = performance.now();
-    const clientBuildId = payload.clientBuildId ?? createClientBuildId(caseId);
+    const clientBuildId =
+      payload.clientBuildId ?? restoredClientBuildIdRef.current ?? createClientBuildId(caseId);
+    restoredClientBuildIdRef.current = clientBuildId;
     const requestPayload: BuildReportPayload = {
       ...payload,
       caseId,
@@ -182,8 +244,7 @@ export function MobileGenerateReportSheet({
       abortController.abort();
     }, REPORT_BUILD_TIMEOUT_MS);
 
-    setBuildState('building');
-    persistReportBuildProgress(caseId, 'building', clientBuildId);
+    updateBuildState('building', clientBuildId);
     setErrorMessage('');
     trackMobileEvent('mobile_report_build_started', { caseId });
 
@@ -203,8 +264,7 @@ export function MobileGenerateReportSheet({
         throw new Error("We couldn't build the draft. Your selections are saved. Try again.");
       }
 
-      setBuildState('success');
-      persistReportBuildProgress(caseId, 'success', clientBuildId);
+      updateBuildState('success', clientBuildId);
       trackMobileEvent('mobile_report_build_succeeded', {
         caseId,
         draftId: result.reportDraftId,
@@ -235,8 +295,7 @@ export function MobileGenerateReportSheet({
 
       const didTimeout = abortReasonRef.current === 'timeout';
       const fallbackMessage = "We couldn't build the draft. Your selections are saved. Try again.";
-      setBuildState('error');
-      persistReportBuildProgress(caseId, 'error', clientBuildId);
+      updateBuildState('error', clientBuildId);
       setErrorMessage(
         didTimeout
           ? "We couldn't build the draft before the connection timed out. Your selections are saved. Try again."
@@ -264,7 +323,8 @@ export function MobileGenerateReportSheet({
       abortReasonRef.current = 'cancelled';
       abortControllerRef.current?.abort();
     }
-    setBuildState('idle');
+    updateBuildState('idle');
+    restoredClientBuildIdRef.current = undefined;
     setErrorMessage('');
     onClose();
   };

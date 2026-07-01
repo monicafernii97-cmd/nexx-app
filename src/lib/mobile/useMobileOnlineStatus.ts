@@ -9,14 +9,16 @@ export type MobileOnlineStatus = {
   justRestored: boolean;
 };
 
-/** Read the initial browser online state without requiring an effect update. */
+const SSR_SAFE_ONLINE_STATUS: MobileOnlineStatus = {
+  isOnline: true,
+  wasOffline: false,
+  justRestored: false,
+};
+
+/** Read the browser online state after mount. */
 function getInitialOnlineStatus(): MobileOnlineStatus {
   if (typeof navigator === 'undefined') {
-    return {
-      isOnline: true,
-      wasOffline: false,
-      justRestored: false,
-    };
+    return SSR_SAFE_ONLINE_STATUS;
   }
 
   const isOnline = navigator.onLine;
@@ -30,12 +32,20 @@ function getInitialOnlineStatus(): MobileOnlineStatus {
 /** Track mobile online/offline state and emit metadata-only quality events. */
 export function useMobileOnlineStatus(caseId?: string): MobileOnlineStatus {
   const restoredTimerRef = useRef<number | null>(null);
-  const [status, setStatus] = useState<MobileOnlineStatus>(getInitialOnlineStatus);
+  const [status, setStatus] = useState<MobileOnlineStatus>(SSR_SAFE_ONLINE_STATUS);
 
   useEffect(() => {
-    if (!navigator.onLine) {
-      trackMobileEvent('mobile_offline_detected', { caseId });
-    }
+    let cancelled = false;
+
+    queueMicrotask(() => {
+      if (cancelled) return;
+
+      const initialStatus = getInitialOnlineStatus();
+      setStatus(initialStatus);
+      if (!initialStatus.isOnline) {
+        trackMobileEvent('mobile_offline_detected', { caseId });
+      }
+    });
 
     const handleOffline = () => {
       setStatus({
@@ -65,6 +75,7 @@ export function useMobileOnlineStatus(caseId?: string): MobileOnlineStatus {
     window.addEventListener('offline', handleOffline);
     window.addEventListener('online', handleOnline);
     return () => {
+      cancelled = true;
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('online', handleOnline);
       if (restoredTimerRef.current) {

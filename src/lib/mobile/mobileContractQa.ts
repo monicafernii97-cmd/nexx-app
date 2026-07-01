@@ -35,6 +35,42 @@ const sensitiveMetadataKeys = [
   'fileBytes',
 ] as const;
 
+const safeMetadataSuffixes = new Set([
+  'bucket',
+  'count',
+  'hash',
+  'id',
+  'length',
+  'status',
+  'type',
+  'width',
+]);
+
+function splitMetadataKey(key: string) {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function keyMatchesSensitiveMetadata(key: string, sensitiveKey: string) {
+  const keySegments = splitMetadataKey(key);
+  const sensitiveSegments = splitMetadataKey(sensitiveKey);
+  if (keySegments.length === 0 || sensitiveSegments.length === 0) return false;
+
+  return keySegments.some((_, index) => {
+    const candidate = keySegments.slice(index, index + sensitiveSegments.length);
+    const isMatch = candidate.join(' ') === sensitiveSegments.join(' ');
+    if (!isMatch) return false;
+
+    const nextSegment = keySegments[index + sensitiveSegments.length];
+    return !(sensitiveSegments.length === 1 && safeMetadataSuffixes.has(nextSegment));
+  });
+}
+
 /** True when a viewport width is part of the required mobile QA contract. */
 export function isSupportedMobileWidth(width: number) {
   return MOBILE_SUPPORTED_WIDTHS.includes(width as (typeof MOBILE_SUPPORTED_WIDTHS)[number]);
@@ -55,7 +91,7 @@ export function getMobileWidthBucket(width: number) {
 export function assertMobileAnalyticsMetadataSafe(metadata: Record<string, unknown>) {
   const unsafeKey = Object.keys(metadata).find((key) => (
     sensitiveMetadataKeys.some((sensitiveKey) => (
-      key.toLowerCase().includes(sensitiveKey.toLowerCase())
+      keyMatchesSensitiveMetadata(key, sensitiveKey)
     ))
   ));
   if (unsafeKey) {

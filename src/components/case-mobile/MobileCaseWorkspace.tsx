@@ -54,7 +54,11 @@ export function MobileCaseWorkspace({ data }: MobileCaseWorkspaceProps) {
   useMobileScrollRestoration({ key: `workspace:${data.caseId}` });
 
   useEffect(() => {
-    trackMobileEvent('mobile_workspace_viewed', { caseId: data.caseId });
+    try {
+      trackMobileEvent('mobile_workspace_viewed', { caseId: data.caseId });
+    } catch {
+      // Analytics should never block local workspace recovery state.
+    }
     try {
       window.localStorage.setItem('mobile-last-opened-case', data.caseId);
     } catch {

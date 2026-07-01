@@ -51,12 +51,19 @@ describe('mobile interaction contract QA helpers', () => {
     expect(() => assertMobileAnalyticsMetadataSafe({
       caseId: 'case_123',
       draftId: 'draft_123',
+      contentLength: 240,
+      contextType: 'workspace',
       status: 'ready',
     })).not.toThrow();
 
     expect(() => assertMobileAnalyticsMetadataSafe({
       caseId: 'case_123',
       messageText: 'sensitive source text',
+    })).toThrow(/sensitive field/i);
+
+    expect(() => assertMobileAnalyticsMetadataSafe({
+      caseId: 'case_123',
+      sourceText: 'sensitive source text',
     })).toThrow(/sensitive field/i);
   });
 });

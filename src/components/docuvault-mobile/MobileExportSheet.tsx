@@ -96,6 +96,8 @@ export function MobileExportSheet({
   const { isOnline } = useMobileOnlineStatus(caseId);
   const options = useMemo(() => getExportOptions(draft), [draft]);
   const plainText = useMemo(() => getMobileDraftPlainText(draft), [draft]);
+  const lastExportOption = lastOption ? options.find((option) => option.id === lastOption) : null;
+  const isRetryOfflineBlocked = Boolean(lastExportOption?.requiresOnline && !isOnline);
 
   const resetSheet = () => {
     setState('idle');
@@ -109,6 +111,14 @@ export function MobileExportSheet({
   };
 
   const runExport = async (optionId: ExportOptionId) => {
+    const option = options.find((item) => item.id === optionId);
+    if (option?.requiresOnline && !isOnline) {
+      setLastOption(optionId);
+      setActiveOption(null);
+      setState('error');
+      return;
+    }
+
     const startedAt = performance.now();
     setActiveOption(optionId);
     setLastOption(optionId);
@@ -178,7 +188,7 @@ export function MobileExportSheet({
   };
 
   const retry = () => {
-    if (lastOption) {
+    if (lastOption && !isRetryOfflineBlocked) {
       void runExport(lastOption);
     }
   };
@@ -212,15 +222,18 @@ export function MobileExportSheet({
             We could not export the document.
           </h3>
           <p className="mt-2 text-sm leading-6 text-neutral-600">
-            Your draft is still saved.
+            {isRetryOfflineBlocked
+              ? 'Reconnect to retry this export. Your draft is still saved.'
+              : 'Your draft is still saved.'}
           </p>
           <div className="mt-4 flex gap-3">
             <button
               type="button"
-              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-2xl bg-neutral-900 px-4 text-sm font-semibold text-white active:bg-neutral-800"
+              disabled={isRetryOfflineBlocked}
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-2xl bg-neutral-900 px-4 text-sm font-semibold text-white active:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
               onClick={retry}
             >
-              Try Again
+              {isRetryOfflineBlocked ? 'Reconnect' : 'Try Again'}
             </button>
             <button
               type="button"

@@ -46,7 +46,11 @@ export function trackMobileEvent(
   metadata: MobileAnalyticsMetadata = {},
 ) {
   if (typeof window === 'undefined') return;
-  assertMobileAnalyticsMetadataSafe(metadata as Record<string, unknown>);
+  try {
+    assertMobileAnalyticsMetadataSafe(metadata as Record<string, unknown>);
+  } catch {
+    return;
+  }
 
   window.dispatchEvent(new CustomEvent('nexproof:mobile-analytics', {
     detail: {

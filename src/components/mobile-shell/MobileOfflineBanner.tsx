@@ -15,7 +15,11 @@ export function MobileOfflineBanner({ caseId }: MobileOfflineBannerProps) {
 
   return (
     <div className="mx-auto w-full max-w-md px-4 pt-3">
-      <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-neutral-900 shadow-sm">
+      <div
+        role="status"
+        aria-live="polite"
+        className="rounded-2xl border border-neutral-200 bg-white p-4 text-neutral-900 shadow-sm"
+      >
         <div className="flex gap-3">
           <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
             <WifiOff aria-hidden="true" className="h-5 w-5" />

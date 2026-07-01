@@ -26,25 +26,19 @@ export function MobileCaseUtilityTopBar({
       left={
         <MobileIconButton
           label="Go back"
-          onClick={() => {
-            if (window.history.length > 1) {
-              router.back();
-              return;
-            }
-            router.push(`/case/${caseId}/workspace`);
-          }}
+          onClick={() => router.push(`/case/${caseId}/workspace`)}
         >
           <ArrowLeft aria-hidden="true" className="h-5 w-5" />
         </MobileIconButton>
       }
-      right={
+      right={onRightAction ? (
         <MobileIconButton
           label={rightLabel}
           onClick={onRightAction}
         >
           <MoreHorizontal aria-hidden="true" className="h-5 w-5" />
         </MobileIconButton>
-      }
+      ) : null}
     />
   );
 }

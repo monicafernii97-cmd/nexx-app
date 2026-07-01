@@ -11,7 +11,8 @@ type MobileAnalyticsEvent =
   | 'mobile_pdf_preview_failed'
   | 'mobile_export_started'
   | 'mobile_export_succeeded'
-  | 'mobile_export_failed';
+  | 'mobile_export_failed'
+  | 'mobile_add_evidence_tapped';
 
 type MobileAnalyticsMetadata = {
   caseId?: string;

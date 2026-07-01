@@ -1,5 +1,6 @@
 export * from './MobileBottomActionBar';
 export * from './MobileBottomSheet';
+export * from './MobileCaseUtilityTopBar';
 export * from './MobileDrawer';
 export * from './MobileEmptyState';
 export * from './MobileErrorState';

@@ -101,15 +101,15 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 
 ## Phase 6 - Utility Mobile Screens PR
 
-- [ ] Add `/case/[caseId]/evidence`.
-- [ ] Add evidence filters, cards, and Add Evidence bottom sheet.
-- [ ] Add `/case/[caseId]/messages`.
-- [ ] Add message search, filters, cards, and detail view.
-- [ ] Add `/case/[caseId]/reports`.
-- [ ] Add report list, resume draft, retry failed, view/download exported actions.
-- [ ] Add `/case/[caseId]/settings`.
-- [ ] Add grouped settings rows with 48px targets.
-- [ ] Run typecheck/build and review loop.
+- [x] Add `/case/[caseId]/evidence`.
+- [x] Add evidence filters, cards, and Add Evidence bottom sheet.
+- [x] Add `/case/[caseId]/messages`.
+- [x] Add message search, filters, cards, and detail view.
+- [x] Add `/case/[caseId]/reports`.
+- [x] Add report list, resume draft, retry failed, view/download exported actions.
+- [x] Add `/case/[caseId]/settings`.
+- [x] Add grouped settings rows with 48px targets.
+- [x] Run typecheck/build and review loop.
 - [ ] Merge PR to `main`.
 
 ## Phase 7 - State, Offline, QA, and Performance PR

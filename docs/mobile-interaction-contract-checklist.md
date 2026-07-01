@@ -34,21 +34,21 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 
 ## Phase 2 - Workspace Mobile Route PR
 
-- [ ] Add `/case/[caseId]/workspace`.
-- [ ] Implement mobile workspace single-column shell.
-- [ ] Implement sticky workspace top bar with case selector and overflow.
-- [ ] Implement case snapshot card.
-- [ ] Implement key facts carousel with horizontal snap scrolling.
-- [ ] Implement key facts empty state.
-- [ ] Implement `/case/[caseId]/facts` full list route.
-- [ ] Implement timeline snapshot with 3-5 events.
-- [ ] Implement `/case/[caseId]/timeline` with filter chips and event details.
-- [ ] Implement observed patterns with calm support labels only.
-- [ ] Implement case summary preview with gradient fade.
-- [ ] Implement full summary route/screen.
-- [ ] Implement sticky Generate Report CTA.
+- [x] Add `/case/[caseId]/workspace`.
+- [x] Implement mobile workspace single-column shell.
+- [x] Implement sticky workspace top bar with case selector and overflow.
+- [x] Implement case snapshot card.
+- [x] Implement key facts carousel with horizontal snap scrolling.
+- [x] Implement key facts empty state.
+- [x] Implement `/case/[caseId]/facts` full list route.
+- [x] Implement timeline snapshot with 3-5 events.
+- [x] Implement `/case/[caseId]/timeline` with filter chips and event details.
+- [x] Implement observed patterns with calm support labels only.
+- [x] Implement case summary preview with gradient fade.
+- [x] Implement full summary route/screen.
+- [x] Implement sticky Generate Report CTA.
 - [ ] Verify 320px to 430px layout behavior.
-- [ ] Run typecheck/build and review loop.
+- [x] Run typecheck/build and review loop.
 - [ ] Merge PR to `main`.
 
 ## Phase 3 - Generate Report Mobile Flow PR

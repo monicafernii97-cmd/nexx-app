@@ -14,6 +14,7 @@ type MobileMessagesScreenProps = {
 
 const filters = ['All', 'Calls', 'Exchange', 'Court', 'Routine'];
 
+/** True when a message evidence item belongs in the selected filter chip. */
 function messageMatchesFilter(message: MobileMessageEvidence, filter: string) {
   if (filter === 'All') return true;
   if (filter === 'Calls') return message.category === 'calls';
@@ -23,6 +24,7 @@ function messageMatchesFilter(message: MobileMessageEvidence, filter: string) {
   return false;
 }
 
+/** True when a message evidence item matches the entered search text. */
 function messageMatchesSearch(message: MobileMessageEvidence, search: string) {
   const normalizedSearch = search.trim().toLowerCase();
   if (!normalizedSearch) return true;

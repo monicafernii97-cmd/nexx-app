@@ -14,7 +14,7 @@ export default async function MobileReportsPage({ params }: MobileReportsPagePro
   return (
     <div className="light min-h-dvh bg-neutral-50 text-neutral-900">
       <MobileCaseUtilityTopBar title="Reports" caseId={caseId} />
-      <MobileReportsScreen caseId={caseId} reports={data.reports} />
+      <MobileReportsScreen key={caseId} caseId={caseId} reports={data.reports} />
     </div>
   );
 }

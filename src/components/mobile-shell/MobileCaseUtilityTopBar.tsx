@@ -40,7 +40,7 @@ export function MobileCaseUtilityTopBar({
       right={
         <MobileIconButton
           label={rightLabel}
-          onClick={onRightAction ?? (() => router.push(`/case/${caseId}/workspace`))}
+          onClick={onRightAction}
         >
           <MoreHorizontal aria-hidden="true" className="h-5 w-5" />
         </MobileIconButton>

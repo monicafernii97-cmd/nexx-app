@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileText, Plus, RotateCcw } from 'lucide-react';
 import {
@@ -29,6 +29,7 @@ const statusLabel: Record<MobileReportStatus, string> = {
   failed: 'Failed',
 };
 
+/** Calm status badge styles for prior report cards. */
 function statusClasses(status: MobileReportStatus) {
   if (status === 'exported') return 'bg-neutral-900 text-white';
   if (status === 'failed') return 'bg-neutral-100 text-neutral-700';
@@ -41,9 +42,15 @@ export function MobileReportsScreen({ caseId, reports }: MobileReportsScreenProp
   const router = useRouter();
   const [items, setItems] = useState(reports);
   const [activeReport, setActiveReport] = useState<MobileReportItem | null>(null);
+  const retryTimerRef = useRef<number | null>(null);
 
   const hasReports = items.length > 0;
-  const sortedReports = useMemo(() => items, [items]);
+
+  useEffect(() => () => {
+    if (retryTimerRef.current) {
+      window.clearTimeout(retryTimerRef.current);
+    }
+  }, []);
 
   const openReport = (report: MobileReportItem) => {
     const draft = createInitialMobileDraft(caseId, report.type, report.id);
@@ -58,10 +65,14 @@ export function MobileReportsScreen({ caseId, reports }: MobileReportsScreenProp
     setItems((current) => current.map((item) => (
       item.id === report.id ? { ...item, status: 'processing' } : item
     )));
-    window.setTimeout(() => {
+    if (retryTimerRef.current) {
+      window.clearTimeout(retryTimerRef.current);
+    }
+    retryTimerRef.current = window.setTimeout(() => {
       setItems((current) => current.map((item) => (
         item.id === report.id ? { ...item, status: 'draft' } : item
       )));
+      retryTimerRef.current = null;
     }, 900);
   };
 
@@ -70,7 +81,7 @@ export function MobileReportsScreen({ caseId, reports }: MobileReportsScreenProp
       <main className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4">
         {hasReports ? (
           <div className="space-y-3">
-            {sortedReports.map((report) => (
+            {items.map((report) => (
               <article
                 key={report.id}
                 className="rounded-2xl border border-neutral-200 bg-white p-5 text-neutral-900 shadow-sm"

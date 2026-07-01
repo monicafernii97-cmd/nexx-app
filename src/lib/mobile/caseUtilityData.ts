@@ -23,8 +23,12 @@ export type MobileMessageEvidence = {
   preview: string;
   linkedFactsCount: number;
   tags: string[];
-  category: 'all' | 'calls' | 'exchange' | 'court' | 'routine';
+  category: MobileMessageCategory;
 };
+
+export type MobileMessageCategory = 'calls' | 'exchange' | 'court' | 'routine';
+
+export type MobileMessageFilter = 'all' | MobileMessageCategory;
 
 export type MobileReportStatus = 'draft' | 'processing' | 'exported' | 'failed';
 

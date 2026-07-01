@@ -28,6 +28,7 @@ const evidenceTypeLabel: Record<MobileEvidenceType, string> = {
   note: 'Note',
 };
 
+/** True when an evidence item belongs in the selected type filter. */
 function evidenceMatchesFilter(item: MobileEvidenceItem, filter: string) {
   if (filter === 'All') return true;
   if (filter === 'Messages') return item.type === 'message';
@@ -38,18 +39,31 @@ function evidenceMatchesFilter(item: MobileEvidenceItem, filter: string) {
   return false;
 }
 
+/** True when an evidence item matches the user's focused evidence search. */
+function evidenceMatchesSearch(item: MobileEvidenceItem, search: string) {
+  const normalizedSearch = search.trim().toLowerCase();
+  if (!normalizedSearch) return true;
+  return [item.title, item.date, item.preview, evidenceTypeLabel[item.type]].some((value) => (
+    value.toLowerCase().includes(normalizedSearch)
+  ));
+}
+
+/** Bottom-sheet action row for the mobile Add Evidence intake choices. */
 function AddEvidenceOption({
   icon,
   title,
   description,
+  onClick,
 }: {
   icon: ReactNode;
   title: string;
   description: string;
+  onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-neutral-200 px-4 py-3 text-left active:bg-neutral-100"
     >
       <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
@@ -66,11 +80,23 @@ function AddEvidenceOption({
 /** Source-material review screen with filters and an accessible Add Evidence sheet. */
 export function MobileEvidenceScreen({ caseId, evidence }: MobileEvidenceScreenProps) {
   const [selectedFilter, setSelectedFilter] = useState('All');
+  const [search, setSearch] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [selectedAddAction, setSelectedAddAction] = useState<string | null>(null);
   const filteredEvidence = useMemo(
-    () => evidence.filter((item) => evidenceMatchesFilter(item, selectedFilter)),
-    [evidence, selectedFilter],
+    () => evidence.filter((item) => (
+      evidenceMatchesFilter(item, selectedFilter) && evidenceMatchesSearch(item, search)
+    )),
+    [evidence, search, selectedFilter],
   );
+  const openAddEvidence = () => {
+    trackMobileEvent('mobile_add_evidence_tapped', { caseId });
+    setSelectedAddAction(null);
+    setIsAddOpen(true);
+  };
+  const chooseAddAction = (action: string) => {
+    setSelectedAddAction(action);
+  };
 
   return (
     <>
@@ -82,6 +108,8 @@ export function MobileEvidenceScreen({ caseId, evidence }: MobileEvidenceScreenP
           <input
             id="mobile-evidence-search"
             type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
             placeholder="Find documents, notes, or messages"
             className="mt-2 min-h-11 w-full rounded-2xl border border-neutral-300 px-4 text-sm text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-neutral-900"
           />
@@ -126,7 +154,7 @@ export function MobileEvidenceScreen({ caseId, evidence }: MobileEvidenceScreenP
               <button
                 type="button"
                 className="inline-flex min-h-11 items-center justify-center rounded-full border border-neutral-300 px-4 text-sm font-semibold text-neutral-800 active:bg-neutral-100"
-                onClick={() => setIsAddOpen(true)}
+                onClick={openAddEvidence}
               >
                 Add Evidence
               </button>
@@ -137,10 +165,7 @@ export function MobileEvidenceScreen({ caseId, evidence }: MobileEvidenceScreenP
 
       <MobileBottomActionBar>
         <MobilePrimaryActionButton
-          onClick={() => {
-            trackMobileEvent('mobile_add_evidence_tapped', { caseId });
-            setIsAddOpen(true);
-          }}
+          onClick={openAddEvidence}
         >
           <span className="inline-flex items-center gap-2">
             <Plus aria-hidden="true" className="h-4 w-4" />
@@ -160,23 +185,33 @@ export function MobileEvidenceScreen({ caseId, evidence }: MobileEvidenceScreenP
             icon={<FileUp aria-hidden="true" className="h-5 w-5" />}
             title="Upload File"
             description="Add a document, image, or PDF as source material."
+            onClick={() => chooseAddAction('Upload File')}
           />
           <AddEvidenceOption
             icon={<StickyNote aria-hidden="true" className="h-5 w-5" />}
             title="Add Note"
             description="Save a short note tied to this case."
+            onClick={() => chooseAddAction('Add Note')}
           />
           <AddEvidenceOption
             icon={<MessageSquareText aria-hidden="true" className="h-5 w-5" />}
             title="Import Message"
             description="Bring in a message thread for review."
+            onClick={() => chooseAddAction('Import Message')}
           />
           <AddEvidenceOption
             icon={<CalendarPlus aria-hidden="true" className="h-5 w-5" />}
             title="Add Timeline Event"
             description="Record something that happened on a specific date."
+            onClick={() => chooseAddAction('Add Timeline Event')}
           />
         </div>
+        {selectedAddAction ? (
+          <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm leading-6 text-neutral-700">
+            {selectedAddAction} is selected. The connected intake flow will open here when
+            backend evidence intake is wired to this mobile screen.
+          </div>
+        ) : null}
       </MobileBottomSheet>
     </>
   );

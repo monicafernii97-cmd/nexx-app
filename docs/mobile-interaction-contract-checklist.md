@@ -96,7 +96,7 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 - [x] Add export bottom sheet.
 - [x] Add export loading/success/error/retry states.
 - [x] Preserve draft on export failure.
-- [ ] Run typecheck/build and review loop.
+- [x] Run typecheck/build and review loop.
 - [ ] Merge PR to `main`.
 
 ## Phase 6 - Utility Mobile Screens PR

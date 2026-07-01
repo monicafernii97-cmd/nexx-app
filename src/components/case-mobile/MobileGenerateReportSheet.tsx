@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MobileBottomSheet } from '@/components/mobile-shell';
 import { trackMobileEvent } from '@/lib/mobile/mobileAnalytics';
@@ -14,6 +14,8 @@ import {
   type ReportTone,
 } from '@/lib/mobile/reportTypes';
 import { usePersistentMobileState } from '@/lib/mobile/usePersistentMobileState';
+
+const REPORT_BUILD_TIMEOUT_MS = 75_000;
 
 type MobileGenerateReportSheetProps = {
   caseId: string;
@@ -53,6 +55,12 @@ const patternOptions: Array<{ value: PatternHandling; label: string }> = [
   { value: 'include_supported_only', label: 'Include supported only' },
   { value: 'exclude_patterns', label: 'Exclude patterns' },
 ];
+
+/** Create a per-build idempotency key before any model generation starts. */
+function createClientBuildId(caseId: string) {
+  const randomPart = Math.random().toString(36).slice(2);
+  return `mobile-report-${caseId}-${Date.now().toString(36)}-${randomPart}`;
+}
 
 /** Semantic radio row with the contract-required 44px minimum hit area. */
 function RadioRow<T extends string>({
@@ -110,6 +118,8 @@ export function MobileGenerateReportSheet({
   });
   const [buildState, setBuildState] = useState<ReportBuildState>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const abortReasonRef = useRef<'cancelled' | 'timeout' | null>(null);
   const isBuilding = buildState === 'building';
 
   useEffect(() => {
@@ -135,6 +145,23 @@ export function MobileGenerateReportSheet({
     if (isBuilding) return;
 
     const startedAt = performance.now();
+    const clientBuildId = payload.clientBuildId ?? createClientBuildId(caseId);
+    const requestPayload: BuildReportPayload = {
+      ...payload,
+      caseId,
+      source: 'workspace_mobile',
+      clientBuildId,
+    };
+    setPayload(requestPayload);
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    abortReasonRef.current = null;
+    const timeoutId = window.setTimeout(() => {
+      abortReasonRef.current = 'timeout';
+      abortController.abort();
+    }, REPORT_BUILD_TIMEOUT_MS);
+
     setBuildState('building');
     setErrorMessage('');
     trackMobileEvent('mobile_report_build_started', { caseId });
@@ -143,11 +170,8 @@ export function MobileGenerateReportSheet({
       const response = await fetch('/api/workspace/report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...payload,
-          caseId,
-          source: 'workspace_mobile',
-        }),
+        signal: abortController.signal,
+        body: JSON.stringify(requestPayload),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -174,26 +198,49 @@ export function MobileGenerateReportSheet({
         source: 'workspace',
         prefill: '1',
         draftId: result.reportDraftId,
+        outputType: requestPayload.outputType,
       });
       router.push(`/case/${caseId}/docuvault?${searchParams.toString()}`);
     } catch (error) {
+      if (abortReasonRef.current === 'cancelled') {
+        trackMobileEvent('mobile_report_build_failed', {
+          caseId,
+          status: 'aborted',
+          durationMs: Math.round(performance.now() - startedAt),
+        });
+        return;
+      }
+
+      const didTimeout = abortReasonRef.current === 'timeout';
+      const fallbackMessage = "We couldn't build the draft. Your selections are saved. Try again.";
       setBuildState('error');
       setErrorMessage(
-        error instanceof Error && error.message
-          ? error.message
-          : "We couldn't build the draft. Your selections are saved. Try again.",
+        didTimeout
+          ? "We couldn't build the draft before the connection timed out. Your selections are saved. Try again."
+          : error instanceof Error && error.message
+            ? error.message
+            : fallbackMessage,
       );
       trackMobileEvent('mobile_report_build_failed', {
         caseId,
-        status: 'error',
+        status: didTimeout ? 'timeout' : 'error',
         durationMs: Math.round(performance.now() - startedAt),
       });
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
+      abortReasonRef.current = null;
     }
   };
 
   /** Close the sheet only when a report build is not actively in flight. */
   const closeSheet = () => {
-    if (isBuilding) return;
+    if (isBuilding) {
+      abortReasonRef.current = 'cancelled';
+      abortControllerRef.current?.abort();
+    }
     setBuildState('idle');
     setErrorMessage('');
     onClose();
@@ -203,8 +250,7 @@ export function MobileGenerateReportSheet({
     <div className="flex gap-3">
       <button
         type="button"
-        disabled={isBuilding}
-        className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl border border-neutral-300 px-4 text-sm font-semibold text-neutral-800 active:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl border border-neutral-300 px-4 text-sm font-semibold text-neutral-800 active:bg-neutral-100"
         onClick={closeSheet}
       >
         Cancel
@@ -281,13 +327,20 @@ export function MobileGenerateReportSheet({
       </fieldset>
 
       {buildState === 'building' ? (
-        <p className="rounded-2xl bg-neutral-50 px-4 py-3 text-sm leading-6 text-neutral-600">
+        <p
+          role="status"
+          aria-live="polite"
+          className="rounded-2xl bg-neutral-50 px-4 py-3 text-sm leading-6 text-neutral-600"
+        >
           Building your draft...
         </p>
       ) : null}
 
       {buildState === 'error' ? (
-        <p className="rounded-2xl bg-neutral-50 px-4 py-3 text-sm leading-6 text-neutral-700">
+        <p
+          role="alert"
+          className="rounded-2xl bg-neutral-50 px-4 py-3 text-sm leading-6 text-neutral-700"
+        >
           {errorMessage || "We couldn't build the draft. Your selections are saved. Try again."}
         </p>
       ) : null}

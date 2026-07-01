@@ -10,6 +10,7 @@ export type BuildReportPayload = {
   tone: ReportTone;
   patternHandling: PatternHandling;
   source: 'workspace_mobile';
+  clientBuildId?: string;
 };
 
 export type BuildReportResponse = {

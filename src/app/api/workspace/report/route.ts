@@ -117,6 +117,25 @@ function normalizePatternHandling(value: unknown, defaultValue: PatternHandling)
     return value === undefined || value === null ? defaultValue : null;
 }
 
+/** Convert normalized API output type back into the mobile contract enum. */
+function toMobileOutputType(outputType: OutputType): ReportOutputType {
+    if (outputType === 'summary') return 'summary_pdf';
+    return outputType;
+}
+
+/** Convert normalized API tone back into the mobile contract enum. */
+function toMobileTone(tone: ToneType): ReportTone {
+    if (tone === 'neutral_concise') return 'neutral';
+    if (tone === 'detailed_organized') return 'detailed';
+    return 'attorney_ready';
+}
+
+/** Convert normalized API pattern handling back into the mobile contract enum. */
+function toMobilePatternHandling(patternHandling: PatternHandling): MobilePatternHandling {
+    if (patternHandling === 'include_supported') return 'include_supported_only';
+    return 'exclude_patterns';
+}
+
 /** Validate report configuration from request body. */
 function validateConfig(body: Record<string, unknown>): {
     valid: boolean;
@@ -150,6 +169,17 @@ function validateConfig(body: Record<string, unknown>): {
         return { valid: false, error: `Invalid patternHandling. Must be one of: ${validPatternHandling.join(', ')}` };
     }
 
+    const mobilePayload: BuildReportPayload | undefined = source === 'workspace_mobile'
+        ? {
+            caseId: body.caseId,
+            outputType: toMobileOutputType(outputType),
+            tone: toMobileTone(tone),
+            patternHandling: toMobilePatternHandling(patternHandling),
+            source: 'workspace_mobile',
+            clientBuildId: typeof body.clientBuildId === 'string' ? body.clientBuildId : undefined,
+        }
+        : undefined;
+
     return {
         valid: true,
         config: {
@@ -158,9 +188,7 @@ function validateConfig(body: Record<string, unknown>): {
             tone,
             patternHandling,
             source,
-            mobilePayload: source === 'workspace_mobile'
-                ? body as unknown as BuildReportPayload
-                : undefined,
+            mobilePayload,
         },
     };
 }
@@ -290,8 +318,7 @@ export async function POST(req: NextRequest) {
                 config.outputType,
                 config.tone,
                 config.patternHandling,
-                title,
-                content,
+                config.mobilePayload?.clientBuildId ?? 'missing-client-build-id',
             );
             const savedId = await convex.mutation(api.caseMemory.save, {
                 caseId: config.caseId,

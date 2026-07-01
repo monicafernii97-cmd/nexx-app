@@ -1,9 +1,11 @@
 import { MobileCaseDetailTopBar } from '@/components/case-mobile';
+import type { ReportOutputType } from '@/lib/mobile/reportTypes';
 
 type MobileDocuVaultPageProps = {
   params: Promise<{ caseId: string }>;
   searchParams: Promise<{
     draftId?: string;
+    outputType?: ReportOutputType;
     prefill?: string;
     source?: string;
   }>;
@@ -18,14 +20,22 @@ const outlineSections = [
   'Source Notes',
 ];
 
+/** Convert the mobile output type contract into user-facing DocuVault copy. */
+function getDocumentTypeLabel(outputType?: ReportOutputType) {
+  if (outputType === 'summary_pdf') return 'Case Summary PDF';
+  if (outputType === 'court_document') return 'Court Document Draft';
+  return 'Summary PDF + Court Document';
+}
+
 /** Initial mobile DocuVault handoff route for generated workspace drafts. */
 export default async function MobileDocuVaultPage({
   params,
   searchParams,
 }: MobileDocuVaultPageProps) {
   const { caseId } = await params;
-  const { draftId, prefill, source } = await searchParams;
+  const { draftId, outputType, prefill, source } = await searchParams;
   const hasWorkspaceDraft = Boolean(draftId && prefill === '1' && source === 'workspace');
+  const documentTypeLabel = getDocumentTypeLabel(outputType);
 
   return (
     <div className="light min-h-dvh bg-neutral-50 text-neutral-900">
@@ -47,7 +57,7 @@ export default async function MobileDocuVaultPage({
             Document Type
           </p>
           <h2 className="mt-2 text-base font-semibold text-neutral-900">
-            Summary PDF + Court Document
+            {documentTypeLabel}
           </h2>
           <p className="mt-2 text-sm leading-6 text-neutral-600">
             Built from saved facts, timeline events, and linked sources.

@@ -6,6 +6,7 @@ import { MobileBottomSheet } from '@/components/mobile-shell';
 import { getMobileDraftPlainText } from '@/lib/mobile/docuvaultDraft';
 import { trackMobileEvent } from '@/lib/mobile/mobileAnalytics';
 import type { DocumentDraft } from '@/lib/mobile/reportTypes';
+import { useMobileOnlineStatus } from '@/lib/mobile/useMobileOnlineStatus';
 
 type ExportState = 'idle' | 'preparing' | 'success' | 'error';
 type ExportOptionId = 'download_pdf' | 'save_docuvault' | 'share' | 'convert_court_document';
@@ -14,6 +15,7 @@ type ExportOption = {
   id: ExportOptionId;
   label: string;
   description: string;
+  requiresOnline?: boolean;
 };
 
 type MobileExportSheetProps = {
@@ -44,6 +46,7 @@ function getExportOptions(draft: DocumentDraft): ExportOption[] {
       id: 'save_docuvault',
       label: 'Save to DocuVault',
       description: 'Keep this draft available with your case documents.',
+      requiresOnline: true,
     },
     {
       id: 'share',
@@ -55,6 +58,7 @@ function getExportOptions(draft: DocumentDraft): ExportOption[] {
           id: 'convert_court_document' as const,
           label: 'Convert to Court Document',
           description: 'Keep this version ready for court-document drafting.',
+          requiresOnline: true,
         }]
       : []),
   ];
@@ -89,8 +93,11 @@ export function MobileExportSheet({
   const [state, setState] = useState<ExportState>('idle');
   const [activeOption, setActiveOption] = useState<ExportOptionId | null>(null);
   const [lastOption, setLastOption] = useState<ExportOptionId | null>(null);
+  const { isOnline } = useMobileOnlineStatus(caseId);
   const options = useMemo(() => getExportOptions(draft), [draft]);
   const plainText = useMemo(() => getMobileDraftPlainText(draft), [draft]);
+  const lastExportOption = lastOption ? options.find((option) => option.id === lastOption) : null;
+  const isRetryOfflineBlocked = Boolean(lastExportOption?.requiresOnline && !isOnline);
 
   const resetSheet = () => {
     setState('idle');
@@ -104,6 +111,14 @@ export function MobileExportSheet({
   };
 
   const runExport = async (optionId: ExportOptionId) => {
+    const option = options.find((item) => item.id === optionId);
+    if (option?.requiresOnline && !isOnline) {
+      setLastOption(optionId);
+      setActiveOption(null);
+      setState('error');
+      return;
+    }
+
     const startedAt = performance.now();
     setActiveOption(optionId);
     setLastOption(optionId);
@@ -173,7 +188,7 @@ export function MobileExportSheet({
   };
 
   const retry = () => {
-    if (lastOption) {
+    if (lastOption && !isRetryOfflineBlocked) {
       void runExport(lastOption);
     }
   };
@@ -207,15 +222,18 @@ export function MobileExportSheet({
             We could not export the document.
           </h3>
           <p className="mt-2 text-sm leading-6 text-neutral-600">
-            Your draft is still saved.
+            {isRetryOfflineBlocked
+              ? 'Reconnect to retry this export. Your draft is still saved.'
+              : 'Your draft is still saved.'}
           </p>
           <div className="mt-4 flex gap-3">
             <button
               type="button"
-              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-2xl bg-neutral-900 px-4 text-sm font-semibold text-white active:bg-neutral-800"
+              disabled={isRetryOfflineBlocked}
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-2xl bg-neutral-900 px-4 text-sm font-semibold text-white active:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
               onClick={retry}
             >
-              Try Again
+              {isRetryOfflineBlocked ? 'Reconnect' : 'Try Again'}
             </button>
             <button
               type="button"
@@ -234,7 +252,7 @@ export function MobileExportSheet({
             <button
               key={option.id}
               type="button"
-              disabled={state === 'preparing'}
+              disabled={state === 'preparing' || (option.requiresOnline && !isOnline)}
               className="flex min-h-14 w-full flex-col justify-center rounded-2xl border border-neutral-200 px-4 py-3 text-left active:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60"
               onClick={() => void runExport(option.id)}
             >
@@ -244,7 +262,9 @@ export function MobileExportSheet({
                   : option.label}
               </span>
               <span className="mt-1 text-xs leading-5 text-neutral-500">
-                {option.description}
+                {option.requiresOnline && !isOnline
+                  ? 'Reconnect to use this export option. Your draft is still saved.'
+                  : option.description}
               </span>
             </button>
           ))}

@@ -1,5 +1,6 @@
 import { MobileCaseDetailTopBar } from '@/components/case-mobile';
 import { MobileDocuVaultDraftReview } from '@/components/docuvault-mobile/MobileDocuVaultDraftReview';
+import { MobileOfflineBanner } from '@/components/mobile-shell';
 import { getMobileDocumentTypeLabel } from '@/lib/mobile/docuvaultDraft';
 import type { ReportOutputType } from '@/lib/mobile/reportTypes';
 
@@ -27,6 +28,7 @@ export default async function MobileDocuVaultPage({
   return (
     <div className="light min-h-dvh bg-neutral-50 text-neutral-900">
       <MobileCaseDetailTopBar title="DocuVault" caseId={caseId} />
+      <MobileOfflineBanner caseId={caseId} />
       <MobileDocuVaultDraftReview
         key={draftId ?? caseId}
         caseId={caseId}

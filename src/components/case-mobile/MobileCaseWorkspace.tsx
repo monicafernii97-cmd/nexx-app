@@ -1,17 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, BriefcaseBusiness, Menu, MoreHorizontal } from 'lucide-react';
 import {
   MobileBottomSheet,
   MobileDrawer,
   MobileIconButton,
+  MobileOfflineBanner,
   MobileTopBar,
   type MobileDrawerItem,
 } from '@/components/mobile-shell';
 import type { MobileCaseWorkspaceData } from '@/lib/mobile/caseWorkspaceData';
 import { trackMobileEvent } from '@/lib/mobile/mobileAnalytics';
+import { useMobileScrollRestoration } from '@/lib/mobile/useMobileScrollRestoration';
 import { MobileCaseSnapshotCard } from './MobileCaseSnapshotCard';
 import { MobileFactsCarousel } from './MobileFactsCarousel';
 import { MobileGenerateReportBar } from './MobileGenerateReportBar';
@@ -48,6 +50,22 @@ export function MobileCaseWorkspace({ data }: MobileCaseWorkspaceProps) {
   const [isActionsOpen, setIsActionsOpen] = useState(false);
   const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
   const router = useRouter();
+
+  useMobileScrollRestoration({ key: `workspace:${data.caseId}` });
+
+  useEffect(() => {
+    try {
+      trackMobileEvent('mobile_workspace_viewed', { caseId: data.caseId });
+    } catch {
+      // Analytics should never block local workspace recovery state.
+    }
+    try {
+      window.localStorage.setItem('mobile-last-opened-case', data.caseId);
+    } catch {
+      // Last-opened case persistence is best-effort.
+    }
+  }, [data.caseId]);
+
   const openDocuVault = () => {
     const searchParams = new URLSearchParams({
       source: 'workspace_mobile',
@@ -74,6 +92,7 @@ export function MobileCaseWorkspace({ data }: MobileCaseWorkspaceProps) {
           </MobileIconButton>
         }
       />
+      <MobileOfflineBanner caseId={data.caseId} />
 
       <MobileDrawer
         isOpen={isDrawerOpen}

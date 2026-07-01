@@ -14,7 +14,7 @@ export default async function MobileMessagesPage({ params }: MobileMessagesPageP
   return (
     <div className="light min-h-dvh bg-neutral-50 text-neutral-900">
       <MobileCaseUtilityTopBar title="Messages" caseId={caseId} />
-      <MobileMessagesScreen messages={data.messages} />
+      <MobileMessagesScreen caseId={caseId} messages={data.messages} />
     </div>
   );
 }

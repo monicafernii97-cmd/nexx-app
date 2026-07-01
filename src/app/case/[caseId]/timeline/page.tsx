@@ -1,4 +1,5 @@
 import { MobileCaseDetailTopBar, MobileTimelineScreen } from '@/components/case-mobile';
+import { MobileOfflineBanner } from '@/components/mobile-shell';
 import { getMobileCaseWorkspaceData } from '@/lib/mobile/caseWorkspaceData';
 
 type MobileTimelinePageProps = {
@@ -13,8 +14,9 @@ export default async function MobileTimelinePage({ params }: MobileTimelinePageP
   return (
     <div className="light min-h-dvh bg-neutral-50 text-neutral-900">
       <MobileCaseDetailTopBar title="Timeline" caseId={caseId} />
+      <MobileOfflineBanner caseId={caseId} />
       <main className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pb-[calc(3rem+env(safe-area-inset-bottom))] pt-4">
-        <MobileTimelineScreen events={data.timeline} />
+        <MobileTimelineScreen caseId={caseId} events={data.timeline} />
       </main>
     </div>
   );

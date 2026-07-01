@@ -114,23 +114,23 @@ This checklist breaks the Mobile Interaction Contract v1.0 into PR-sized impleme
 
 ## Phase 7 - State, Offline, QA, and Performance PR
 
-- [ ] Preserve workspace scroll position.
-- [ ] Preserve selected report options.
-- [ ] Preserve report build progress.
-- [ ] Preserve current DocuVault draft.
-- [ ] Preserve active filters.
-- [ ] Preserve last opened case.
-- [ ] Preserve PDF preview return location.
-- [ ] Add offline state copy and behavior.
-- [ ] Disable export when network is required and offline.
-- [ ] Add sync restored copy.
-- [ ] Add mobile analytics quality events.
-- [ ] Ensure no sensitive case text enters analytics.
-- [ ] Add responsive tests or visual QA scripts for 320, 360, 375, 390, 414, 430, and landscape.
-- [ ] Add accessibility tests for dialogs, focus trap, names, and keyboard navigation.
-- [ ] Add no-horizontal-overflow checks.
-- [ ] Confirm workspace avoids hidden desktop rendering on mobile.
-- [ ] Run typecheck/build/test and review loop.
+- [x] Preserve workspace scroll position.
+- [x] Preserve selected report options.
+- [x] Preserve report build progress.
+- [x] Preserve current DocuVault draft.
+- [x] Preserve active filters.
+- [x] Preserve last opened case.
+- [x] Preserve PDF preview return location.
+- [x] Add offline state copy and behavior.
+- [x] Disable export when network is required and offline.
+- [x] Add sync restored copy.
+- [x] Add mobile analytics quality events.
+- [x] Ensure no sensitive case text enters analytics.
+- [x] Add responsive tests or visual QA scripts for 320, 360, 375, 390, 414, 430, and landscape.
+- [x] Add accessibility tests for dialogs, focus trap, names, and keyboard navigation.
+- [x] Add no-horizontal-overflow checks.
+- [x] Confirm workspace avoids hidden desktop rendering on mobile.
+- [x] Run typecheck/build/test and review loop.
 - [ ] Merge PR to `main`.
 
 ## Final Acceptance

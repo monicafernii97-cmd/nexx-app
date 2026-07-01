@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, BriefcaseBusiness, Menu, MoreHorizontal } from 'lucide-react';
 import {
+  MobileBottomSheet,
   MobileDrawer,
   MobileIconButton,
   MobileTopBar,
@@ -42,7 +43,15 @@ function buildDrawerItems(caseId: string, active: string): MobileDrawerItem[] {
 /** Contract-compliant single-column mobile workspace screen. */
 export function MobileCaseWorkspace({ data }: MobileCaseWorkspaceProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isActionsOpen, setIsActionsOpen] = useState(false);
   const router = useRouter();
+  const openDocuVault = () => {
+    const searchParams = new URLSearchParams({
+      source: 'workspace_mobile',
+      caseId: data.caseId,
+    });
+    router.push(`/docuvault?${searchParams.toString()}`);
+  };
 
   return (
     <div className="light min-h-dvh bg-neutral-50 text-neutral-900">
@@ -55,8 +64,8 @@ export function MobileCaseWorkspace({ data }: MobileCaseWorkspaceProps) {
         }
         right={
           <MobileIconButton
-            label="Open case navigation"
-            onClick={() => setIsDrawerOpen(true)}
+            label="Open workspace actions"
+            onClick={() => setIsActionsOpen(true)}
           >
             <MoreHorizontal aria-hidden="true" className="h-5 w-5" />
           </MobileIconButton>
@@ -69,6 +78,30 @@ export function MobileCaseWorkspace({ data }: MobileCaseWorkspaceProps) {
         items={buildDrawerItems(data.caseId, 'Workspace')}
         onClose={() => setIsDrawerOpen(false)}
       />
+
+      <MobileBottomSheet
+        isOpen={isActionsOpen}
+        title="Workspace Actions"
+        description="Open related case tools without losing your place."
+        onClose={() => setIsActionsOpen(false)}
+      >
+        <div className="space-y-2">
+          <button
+            type="button"
+            className="flex min-h-11 w-full items-center rounded-2xl border border-neutral-200 px-4 text-left text-sm font-semibold text-neutral-900 active:bg-neutral-100"
+            onClick={openDocuVault}
+          >
+            Open DocuVault
+          </button>
+          <button
+            type="button"
+            className="flex min-h-11 w-full items-center rounded-2xl border border-neutral-200 px-4 text-left text-sm font-semibold text-neutral-900 active:bg-neutral-100"
+            onClick={() => router.push(`/settings?caseId=${encodeURIComponent(data.caseId)}`)}
+          >
+            Open Settings
+          </button>
+        </div>
+      </MobileBottomSheet>
 
       <main className="mx-auto flex w-full max-w-md flex-col gap-5 px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4">
         <MobileCaseSnapshotCard
@@ -85,13 +118,7 @@ export function MobileCaseWorkspace({ data }: MobileCaseWorkspaceProps) {
       </main>
 
       <MobileGenerateReportBar
-        onGenerateReport={() => {
-          const searchParams = new URLSearchParams({
-            source: 'workspace_mobile',
-            caseId: data.caseId,
-          });
-          router.push(`/docuvault?${searchParams.toString()}`);
-        }}
+        onGenerateReport={openDocuVault}
       />
     </div>
   );
@@ -110,7 +137,7 @@ export function MobileCaseDetailTopBar({ title, caseId }: MobileCaseDetailTopBar
     <MobileTopBar
       title={title}
       left={
-        <MobileIconButton label="Go back" onClick={() => router.push(`/case/${caseId}/workspace`)}>
+        <MobileIconButton label="Go back" onClick={() => router.back()}>
           <ArrowLeft aria-hidden="true" className="h-5 w-5" />
         </MobileIconButton>
       }

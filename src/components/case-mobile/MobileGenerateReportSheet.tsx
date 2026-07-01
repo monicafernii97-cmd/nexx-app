@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MobileBottomSheet } from '@/components/mobile-shell';
 import { trackMobileEvent } from '@/lib/mobile/mobileAnalytics';
@@ -174,13 +174,13 @@ export function MobileGenerateReportSheet({
   const restoredClientBuildIdRef = useRef<string | undefined>(undefined);
   const isBuilding = buildState === 'building';
 
-  const updateBuildState = (
+  const updateBuildState = useCallback((
     nextState: ReportBuildState,
     clientBuildId?: string,
   ) => {
     setBuildState(nextState);
     persistReportBuildProgress(caseId, nextState, clientBuildId);
-  };
+  }, [caseId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -194,7 +194,7 @@ export function MobileGenerateReportSheet({
       if (!progress || progress.state === 'idle' || progress.state === 'success') return;
 
       restoredClientBuildIdRef.current = progress.clientBuildId;
-      setBuildState('error');
+      updateBuildState('error', progress.clientBuildId);
       setErrorMessage(
         progress.state === 'building'
           ? 'Your last report build was interrupted. Your selections are saved. Try again.'
@@ -205,7 +205,7 @@ export function MobileGenerateReportSheet({
     return () => {
       cancelled = true;
     };
-  }, [caseId, isOpen]);
+  }, [caseId, isOpen, updateBuildState]);
 
   /** Persist one mobile report option while keeping required payload fields intact. */
   const updatePayload = <K extends keyof BuildReportPayload>(
@@ -225,16 +225,21 @@ export function MobileGenerateReportSheet({
     if (isBuilding) return;
 
     const startedAt = performance.now();
-    const clientBuildId =
-      payload.clientBuildId ?? restoredClientBuildIdRef.current ?? createClientBuildId(caseId);
+    const clientBuildId = restoredClientBuildIdRef.current ?? createClientBuildId(caseId);
     restoredClientBuildIdRef.current = clientBuildId;
-    const requestPayload: BuildReportPayload = {
-      ...payload,
+
+    const persistedOptionsPayload: BuildReportPayload = {
       caseId,
+      outputType: payload.outputType,
+      tone: payload.tone,
+      patternHandling: payload.patternHandling,
       source: 'workspace_mobile',
+    };
+    const requestPayload: BuildReportPayload = {
+      ...persistedOptionsPayload,
       clientBuildId,
     };
-    setPayload(requestPayload);
+    setPayload(persistedOptionsPayload);
 
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
@@ -265,6 +270,7 @@ export function MobileGenerateReportSheet({
       }
 
       updateBuildState('success', clientBuildId);
+      restoredClientBuildIdRef.current = undefined;
       trackMobileEvent('mobile_report_build_succeeded', {
         caseId,
         draftId: result.reportDraftId,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MobileBottomSheet } from '@/components/mobile-shell';
 import { getMobileDraftPlainText } from '@/lib/mobile/docuvaultDraft';
@@ -26,6 +26,7 @@ type MobileExportSheetProps = {
   onMarkExported?: () => void;
 };
 
+/** Derive available export actions from the selected mobile document type. */
 function getExportOptions(draft: DocumentDraft): ExportOption[] {
   const includesPdf = draft.documentType === 'summary_pdf' || draft.documentType === 'both';
   const includesCourtDocument =
@@ -59,10 +60,19 @@ function getExportOptions(draft: DocumentDraft): ExportOption[] {
   ];
 }
 
+/** Small async delay used to expose the preparing state without blocking the UI. */
 function wait(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+/** True when the device share sheet was intentionally cancelled by the user. */
+function isShareAbortError(error: unknown) {
+  return (
+    error instanceof DOMException &&
+    (error.name === 'AbortError' || error.name === 'NotAllowedError')
+  );
 }
 
 /** Accessible mobile export sheet with retryable draft-safe export states. */
@@ -82,15 +92,16 @@ export function MobileExportSheet({
   const options = useMemo(() => getExportOptions(draft), [draft]);
   const plainText = useMemo(() => getMobileDraftPlainText(draft), [draft]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const timeout = setTimeout(() => {
-      setState('idle');
-      setActiveOption(null);
-      setLastOption(null);
-    }, 0);
-    return () => clearTimeout(timeout);
-  }, [isOpen]);
+  const resetSheet = () => {
+    setState('idle');
+    setActiveOption(null);
+    setLastOption(null);
+  };
+
+  const closeSheet = () => {
+    resetSheet();
+    onClose();
+  };
 
   const runExport = async (optionId: ExportOptionId) => {
     const startedAt = performance.now();
@@ -111,15 +122,25 @@ export function MobileExportSheet({
           window.print();
         } else {
           router.push(previewHref);
+          closeSheet();
+          return;
         }
       }
 
       if (optionId === 'share') {
         if (navigator.share) {
-          await navigator.share({
-            title: 'Nexproof draft',
-            text: plainText || 'Nexproof draft',
-          });
+          try {
+            await navigator.share({
+              title: 'Nexproof draft',
+              text: plainText || 'Nexproof draft',
+            });
+          } catch (error) {
+            if (isShareAbortError(error)) {
+              resetSheet();
+              return;
+            }
+            throw error;
+          }
         } else if (navigator.clipboard) {
           await navigator.clipboard.writeText(plainText || 'Nexproof draft');
         } else {
@@ -162,7 +183,7 @@ export function MobileExportSheet({
       isOpen={isOpen}
       title="Export Draft"
       description="Choose how you want to use this document."
-      onClose={state === 'preparing' ? () => undefined : onClose}
+      onClose={state === 'preparing' ? () => undefined : closeSheet}
     >
       {state === 'success' ? (
         <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
@@ -173,7 +194,7 @@ export function MobileExportSheet({
           <button
             type="button"
             className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-neutral-900 px-4 text-sm font-semibold text-white active:bg-neutral-800"
-            onClick={onClose}
+            onClick={closeSheet}
           >
             Done
           </button>
@@ -199,7 +220,7 @@ export function MobileExportSheet({
             <button
               type="button"
               className="inline-flex min-h-11 flex-1 items-center justify-center rounded-2xl border border-neutral-300 px-4 text-sm font-semibold text-neutral-800 active:bg-neutral-100"
-              onClick={onClose}
+              onClick={closeSheet}
             >
               Cancel
             </button>

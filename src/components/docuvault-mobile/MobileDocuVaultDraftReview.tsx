@@ -7,6 +7,7 @@ import {
   MobileFullScreenDialog,
 } from '@/components/mobile-shell';
 import {
+  buildMobilePreviewHref,
   createInitialMobileDraft,
   getMobileDraftStorageKey,
   getMobileSectionStatusLabel,
@@ -65,7 +66,7 @@ export function MobileDocuVaultDraftReview({
   const [isExportOpen, setIsExportOpen] = useState(false);
   const activeSection = draft.sections.find((section) => section.id === activeSectionId) ?? null;
   const isDirty = Boolean(activeSection && editorText !== activeSection.body);
-  const previewHref = `/case/${caseId}/docuvault/preview?draftId=${encodeURIComponent(draft.id)}&outputType=${draft.documentType}`;
+  const previewHref = buildMobilePreviewHref(caseId, draft);
   const unsavedWriteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUnsavedEditRef = useRef<UnsavedSectionEdit | null>(null);
 

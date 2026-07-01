@@ -12,6 +12,8 @@ import {
   MobileTopBar,
 } from '@/components/mobile-shell';
 import {
+  buildMobileDocuVaultHref,
+  buildMobilePreviewHref,
   createInitialMobileDraft,
   getMobileDraftStorageKey,
   getMobileDocumentTypeLabel,
@@ -30,14 +32,6 @@ type MobilePDFPreviewProps = {
   outputType?: ReportOutputType;
 };
 
-function buildDocuVaultHref(caseId: string, draft: DocumentDraft) {
-  const params = new URLSearchParams({
-    draftId: draft.id,
-    outputType: draft.documentType,
-  });
-  return `/case/${caseId}/docuvault?${params.toString()}`;
-}
-
 /** Route-level mobile PDF preview surface for saved DocuVault drafts. */
 export function MobilePDFPreview({ caseId, draftId, outputType = 'both' }: MobilePDFPreviewProps) {
   const initialDraft = useMemo(
@@ -55,8 +49,8 @@ export function MobilePDFPreview({ caseId, draftId, outputType = 'both' }: Mobil
     draft.status === 'failed' ? 'error' : 'loading',
   );
   const [isExportOpen, setIsExportOpen] = useState(false);
-  const docuVaultHref = buildDocuVaultHref(caseId, draft);
-  const previewHref = `/case/${caseId}/docuvault/preview?draftId=${encodeURIComponent(draft.id)}&outputType=${draft.documentType}`;
+  const docuVaultHref = buildMobileDocuVaultHref(caseId, draft);
+  const previewHref = buildMobilePreviewHref(caseId, draft);
   const hasContent = mobileDraftHasContent(draft);
 
   useEffect(() => {
@@ -84,7 +78,9 @@ export function MobilePDFPreview({ caseId, draftId, outputType = 'both' }: Mobil
 
   const retryPreview = () => {
     setPreviewState('loading');
-    setTimeout(() => setPreviewState('ready'), 350);
+    setTimeout(() => {
+      setPreviewState(draft.status === 'failed' ? 'error' : 'ready');
+    }, 350);
   };
 
   return (

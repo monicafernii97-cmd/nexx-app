@@ -54,14 +54,17 @@ export const mobileDocuVaultSectionSeeds: Array<
   },
 ];
 
+/** Stable local-storage identity for a mobile draft. */
 export function getMobileDraftStorageIdentity(caseId: string, draftId?: string) {
   return draftId ?? `mobile-draft-${caseId}`;
 }
 
+/** Local-storage key for the persisted mobile DocuVault draft. */
 export function getMobileDraftStorageKey(caseId: string, draftId?: string) {
   return `mobile-docuvault-draft:${getMobileDraftStorageIdentity(caseId, draftId)}`;
 }
 
+/** Local-storage key for interrupted section-editor text. */
 export function getMobileUnsavedDraftStorageKey(caseId: string, draftId?: string) {
   return `mobile-docuvault-unsaved:${getMobileDraftStorageIdentity(caseId, draftId)}`;
 }
@@ -88,6 +91,7 @@ export function createInitialMobileDraft(
   };
 }
 
+/** Convert the mobile output type contract into user-facing DocuVault copy. */
 export function getMobileDocumentTypeLabel(outputType?: ReportOutputType) {
   if (outputType === 'summary_pdf') return 'Case Summary PDF';
   if (outputType === 'court_document') return 'Court Document Draft';
@@ -101,6 +105,25 @@ export function getMobileSectionStatusLabel(status: DocumentSectionStatus) {
   return 'Ready';
 }
 
+/** Build the canonical DocuVault preview route for a saved mobile draft. */
+export function buildMobilePreviewHref(caseId: string, draft: DocumentDraft) {
+  const params = new URLSearchParams({
+    draftId: draft.id,
+    outputType: draft.documentType,
+  });
+  return `/case/${caseId}/docuvault/preview?${params.toString()}`;
+}
+
+/** Build the canonical DocuVault outline route for a saved mobile draft. */
+export function buildMobileDocuVaultHref(caseId: string, draft: DocumentDraft) {
+  const params = new URLSearchParams({
+    draftId: draft.id,
+    outputType: draft.documentType,
+  });
+  return `/case/${caseId}/docuvault?${params.toString()}`;
+}
+
+/** Flatten section text for device share and clipboard fallbacks. */
 export function getMobileDraftPlainText(draft: DocumentDraft) {
   return draft.sections
     .map((section) => {
@@ -112,6 +135,7 @@ export function getMobileDraftPlainText(draft: DocumentDraft) {
     .join('\n\n');
 }
 
+/** True when any draft section has readable body text. */
 export function mobileDraftHasContent(draft: DocumentDraft) {
   return draft.sections.some((section) => section.body.trim().length > 0);
 }

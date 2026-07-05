@@ -44,7 +44,7 @@ function hasInternalKeyAssignment(content: string) {
 function hasJsonKeyContext(content: string, keyIndex: number) {
   for (let index = keyIndex - 1; index >= 0; index -= 1) {
     const char = content[index];
-    if (!/\s/.test(char)) {
+    if (!isWhitespace(char)) {
       return char === '{' || char === '[' || char === ',';
     }
   }
@@ -57,11 +57,63 @@ function startsWithJsonValue(value: string) {
   if (!trimmed) return false;
 
   const first = trimmed[0];
-  if (first === '"' || first === '{' || first === '[' || first === '-' || (first >= '0' && first <= '9')) {
+  if (first === '"' || first === '{' || first === '[') {
     return true;
   }
 
-  return trimmed.startsWith('true') || trimmed.startsWith('false') || trimmed.startsWith('null');
+  if (first === '-' || isDigit(first)) {
+    return startsWithJsonNumber(trimmed);
+  }
+
+  return startsWithJsonLiteral(trimmed, 'true')
+    || startsWithJsonLiteral(trimmed, 'false')
+    || startsWithJsonLiteral(trimmed, 'null');
+}
+
+function startsWithJsonLiteral(value: string, literal: string) {
+  return value.startsWith(literal) && hasJsonValueBoundary(value, literal.length);
+}
+
+function startsWithJsonNumber(value: string) {
+  let index = 0;
+
+  if (value[index] === '-') index += 1;
+  if (!isDigit(value[index])) return false;
+
+  if (value[index] === '0') {
+    index += 1;
+  } else {
+    while (isDigit(value[index])) index += 1;
+  }
+
+  if (value[index] === '.') {
+    index += 1;
+    if (!isDigit(value[index])) return false;
+    while (isDigit(value[index])) index += 1;
+  }
+
+  if (value[index] === 'e' || value[index] === 'E') {
+    index += 1;
+    if (value[index] === '+' || value[index] === '-') index += 1;
+    if (!isDigit(value[index])) return false;
+    while (isDigit(value[index])) index += 1;
+  }
+
+  return hasJsonValueBoundary(value, index);
+}
+
+function hasJsonValueBoundary(value: string, index: number) {
+  if (index >= value.length) return true;
+  const char = value[index];
+  return isWhitespace(char) || char === ',' || char === '}' || char === ']';
+}
+
+function isDigit(char: string | undefined) {
+  return char !== undefined && char >= '0' && char <= '9';
+}
+
+function isWhitespace(char: string) {
+  return char === ' ' || char === '\n' || char === '\r' || char === '\t';
 }
 
 export function looksLikeInternalStructuredPayload(content: string) {

@@ -164,11 +164,14 @@ describe('MessageBubble document evidence panel', () => {
   });
 
   it('renders a safe status card instead of raw structured source JSON', async () => {
+    const onRetry = vi.fn();
     const rawPayload = '{"documentAnswer":{"citations":[{"sourceId":"src_005","chunkId":"abc","quotedText":"secret"}]}}';
-    const { container, root } = await renderMessage({}, undefined, rawPayload);
+    const { container, root } = await renderMessage({}, undefined, rawPayload, { onRetry });
     roots.push(root);
 
     expect(container.textContent).toContain('Analyzing court order');
+    expect(container.querySelector('button[aria-label="Retry response"]')).toBeTruthy();
+    expect(container.querySelector('button[aria-label="Copy recovery notice"]')).toBeTruthy();
     expect(container.textContent).not.toContain('sourceId');
     expect(container.textContent).not.toContain('chunkId');
     expect(container.textContent).not.toContain('quotedText');

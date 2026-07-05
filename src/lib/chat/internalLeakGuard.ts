@@ -13,10 +13,6 @@ export const INTERNAL_LEAK_KEYS = [
 
 const INTERNAL_LEAK_KEY_SET = new Set<string>(INTERNAL_LEAK_KEYS);
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 function valueContainsInternalKey(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
   if (Array.isArray(value)) return value.some(valueContainsInternalKey);
@@ -32,9 +28,14 @@ function valueContainsInternalKey(value: unknown): boolean {
 
 function hasInternalKeyAssignment(content: string) {
   return INTERNAL_LEAK_KEYS.some((key) => {
-    const escapedKey = escapeRegExp(key);
-    const assignmentPattern = new RegExp(`(?:^|[\\s,{\\[])(?:"${escapedKey}"|${escapedKey})\\s*:`);
-    return assignmentPattern.test(content);
+    const quotedKey = `"${key}"`;
+    let index = content.indexOf(quotedKey);
+    while (index >= 0) {
+      const afterKey = content.slice(index + quotedKey.length).trimStart();
+      if (afterKey.startsWith(':')) return true;
+      index = content.indexOf(quotedKey, index + quotedKey.length);
+    }
+    return false;
   });
 }
 

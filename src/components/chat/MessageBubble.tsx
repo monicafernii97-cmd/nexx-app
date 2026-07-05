@@ -378,6 +378,9 @@ const COURT_ORDER_FOLLOW_UPS = [
     },
 ] as const;
 
+const REDACTED_ASSISTANT_COPY_TEXT =
+    'Analysis was withheld because it contained internal source metadata. Please retry this answer.';
+
 function CourtOrderFollowUpChips({
     isLight,
     onSuggestedPrompt,
@@ -663,6 +666,7 @@ export default function MessageBubble({
     const documentSources = useMemo(() => getDocumentSources(metadata), [metadata]);
     const documentCitations = useMemo(() => getDocumentCitations(metadata), [metadata]);
     const shouldShowCourtOrderFollowUps = role === 'assistant' && !isStreaming && content.includes('Court Order Analysis');
+    const unsafeAssistantContent = role === 'assistant' && looksLikeInternalStructuredPayload(content);
 
     useEffect(() => {
         return () => {
@@ -683,7 +687,7 @@ export default function MessageBubble({
     const handleCopy = useCallback(async () => {
         if (!window.isSecureContext || !navigator.clipboard?.writeText) return;
         try {
-            await navigator.clipboard.writeText(content);
+            await navigator.clipboard.writeText(unsafeAssistantContent ? REDACTED_ASSISTANT_COPY_TEXT : content);
             setCopied(true);
             if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
             copyTimerRef.current = setTimeout(() => {
@@ -693,7 +697,7 @@ export default function MessageBubble({
         } catch (err) {
             console.error('Failed to copy:', err);
         }
-    }, [content]);
+    }, [content, unsafeAssistantContent]);
 
     /** Enter inline edit mode, pre-filling the textarea with the current message content. */
     const handleStartEdit = useCallback(() => {
@@ -730,7 +734,6 @@ export default function MessageBubble({
     }, [handleSaveEdit, handleCancelEdit]);
 
     const isLight = theme === 'light';
-    const unsafeAssistantContent = role === 'assistant' && looksLikeInternalStructuredPayload(content);
 
     // Responsive visibility: always visible on mobile, hover-reveal on desktop
     const actionBarClass = 'flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity';
@@ -825,7 +828,24 @@ export default function MessageBubble({
             <div className="flex-1 max-w-4xl min-w-0 pr-4">
                 {/* Structured response rendering (AssistantMessageCard) */}
                 {unsafeAssistantContent ? (
-                    <AnalysisStatusCard isLight={isLight} />
+                    <>
+                        <AnalysisStatusCard isLight={isLight} />
+                        <div className="mt-3">
+                            <PlayAloudButton text={REDACTED_ASSISTANT_COPY_TEXT} />
+                        </div>
+                        {!isStreaming && (
+                            <div className={`${actionBarClass} mt-2`}>
+                                <ActionButton onClick={handleCopy} label={copied ? 'Copied' : 'Copy recovery notice'} isLight={isLight}>
+                                    {copied ? <Check size={14} weight="bold" className="text-emerald-400" /> : <Copy size={14} weight="regular" />}
+                                </ActionButton>
+                                {onRetry && (
+                                    <ActionButton onClick={onRetry} label="Retry response" isLight={isLight}>
+                                        <ArrowsClockwise size={14} weight="regular" />
+                                    </ActionButton>
+                                )}
+                            </div>
+                        )}
+                    </>
                 ) : structuredViewModel && !isStreaming ? (
                     <>
                         <AssistantMessageCard

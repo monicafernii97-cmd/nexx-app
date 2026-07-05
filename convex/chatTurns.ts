@@ -1921,7 +1921,10 @@ export const redactLeakedAssistantMessages = internalMutation({
 
         for (const message of rows) {
             scanned += 1;
-            if (message.role !== 'assistant' || !looksLikeInternalStructuredPayload(message.content)) {
+            const unsafeContent = looksLikeInternalStructuredPayload(message.content);
+            const unsafeArtifacts = typeof message.artifactsJson === 'string' &&
+                looksLikeInternalStructuredPayload(message.artifactsJson);
+            if (message.role !== 'assistant' || (!unsafeContent && !unsafeArtifacts)) {
                 continue;
             }
             matched += 1;
@@ -1934,8 +1937,10 @@ export const redactLeakedAssistantMessages = internalMutation({
                 metadata: {
                     ...asMetadataObject(message.metadata),
                     redactedExistingInternalLeak: true,
+                    redactedArtifactsJson: unsafeArtifacts || undefined,
                     uiKind: message.status === 'draft' ? 'analysis_status' : 'answer',
                 },
+                artifactsJson: undefined,
                 updatedAt: now,
             });
             redacted += 1;

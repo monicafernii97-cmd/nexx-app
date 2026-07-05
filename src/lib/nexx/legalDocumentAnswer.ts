@@ -26,16 +26,10 @@ export type LegalDocumentAnswer = {
   }>;
   citations: Array<{
     sourceId: string;
-    fileId: string;
-    fileName: string;
-    memoryGenerationId?: string | null;
-    chunkId: string;
     pageStart?: number | null;
     pageEnd?: number | null;
-    blockIds: string[];
-    quotedText: string;
-    confidence?: number | null;
-    warning?: string | null;
+    supports?: string | null;
+    confidence?: 'high' | 'medium' | 'low' | null;
   }>;
   warnings: string[];
   unsupportedClaims: string[];
@@ -126,6 +120,183 @@ function contiguousWindowCoverage(sourceWords: string[], quoteWords: string[]) {
   return bestCoverage;
 }
 
+function sourceQuotePreview(sourceText: string) {
+  const normalized = sourceText.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= 500) return normalized;
+  return `${normalized.slice(0, 497).trim()}...`;
+}
+
+type RenderableCitation = {
+  sourceId: string;
+  label: string;
+};
+
+function compactPageLabel(pageStart?: number | null, pageEnd?: number | null) {
+  if (!pageStart) return 'source';
+  return pageEnd && pageEnd !== pageStart
+    ? `pp. ${pageStart}-${pageEnd}`
+    : `p. ${pageStart}`;
+}
+
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function cleanUserFacingDocumentText(value: string) {
+  return value
+    .replace(/\bSOURCE_ID\b:?/gi, 'source')
+    .replace(/\bsourceId\b:?/g, 'source')
+    .replace(/\bchunkId\b:?/g, 'source')
+    .replace(/\bmemoryGenerationId\b:?/g, 'source')
+    .replace(/\bblockIds\b:?/g, 'source')
+    .replace(/\bquotedText\b:?/g, 'source quote')
+    .replace(/\bsrc_\d+\b/gi, 'source')
+    .replace(/\s+([,.;:])/g, '$1')
+    .replace(/[^\S\n]{2,}/g, ' ')
+    .trim();
+}
+
+function citationMapForAnswer(answer: LegalDocumentAnswer, sourcePackets: LegalDocumentSourcePacket[]) {
+  const sourcePages = new Map(
+    sourcePackets.map((source) => [
+      source.sourceId,
+      compactPageLabel(source.pageStart, source.pageEnd),
+    ])
+  );
+
+  return new Map<string, RenderableCitation>(
+    answer.citations.map((citation) => {
+      const sourcePage = sourcePages.get(citation.sourceId);
+      const label = sourcePage && sourcePage !== 'source'
+        ? sourcePage
+        : compactPageLabel(citation.pageStart, citation.pageEnd);
+      return [citation.sourceId, { sourceId: citation.sourceId, label }];
+    })
+  );
+}
+
+function labelsForSourceIds(sourceIds: string[], citationMap: Map<string, RenderableCitation>) {
+  return uniqueValues(
+    sourceIds
+      .map((sourceId) => citationMap.get(sourceId)?.label)
+      .filter((label): label is string => Boolean(label && label !== 'source'))
+  ).slice(0, 3);
+}
+
+function firstCitationLabels(citationMap: Map<string, RenderableCitation>) {
+  return uniqueValues(
+    Array.from(citationMap.values())
+      .map((citation) => citation.label)
+      .filter((label) => label !== 'source')
+  ).slice(0, 3);
+}
+
+function hasCompactCitation(value: string) {
+  return /\[(?:p\.|pp\.)\s*\d+/i.test(value);
+}
+
+function appendCitationLabels(value: string, labels: string[]) {
+  const clean = cleanUserFacingDocumentText(value);
+  const usableLabels = uniqueValues(labels).filter((label) => label !== 'source').slice(0, 3);
+  if (!clean || usableLabels.length === 0 || hasCompactCitation(clean)) return clean;
+  return `${clean} ${usableLabels.map((label) => `[${label}]`).join(' ')}`;
+}
+
+function claimSortScore(claim: LegalDocumentAnswer['claims'][number]) {
+  const text = claim.claim.toLowerCase();
+  if (/\b(order|ordered|shall|required|must|exclusive|authority|deadline|within|pay|support|notice)\b/.test(text)) {
+    return 0;
+  }
+  if (claim.claimType === 'document_fact') return 1;
+  return 2;
+}
+
+function deadlineTimingFromClaim(value: string) {
+  const patterns = [
+    /\bwithin\s+\d+\s+(?:calendar\s+)?days?\b/i,
+    /\bno later than\s+[^.;,]+/i,
+    /\bmonthly\b/i,
+    /\bevery\s+[^.;,]+/i,
+    /\bby\s+[A-Z][a-z]+\s+\d{1,2}(?:,\s*\d{4})?\b/,
+  ];
+  for (const pattern of patterns) {
+    const match = value.match(pattern);
+    if (match?.[0]) return cleanUserFacingDocumentText(match[0]);
+  }
+  return 'Review exact timing';
+}
+
+function isDeadlineClaim(value: string) {
+  return /\b(deadline|within|no later than|monthly|every|calendar|days?|notice|payment|support|pay|due)\b/i.test(value);
+}
+
+function formatMarkdownList(items: string[]) {
+  return items.length > 0 ? items.map((item) => `- ${item}`).join('\n') : '- No supported finding was extracted from the available text.';
+}
+
+/**
+ * Render a citation-locked document answer into the product's stable court-order
+ * analysis shape. The model may choose findings; this renderer owns the
+ * user-facing structure and citation labels.
+ */
+export function renderCourtOrderAnalysisMarkdown(
+  answer: LegalDocumentAnswer,
+  sourcePackets: LegalDocumentSourcePacket[],
+  fallbackMessage: string
+) {
+  const citationMap = citationMapForAnswer(answer, sourcePackets);
+  const firstLabels = firstCitationLabels(citationMap);
+  const cleanAnswer = cleanUserFacingDocumentText(answer.answer || fallbackMessage);
+  const executiveSummary = appendCitationLabels(cleanAnswer, firstLabels);
+
+  const supportedClaims = [...answer.claims]
+    .filter((claim) => claim.claim.trim().length > 0)
+    .sort((a, b) => claimSortScore(a) - claimSortScore(b))
+    .slice(0, 8);
+
+  const obligationItems = supportedClaims.length > 0
+    ? supportedClaims.map((claim) => appendCitationLabels(
+      claim.claim,
+      labelsForSourceIds(claim.sourceIds, citationMap)
+    ))
+    : [appendCitationLabels(cleanAnswer, firstLabels)];
+
+  const deadlineClaims = supportedClaims.filter((claim) => isDeadlineClaim(claim.claim)).slice(0, 6);
+  const deadlineRows = deadlineClaims.length > 0
+    ? deadlineClaims.map((claim) => {
+      const labels = labelsForSourceIds(claim.sourceIds, citationMap);
+      const source = labels.length > 0 ? labels.map((label) => `[${label}]`).join(' ') : 'Review source';
+      return `| ${cleanUserFacingDocumentText(claim.claim)} | ${deadlineTimingFromClaim(claim.claim)} | ${source} |`;
+    })
+    : ['| No clear deadline found in the supported extracted text. | Review the order before calendaring. | Review source |'];
+
+  const warnings = uniqueValues(answer.warnings.map(cleanUserFacingDocumentText).filter(Boolean)).slice(0, 5);
+  const riskItems = warnings.length > 0
+    ? warnings
+    : ['Verify exact wording in the original order before enforcement, filing, or calendaring.'];
+
+  return [
+    '# Court Order Analysis',
+    '## Executive Summary',
+    executiveSummary || 'The available extracted text does not support a complete court-order analysis yet.',
+    '## Key Obligations',
+    formatMarkdownList(obligationItems),
+    '## Deadlines',
+    ['| Finding | Timing | Source |', '|---|---|---|', ...deadlineRows].join('\n'),
+    '## Risks and Cautions',
+    formatMarkdownList(riskItems),
+    '## Recommended Next Steps',
+    [
+      '1. Verify the cited page text against the original PDF before relying on it.',
+      '2. Calendar every supported deadline and recurring obligation.',
+      '3. Draft required co-parenting or notice messages from the exact order language.',
+      '4. Flag incomplete or ambiguous provisions for attorney review.',
+    ].join('\n'),
+    '## Source Details',
+    'Source details are available below in the collapsed source panel. Use the page chips and quote previews to verify exact wording.',
+  ].join('\n\n');
+}
+
 export function fuzzyTextContains(sourceText: string, quotedText: string) {
   const quote = normalizeForFuzzyMatch(quotedText);
   if (!quote || quote.length < 8) return false;
@@ -185,17 +356,6 @@ export function validateLegalDocumentAnswerShape(value: unknown): value is Legal
     citation &&
     typeof citation === 'object' &&
     typeof citation.sourceId === 'string' &&
-    typeof citation.fileId === 'string' &&
-    typeof citation.fileName === 'string' &&
-    typeof citation.chunkId === 'string' &&
-    Array.isArray(citation.blockIds) &&
-    citation.blockIds.every((blockId) => typeof blockId === 'string') &&
-    typeof citation.quotedText === 'string' &&
-    (
-      citation.memoryGenerationId === undefined ||
-      citation.memoryGenerationId === null ||
-      typeof citation.memoryGenerationId === 'string'
-    ) &&
     (
       citation.pageStart === undefined ||
       citation.pageStart === null ||
@@ -209,12 +369,14 @@ export function validateLegalDocumentAnswerShape(value: unknown): value is Legal
     (
       citation.confidence === undefined ||
       citation.confidence === null ||
-      typeof citation.confidence === 'number'
+      citation.confidence === 'high' ||
+      citation.confidence === 'medium' ||
+      citation.confidence === 'low'
     ) &&
     (
-      citation.warning === undefined ||
-      citation.warning === null ||
-      typeof citation.warning === 'string'
+      citation.supports === undefined ||
+      citation.supports === null ||
+      typeof citation.supports === 'string'
     )
   );
 }
@@ -268,26 +430,16 @@ export function verifyLegalDocumentAnswer(
       errors.push(`Citation source does not exist: ${citation.sourceId}`);
       continue;
     }
-    if (source.fileId !== citation.fileId) {
-      errors.push(`Citation file mismatch for ${citation.sourceId}.`);
-    }
-    if (source.chunkId !== citation.chunkId) {
-      errors.push(`Citation chunk mismatch for ${citation.sourceId}.`);
-    }
-    if (source.memoryGenerationId && !citation.memoryGenerationId) {
-      errors.push(`Citation generation missing for ${citation.sourceId}.`);
-    } else if (citation.memoryGenerationId && source.memoryGenerationId && citation.memoryGenerationId !== source.memoryGenerationId) {
-      errors.push(`Citation generation mismatch for ${citation.sourceId}.`);
-    }
-    if (!fuzzyTextContains(source.text, citation.quotedText)) {
-      errors.push(`Quoted text was not found in source ${citation.sourceId}.`);
+    const supportText = citation.supports?.trim();
+    if (supportText && !fuzzyTextContains(source.text, supportText)) {
+      errors.push(`Supporting text was not found in source ${citation.sourceId}.`);
       continue;
     }
 
     verifiedCitations.push({
       sourceId: citation.sourceId,
-      chunkId: citation.chunkId,
-      quotedText: citation.quotedText,
+      chunkId: source.chunkId,
+      quotedText: supportText || sourceQuotePreview(source.text),
       citationVerifierStatus: source.confidence !== undefined && source.confidence < 0.85 ? 'partial' : 'verified',
     });
   }

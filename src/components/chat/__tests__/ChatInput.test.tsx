@@ -150,7 +150,7 @@ describe('ChatInput file send flow', () => {
       fileInput(container).dispatchEvent(new Event('change', { bubbles: true }));
     });
 
-    expect(container.textContent).toContain('Ready to send');
+    expect(container.textContent).toContain('Selected');
     const chipSend = buttonWithText(container, 'Send file');
     expect(chipSend).toBeTruthy();
 
@@ -185,8 +185,8 @@ describe('ChatInput file send flow', () => {
       buttonWithText(container, 'Send file')?.click();
     });
 
-    expect(container.textContent).toContain('Processing');
-    expect(container.textContent).not.toContain('Ready to send');
+    expect(container.textContent).toContain('Reading document');
+    expect(container.textContent).not.toContain('Selected');
     expect(sendButton(container).disabled).toBe(true);
 
     await act(async () => {
@@ -206,7 +206,7 @@ describe('ChatInput file send flow', () => {
       setFiles(fileInput(container), [file]);
       fileInput(container).dispatchEvent(new Event('change', { bubbles: true }));
     });
-    expect(container.textContent).toContain('Ready to send');
+    expect(container.textContent).toContain('Selected');
 
     await act(async () => {
       buttonWithText(container, 'Send file')?.click();
@@ -214,7 +214,7 @@ describe('ChatInput file send flow', () => {
     });
 
     expect(onSend).toHaveBeenCalledTimes(1);
-    expect(container.textContent).not.toContain('Ready to send');
+    expect(container.textContent).not.toContain('Selected');
     expect(sendButton(container).disabled).toBe(true);
 
     await act(async () => {

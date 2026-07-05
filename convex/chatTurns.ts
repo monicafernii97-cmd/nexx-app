@@ -46,6 +46,19 @@ const MAX_EXPLICIT_ALIAS_MATCHED_FILES = 50;
 const MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE = 300;
 const MAX_DOCUMENT_CHUNKS_FROM_SEARCH_PER_FILE = 80;
 const MAX_RETRIEVED_CHUNKS_PER_FILE = 12;
+const SAFE_ASSISTANT_DRAFT_MESSAGE = 'Analyzing court order...';
+const INTERNAL_LEAK_KEYS = [
+    'sourceId',
+    'fileId',
+    'fileName',
+    'memoryGenerationId',
+    'chunkId',
+    'pageStart',
+    'pageEnd',
+    'blockIds',
+    'quotedText',
+    'documentAnswer',
+] as const;
 
 const routeModeValidator = v.union(
     v.literal('adaptive_chat'),
@@ -496,6 +509,19 @@ function metadataFromJson(metadataJson?: string) {
     } catch {
         return {};
     }
+}
+
+function looksLikeInternalStructuredPayload(content: string) {
+    if (!content) return false;
+    const trimmed = content.trim();
+    const looksLikeJson =
+        trimmed.startsWith('{') ||
+        trimmed.startsWith('[') ||
+        trimmed.includes('","');
+    const containsInternalKeys = INTERNAL_LEAK_KEYS.some((key) =>
+        content.includes(`"${key}"`) || content.includes(`${key}:`)
+    );
+    return looksLikeJson && containsInternalKeys;
 }
 
 /** Load normalized aliases for a stored document before ranking it for recall. */
@@ -1683,6 +1709,14 @@ export const recordDocumentAnswerEvidence = internalMutation({
         await ctx.db.patch(assistantMessage._id, {
             metadata: {
                 ...asMetadataObject(assistantMessage.metadata),
+                uiKind: 'answer',
+                sourceDisplayMode: 'collapsed',
+                sourceCount: verifiedSources.length,
+                citedPages: Array.from(new Set(
+                    Array.from(verifiedChunks.values())
+                        .map(({ chunk }) => chunk.pageStart)
+                        .filter((page): page is number => typeof page === 'number')
+                )).slice(0, 50),
                 documentSources: verifiedSources.map((source) => ({
                     uploadedFileId: source.uploadedFileId.toString(),
                     filename: source.filename,
@@ -1693,7 +1727,6 @@ export const recordDocumentAnswerEvidence = internalMutation({
                     contextTruncated: source.contextTruncated,
                 })),
                 usedUploadedFileIds: usedUploadedFileIds.map((uploadedFileId) => uploadedFileId.toString()),
-                usedDocumentChunkIds: usedChunkIds.map((chunkId) => chunkId.toString()),
             },
             updatedAt: now,
         });
@@ -1820,6 +1853,7 @@ export const saveAssistantDraft = internalMutation({
         jobId: v.id('chatGenerationJobs'),
         leaseOwner: v.string(),
         content: v.string(),
+        metadataJson: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const now = Date.now();
@@ -1828,10 +1862,28 @@ export const saveAssistantDraft = internalMutation({
 
         const turn = await ctx.db.get(job.turnId);
         if (!turn) return null;
+        const unsafeDraft = looksLikeInternalStructuredPayload(args.content);
+        const metadata = {
+            ...metadataFromJson(args.metadataJson),
+            draft: true,
+            ...(unsafeDraft
+                ? {
+                    uiKind: 'analysis_status',
+                    phase: 'preparing_answer',
+                    redactedInternalDraft: true,
+                }
+                : {}),
+        };
+        const content = unsafeDraft ? SAFE_ASSISTANT_DRAFT_MESSAGE : args.content;
 
         if (turn.assistantDraftMessageId) {
             await ctx.db.patch(turn.assistantDraftMessageId, {
-                content: args.content,
+                content,
+                status: 'draft',
+                metadata: {
+                    ...asMetadataObject((await ctx.db.get(turn.assistantDraftMessageId))?.metadata),
+                    ...metadata,
+                },
                 updatedAt: now,
             });
         } else {
@@ -1840,13 +1892,13 @@ export const saveAssistantDraft = internalMutation({
                 userId: turn.userId,
                 turnId: turn._id,
                 role: 'assistant',
-                content: args.content,
+                content,
                 status: 'draft',
                 turnNumber: turn.turnNumber,
                 roleOrder: 1,
                 version: 1,
                 requestId: `${turn.requestId}-assistant-draft`,
-                metadata: { draft: true },
+                metadata,
                 createdAt: now,
                 updatedAt: now,
                 mode: turn.routeMode,
@@ -1863,6 +1915,53 @@ export const saveAssistantDraft = internalMutation({
             updatedAt: now,
         });
         return true;
+    },
+});
+
+/** One-time maintenance helper for replacing previously leaked assistant JSON drafts. */
+export const redactLeakedAssistantMessages = internalMutation({
+    args: {
+        conversationId: v.optional(v.id('conversations')),
+        limit: v.optional(v.number()),
+        dryRun: v.optional(v.boolean()),
+    },
+    handler: async (ctx, args) => {
+        const limit = Math.min(Math.max(Math.floor(args.limit ?? 100), 1), 500);
+        const rows = args.conversationId
+            ? await ctx.db
+                .query('messages')
+                .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId!))
+                .take(limit)
+            : await ctx.db.query('messages').take(limit);
+
+        let scanned = 0;
+        let matched = 0;
+        let redacted = 0;
+        const now = Date.now();
+
+        for (const message of rows) {
+            scanned += 1;
+            if (message.role !== 'assistant' || !looksLikeInternalStructuredPayload(message.content)) {
+                continue;
+            }
+            matched += 1;
+            if (args.dryRun) continue;
+
+            await ctx.db.patch(message._id, {
+                content: message.status === 'draft'
+                    ? SAFE_ASSISTANT_DRAFT_MESSAGE
+                    : 'Analysis was interrupted. Please regenerate this answer.',
+                metadata: {
+                    ...asMetadataObject(message.metadata),
+                    redactedExistingInternalLeak: true,
+                    uiKind: message.status === 'draft' ? 'analysis_status' : 'answer',
+                },
+                updatedAt: now,
+            });
+            redacted += 1;
+        }
+
+        return { scanned, matched, redacted, dryRun: args.dryRun ?? false };
     },
 });
 
@@ -1887,18 +1986,23 @@ export const completeAssistant = internalMutation({
         if (!turn) return null;
 
         const messageStatus = args.degraded ? 'degraded' : 'committed';
+        const unsafeContent = looksLikeInternalStructuredPayload(args.content);
+        const content = unsafeContent
+            ? 'Analysis completed, but the answer was withheld because it contained internal source metadata. Please regenerate this answer.'
+            : args.content;
         const metadata = {
             ...metadataFromJson(args.metadataJson),
             degraded: args.degraded ?? false,
             errorCode: args.errorCode,
             errorMessage: args.errorMessage,
+            redactedInternalContent: unsafeContent || undefined,
         };
         let assistantMessageId = turn.assistantMessageId;
         let shouldIncrementMessageCount = false;
 
         if (assistantMessageId) {
             await ctx.db.patch(assistantMessageId, {
-                content: args.content,
+                content,
                 status: messageStatus,
                 artifactsJson: args.artifactsJson,
                 metadata,
@@ -1908,7 +2012,7 @@ export const completeAssistant = internalMutation({
             assistantMessageId = turn.assistantDraftMessageId;
             shouldIncrementMessageCount = true;
             await ctx.db.patch(turn.assistantDraftMessageId, {
-                content: args.content,
+                content,
                 status: messageStatus,
                 artifactsJson: args.artifactsJson,
                 requestId: assistantRequestId(turn.requestId),
@@ -1922,7 +2026,7 @@ export const completeAssistant = internalMutation({
                 userId: turn.userId,
                 turnId: turn._id,
                 role: 'assistant',
-                content: args.content,
+                content,
                 status: messageStatus,
                 turnNumber: turn.turnNumber,
                 roleOrder: 1,

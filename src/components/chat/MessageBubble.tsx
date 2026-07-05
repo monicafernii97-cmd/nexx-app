@@ -32,6 +32,8 @@ interface MessageBubbleProps {
     procedureInfo?: LocalProcedureInfo;
     /** Handler for contextual actions from AssistantMessageCard. */
     onAction?: (action: ActionType, content?: string) => void;
+    /** Send a suggested follow-up prompt back into the chat. */
+    onSuggestedPrompt?: (prompt: string) => void;
 }
 
 type DocumentSourceMetadata = {
@@ -45,18 +47,42 @@ type DocumentSourceMetadata = {
 };
 
 type DocumentCitationMetadata = {
-    chatAnswerSourceId: string;
+    id: string;
     uploadedFileId: string;
     filename: string;
-    chunkId: string;
-    memoryGenerationId?: string;
     pageStart?: number;
     pageEnd?: number;
     pageLabel?: string;
     citationLabel?: string;
-    quotedText: string;
+    quotePreview: string;
     citationVerifierStatus: 'verified' | 'partial' | 'failed';
 };
+
+const INTERNAL_LEAK_KEYS = [
+    'sourceId',
+    'fileId',
+    'fileName',
+    'memoryGenerationId',
+    'chunkId',
+    'pageStart',
+    'pageEnd',
+    'blockIds',
+    'quotedText',
+    'documentAnswer',
+] as const;
+
+function isUnsafeAssistantContent(content: string) {
+    if (!content) return false;
+    const trimmed = content.trim();
+    const looksLikeJson =
+        trimmed.startsWith('{') ||
+        trimmed.startsWith('[') ||
+        trimmed.includes('","');
+    const containsInternalKeys = INTERNAL_LEAK_KEYS.some((key) =>
+        content.includes(`"${key}"`) || content.includes(`${key}:`)
+    );
+    return looksLikeJson && containsInternalKeys;
+}
 
 // ── Shared action button (declared OUTSIDE render to satisfy react-hooks/static-components) ──
 
@@ -119,12 +145,21 @@ function getDocumentCitations(metadata: unknown) {
     return rawCitations.flatMap((citation): DocumentCitationMetadata[] => {
         if (!citation || typeof citation !== 'object' || Array.isArray(citation)) return [];
         const record = citation as Record<string, unknown>;
+        const id = typeof record.id === 'string'
+            ? record.id
+            : typeof record.chatAnswerSourceId === 'string'
+                ? record.chatAnswerSourceId
+                : undefined;
+        const quotePreview = typeof record.quotePreview === 'string'
+            ? record.quotePreview
+            : typeof record.quotedText === 'string'
+                ? record.quotedText.replace(/\s+/g, ' ').trim().slice(0, 280)
+                : undefined;
         if (
-            typeof record.chatAnswerSourceId !== 'string' ||
+            typeof id !== 'string' ||
             typeof record.uploadedFileId !== 'string' ||
             typeof record.filename !== 'string' ||
-            typeof record.chunkId !== 'string' ||
-            typeof record.quotedText !== 'string'
+            typeof quotePreview !== 'string'
         ) {
             return [];
         }
@@ -137,16 +172,14 @@ function getDocumentCitations(metadata: unknown) {
                 : 'failed';
 
         return [{
-            chatAnswerSourceId: record.chatAnswerSourceId,
+            id,
             uploadedFileId: record.uploadedFileId,
             filename: record.filename,
-            chunkId: record.chunkId,
-            memoryGenerationId: typeof record.memoryGenerationId === 'string' ? record.memoryGenerationId : undefined,
             pageStart: typeof record.pageStart === 'number' ? record.pageStart : undefined,
             pageEnd: typeof record.pageEnd === 'number' ? record.pageEnd : undefined,
             pageLabel: typeof record.pageLabel === 'string' ? record.pageLabel : undefined,
             citationLabel: typeof record.citationLabel === 'string' ? record.citationLabel : undefined,
-            quotedText: record.quotedText,
+            quotePreview,
             citationVerifierStatus: status as DocumentCitationMetadata['citationVerifierStatus'],
         }];
     }).slice(0, 12);
@@ -176,9 +209,28 @@ function DocumentEvidencePanel({
     isLight: boolean;
 }) {
     const [openCitationId, setOpenCitationId] = useState<string | null>(null);
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const [copiedCitationId, setCopiedCitationId] = useState<string | null>(null);
     const hasLimitedText = sources.some((source) => source.contextTruncated);
+    const sourceNames = Array.from(new Set(sources.map((source) => source.filename).filter(Boolean)));
+    const citedSourceNames = Array.from(new Set(citations.map((citation) => citation.filename).filter(Boolean)));
+    const displaySourceNames = citedSourceNames.length > 0 ? citedSourceNames : sourceNames;
+    const visibleSources = citations.length > 0
+        ? sources.filter((source) => citedSourceNames.includes(source.filename))
+        : sources;
+    const citationCountLabel = `${citations.length} citation${citations.length === 1 ? '' : 's'}`;
+    const sourceSummary = displaySourceNames.length === 1
+        ? `${displaySourceNames[0]} · ${citationCountLabel}`
+        : `${displaySourceNames.length || 1} document${displaySourceNames.length === 1 ? '' : 's'} · ${citationCountLabel}`;
 
     if (sources.length === 0 && citations.length === 0) return null;
+
+    const handleCopyQuote = async (citation: DocumentCitationMetadata) => {
+        if (!window.isSecureContext || !navigator.clipboard?.writeText) return;
+        await navigator.clipboard.writeText(citation.quotePreview);
+        setCopiedCitationId(citation.id);
+        window.setTimeout(() => setCopiedCitationId((current) => current === citation.id ? null : current), 1800);
+    };
 
     return (
         <div className={`mt-3 rounded-lg border px-3 py-2 ${isLight
@@ -198,12 +250,27 @@ function DocumentEvidencePanel({
                     </span>
                 )}
             </div>
-            {citations.length > 0 && (
+            <div className={`mt-2 flex flex-wrap items-center gap-2 text-xs ${isLight ? 'text-blue-950' : 'text-white'}`}>
+                <FileText size={13} weight="regular" className="shrink-0" />
+                <span className="min-w-0 max-w-full truncate font-semibold">{sourceSummary}</span>
+                {(citations.length > 0 || sources.length > 0) && (
+                    <button
+                        type="button"
+                        onClick={() => setDetailsOpen((open) => !open)}
+                        className={`rounded px-2 py-1 text-[11px] font-bold transition-colors ${isLight ? 'bg-white text-blue-700 hover:bg-blue-100' : 'bg-white/10 text-sky-100 hover:bg-white/15'}`}
+                        aria-expanded={detailsOpen}
+                    >
+                        {detailsOpen ? 'Hide details' : 'View source details'}
+                    </button>
+                )}
+            </div>
+            {detailsOpen && citations.length > 0 && (
                 <div className="mt-2 space-y-2">
-                    {citations.map((citation, index) => {
-                        const citationId = `${citation.chatAnswerSourceId}:${citation.chunkId}`;
+                    {citations.map((citation) => {
+                        const citationId = citation.id;
                         const isOpen = openCitationId === citationId;
                         const status = citationBadge(citation.citationVerifierStatus);
+                        const locationLabel = citation.pageLabel || citation.citationLabel || 'Page metadata unavailable';
                         return (
                             <div
                                 key={citationId}
@@ -218,10 +285,10 @@ function DocumentEvidencePanel({
                                     <Quotes size={14} weight="duotone" className="mt-0.5 shrink-0" />
                                     <span className="min-w-0 flex-1">
                                         <span className="block truncate font-semibold">
-                                            {index + 1}. {citation.filename}
+                                            {locationLabel}
                                         </span>
                                         <span className={isLight ? 'text-blue-500' : 'text-white/55'}>
-                                            {citation.citationLabel || citation.pageLabel || 'Page metadata unavailable'}
+                                            Short source preview
                                         </span>
                                     </span>
                                     <span className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${citation.citationVerifierStatus === 'failed'
@@ -238,9 +305,23 @@ function DocumentEvidencePanel({
                                 </button>
                                 {isOpen && (
                                     <div className={`border-t px-3 py-2 text-xs leading-relaxed ${isLight ? 'border-blue-100 text-blue-950/80' : 'border-white/10 text-white/75'}`}>
+                                        <div className={`mb-2 flex flex-wrap items-center gap-2 text-[11px] ${isLight ? 'text-blue-700' : 'text-sky-100/75'}`}>
+                                            <span className="font-semibold">{citation.filename}</span>
+                                            <span>{locationLabel}</span>
+                                        </div>
                                         <p className="whitespace-pre-wrap break-words">
-                                            “{citation.quotedText}”
+                                            &quot;{citation.quotePreview}&quot;
                                         </p>
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => void handleCopyQuote(citation)}
+                                                className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-bold transition-colors ${isLight ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-white/10 text-sky-100 hover:bg-white/15'}`}
+                                            >
+                                                <Copy size={12} weight="regular" />
+                                                {copiedCitationId === citation.id ? 'Copied' : 'Copy quote'}
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -248,8 +329,9 @@ function DocumentEvidencePanel({
                     })}
                 </div>
             )}
+            {detailsOpen && (
             <div className="mt-2 flex flex-wrap gap-2">
-                {sources.map((source) => (
+                {visibleSources.map((source) => (
                     <div
                         key={`${source.uploadedFileId}-${source.source}`}
                         className={`inline-flex max-w-full items-center gap-2 rounded-md border px-2.5 py-1 text-xs ${isLight
@@ -264,6 +346,76 @@ function DocumentEvidencePanel({
                     </div>
                 ))}
             </div>
+            )}
+        </div>
+    );
+}
+
+function AnalysisStatusCard({ isLight }: { isLight: boolean }) {
+    return (
+        <div className={`rounded-xl border px-4 py-3 text-sm ${isLight
+            ? 'border-blue-100 bg-blue-50 text-blue-950'
+            : 'border-sky-300/15 bg-sky-300/10 text-sky-50'
+            }`}>
+            <p className="font-semibold">Analyzing court order</p>
+            <p className={`mt-1 text-xs ${isLight ? 'text-blue-700' : 'text-sky-100/75'}`}>
+                Preparing a clean summary, deadlines, risks, and source references.
+            </p>
+        </div>
+    );
+}
+
+const COURT_ORDER_FOLLOW_UPS = [
+    {
+        label: 'Create deadline checklist',
+        prompt: 'Create a deadline checklist from this court-order analysis.',
+    },
+    {
+        label: 'Draft AppClose message',
+        prompt: 'Draft a concise AppClose message for the most important notice or compliance item in this order.',
+    },
+    {
+        label: 'Explain possession schedule',
+        prompt: 'Explain the possession schedule provisions from this order in plain English.',
+    },
+    {
+        label: 'Extract only deadlines',
+        prompt: 'Extract only the deadlines, triggers, and recurring obligations from this order.',
+    },
+    {
+        label: 'Create compliance calendar',
+        prompt: 'Create a compliance calendar from the deadlines and recurring obligations in this order.',
+    },
+    {
+        label: 'Find enforcement risks',
+        prompt: 'Find the enforcement risks and ambiguous provisions in this order.',
+    },
+] as const;
+
+function CourtOrderFollowUpChips({
+    isLight,
+    onSuggestedPrompt,
+}: {
+    isLight: boolean;
+    onSuggestedPrompt?: (prompt: string) => void;
+}) {
+    if (!onSuggestedPrompt) return null;
+
+    return (
+        <div className="mt-3 flex flex-wrap gap-2" aria-label="Suggested court order follow-ups">
+            {COURT_ORDER_FOLLOW_UPS.map((followUp) => (
+                <button
+                    key={followUp.label}
+                    type="button"
+                    onClick={() => onSuggestedPrompt(followUp.prompt)}
+                    className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${isLight
+                        ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                        : 'border-white/10 bg-white/5 text-white/75 hover:bg-white/10 hover:text-white'
+                        }`}
+                >
+                    {followUp.label}
+                </button>
+            ))}
         </div>
     );
 }
@@ -496,6 +648,7 @@ export default function MessageBubble({
     detectedPatterns,
     procedureInfo,
     onAction,
+    onSuggestedPrompt,
 }: MessageBubbleProps) {
     const [copied, setCopied] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -523,6 +676,11 @@ export default function MessageBubble({
     );
     const documentSources = useMemo(() => getDocumentSources(metadata), [metadata]);
     const documentCitations = useMemo(() => getDocumentCitations(metadata), [metadata]);
+    const shouldShowCourtOrderFollowUps = role === 'assistant' && !isStreaming && (
+        documentSources.length > 0 ||
+        documentCitations.length > 0 ||
+        content.includes('Court Order Analysis')
+    );
 
     useEffect(() => {
         return () => {
@@ -590,6 +748,7 @@ export default function MessageBubble({
     }, [handleSaveEdit, handleCancelEdit]);
 
     const isLight = theme === 'light';
+    const unsafeAssistantContent = role === 'assistant' && isUnsafeAssistantContent(content);
 
     // Responsive visibility: always visible on mobile, hover-reveal on desktop
     const actionBarClass = 'flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity';
@@ -683,7 +842,9 @@ export default function MessageBubble({
 
             <div className="flex-1 max-w-4xl min-w-0 pr-4">
                 {/* Structured response rendering (AssistantMessageCard) */}
-                {structuredViewModel && !isStreaming ? (
+                {unsafeAssistantContent ? (
+                    <AnalysisStatusCard isLight={isLight} />
+                ) : structuredViewModel && !isStreaming ? (
                     <>
                         <AssistantMessageCard
                             viewModel={structuredViewModel}
@@ -692,6 +853,9 @@ export default function MessageBubble({
                             onAction={(action, content) => onAction?.(action, content)}
                         />
                         <DocumentEvidencePanel sources={documentSources} citations={documentCitations} isLight={isLight} />
+                        {shouldShowCourtOrderFollowUps && (
+                            <CourtOrderFollowUpChips isLight={isLight} onSuggestedPrompt={onSuggestedPrompt} />
+                        )}
                         {content.trim() && (
                             <div className="mt-3">
                                 <PlayAloudButton text={content} />
@@ -712,6 +876,10 @@ export default function MessageBubble({
                 {/* ── Artifact Panels ── */}
                 {!isStreaming && (
                     <DocumentEvidencePanel sources={documentSources} citations={documentCitations} isLight={isLight} />
+                )}
+
+                {shouldShowCourtOrderFollowUps && (
+                    <CourtOrderFollowUpChips isLight={isLight} onSuggestedPrompt={onSuggestedPrompt} />
                 )}
 
                 {!isStreaming && content.trim() && (

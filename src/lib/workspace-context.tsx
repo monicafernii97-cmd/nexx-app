@@ -4,6 +4,7 @@ import { createContext, useContext, useCallback, useState, useEffect, useRef, ty
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Doc, Id } from '@convex/_generated/dataModel';
+import { useUser } from '@/lib/user-context';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,15 +48,17 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefin
 // ---------------------------------------------------------------------------
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
+    const { userId, isLoading: isUserLoading, clerkUser } = useUser();
     const [activeCaseId, setActiveCaseIdLocal] = useState<Id<'cases'> | null>(null);
     const provisioningRef = useRef(false);
     const [provisionRetry, setProvisionRetry] = useState(0);
     const pendingSetActiveRef = useRef<Promise<void>>(Promise.resolve());
+    const canLoadWorkspace = Boolean(clerkUser && userId && !isUserLoading);
 
     // Ensure a default case exists for the user
     const getOrCreateDefault = useMutation(api.cases.getOrCreateDefault);
     const setActiveMutation = useMutation(api.cases.setActive);
-    const cases = useQuery(api.cases.list);
+    const cases = useQuery(api.cases.list, canLoadWorkspace ? {} : 'skip');
 
     // On first load, auto-provision a default case.
     // On transient failure, increment provisionRetry to re-trigger (max 3 attempts).
@@ -99,9 +102,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         defaultCaseId !== null && resolvedActiveCaseId === defaultCaseId;
 
     // Queries — still user-scoped (caseId filtering done client-side for backward compat)
-    const allPins = useQuery(api.casePins.listByUser);
-    const allMemory = useQuery(api.caseMemory.listByUser);
-    const allTimeline = useQuery(api.timelineCandidates.listByUser);
+    const allPins = useQuery(api.casePins.listByUser, canLoadWorkspace ? {} : 'skip');
+    const allMemory = useQuery(api.caseMemory.listByUser, canLoadWorkspace ? {} : 'skip');
+    const allTimeline = useQuery(api.timelineCandidates.listByUser, canLoadWorkspace ? {} : 'skip');
 
     // Filter to active case — legacy items (no caseId) only appear in the default case.
     // Return undefined until cases is loaded (or empty) so consumers see loading state.

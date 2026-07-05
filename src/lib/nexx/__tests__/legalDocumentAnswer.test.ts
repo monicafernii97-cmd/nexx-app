@@ -3,6 +3,7 @@ import {
   type LegalDocumentAnswer,
   type LegalDocumentSourcePacket,
   validateLegalDocumentAnswerShape,
+  renderCourtOrderAnalysisMarkdown,
   verifyLegalDocumentAnswer,
 } from '../legalDocumentAnswer';
 
@@ -35,16 +36,10 @@ function answer(overrides: Partial<LegalDocumentAnswer> = {}): LegalDocumentAnsw
     citations: [
       {
         sourceId: 'src_001',
-        fileId: 'file_1',
-        fileName: 'Final Order.pdf',
-        memoryGenerationId: 'gen_1',
-        chunkId: 'chunk_1',
         pageStart: 4,
         pageEnd: 4,
-        blockIds: ['block_1'],
-        quotedText: 'Respondent shall pay $500 no later than June 14, 2026.',
-        confidence: 0.97,
-        warning: null,
+        supports: 'Respondent shall pay $500 no later than June 14, 2026.',
+        confidence: 'high',
       },
     ],
     warnings: [],
@@ -72,6 +67,41 @@ describe('verifyLegalDocumentAnswer', () => {
     ]);
   });
 
+  it('uses a source preview when citation supports text is null', () => {
+    const result = verifyLegalDocumentAnswer(answer({
+      citations: [{
+        sourceId: 'src_001',
+        pageStart: 4,
+        pageEnd: 4,
+        supports: null,
+        confidence: 'high',
+      }],
+    }), sourcePackets, {
+      requiresDocumentAnswer: true,
+      requiresCitation: true,
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.verifiedCitations[0]?.quotedText).toBe(sourcePackets[0].text);
+  });
+
+  it('uses a source preview when citation supports text is omitted', () => {
+    const result = verifyLegalDocumentAnswer(answer({
+      citations: [{
+        sourceId: 'src_001',
+        pageStart: 4,
+        pageEnd: 4,
+        confidence: 'high',
+      }],
+    }), sourcePackets, {
+      requiresDocumentAnswer: true,
+      requiresCitation: true,
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.verifiedCitations[0]?.quotedText).toBe(sourcePackets[0].text);
+  });
+
   it('blocks document factual claims without a source id', () => {
     const result = verifyLegalDocumentAnswer(answer({
       claims: [{ claim: 'The order requires payment.', claimType: 'document_fact', sourceIds: [] }],
@@ -84,11 +114,11 @@ describe('verifyLegalDocumentAnswer', () => {
     expect(result.errors.join(' ')).toContain('missing sources');
   });
 
-  it('blocks quoted text that is not present in the cited source packet', () => {
+  it('blocks supporting text that is not present in the cited source packet', () => {
     const result = verifyLegalDocumentAnswer(answer({
       citations: [{
         ...answer().citations[0],
-        quotedText: 'Respondent shall transfer sole custody immediately.',
+        supports: 'Respondent shall transfer sole custody immediately.',
       }],
     }), sourcePackets, {
       requiresDocumentAnswer: true,
@@ -99,26 +129,11 @@ describe('verifyLegalDocumentAnswer', () => {
     expect(result.errors.join(' ')).toContain('not found');
   });
 
-  it('blocks generation-backed citations that omit the memory generation id', () => {
-    const result = verifyLegalDocumentAnswer(answer({
-      citations: [{
-        ...answer().citations[0],
-        memoryGenerationId: null,
-      }],
-    }), sourcePackets, {
-      requiresDocumentAnswer: true,
-      requiresCitation: true,
-    });
-
-    expect(result.passed).toBe(false);
-    expect(result.errors.join(' ')).toContain('generation missing');
-  });
-
   it('blocks reordered quotes even when the same words appear in the source packet', () => {
     const result = verifyLegalDocumentAnswer(answer({
       citations: [{
         ...answer().citations[0],
-        quotedText: 'June 14 2026 Respondent $500 shall pay no later than',
+        supports: 'June 14 2026 Respondent $500 shall pay no later than',
       }],
     }), sourcePackets, {
       requiresDocumentAnswer: true,
@@ -132,7 +147,7 @@ describe('verifyLegalDocumentAnswer', () => {
     const result = verifyLegalDocumentAnswer(answer({
       citations: [{
         ...answer().citations[0],
-        quotedText: 'Respondent shall pay 500 no later than June 14 2026',
+        supports: 'Respondent shall pay 500 no later than June 14 2026',
       }],
     }), sourcePackets, {
       requiresDocumentAnswer: true,
@@ -146,7 +161,7 @@ describe('verifyLegalDocumentAnswer', () => {
     const result = verifyLegalDocumentAnswer(answer({
       citations: [{
         ...answer().citations[0],
-        quotedText: 'Respondent shall pay $500 June 14 2026',
+        supports: 'Respondent shall pay $500 June 14 2026',
       }],
     }), [{
       ...sourcePackets[0],
@@ -183,5 +198,37 @@ describe('verifyLegalDocumentAnswer', () => {
       ...answer(),
       notFoundReason: { code: 'bad_shape' },
     })).toBe(false);
+  });
+});
+
+describe('renderCourtOrderAnalysisMarkdown', () => {
+  it('renders the required executive sections with compact citations and no internal metadata', () => {
+    const content = renderCourtOrderAnalysisMarkdown(answer({
+      claims: [
+        {
+          claim: 'Respondent | shall pay $500\nno later than June 14, 2026.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
+      ],
+      warnings: ['chunkId should never be shown to the user. Verify exact wording.'],
+    }), sourcePackets, 'Fallback answer');
+
+    expect(content).toContain('# Court Order Analysis');
+    expect(content).toContain('## Executive Summary');
+    expect(content).toContain('## Key Obligations');
+    expect(content).toContain('## Deadlines');
+    expect(content).toContain('## Risks and Cautions');
+    expect(content).toContain('## Recommended Next Steps');
+    expect(content).toContain('## Source Details');
+    expect(content).toContain('[p. 4]');
+    expect(content).toContain('Respondent \\| shall pay $500 no later than June 14');
+    expect(content).not.toContain('sourceId');
+    expect(content).not.toContain('chunkId');
+    expect(content).not.toContain('memoryGenerationId');
+    expect(content).not.toContain('blockIds');
+    expect(content).not.toContain('quotedText');
+    expect(content).not.toContain('Sources used:');
+    expect(content).not.toContain('Final Order.pdf, p.');
   });
 });

@@ -17,7 +17,12 @@ vi.mock('@/hooks/useTTSPlayer', () => ({
   }),
 }));
 
-async function renderMessage(metadata: unknown, artifactsJson?: string) {
+async function renderMessage(
+  metadata: unknown,
+  artifactsJson?: string,
+  content = 'The order requires payment by Friday.',
+  props: Partial<React.ComponentProps<typeof MessageBubble>> = {}
+) {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -26,9 +31,10 @@ async function renderMessage(metadata: unknown, artifactsJson?: string) {
     root.render(
       <MessageBubble
         role="assistant"
-        content="The order requires payment by Friday."
+        content={content}
         metadata={metadata}
         artifactsJson={artifactsJson}
+        {...props}
       />
     );
   });
@@ -76,17 +82,32 @@ describe('MessageBubble document evidence panel', () => {
 
     expect(container.textContent).toContain('1 cited passage');
     expect(container.textContent).toContain('Final Order.pdf');
-    expect(container.textContent).toContain('p. 4');
-    expect(container.textContent).toContain('Source');
-    expect(container.textContent).toContain('Case document');
+    expect(container.textContent).toContain('View source details');
+    expect(container.textContent).not.toContain('p. 4');
+    expect(container.textContent).not.toContain('Case document');
     expect(container.textContent).not.toContain('Respondent shall pay by Friday.');
     expect(container.textContent).not.toContain('retrieved chunk');
     expect(container.textContent).not.toContain('Conversation memory');
     expect(container.textContent).not.toContain('Uploaded now');
     expect(container.textContent).not.toContain('Partial');
 
+    const detailsButton = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('View source details')
+    );
+    expect(detailsButton?.getAttribute('aria-expanded')).toBe('false');
+
+    await act(async () => {
+      detailsButton?.click();
+    });
+
+    expect(detailsButton?.getAttribute('aria-expanded')).toBe('true');
+    expect(container.textContent).toContain('p. 4');
+    expect(container.textContent).toContain('Source');
+    expect(container.textContent).toContain('Case document');
+    expect(container.textContent).not.toContain('Respondent shall pay by Friday.');
+
     const citationButton = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Final Order.pdf')
+      button.textContent?.includes('p. 4')
     );
     expect(citationButton?.getAttribute('aria-expanded')).toBe('false');
 
@@ -122,7 +143,7 @@ describe('MessageBubble document evidence panel', () => {
     roots.push(root);
 
     expect(container.textContent).toContain('Final Order.pdf');
-    expect(container.textContent).toContain('Saved in this chat');
+    expect(container.textContent).not.toContain('Saved in this chat');
     expect(container.textContent).toContain('Extracted text may be incomplete');
     expect(container.textContent).not.toMatch(/high confidence/i);
     expect(container.textContent).not.toContain('Internal source review');
@@ -130,5 +151,104 @@ describe('MessageBubble document evidence panel', () => {
     expect(container.textContent).not.toContain('retrieved chunk');
     expect(container.textContent).not.toContain('Conversation memory');
     expect(container.textContent).not.toContain('Partial');
+
+    const detailsButton = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('View source details')
+    );
+
+    await act(async () => {
+      detailsButton?.click();
+    });
+
+    expect(container.textContent).toContain('Saved in this chat');
+  });
+
+  it('renders a safe status card instead of raw structured source JSON', async () => {
+    const onRetry = vi.fn();
+    const rawPayload = '{"documentAnswer":{"citations":[{"sourceId":"src_005","chunkId":"abc","quotedText":"secret"}]}}';
+    const { container, root } = await renderMessage({}, undefined, rawPayload, { onRetry });
+    roots.push(root);
+
+    expect(container.textContent).toContain('Analyzing court order');
+    expect(container.querySelector('button[aria-label="Retry response"]')).toBeTruthy();
+    expect(container.querySelector('button[aria-label="Copy recovery notice"]')).toBeTruthy();
+    expect(container.textContent).not.toContain('sourceId');
+    expect(container.textContent).not.toContain('chunkId');
+    expect(container.textContent).not.toContain('quotedText');
+    expect(container.textContent).not.toContain('secret');
+  });
+
+  it('summarizes cited documents instead of unrelated source metadata', async () => {
+    const { container, root } = await renderMessage({
+      documentSources: [
+        {
+          uploadedFileId: 'file_current',
+          filename: 'Uploaded Order.pdf',
+          source: 'current_turn',
+          status: 'ready',
+        },
+        {
+          uploadedFileId: 'file_case',
+          filename: 'Older Case Order.pdf',
+          source: 'case_memory',
+          status: 'ready',
+        },
+      ],
+      documentCitations: [{
+        chatAnswerSourceId: 'source_current',
+        uploadedFileId: 'file_current',
+        filename: 'Uploaded Order.pdf',
+        pageStart: 2,
+        pageEnd: 2,
+        pageLabel: 'p. 2',
+        quotedText: 'Parent A has exclusive education authority.',
+        citationVerifierStatus: 'verified',
+      }],
+    });
+    roots.push(root);
+
+    expect(container.textContent).toContain('Uploaded Order.pdf · 1 citation');
+    expect(container.textContent).not.toContain('2 sources');
+    expect(container.textContent).not.toContain('Older Case Order.pdf');
+
+    const detailsButton = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('View source details')
+    );
+
+    await act(async () => {
+      detailsButton?.click();
+    });
+
+    expect(container.textContent).toContain('Uploaded Order.pdf');
+    expect(container.textContent).not.toContain('Older Case Order.pdf');
+  });
+
+  it('renders follow-up chips that dispatch prompt text for court-order answers', async () => {
+    const onSuggestedPrompt = vi.fn();
+    const { container, root } = await renderMessage(
+      {
+        documentSources: [{
+          uploadedFileId: 'file_123',
+          filename: 'Final Order.pdf',
+          source: 'current_turn',
+          status: 'ready',
+        }],
+      },
+      undefined,
+      '# Court Order Analysis\n\n## Executive Summary\nThe order requires payment. [p. 4]',
+      { onSuggestedPrompt }
+    );
+    roots.push(root);
+
+    const deadlineButton = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Create deadline checklist')
+    );
+    expect(deadlineButton).toBeTruthy();
+
+    await act(async () => {
+      deadlineButton?.click();
+    });
+
+    expect(onSuggestedPrompt).toHaveBeenCalledWith('Create a deadline checklist from this court-order analysis.');
   });
 });

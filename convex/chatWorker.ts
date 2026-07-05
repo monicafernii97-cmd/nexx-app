@@ -20,6 +20,7 @@ import { polishLegalResponse } from '../src/lib/nexx/postprocess';
 import {
     type LegalDocumentAnswerVerification,
     type LegalDocumentSourcePacket,
+    renderCourtOrderAnalysisMarkdown,
     verifyLegalDocumentAnswer,
 } from '../src/lib/nexx/legalDocumentAnswer';
 import {
@@ -33,6 +34,7 @@ import type { NexxAssistantResponse, RouteMode } from '../src/lib/types';
 
 const DEGRADED_MESSAGE =
     'I saved your message, but the response did not finish. Please retry this turn in a moment.';
+const SAFE_ANALYSIS_DRAFT_MESSAGE = 'Analyzing court order...';
 const PROVIDER_TIMEOUT_MS = 80_000;
 
 let cachedOpenAI: OpenAI | null = null;
@@ -113,12 +115,6 @@ function normalizeProviderError(error: unknown) {
         rawMessage: message,
         retryable: true,
     };
-}
-
-function isProviderGenerationError(error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    return /\b(?:provider|model|rate limit|429|overloaded|503|unavailable|structured_output)\b/i
-        .test(message);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -611,14 +607,10 @@ function buildRetrievedChunkPrompt(chunks: DocumentChunkContext[], sourcePackets
         ...chunks.map((chunk) => {
             const sourcePacket = packetsByChunkId.get(chunk.chunkId.toString());
             return [
-            `<CHUNK sourceId="${escapeXmlAttribute(sourcePacket?.sourceId)}" chunkId="${chunk.chunkId}" fileId="${escapeXmlAttribute(sourcePacket?.fileId)}" memoryGenerationId="${escapeXmlAttribute(sourcePacket?.memoryGenerationId)}" pageStart="${chunk.pageStart ?? ''}" pageEnd="${chunk.pageEnd ?? ''}" sectionHeading="${escapeXmlAttribute(chunk.sectionHeading)}" retrievalReasons="${escapeXmlAttribute(chunk.retrievalReasons.join(', '))}" extractionMethod="${escapeXmlAttribute(chunk.extractionMethod ?? 'unknown')}" confidence="${chunk.ocrConfidence ?? ''}">`,
+            `<CHUNK sourceId="${escapeXmlAttribute(sourcePacket?.sourceId)}" pageStart="${chunk.pageStart ?? ''}" pageEnd="${chunk.pageEnd ?? ''}" sectionHeading="${escapeXmlAttribute(chunk.sectionHeading)}" retrievalReasons="${escapeXmlAttribute(chunk.retrievalReasons.join(', '))}" extractionMethod="${escapeXmlAttribute(chunk.extractionMethod ?? 'unknown')}" confidence="${chunk.ocrConfidence ?? ''}">`,
             `SOURCE_ID: ${sourcePacket?.sourceId ?? ''}`,
             `FILE: ${escapeXmlText(sourcePacket?.fileName ?? '')}`,
-            `FILE_ID: ${sourcePacket?.fileId ?? ''}`,
-            `GENERATION_ID: ${sourcePacket?.memoryGenerationId ?? ''}`,
-            `CHUNK_ID: ${chunk.chunkId}`,
             `PAGES: ${chunk.pageStart ?? ''}${chunk.pageEnd && chunk.pageEnd !== chunk.pageStart ? `-${chunk.pageEnd}` : ''}`,
-            `BLOCK_IDS: ${(sourcePacket?.blockIds ?? []).join(', ')}`,
             'TEXT:',
             sanitizeDocumentContextText(chunk.text),
             '</CHUNK>',
@@ -729,11 +721,13 @@ function buildAttachmentContextPrompt(
         'Do not describe uploaded document memory as "the text you provided" or "pasted text"; identify the uploaded document by filename/source instead.',
         'If the excerpts do not contain the answer, say the available extracted text does not show it.',
         'If SOURCE_ID chunks are present for a document, make document-specific claims about that document only from those SOURCE_ID chunks. Uncited extracted context is not enough for a document-specific claim for that document.',
-        'For court-order review, identify which document was reviewed and cite page/section/chunk metadata when available.',
+        'For court-order review, identify which document was reviewed and cite compact page labels like [p. 2] or [pp. 2-3] when available.',
         'Quote short exact phrases only when exact wording matters.',
+        'Never reveal SOURCE_ID values, backend field names, chunk IDs, memory generation IDs, block IDs, raw JSON, or retrieval metadata in the user-facing message.',
         'When you make document-specific claims, fill documentAnswer with claims and citations that use only the SOURCE_ID values shown in retrieved chunks.',
         'Every document_fact, quote, summary, comparison, or interpretation claim in documentAnswer.claims must include at least one valid sourceId.',
-        'Every documentAnswer.citation quotedText must be copied from the cited SOURCE_ID text. If the source packets do not support the answer, set documentAnswer.answerType to "not_found".',
+        'Every documentAnswer citation may include a short supports phrase copied from the cited SOURCE_ID text, but must not include file names, chunk IDs, memory generation IDs, block IDs, raw source objects, or backend metadata.',
+        'If the source packets do not support the answer, set documentAnswer.answerType to "not_found".',
         preferRetrievedChunks ? 'Use the retrieved chunks first for this turn; they were selected from stored document memory for the user\'s specific question.' : undefined,
         detection.requiresExactText ? 'This turn requires exact wording: verify terms against the extracted text and do not infer missing words.' : undefined,
         detection.requiresPageOrSectionCitation ? 'This turn asks for source location: cite available page, section, paragraph, or document metadata when possible.' : undefined,
@@ -938,41 +932,6 @@ function shouldRequireDocumentAnswer(args: {
         );
 }
 
-function sourceCitationLabel(packet: LegalDocumentSourcePacket) {
-    const pageLabel = packet.pageStart
-        ? `p. ${packet.pageStart}${packet.pageEnd && packet.pageEnd !== packet.pageStart ? `-${packet.pageEnd}` : ''}`
-        : 'page metadata unavailable';
-    const sectionLabel = packet.sectionHeading ? `, ${packet.sectionHeading}` : '';
-    return `${packet.fileName}, ${pageLabel}${sectionLabel}`;
-}
-
-function clippedQuote(value: string) {
-    const normalized = value.replace(/\s+/g, ' ').trim();
-    if (normalized.length <= 260) return normalized;
-    return `${normalized.slice(0, 257).trim()}...`;
-}
-
-function userFacingDocumentWarning(value: string) {
-    const sanitized = value
-        .replace(/\bPAGE_BOUNDARIES_UNAVAILABLE\b/gi, '')
-        .replace(/\bSOURCE_ID\b/gi, '')
-        .replace(/\bsource[_\s-]?id\b/gi, '')
-        .replace(/\bsrc_\d+\b/gi, '')
-        .replace(/\b\d+\s+retrieved chunks?\b/gi, '')
-        .replace(/\bcitation(?:[_\s-]?|(?=Verifier))verifier(?:[_\s-]?(?:failed|blocked|failure))?[^.]*\.?/gi, '')
-        .replace(/\bcitationVerifier(?:Failed|Blocked|Failure)?\b/g, '')
-        .replace(/\bOCR confidence[^.]*\.?/gi, '')
-        .replace(/\s+([,.;:])/g, '$1')
-        .replace(/^[\s,.;:|/-]+|[\s,.;:|/-]+$/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    if (!sanitized || /^(source|warning|none)$/i.test(sanitized)) {
-        return null;
-    }
-    return sanitized;
-}
-
 function renderCitationLockedDocumentMessage(
     response: NexxAssistantResponse,
     sourcePackets: LegalDocumentSourcePacket[]
@@ -980,32 +939,9 @@ function renderCitationLockedDocumentMessage(
     const answer = response.documentAnswer;
     if (!answer) return response;
 
-    const packetsBySourceId = new Map(sourcePackets.map((packet) => [packet.sourceId, packet]));
-    const sourceLines = answer.citations
-        .map((citation) => {
-            const packet = packetsBySourceId.get(citation.sourceId);
-            if (!packet) return null;
-            const quote = clippedQuote(citation.quotedText);
-            return `- ${sourceCitationLabel(packet)}: "${quote}"`;
-        })
-        .filter((line): line is string => Boolean(line));
-    const extractionWarnings = answer.citations
-        .map((citation) => packetsBySourceId.get(citation.sourceId))
-        .filter((packet): packet is LegalDocumentSourcePacket => Boolean(packet))
-        .filter((packet) => (packet.confidence !== undefined && packet.confidence < 0.85) || Boolean(packet.warning))
-        .map(() => 'Some extracted text may be imperfect. Verify exact wording in the original document before relying on it.');
-    const warnings = Array.from(new Set([...answer.warnings.map(userFacingDocumentWarning), ...extractionWarnings]))
-        .filter((warning): warning is string => Boolean(warning && warning.trim().length > 0))
-        .slice(0, 5);
-    const baseAnswer = answer.answer.trim() || response.message;
-
     return {
         ...response,
-        message: [
-            baseAnswer,
-            sourceLines.length > 0 ? ['Sources', ...sourceLines].join('\n') : undefined,
-            warnings.length > 0 ? ['Warnings', ...warnings.map((warning) => `- ${warning}`)].join('\n') : undefined,
-        ].filter(Boolean).join('\n\n'),
+        message: renderCourtOrderAnalysisMarkdown(answer, sourcePackets, response.message),
     };
 }
 
@@ -1170,11 +1106,11 @@ async function generateWithFallbacks({
                 { timeout: PROVIDER_TIMEOUT_MS, maxRetries: 0 }
             );
 
-            let accumulatedText = '';
-                let responseId: string | undefined;
+            let structuredBuffer = '';
+            let responseId: string | undefined;
             let lastResponse: unknown = null;
-            let lastDraftLength = 0;
-            let lastDraftSavedAt = Date.now();
+            let safeDraftWritten = false;
+            let lastDraftSavedAt = 0;
             let completedCleanly = false;
 
             for await (const event of streamResponse) {
@@ -1192,17 +1128,16 @@ async function generateWithFallbacks({
                 };
                 if (streamEvent.type === 'response.output_text.delta') {
                     const delta = streamEvent.delta ?? '';
-                    accumulatedText += delta;
+                    structuredBuffer += delta;
 
                     const now = Date.now();
-                    if (accumulatedText.length - lastDraftLength >= 600) {
-                        lastDraftLength = accumulatedText.length;
+                    if (!safeDraftWritten || now - lastDraftSavedAt > 5000) {
+                        safeDraftWritten = true;
                         lastDraftSavedAt = now;
-                        await saveDraft(ctx, jobId, leaseOwner, accumulatedText);
-                    } else if (now - lastDraftSavedAt > 2000 && accumulatedText.length > 0) {
-                        lastDraftLength = accumulatedText.length;
-                        lastDraftSavedAt = now;
-                        await saveDraft(ctx, jobId, leaseOwner, accumulatedText);
+                        await saveDraft(ctx, jobId, leaseOwner, SAFE_ANALYSIS_DRAFT_MESSAGE, {
+                            uiKind: 'analysis_status',
+                            phase: 'preparing_answer',
+                        });
                     }
                 } else if (streamEvent.type === 'response.completed') {
                     lastResponse = streamEvent.response;
@@ -1233,7 +1168,7 @@ async function generateWithFallbacks({
                 throw new Error('Provider stream ended before completion');
             }
 
-            const rawText = accumulatedText || extractOutputText(lastResponse);
+            const rawText = structuredBuffer || extractOutputText(lastResponse);
             const recoveryResult = await recoverStructuredOutput(rawText, {
                 systemPrompt: promptBundle.systemPrompt,
                 developerPrompt: [
@@ -1366,11 +1301,18 @@ async function generateWithFallbacks({
 }
 
 /** Persist a streaming draft chunk through Convex mutations. */
-async function saveDraft(ctx: ActionCtx, jobId: Id<'chatGenerationJobs'>, leaseOwner: string, content: string) {
+async function saveDraft(
+    ctx: ActionCtx,
+    jobId: Id<'chatGenerationJobs'>,
+    leaseOwner: string,
+    content: string,
+    metadata?: Record<string, unknown>
+) {
     await ctx.runMutation(internal.chatTurns.saveAssistantDraft, {
         jobId,
         leaseOwner,
         content,
+        metadataJson: metadata ? JSON.stringify(metadata) : undefined,
     });
 }
 
@@ -1481,6 +1423,24 @@ export const processChatGenerationJob = internalAction({
                 let citationVerifierPassed = false;
                 if (result.attachmentContexts.length > 0 && !result.degraded && completion?.assistantMessageId) {
                     try {
+                        const verifiedCitationChunkIds = new Set(
+                            result.citationVerification.verifiedCitations.map((citation) => citation.chunkId.toString())
+                        );
+                        const citedUploadedFileIds = new Set<string>();
+                        for (const attachment of result.attachmentContexts) {
+                            if ((attachment.documentChunks ?? []).some((chunk) => verifiedCitationChunkIds.has(chunk.chunkId.toString()))) {
+                                citedUploadedFileIds.add(attachment.uploadedFileId.toString());
+                            }
+                        }
+                        const citedAttachmentContexts = citedUploadedFileIds.size > 0
+                            ? result.attachmentContexts.filter((attachment) =>
+                                citedUploadedFileIds.has(attachment.uploadedFileId.toString())
+                            )
+                            : result.attachmentContexts.filter((attachment) => attachment.source === 'current_turn');
+                        const evidenceAttachmentContexts = citedAttachmentContexts.length > 0
+                            ? citedAttachmentContexts
+                            : result.attachmentContexts.slice(0, 1);
+
                         const evidenceResult = await ctx.runMutation(internal.chatTurns.recordDocumentAnswerEvidence, {
                             turnId: lease.turnId,
                             assistantMessageId: completion.assistantMessageId,
@@ -1492,7 +1452,7 @@ export const processChatGenerationJob = internalAction({
                                 quotedText: citation.quotedText,
                                 citationVerifierStatus: citation.citationVerifierStatus,
                             })),
-                            sources: result.attachmentContexts.map((attachment) => ({
+                            sources: evidenceAttachmentContexts.map((attachment) => ({
                                 uploadedFileId: attachment.uploadedFileId,
                                 filename: attachment.filename,
                                 source: attachment.source ?? 'current_turn',

@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
@@ -38,7 +38,9 @@ export default function ConversationPage() {
     const [streamingContent, setStreamingContent] = useState('');
     const [analysisSteps, setAnalysisSteps] = useState<AnalysisStep[]>(DEFAULT_ANALYSIS_STEPS);
     const streamStartRef = useRef<number>(0);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const composerRef = useRef<HTMLDivElement>(null);
     const pendingInitialSentRef = useRef(false);
     const hasActiveTurn = (activeTurns?.length ?? 0) > 0;
     const isGenerating = isStreaming || hasActiveTurn;
@@ -83,10 +85,53 @@ export default function ConversationPage() {
         return () => clearInterval(interval);
     }, [isGenerating]);
 
-    // Auto-scroll to bottom on new messages
+    const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+        window.requestAnimationFrame(() => {
+            const container = scrollContainerRef.current;
+            if (!container) {
+                messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
+                return;
+            }
+            container.scrollTo({ top: container.scrollHeight, behavior });
+        });
+    }, []);
+
+    // Auto-scroll to bottom on new messages. Scroll the chat pane itself so
+    // bottom padding/spacers are honored instead of aligning only the sentinel.
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, streamingContent]);
+        scrollMessagesToBottom('smooth');
+    }, [messages, streamingContent, isGenerating, scrollMessagesToBottom]);
+
+    useLayoutEffect(() => {
+        const composer = composerRef.current;
+        if (!composer) return;
+
+        const isNearBottom = () => {
+            const container = scrollContainerRef.current;
+            if (!container) return true;
+            return container.scrollHeight - container.scrollTop - container.clientHeight < 160;
+        };
+
+        const updateComposerHeight = () => {
+            const shouldStayPinned = isNearBottom();
+            document.documentElement.style.setProperty('--chat-composer-height', `${composer.offsetHeight}px`);
+            if (shouldStayPinned) scrollMessagesToBottom('auto');
+        };
+
+        updateComposerHeight();
+        if (typeof ResizeObserver === 'undefined') {
+            window.addEventListener('resize', updateComposerHeight);
+            return () => window.removeEventListener('resize', updateComposerHeight);
+        }
+
+        const observer = new ResizeObserver(updateComposerHeight);
+        observer.observe(composer);
+        window.addEventListener('resize', updateComposerHeight);
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('resize', updateComposerHeight);
+        };
+    }, [scrollMessagesToBottom]);
 
     // Redirect if ID is invalid (after all hooks)
     useEffect(() => {
@@ -200,7 +245,6 @@ export default function ConversationPage() {
                 if (fileState?.attachmentRef) {
                     attachments = [fileState.attachmentRef];
                 } else if (fileState?.file) {
-                    setStreamingContent(`Uploading ${fileState.file.name}...`);
                     const upload = await uploadFileForConversation({
                         convex,
                         file: fileState.file,
@@ -214,7 +258,6 @@ export default function ConversationPage() {
                     });
                     uploadCallbacks?.onComplete(upload);
                     attachments = [upload.attachmentRef];
-                    setStreamingContent('');
                 }
 
                 // Server handles user message persistence (Step 13 in route.ts).
@@ -358,7 +401,7 @@ export default function ConversationPage() {
     return (
         <WorkspaceClient>
             {(workspace) => (
-        <div className={`flex flex-col h-[calc(100vh-80px)] max-w-5xl mx-auto px-2 md:px-4 pt-4 transition-colors duration-300 ${isLight ? 'bg-white' : ''}`}>
+        <div className={`flex h-[calc(100dvh-80px)] min-h-0 max-w-5xl flex-col overflow-hidden mx-auto px-2 md:px-4 pt-4 transition-colors duration-300 ${isLight ? 'bg-white' : ''}`}>
             {/* Header */}
             <motion.div
                 initial={{ opacity: 0, y: -12 }}
@@ -426,7 +469,13 @@ export default function ConversationPage() {
             </div>
 
             {/* Messages Area */}
-            <div className={`flex-1 overflow-y-auto w-full no-scrollbar pb-6 px-1 lg:px-6 relative scroll-smooth flex flex-col transition-colors duration-300 ${isLight ? 'bg-white' : ''}`}>
+            <div
+                ref={scrollContainerRef}
+                className={`flex-1 min-h-0 overflow-y-auto overscroll-contain w-full no-scrollbar px-1 lg:px-6 relative scroll-smooth flex flex-col transition-colors duration-300 ${isLight ? 'bg-white' : ''}`}
+                style={{
+                    scrollPaddingBottom: 'calc(var(--chat-composer-height, 176px) + env(safe-area-inset-bottom) + 40px)',
+                }}
+            >
                 {messages?.length === 0 && !isGenerating && (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
@@ -497,6 +546,15 @@ export default function ConversationPage() {
                                 })
                                 : undefined
                         }
+                        onSuggestedPrompt={
+                            msg.role === 'assistant' && !isGenerating && !isPending
+                                ? (prompt) => {
+                                    void handleSend(prompt).catch((error) => {
+                                        console.error('Suggested prompt failed:', error);
+                                    });
+                                }
+                                : undefined
+                        }
                     />
                 ))}
 
@@ -543,12 +601,18 @@ export default function ConversationPage() {
                     </motion.div>
                 )}
 
-                {/* Invisible element to scroll to bottom */}
-                <div ref={messagesEndRef} className="h-4" />
+                {/* Bottom spacer keeps the final answer clear of the composer/footer on mobile and desktop. */}
+                <div
+                    ref={messagesEndRef}
+                    aria-hidden="true"
+                    className="shrink-0"
+                    style={{ minHeight: 'calc(var(--chat-composer-height, 176px) + env(safe-area-inset-bottom) + 40px)' }}
+                />
             </div>
 
             {/* Input Area */}
             <motion.div
+                ref={composerRef}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}

@@ -26,6 +26,12 @@ function pageLabel(pageStart?: number, pageEnd?: number) {
         : `p. ${pageStart}`;
 }
 
+function quotePreview(value: string) {
+    const normalized = value.replace(/\s+/g, ' ').trim();
+    if (normalized.length <= 280) return normalized;
+    return `${normalized.slice(0, 277).trim()}...`;
+}
+
 /** Shared validator for route mode — used by both `send` and `createMessage`. */
 const routeModeValidator = v.union(
     v.literal('adaptive_chat'),
@@ -330,16 +336,14 @@ export const list = query({
             if (answerSources.length === 0) return message;
 
             const citations: Array<{
-                chatAnswerSourceId: string;
+                id: string;
                 uploadedFileId: string;
                 filename: string;
-                chunkId: string;
-                memoryGenerationId?: string;
                 pageStart?: number;
                 pageEnd?: number;
                 pageLabel?: string;
                 citationLabel?: string;
-                quotedText: string;
+                quotePreview: string;
                 citationVerifierStatus: 'verified' | 'partial' | 'failed';
             }> = [];
 
@@ -365,16 +369,14 @@ export const list = query({
                 }
 
                 citations.push({
-                    chatAnswerSourceId: source._id.toString(),
+                    id: source._id.toString(),
                     uploadedFileId: uploadedFile._id.toString(),
                     filename: uploadedFile.filename,
-                    chunkId: source.chunkId.toString(),
-                    memoryGenerationId: source.memoryGenerationId?.toString(),
                     pageStart: source.pageStart,
                     pageEnd: source.pageEnd,
                     pageLabel: pageLabel(source.pageStart, source.pageEnd),
                     citationLabel: chunk.citationLabel,
-                    quotedText: source.quotedText,
+                    quotePreview: quotePreview(source.quotedText),
                     citationVerifierStatus: source.citationVerifierStatus,
                 });
             }

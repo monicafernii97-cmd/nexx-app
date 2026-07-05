@@ -4,10 +4,11 @@
  * AnalysisStatusStrip — "thinking structure" indicator during generation.
  *
  * Shows subtle progress dots:
- * - Analyzing case context ●
- * - Reviewing evidence patterns ●
- * - Applying judge lens ●
- * - Structuring response ○
+ * - Reading document ●
+ * - Extracting obligations ●
+ * - Finding deadlines ●
+ * - Checking risks ●
+ * - Preparing summary ○
  *
  * Dots: green (complete), blue (active), gray (upcoming).
  */
@@ -19,12 +20,13 @@ import type { AnalysisStep } from '@/lib/ui-intelligence/types';
 // Default steps
 // ---------------------------------------------------------------------------
 
-/** Default 4-step analysis progression shown during streaming. */
+/** Default analysis progression shown during streaming. */
 export const DEFAULT_ANALYSIS_STEPS: AnalysisStep[] = [
-  { id: 'context', label: 'Analyzing case context', status: 'upcoming' },
-  { id: 'evidence', label: 'Reviewing evidence patterns', status: 'upcoming' },
-  { id: 'judge', label: 'Applying judge lens', status: 'upcoming' },
-  { id: 'structure', label: 'Structuring response', status: 'upcoming' },
+  { id: 'reading_document', label: 'Reading document', status: 'upcoming' },
+  { id: 'extracting_obligations', label: 'Extracting obligations', status: 'upcoming' },
+  { id: 'finding_deadlines', label: 'Finding deadlines', status: 'upcoming' },
+  { id: 'checking_risks', label: 'Checking risks', status: 'upcoming' },
+  { id: 'preparing_summary', label: 'Preparing summary', status: 'upcoming' },
 ];
 
 // ---------------------------------------------------------------------------

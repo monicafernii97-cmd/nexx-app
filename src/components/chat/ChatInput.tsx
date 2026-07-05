@@ -92,14 +92,16 @@ function isBlockedFileState(state: ChatComposerFileState | null) {
 }
 
 function fileStatusLabel(state: ChatComposerFileState) {
-    if (state.status === 'session_created') return 'Starting upload';
-    if (state.status === 'uploading_to_storage') return `${state.progress ?? 0}%`;
-    if (state.status === 'processing_queued' || state.status === 'processing') return 'Processing';
+    if (state.status === 'session_created') return 'Uploading';
+    if (state.status === 'uploading_to_storage') return `Uploading ${state.progress ?? 0}%`;
+    if (state.status === 'stored') return 'Uploaded';
+    if (state.status === 'processing_queued') return 'Preparing sources';
+    if (state.status === 'processing') return 'Reading document';
     if (state.status === 'ready') return 'Ready';
-    if (state.status === 'partial') return 'Text ready';
+    if (state.status === 'partial') return 'Needs verification';
     if (isNonRetryableFailure(state.status) || state.retryable === false) return 'Replace file';
-    if (isFailureStatus(state.status)) return 'Retry';
-    return 'Ready to send';
+    if (isFailureStatus(state.status)) return 'Failed';
+    return 'Selected';
 }
 
 function getUploadErrorDetails(error: unknown) {

@@ -43,3 +43,8 @@ next-env.d.ts
 
 # Taste-skill design reference (cloned repo)
 .agents/skills/taste-skill/
+
+# clerk configuration (can include secrets)
+/.clerk/
+
+.env*.local

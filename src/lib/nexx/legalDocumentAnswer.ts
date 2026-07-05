@@ -234,6 +234,13 @@ function formatMarkdownList(items: string[]) {
   return items.length > 0 ? items.map((item) => `- ${item}`).join('\n') : '- No supported finding was extracted from the available text.';
 }
 
+function markdownTableCell(value: string) {
+  return cleanUserFacingDocumentText(value)
+    .replace(/\|/g, '\\|')
+    .replace(/[\r\n]+/g, ' ')
+    .trim();
+}
+
 /**
  * Render a citation-locked document answer into the product's stable court-order
  * analysis shape. The model may choose findings; this renderer owns the
@@ -266,9 +273,9 @@ export function renderCourtOrderAnalysisMarkdown(
     ? deadlineClaims.map((claim) => {
       const labels = labelsForSourceIds(claim.sourceIds, citationMap);
       const source = labels.length > 0 ? labels.map((label) => `[${label}]`).join(' ') : 'Review source';
-      return `| ${cleanUserFacingDocumentText(claim.claim)} | ${deadlineTimingFromClaim(claim.claim)} | ${source} |`;
+      return `| ${markdownTableCell(claim.claim)} | ${markdownTableCell(deadlineTimingFromClaim(claim.claim))} | ${source} |`;
     })
-    : ['| No clear deadline found in the supported extracted text. | Review the order before calendaring. | Review source |'];
+    : [`| ${markdownTableCell('No clear deadline found in the supported extracted text.')} | ${markdownTableCell('Review the order before calendaring.')} | Review source |`];
 
   const warnings = uniqueValues(answer.warnings.map(cleanUserFacingDocumentText).filter(Boolean)).slice(0, 5);
   const riskItems = warnings.length > 0

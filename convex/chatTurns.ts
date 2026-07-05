@@ -26,6 +26,7 @@ import {
     getDailyLimit,
     PRIMARY_MODEL,
 } from '../src/lib/tiers';
+import { looksLikeInternalStructuredPayload } from '../src/lib/chat/internalLeakGuard';
 import {
     CHAT_RATE_LIMIT_WINDOW_MS,
     chatRateLimitKeyForModel,
@@ -47,18 +48,6 @@ const MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE = 300;
 const MAX_DOCUMENT_CHUNKS_FROM_SEARCH_PER_FILE = 80;
 const MAX_RETRIEVED_CHUNKS_PER_FILE = 12;
 const SAFE_ASSISTANT_DRAFT_MESSAGE = 'Analyzing court order...';
-const INTERNAL_LEAK_KEYS = [
-    'sourceId',
-    'fileId',
-    'fileName',
-    'memoryGenerationId',
-    'chunkId',
-    'pageStart',
-    'pageEnd',
-    'blockIds',
-    'quotedText',
-    'documentAnswer',
-] as const;
 
 const routeModeValidator = v.union(
     v.literal('adaptive_chat'),
@@ -509,19 +498,6 @@ function metadataFromJson(metadataJson?: string) {
     } catch {
         return {};
     }
-}
-
-function looksLikeInternalStructuredPayload(content: string) {
-    if (!content) return false;
-    const trimmed = content.trim();
-    const looksLikeJson =
-        trimmed.startsWith('{') ||
-        trimmed.startsWith('[') ||
-        trimmed.includes('","');
-    const containsInternalKeys = INTERNAL_LEAK_KEYS.some((key) =>
-        content.includes(`"${key}"`) || content.includes(`${key}:`)
-    );
-    return looksLikeJson && containsInternalKeys;
 }
 
 /** Load normalized aliases for a stored document before ranking it for recall. */
@@ -1923,16 +1899,20 @@ export const redactLeakedAssistantMessages = internalMutation({
     args: {
         conversationId: v.optional(v.id('conversations')),
         limit: v.optional(v.number()),
+        cursor: v.optional(v.union(v.string(), v.null())),
         dryRun: v.optional(v.boolean()),
     },
     handler: async (ctx, args) => {
         const limit = Math.min(Math.max(Math.floor(args.limit ?? 100), 1), 500);
-        const rows = args.conversationId
+        const page = args.conversationId
             ? await ctx.db
                 .query('messages')
                 .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId!))
-                .take(limit)
-            : await ctx.db.query('messages').take(limit);
+                .paginate({ cursor: args.cursor ?? null, numItems: limit })
+            : await ctx.db
+                .query('messages')
+                .paginate({ cursor: args.cursor ?? null, numItems: limit });
+        const rows = page.page;
 
         let scanned = 0;
         let matched = 0;
@@ -1961,7 +1941,14 @@ export const redactLeakedAssistantMessages = internalMutation({
             redacted += 1;
         }
 
-        return { scanned, matched, redacted, dryRun: args.dryRun ?? false };
+        return {
+            scanned,
+            matched,
+            redacted,
+            dryRun: args.dryRun ?? false,
+            cursor: page.continueCursor,
+            isDone: page.isDone,
+        };
     },
 });
 
@@ -1990,6 +1977,7 @@ export const completeAssistant = internalMutation({
         const content = unsafeContent
             ? 'Analysis completed, but the answer was withheld because it contained internal source metadata. Please regenerate this answer.'
             : args.content;
+        const artifactsJson = unsafeContent ? undefined : args.artifactsJson;
         const metadata = {
             ...metadataFromJson(args.metadataJson),
             degraded: args.degraded ?? false,
@@ -2004,7 +1992,7 @@ export const completeAssistant = internalMutation({
             await ctx.db.patch(assistantMessageId, {
                 content,
                 status: messageStatus,
-                artifactsJson: args.artifactsJson,
+                artifactsJson,
                 metadata,
                 updatedAt: now,
             });
@@ -2014,7 +2002,7 @@ export const completeAssistant = internalMutation({
             await ctx.db.patch(turn.assistantDraftMessageId, {
                 content,
                 status: messageStatus,
-                artifactsJson: args.artifactsJson,
+                artifactsJson,
                 requestId: assistantRequestId(turn.requestId),
                 metadata,
                 updatedAt: now,
@@ -2031,7 +2019,7 @@ export const completeAssistant = internalMutation({
                 turnNumber: turn.turnNumber,
                 roleOrder: 1,
                 version: 1,
-                artifactsJson: args.artifactsJson,
+                artifactsJson,
                 requestId: assistantRequestId(turn.requestId),
                 metadata,
                 createdAt: now,

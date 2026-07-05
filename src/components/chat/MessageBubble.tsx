@@ -9,6 +9,7 @@ import type { NexxArtifacts, JudgeSimulationResult, OppositionSimulationResult }
 import { PlayAloudButton } from '@/components/voice';
 import { AssistantMessageCard } from './AssistantMessageCard';
 import type { AssistantResponseViewModel, ActionType, DetectedPattern, LocalProcedureInfo } from '@/lib/ui-intelligence/types';
+import { looksLikeInternalStructuredPayload } from '@/lib/chat/internalLeakGuard';
 
 export type ChatTheme = 'dark' | 'light';
 
@@ -57,32 +58,6 @@ type DocumentCitationMetadata = {
     quotePreview: string;
     citationVerifierStatus: 'verified' | 'partial' | 'failed';
 };
-
-const INTERNAL_LEAK_KEYS = [
-    'sourceId',
-    'fileId',
-    'fileName',
-    'memoryGenerationId',
-    'chunkId',
-    'pageStart',
-    'pageEnd',
-    'blockIds',
-    'quotedText',
-    'documentAnswer',
-] as const;
-
-function isUnsafeAssistantContent(content: string) {
-    if (!content) return false;
-    const trimmed = content.trim();
-    const looksLikeJson =
-        trimmed.startsWith('{') ||
-        trimmed.startsWith('[') ||
-        trimmed.includes('","');
-    const containsInternalKeys = INTERNAL_LEAK_KEYS.some((key) =>
-        content.includes(`"${key}"`) || content.includes(`${key}:`)
-    );
-    return looksLikeJson && containsInternalKeys;
-}
 
 // ── Shared action button (declared OUTSIDE render to satisfy react-hooks/static-components) ──
 
@@ -218,18 +193,29 @@ function DocumentEvidencePanel({
     const visibleSources = citations.length > 0
         ? sources.filter((source) => citedSourceNames.includes(source.filename))
         : sources;
-    const citationCountLabel = `${citations.length} citation${citations.length === 1 ? '' : 's'}`;
-    const sourceSummary = displaySourceNames.length === 1
-        ? `${displaySourceNames[0]} · ${citationCountLabel}`
-        : `${displaySourceNames.length || 1} document${displaySourceNames.length === 1 ? '' : 's'} · ${citationCountLabel}`;
+    const citationCountLabel = citations.length > 0
+        ? `${citations.length} citation${citations.length === 1 ? '' : 's'}`
+        : null;
+    const sourceSummaryBase = displaySourceNames.length === 0
+        ? 'Uploaded document'
+        : displaySourceNames.length === 1
+            ? displaySourceNames[0]
+            : `${displaySourceNames.length} documents`;
+    const sourceSummary = citationCountLabel
+        ? `${sourceSummaryBase} · ${citationCountLabel}`
+        : sourceSummaryBase;
 
     if (sources.length === 0 && citations.length === 0) return null;
 
     const handleCopyQuote = async (citation: DocumentCitationMetadata) => {
         if (!window.isSecureContext || !navigator.clipboard?.writeText) return;
-        await navigator.clipboard.writeText(citation.quotePreview);
-        setCopiedCitationId(citation.id);
-        window.setTimeout(() => setCopiedCitationId((current) => current === citation.id ? null : current), 1800);
+        try {
+            await navigator.clipboard.writeText(citation.quotePreview);
+            setCopiedCitationId(citation.id);
+            window.setTimeout(() => setCopiedCitationId((current) => current === citation.id ? null : current), 1800);
+        } catch (err) {
+            console.error('Failed to copy quote:', err);
+        }
     };
 
     return (
@@ -676,11 +662,7 @@ export default function MessageBubble({
     );
     const documentSources = useMemo(() => getDocumentSources(metadata), [metadata]);
     const documentCitations = useMemo(() => getDocumentCitations(metadata), [metadata]);
-    const shouldShowCourtOrderFollowUps = role === 'assistant' && !isStreaming && (
-        documentSources.length > 0 ||
-        documentCitations.length > 0 ||
-        content.includes('Court Order Analysis')
-    );
+    const shouldShowCourtOrderFollowUps = role === 'assistant' && !isStreaming && content.includes('Court Order Analysis');
 
     useEffect(() => {
         return () => {
@@ -748,7 +730,7 @@ export default function MessageBubble({
     }, [handleSaveEdit, handleCancelEdit]);
 
     const isLight = theme === 'light';
-    const unsafeAssistantContent = role === 'assistant' && isUnsafeAssistantContent(content);
+    const unsafeAssistantContent = role === 'assistant' && looksLikeInternalStructuredPayload(content);
 
     // Responsive visibility: always visible on mobile, hover-reveal on desktop
     const actionBarClass = 'flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity';

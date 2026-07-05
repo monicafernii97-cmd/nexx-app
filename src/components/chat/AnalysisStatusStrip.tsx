@@ -7,6 +7,7 @@
  * - Reading document ●
  * - Extracting obligations ●
  * - Finding deadlines ●
+ * - Checking risks ●
  * - Preparing summary ○
  *
  * Dots: green (complete), blue (active), gray (upcoming).

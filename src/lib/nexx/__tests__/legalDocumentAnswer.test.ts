@@ -67,6 +67,41 @@ describe('verifyLegalDocumentAnswer', () => {
     ]);
   });
 
+  it('uses a source preview when citation supports text is null', () => {
+    const result = verifyLegalDocumentAnswer(answer({
+      citations: [{
+        sourceId: 'src_001',
+        pageStart: 4,
+        pageEnd: 4,
+        supports: null,
+        confidence: 'high',
+      }],
+    }), sourcePackets, {
+      requiresDocumentAnswer: true,
+      requiresCitation: true,
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.verifiedCitations[0]?.quotedText).toBe(sourcePackets[0].text);
+  });
+
+  it('uses a source preview when citation supports text is omitted', () => {
+    const result = verifyLegalDocumentAnswer(answer({
+      citations: [{
+        sourceId: 'src_001',
+        pageStart: 4,
+        pageEnd: 4,
+        confidence: 'high',
+      }],
+    }), sourcePackets, {
+      requiresDocumentAnswer: true,
+      requiresCitation: true,
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.verifiedCitations[0]?.quotedText).toBe(sourcePackets[0].text);
+  });
+
   it('blocks document factual claims without a source id', () => {
     const result = verifyLegalDocumentAnswer(answer({
       claims: [{ claim: 'The order requires payment.', claimType: 'document_fact', sourceIds: [] }],
@@ -171,7 +206,7 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
     const content = renderCourtOrderAnalysisMarkdown(answer({
       claims: [
         {
-          claim: 'Respondent shall pay $500 no later than June 14, 2026.',
+          claim: 'Respondent | shall pay $500\nno later than June 14, 2026.',
           claimType: 'document_fact',
           sourceIds: ['src_001'],
         },
@@ -187,6 +222,7 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
     expect(content).toContain('## Recommended Next Steps');
     expect(content).toContain('## Source Details');
     expect(content).toContain('[p. 4]');
+    expect(content).toContain('Respondent \\| shall pay $500 no later than June 14');
     expect(content).not.toContain('sourceId');
     expect(content).not.toContain('chunkId');
     expect(content).not.toContain('memoryGenerationId');

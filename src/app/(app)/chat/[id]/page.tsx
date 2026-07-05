@@ -106,9 +106,16 @@ export default function ConversationPage() {
         const composer = composerRef.current;
         if (!composer) return;
 
+        const isNearBottom = () => {
+            const container = scrollContainerRef.current;
+            if (!container) return true;
+            return container.scrollHeight - container.scrollTop - container.clientHeight < 160;
+        };
+
         const updateComposerHeight = () => {
+            const shouldStayPinned = isNearBottom();
             document.documentElement.style.setProperty('--chat-composer-height', `${composer.offsetHeight}px`);
-            scrollMessagesToBottom('auto');
+            if (shouldStayPinned) scrollMessagesToBottom('auto');
         };
 
         updateComposerHeight();

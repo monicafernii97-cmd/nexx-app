@@ -178,6 +178,16 @@ describe('MessageBubble document evidence panel', () => {
     expect(container.textContent).not.toContain('secret');
   });
 
+  it('does not redact normal prose that names internal fields without source payload values', async () => {
+    const prose = 'Do not write `"pageStart":` or `"sourceId":` in a user-facing court-order answer.';
+    const { container, root } = await renderMessage({}, undefined, prose);
+    roots.push(root);
+
+    expect(container.textContent).toContain('Do not write');
+    expect(container.textContent).toContain('pageStart');
+    expect(container.textContent).not.toContain('Analyzing court order');
+  });
+
   it('summarizes cited documents instead of unrelated source metadata', async () => {
     const { container, root } = await renderMessage({
       documentSources: [

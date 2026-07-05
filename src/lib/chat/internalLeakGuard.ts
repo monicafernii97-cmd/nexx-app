@@ -32,11 +32,36 @@ function hasInternalKeyAssignment(content: string) {
     let index = content.indexOf(quotedKey);
     while (index >= 0) {
       const afterKey = content.slice(index + quotedKey.length).trimStart();
-      if (afterKey.startsWith(':')) return true;
+      if (afterKey.startsWith(':') && hasJsonKeyContext(content, index) && startsWithJsonValue(afterKey.slice(1))) {
+        return true;
+      }
       index = content.indexOf(quotedKey, index + quotedKey.length);
     }
     return false;
   });
+}
+
+function hasJsonKeyContext(content: string, keyIndex: number) {
+  for (let index = keyIndex - 1; index >= 0; index -= 1) {
+    const char = content[index];
+    if (!/\s/.test(char)) {
+      return char === '{' || char === '[' || char === ',';
+    }
+  }
+
+  return true;
+}
+
+function startsWithJsonValue(value: string) {
+  const trimmed = value.trimStart();
+  if (!trimmed) return false;
+
+  const first = trimmed[0];
+  if (first === '"' || first === '{' || first === '[' || first === '-' || (first >= '0' && first <= '9')) {
+    return true;
+  }
+
+  return trimmed.startsWith('true') || trimmed.startsWith('false') || trimmed.startsWith('null');
 }
 
 export function looksLikeInternalStructuredPayload(content: string) {

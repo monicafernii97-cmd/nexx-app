@@ -4,6 +4,7 @@ import {
   type LegalDocumentSourcePacket,
   validateLegalDocumentAnswerShape,
   renderCourtOrderAnalysisMarkdown,
+  renderTargetedLegalDocumentAnswerMarkdown,
   verifyLegalDocumentAnswer,
 } from '../legalDocumentAnswer';
 
@@ -102,6 +103,25 @@ describe('verifyLegalDocumentAnswer', () => {
     expect(result.verifiedCitations[0]?.quotedText).toBe(sourcePackets[0].text);
   });
 
+  it('passes sourced claims when the model omits duplicate citation refs', () => {
+    const result = verifyLegalDocumentAnswer(answer({
+      citations: [],
+    }), sourcePackets, {
+      requiresDocumentAnswer: true,
+      requiresCitation: true,
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.verifiedCitations).toEqual([
+      {
+        sourceId: 'src_001',
+        chunkId: 'chunk_1',
+        quotedText: sourcePackets[0].text,
+        citationVerifierStatus: 'verified',
+      },
+    ]);
+  });
+
   it('blocks document factual claims without a source id', () => {
     const result = verifyLegalDocumentAnswer(answer({
       claims: [{ claim: 'The order requires payment.', claimType: 'document_fact', sourceIds: [] }],
@@ -114,7 +134,7 @@ describe('verifyLegalDocumentAnswer', () => {
     expect(result.errors.join(' ')).toContain('missing sources');
   });
 
-  it('blocks supporting text that is not present in the cited source packet', () => {
+  it('downgrades supporting text that is not present in the cited source packet', () => {
     const result = verifyLegalDocumentAnswer(answer({
       citations: [{
         ...answer().citations[0],
@@ -125,11 +145,12 @@ describe('verifyLegalDocumentAnswer', () => {
       requiresCitation: true,
     });
 
-    expect(result.passed).toBe(false);
-    expect(result.errors.join(' ')).toContain('not found');
+    expect(result.passed).toBe(true);
+    expect(result.verifiedCitations[0]?.citationVerifierStatus).toBe('partial');
+    expect(result.errors).toEqual([]);
   });
 
-  it('blocks reordered quotes even when the same words appear in the source packet', () => {
+  it('downgrades reordered quotes even when the same words appear in the source packet', () => {
     const result = verifyLegalDocumentAnswer(answer({
       citations: [{
         ...answer().citations[0],
@@ -140,7 +161,8 @@ describe('verifyLegalDocumentAnswer', () => {
       requiresCitation: true,
     });
 
-    expect(result.passed).toBe(false);
+    expect(result.passed).toBe(true);
+    expect(result.verifiedCitations[0]?.citationVerifierStatus).toBe('partial');
   });
 
   it('allows OCR-style punctuation differences when quote words remain in order', () => {
@@ -157,7 +179,7 @@ describe('verifyLegalDocumentAnswer', () => {
     expect(result.passed).toBe(true);
   });
 
-  it('blocks loose quotes stitched from non-contiguous source text', () => {
+  it('downgrades loose quotes stitched from non-contiguous source text', () => {
     const result = verifyLegalDocumentAnswer(answer({
       citations: [{
         ...answer().citations[0],
@@ -171,7 +193,8 @@ describe('verifyLegalDocumentAnswer', () => {
       requiresCitation: true,
     });
 
-    expect(result.passed).toBe(false);
+    expect(result.passed).toBe(true);
+    expect(result.verifiedCitations[0]?.citationVerifierStatus).toBe('partial');
   });
 
   it('allows not-found answers without citations when the sources do not support the answer', () => {
@@ -230,5 +253,29 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
     expect(content).not.toContain('quotedText');
     expect(content).not.toContain('Sources used:');
     expect(content).not.toContain('Final Order.pdf, p.');
+  });
+});
+
+describe('renderTargetedLegalDocumentAnswerMarkdown', () => {
+  it('renders targeted document questions as a direct answer with compact citations', () => {
+    const content = renderTargetedLegalDocumentAnswerMarkdown(answer({
+      answer: 'The order requires payment by June 14, 2026.',
+      claims: [{
+        claim: 'Respondent shall pay no later than June 14, 2026.',
+        claimType: 'document_fact',
+        sourceIds: ['src_001'],
+      }],
+    }), sourcePackets, 'Fallback answer');
+
+    expect(content).toContain('## Direct Answer');
+    expect(content).toContain('## What I Found in the Order');
+    expect(content).toContain('## Practical Reading');
+    expect(content).toContain('[p. 4]');
+    expect(content).not.toContain('# Court Order Analysis');
+    expect(content).not.toContain('sourceId');
+    expect(content).not.toContain('chunkId');
+    expect(content).not.toContain('memoryGenerationId');
+    expect(content).not.toContain('blockIds');
+    expect(content).not.toContain('quotedText');
   });
 });

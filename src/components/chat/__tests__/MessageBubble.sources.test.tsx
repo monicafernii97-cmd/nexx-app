@@ -163,6 +163,38 @@ describe('MessageBubble document evidence panel', () => {
     expect(container.textContent).toContain('Saved in this chat');
   });
 
+  it('distinguishes focused passages from incomplete extraction', async () => {
+    const { container, root } = await renderMessage({
+      documentSources: [{
+        uploadedFileId: 'file_123',
+        filename: 'Long Final Order.pdf',
+        source: 'current_turn',
+        status: 'ready',
+        contextTruncated: true,
+      }],
+    });
+    roots.push(root);
+
+    expect(container.textContent).toContain('Showing selected passages');
+    expect(container.textContent).not.toContain('Extracted text may be incomplete');
+  });
+
+  it('suppresses focused-passages notice when extraction is partial', async () => {
+    const { container, root } = await renderMessage({
+      documentSources: [{
+        uploadedFileId: 'file_456',
+        filename: 'Partial Order.pdf',
+        source: 'current_turn',
+        status: 'partial',
+        contextTruncated: true,
+      }],
+    });
+    roots.push(root);
+
+    expect(container.textContent).toContain('Extracted text may be incomplete');
+    expect(container.textContent).not.toContain('Showing selected passages');
+  });
+
   it('renders a safe status card instead of raw structured source JSON', async () => {
     const onRetry = vi.fn();
     const rawPayload = '{"documentAnswer":{"citations":[{"sourceId":"src_005","chunkId":"abc","quotedText":"secret"}]}}';

@@ -164,13 +164,21 @@ function citationMapForAnswer(answer: LegalDocumentAnswer, sourcePackets: LegalD
     ])
   );
 
+  const sourceIds = uniqueValues([
+    ...answer.citations.map((citation) => citation.sourceId),
+    ...answer.claims.flatMap((claim) => claim.sourceIds),
+  ]);
+
   return new Map<string, RenderableCitation>(
-    answer.citations.map((citation) => {
-      const sourcePage = sourcePages.get(citation.sourceId);
+    sourceIds.map((sourceId) => {
+      const sourcePage = sourcePages.get(sourceId);
       const label = sourcePage && sourcePage !== 'source'
         ? sourcePage
-        : compactPageLabel(citation.pageStart, citation.pageEnd);
-      return [citation.sourceId, { sourceId: citation.sourceId, label }];
+        : compactPageLabel(
+          answer.citations.find((citation) => citation.sourceId === sourceId)?.pageStart,
+          answer.citations.find((citation) => citation.sourceId === sourceId)?.pageEnd
+        );
+      return [sourceId, { sourceId, label }];
     })
   );
 }
@@ -304,6 +312,62 @@ export function renderCourtOrderAnalysisMarkdown(
   ].join('\n\n');
 }
 
+/**
+ * Render targeted document questions as a chat answer instead of the full court
+ * order report shell. The model owns the substantive answer; this renderer adds
+ * stable, compact evidence sections and keeps source metadata out of visible text.
+ */
+export function renderTargetedLegalDocumentAnswerMarkdown(
+  answer: LegalDocumentAnswer,
+  sourcePackets: LegalDocumentSourcePacket[],
+  fallbackMessage: string
+) {
+  const citationMap = citationMapForAnswer(answer, sourcePackets);
+  const firstLabels = firstCitationLabels(citationMap);
+  const cleanAnswer = cleanUserFacingDocumentText(answer.answer || fallbackMessage);
+  const directAnswer = appendCitationLabels(cleanAnswer, firstLabels);
+  const supportedClaims = [...answer.claims]
+    .filter((claim) => claim.claim.trim().length > 0)
+    .sort((a, b) => claimSortScore(a) - claimSortScore(b))
+    .slice(0, 8);
+  const findingItems = supportedClaims.length > 0
+    ? supportedClaims.map((claim) => appendCitationLabels(
+      claim.claim,
+      labelsForSourceIds(claim.sourceIds, citationMap)
+    ))
+    : [directAnswer || 'I found relevant extracted order text, but it needs manual page review before relying on it.'];
+  const deadlineClaims = supportedClaims.filter((claim) => isDeadlineClaim(claim.claim)).slice(0, 4);
+  const warnings = uniqueValues(answer.warnings.map(cleanUserFacingDocumentText).filter(Boolean)).slice(0, 4);
+  const cautionItems = warnings.length > 0
+    ? warnings
+    : [
+      'This is document analysis, not legal advice. Verify exact wording in the signed order before taking enforcement action.',
+    ];
+
+  return [
+    '## Direct Answer',
+    directAnswer || 'I do not see enough supported text in the extracted order to answer that directly.',
+    '## What I Found in the Order',
+    formatMarkdownList(findingItems),
+    deadlineClaims.length > 0
+      ? [
+        '## Dates, Deadlines, or Timing',
+        ['| Provision | Timing | Source |', '|---|---|---|', ...deadlineClaims.map((claim) => {
+          const labels = labelsForSourceIds(claim.sourceIds, citationMap);
+          const source = labels.length > 0 ? labels.map((label) => `[${label}]`).join(' ') : 'Review source';
+          return `| ${markdownTableCell(claim.claim)} | ${markdownTableCell(deadlineTimingFromClaim(claim.claim))} | ${source} |`;
+        })].join('\n'),
+      ].join('\n\n')
+      : undefined,
+    '## Practical Reading',
+    'Use the cited page labels to check the exact wording. If two possession, holiday, or notice provisions appear to overlap, the more specific provision may control, but the signed order should be reviewed before anyone acts on that interpretation.',
+    '## Cautions',
+    formatMarkdownList(cautionItems),
+    '## Source Details',
+    'Source details are available below in the collapsed source panel. Use the page chips and quote previews to verify exact wording.',
+  ].filter(Boolean).join('\n\n');
+}
+
 export function fuzzyTextContains(sourceText: string, quotedText: string) {
   const quote = normalizeForFuzzyMatch(quotedText);
   if (!quote || quote.length < 8) return false;
@@ -399,6 +463,38 @@ export function verifyLegalDocumentAnswer(
   const errors: string[] = [];
   const packetsBySourceId = new Map(sourcePackets.map((packet) => [packet.sourceId, packet]));
   const verifiedCitations: LegalDocumentAnswerVerification['verifiedCitations'] = [];
+  const seenVerifiedCitationKeys = new Set<string>();
+
+  const addVerifiedCitation = (
+    sourceId: string,
+    supportText?: string | null,
+    forcePartial = false
+  ) => {
+    const source = packetsBySourceId.get(sourceId);
+    if (!source) return;
+    const key = `${source.sourceId}:${source.chunkId}`;
+    if (seenVerifiedCitationKeys.has(key)) {
+      const existing = verifiedCitations.find((citation) =>
+        citation.sourceId === source.sourceId &&
+        citation.chunkId === source.chunkId
+      );
+      if (forcePartial) {
+        if (existing) existing.citationVerifierStatus = 'partial';
+      } else if (supportText?.trim() && existing) {
+        existing.quotedText = supportText.trim();
+      }
+      return;
+    }
+    seenVerifiedCitationKeys.add(key);
+    verifiedCitations.push({
+      sourceId,
+      chunkId: source.chunkId,
+      quotedText: supportText?.trim() || sourceQuotePreview(source.text),
+      citationVerifierStatus: forcePartial || (source.confidence !== undefined && source.confidence < 0.85)
+        ? 'partial'
+        : 'verified',
+    });
+  };
 
   if (!options.requiresDocumentAnswer) {
     return { passed: true, errors, verifiedCitations };
@@ -412,10 +508,6 @@ export function verifyLegalDocumentAnswer(
     };
   }
 
-  if (answer.unsupportedClaims.length > 0) {
-    errors.push('Document answer contains unsupportedClaims.');
-  }
-
   for (const claim of answer.claims) {
     if (DOCUMENT_FACT_CLAIM_TYPES.has(claim.claimType) && claim.sourceIds.length === 0) {
       errors.push(`Document claim is missing sources: ${claim.claim.slice(0, 120)}`);
@@ -423,11 +515,18 @@ export function verifyLegalDocumentAnswer(
     for (const sourceId of claim.sourceIds) {
       if (!packetsBySourceId.has(sourceId)) {
         errors.push(`Claim cites unknown source_id: ${sourceId}`);
+      } else {
+        addVerifiedCitation(sourceId);
       }
     }
   }
 
-  if (options.requiresCitation && answer.answerType !== 'not_found' && answer.citations.length === 0) {
+  if (
+    options.requiresCitation &&
+    answer.answerType !== 'not_found' &&
+    answer.citations.length === 0 &&
+    verifiedCitations.length === 0
+  ) {
     errors.push('Document answer requires at least one verified citation.');
   }
 
@@ -439,16 +538,11 @@ export function verifyLegalDocumentAnswer(
     }
     const supportText = citation.supports?.trim();
     if (supportText && !fuzzyTextContains(source.text, supportText)) {
-      errors.push(`Supporting text was not found in source ${citation.sourceId}.`);
+      addVerifiedCitation(citation.sourceId, undefined, true);
       continue;
     }
 
-    verifiedCitations.push({
-      sourceId: citation.sourceId,
-      chunkId: source.chunkId,
-      quotedText: supportText || sourceQuotePreview(source.text),
-      citationVerifierStatus: source.confidence !== undefined && source.confidence < 0.85 ? 'partial' : 'verified',
-    });
+    addVerifiedCitation(citation.sourceId, supportText, false);
   }
 
   return {

@@ -186,13 +186,14 @@ function DocumentEvidencePanel({
     const [openCitationId, setOpenCitationId] = useState<string | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [copiedCitationId, setCopiedCitationId] = useState<string | null>(null);
-    const hasLimitedText = sources.some((source) => source.contextTruncated);
     const sourceNames = Array.from(new Set(sources.map((source) => source.filename).filter(Boolean)));
     const citedSourceNames = Array.from(new Set(citations.map((citation) => citation.filename).filter(Boolean)));
     const displaySourceNames = citedSourceNames.length > 0 ? citedSourceNames : sourceNames;
     const visibleSources = citations.length > 0
         ? sources.filter((source) => citedSourceNames.includes(source.filename))
         : sources;
+    const hasPartialExtraction = visibleSources.some((source) => source.status === 'partial' || source.status === 'failed');
+    const hasFocusedPassages = !hasPartialExtraction && visibleSources.some((source) => source.contextTruncated);
     const citationCountLabel = citations.length > 0
         ? `${citations.length} citation${citations.length === 1 ? '' : 's'}`
         : null;
@@ -230,9 +231,14 @@ function DocumentEvidencePanel({
                         {citations.length} cited passage{citations.length === 1 ? '' : 's'}
                     </span>
                 )}
-                {hasLimitedText && (
+                {hasPartialExtraction && (
                     <span className={isLight ? 'text-amber-600' : 'text-amber-200'}>
                         Extracted text may be incomplete
+                    </span>
+                )}
+                {hasFocusedPassages && (
+                    <span className={isLight ? 'text-blue-500' : 'text-sky-200/70'}>
+                        Showing selected passages
                     </span>
                 )}
             </div>

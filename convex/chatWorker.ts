@@ -21,6 +21,7 @@ import {
     type LegalDocumentAnswerVerification,
     type LegalDocumentSourcePacket,
     renderCourtOrderAnalysisMarkdown,
+    renderTargetedLegalDocumentAnswerMarkdown,
     verifyLegalDocumentAnswer,
 } from '../src/lib/nexx/legalDocumentAnswer';
 import {
@@ -504,6 +505,25 @@ function shouldPreferRetrievedChunks(detection: DocumentReferenceDetection) {
         detection.referenceType === 'source_location_request';
 }
 
+function shouldIncludeStoredDocumentsWithCurrentUpload(detection: DocumentReferenceDetection) {
+    return detection.referenceType === 'comparison_request' ||
+        (
+            detection.referenceType === 'explicit_prior_upload' &&
+            detection.documentHints.some((hint) => /\b(?:prior|previous|shared)\b/i.test(hint))
+        );
+}
+
+function shouldRenderTargetedDocumentAnswer(detection: DocumentReferenceDetection) {
+    return detection.referenceType === 'deadline_lookup' ||
+        detection.referenceType === 'section_lookup' ||
+        detection.referenceType === 'terminology_check' ||
+        detection.referenceType === 'quote_request' ||
+        detection.referenceType === 'metadata_lookup' ||
+        detection.referenceType === 'source_location_request' ||
+        detection.requiresExactText ||
+        detection.requiresPageOrSectionCitation;
+}
+
 function attachmentIdentityKey(attachment: AttachmentContext) {
     if (attachment.storageSha256) return `sha256:${attachment.storageSha256}`;
     if (attachment.storageId) return `storage:${attachment.storageId.toString()}`;
@@ -646,6 +666,12 @@ function selectAttachmentContextsForPrompt(
         addAttachment(attachment, selected.length < 3);
     }
 
+    const documentReference = routerResult.documentReference ?? detectDocumentReference(context.turn.message);
+    const hasCurrentTurnAttachment = selected.some((attachment) => attachment.source === 'current_turn');
+    if (hasCurrentTurnAttachment && !shouldIncludeStoredDocumentsWithCurrentUpload(documentReference)) {
+        return selected;
+    }
+
     const availableDocuments = context.availableDocumentContexts ?? [];
     const shouldLoadStoredDocuments =
         availableDocuments.length > 0 &&
@@ -719,7 +745,8 @@ function buildAttachmentContextPrompt(
         'Use these excerpts only to answer the user\'s document-related question.',
         'When uploaded document memory is present, it is the source of truth for document re-analysis. Do not rely on older pasted order text in chat history unless the user explicitly asks you to analyze that pasted text.',
         'Do not describe uploaded document memory as "the text you provided" or "pasted text"; identify the uploaded document by filename/source instead.',
-        'If the excerpts do not contain the answer, say the available extracted text does not show it.',
+        'When retrieved chunks contain relevant provisions, answer substantively from those chunks and cite them. Do not collapse a useful answer into a generic "not enough text" fallback just because the document is long or the exact issue requires explanation.',
+        'If the excerpts do not contain the answer after checking the retrieved chunks, say what you checked and what the available extracted text does not show.',
         'If SOURCE_ID chunks are present for a document, make document-specific claims about that document only from those SOURCE_ID chunks. Uncited extracted context is not enough for a document-specific claim for that document.',
         'For court-order review, identify which document was reviewed and cite compact page labels like [p. 2] or [pp. 2-3] when available.',
         'Quote short exact phrases only when exact wording matters.',
@@ -934,14 +961,17 @@ function shouldRequireDocumentAnswer(args: {
 
 function renderCitationLockedDocumentMessage(
     response: NexxAssistantResponse,
-    sourcePackets: LegalDocumentSourcePacket[]
+    sourcePackets: LegalDocumentSourcePacket[],
+    documentReference: DocumentReferenceDetection
 ) {
     const answer = response.documentAnswer;
     if (!answer) return response;
 
     return {
         ...response,
-        message: renderCourtOrderAnalysisMarkdown(answer, sourcePackets, response.message),
+        message: shouldRenderTargetedDocumentAnswer(documentReference)
+            ? renderTargetedLegalDocumentAnswerMarkdown(answer, sourcePackets, response.message)
+            : renderCourtOrderAnalysisMarkdown(answer, sourcePackets, response.message),
     };
 }
 
@@ -1257,7 +1287,11 @@ async function generateWithFallbacks({
                 );
             }
 
-            parsedResponse = renderCitationLockedDocumentMessage(parsedResponse, promptBundle.documentSourcePackets);
+            parsedResponse = renderCitationLockedDocumentMessage(
+                parsedResponse,
+                promptBundle.documentSourcePackets,
+                promptBundle.documentReference
+            );
             parsedResponse.message = polishLegalResponse(parsedResponse.message);
 
             return {

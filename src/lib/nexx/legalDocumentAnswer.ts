@@ -88,6 +88,7 @@ const DOCUMENT_FACT_CLAIM_TYPES = new Set<LegalDocumentClaimType>([
   'summary',
   'comparison',
   'interpretation',
+  'procedural',
 ]);
 
 function normalizeForFuzzyMatch(value: string) {
@@ -210,6 +211,83 @@ function appendCitationLabels(value: string, labels: string[]) {
   return `${clean} ${usableLabels.map((label) => `[${label}]`).join(' ')}`;
 }
 
+function truncateUserFacingText(value: string, maxLength = 280) {
+  const clean = cleanUserFacingDocumentText(value).replace(/\s+/g, ' ').trim();
+  if (clean.length <= maxLength) return clean;
+  return `${clean.slice(0, maxLength - 3).trim()}...`;
+}
+
+const LEGAL_SIGNAL_PATTERN = /\b(order|ordered|shall|must|required|deadline|within|notice|pay|support|possession|conservator|custody|school|medical|passport|exclusive|authority)\b/i;
+
+function sourceTextToSupportedClaim(source: LegalDocumentSourcePacket) {
+  const normalized = cleanUserFacingDocumentText(source.text).replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+
+  const sentences = normalized.match(/[^.!?]+[.!?]?/g)?.map((sentence) => sentence.trim()).filter(Boolean) ?? [normalized];
+  const candidate =
+    sentences.find((sentence) => sentence.length >= 35 && LEGAL_SIGNAL_PATTERN.test(sentence)) ??
+    sentences.find((sentence) => sentence.length >= 35) ??
+    normalized;
+  const heading = truncateUserFacingText(source.sectionHeading ?? '', 90);
+  const claim = truncateUserFacingText(candidate, heading ? 230 : 260);
+
+  return heading && !claim.toLowerCase().includes(heading.toLowerCase())
+    ? `${heading}: ${claim}`
+    : claim;
+}
+
+function confidenceLabel(confidence?: number): 'high' | 'medium' | 'low' {
+  if (confidence === undefined) return 'low';
+  if (confidence >= 0.9) return 'high';
+  if (confidence >= 0.72) return 'medium';
+  return 'low';
+}
+
+export function buildBestEffortLegalDocumentAnswerFromSources(
+  sourcePackets: LegalDocumentSourcePacket[],
+  fallbackMessage?: string
+): LegalDocumentAnswer {
+  const usableSources = sourcePackets
+    .map((source) => ({ source, claim: sourceTextToSupportedClaim(source) }))
+    .filter(({ claim }) => claim.length > 0)
+    .slice(0, 8);
+
+  if (usableSources.length === 0) {
+    return {
+      answerType: 'not_found',
+      answer: cleanUserFacingDocumentText(
+        fallbackMessage ||
+        'I do not see usable extracted text for this upload yet. Reprocess the document or upload a clearer copy and I can analyze it.'
+      ),
+      claims: [],
+      citations: [],
+      warnings: [],
+      unsupportedClaims: [],
+      notFoundReason: 'no_usable_extracted_text',
+    };
+  }
+
+  return {
+    answerType: 'summary',
+    answer: 'I found usable extracted court-order text and organized the visible provisions below. I will cite exact pages when page data is available and otherwise stay grounded in the extracted order text.',
+    claims: usableSources.map(({ source, claim }) => ({
+      claim,
+      claimType: isDeadlineClaim(claim) ? 'procedural' : 'document_fact',
+      sourceIds: [source.sourceId],
+    })),
+    citations: usableSources.map(({ source }) => ({
+      sourceId: source.sourceId,
+      pageStart: source.pageStart,
+      pageEnd: source.pageEnd,
+      supports: null,
+      confidence: confidenceLabel(source.confidence),
+    })),
+    warnings: [],
+    unsupportedClaims: [],
+    notFoundReason: null,
+  };
+}
+
 function claimSortScore(claim: LegalDocumentAnswer['claims'][number]) {
   const text = claim.claim.toLowerCase();
   if (/\b(order|ordered|shall|required|must|exclusive|authority|deadline|within|pay|support|notice)\b/.test(text)) {
@@ -231,7 +309,7 @@ function deadlineTimingFromClaim(value: string) {
     const match = value.match(pattern);
     if (match?.[0]) return cleanUserFacingDocumentText(match[0]);
   }
-  return 'Review exact timing';
+  return 'Not stated in the extracted text';
 }
 
 function isDeadlineClaim(value: string) {
@@ -280,20 +358,20 @@ export function renderCourtOrderAnalysisMarkdown(
   const deadlineRows = deadlineClaims.length > 0
     ? deadlineClaims.map((claim) => {
       const labels = labelsForSourceIds(claim.sourceIds, citationMap);
-      const source = labels.length > 0 ? labels.map((label) => `[${label}]`).join(' ') : 'Review source';
+      const source = labels.length > 0 ? labels.map((label) => `[${label}]`).join(' ') : 'Order text';
       return `| ${markdownTableCell(claim.claim)} | ${markdownTableCell(deadlineTimingFromClaim(claim.claim))} | ${source} |`;
     })
-    : [`| ${markdownTableCell('No clear deadline found in the supported extracted text.')} | ${markdownTableCell('Review the order before calendaring.')} | Review source |`];
+    : [`| ${markdownTableCell('No specific deadline was identified in the extracted provisions.')} | ${markdownTableCell('Not stated')} | - |`];
 
   const warnings = uniqueValues(answer.warnings.map(cleanUserFacingDocumentText).filter(Boolean)).slice(0, 5);
   const riskItems = warnings.length > 0
     ? warnings
-    : ['Verify exact wording in the original order before enforcement, filing, or calendaring.'];
+    : ['Use the signed order language for filings, enforcement, or calendaring because exact wording controls.'];
 
   return [
     '# Court Order Analysis',
     '## Executive Summary',
-    executiveSummary || 'The available extracted text does not support a complete court-order analysis yet.',
+    executiveSummary || 'I found extracted order text and organized the visible provisions below.',
     '## Key Obligations',
     formatMarkdownList(obligationItems),
     '## Deadlines',
@@ -302,13 +380,13 @@ export function renderCourtOrderAnalysisMarkdown(
     formatMarkdownList(riskItems),
     '## Recommended Next Steps',
     [
-      '1. Verify the cited page text against the original PDF before relying on it.',
+      '1. Use the cited pages and source details when drafting filings, notices, or messages.',
       '2. Calendar every supported deadline and recurring obligation.',
       '3. Draft required co-parenting or notice messages from the exact order language.',
       '4. Flag incomplete or ambiguous provisions for attorney review.',
     ].join('\n'),
     '## Source Details',
-    'Source details are available below in the collapsed source panel. Use the page chips and quote previews to verify exact wording.',
+    'Source details are available below in the collapsed source panel.',
   ].join('\n\n');
 }
 
@@ -335,13 +413,13 @@ export function renderTargetedLegalDocumentAnswerMarkdown(
       claim.claim,
       labelsForSourceIds(claim.sourceIds, citationMap)
     ))
-    : [directAnswer || 'I found relevant extracted order text, but it needs manual page review before relying on it.'];
+    : [directAnswer || 'I found relevant extracted order text and summarized the supported points above.'];
   const deadlineClaims = supportedClaims.filter((claim) => isDeadlineClaim(claim.claim)).slice(0, 4);
   const warnings = uniqueValues(answer.warnings.map(cleanUserFacingDocumentText).filter(Boolean)).slice(0, 4);
   const cautionItems = warnings.length > 0
     ? warnings
     : [
-      'This is document analysis, not legal advice. Verify exact wording in the signed order before taking enforcement action.',
+      'This is document analysis and drafting support, not a substitute for advice from a licensed attorney.',
     ];
 
   return [
@@ -354,17 +432,17 @@ export function renderTargetedLegalDocumentAnswerMarkdown(
         '## Dates, Deadlines, or Timing',
         ['| Provision | Timing | Source |', '|---|---|---|', ...deadlineClaims.map((claim) => {
           const labels = labelsForSourceIds(claim.sourceIds, citationMap);
-          const source = labels.length > 0 ? labels.map((label) => `[${label}]`).join(' ') : 'Review source';
+          const source = labels.length > 0 ? labels.map((label) => `[${label}]`).join(' ') : 'Order text';
           return `| ${markdownTableCell(claim.claim)} | ${markdownTableCell(deadlineTimingFromClaim(claim.claim))} | ${source} |`;
         })].join('\n'),
       ].join('\n\n')
       : undefined,
     '## Practical Reading',
-    'Use the cited page labels to check the exact wording. If two possession, holiday, or notice provisions appear to overlap, the more specific provision may control, but the signed order should be reviewed before anyone acts on that interpretation.',
+    'Use the signed order language for exact filing or enforcement wording. If two possession, holiday, or notice provisions overlap, the more specific provision may control.',
     '## Cautions',
     formatMarkdownList(cautionItems),
     '## Source Details',
-    'Source details are available below in the collapsed source panel. Use the page chips and quote previews to verify exact wording.',
+    'Source details are available below in the collapsed source panel.',
   ].filter(Boolean).join('\n\n');
 }
 

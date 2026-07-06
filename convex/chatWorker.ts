@@ -20,6 +20,7 @@ import { polishLegalResponse } from '../src/lib/nexx/postprocess';
 import {
     type LegalDocumentAnswerVerification,
     type LegalDocumentSourcePacket,
+    buildBestEffortLegalDocumentAnswerFromSources,
     renderCourtOrderAnalysisMarkdown,
     renderTargetedLegalDocumentAnswerMarkdown,
     verifyLegalDocumentAnswer,
@@ -754,7 +755,8 @@ function buildAttachmentContextPrompt(
         'When you make document-specific claims, fill documentAnswer with claims and citations that use only the SOURCE_ID values shown in retrieved chunks.',
         'Every document_fact, quote, summary, comparison, or interpretation claim in documentAnswer.claims must include at least one valid sourceId.',
         'Every documentAnswer citation may include a short supports phrase copied from the cited SOURCE_ID text, but must not include file names, chunk IDs, memory generation IDs, block IDs, raw source objects, or backend metadata.',
-        'If the source packets do not support the answer, set documentAnswer.answerType to "not_found".',
+        'If source packets contain usable extracted order text, answer from that text even when page metadata is incomplete. Cite page labels when available; if a page label is unavailable, keep the claim grounded in the extracted text without inventing a page number.',
+        'If the retrieved chunks truly do not contain the requested fact after checking them, say what you checked and what the extracted order text does not state.',
         preferRetrievedChunks ? 'Use the retrieved chunks first for this turn; they were selected from stored document memory for the user\'s specific question.' : undefined,
         detection.requiresExactText ? 'This turn requires exact wording: verify terms against the extracted text and do not infer missing words.' : undefined,
         detection.requiresPageOrSectionCitation ? 'This turn asks for source location: cite available page, section, paragraph, or document metadata when possible.' : undefined,
@@ -975,24 +977,21 @@ function renderCitationLockedDocumentMessage(
     };
 }
 
-function citationLockedFallbackResponse(errors: string[]): NexxAssistantResponse {
-    const message = [
-        'I cannot safely support every part of that answer from the uploaded document text yet.',
-        'I will not guess from the order. Ask me to re-check a specific page, section, or phrase, or reprocess the document if the extracted text looks incomplete.',
-    ].join(' ');
+function citationLockedFallbackResponse(
+    errors: string[],
+    sourcePackets: LegalDocumentSourcePacket[]
+): NexxAssistantResponse {
+    const documentAnswer = buildBestEffortLegalDocumentAnswerFromSources(
+        sourcePackets,
+        errors.length > 0
+            ? 'I checked the extracted order text, but the citation verifier could not lock every model-generated claim. I will answer from the extracted provisions that are available.'
+            : undefined
+    );
 
     return {
-        message,
+        message: documentAnswer.answer,
         artifacts: emptyArtifacts(),
-        documentAnswer: {
-            answerType: 'not_found',
-            answer: message,
-            claims: [],
-            citations: [],
-            warnings: ['The available document text did not support a complete answer.'],
-            unsupportedClaims: [],
-            notFoundReason: errors.slice(0, 5).join(' | ') || 'citation_verifier_failed',
-        },
+        documentAnswer,
     };
 }
 
@@ -1021,7 +1020,7 @@ async function repairCitationLockedResponse(args: {
                             'The citation verifier rejected the previous document answer.',
                             `Verifier errors: ${args.verifierErrors.slice(0, 8).join(' | ')}`,
                             'Repair the answer using only the existing SOURCE_ID values from the document context.',
-                            'If the available source packets do not support the answer, set documentAnswer.answerType to "not_found" and do not make unsupported document claims.',
+                            'If usable source packets exist, answer from the extracted order text with valid sourceIds even when page metadata is incomplete. If the available source packets truly do not support the requested fact, set documentAnswer.answerType to "not_found" and do not make unsupported document claims.',
                             'Return valid JSON matching the required schema.',
                             `Rejected response JSON: ${JSON.stringify(args.originalResponse).slice(0, 8_000)}`,
                         ].join('\n'),
@@ -1276,13 +1275,16 @@ async function generateWithFallbacks({
             }
 
             if (!citationVerification.passed && requiresDocumentAnswer) {
-                parsedResponse = citationLockedFallbackResponse(citationVerification.errors);
+                parsedResponse = citationLockedFallbackResponse(
+                    citationVerification.errors,
+                    promptBundle.documentSourcePackets
+                );
                 citationVerification = verifyLegalDocumentAnswer(
                     parsedResponse.documentAnswer,
                     promptBundle.documentSourcePackets,
                     {
-                        requiresDocumentAnswer: false,
-                        requiresCitation: false,
+                        requiresDocumentAnswer: true,
+                        requiresCitation: promptBundle.documentSourcePackets.length > 0,
                     }
                 );
             }

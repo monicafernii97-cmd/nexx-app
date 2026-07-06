@@ -210,6 +210,52 @@ describe('MessageBubble document evidence panel', () => {
     expect(container.textContent).not.toContain('secret');
   });
 
+  it('keeps ordinary streaming assistant text visible while guarding unsafe payloads', async () => {
+    const { container, root } = await renderMessage(
+      {},
+      undefined,
+      'Court Order Analysis\n\nExecutive Summary\nThe order says possession begins Friday.',
+      { isStreaming: true }
+    );
+    roots.push(root);
+
+    expect(container.textContent).toContain('Court Order Analysis');
+    expect(container.textContent).toContain('possession begins Friday');
+    expect(container.textContent).not.toContain('Analyzing court order');
+  });
+
+  it('withholds unsafe structured payloads even while streaming', async () => {
+    const rawPayload = '{"documentAnswer":{"citations":[{"sourceId":"src_005","quotedText":"secret"}]}}';
+    const { container, root } = await renderMessage({}, undefined, rawPayload, { isStreaming: true });
+    roots.push(root);
+
+    expect(container.textContent).toContain('Analyzing court order');
+    expect(container.textContent).not.toContain('sourceId');
+    expect(container.textContent).not.toContain('quotedText');
+    expect(container.textContent).not.toContain('secret');
+  });
+
+  it('strips legacy markdown source bullets from visible assistant content', async () => {
+    const legacyContent = [
+      'The verified order text supports Friday possession for Father\'s Day weekend. [p. 5]',
+      '',
+      'Sources',
+      '',
+      'Signed Final Order.pdf, p. 5 (src_009): "Father\'s Day begins Friday."',
+      '',
+      'Warnings',
+      'src_009: PAGE_BOUNDARIES_UNAVAILABLE',
+    ].join('\n');
+
+    const { container, root } = await renderMessage({}, undefined, legacyContent);
+    roots.push(root);
+
+    expect(container.textContent).toContain('The verified order text supports Friday possession');
+    expect(container.textContent).not.toContain('src_009');
+    expect(container.textContent).not.toContain('PAGE_BOUNDARIES_UNAVAILABLE');
+    expect(container.textContent).not.toContain('Signed Final Order.pdf, p. 5');
+  });
+
   it('summarizes cited documents instead of unrelated source metadata', async () => {
     const { container, root } = await renderMessage({
       documentSources: [

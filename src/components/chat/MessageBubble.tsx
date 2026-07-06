@@ -9,7 +9,7 @@ import type { NexxArtifacts, JudgeSimulationResult, OppositionSimulationResult }
 import { PlayAloudButton } from '@/components/voice';
 import { AssistantMessageCard } from './AssistantMessageCard';
 import type { AssistantResponseViewModel, ActionType, DetectedPattern, LocalProcedureInfo } from '@/lib/ui-intelligence/types';
-import { looksLikeInternalStructuredPayload } from '@/lib/chat/internalLeakGuard';
+import { looksLikeInternalStructuredPayload, sanitizeVisibleAssistantContent } from '@/lib/chat/internalLeakGuard';
 
 export type ChatTheme = 'dark' | 'light';
 
@@ -671,8 +671,16 @@ export default function MessageBubble({
     );
     const documentSources = useMemo(() => getDocumentSources(metadata), [metadata]);
     const documentCitations = useMemo(() => getDocumentCitations(metadata), [metadata]);
-    const shouldShowCourtOrderFollowUps = role === 'assistant' && !isStreaming && content.includes('Court Order Analysis');
-    const unsafeAssistantContent = role === 'assistant' && looksLikeInternalStructuredPayload(content);
+    const hasInternalAssistantContent = role === 'assistant' && looksLikeInternalStructuredPayload(content);
+    const shouldSanitizeAssistantContent = role === 'assistant' && (!isStreaming || hasInternalAssistantContent);
+    const sanitizedAssistantContent = shouldSanitizeAssistantContent
+        ? sanitizeVisibleAssistantContent(content)
+        : content;
+    const unsafeAssistantContent = role === 'assistant' && sanitizedAssistantContent === null;
+    const visibleContent = role === 'assistant'
+        ? sanitizedAssistantContent ?? ''
+        : content;
+    const shouldShowCourtOrderFollowUps = role === 'assistant' && !isStreaming && visibleContent.includes('Court Order Analysis');
 
     useEffect(() => {
         return () => {
@@ -693,7 +701,7 @@ export default function MessageBubble({
     const handleCopy = useCallback(async () => {
         if (!window.isSecureContext || !navigator.clipboard?.writeText) return;
         try {
-            await navigator.clipboard.writeText(unsafeAssistantContent ? REDACTED_ASSISTANT_COPY_TEXT : content);
+            await navigator.clipboard.writeText(unsafeAssistantContent ? REDACTED_ASSISTANT_COPY_TEXT : visibleContent);
             setCopied(true);
             if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
             copyTimerRef.current = setTimeout(() => {
@@ -703,7 +711,7 @@ export default function MessageBubble({
         } catch (err) {
             console.error('Failed to copy:', err);
         }
-    }, [content, unsafeAssistantContent]);
+    }, [unsafeAssistantContent, visibleContent]);
 
     /** Enter inline edit mode, pre-filling the textarea with the current message content. */
     const handleStartEdit = useCallback(() => {
@@ -864,9 +872,9 @@ export default function MessageBubble({
                         {shouldShowCourtOrderFollowUps && (
                             <CourtOrderFollowUpChips isLight={isLight} onSuggestedPrompt={onSuggestedPrompt} />
                         )}
-                        {content.trim() && (
+                        {visibleContent.trim() && (
                             <div className="mt-3">
-                                <PlayAloudButton text={content} />
+                                <PlayAloudButton text={visibleContent} />
                             </div>
                         )}
                     </>
@@ -877,7 +885,7 @@ export default function MessageBubble({
                     : 'text-white/90 prose-invert'
                     }`}>
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {content + (isStreaming ? ' ▍' : '')}
+                        {visibleContent + (isStreaming ? ' ▍' : '')}
                     </ReactMarkdown>
                 </div>
 
@@ -890,9 +898,9 @@ export default function MessageBubble({
                     <CourtOrderFollowUpChips isLight={isLight} onSuggestedPrompt={onSuggestedPrompt} />
                 )}
 
-                {!isStreaming && content.trim() && (
+                {!isStreaming && visibleContent.trim() && (
                     <div className="mt-3">
-                        <PlayAloudButton text={content} />
+                        <PlayAloudButton text={visibleContent} />
                     </div>
                 )}
 

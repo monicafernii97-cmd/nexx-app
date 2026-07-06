@@ -12,6 +12,21 @@ export const INTERNAL_LEAK_KEYS = [
 ] as const;
 
 const INTERNAL_LEAK_KEY_SET = new Set<string>(INTERNAL_LEAK_KEYS);
+const LEGACY_SOURCE_ID_PATTERN = /\bsrc_\d{3,}\b/i;
+const LEGACY_SOURCE_ID_TOKEN_PATTERN = /\bsrc_\d{3,}\b/gi;
+const LEGACY_SOURCE_LINE_PATTERN = /^\s*src_\d{3,}\s*:\s*.*$/gim;
+const LEGACY_SOURCE_PAREN_PATTERN = /\s*\(\s*src_\d{3,}\s*\)/gi;
+const SOURCE_SECTION_PATTERN = /(?:^|\n)(?:#{1,6}\s*)?Sources:?\s*\n/i;
+const PDF_FILENAME_PATTERN = /\.pdf\b/i;
+const PAGE_LOCATION_PATTERN = /,\s*p{1,2}\.\s*\d+/i;
+const SOURCE_ID_PREFIX_PATTERN = /\bsrc_\d{3,}\s*:/i;
+const SOURCE_ID_PAREN_PREFIX_PATTERN = /\(src_\d{3,}\)\s*:/i;
+const BARE_INTERNAL_KEY_ASSIGNMENT_PATTERNS = INTERNAL_LEAK_KEYS.map(
+  (key) => new RegExp(`(?:^|[\\s{\\[,])${key}\\s*:`)
+);
+const JSON_INTERNAL_KEY_MARKER_PATTERNS = INTERNAL_LEAK_KEYS.map(
+  (key) => new RegExp(`"${key}"\\s*:`)
+);
 
 function valueContainsInternalKey(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
@@ -39,6 +54,44 @@ function hasInternalKeyAssignment(content: string) {
     }
     return false;
   });
+}
+
+function hasBareInternalKeyAssignment(content: string) {
+  return BARE_INTERNAL_KEY_ASSIGNMENT_PATTERNS.some((pattern) => pattern.test(content));
+}
+
+function hasJsonInternalKeyMarker(content: string) {
+  return JSON_INTERNAL_KEY_MARKER_PATTERNS.some((pattern) => pattern.test(content));
+}
+
+function looksStructuredForBareKeys(content: string) {
+  return content.startsWith('{')
+    || content.startsWith('[')
+    || content.startsWith('```')
+    || content.includes('\n')
+    || content.includes('","')
+    || /[{}[\]",]/.test(content);
+}
+
+function stripSourceSection(content: string) {
+  const sourceSectionMatch = content.match(SOURCE_SECTION_PATTERN);
+  if (sourceSectionMatch?.index === undefined) return content;
+  return content.slice(0, sourceSectionMatch.index).trimEnd();
+}
+
+function dropLegacySourceCitationLines(content: string) {
+  return content
+    .split('\n')
+    .filter((line) => {
+      if (!LEGACY_SOURCE_ID_PATTERN.test(line)) return true;
+      return !(
+        PDF_FILENAME_PATTERN.test(line)
+        || PAGE_LOCATION_PATTERN.test(line)
+        || SOURCE_ID_PREFIX_PATTERN.test(line)
+        || SOURCE_ID_PAREN_PREFIX_PATTERN.test(line)
+      );
+    })
+    .join('\n');
 }
 
 function hasJsonKeyContext(content: string, keyIndex: number) {
@@ -121,6 +174,9 @@ export function looksLikeInternalStructuredPayload(content: string) {
 
   const trimmed = content.trim();
   if (!trimmed) return false;
+  if (LEGACY_SOURCE_ID_PATTERN.test(trimmed)) return true;
+  if (looksStructuredForBareKeys(trimmed) && hasBareInternalKeyAssignment(trimmed)) return true;
+  if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && hasJsonInternalKeyMarker(trimmed)) return true;
   if (hasInternalKeyAssignment(trimmed)) return true;
   if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return false;
 
@@ -129,4 +185,29 @@ export function looksLikeInternalStructuredPayload(content: string) {
   } catch {
     return false;
   }
+}
+
+export function sanitizeVisibleAssistantContent(content: string): string | null {
+  if (!content) return '';
+
+  const trimmed = content.trim();
+  if (!trimmed) return '';
+
+  const sourceStripped = stripSourceSection(trimmed);
+  const hadSourceSection = sourceStripped !== trimmed;
+  const hasLegacySourceId = LEGACY_SOURCE_ID_PATTERN.test(trimmed);
+
+  if (!hadSourceSection && !hasLegacySourceId) {
+    return looksLikeInternalStructuredPayload(trimmed) ? null : content;
+  }
+
+  const sanitized = dropLegacySourceCitationLines(sourceStripped)
+    .replace(LEGACY_SOURCE_LINE_PATTERN, '')
+    .replace(LEGACY_SOURCE_PAREN_PATTERN, '')
+    .replace(LEGACY_SOURCE_ID_TOKEN_PATTERN, 'source reference')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (!sanitized) return null;
+  return looksLikeInternalStructuredPayload(sanitized) ? null : sanitized;
 }

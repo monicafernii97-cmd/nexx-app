@@ -355,6 +355,73 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
     expect(prioritySection).not.toContain('Provision 6 requires a specific action.');
     expect(obligationsSection).toContain('Provision 6 requires a specific action. [p. 4]');
   });
+
+  it('extracts written-out deadline timing from supported claims', () => {
+    const content = renderCourtOrderAnalysisMarkdown(answer({
+      claims: [
+        {
+          claim: 'The order requires each party to provide updated residence and employment information within seven days of a change.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
+        {
+          claim: 'The order requires notice to the other party within fourteen days if a party applies for a passport for the child.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
+        {
+          claim: 'The order requires notice within twenty-five business days after service.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
+        {
+          claim: 'The order requires exchange within thirty one calendar days after request.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
+        {
+          claim: 'The order requires filing within sixty days after notice.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
+        {
+          claim: 'The order requires review within one hundred eighty days after entry.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
+      ],
+    }), sourcePackets, 'Fallback answer');
+
+    const deadlinesSection = sectionBetween(content, '## Deadlines', '## Risks and Cautions');
+
+    expect(deadlinesSection).toContain('| The order requires each party to provide updated residence and employment information within seven days of a change. | within seven days | [p. 4] |');
+    expect(deadlinesSection).toContain('| The order requires notice to the other party within fourteen days if a party applies for a passport for the child. | within fourteen days | [p. 4] |');
+    expect(deadlinesSection).toContain('| The order requires notice within twenty-five business days after service. | within twenty-five business days | [p. 4] |');
+    expect(deadlinesSection).toContain('| The order requires exchange within thirty one calendar days after request. | within thirty one calendar days | [p. 4] |');
+    expect(deadlinesSection).toContain('| The order requires filing within sixty days after notice. | within sixty days | [p. 4] |');
+    expect(deadlinesSection).toContain('| The order requires review within one hundred eighty days after entry. | within one hundred eighty days | [p. 4] |');
+    expect(deadlinesSection).not.toContain('Not stated in the extracted text');
+
+    const hundredContent = renderCourtOrderAnalysisMarkdown(answer({
+      claims: [
+        {
+          claim: 'The order requires a supplemental filing within one hundred twenty business days after entry.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
+        {
+          claim: 'The order requires a status update within one hundred and five calendar days after review.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
+      ],
+    }), sourcePackets, 'Fallback answer');
+    const hundredDeadlinesSection = sectionBetween(hundredContent, '## Deadlines', '## Risks and Cautions');
+
+    expect(hundredDeadlinesSection).toContain('| The order requires a supplemental filing within one hundred twenty business days after entry. | within one hundred twenty business days | [p. 4] |');
+    expect(hundredDeadlinesSection).toContain('| The order requires a status update within one hundred and five calendar days after review. | within one hundred and five calendar days | [p. 4] |');
+    expect(hundredDeadlinesSection).not.toContain('Not stated in the extracted text');
+  });
 });
 
 describe('renderTargetedLegalDocumentAnswerMarkdown', () => {

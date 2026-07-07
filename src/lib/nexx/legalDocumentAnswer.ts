@@ -353,7 +353,12 @@ export function renderCourtOrderAnalysisMarkdown(
       labelsForSourceIds(claim.sourceIds, citationMap)
     ))
     : [appendCitationLabels(cleanAnswer, firstLabels)];
-  const priorityFindings = obligationItems.slice(0, 5);
+  const priorityFindings = supportedClaims.length > 0
+    ? supportedClaims.slice(0, 5).map((claim, index) => {
+      const finding = appendCitationLabels(claim.claim, labelsForSourceIds(claim.sourceIds, citationMap));
+      return `**Priority ${index + 1}.** ${finding}`;
+    })
+    : obligationItems.slice(0, 1).map((finding) => `**Priority 1.** ${finding}`);
 
   const deadlineClaims = supportedClaims.filter((claim) => isDeadlineClaim(claim.claim)).slice(0, 6);
   const deadlineRows = deadlineClaims.length > 0

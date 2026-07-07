@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type LegalDocumentAnswer,
   type LegalDocumentSourcePacket,
+  buildBestEffortLegalDocumentAnswerFromSources,
   validateLegalDocumentAnswerShape,
   renderCourtOrderAnalysisMarkdown,
   renderTargetedLegalDocumentAnswerMarkdown,
@@ -134,6 +135,18 @@ describe('verifyLegalDocumentAnswer', () => {
     expect(result.errors.join(' ')).toContain('missing sources');
   });
 
+  it('blocks procedural deadline claims without a source id', () => {
+    const result = verifyLegalDocumentAnswer(answer({
+      claims: [{ claim: 'Notice is due within 24 hours.', claimType: 'procedural', sourceIds: [] }],
+    }), sourcePackets, {
+      requiresDocumentAnswer: true,
+      requiresCitation: true,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.errors.join(' ')).toContain('missing sources');
+  });
+
   it('downgrades supporting text that is not present in the cited source packet', () => {
     const result = verifyLegalDocumentAnswer(answer({
       citations: [{
@@ -224,6 +237,38 @@ describe('verifyLegalDocumentAnswer', () => {
   });
 });
 
+describe('buildBestEffortLegalDocumentAnswerFromSources', () => {
+  it('builds a grounded answer from extracted packets instead of a generic unsupported fallback', () => {
+    const bestEffort = buildBestEffortLegalDocumentAnswerFromSources(sourcePackets);
+    const verification = verifyLegalDocumentAnswer(bestEffort, sourcePackets, {
+      requiresDocumentAnswer: true,
+      requiresCitation: true,
+    });
+    const content = renderCourtOrderAnalysisMarkdown(bestEffort, sourcePackets, 'Fallback answer');
+
+    expect(bestEffort.answerType).toBe('summary');
+    expect(bestEffort.claims).toHaveLength(1);
+    expect(verification.passed).toBe(true);
+    expect(content).toContain('## Executive Summary');
+    expect(content).toContain('[p. 4]');
+    expect(content).not.toContain('I cannot safely support');
+    expect(content).not.toContain('sourceId');
+    expect(content).not.toContain('chunkId');
+    expect(content).not.toContain('memoryGenerationId');
+    expect(content).not.toContain('blockIds');
+    expect(content).not.toContain('quotedText');
+  });
+
+  it('labels missing source confidence as low in fallback citations', () => {
+    const bestEffort = buildBestEffortLegalDocumentAnswerFromSources([{
+      ...sourcePackets[0],
+      confidence: undefined,
+    }]);
+
+    expect(bestEffort.citations[0]?.confidence).toBe('low');
+  });
+});
+
 describe('renderCourtOrderAnalysisMarkdown', () => {
   it('renders the required executive sections with compact citations and no internal metadata', () => {
     const content = renderCourtOrderAnalysisMarkdown(answer({
@@ -253,6 +298,34 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
     expect(content).not.toContain('quotedText');
     expect(content).not.toContain('Sources used:');
     expect(content).not.toContain('Final Order.pdf, p.');
+  });
+
+  it('keeps no-page extracted-text answers quiet instead of showing source-review warnings', () => {
+    const noPageSources: LegalDocumentSourcePacket[] = [{
+      ...sourcePackets[0],
+      pageStart: undefined,
+      pageEnd: undefined,
+      text: 'The conservators shall send child-related notices through AppClose within 24 hours.',
+    }];
+    const content = renderCourtOrderAnalysisMarkdown(answer({
+      answer: 'The order requires AppClose notices within 24 hours.',
+      claims: [{
+        claim: 'The conservators shall send child-related notices through AppClose within 24 hours.',
+        claimType: 'document_fact',
+        sourceIds: ['src_001'],
+      }],
+      citations: [{
+        sourceId: 'src_001',
+        supports: 'The conservators shall send child-related notices through AppClose within 24 hours.',
+        confidence: 'high',
+      }],
+    }), noPageSources, 'Fallback answer');
+
+    expect(content).toContain('Order text');
+    expect(content).not.toContain('Review source');
+    expect(content).not.toContain('needs source review');
+    expect(content).not.toContain('sourceId');
+    expect(content).not.toContain('chunkId');
   });
 });
 

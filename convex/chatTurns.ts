@@ -26,6 +26,11 @@ import {
     getDailyLimit,
     PRIMARY_MODEL,
 } from '../src/lib/tiers';
+import {
+    ANALYSIS_STATUS_UI_KIND,
+    ASSISTANT_ANSWER_UI_KIND,
+    SAFE_ANALYSIS_DRAFT_MESSAGE,
+} from '../src/lib/chat/analysisStatus';
 import { looksLikeInternalStructuredPayload } from '../src/lib/chat/internalLeakGuard';
 import {
     CHAT_RATE_LIMIT_WINDOW_MS,
@@ -47,7 +52,6 @@ const MAX_EXPLICIT_ALIAS_MATCHED_FILES = 50;
 const MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE = 300;
 const MAX_DOCUMENT_CHUNKS_FROM_SEARCH_PER_FILE = 80;
 const MAX_RETRIEVED_CHUNKS_PER_FILE = 12;
-const SAFE_ASSISTANT_DRAFT_MESSAGE = 'Analyzing court order...';
 
 const routeModeValidator = v.union(
     v.literal('adaptive_chat'),
@@ -1685,7 +1689,7 @@ export const recordDocumentAnswerEvidence = internalMutation({
         await ctx.db.patch(assistantMessage._id, {
             metadata: {
                 ...asMetadataObject(assistantMessage.metadata),
-                uiKind: 'answer',
+                uiKind: ASSISTANT_ANSWER_UI_KIND,
                 sourceDisplayMode: 'collapsed',
                 sourceCount: verifiedSources.length,
                 citedPages: Array.from(new Set(
@@ -1844,13 +1848,13 @@ export const saveAssistantDraft = internalMutation({
             draft: true,
             ...(unsafeDraft
                 ? {
-                    uiKind: 'analysis_status',
+                    uiKind: ANALYSIS_STATUS_UI_KIND,
                     phase: 'preparing_answer',
                     redactedInternalDraft: true,
                 }
                 : {}),
         };
-        const content = unsafeDraft ? SAFE_ASSISTANT_DRAFT_MESSAGE : args.content;
+        const content = unsafeDraft ? SAFE_ANALYSIS_DRAFT_MESSAGE : args.content;
 
         if (turn.assistantDraftMessageId) {
             await ctx.db.patch(turn.assistantDraftMessageId, {
@@ -1932,13 +1936,13 @@ export const redactLeakedAssistantMessages = internalMutation({
 
             await ctx.db.patch(message._id, {
                 content: message.status === 'draft'
-                    ? SAFE_ASSISTANT_DRAFT_MESSAGE
+                    ? SAFE_ANALYSIS_DRAFT_MESSAGE
                     : 'Analysis was interrupted. Please regenerate this answer.',
                 metadata: {
                     ...asMetadataObject(message.metadata),
                     redactedExistingInternalLeak: true,
                     redactedArtifactsJson: unsafeArtifacts || undefined,
-                    uiKind: message.status === 'draft' ? 'analysis_status' : 'answer',
+                    uiKind: message.status === 'draft' ? ANALYSIS_STATUS_UI_KIND : ASSISTANT_ANSWER_UI_KIND,
                 },
                 artifactsJson: undefined,
                 updatedAt: now,

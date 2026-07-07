@@ -13,6 +13,7 @@ import { buildFeatureToolPrompt } from '../src/lib/nexx/prompts/featurePrompt';
 import { buildArtifactPrompt } from '../src/lib/nexx/prompts/artifactPrompt';
 import { buildContextPrompt, type ContextPacket } from '../src/lib/nexx/prompts/contextPrompt';
 import { NEXX_RESPONSE_SCHEMA } from '../src/lib/nexx/schemas';
+import { ANALYSIS_STATUS_UI_KIND, SAFE_ANALYSIS_DRAFT_MESSAGE } from '../src/lib/chat/analysisStatus';
 import { recoverStructuredOutput } from '../src/lib/nexx/recovery/recoverStructuredOutput';
 import { suppressWeakArtifacts } from '../src/lib/nexx/recovery/suppressWeakArtifacts';
 import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
@@ -36,7 +37,6 @@ import type { NexxAssistantResponse, RouteMode } from '../src/lib/types';
 
 const DEGRADED_MESSAGE =
     'I saved your message, but the response did not finish. Please retry this turn in a moment.';
-const SAFE_ANALYSIS_DRAFT_MESSAGE = 'Analyzing court order...';
 const PROVIDER_TIMEOUT_MS = 80_000;
 
 let cachedOpenAI: OpenAI | null = null;
@@ -1164,7 +1164,7 @@ async function generateWithFallbacks({
                         safeDraftWritten = true;
                         lastDraftSavedAt = now;
                         await saveDraft(ctx, jobId, leaseOwner, SAFE_ANALYSIS_DRAFT_MESSAGE, {
-                            uiKind: 'analysis_status',
+                            uiKind: ANALYSIS_STATUS_UI_KIND,
                             phase: 'preparing_answer',
                         });
                     }

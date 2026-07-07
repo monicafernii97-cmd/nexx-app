@@ -329,4 +329,43 @@ describe('MessageBubble document evidence panel', () => {
 
     expect(onSuggestedPrompt).toHaveBeenCalledWith('Create a deadline checklist from this court-order analysis.');
   });
+
+  it('renders draft-ready artifacts as polished draft text and filing notes instead of raw JSON', async () => {
+    const { container, root } = await renderMessage(
+      {},
+      JSON.stringify({
+        draftReady: {
+          title: 'Motion to Enforce Parenting-Time Provisions',
+          body: [
+            'CAUSE NO. [NEEDED: cause number]',
+            '',
+            'Movant asks the Court to enforce the parenting-time provisions cited in the order.',
+          ].join('\n'),
+          filingNotes: 'Confirm county standing-order requirements before filing.',
+        },
+      }),
+      'I drafted a court-facing motion using the facts available so far.'
+    );
+    roots.push(root);
+
+    expect(container.textContent).toContain('Court-Ready Draft');
+
+    const draftButton = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Court-Ready Draft')
+    );
+    expect(draftButton?.getAttribute('aria-expanded')).toBe('false');
+
+    await act(async () => {
+      draftButton?.click();
+    });
+
+    expect(draftButton?.getAttribute('aria-expanded')).toBe('true');
+    expect(container.textContent).toContain('Motion to Enforce Parenting-Time Provisions');
+    expect(container.textContent).toContain('CAUSE NO. [NEEDED: cause number]');
+    expect(container.textContent).toContain('Filing Notes');
+    expect(container.textContent).toContain('Confirm county standing-order requirements before filing.');
+    expect(container.textContent).not.toContain('"draftReady"');
+    expect(container.textContent).not.toContain('"filingNotes"');
+    expect(container.textContent).not.toContain('{"');
+  });
 });

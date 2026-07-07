@@ -76,7 +76,7 @@ async function extractPdfTextWithOpenAIFileInput(buffer: Buffer): Promise<Docume
     const uploadedFile = await client.files.create({
       file: new File([new Uint8Array(buffer)], 'uploaded-document.pdf', { type: PDF_MIME }),
       purpose: 'assistants',
-    }, { timeout: 30_000 });
+    }, { timeout: 30_000, maxRetries: 0 });
     uploadedFileId = uploadedFile.id;
 
     const response = await client.responses.create({

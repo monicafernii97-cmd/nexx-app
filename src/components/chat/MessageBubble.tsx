@@ -422,6 +422,31 @@ function CourtOrderFollowUpChips({
     );
 }
 
+function renderDraftReadyMarkdown(draftReady: unknown) {
+    if (!draftReady || typeof draftReady !== 'object' || Array.isArray(draftReady)) {
+        return 'Draft artifact is available, but the draft body was not returned in a displayable format.';
+    }
+
+    const draft = draftReady as Record<string, unknown>;
+    const title = typeof draft.title === 'string' ? draft.title.trim() : '';
+    const body = typeof draft.body === 'string'
+        ? draft.body.trim()
+        : typeof draft.content === 'string'
+            ? draft.content.trim()
+            : '';
+    const filingNotes = typeof draft.filingNotes === 'string' ? draft.filingNotes.trim() : '';
+
+    if (!body) {
+        return 'Draft artifact is available, but the draft body was not returned in a displayable format.';
+    }
+
+    return [
+        title ? `## ${title}` : undefined,
+        body,
+        filingNotes ? `## Filing Notes\n${filingNotes}` : undefined,
+    ].filter(Boolean).join('\n\n');
+}
+
 /** Ensure a value is an array of strings, defaulting to [] on mismatch. */
 function ensureStringArray(val: unknown): string[] {
     return Array.isArray(val) ? val.filter((v): v is string => typeof v === 'string') : [];
@@ -924,9 +949,7 @@ export default function MessageBubble({
                             <ArtifactPanel icon={FileText} label="Court-Ready Draft" isLight={isLight} accentColor="#C75A5A">
                                 <div className="prose prose-sm max-w-none">
                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                        {typeof artifacts.draftReady === 'object' && 'content' in artifacts.draftReady
-                                            ? String(artifacts.draftReady.content)
-                                            : JSON.stringify(artifacts.draftReady, null, 2)}
+                                        {renderDraftReadyMarkdown(artifacts.draftReady)}
                                     </ReactMarkdown>
                                 </div>
                             </ArtifactPanel>

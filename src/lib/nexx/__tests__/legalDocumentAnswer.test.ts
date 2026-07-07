@@ -51,6 +51,14 @@ function answer(overrides: Partial<LegalDocumentAnswer> = {}): LegalDocumentAnsw
   };
 }
 
+function sectionBetween(content: string, startHeading: string, endHeading: string) {
+  const start = content.indexOf(startHeading);
+  const end = content.indexOf(endHeading, start + startHeading.length);
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(end).toBeGreaterThan(start);
+  return content.slice(start, end);
+}
+
 describe('verifyLegalDocumentAnswer', () => {
   it('passes sourced claims with quotes found in source packets', () => {
     const result = verifyLegalDocumentAnswer(answer(), sourcePackets, {
@@ -284,12 +292,15 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
 
     expect(content).toContain('# Court Order Analysis');
     expect(content).toContain('## Executive Summary');
+    expect(content).toContain('## Highest-Priority Findings');
     expect(content).toContain('## Key Obligations');
     expect(content).toContain('## Deadlines');
     expect(content).toContain('## Risks and Cautions');
     expect(content).toContain('## Recommended Next Steps');
     expect(content).toContain('## Source Details');
     expect(content).toContain('[p. 4]');
+    expect(content).toContain('Create a deadline checklist from the cited provisions.');
+    expect(content).toContain('Prepare filing language from the supported facts');
     expect(content).toContain('Respondent \\| shall pay $500 no later than June 14');
     expect(content).not.toContain('sourceId');
     expect(content).not.toContain('chunkId');
@@ -326,6 +337,23 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
     expect(content).not.toContain('needs source review');
     expect(content).not.toContain('sourceId');
     expect(content).not.toContain('chunkId');
+  });
+
+  it('caps highest-priority findings at five while keeping additional obligations visible', () => {
+    const claims = Array.from({ length: 6 }, (_, index) => ({
+      claim: `Provision ${index + 1} requires a specific action.`,
+      claimType: 'document_fact' as const,
+      sourceIds: ['src_001'],
+    }));
+    const content = renderCourtOrderAnalysisMarkdown(answer({ claims }), sourcePackets, 'Fallback answer');
+
+    const prioritySection = sectionBetween(content, '## Highest-Priority Findings', '## Key Obligations');
+    const obligationsSection = sectionBetween(content, '## Key Obligations', '## Deadlines');
+
+    expect(prioritySection).toContain('**Priority 1.** Provision 1 requires a specific action. [p. 4]');
+    expect(prioritySection).toContain('**Priority 5.** Provision 5 requires a specific action. [p. 4]');
+    expect(prioritySection).not.toContain('Provision 6 requires a specific action.');
+    expect(obligationsSection).toContain('Provision 6 requires a specific action. [p. 4]');
   });
 });
 

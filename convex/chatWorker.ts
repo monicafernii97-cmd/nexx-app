@@ -753,7 +753,7 @@ function buildAttachmentContextPrompt(
         'Quote short exact phrases only when exact wording matters.',
         'Never reveal SOURCE_ID values, backend field names, chunk IDs, memory generation IDs, block IDs, raw JSON, or retrieval metadata in the user-facing message.',
         'When you make document-specific claims, fill documentAnswer with claims and citations that use only the SOURCE_ID values shown in retrieved chunks.',
-        'Every document_fact, quote, summary, comparison, or interpretation claim in documentAnswer.claims must include at least one valid sourceId.',
+        'Every document_fact, quote, summary, comparison, interpretation, or procedural claim in documentAnswer.claims must include at least one valid sourceId.',
         'Every documentAnswer citation may include a short supports phrase copied from the cited SOURCE_ID text, but must not include file names, chunk IDs, memory generation IDs, block IDs, raw source objects, or backend metadata.',
         'If source packets contain usable extracted order text, answer from that text even when page metadata is incomplete. Cite page labels when available; if a page label is unavailable, keep the claim grounded in the extracted text without inventing a page number.',
         'If the retrieved chunks truly do not contain the requested fact after checking them, say what you checked and what the extracted order text does not state.',

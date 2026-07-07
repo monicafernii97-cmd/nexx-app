@@ -297,9 +297,69 @@ function claimSortScore(claim: LegalDocumentAnswer['claims'][number]) {
   return 2;
 }
 
+const DAY_COUNT_ONES = [
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+] as const;
+
+const DAY_COUNT_TEENS = [
+  'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
+  'seventeen',
+  'eighteen',
+  'nineteen',
+] as const;
+
+const DAY_COUNT_TENS = [
+  'twenty',
+  'thirty',
+  'forty',
+  'fifty',
+  'sixty',
+  'seventy',
+  'eighty',
+  'ninety',
+] as const;
+
+const DAY_COUNT_WORDS_BELOW_ONE_HUNDRED = [
+  ...DAY_COUNT_ONES,
+  ...DAY_COUNT_TEENS,
+  ...DAY_COUNT_TENS.flatMap((ten) => [
+    ten,
+    ...DAY_COUNT_ONES.flatMap((unit) => [`${ten}-${unit}`, `${ten} ${unit}`]),
+  ]),
+];
+
+const DAY_COUNT_WORDS = [
+  ...DAY_COUNT_WORDS_BELOW_ONE_HUNDRED,
+  'one hundred',
+  ...DAY_COUNT_WORDS_BELOW_ONE_HUNDRED.flatMap((count) => [
+    `one hundred ${count}`,
+    `one hundred and ${count}`,
+  ]),
+].sort((a, b) => b.length - a.length);
+
+const DAY_COUNT_PATTERN = `(?:\\d+|${DAY_COUNT_WORDS.join('|')})`;
+const WITHIN_DAYS_PATTERN = new RegExp(
+  `\\bwithin\\s+${DAY_COUNT_PATTERN}\\s+(?:calendar\\s+|business\\s+)?days?\\b`,
+  'i',
+);
+
 function deadlineTimingFromClaim(value: string) {
   const patterns = [
-    /\bwithin\s+\d+\s+(?:calendar\s+)?days?\b/i,
+    WITHIN_DAYS_PATTERN,
     /\bno later than\s+[^.;,]+/i,
     /\bmonthly\b/i,
     /\bevery\s+[^.;,]+/i,

@@ -353,6 +353,7 @@ export function renderCourtOrderAnalysisMarkdown(
       labelsForSourceIds(claim.sourceIds, citationMap)
     ))
     : [appendCitationLabels(cleanAnswer, firstLabels)];
+  const priorityFindings = obligationItems.slice(0, 5);
 
   const deadlineClaims = supportedClaims.filter((claim) => isDeadlineClaim(claim.claim)).slice(0, 6);
   const deadlineRows = deadlineClaims.length > 0
@@ -372,6 +373,8 @@ export function renderCourtOrderAnalysisMarkdown(
     '# Court Order Analysis',
     '## Executive Summary',
     executiveSummary || 'I found extracted order text and organized the visible provisions below.',
+    '## Highest-Priority Findings',
+    formatMarkdownList(priorityFindings),
     '## Key Obligations',
     formatMarkdownList(obligationItems),
     '## Deadlines',
@@ -380,10 +383,10 @@ export function renderCourtOrderAnalysisMarkdown(
     formatMarkdownList(riskItems),
     '## Recommended Next Steps',
     [
-      '1. Use the cited pages and source details when drafting filings, notices, or messages.',
+      '1. Create a deadline checklist from the cited provisions.',
       '2. Calendar every supported deadline and recurring obligation.',
-      '3. Draft required co-parenting or notice messages from the exact order language.',
-      '4. Flag incomplete or ambiguous provisions for attorney review.',
+      '3. Draft required co-parenting, AppClose, or notice messages from the exact order language.',
+      '4. Prepare filing language from the supported facts and keep page citations attached.',
     ].join('\n'),
     '## Source Details',
     'Source details are available below in the collapsed source panel.',

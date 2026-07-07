@@ -284,12 +284,15 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
 
     expect(content).toContain('# Court Order Analysis');
     expect(content).toContain('## Executive Summary');
+    expect(content).toContain('## Highest-Priority Findings');
     expect(content).toContain('## Key Obligations');
     expect(content).toContain('## Deadlines');
     expect(content).toContain('## Risks and Cautions');
     expect(content).toContain('## Recommended Next Steps');
     expect(content).toContain('## Source Details');
     expect(content).toContain('[p. 4]');
+    expect(content).toContain('Create a deadline checklist from the cited provisions.');
+    expect(content).toContain('Prepare filing language from the supported facts');
     expect(content).toContain('Respondent \\| shall pay $500 no later than June 14');
     expect(content).not.toContain('sourceId');
     expect(content).not.toContain('chunkId');

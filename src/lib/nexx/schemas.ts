@@ -67,8 +67,8 @@ const exhibitReadySchema = {
   required: ['exhibits'],
 } as const;
 
-const judgeSimulationSchema = {
-  type: ['object', 'null'],
+const judgeSimulationObjectSchema = {
+  type: 'object',
   additionalProperties: false,
   properties: {
     credibilityScore: { type: 'number' },
@@ -90,8 +90,13 @@ const judgeSimulationSchema = {
   ],
 } as const;
 
-const oppositionSimulationSchema = {
+const judgeSimulationSchema = {
+  ...judgeSimulationObjectSchema,
   type: ['object', 'null'],
+} as const;
+
+const oppositionSimulationObjectSchema = {
+  type: 'object',
   additionalProperties: false,
   properties: {
     likelyAttackPoints: stringArray,
@@ -102,8 +107,13 @@ const oppositionSimulationSchema = {
   required: ['likelyAttackPoints', 'framingRisks', 'whatNeedsTightening', 'preemptionSuggestions'],
 } as const;
 
-const confidenceSchema = {
+const oppositionSimulationSchema = {
+  ...oppositionSimulationObjectSchema,
   type: ['object', 'null'],
+} as const;
+
+const confidenceObjectSchema = {
+  type: 'object',
   additionalProperties: false,
   properties: {
     confidence: { type: 'string', enum: ['high', 'moderate', 'low'] },
@@ -112,6 +122,11 @@ const confidenceSchema = {
     missingSupport: stringArray,
   },
   required: ['confidence', 'basis', 'evidenceSufficiency', 'missingSupport'],
+} as const;
+
+const confidenceSchema = {
+  ...confidenceObjectSchema,
+  type: ['object', 'null'],
 } as const;
 
 const legalDocumentAnswerSchema = {
@@ -437,21 +452,7 @@ export const PARSED_LEGAL_DOCUMENT_SCHEMA = {
 export const JUDGE_SIMULATION_SCHEMA = {
   type: 'json_schema' as const,
   name: 'judge_simulation',
-  schema: {
-    type: 'object',
-    additionalProperties: false,
-    properties: {
-      credibilityScore: { type: 'number' },
-      neutralityScore: { type: 'number' },
-      clarityScore: { type: 'number' },
-      strengths: { type: 'array', items: { type: 'string' } },
-      weaknesses: { type: 'array', items: { type: 'string' } },
-      likelyCourtInterpretation: { type: 'string' },
-      improvementSuggestions: { type: 'array', items: { type: 'string' } },
-    },
-    required: ['credibilityScore', 'neutralityScore', 'clarityScore',
-               'strengths', 'weaknesses', 'likelyCourtInterpretation', 'improvementSuggestions'],
-  },
+  schema: judgeSimulationObjectSchema,
 };
 
 // ---------------------------------------------------------------------------
@@ -461,17 +462,7 @@ export const JUDGE_SIMULATION_SCHEMA = {
 export const OPPOSITION_SIMULATION_SCHEMA = {
   type: 'json_schema' as const,
   name: 'opposition_simulation',
-  schema: {
-    type: 'object',
-    additionalProperties: false,
-    properties: {
-      likelyAttackPoints: { type: 'array', items: { type: 'string' } },
-      framingRisks: { type: 'array', items: { type: 'string' } },
-      whatNeedsTightening: { type: 'array', items: { type: 'string' } },
-      preemptionSuggestions: { type: 'array', items: { type: 'string' } },
-    },
-    required: ['likelyAttackPoints', 'framingRisks', 'whatNeedsTightening', 'preemptionSuggestions'],
-  },
+  schema: oppositionSimulationObjectSchema,
 };
 
 // ---------------------------------------------------------------------------
@@ -511,17 +502,7 @@ export const EVIDENCE_PACKET_SCHEMA = {
 export const LEGAL_CONFIDENCE_SCHEMA = {
   type: 'json_schema' as const,
   name: 'legal_confidence',
-  schema: {
-    type: 'object',
-    additionalProperties: false,
-    properties: {
-      confidence: { type: 'string', enum: ['high', 'moderate', 'low'] },
-      basis: { type: 'string' },
-      evidenceSufficiency: { type: 'string' },
-      missingSupport: { type: 'array', items: { type: 'string' } },
-    },
-    required: ['confidence', 'basis', 'evidenceSufficiency', 'missingSupport'],
-  },
+  schema: confidenceObjectSchema,
 };
 
 // ---------------------------------------------------------------------------

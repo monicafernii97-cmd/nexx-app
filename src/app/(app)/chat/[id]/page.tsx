@@ -44,6 +44,7 @@ export default function ConversationPage() {
     const pendingInitialSentRef = useRef(false);
     const hasActiveTurn = (activeTurns?.length ?? 0) > 0;
     const isGenerating = isStreaming || hasActiveTurn;
+    const hasDraftAssistantMessage = Boolean(messages?.some((message) => message.role === 'assistant' && message.status === 'draft'));
 
     // ── Theme state (persisted to localStorage) ──
     const [theme, setTheme] = useState<ChatTheme>('dark');
@@ -463,11 +464,6 @@ export default function ConversationPage() {
                 </button>
             </motion.div>
 
-            {/* Analysis Status Strip */}
-            <div className="px-4 lg:px-8">
-                <AnalysisStatusStrip steps={analysisSteps} visible={isGenerating} />
-            </div>
-
             {/* Messages Area */}
             <div
                 ref={scrollContainerRef}
@@ -568,8 +564,8 @@ export default function ConversationPage() {
                     />
                 )}
 
-                {/* Loading indicator (Pre-stream) — now covered by AnalysisStatusStrip */}
-                {isGenerating && !streamingContent && (
+                {/* Pre-draft analysis status. Once Convex writes a safe draft, MessageBubble owns the status card. */}
+                {isGenerating && !streamingContent && !hasDraftAssistantMessage && (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -582,20 +578,8 @@ export default function ConversationPage() {
                                 }`}>
                                 <span className="text-white font-serif font-bold text-[14px] animate-pulse"><i>N</i></span>
                             </div>
-                            <div className={`flex items-center gap-2 px-4 py-3 rounded-2xl ${isLight ? 'bg-gray-100' : 'bg-white/10'}`}>
-                                {[0, 1, 2].map((j) => (
-                                    <motion.div
-                                        key={j}
-                                        className={`w-2 h-2 rounded-full ${isLight ? 'bg-blue-500' : 'bg-white'}`}
-                                        animate={{ y: [0, -6, 0], opacity: [0.4, 1, 0.4] }}
-                                        transition={{
-                                            duration: 0.8,
-                                            repeat: Infinity,
-                                            delay: j * 0.15,
-                                            ease: "easeInOut"
-                                        }}
-                                    />
-                                ))}
+                            <div className="max-w-[min(92vw,48rem)]">
+                                <AnalysisStatusStrip steps={analysisSteps} visible />
                             </div>
                         </div>
                     </motion.div>

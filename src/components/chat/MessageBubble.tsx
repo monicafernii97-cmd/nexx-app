@@ -9,6 +9,7 @@ import type { NexxArtifacts, JudgeSimulationResult, OppositionSimulationResult }
 import { PlayAloudButton } from '@/components/voice';
 import { AssistantMessageCard } from './AssistantMessageCard';
 import type { AssistantResponseViewModel, ActionType, DetectedPattern, LocalProcedureInfo } from '@/lib/ui-intelligence/types';
+import { ANALYSIS_STATUS_UI_KIND, SAFE_ANALYSIS_DRAFT_MESSAGE } from '@/lib/chat/analysisStatus';
 import { looksLikeInternalStructuredPayload, sanitizeVisibleAssistantContent } from '@/lib/chat/internalLeakGuard';
 
 export type ChatTheme = 'dark' | 'light';
@@ -158,6 +159,12 @@ function getDocumentCitations(metadata: unknown) {
             citationVerifierStatus: status as DocumentCitationMetadata['citationVerifierStatus'],
         }];
     }).slice(0, 12);
+}
+
+function getMetadataString(metadata: unknown, key: string) {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return undefined;
+    const value = (metadata as Record<string, unknown>)[key];
+    return typeof value === 'string' ? value : undefined;
 }
 
 function getSourceLabel(source: DocumentSourceMetadata['source']) {
@@ -671,7 +678,12 @@ export default function MessageBubble({
     );
     const documentSources = useMemo(() => getDocumentSources(metadata), [metadata]);
     const documentCitations = useMemo(() => getDocumentCitations(metadata), [metadata]);
+    const metadataUiKind = getMetadataString(metadata, 'uiKind');
     const hasInternalAssistantContent = role === 'assistant' && looksLikeInternalStructuredPayload(content);
+    const isAnalysisStatusMessage = role === 'assistant' && (
+        metadataUiKind === ANALYSIS_STATUS_UI_KIND ||
+        (isStreaming && content.trim() === SAFE_ANALYSIS_DRAFT_MESSAGE)
+    );
     const shouldSanitizeAssistantContent = role === 'assistant' && (!isStreaming || hasInternalAssistantContent);
     const sanitizedAssistantContent = shouldSanitizeAssistantContent
         ? sanitizeVisibleAssistantContent(content)
@@ -860,6 +872,8 @@ export default function MessageBubble({
                             </div>
                         )}
                     </>
+                ) : isAnalysisStatusMessage ? (
+                    <AnalysisStatusCard isLight={isLight} />
                 ) : structuredViewModel && !isStreaming ? (
                     <>
                         <AssistantMessageCard

@@ -98,7 +98,7 @@ function fileStatusLabel(state: ChatComposerFileState) {
     if (state.status === 'processing_queued') return 'Preparing sources';
     if (state.status === 'processing') return 'Reading document';
     if (state.status === 'ready') return 'Ready';
-    if (state.status === 'partial') return 'Needs verification';
+    if (state.status === 'partial') return 'Ready with extracted text';
     if (isNonRetryableFailure(state.status) || state.retryable === false) return 'Replace file';
     if (isFailureStatus(state.status)) return 'Failed';
     return 'Selected';

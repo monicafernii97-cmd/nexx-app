@@ -28,6 +28,12 @@ const DRAFT_PATTERNS = [
   /\b(court[-\s]?ready|filing|submit.*court)\b/i,
 ];
 
+const EXPLICIT_DRAFT_PATTERNS = [
+  /\b(draft|prepare|generate)\b.{0,80}\b(motion|petition|declaration|pleading|notice|proposed\s+order|response|certificate|filing|draft)\b/i,
+  /\b(write|create)\b.{0,80}\b(motion|petition|declaration|pleading|response|certificate|filing|draft)\b/i,
+  /\b(court[-\s]?ready|filing-ready)\b.{0,80}\b(motion|petition|declaration|pleading|notice|proposed\s+order|response|certificate|draft)\b/i,
+];
+
 const JUDGE_LENS_PATTERNS = [
   /\b(judge|court.*see|how.*look|credib|neutral|perception)\b/i,
   /\b(judge.*think|court.*view|magistrate)\b/i,
@@ -94,6 +100,12 @@ export function classifyMessage(
     return buildResult('safety_escalation');
   }
 
+  // Explicit drafting commands should win over document words like "order" so
+  // the assistant drafts with document and official-source context available.
+  if (matchesAny(text, EXPLICIT_DRAFT_PATTERNS)) {
+    return buildResult('court_ready_drafting', documentReference);
+  }
+
   // Document follow-ups should win over generic procedure terms like "deadline".
   if (matchesAny(text, DOCUMENT_ANALYSIS_PATTERNS) || documentReference.referencesDocument) {
     return buildResult('document_analysis', documentReference);
@@ -145,7 +157,7 @@ export function classifyMessage(
 function buildToolPlan(mode: RouteMode): ToolPlan {
   return {
     useFileSearch: ['document_analysis', 'court_ready_drafting', 'judge_lens_strategy', 'pattern_analysis'].includes(mode),
-    useWebSearch: ['local_procedure', 'direct_legal_answer', 'document_analysis'].includes(mode),
+    useWebSearch: ['local_procedure', 'direct_legal_answer', 'document_analysis', 'court_ready_drafting'].includes(mode),
     useCodeInterpreter: ['pattern_analysis', 'document_analysis'].includes(mode),
     useLocalCourtRetriever: ['local_procedure', 'direct_legal_answer', 'court_ready_drafting'].includes(mode),
     needsClarification: false, // Set by the model if needed

@@ -1125,7 +1125,7 @@ export const getGenerationContext = internalQuery({
         const turn = await ctx.db.get(args.turnId);
         if (!turn) return null;
 
-        const [conversation, user, summaryDoc, caseGraphDoc] = await Promise.all([
+        const [conversation, user, summaryDoc, caseGraphDoc, courtSettings] = await Promise.all([
             ctx.db.get(turn.conversationId),
             ctx.db.get(turn.userId),
             ctx.db
@@ -1136,9 +1136,16 @@ export const getGenerationContext = internalQuery({
                 .query('caseGraphs')
                 .withIndex('by_userId', (q) => q.eq('userId', turn.userId))
                 .first(),
+            ctx.db
+                .query('userCourtSettings')
+                .withIndex('by_user', (q) => q.eq('userId', turn.userId))
+                .first(),
         ]);
 
         if (!conversation || !user?.clerkId) return null;
+
+        const activeCase = conversation.caseId ? await ctx.db.get(conversation.caseId) : null;
+        const safeActiveCase = activeCase?.userId === turn.userId ? activeCase : null;
 
         const recentMessages = await ctx.db
             .query('messages')
@@ -1381,6 +1388,14 @@ export const getGenerationContext = internalQuery({
             turn,
             conversation,
             user,
+            courtSettings,
+            activeCase: safeActiveCase
+                ? {
+                    title: safeActiveCase.title,
+                    description: safeActiveCase.description,
+                    status: safeActiveCase.status,
+                }
+                : null,
             summaryDoc,
             caseGraphDoc,
             conversationDocumentState: documentState,

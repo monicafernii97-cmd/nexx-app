@@ -14,6 +14,7 @@ import { buildArtifactPrompt } from '../src/lib/nexx/prompts/artifactPrompt';
 import { buildContextPrompt, type ContextPacket } from '../src/lib/nexx/prompts/contextPrompt';
 import { NEXX_RESPONSE_SCHEMA } from '../src/lib/nexx/schemas';
 import { ANALYSIS_STATUS_UI_KIND, SAFE_ANALYSIS_DRAFT_MESSAGE } from '../src/lib/chat/analysisStatus';
+import { buildOfficialLegalResearchTargets } from '../src/lib/nexx/legalResearchTargets';
 import { recoverStructuredOutput } from '../src/lib/nexx/recovery/recoverStructuredOutput';
 import { suppressWeakArtifacts } from '../src/lib/nexx/recovery/suppressWeakArtifacts';
 import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
@@ -360,6 +361,77 @@ function buildUserContext(rawJson?: string): ContextPacket {
     }
 }
 
+function mergeAccountCourtContext(contextPacket: ContextPacket, context: GenerationContext) {
+    const court = context.courtSettings;
+    const activeCase = context.activeCase;
+    if (!court && !activeCase) return;
+
+    const accountCourtContext: NonNullable<ContextPacket['accountCourtContext']> = {};
+    if (court) {
+        accountCourtContext.state = asString(court.state);
+        accountCourtContext.county = asString(court.county);
+        accountCourtContext.courtName = asString(court.courtName);
+        accountCourtContext.judicialDistrict = asString(court.judicialDistrict);
+        accountCourtContext.assignedJudge = asString(court.assignedJudge);
+        accountCourtContext.causeNumber = asString(court.causeNumber);
+        accountCourtContext.caseTitleFormat = asString(court.caseTitleFormat);
+        accountCourtContext.caseTitleCustom = asString(court.caseTitleCustom);
+        accountCourtContext.petitionerLegalName = asString(court.petitionerLegalName);
+        accountCourtContext.respondentLegalName = asString(court.respondentLegalName);
+        accountCourtContext.petitionerRole = court.petitionerRole;
+        accountCourtContext.children = asChildren(court.children);
+    }
+    if (activeCase) {
+        accountCourtContext.activeCaseTitle = asString(activeCase.title);
+        accountCourtContext.activeCaseDescription = asString(activeCase.description);
+    }
+
+    if (
+        accountCourtContext.state ||
+        accountCourtContext.county ||
+        accountCourtContext.courtName ||
+        accountCourtContext.causeNumber ||
+        accountCourtContext.caseTitleCustom ||
+        accountCourtContext.petitionerLegalName ||
+        accountCourtContext.respondentLegalName ||
+        accountCourtContext.children?.length ||
+        accountCourtContext.activeCaseTitle ||
+        accountCourtContext.activeCaseDescription
+    ) {
+        contextPacket.accountCourtContext = accountCourtContext;
+    }
+}
+
+function addOfficialResearchTargets(
+    contextPacket: ContextPacket,
+    routeMode: RouteMode,
+    message: string,
+    useWebSearch: boolean
+) {
+    if (!useWebSearch) return;
+
+    const state =
+        contextPacket.accountCourtContext?.state ??
+        contextPacket.userProfile?.state ??
+        contextPacket.caseGraph?.jurisdiction?.state;
+    const county =
+        contextPacket.accountCourtContext?.county ??
+        contextPacket.userProfile?.county ??
+        contextPacket.caseGraph?.jurisdiction?.county;
+    const courtName = contextPacket.accountCourtContext?.courtName;
+    const targets = buildOfficialLegalResearchTargets({
+        state,
+        county,
+        courtName,
+        routeMode,
+        message,
+    });
+
+    if (targets.length > 0) {
+        contextPacket.officialResearchTargets = targets;
+    }
+}
+
 function sanitizePromptMetadata(value?: string) {
     if (!value) return undefined;
     return value
@@ -381,6 +453,25 @@ type GenerationContext = {
     };
     conversation?: {
         vectorStoreId?: string;
+    } | null;
+    courtSettings?: {
+        state?: string;
+        county?: string;
+        courtName?: string;
+        judicialDistrict?: string;
+        assignedJudge?: string;
+        causeNumber?: string;
+        caseTitleFormat?: string;
+        caseTitleCustom?: string;
+        respondentLegalName?: string;
+        petitionerLegalName?: string;
+        petitionerRole?: 'petitioner' | 'respondent';
+        children?: { name: string; age: number }[];
+    } | null;
+    activeCase?: {
+        title?: string;
+        description?: string;
+        status?: 'active' | 'archived';
     } | null;
     summaryDoc?: { summary: string } | null;
     caseGraphDoc?: { graphJson: string } | null;
@@ -1080,6 +1171,7 @@ async function generateWithFallbacks({
     const temperature = context.turn.temperature ?? routerResult.temperature;
 
     const contextPacket = buildUserContext(context.turn.userContextJson);
+    mergeAccountCourtContext(contextPacket, context);
     if (context.summaryDoc) {
         contextPacket.conversationSummary = parseContextJson(
             context.summaryDoc.summary,
@@ -1092,6 +1184,7 @@ async function generateWithFallbacks({
             sanitizeCaseGraph,
         );
     }
+    addOfficialResearchTargets(contextPacket, routeMode, context.turn.message, routerResult.toolPlan.useWebSearch);
 
     const contextPrompt = buildContextPrompt(contextPacket);
     const promptBundle = buildInput(context, routeMode, contextPrompt);

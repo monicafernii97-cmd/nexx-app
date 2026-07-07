@@ -27,9 +27,11 @@ The user has uploaded documents to a vector store. You have access to file_searc
     sections.push(`
 ### Web Search
 You have access to web_search for retrieving current legal information.
-- Use it for local court rules, filing procedures, and jurisdiction-specific requirements.
-- Prefer .gov and official court domains.
-- Always note the source URL when citing retrieved information.`);
+- Use it for local court rules, filing procedures, statutes, filing forms, service requirements, and jurisdiction-specific drafting requirements.
+- Prefer official state judiciary, statute, court, county clerk, district clerk, and court self-help domains before blogs or private legal marketing pages.
+- Use the Official Legal Research Targets in the context packet when they are present.
+- Separate uploaded-document facts from external law/procedure sources.
+- Cite official source URLs for legal/procedure statements that are not directly from the uploaded document.`);
   }
 
   if (toolPlan.useCodeInterpreter) {
@@ -46,7 +48,8 @@ You have access to code_interpreter for structured data tasks.
 The system will inject local court source data when available.
 - Court rules are retrieved first, then you normalize them — NEVER invent rules.
 - If a retrieved source conflicts with your knowledge, prefer the retrieved source.
-- Always provide a court-ready summary alongside plain-language explanations.`);
+- Always provide a court-ready summary alongside plain-language explanations.
+- When drafting, use saved court settings for caption/court/party details if present, and ask only for fields that are truly missing.`);
   }
 
   sections.push(`

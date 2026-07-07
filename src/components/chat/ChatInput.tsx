@@ -382,11 +382,21 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
         }
     }, [disabled, isListening, getSpeechRecognition, updateInput]);
 
-    const handleFileSelect = useCallback(() => {
-        autoSendFileIntentRef.current = null;
-        setSelectedFileIntent('attachment');
-        fileInputRef.current?.click();
+    const openFilePicker = useCallback((intent: FilePromptIntent, options?: { autoSend?: boolean }) => {
+        autoSendFileIntentRef.current = options?.autoSend && intent === 'court_order' ? 'court_order' : null;
+        setSelectedFileIntent(intent);
+        setMicError(null);
+
+        const fileInputElement = fileInputRef.current;
+        if (!fileInputElement) return;
+        fileInputElement.accept = getChatUploadAccept();
+        fileInputElement.value = '';
+        fileInputElement.click();
     }, []);
+
+    const handleFileSelect = useCallback(() => {
+        openFilePicker('attachment');
+    }, [openFilePicker]);
 
     const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -482,12 +492,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
 
     const handleQuickActionClick = useCallback((actionId: string) => {
         if (actionId === 'analyze_court_order') {
-            setSelectedFileIntent('court_order');
-            autoSendFileIntentRef.current = 'court_order';
-            if (fileInputRef.current) {
-                fileInputRef.current.accept = getChatUploadAccept();
-                fileInputRef.current.click();
-            }
+            openFilePicker('court_order', { autoSend: true });
             return;
         }
 
@@ -507,7 +512,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             updateInput(prefills[actionId] ?? '');
             textareaRef.current?.focus();
         }
-    }, [onQuickAction, updateInput]);
+    }, [onQuickAction, openFilePicker, updateInput]);
 
     const chipButtonClasses = `
         inline-flex items-center gap-1.5 px-3 py-1.5
@@ -542,14 +547,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
 
                 <button
                     type="button"
-                    onClick={() => {
-                        autoSendFileIntentRef.current = null;
-                        setSelectedFileIntent('thread');
-                        if (fileInputRef.current) {
-                            fileInputRef.current.accept = getChatUploadAccept();
-                            fileInputRef.current.click();
-                        }
-                    }}
+                    onClick={() => openFilePicker('thread')}
                     disabled={disabled || isFileBusy}
                     className={chipButtonClasses}
                 >
@@ -558,14 +556,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                 </button>
                 <button
                     type="button"
-                    onClick={() => {
-                        autoSendFileIntentRef.current = null;
-                        setSelectedFileIntent('court_order');
-                        if (fileInputRef.current) {
-                            fileInputRef.current.accept = getChatUploadAccept();
-                            fileInputRef.current.click();
-                        }
-                    }}
+                    onClick={() => openFilePicker('court_order')}
                     disabled={disabled || isFileBusy}
                     className={chipButtonClasses}
                 >
@@ -627,8 +618,9 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             <input
                 ref={fileInputRef}
                 type="file"
-                className="hidden"
+                className="sr-only"
                 accept={getChatUploadAccept()}
+                aria-label="Choose a file to upload"
                 onChange={handleFileChange}
             />
 

@@ -167,6 +167,74 @@ describe('ChatInput file send flow', () => {
     );
   });
 
+  it('Upload Order opens the file picker and sends with the court-order intent after selection', async () => {
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    const { container, root } = await renderChatInput(onSend);
+    roots.push(root);
+    const picker = fileInput(container);
+    const clickSpy = vi.spyOn(picker, 'click').mockImplementation(() => undefined);
+    const file = makeFile('signed-order.pdf');
+
+    await act(async () => {
+      buttonWithText(container, 'Upload Order')?.click();
+    });
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      setFiles(picker, [file]);
+      picker.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('signed-order.pdf');
+    expect(onSend).not.toHaveBeenCalled();
+
+    await act(async () => {
+      buttonWithText(container, 'Send file')?.click();
+    });
+
+    expect(onSend).toHaveBeenCalledWith(
+      'Analyze this court order and extract the key obligations, deadlines, risks, and recommended next steps.',
+      expect.objectContaining({
+        file,
+        intent: 'court_order',
+      }),
+      undefined,
+      expect.any(Object),
+    );
+  });
+
+  it('Analyze Court Order opens the file picker and auto-sends the selected court order', async () => {
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    const { container, root } = await renderChatInput(onSend);
+    roots.push(root);
+    const picker = fileInput(container);
+    const clickSpy = vi.spyOn(picker, 'click').mockImplementation(() => undefined);
+    const file = makeFile('signed-order.pdf');
+
+    await act(async () => {
+      buttonWithText(container, 'Analyze Court Order')?.click();
+    });
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      setFiles(picker, [file]);
+      picker.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(onSend).toHaveBeenCalledWith(
+      'Analyze this court order and extract the key obligations, deadlines, risks, and recommended next steps.',
+      expect.objectContaining({
+        file,
+        intent: 'court_order',
+      }),
+      undefined,
+      expect.any(Object),
+    );
+    expect(container.textContent).not.toContain('signed-order.pdf');
+  });
+
   it('leaves the idle attached state when upload callbacks report processing', async () => {
     const pending = deferred();
     const onSend = vi.fn((_message, _fileState, _mode, callbacks) => {

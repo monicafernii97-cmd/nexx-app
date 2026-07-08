@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
-import { classifyMessage } from '@/lib/nexx/router';
+import { classifyMessage, preserveOrUpgradeDocumentRoute } from '@/lib/nexx/router';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { getModelForRoute, type SubscriptionTier } from '@/lib/tiers';
 
@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
   const classified = classifyMessage(message);
   const routerResult =
     sanitizedAttachments.length > 0 && classified.mode !== 'safety_escalation'
-      ? { ...classified, mode: 'document_analysis' as const }
+      ? preserveOrUpgradeDocumentRoute(classified, message)
       : classified;
   console.info('[Chat] Accepting chat turn', {
     requestId: turnRequestId,
@@ -215,6 +215,9 @@ export async function POST(req: NextRequest) {
     direct_legal_answer: 'chat',
     local_procedure: 'chat',
     document_analysis: 'analysis',
+    order_interpretation: 'analysis',
+    possession_access_schedule: 'analysis',
+    party_message_draft: 'chat',
     judge_lens_strategy: 'judge_sim',
     court_ready_drafting: 'deep_draft',
     pattern_analysis: 'analysis',

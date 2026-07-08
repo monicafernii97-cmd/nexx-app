@@ -12,10 +12,12 @@ describe('official legal research targets', () => {
     expect(result.toolPlan.useLocalCourtRetriever).toBe(true);
   });
 
-  it('keeps ordinary order and notice questions in document-analysis mode', () => {
+  it('routes ordinary order and notice questions through interpretation mode with research available', () => {
     const result = classifyMessage('What does the order say about notice?');
 
-    expect(result.mode).toBe('document_analysis');
+    expect(result.mode).toBe('order_interpretation');
+    expect(result.toolPlan.useWebSearch).toBe(true);
+    expect(result.toolPlan.useLocalCourtRetriever).toBe(true);
   });
 
   it('builds state and county official-source targets from saved location', () => {

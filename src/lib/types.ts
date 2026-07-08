@@ -26,11 +26,25 @@ export type RouteMode =
   | 'direct_legal_answer'
   | 'local_procedure'
   | 'document_analysis'
+  | 'order_interpretation'
+  | 'possession_access_schedule'
+  | 'party_message_draft'
   | 'judge_lens_strategy'
   | 'court_ready_drafting'
   | 'pattern_analysis'
   | 'support_grounding'
   | 'safety_escalation';
+
+export type LegalIntent =
+  | 'direct_order_interpretation'
+  | 'possession_access_schedule'
+  | 'rights_obligations_question'
+  | 'deadline_or_timing_question'
+  | 'procedure_question'
+  | 'draft_response_to_other_party'
+  | 'court_filing_draft'
+  | 'evidence_strategy'
+  | 'general_summary';
 
 // ---------------------------------------------------------------------------
 // Tool Plan — output of the router, tells the chat route which tools to wire
@@ -52,6 +66,7 @@ export interface RouterResult {
   mode: RouteMode;
   toolPlan: ToolPlan;
   temperature: number;
+  legalIntent?: LegalIntent;
   documentReference?: DocumentReferenceDetection;
   requiresDocumentRetrieval?: boolean;
   requiresClarification?: boolean;

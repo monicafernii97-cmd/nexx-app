@@ -576,8 +576,14 @@ function retrievalQueryTypeForDetection(
     }
     if (detection.referenceType === 'metadata_lookup') return 'metadata';
     if (detection.referenceType === 'deadline_lookup' || detection.requestedDates.length > 0) return 'timeline';
-    if (routeMode === 'document_analysis' || detection.referencesDocument) return 'interpretation';
+    if (isDocumentContextRoute(routeMode) || detection.referencesDocument) return 'interpretation';
     return 'summary';
+}
+
+function isDocumentContextRoute(routeMode?: RouteMode) {
+    return routeMode === 'document_analysis' ||
+        routeMode === 'order_interpretation' ||
+        routeMode === 'possession_access_schedule';
 }
 
 function documentRetrievalRunCounts(attachments: AttachmentContext[]) {
@@ -767,8 +773,8 @@ function selectAttachmentContextsForPrompt(
     const availableDocuments = context.availableDocumentContexts ?? [];
     const shouldLoadStoredDocuments =
         availableDocuments.length > 0 &&
-        (routeMode === 'document_analysis' ||
-            routerResult.mode === 'document_analysis' ||
+        (isDocumentContextRoute(routeMode) ||
+            isDocumentContextRoute(routerResult.mode) ||
             routerResult.documentReference?.referencesDocument ||
             detectDocumentReference(context.turn.message).referencesDocument);
 
@@ -906,8 +912,8 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
     );
     const shouldUseUploadedDocumentMemory =
         attachmentContexts.length > 0 &&
-        (routeMode === 'document_analysis' ||
-            routerResult.mode === 'document_analysis' ||
+        (isDocumentContextRoute(routeMode) ||
+            isDocumentContextRoute(routerResult.mode) ||
             documentReference.referencesDocument);
     const preservePastedHistory = messageExplicitlyRequestsPastedDocumentText(context.turn.message);
 
@@ -985,7 +991,7 @@ function determineRetrievalReason(
     if (selected.some((attachment) => attachment.source === 'user_private_memory')) return 'user_private_memory' as const;
     if (selected.some((attachment) => attachment.source === 'shared_memory')) return 'shared_memory' as const;
     if (documentReference.referencesDocument) return 'recent_reference' as const;
-    if (routeMode === 'document_analysis') return 'document_analysis_route' as const;
+    if (isDocumentContextRoute(routeMode)) return 'document_analysis_route' as const;
     return 'conversation_memory' as const;
 }
 
@@ -1045,7 +1051,7 @@ function shouldRequireDocumentAnswer(args: {
     return args.attachmentContexts.length > 0 &&
         args.sourcePackets.length > 0 &&
         (
-            args.routeMode === 'document_analysis' ||
+            isDocumentContextRoute(args.routeMode) ||
             args.documentReference.referencesDocument ||
             args.documentReference.requiresExactText ||
             args.documentReference.requiresPageOrSectionCitation

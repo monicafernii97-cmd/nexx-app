@@ -35,6 +35,21 @@ export const RESPONSE_MODE_SKELETONS: Record<RouteMode, ResponseModeSkeleton> = 
     sections: ['Direct Answer', 'Document Language', 'Clause Hierarchy', 'Strongest and Weakest Interpretations', 'Risk', 'Next Step or Draft'],
     description: 'Analysis of an uploaded document, order, motion, or filing',
   },
+  order_interpretation: {
+    mode: 'order_interpretation',
+    sections: ['Direct Answer', 'Controlling Language', 'Competing Language', 'Why It Controls', 'Practical Meaning', 'Suggested Next Step'],
+    description: 'Direct interpretation of what an uploaded court order or filing means',
+  },
+  possession_access_schedule: {
+    mode: 'possession_access_schedule',
+    sections: ['Direct Answer', 'Controlling Possession Clause', 'Competing Clause', 'Timing', 'Practical Meaning', 'Suggested Response'],
+    description: 'Possession, access, exchange, holiday, weekend, or schedule interpretation',
+  },
+  party_message_draft: {
+    mode: 'party_message_draft',
+    sections: ['Draft Message', 'Why This Wording Fits', 'Optional Firmer Version', 'Next Step'],
+    description: 'Plain-language message drafting for AppClose, co-parenting, notice, or other-party communication',
+  },
   judge_lens_strategy: {
     mode: 'judge_lens_strategy',
     sections: ["Judge's View", 'Strong Facts', 'Weak Spots', 'Neutral Framing', 'Next Steps', 'Court-Appropriate Version'],

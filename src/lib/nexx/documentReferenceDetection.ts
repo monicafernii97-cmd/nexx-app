@@ -42,14 +42,14 @@ export type DocumentReferenceDetection = {
 };
 
 const DOCUMENT_HINT_PATTERNS = [
-  /\b((?:uploaded|attached|shared|prior|previous|current|this|that|the)\s+(?:court\s+order|order|document|file|pdf|upload))\b/gi,
+  /\b((?:uploaded|attached|shared|prior|previous|current|this|that|the|my|our)\s+(?:court\s+order|order|document|file|pdf|upload))\b/gi,
   /\b(court\s+order|temporary\s+order|temporary\s+orders|amended\s+order|amended\s+temporary\s+order|final\s+order|parenting\s+plan|docket\s+sheet|exhibit|notice|motion|petition)\b/gi,
   /\b(?:refer\s+back|look\s+back|pull\s+up|open\s+(?:it|that|the\s+(?:file|document|order))|double[-\s]?check|verify|re-?read|review\s+again)\b/gi,
 ];
 
 const IMPLICIT_FOLLOW_UP_PATTERNS = [
-  /\b(?:what|when|where|who|does|did|can|should|must|shall).{0,80}\b(?:it|that|the\s+(?:order|document|file|pdf))\b/i,
-  /\b(?:it|that|the\s+(?:order|document|file|pdf)).{0,80}\b(?:say|state|require|mean|allow|prohibit|mention|include)\b/i,
+  /\b(?:what|when|where|who|does|did|can|should|must|shall).{0,80}\b(?:it|that|(?:the|my|our)\s+(?:order|document|file|pdf))\b/i,
+  /\b(?:it|that|(?:the|my|our)\s+(?:order|document|file|pdf)).{0,80}\b(?:say|state|require|mean|allow|prohibit|mention|include)\b/i,
 ];
 
 const DEADLINE_TERMS = [
@@ -187,13 +187,15 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
   const asksForSource = /\b(?:where\s+(?:does|did)\s+it\s+say|where\s+exactly|what\s+page|show\s+me\s+where|cite)\b/i.test(text);
   const asksForComparison = /\b(?:compare|difference|different|amended|prior|previous|original)\b/i.test(text) && documentHints.length > 0;
   const asksForSpecificLocation = /\b(?:section|paragraph|page|clause)\s+([0-9]+|[ivxlcdm]+|[a-z])\b/i.test(text);
+  const documentObjectPattern = /\b(?:it|that|(?:the|my|our)\s+(?:order|document|file|pdf))\b/i;
+  const asksIfDocumentSays = /\b(?:does|did|is)\s+(?:it|that|(?:the|my|our)\s+(?:order|document|file|pdf)).{0,80}\b(?:say|use|mention|include)\b/i.test(text);
   const hasHolidayPossessionSignal =
     holidayTerms.length > 0 &&
     /\b(?:possession|schedule|start|starts|begin|begins|end|ends|pickup|exchange|weekend|thursday|friday|saturday|sunday|provision|clause|paragraph)\b/i.test(text);
   const hasDocumentSignal = documentHints.length > 0 || requestedDocumentTypes.length > 0;
   const hasSectionSignal = requestedSections.length > 0 && (hasDocumentSignal || hasImplicitFollowUp || asksForSpecificLocation);
   const hasDeadlineSignal = deadlineTerms.length > 0 && (hasDocumentSignal || hasImplicitFollowUp);
-  const hasExactSignal = (asksForQuote || /\b(?:does|did|is)\s+(?:it|the\s+(?:order|document|file|pdf)).{0,80}\b(?:say|use|mention|include)\b/i.test(text)) &&
+  const hasExactSignal = (asksForQuote || asksIfDocumentSays) &&
     (hasDocumentSignal || hasImplicitFollowUp || exactTerms.length > 0 || hasHolidayPossessionSignal);
   const isGenericLegalQuestion =
     GENERIC_LEGAL_QUESTION_PATTERN.test(text) &&
@@ -241,6 +243,6 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
     requestedDocumentTypes,
     requiresExactText,
     requiresPageOrSectionCitation: requiresExactText || hasSectionSignal || asksForSource,
-    mayNeedClarification: asksForComparison || (/\b(?:the\s+order|the\s+document|it)\b/i.test(text) && !hasImplicitFollowUp && documentHints.length === 0),
+    mayNeedClarification: asksForComparison || (documentObjectPattern.test(text) && !hasImplicitFollowUp && documentHints.length === 0),
   };
 }

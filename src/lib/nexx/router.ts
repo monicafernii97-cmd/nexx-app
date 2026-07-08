@@ -7,8 +7,9 @@
  * Current: Regex heuristics (fast, no API call)
  */
 
-import type { RouteMode, ToolPlan, RouterResult } from '../types';
+import type { LegalIntent, RouteMode, ToolPlan, RouterResult } from '../types';
 import { detectDocumentReference, type DocumentReferenceDetection } from './documentReferenceDetection';
+import { classifyLegalIntent } from './legalIntent';
 
 // ---------------------------------------------------------------------------
 // Keyword/pattern maps for Phase 1 heuristic classification
@@ -68,6 +69,9 @@ const MODE_TEMPERATURES: Record<RouteMode, number> = {
   direct_legal_answer: 0.25,
   local_procedure: 0.2,
   document_analysis: 0.25,
+  order_interpretation: 0.2,
+  possession_access_schedule: 0.18,
+  party_message_draft: 0.25,
   judge_lens_strategy: 0.3,
   court_ready_drafting: 0.2,
   pattern_analysis: 0.3,
@@ -92,62 +96,113 @@ export function classifyMessage(
   _conversationSummary?: string,
   _activeMode?: RouteMode
 ): RouterResult {
+  void _conversationSummary;
+  void _activeMode;
+
   const text = message.toLowerCase();
   const documentReference = detectDocumentReference(message);
+  const legalIntent = classifyLegalIntent(message);
 
   // Safety-first: always check escalation first
   if (matchesAny(text, SAFETY_PATTERNS)) {
-    return buildResult('safety_escalation');
+    return buildResult('safety_escalation', undefined, legalIntent);
+  }
+
+  if (legalIntent === 'draft_response_to_other_party') {
+    return buildResult('party_message_draft', documentReference, legalIntent);
   }
 
   // Explicit drafting commands should win over document words like "order" so
   // the assistant drafts with document and official-source context available.
   if (matchesAny(text, EXPLICIT_DRAFT_PATTERNS)) {
-    return buildResult('court_ready_drafting', documentReference);
+    return buildResult('court_ready_drafting', documentReference, legalIntent);
   }
 
   // Document follow-ups should win over generic procedure terms like "deadline".
+  if (documentReference.referencesDocument && legalIntent === 'possession_access_schedule') {
+    return buildResult('possession_access_schedule', documentReference, legalIntent);
+  }
+
+  if (
+    documentReference.referencesDocument &&
+    (legalIntent === 'direct_order_interpretation' || legalIntent === 'rights_obligations_question')
+  ) {
+    return buildResult('order_interpretation', documentReference, legalIntent);
+  }
+
   if (matchesAny(text, DOCUMENT_ANALYSIS_PATTERNS) || documentReference.referencesDocument) {
-    return buildResult('document_analysis', documentReference);
+    return buildResult('document_analysis', documentReference, legalIntent);
   }
 
   // Local procedure — check BEFORE drafting so "how do I file" hits procedure
   if (matchesAny(text, PROCEDURE_PATTERNS)) {
-    return buildResult('local_procedure');
+    return buildResult('local_procedure', undefined, legalIntent);
   }
 
   // Court-ready drafting
   if (matchesAny(text, DRAFT_PATTERNS)) {
-    return buildResult('court_ready_drafting');
+    return buildResult('court_ready_drafting', undefined, legalIntent);
   }
 
   // Judge lens
   if (matchesAny(text, JUDGE_LENS_PATTERNS)) {
-    return buildResult('judge_lens_strategy');
+    return buildResult('judge_lens_strategy', undefined, legalIntent);
   }
 
   // Document analysis
   if (matchesAny(text, DOCUMENT_ANALYSIS_PATTERNS)) {
-    return buildResult('document_analysis', documentReference);
+    return buildResult('document_analysis', documentReference, legalIntent);
   }
 
   // Pattern analysis
   if (matchesAny(text, PATTERN_ANALYSIS_PATTERNS)) {
-    return buildResult('pattern_analysis');
+    return buildResult('pattern_analysis', undefined, legalIntent);
   }
 
   // Support/grounding
   if (matchesAny(text, SUPPORT_PATTERNS)) {
-    return buildResult('support_grounding');
+    return buildResult('support_grounding', undefined, legalIntent);
   }
 
   // Default: check if it's clearly a legal question
   if (/\b(law|legal|statute|code|section|rights?|custody|visitation|child\s+support|federal\s+holiday|state\s+holiday|local\s+holiday)\b/i.test(text)) {
-    return buildResult('direct_legal_answer');
+    return buildResult('direct_legal_answer', undefined, legalIntent);
   }
 
   // Truly adaptive
-  return buildResult('adaptive_chat');
+  return buildResult('adaptive_chat', undefined, legalIntent);
+}
+
+export function preserveOrUpgradeDocumentRoute(classified: RouterResult, message: string): RouterResult {
+  if (classified.mode === 'safety_escalation') return classified;
+
+  const legalIntent = classifyLegalIntent(message);
+  const documentReference = classified.documentReference ?? detectDocumentReference(message);
+
+  if (legalIntent === 'possession_access_schedule') {
+    return buildResult('possession_access_schedule', documentReference, legalIntent);
+  }
+
+  if (
+    legalIntent === 'direct_order_interpretation' ||
+    legalIntent === 'rights_obligations_question'
+  ) {
+    return buildResult('order_interpretation', documentReference, legalIntent);
+  }
+
+  if (legalIntent === 'draft_response_to_other_party') {
+    return buildResult('party_message_draft', documentReference, legalIntent);
+  }
+
+  if (classified.mode === 'court_ready_drafting') {
+    return buildResult('court_ready_drafting', documentReference, legalIntent);
+  }
+
+  if (classified.mode === 'judge_lens_strategy' || classified.mode === 'pattern_analysis') {
+    return buildResult(classified.mode, documentReference, legalIntent);
+  }
+
+  return buildResult('document_analysis', documentReference, legalIntent);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,22 +210,45 @@ export function classifyMessage(
 // ---------------------------------------------------------------------------
 
 function buildToolPlan(mode: RouteMode): ToolPlan {
+  const documentModes: RouteMode[] = [
+    'document_analysis',
+    'order_interpretation',
+    'possession_access_schedule',
+  ];
+  const officialResearchModes: RouteMode[] = [
+    'local_procedure',
+    'direct_legal_answer',
+    'order_interpretation',
+    'possession_access_schedule',
+    'court_ready_drafting',
+  ];
+
   return {
-    useFileSearch: ['document_analysis', 'court_ready_drafting', 'judge_lens_strategy', 'pattern_analysis'].includes(mode),
-    useWebSearch: ['local_procedure', 'direct_legal_answer', 'document_analysis', 'court_ready_drafting'].includes(mode),
+    useFileSearch: [...documentModes, 'court_ready_drafting', 'judge_lens_strategy', 'pattern_analysis'].includes(mode),
+    useWebSearch: [...officialResearchModes, 'document_analysis'].includes(mode),
     useCodeInterpreter: ['pattern_analysis', 'document_analysis'].includes(mode),
-    useLocalCourtRetriever: ['local_procedure', 'direct_legal_answer', 'court_ready_drafting'].includes(mode),
+    useLocalCourtRetriever: officialResearchModes.includes(mode),
     needsClarification: false, // Set by the model if needed
   };
 }
 
-function buildResult(mode: RouteMode, documentReference?: DocumentReferenceDetection): RouterResult {
+function buildResult(mode: RouteMode, documentReference?: DocumentReferenceDetection, legalIntent?: LegalIntent): RouterResult {
+  const requiresDocumentRetrieval =
+    documentReference?.referencesDocument ||
+    ['document_analysis', 'order_interpretation', 'possession_access_schedule'].includes(mode) ||
+    undefined;
+  const baseToolPlan = buildToolPlan(mode);
+
   return {
     mode,
-    toolPlan: buildToolPlan(mode),
+    toolPlan: {
+      ...baseToolPlan,
+      useFileSearch: baseToolPlan.useFileSearch || Boolean(requiresDocumentRetrieval),
+    },
     temperature: MODE_TEMPERATURES[mode],
+    legalIntent,
     documentReference,
-    requiresDocumentRetrieval: documentReference?.referencesDocument || undefined,
+    requiresDocumentRetrieval,
     requiresClarification: documentReference?.mayNeedClarification || undefined,
   };
 }

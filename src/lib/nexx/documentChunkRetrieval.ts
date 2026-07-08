@@ -1,9 +1,15 @@
 import type { DocumentReferenceDetection } from './documentReferenceDetection';
+import {
+  buildClauseRetrievalPlan,
+  type ClauseRetrievalBucket,
+  type ClauseRetrievalBucketPlan,
+} from './legal-engine/retrievalPlan';
 
 export type DocumentChunkRetrievalReason =
   | 'exact_term'
   | 'deadline_pattern'
   | 'holiday_possession'
+  | 'clause_bucket'
   | 'heading_match'
   | 'page_match'
   | 'section_match'
@@ -43,6 +49,7 @@ export type DocumentChunkRetrievalCandidate = {
 export type RetrievedDocumentChunk = DocumentChunkRetrievalCandidate & {
   retrievalScore: number;
   retrievalReasons: DocumentChunkRetrievalReason[];
+  retrievalBuckets?: ClauseRetrievalBucket[];
 };
 
 const DEADLINE_KEYWORDS = [
@@ -87,6 +94,21 @@ const HOLIDAY_POSSESSION_KEYWORDS = [
   'saturday',
   'sunday',
 ];
+
+const BUCKET_TERM_STOP_WORDS = new Set([
+  'and',
+  'day',
+  'days',
+  'for',
+  'order',
+  'period',
+  'possession',
+  'provided',
+  'shall',
+  'the',
+  'this',
+  'with',
+]);
 
 const STOP_WORDS = new Set([
   'about',
@@ -156,6 +178,15 @@ function normalizeTerms(terms: string[]) {
   );
 }
 
+function normalizeBucketTerms(queries: string[]) {
+  return normalizeTerms(queries)
+    .filter((term) => term.includes(' ') || (term.length >= 4 && !BUCKET_TERM_STOP_WORDS.has(term)));
+}
+
+function buildBucketTerms(plan: ClauseRetrievalBucketPlan[]) {
+  return new Map(plan.map(({ bucket, queries }) => [bucket, normalizeBucketTerms(queries)]));
+}
+
 function extractRequestedPages(sections: string[]) {
   return unique(
     sections
@@ -195,22 +226,28 @@ function pageRangeContains(chunk: DocumentChunkRetrievalCandidate, page: number)
   return page >= pageStart && page <= pageEnd;
 }
 
-function buildSearchTerms(message: string, detection: DocumentReferenceDetection) {
+function buildSearchTerms(
+  message: string,
+  detection: DocumentReferenceDetection,
+  clausePlan = buildClauseRetrievalPlan(message, detection)
+) {
   const messageTerms = words(message).slice(0, 16);
   const requestedTerms = normalizeTerms(detection.requestedTerms);
   const requestedDates = normalizeTerms(detection.requestedDates);
   const sectionTerms = extractSectionTerms(detection.requestedSections);
   const locationIdentifierTerms = extractLocationIdentifierTerms(message);
+  const clauseTerms = normalizeBucketTerms(clausePlan.flatMap((item) => item.queries));
 
   if (detection.referenceType === 'deadline_lookup') {
-    return unique([...requestedTerms, ...requestedDates, ...sectionTerms, ...locationIdentifierTerms, ...DEADLINE_KEYWORDS, ...messageTerms]);
+    return unique([...requestedTerms, ...requestedDates, ...sectionTerms, ...locationIdentifierTerms, ...clauseTerms, ...DEADLINE_KEYWORDS, ...messageTerms]);
   }
 
-  return unique([...requestedTerms, ...requestedDates, ...sectionTerms, ...locationIdentifierTerms, ...messageTerms]);
+  return unique([...requestedTerms, ...requestedDates, ...sectionTerms, ...locationIdentifierTerms, ...clauseTerms, ...messageTerms]);
 }
 
 /** Build a compact full-text query for the Convex search index before in-memory reranking. */
 export function buildDocumentChunkSearchQuery(message: string, detection: DocumentReferenceDetection) {
+  const clausePlan = buildClauseRetrievalPlan(message, detection);
   const prioritizedTerms = [
     ...normalizeTerms(detection.requestedTerms),
     ...normalizeTerms(detection.requestedDates),
@@ -219,7 +256,7 @@ export function buildDocumentChunkSearchQuery(message: string, detection: Docume
   ];
   const terms = unique([
     ...prioritizedTerms,
-    ...buildSearchTerms(message, detection),
+    ...buildSearchTerms(message, detection, clausePlan),
   ])
     .filter((term) => term.length >= 3 || /^\d+$/.test(term))
     .slice(0, detection.requiresExactText ? 18 : 24);
@@ -231,12 +268,65 @@ function canAnchorNeighborExpansion(chunk: RetrievedDocumentChunk) {
   return chunk.retrievalReasons.some((reason) =>
     reason === 'exact_term' ||
     reason === 'holiday_possession' ||
+    reason === 'clause_bucket' ||
     reason === 'page_match' ||
     reason === 'section_match' ||
     reason === 'heading_match' ||
     reason === 'deadline_pattern' ||
     reason === 'metadata_match'
   );
+}
+
+function scoreClauseBuckets(args: {
+  normalizedChunkText: string;
+  normalizedHeading: string;
+  bucketTerms: Map<ClauseRetrievalBucket, string[]>;
+}) {
+  const retrievalBuckets: ClauseRetrievalBucket[] = [];
+  let score = 0;
+
+  for (const [bucket, terms] of args.bucketTerms.entries()) {
+    const hits = terms.filter((term) =>
+      textContainsTerm(args.normalizedChunkText, term) ||
+      textContainsTerm(args.normalizedHeading, term)
+    );
+    if (hits.length === 0) continue;
+
+    retrievalBuckets.push(bucket);
+    const phraseHits = hits.filter((term) => term.includes(' ')).length;
+    score += 90 + hits.length * 10 + phraseHits * 24;
+  }
+
+  return { score, retrievalBuckets };
+}
+
+function selectRankedChunks(args: {
+  ranked: RetrievedDocumentChunk[];
+  maxChunks: number;
+  bucketOrder: ClauseRetrievalBucket[];
+}) {
+  const selected: RetrievedDocumentChunk[] = [];
+  const selectedIds = new Set<string>();
+
+  for (const bucket of args.bucketOrder) {
+    if (selected.length >= args.maxChunks) return selected;
+    const bucketHit = args.ranked.find((chunk) =>
+      chunk.retrievalBuckets?.includes(bucket) &&
+      !selectedIds.has(chunk.chunkId)
+    );
+    if (!bucketHit) continue;
+    selectedIds.add(bucketHit.chunkId);
+    selected.push(bucketHit);
+  }
+
+  for (const chunk of args.ranked) {
+    if (selected.length >= args.maxChunks) break;
+    if (selectedIds.has(chunk.chunkId)) continue;
+    selectedIds.add(chunk.chunkId);
+    selected.push(chunk);
+  }
+
+  return selected;
 }
 
 function messageNeedsHolidayPossessionRetrieval(message: string, detection: DocumentReferenceDetection) {
@@ -283,13 +373,16 @@ export function retrieveRelevantDocumentChunks(args: {
 }): RetrievedDocumentChunk[] {
   if (args.maxChunks <= 0 || args.chunks.length === 0) return [];
 
-  const searchTerms = buildSearchTerms(args.message, args.detection);
+  const clausePlan = buildClauseRetrievalPlan(args.message, args.detection);
+  const searchTerms = buildSearchTerms(args.message, args.detection, clausePlan);
   const requestedPages = extractRequestedPages(args.detection.requestedSections);
   const sectionTerms = extractSectionTerms(args.detection.requestedSections);
   const needsDeadline = args.detection.referenceType === 'deadline_lookup';
   const needsExact = args.detection.requiresExactText;
   const needsSection = args.detection.referenceType === 'section_lookup';
   const needsHolidayPossession = messageNeedsHolidayPossessionRetrieval(args.message, args.detection);
+  const bucketTerms = buildBucketTerms(clausePlan);
+  const bucketOrder = clausePlan.map((item) => item.bucket);
   const hasOrderLanguageIntent = /\b(?:order|ordered|orders|shall|must|restrained|granted|denied|requires?|requirement)\b/i.test(args.message);
   const asksForTables = /\b(?:table|schedule|calendar|chart|row|column|amounts?|payments?|fees?|arrears)\b/i.test(args.message);
   const asksForMoney = /\b(?:money|amount|payment|fee|fees|arrears|support|reimburse|costs?|dollars?|\$)\b/i.test(args.message);
@@ -302,6 +395,7 @@ export function retrieveRelevantDocumentChunks(args: {
     const metadata = chunk.retrievalMetadata;
     let retrievalScore = Math.max(0, 20 - chunk.chunkIndex);
     const retrievalReasons: DocumentChunkRetrievalReason[] = ['early_context'];
+    const retrievalBuckets: ClauseRetrievalBucket[] = [];
 
     for (const page of requestedPages) {
       if (pageRangeContains(chunk, page)) {
@@ -343,6 +437,19 @@ export function retrieveRelevantDocumentChunks(args: {
       }
     }
 
+    if (bucketTerms.size > 0) {
+      const bucketScore = scoreClauseBuckets({
+        normalizedChunkText,
+        normalizedHeading,
+        bucketTerms,
+      });
+      if (bucketScore.retrievalBuckets.length > 0) {
+        retrievalScore += bucketScore.score;
+        retrievalReasons.push('clause_bucket');
+        retrievalBuckets.push(...bucketScore.retrievalBuckets);
+      }
+    }
+
     if (metadata?.containsTable && asksForTables) {
       retrievalScore += 65;
       retrievalReasons.push('metadata_match');
@@ -367,6 +474,7 @@ export function retrieveRelevantDocumentChunks(args: {
       ...chunk,
       retrievalScore,
       retrievalReasons: unique(retrievalReasons),
+      retrievalBuckets: unique(retrievalBuckets),
     };
   });
 
@@ -377,13 +485,26 @@ export function retrieveRelevantDocumentChunks(args: {
 
   const neighborCandidates = ranked.filter((chunk, index) => index < args.maxChunks || chunk.retrievalScore > 40);
   const shouldExpandWithNeighbors =
-    needsExact || needsHolidayPossession || needsSection || needsDeadline || needsMetadataContext || requestedPages.length > 0;
+    needsExact || needsHolidayPossession || bucketOrder.length > 0 || needsSection || needsDeadline || needsMetadataContext || requestedPages.length > 0;
   const hasNeighborAnchor = shouldExpandWithNeighbors && neighborCandidates.some(canAnchorNeighborExpansion);
+  const bucketCoverageCount = bucketOrder.length > 0
+    ? Math.min(
+      args.maxChunks,
+      new Set(
+        neighborCandidates
+          .filter((chunk) => (chunk.retrievalBuckets ?? []).some((bucket) => bucketOrder.includes(bucket)))
+          .map((chunk) => chunk.chunkId)
+      ).size
+    )
+    : 0;
   const initialChunkLimit = hasNeighborAnchor
-    ? Math.max(1, args.maxChunks - 2)
+    ? Math.max(bucketCoverageCount || 1, args.maxChunks - 2)
     : args.maxChunks;
-  const selected = neighborCandidates
-    .slice(0, initialChunkLimit);
+  const selected = selectRankedChunks({
+    ranked: neighborCandidates,
+    maxChunks: initialChunkLimit,
+    bucketOrder,
+  });
 
   const expanded = hasNeighborAnchor
     ? addNeighborChunks({ selected, ranked, maxChunks: args.maxChunks })

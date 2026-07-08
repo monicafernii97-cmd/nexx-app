@@ -152,7 +152,89 @@ describe('retrieveRelevantDocumentChunks', () => {
     expect(result.map((chunk) => chunk.chunkId)).toContain('chunk-5');
     expect(result.map((chunk) => chunk.chunkId)).toContain('chunk-6');
     expect(result.find((chunk) => chunk.chunkId === 'chunk-5')?.retrievalReasons).toContain('holiday_possession');
-    expect(result.find((chunk) => chunk.chunkId === 'chunk-6')?.retrievalReasons).toContain('neighbor_context');
+    expect(result.find((chunk) => chunk.chunkId === 'chunk-6')?.retrievalReasons.some((reason) =>
+      reason === 'neighbor_context' || reason === 'clause_bucket'
+    )).toBe(true);
+  });
+
+  it('covers clause buckets for holiday possession interpretation', () => {
+    const clauseChunks: DocumentChunkRetrievalCandidate[] = [
+      {
+        chunkId: 'background',
+        uploadedFileId: 'file-1',
+        chunkIndex: 0,
+        text: 'The order includes background findings about the parties.',
+        textLength: 58,
+        sectionHeading: 'Findings',
+        warnings: [],
+      },
+      {
+        chunkId: 'father-day',
+        uploadedFileId: 'file-1',
+        chunkIndex: 7,
+        text: 'Father\'s Day possession begins at 6:00 p.m. on the Friday preceding Father\'s Day and ends at 8:00 a.m. on the Monday after Father\'s Day.',
+        textLength: 145,
+        sectionHeading: 'Father\'s Day Possession',
+        warnings: [],
+      },
+      {
+        chunkId: 'weekend-extension',
+        uploadedFileId: 'file-1',
+        chunkIndex: 8,
+        text: 'Regular weekend possession begins on Thursday when Friday is a federal, state, or local holiday or a student holiday.',
+        textLength: 119,
+        sectionHeading: 'Weekend Possession',
+        warnings: [],
+      },
+      {
+        chunkId: 'priority-language',
+        uploadedFileId: 'file-1',
+        chunkIndex: 9,
+        text: 'Except as otherwise expressly provided in this order, the standard possession schedule applies.',
+        textLength: 91,
+        sectionHeading: 'Priority Language',
+        warnings: [],
+      },
+      {
+        chunkId: 'later-modification',
+        uploadedFileId: 'file-1',
+        chunkIndex: 10,
+        text: 'This order supersedes any prior order except as modified by a later signed order.',
+        textLength: 82,
+        sectionHeading: 'Modified Orders',
+        warnings: [],
+      },
+      {
+        chunkId: 'definitions',
+        uploadedFileId: 'file-1',
+        chunkIndex: 11,
+        text: 'A student holiday includes a school holiday or teacher in-service day listed by the child\'s school.',
+        textLength: 97,
+        sectionHeading: 'Definitions',
+        warnings: [],
+      },
+    ];
+    const detection = detectDocumentReference('Which clause controls if Father\'s Day possession conflicts with the regular Thursday-start weekend clause?');
+    const result = retrieveRelevantDocumentChunks({
+      message: 'Which clause controls if Father\'s Day possession conflicts with the regular Thursday-start weekend clause?',
+      detection,
+      chunks: clauseChunks,
+      maxChunks: 5,
+    });
+
+    expect(result.map((chunk) => chunk.chunkId)).toEqual([
+      'father-day',
+      'weekend-extension',
+      'priority-language',
+      'later-modification',
+      'definitions',
+    ]);
+    expect(result.find((chunk) => chunk.chunkId === 'father-day')?.retrievalBuckets).toContain('controlling_specific_clause');
+    expect(result.find((chunk) => chunk.chunkId === 'weekend-extension')?.retrievalBuckets).toContain('competing_general_clause');
+    expect(result.find((chunk) => chunk.chunkId === 'priority-language')?.retrievalBuckets).toContain('exception_priority_language');
+    expect(result.find((chunk) => chunk.chunkId === 'later-modification')?.retrievalBuckets).toContain('later_modification_language');
+    expect(result.find((chunk) => chunk.chunkId === 'definitions')?.retrievalBuckets).toContain('definition_language');
+    expect(result.every((chunk) => chunk.retrievalReasons.includes('clause_bucket'))).toBe(true);
   });
 
   it('does not attach neighbor chunks from a different uploaded file', () => {

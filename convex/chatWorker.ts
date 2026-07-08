@@ -528,6 +528,7 @@ type DocumentChunkContext = {
     warnings?: string[];
     retrievalScore: number;
     retrievalReasons: string[];
+    retrievalBuckets?: string[];
 };
 
 function escapeXmlAttribute(value?: string) {
@@ -600,7 +601,9 @@ function shouldPreferRetrievedChunks(detection: DocumentReferenceDetection) {
         detection.requiresPageOrSectionCitation ||
         detection.referenceType === 'deadline_lookup' ||
         detection.referenceType === 'section_lookup' ||
-        detection.referenceType === 'source_location_request';
+        detection.referenceType === 'source_location_request' ||
+        detection.referenceType === 'possession_schedule_interpretation' ||
+        detection.referenceType === 'clause_conflict_interpretation';
 }
 
 function shouldIncludeStoredDocumentsWithCurrentUpload(detection: DocumentReferenceDetection) {
@@ -618,6 +621,8 @@ function shouldRenderTargetedDocumentAnswer(detection: DocumentReferenceDetectio
         detection.referenceType === 'quote_request' ||
         detection.referenceType === 'metadata_lookup' ||
         detection.referenceType === 'source_location_request' ||
+        detection.referenceType === 'possession_schedule_interpretation' ||
+        detection.referenceType === 'clause_conflict_interpretation' ||
         detection.requiresExactText ||
         detection.requiresPageOrSectionCitation;
 }
@@ -663,6 +668,7 @@ function mergeAttachmentContext(existing: AttachmentContext, incoming: Attachmen
             ...(chunk.retrievalScore > previous.retrievalScore ? chunk : previous),
             retrievalScore: Math.max(previous.retrievalScore, chunk.retrievalScore),
             retrievalReasons: Array.from(new Set([...previous.retrievalReasons, ...chunk.retrievalReasons])),
+            retrievalBuckets: Array.from(new Set([...(previous.retrievalBuckets ?? []), ...(chunk.retrievalBuckets ?? [])])),
         });
     }
 
@@ -725,7 +731,7 @@ function buildRetrievedChunkPrompt(chunks: DocumentChunkContext[], sourcePackets
         ...chunks.map((chunk) => {
             const sourcePacket = packetsByChunkId.get(chunk.chunkId.toString());
             return [
-            `<CHUNK sourceId="${escapeXmlAttribute(sourcePacket?.sourceId)}" pageStart="${chunk.pageStart ?? ''}" pageEnd="${chunk.pageEnd ?? ''}" sectionHeading="${escapeXmlAttribute(chunk.sectionHeading)}" retrievalReasons="${escapeXmlAttribute(chunk.retrievalReasons.join(', '))}" extractionMethod="${escapeXmlAttribute(chunk.extractionMethod ?? 'unknown')}" confidence="${chunk.ocrConfidence ?? ''}">`,
+            `<CHUNK sourceId="${escapeXmlAttribute(sourcePacket?.sourceId)}" pageStart="${chunk.pageStart ?? ''}" pageEnd="${chunk.pageEnd ?? ''}" sectionHeading="${escapeXmlAttribute(chunk.sectionHeading)}" retrievalReasons="${escapeXmlAttribute(chunk.retrievalReasons.join(', '))}" retrievalBuckets="${escapeXmlAttribute((chunk.retrievalBuckets ?? []).join(', '))}" extractionMethod="${escapeXmlAttribute(chunk.extractionMethod ?? 'unknown')}" confidence="${chunk.ocrConfidence ?? ''}">`,
             `SOURCE_ID: ${sourcePacket?.sourceId ?? ''}`,
             `FILE: ${escapeXmlText(sourcePacket?.fileName ?? '')}`,
             `PAGES: ${chunk.pageStart ?? ''}${chunk.pageEnd && chunk.pageEnd !== chunk.pageStart ? `-${chunk.pageEnd}` : ''}`,
@@ -844,6 +850,7 @@ function buildAttachmentContextPrompt(
         'When uploaded document memory is present, it is the source of truth for document re-analysis. Do not rely on older pasted order text in chat history unless the user explicitly asks you to analyze that pasted text.',
         'Do not describe uploaded document memory as "the text you provided" or "pasted text"; identify the uploaded document by filename/source instead.',
         'When retrieved chunks contain relevant provisions, answer substantively from those chunks and cite them. Do not collapse a useful answer into a generic "not enough text" fallback just because the document is long or the exact issue requires explanation.',
+        'When retrieved CHUNK attributes include retrievalBuckets, compare the controlling_specific_clause, competing_general_clause, exception_priority_language, later_modification_language, and definition_language buckets before answering a possession or clause-conflict question.',
         'If the excerpts do not contain the answer after checking the retrieved chunks, say what you checked and what the available extracted text does not show.',
         'If SOURCE_ID chunks are present for a document, make document-specific claims about that document only from those SOURCE_ID chunks. Uncited extracted context is not enough for a document-specific claim for that document.',
         'For court-order review, identify which document was reviewed and cite compact page labels like [p. 2] or [pp. 2-3] when available.',

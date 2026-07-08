@@ -208,7 +208,9 @@ function isClarificationSensitiveReference(detection: DocumentReferenceDetection
     detection.referenceType === 'section_lookup' ||
     detection.referenceType === 'terminology_check' ||
     detection.referenceType === 'quote_request' ||
-    detection.referenceType === 'source_location_request';
+    detection.referenceType === 'source_location_request' ||
+    detection.referenceType === 'possession_schedule_interpretation' ||
+    detection.referenceType === 'clause_conflict_interpretation';
 }
 
 /** Identify when stored document recall should ask the user which document to use. */

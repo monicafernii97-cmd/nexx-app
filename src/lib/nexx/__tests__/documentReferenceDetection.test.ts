@@ -35,11 +35,25 @@ describe('detectDocumentReference', () => {
 
     expect(detection).toMatchObject({
       referencesDocument: true,
-      referenceType: 'source_location_request',
-      requiresExactText: true,
+      referenceType: 'possession_schedule_interpretation',
+      requiresExactText: false,
       requiresPageOrSectionCitation: true,
     });
     expect(detection.requestedTerms).toContain('father\'s day');
+  });
+
+  it('detects holiday possession clause-conflict interpretation requests', () => {
+    const detection = detectDocumentReference('Which clause controls if Father\'s Day possession conflicts with the regular Thursday-start weekend clause?');
+
+    expect(detection).toMatchObject({
+      referencesDocument: true,
+      referenceType: 'clause_conflict_interpretation',
+      requiresExactText: false,
+      requiresPageOrSectionCitation: true,
+    });
+    expect(detection.requestedTerms).toContain('father\'s day');
+    expect(detection.requestedTerms).toContain('conflicts');
+    expect(detection.requestedTerms).toContain('except as otherwise expressly provided');
   });
 
   it('does not treat a plain holiday date question as document retrieval', () => {

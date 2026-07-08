@@ -30,7 +30,9 @@ export type DocumentReferenceDetection = {
     | 'quote_request'
     | 'comparison_request'
     | 'metadata_lookup'
-    | 'source_location_request';
+    | 'source_location_request'
+    | 'possession_schedule_interpretation'
+    | 'clause_conflict_interpretation';
   documentHints: string[];
   requestedTerms: string[];
   requestedSections: string[];
@@ -92,6 +94,39 @@ const HOLIDAY_POSSESSION_TERMS = [
   'extended summer',
   'summer possession',
   'weekend possession',
+];
+
+const CLAUSE_CONFLICT_TERMS = [
+  'controls',
+  'control',
+  'conflict',
+  'conflicts',
+  'overlap',
+  'overlaps',
+  'exception',
+  'except as otherwise',
+  'notwithstanding',
+  'specific provision',
+  'general provision',
+  'which clause',
+  'which provision',
+  'supersede',
+  'supersedes',
+  'later order',
+  'modified order',
+];
+
+const CLAUSE_PRIORITY_SEARCH_TERMS = [
+  'except as otherwise expressly provided',
+  'except as otherwise provided',
+  'notwithstanding',
+  'specific provision',
+  'general provision',
+  'supersede',
+  'supersedes',
+  'modified order',
+  'amended order',
+  'later order',
 ];
 
 const SECTION_PATTERN = /\b(?:section|paragraph|page|clause)\s+([0-9]+|[ivxlcdm]+|[a-z])\b/gi;
@@ -182,6 +217,7 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
   const deadlineTerms = matchesAnyTerm(lower, DEADLINE_TERMS);
   const exactTerms = matchesAnyTerm(lower, EXACT_TERMS);
   const holidayTerms = matchesAnyTerm(lower, HOLIDAY_POSSESSION_TERMS);
+  const clauseConflictTerms = matchesAnyTerm(lower, CLAUSE_CONFLICT_TERMS);
   const hasImplicitFollowUp = IMPLICIT_FOLLOW_UP_PATTERNS.some((pattern) => pattern.test(text));
   const asksForQuote = /\b(?:quote|exact\s+(?:wording|words|language)|what\s+exact\s+words|word\s+for\s+word)\b/i.test(text);
   const asksForSource = /\b(?:where\s+(?:does|did)\s+it\s+say|where\s+exactly|what\s+page|show\s+me\s+where|cite)\b/i.test(text);
@@ -192,6 +228,14 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
   const hasHolidayPossessionSignal =
     holidayTerms.length > 0 &&
     /\b(?:possession|schedule|start|starts|begin|begins|end|ends|pickup|exchange|weekend|thursday|friday|saturday|sunday|provision|clause|paragraph)\b/i.test(text);
+  const hasClauseConflictSignal =
+    hasHolidayPossessionSignal &&
+    (
+      clauseConflictTerms.length > 0 ||
+      /\b(?:which|what)\s+(?:clause|provision|rule)\s+controls\b/i.test(text) ||
+      /\b(?:general|regular)\s+(?:weekend|possession|provision|clause|rule)\b/i.test(text) ||
+      /\b(?:specific|holiday|father'?s\s+day|mother'?s\s+day)\s+(?:provision|clause|rule)\b/i.test(text)
+    );
   const hasDocumentSignal = documentHints.length > 0 || requestedDocumentTypes.length > 0;
   const hasSectionSignal = requestedSections.length > 0 && (hasDocumentSignal || hasImplicitFollowUp || asksForSpecificLocation);
   const hasDeadlineSignal = deadlineTerms.length > 0 && (hasDocumentSignal || hasImplicitFollowUp);
@@ -223,7 +267,8 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
   else if (hasExactSignal || asksForQuote) referenceType = asksForQuote ? 'quote_request' : 'terminology_check';
   else if (hasSectionSignal) referenceType = 'section_lookup';
   else if (hasDeadlineSignal) referenceType = 'deadline_lookup';
-  else if (hasHolidayPossessionSignal) referenceType = 'source_location_request';
+  else if (hasClauseConflictSignal) referenceType = 'clause_conflict_interpretation';
+  else if (hasHolidayPossessionSignal) referenceType = 'possession_schedule_interpretation';
   else if (documentHints.some((hint) => /\b(uploaded|attached|shared|prior|previous)\b/i.test(hint))) referenceType = 'explicit_prior_upload';
   else if (documentHints.length > 0) referenceType = 'active_document_followup';
 
@@ -237,12 +282,23 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
     confidence: hasDocumentSignal || requiresExactText ? 'high' : 'medium',
     referenceType,
     documentHints,
-    requestedTerms: unique([...deadlineTerms, ...exactTerms, ...holidayTerms]),
+    requestedTerms: unique([
+      ...deadlineTerms,
+      ...exactTerms,
+      ...holidayTerms,
+      ...clauseConflictTerms,
+      ...(hasClauseConflictSignal ? CLAUSE_PRIORITY_SEARCH_TERMS : []),
+    ]),
     requestedSections,
     requestedDates,
     requestedDocumentTypes,
     requiresExactText,
-    requiresPageOrSectionCitation: requiresExactText || hasSectionSignal || asksForSource,
+    requiresPageOrSectionCitation:
+      requiresExactText ||
+      hasSectionSignal ||
+      asksForSource ||
+      referenceType === 'possession_schedule_interpretation' ||
+      referenceType === 'clause_conflict_interpretation',
     mayNeedClarification: asksForComparison || (documentObjectPattern.test(text) && !hasImplicitFollowUp && documentHints.length === 0),
   };
 }

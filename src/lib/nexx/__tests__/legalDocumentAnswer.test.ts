@@ -295,9 +295,7 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
     expect(content).toContain('## Highest-Priority Findings');
     expect(content).toContain('## Key Obligations');
     expect(content).toContain('## Deadlines');
-    expect(content).toContain('## Risks and Cautions');
     expect(content).toContain('## Recommended Next Steps');
-    expect(content).toContain('## Source Details');
     expect(content).toContain('[p. 4]');
     expect(content).toContain('Create a deadline checklist from the cited provisions.');
     expect(content).toContain('Prepare filing language from the supported facts');
@@ -309,6 +307,9 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
     expect(content).not.toContain('quotedText');
     expect(content).not.toContain('Sources used:');
     expect(content).not.toContain('Final Order.pdf, p.');
+    expect(content).not.toContain('## Risks and Cautions');
+    expect(content).not.toContain('## Source Details');
+    expect(content).not.toContain('chunkId should never be shown');
   });
 
   it('keeps no-page extracted-text answers quiet instead of showing source-review warnings', () => {
@@ -392,7 +393,7 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
       ],
     }), sourcePackets, 'Fallback answer');
 
-    const deadlinesSection = sectionBetween(content, '## Deadlines', '## Risks and Cautions');
+    const deadlinesSection = sectionBetween(content, '## Deadlines', '## Recommended Next Steps');
 
     expect(deadlinesSection).toContain('| The order requires each party to provide updated residence and employment information within seven days of a change. | within seven days | [p. 4] |');
     expect(deadlinesSection).toContain('| The order requires notice to the other party within fourteen days if a party applies for a passport for the child. | within fourteen days | [p. 4] |');
@@ -416,7 +417,7 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
         },
       ],
     }), sourcePackets, 'Fallback answer');
-    const hundredDeadlinesSection = sectionBetween(hundredContent, '## Deadlines', '## Risks and Cautions');
+    const hundredDeadlinesSection = sectionBetween(hundredContent, '## Deadlines', '## Recommended Next Steps');
 
     expect(hundredDeadlinesSection).toContain('| The order requires a supplemental filing within one hundred twenty business days after entry. | within one hundred twenty business days | [p. 4] |');
     expect(hundredDeadlinesSection).toContain('| The order requires a status update within one hundred and five calendar days after review. | within one hundred and five calendar days | [p. 4] |');
@@ -435,15 +436,72 @@ describe('renderTargetedLegalDocumentAnswerMarkdown', () => {
       }],
     }), sourcePackets, 'Fallback answer');
 
-    expect(content).toContain('## Direct Answer');
-    expect(content).toContain('## What I Found in the Order');
-    expect(content).toContain('## Practical Reading');
+    expect(content).toContain('The order requires payment by June 14, 2026. [p. 4]');
+    expect(content).toContain('**Why:**');
+    expect(content).toContain('**Practical meaning:**');
     expect(content).toContain('[p. 4]');
     expect(content).not.toContain('# Court Order Analysis');
+    expect(content).not.toContain('## Direct Answer');
+    expect(content).not.toContain('## What I Found in the Order');
+    expect(content).not.toContain('## Cautions');
+    expect(content).not.toContain('## Source Details');
+    expect(content).not.toContain('may control');
+    expect(content).not.toContain('licensed attorney');
     expect(content).not.toContain('sourceId');
     expect(content).not.toContain('chunkId');
     expect(content).not.toContain('memoryGenerationId');
     expect(content).not.toContain('blockIds');
     expect(content).not.toContain('quotedText');
+  });
+
+  it('does not duplicate the direct answer under why when no claims are present', () => {
+    const direct = "The order does not say Father's Day starts on Thursday.";
+    const content = renderTargetedLegalDocumentAnswerMarkdown(answer({
+      answer: direct,
+      claims: [],
+      citations: [],
+    }), sourcePackets, 'Fallback answer');
+
+    expect(content).toContain(direct);
+    expect(content).not.toContain('**Why:**');
+    expect(content.indexOf(direct)).toBe(content.lastIndexOf(direct));
+    expect(content).toContain('**Practical meaning:**');
+  });
+
+  it('renders not-found targeted answers with plain filing-readiness language only', () => {
+    const content = renderTargetedLegalDocumentAnswerMarkdown(answer({
+      answerType: 'not_found',
+      answer: "I do not see a Father's Day provision in the extracted order text.",
+      claims: [],
+      citations: [],
+      notFoundReason: 'term_not_found',
+    }), sourcePackets, 'Fallback answer');
+
+    expect(content).toContain("I do not see a Father's Day provision in the extracted order text.");
+    expect(content).toContain('I would not rely on a missing or unreadable clause for a filing without a clearer copy or the exact page language.');
+    expect(content).not.toContain('**Why:**');
+    expect(content).not.toContain('## Cautions');
+    expect(content).not.toContain('Source Details');
+    expect(content).not.toContain('OCR');
+    expect(content).not.toContain('verifier');
+  });
+
+  it('renders needs-review targeted answers with review-needed practical meaning', () => {
+    const content = renderTargetedLegalDocumentAnswerMarkdown(answer({
+      answerType: 'needs_review',
+      answer: 'The visible language points to Friday at 6:00 p.m., but the exact signed-order clause should be checked before filing.',
+      claims: [{
+        claim: "Father's Day possession begins at 6:00 p.m. on the Friday preceding Father's Day.",
+        claimType: 'interpretation',
+        sourceIds: ['src_001'],
+      }],
+    }), sourcePackets, 'Fallback answer');
+
+    expect(content).toContain('The visible language points to Friday at 6:00 p.m.');
+    expect(content).toContain('I can work from the visible language, but I would review the exact signed-order wording before using this for filing or enforcement.');
+    expect(content).not.toContain('If the order clearly gives a specific rule, state that rule directly.');
+    expect(content).not.toContain('## Cautions');
+    expect(content).not.toContain('Source Details');
+    expect(content).not.toContain('verifier');
   });
 });

@@ -71,6 +71,15 @@ const LEGAL_DOCUMENT_CLAIM_TYPES = new Set<LegalDocumentClaimType>([
   'procedural',
 ]);
 
+const NOT_FOUND_PRACTICAL_MEANING =
+  'I would not rely on a missing or unreadable clause for a filing without a clearer copy or the exact page language.';
+
+const NEEDS_REVIEW_PRACTICAL_MEANING =
+  'I can work from the visible language, but I would review the exact signed-order wording before using this for filing or enforcement.';
+
+const DEFAULT_PRACTICAL_MEANING =
+  'Use the signed order language for exact filing or enforcement wording. When provisions overlap, read the specific provision, exception language, notwithstanding language, and later-modification language together. If the order clearly gives a specific rule, state that rule directly.';
+
 export type LegalDocumentAnswerVerification = {
   passed: boolean;
   errors: string[];
@@ -388,9 +397,10 @@ function markdownTableCell(value: string) {
 }
 
 /**
- * Render a citation-locked document answer into the product's stable court-order
- * analysis shape. The model may choose findings; this renderer owns the
- * user-facing structure and citation labels.
+ * Render a citation-locked whole-order answer into the product's stable
+ * analysis shape. This is for broad "analyze/summarize the order" requests.
+ * Internal caution, verifier, extraction, and source-detail diagnostics stay
+ * out of the visible markdown by default.
  */
 export function renderCourtOrderAnalysisMarkdown(
   answer: LegalDocumentAnswer,
@@ -429,11 +439,6 @@ export function renderCourtOrderAnalysisMarkdown(
     })
     : [`| ${markdownTableCell('No specific deadline was identified in the extracted provisions.')} | ${markdownTableCell('Not stated')} | - |`];
 
-  const warnings = uniqueValues(answer.warnings.map(cleanUserFacingDocumentText).filter(Boolean)).slice(0, 5);
-  const riskItems = warnings.length > 0
-    ? warnings
-    : ['Use the signed order language for filings, enforcement, or calendaring because exact wording controls.'];
-
   return [
     '# Court Order Analysis',
     '## Executive Summary',
@@ -444,8 +449,6 @@ export function renderCourtOrderAnalysisMarkdown(
     formatMarkdownList(obligationItems),
     '## Deadlines',
     ['| Finding | Timing | Source |', '|---|---|---|', ...deadlineRows].join('\n'),
-    '## Risks and Cautions',
-    formatMarkdownList(riskItems),
     '## Recommended Next Steps',
     [
       '1. Create a deadline checklist from the cited provisions.',
@@ -453,15 +456,14 @@ export function renderCourtOrderAnalysisMarkdown(
       '3. Draft required co-parenting, AppClose, or notice messages from the exact order language.',
       '4. Prepare filing language from the supported facts and keep page citations attached.',
     ].join('\n'),
-    '## Source Details',
-    'Source details are available below in the collapsed source panel.',
   ].join('\n\n');
 }
 
 /**
- * Render targeted document questions as a chat answer instead of the full court
- * order report shell. The model owns the substantive answer; this renderer adds
- * stable, compact evidence sections and keeps source metadata out of visible text.
+ * Render targeted document questions as a direct legal interpretation answer
+ * instead of a report shell. The model owns the substantive answer; this
+ * renderer preserves that answer, adds compact support, and keeps diagnostics
+ * and source metadata out of visible text.
  */
 export function renderTargetedLegalDocumentAnswerMarkdown(
   answer: LegalDocumentAnswer,
@@ -481,36 +483,17 @@ export function renderTargetedLegalDocumentAnswerMarkdown(
       claim.claim,
       labelsForSourceIds(claim.sourceIds, citationMap)
     ))
-    : [directAnswer || 'I found relevant extracted order text and summarized the supported points above.'];
-  const deadlineClaims = supportedClaims.filter((claim) => isDeadlineClaim(claim.claim)).slice(0, 4);
-  const warnings = uniqueValues(answer.warnings.map(cleanUserFacingDocumentText).filter(Boolean)).slice(0, 4);
-  const cautionItems = warnings.length > 0
-    ? warnings
-    : [
-      'This is document analysis and drafting support, not a substitute for advice from a licensed attorney.',
-    ];
+    : [];
+  const practicalMeaning = answer.answerType === 'not_found'
+    ? NOT_FOUND_PRACTICAL_MEANING
+    : answer.answerType === 'needs_review'
+      ? NEEDS_REVIEW_PRACTICAL_MEANING
+      : DEFAULT_PRACTICAL_MEANING;
 
   return [
-    '## Direct Answer',
     directAnswer || 'I do not see enough supported text in the extracted order to answer that directly.',
-    '## What I Found in the Order',
-    formatMarkdownList(findingItems),
-    deadlineClaims.length > 0
-      ? [
-        '## Dates, Deadlines, or Timing',
-        ['| Provision | Timing | Source |', '|---|---|---|', ...deadlineClaims.map((claim) => {
-          const labels = labelsForSourceIds(claim.sourceIds, citationMap);
-          const source = labels.length > 0 ? labels.map((label) => `[${label}]`).join(' ') : 'Order text';
-          return `| ${markdownTableCell(claim.claim)} | ${markdownTableCell(deadlineTimingFromClaim(claim.claim))} | ${source} |`;
-        })].join('\n'),
-      ].join('\n\n')
-      : undefined,
-    '## Practical Reading',
-    'Use the signed order language for exact filing or enforcement wording. If two possession, holiday, or notice provisions overlap, the more specific provision may control.',
-    '## Cautions',
-    formatMarkdownList(cautionItems),
-    '## Source Details',
-    'Source details are available below in the collapsed source panel.',
+    findingItems.length > 0 ? `**Why:**\n${formatMarkdownList(findingItems)}` : undefined,
+    `**Practical meaning:** ${practicalMeaning}`,
   ].filter(Boolean).join('\n\n');
 }
 

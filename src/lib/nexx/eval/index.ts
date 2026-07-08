@@ -87,7 +87,7 @@ function selectEvaluators(
         });
     }
 
-    if (['judge_lens_strategy', 'pattern_analysis', 'document_analysis'].includes(mode)) {
+    if (['judge_lens_strategy', 'pattern_analysis', 'document_analysis', 'order_interpretation', 'possession_access_schedule'].includes(mode)) {
         evaluators.push({
             subsystem: 'analysis',
             run: (r) => evaluateAnalysis(r),

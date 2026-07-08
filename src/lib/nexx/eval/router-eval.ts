@@ -35,6 +35,15 @@ const MODE_PATTERNS: Record<string, { keywords: RegExp; antiPatterns?: RegExp }>
     document_analysis: {
         keywords: /\b(document|order|analysis|interpret|clause|provision|section)\b/i,
     },
+    order_interpretation: {
+        keywords: /\b(order|clause|provision|controls?|interpret|means?|language)\b/i,
+    },
+    possession_access_schedule: {
+        keywords: /\b(possession|access|visitation|schedule|holiday|weekend|exchange|father'?s day|mother'?s day)\b/i,
+    },
+    party_message_draft: {
+        keywords: /\b(message|reply|respond|appclose|co[-\s]?parent|draft|wording)\b/i,
+    },
     pattern_analysis: {
         keywords: /\b(pattern|trend|repeated|history|behavior|escalat|consistent)\b/i,
     },

@@ -36,7 +36,13 @@ function domainHintsForState(state?: string) {
 }
 
 export function shouldUseOfficialLegalResearch(routeMode: RouteMode, message: string) {
-  if (routeMode === 'local_procedure' || routeMode === 'direct_legal_answer' || routeMode === 'court_ready_drafting') {
+  if (
+    routeMode === 'local_procedure' ||
+    routeMode === 'direct_legal_answer' ||
+    routeMode === 'order_interpretation' ||
+    routeMode === 'possession_access_schedule' ||
+    routeMode === 'court_ready_drafting'
+  ) {
     return true;
   }
 

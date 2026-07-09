@@ -10,6 +10,7 @@
 import type { FollowUpIntent, LegalIntent, RouteMode, ToolPlan, RouterResult } from '../types';
 import { detectDocumentReference, type DocumentReferenceDetection } from './documentReferenceDetection';
 import { classifyLegalIntent } from './legalIntent';
+import { classifyPackedCaseIntake } from './legal-engine/packedCaseIntake';
 
 // ---------------------------------------------------------------------------
 // Keyword/pattern maps for Phase 1 heuristic classification
@@ -93,6 +94,17 @@ const MODE_TEMPERATURES: Record<RouteMode, number> = {
   order_interpretation: 0.2,
   possession_access_schedule: 0.18,
   party_message_draft: 0.25,
+  supportive_strategy: 0.3,
+  co_parent_response: 0.25,
+  documentation_strategy: 0.25,
+  deescalation_response: 0.28,
+  packed_case_intake: 0.25,
+  litigation_navigation: 0.22,
+  court_response_planning: 0.2,
+  pro_se_guidance: 0.25,
+  attorney_resource_guidance: 0.2,
+  court_narrative_builder: 0.25,
+  filing_walkthrough: 0.2,
   judge_lens_strategy: 0.3,
   court_ready_drafting: 0.2,
   pattern_analysis: 0.3,
@@ -112,6 +124,20 @@ function isDocumentRoute(mode?: RouteMode) {
   return mode === 'document_analysis' ||
     mode === 'order_interpretation' ||
     mode === 'possession_access_schedule';
+}
+
+function isLitigationNavigationRoute(mode?: RouteMode) {
+  return mode === 'supportive_strategy' ||
+    mode === 'co_parent_response' ||
+    mode === 'documentation_strategy' ||
+    mode === 'deescalation_response' ||
+    mode === 'packed_case_intake' ||
+    mode === 'litigation_navigation' ||
+    mode === 'court_response_planning' ||
+    mode === 'pro_se_guidance' ||
+    mode === 'attorney_resource_guidance' ||
+    mode === 'court_narrative_builder' ||
+    mode === 'filing_walkthrough';
 }
 
 export function classifyFollowUpIntent(message: string): FollowUpIntent {
@@ -144,6 +170,27 @@ function inferFollowUpRoute(
   return POSSESSION_FOLLOW_UP_CONTEXT_PATTERN.test(contextText)
     ? 'possession_access_schedule'
     : 'order_interpretation';
+}
+
+function shouldRouteAsActiveOrderFollowUp(
+  legalIntent: LegalIntent,
+  followUpIntent: FollowUpIntent,
+  hasActiveContext: boolean
+) {
+  if (!hasActiveContext || followUpIntent === 'new_issue') return false;
+  return ![
+    'packed_case_intake',
+    'new_court_filing_received',
+    'court_response_deadline',
+    'filing_walkthrough',
+    'pro_se_feasibility',
+    'attorney_cost_question',
+    'legal_aid_resource_request',
+    'judge_explanation_strategy',
+    'co_parent_response_strategy',
+    'court_filing_draft',
+    'draft_response_to_other_party',
+  ].includes(legalIntent);
 }
 
 function activeDocumentFollowUpReference(message: string): DocumentReferenceDetection {
@@ -188,6 +235,7 @@ export function classifyMessage(
   const text = message.toLowerCase();
   const documentReference = detectDocumentReference(message);
   const legalIntent = classifyLegalIntent(message);
+  const multiIntent = classifyPackedCaseIntake(message, conversationSummary);
   const followUpIntent = classifyFollowUpIntent(message);
   const hasActiveContext = hasActiveFamilyLawContext(conversationSummary, activeMode, hasActiveDocumentContext);
   const bareVaguePronounFollowUp = isBareVaguePronounFollowUp(documentReference, followUpIntent);
@@ -199,6 +247,68 @@ export function classifyMessage(
 
   if (legalIntent === 'draft_response_to_other_party') {
     return buildResult('party_message_draft', documentReference, legalIntent);
+  }
+
+  if (legalIntent !== 'court_filing_draft' && (legalIntent === 'packed_case_intake' || multiIntent.secondaryIntents.length >= 3)) {
+    return buildResult('packed_case_intake', documentReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'new_court_filing_received' || legalIntent === 'court_response_deadline') {
+    return buildResult('litigation_navigation', documentReference, legalIntent, multiIntent);
+  }
+
+  if (
+    legalIntent === 'co_parent_response_strategy' &&
+    followUpIntent === 'same_issue_what_to_say' &&
+    hasActiveContext
+  ) {
+    const activeReference = documentReference.referencesDocument && !bareVaguePronounFollowUp
+      ? documentReference
+      : activeDocumentFollowUpReference(message);
+    return buildResult('co_parent_response', activeReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'filing_walkthrough') {
+    return buildResult('filing_walkthrough', documentReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'pro_se_feasibility') {
+    return buildResult('pro_se_guidance', documentReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'attorney_cost_question' || legalIntent === 'legal_aid_resource_request') {
+    return buildResult('attorney_resource_guidance', documentReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'judge_explanation_strategy') {
+    return buildResult('court_narrative_builder', documentReference, legalIntent, multiIntent);
+  }
+
+  if (shouldRouteAsActiveOrderFollowUp(legalIntent, followUpIntent, hasActiveContext)) {
+    const activeReference = documentReference.referencesDocument && !bareVaguePronounFollowUp
+      ? documentReference
+      : activeDocumentFollowUpReference(message);
+    return buildResult(
+      inferFollowUpRoute(message, conversationSummary, activeMode),
+      activeReference,
+      'direct_order_interpretation'
+    );
+  }
+
+  if (legalIntent === 'co_parent_response_strategy') {
+    return buildResult('co_parent_response', documentReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'pressure_or_manipulation_response') {
+    return buildResult('supportive_strategy', documentReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'documentation_guidance') {
+    return buildResult('documentation_strategy', documentReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'emotional_legal_support' || legalIntent === 'deescalation_support') {
+    return buildResult('supportive_strategy', documentReference, legalIntent, multiIntent);
   }
 
   if (
@@ -294,6 +404,7 @@ export function preserveOrUpgradeDocumentRoute(
   if (classified.mode === 'safety_escalation') return classified;
 
   const legalIntent = classifyLegalIntent(message);
+  const multiIntent = classifyPackedCaseIntake(message);
   const documentReference = classified.documentReference ?? detectDocumentReference(message);
   const followUpIntent = classifyFollowUpIntent(message);
   const bareVaguePronounFollowUp = isBareVaguePronounFollowUp(documentReference, followUpIntent);
@@ -327,6 +438,63 @@ export function preserveOrUpgradeDocumentRoute(
     return buildResult('party_message_draft', documentReference, legalIntent);
   }
 
+  if (legalIntent !== 'court_filing_draft' && (legalIntent === 'packed_case_intake' || multiIntent.secondaryIntents.length >= 3)) {
+    return buildResult('packed_case_intake', documentReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'new_court_filing_received' || legalIntent === 'court_response_deadline') {
+    return buildResult('litigation_navigation', documentReference, legalIntent, multiIntent);
+  }
+
+  if (
+    legalIntent === 'co_parent_response_strategy' &&
+    followUpIntent === 'same_issue_what_to_say'
+  ) {
+    const activeReference = documentReference.referencesDocument && !bareVaguePronounFollowUp
+      ? documentReference
+      : activeDocumentFollowUpReference(message);
+    return buildResult('co_parent_response', activeReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'filing_walkthrough') {
+    return buildResult('filing_walkthrough', documentReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'pro_se_feasibility') {
+    return buildResult('pro_se_guidance', documentReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'attorney_cost_question' || legalIntent === 'legal_aid_resource_request') {
+    return buildResult('attorney_resource_guidance', documentReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'judge_explanation_strategy') {
+    return buildResult('court_narrative_builder', documentReference, legalIntent, multiIntent);
+  }
+
+  if (shouldRouteAsActiveOrderFollowUp(legalIntent, followUpIntent, true)) {
+    const activeReference = documentReference.referencesDocument && !bareVaguePronounFollowUp
+      ? documentReference
+      : activeDocumentFollowUpReference(message);
+    return buildResult(
+      inferFollowUpRoute(message, undefined, activeMode),
+      activeReference,
+      'direct_order_interpretation'
+    );
+  }
+
+  if (legalIntent === 'co_parent_response_strategy') {
+    return buildResult('co_parent_response', documentReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'pressure_or_manipulation_response' || legalIntent === 'emotional_legal_support') {
+    return buildResult('supportive_strategy', documentReference, legalIntent, multiIntent);
+  }
+
+  if (legalIntent === 'documentation_guidance') {
+    return buildResult('documentation_strategy', documentReference, legalIntent, multiIntent);
+  }
+
   if (
     documentReference.referencesDocument &&
     legalIntent === 'general_summary' &&
@@ -356,6 +524,12 @@ function buildToolPlan(mode: RouteMode): ToolPlan {
     'document_analysis',
     'order_interpretation',
     'possession_access_schedule',
+    'co_parent_response',
+    'packed_case_intake',
+    'litigation_navigation',
+    'court_response_planning',
+    'court_narrative_builder',
+    'filing_walkthrough',
   ];
   const officialResearchModes: RouteMode[] = [
     'local_procedure',
@@ -363,21 +537,36 @@ function buildToolPlan(mode: RouteMode): ToolPlan {
     'order_interpretation',
     'possession_access_schedule',
     'court_ready_drafting',
+    'packed_case_intake',
+    'litigation_navigation',
+    'court_response_planning',
+    'pro_se_guidance',
+    'attorney_resource_guidance',
+    'filing_walkthrough',
   ];
 
   return {
     useFileSearch: [...documentModes, 'court_ready_drafting', 'judge_lens_strategy', 'pattern_analysis'].includes(mode),
     useWebSearch: [...officialResearchModes, 'document_analysis'].includes(mode),
-    useCodeInterpreter: ['pattern_analysis', 'document_analysis'].includes(mode),
+    useCodeInterpreter: ['pattern_analysis', 'document_analysis', 'packed_case_intake', 'litigation_navigation'].includes(mode),
     useLocalCourtRetriever: officialResearchModes.includes(mode),
     needsClarification: false, // Set by the model if needed
   };
 }
 
-function buildResult(mode: RouteMode, documentReference?: DocumentReferenceDetection, legalIntent?: LegalIntent): RouterResult {
+function buildResult(
+  mode: RouteMode,
+  documentReference?: DocumentReferenceDetection,
+  legalIntent?: LegalIntent,
+  multiIntent?: RouterResult['multiIntent']
+): RouterResult {
   const requiresDocumentRetrieval =
     documentReference?.referencesDocument ||
     ['document_analysis', 'order_interpretation', 'possession_access_schedule'].includes(mode) ||
+    (isLitigationNavigationRoute(mode) && (
+      Boolean(multiIntent?.requiresDocumentReview) ||
+      documentReference?.referencesDocument
+    )) ||
     undefined;
   const baseToolPlan = buildToolPlan(mode);
 
@@ -389,6 +578,7 @@ function buildResult(mode: RouteMode, documentReference?: DocumentReferenceDetec
     },
     temperature: MODE_TEMPERATURES[mode],
     legalIntent,
+    multiIntent,
     documentReference,
     requiresDocumentRetrieval,
     requiresClarification: documentReference?.mayNeedClarification || undefined,

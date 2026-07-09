@@ -101,6 +101,7 @@ describe('legal interpretation response shape', () => {
       },
       documentAnswer: null,
       legalInterpretation: legalInterpretation(),
+      litigationNavigation: null,
     })).toBe(true);
 
     expect(validateAssistantResponse({

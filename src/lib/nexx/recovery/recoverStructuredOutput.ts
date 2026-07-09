@@ -105,6 +105,7 @@ export async function recoverStructuredOutput(
       artifacts: EMPTY_ARTIFACTS,
       documentAnswer: null,
       legalInterpretation: null,
+      litigationNavigation: null,
     },
     stage: 'fallback',
   };

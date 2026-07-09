@@ -50,6 +50,61 @@ export const RESPONSE_MODE_SKELETONS: Record<RouteMode, ResponseModeSkeleton> = 
     sections: ['Draft Message', 'Why This Wording Fits', 'Optional Firmer Version', 'Next Step'],
     description: 'Plain-language message drafting for AppClose, co-parenting, notice, or other-party communication',
   },
+  supportive_strategy: {
+    mode: 'supportive_strategy',
+    sections: ['Calm Acknowledgment', 'Legal Anchor', 'What Matters', 'Strategy', 'Next Step'],
+    description: 'Client-care legal support for emotional, pressured, or reactive moments',
+  },
+  co_parent_response: {
+    mode: 'co_parent_response',
+    sections: ['Calm Anchor', 'What Needs A Response', 'Neutral Draft', 'Firmer Draft', 'Documentation'],
+    description: 'Court-appropriate co-parent response strategy and drafting',
+  },
+  documentation_strategy: {
+    mode: 'documentation_strategy',
+    sections: ['What To Save', 'Neutral Notes', 'Evidence Timeline', 'What To Avoid', 'Next Step'],
+    description: 'Evidence preservation and neutral documentation guidance',
+  },
+  deescalation_response: {
+    mode: 'deescalation_response',
+    sections: ['Slow Down', 'Do Not Take Bait', 'Order-Based Response', 'Document', 'Stop Point'],
+    description: 'De-escalation support for pressured co-parent conflict',
+  },
+  packed_case_intake: {
+    mode: 'packed_case_intake',
+    sections: ['Supportive Opening', 'First Priority', 'Issue Tracks', 'Co-Parent Response', 'Evidence', 'Pro Se/Cost', 'Judge Explanation', 'Next Steps'],
+    description: 'Packed multi-issue family-law intake and litigation navigation',
+  },
+  litigation_navigation: {
+    mode: 'litigation_navigation',
+    sections: ['Deadline First', 'Court Posture', 'Response Plan', 'Evidence', 'Resources', 'Next Steps'],
+    description: 'Court filing, service, deadline, and response planning',
+  },
+  court_response_planning: {
+    mode: 'court_response_planning',
+    sections: ['Filed Document', 'Deadline', 'Likely Response', 'Evidence', 'Drafting Readiness'],
+    description: 'Planning the response to a filed family-law court document',
+  },
+  pro_se_guidance: {
+    mode: 'pro_se_guidance',
+    sections: ['Practical Read', 'Doable Pro Se', 'Higher Risk', 'Limited-Scope Help', 'Next Step'],
+    description: 'Respectful pro se feasibility and limited-scope attorney guidance',
+  },
+  attorney_resource_guidance: {
+    mode: 'attorney_resource_guidance',
+    sections: ['Cost Categories', 'Resource Types', 'County/State Needed', 'Official Sources', 'Next Step'],
+    description: 'Attorney, legal-aid, fee, and local resource guidance without invented prices',
+  },
+  court_narrative_builder: {
+    mode: 'court_narrative_builder',
+    sections: ['Judge-Ready Theory', 'Current Order', 'Timeline', 'Evidence', 'Requested Relief'],
+    description: 'Convert emotional story into court-ready explanation',
+  },
+  filing_walkthrough: {
+    mode: 'filing_walkthrough',
+    sections: ['What Was Filed', 'Deadline', 'Checklist', 'Filing Steps', 'Service', 'Proof'],
+    description: 'Step-by-step pro se filing walkthrough with readiness checks',
+  },
   judge_lens_strategy: {
     mode: 'judge_lens_strategy',
     sections: ["Judge's View", 'Strong Facts', 'Weak Spots', 'Neutral Framing', 'Next Steps', 'Court-Appropriate Version'],

@@ -160,6 +160,10 @@ function cleanUserFacingDocumentText(value: string) {
     .replace(/\bmemoryGenerationId\b:?/g, 'source')
     .replace(/\bblockIds\b:?/g, 'source')
     .replace(/\bquotedText\b:?/g, 'source quote')
+    .replace(/\bextracted court-order text\b/gi, 'court-order language')
+    .replace(/\bextracted order text\b/gi, 'visible order language')
+    .replace(/\bextracted text\b/gi, 'visible order language')
+    .replace(/\bextracted provisions\b/gi, 'visible provisions')
     .replace(/\bsrc_\d+\b/gi, 'source')
     .replace(/\s+([,.;:])/g, '$1')
     .replace(/[^\S\n]{2,}/g, ' ')
@@ -266,7 +270,7 @@ export function buildBestEffortLegalDocumentAnswerFromSources(
       answerType: 'not_found',
       answer: cleanUserFacingDocumentText(
         fallbackMessage ||
-        'I do not see usable extracted text for this upload yet. Reprocess the document or upload a clearer copy and I can analyze it.'
+        'I do not see usable order language for this upload yet. Upload a clearer copy and I can analyze it.'
       ),
       claims: [],
       citations: [],
@@ -278,7 +282,7 @@ export function buildBestEffortLegalDocumentAnswerFromSources(
 
   return {
     answerType: 'summary',
-    answer: 'I found usable extracted court-order text and organized the visible provisions below. I will cite exact pages when page data is available and otherwise stay grounded in the extracted order text.',
+    answer: 'I found usable court-order language and organized the visible provisions below. I will cite exact pages when page data is available and otherwise stay grounded in the visible order language.',
     claims: usableSources.map(({ source, claim }) => ({
       claim,
       claimType: isDeadlineClaim(claim) ? 'procedural' : 'document_fact',
@@ -389,12 +393,12 @@ function deadlineTimingFromClaim(value: string) {
     const match = searchableValue.match(pattern);
     if (match?.[0]) return cleanUserFacingDocumentText(restoreTimeAbbreviations(match[0]));
   }
-  return 'Not stated in the extracted text';
+  return 'Not stated in the visible order language';
 }
 
 function isDeadlineClaim(value: string) {
   return (
-    deadlineTimingFromClaim(value) !== 'Not stated in the extracted text' ||
+    deadlineTimingFromClaim(value) !== 'Not stated in the visible order language' ||
     /\b(deadline|within|no later than|monthly|every|notice|payment|support|pay|due)\b/i.test(value) ||
     /\b(?:calendar|business)\s+days?\b/i.test(value) ||
     DAY_COUNT_DEADLINE_PATTERN.test(value)
@@ -410,7 +414,7 @@ function restoreTimeAbbreviations(value: string) {
 }
 
 function formatMarkdownList(items: string[]) {
-  return items.length > 0 ? items.map((item) => `- ${item}`).join('\n') : '- No supported finding was extracted from the available text.';
+  return items.length > 0 ? items.map((item) => `- ${item}`).join('\n') : '- No supported finding was identified in the visible order language.';
 }
 
 function markdownTableCell(value: string) {
@@ -461,12 +465,12 @@ export function renderCourtOrderAnalysisMarkdown(
       const source = labels.length > 0 ? labels.map((label) => `[${label}]`).join(' ') : 'Order text';
       return `| ${markdownTableCell(claim.claim)} | ${markdownTableCell(deadlineTimingFromClaim(claim.claim))} | ${source} |`;
     })
-    : [`| ${markdownTableCell('No specific deadline was identified in the extracted provisions.')} | ${markdownTableCell('Not stated')} | - |`];
+    : [`| ${markdownTableCell('No specific deadline was identified in the visible provisions.')} | ${markdownTableCell('Not stated')} | - |`];
 
   return [
     '# Court Order Analysis',
     '## Executive Summary',
-    executiveSummary || 'I found extracted order text and organized the visible provisions below.',
+    executiveSummary || 'I found visible order language and organized the provisions below.',
     '## Highest-Priority Findings',
     formatMarkdownList(priorityFindings),
     '## Key Obligations',
@@ -515,7 +519,7 @@ export function renderTargetedLegalDocumentAnswerMarkdown(
       : DEFAULT_PRACTICAL_MEANING;
 
   return [
-    directAnswer || 'I do not see enough supported text in the extracted order to answer that directly.',
+    directAnswer || 'I do not see enough visible order language to answer that directly.',
     findingItems.length > 0 ? `**Why:**\n${formatMarkdownList(findingItems)}` : undefined,
     `**Practical meaning:** ${practicalMeaning}`,
   ].filter(Boolean).join('\n\n');

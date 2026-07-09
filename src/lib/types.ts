@@ -4,6 +4,7 @@
 
 import type { DocumentReferenceDetection } from './nexx/documentReferenceDetection';
 import type { LegalInterpretationAnswer } from './nexx/legal-engine/legalInterpretationSchema';
+import type { LitigationNavigationResponse } from './nexx/legal-engine/litigationNavigationSchema';
 import type { LegalDocumentAnswer } from './nexx/legalDocumentAnswer';
 
 // Re-export shared content bus types for convenience
@@ -30,6 +31,17 @@ export type RouteMode =
   | 'order_interpretation'
   | 'possession_access_schedule'
   | 'party_message_draft'
+  | 'supportive_strategy'
+  | 'co_parent_response'
+  | 'documentation_strategy'
+  | 'deescalation_response'
+  | 'packed_case_intake'
+  | 'litigation_navigation'
+  | 'court_response_planning'
+  | 'pro_se_guidance'
+  | 'attorney_resource_guidance'
+  | 'court_narrative_builder'
+  | 'filing_walkthrough'
   | 'judge_lens_strategy'
   | 'court_ready_drafting'
   | 'pattern_analysis'
@@ -45,7 +57,33 @@ export type LegalIntent =
   | 'draft_response_to_other_party'
   | 'court_filing_draft'
   | 'evidence_strategy'
-  | 'general_summary';
+  | 'general_summary'
+  | 'emotional_legal_support'
+  | 'co_parent_response_strategy'
+  | 'pressure_or_manipulation_response'
+  | 'documentation_guidance'
+  | 'deescalation_support'
+  | 'packed_case_intake'
+  | 'new_court_filing_received'
+  | 'court_response_deadline'
+  | 'pro_se_feasibility'
+  | 'attorney_cost_question'
+  | 'legal_aid_resource_request'
+  | 'judge_explanation_strategy'
+  | 'court_response_drafting'
+  | 'filing_walkthrough'
+  | 'evidence_timeline_strategy';
+
+export type MultiIntentResult = {
+  primaryIntent: LegalIntent;
+  secondaryIntents: LegalIntent[];
+  urgency: 'low' | 'medium' | 'high' | 'urgent';
+  requiresDocumentReview: boolean;
+  requiresCourtDeadlineCheck: boolean;
+  requiresCoParentDraft: boolean;
+  requiresResourceLookup: boolean;
+  requiresFilingPlanning: boolean;
+};
 
 export type FollowUpIntent =
   | 'same_issue_yes_no'
@@ -75,6 +113,7 @@ export interface RouterResult {
   toolPlan: ToolPlan;
   temperature: number;
   legalIntent?: LegalIntent;
+  multiIntent?: MultiIntentResult;
   documentReference?: DocumentReferenceDetection;
   requiresDocumentRetrieval?: boolean;
   requiresClarification?: boolean;
@@ -102,6 +141,7 @@ export interface NexxAssistantResponse {
   artifacts: NexxArtifacts;
   documentAnswer: LegalDocumentAnswer | null;
   legalInterpretation: LegalInterpretationAnswer | null;
+  litigationNavigation: LitigationNavigationResponse | null;
 }
 
 // ---------------------------------------------------------------------------

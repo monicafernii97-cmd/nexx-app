@@ -361,8 +361,13 @@ const DAY_COUNT_WORDS = [
 ].sort((a, b) => b.length - a.length);
 
 const DAY_COUNT_PATTERN = `(?:\\d+|${DAY_COUNT_WORDS.join('|')})`;
+const DAY_COUNT_TO_DAY_UNIT_PATTERN = `${DAY_COUNT_PATTERN}(?:\\s+|-)(?:(?:calendar|business)(?:\\s+|-))?days?`;
 const WITHIN_DAYS_PATTERN = new RegExp(
-  `\\bwithin\\s+${DAY_COUNT_PATTERN}\\s+(?:calendar\\s+|business\\s+)?days?\\b`,
+  `\\bwithin\\s+${DAY_COUNT_TO_DAY_UNIT_PATTERN}\\b`,
+  'i',
+);
+const DAY_COUNT_DEADLINE_PATTERN = new RegExp(
+  `\\b${DAY_COUNT_TO_DAY_UNIT_PATTERN}\\b`,
   'i',
 );
 
@@ -374,6 +379,7 @@ function deadlineTimingFromClaim(value: string) {
     /\b(?:period|possession|weekend)\b[^.;]{0,90}\b(?:begins|starts)\s+(?:at|on)\s+[^.;]+/i,
     /\b(?:begins|starts)\s+(?:at|on)\s+[^.;]+/i,
     WITHIN_DAYS_PATTERN,
+    DAY_COUNT_DEADLINE_PATTERN,
     /\bno later than\s+[^.;,]+/i,
     /\bmonthly\b/i,
     /\bevery\s+[^.;,]+/i,
@@ -387,7 +393,12 @@ function deadlineTimingFromClaim(value: string) {
 }
 
 function isDeadlineClaim(value: string) {
-  return /\b(deadline|within|no later than|monthly|every|calendar|days?|notice|payment|support|pay|due)\b/i.test(value);
+  return (
+    deadlineTimingFromClaim(value) !== 'Not stated in the extracted text' ||
+    /\b(deadline|within|no later than|monthly|every|notice|payment|support|pay|due)\b/i.test(value) ||
+    /\b(?:calendar|business)\s+days?\b/i.test(value) ||
+    DAY_COUNT_DEADLINE_PATTERN.test(value)
+  );
 }
 
 function protectTimeAbbreviations(value: string) {

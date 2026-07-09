@@ -437,6 +437,11 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
           claimType: 'document_fact',
           sourceIds: ['src_001'],
         },
+        {
+          claim: 'The specific Father\'s Day provision controls over the general standard weekend schedule during Father\'s Day weekend.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
       ],
     }), sourcePackets, 'Fallback answer');
 
@@ -444,6 +449,30 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
 
     expect(deadlinesSection).toContain('| If Friday is a federal, state, or local holiday, or a student holiday or teacher in-service day, the regular weekend period begins at 6:00 p.m. on Thursday. | weekend period begins at 6:00 p.m. on Thursday | [p. 4] |');
     expect(deadlinesSection).toContain('| The Father\'s Day possession period runs from 6:00 p.m. on the Friday preceding Father\'s Day until 8:00 a.m. on the Monday after Father\'s Day. | from 6:00 p.m. on the Friday preceding Father\'s Day until 8:00 a.m. on the Monday after Father\'s Day | [p. 4] |');
+    expect(deadlinesSection).not.toContain('The specific Father\'s Day provision controls over the general standard weekend schedule');
+    expect(deadlinesSection).not.toContain('Not stated in the extracted text');
+  });
+
+  it('extracts hyphenated day-count deadlines', () => {
+    const content = renderCourtOrderAnalysisMarkdown(answer({
+      claims: [
+        {
+          claim: 'The order requires 10-day notice before international travel.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
+        {
+          claim: 'The order requires seven-business-day notice before a schedule change.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
+      ],
+    }), sourcePackets, 'Fallback answer');
+
+    const deadlinesSection = sectionBetween(content, '## Deadlines', '## Recommended Next Steps');
+
+    expect(deadlinesSection).toContain('| The order requires 10-day notice before international travel. | 10-day | [p. 4] |');
+    expect(deadlinesSection).toContain('| The order requires seven-business-day notice before a schedule change. | seven-business-day | [p. 4] |');
     expect(deadlinesSection).not.toContain('Not stated in the extracted text');
   });
 });

@@ -1,3 +1,4 @@
+import { validateLegalInterpretationAnswerShape } from '../legal-engine/legalInterpretationSchema';
 import { validateLegalDocumentAnswerShape } from '../legalDocumentAnswer';
 
 /**
@@ -34,6 +35,8 @@ export function validateAssistantResponse(parsed: unknown): boolean {
 
   if (!('documentAnswer' in obj)) return false;
   if (obj.documentAnswer !== null && !validateLegalDocumentAnswerShape(obj.documentAnswer)) return false;
+  if (!('legalInterpretation' in obj)) return false;
+  if (obj.legalInterpretation !== null && !validateLegalInterpretationAnswerShape(obj.legalInterpretation)) return false;
 
   return true;
 }

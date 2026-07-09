@@ -104,6 +104,7 @@ export async function recoverStructuredOutput(
       message: 'I was unable to generate a structured response. Please try rephrasing your question.',
       artifacts: EMPTY_ARTIFACTS,
       documentAnswer: null,
+      legalInterpretation: null,
     },
     stage: 'fallback',
   };

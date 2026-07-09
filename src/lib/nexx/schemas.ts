@@ -191,6 +191,120 @@ const legalDocumentAnswerSchema = {
   required: ['answerType', 'answer', 'claims', 'citations', 'warnings', 'unsupportedClaims', 'notFoundReason'],
 } as const;
 
+const legalInterpretationClauseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    label: { type: 'string' },
+    quote: { type: 'string' },
+    sourceIds: { type: 'array', items: { type: 'string' } },
+    pageStart: { type: ['number', 'null'] },
+    pageEnd: { type: ['number', 'null'] },
+  },
+  required: ['label', 'quote', 'sourceIds', 'pageStart', 'pageEnd'],
+} as const;
+
+const legalInterpretationCompetingClauseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    label: { type: 'string' },
+    quote: { type: 'string' },
+    sourceIds: { type: 'array', items: { type: 'string' } },
+    whyItDoesOrDoesNotControl: { type: 'string' },
+  },
+  required: ['label', 'quote', 'sourceIds', 'whyItDoesOrDoesNotControl'],
+} as const;
+
+const legalInterpretationPriorityLanguageSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    signal: {
+      type: 'string',
+      enum: [
+        'except_as_otherwise_provided',
+        'notwithstanding',
+        'specific_over_general',
+        'later_modification',
+        'other',
+      ],
+    },
+    explanation: { type: 'string' },
+    sourceIds: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['signal', 'explanation', 'sourceIds'],
+} as const;
+
+const legalInterpretationSchema = {
+  type: ['object', 'null'],
+  additionalProperties: false,
+  properties: {
+    answerType: { type: 'string', enum: ['order_interpretation'] },
+    directAnswer: { type: 'string' },
+    userFacingCertainty: {
+      type: 'string',
+      enum: ['clear', 'best_reading', 'ambiguous', 'insufficient_text'],
+    },
+    controllingClauses: {
+      type: 'array',
+      items: legalInterpretationClauseSchema,
+    },
+    competingClauses: {
+      type: 'array',
+      items: legalInterpretationCompetingClauseSchema,
+    },
+    priorityLanguage: {
+      type: 'array',
+      items: legalInterpretationPriorityLanguageSchema,
+    },
+    interpretation: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        plainEnglish: { type: 'string' },
+        legalReading: { type: 'string' },
+        opposingArgument: { type: ['string', 'null'] },
+        responseToOpposingArgument: { type: ['string', 'null'] },
+      },
+      required: ['plainEnglish', 'legalReading', 'opposingArgument', 'responseToOpposingArgument'],
+    },
+    practicalMeaning: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        result: { type: 'string' },
+        startTime: { type: ['string', 'null'] },
+        endTime: { type: ['string', 'null'] },
+        whatUserShouldDo: { type: ['string', 'null'] },
+      },
+      required: ['result', 'startTime', 'endTime', 'whatUserShouldDo'],
+    },
+    draftMessage: {
+      type: ['object', 'null'],
+      additionalProperties: false,
+      properties: {
+        tone: { type: 'string', enum: ['neutral', 'firm', 'court_ready'] },
+        text: { type: 'string' },
+      },
+      required: ['tone', 'text'],
+    },
+    caveats: { type: 'array', items: { type: 'string' } },
+  },
+  required: [
+    'answerType',
+    'directAnswer',
+    'userFacingCertainty',
+    'controllingClauses',
+    'competingClauses',
+    'priorityLanguage',
+    'interpretation',
+    'practicalMeaning',
+    'draftMessage',
+    'caveats',
+  ],
+} as const;
+
 // ---------------------------------------------------------------------------
 // 1. Chat Response Schema (nexx_assistant_response)
 // ---------------------------------------------------------------------------
@@ -218,8 +332,9 @@ export const NEXX_RESPONSE_SCHEMA = {
                    'judgeSimulation', 'oppositionSimulation', 'confidence'],
       },
       documentAnswer: legalDocumentAnswerSchema,
+      legalInterpretation: legalInterpretationSchema,
     },
-    required: ['message', 'artifacts', 'documentAnswer'],
+    required: ['message', 'artifacts', 'documentAnswer', 'legalInterpretation'],
   },
 };
 

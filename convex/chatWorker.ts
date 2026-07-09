@@ -19,6 +19,8 @@ import { recoverStructuredOutput } from '../src/lib/nexx/recovery/recoverStructu
 import { suppressWeakArtifacts } from '../src/lib/nexx/recovery/suppressWeakArtifacts';
 import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
 import { polishLegalResponse } from '../src/lib/nexx/postprocess';
+import { renderLegalInterpretationMarkdown } from '../src/lib/nexx/legal-engine/legalInterpretationRenderer';
+import { verifyLegalInterpretationAnswer } from '../src/lib/nexx/legal-engine/legalInterpretationVerifier';
 import {
     type LegalDocumentAnswerVerification,
     type LegalDocumentSourcePacket,
@@ -71,7 +73,7 @@ function emptyArtifacts(): NexxAssistantResponse['artifacts'] {
 
 /** Build a structured fallback response when provider generation fails. */
 function degradedResponse(message = DEGRADED_MESSAGE): NexxAssistantResponse {
-    return { message, artifacts: emptyArtifacts(), documentAnswer: null };
+    return { message, artifacts: emptyArtifacts(), documentAnswer: null, legalInterpretation: null };
 }
 
 /** Normalize provider exceptions into retryable worker error metadata. */
@@ -797,11 +799,17 @@ function selectAttachmentContextsForPrompt(
 function buildAttachmentContextPrompt(
     attachments: AttachmentContext[],
     detection: DocumentReferenceDetection,
-    sourcePackets: LegalDocumentSourcePacket[]
+    sourcePackets: LegalDocumentSourcePacket[],
+    routeMode: RouteMode
 ) {
     if (attachments.length === 0) return '';
 
     const preferRetrievedChunks = shouldPreferRetrievedChunks(detection);
+    const shouldFillLegalInterpretation =
+        routeMode === 'order_interpretation' ||
+        routeMode === 'possession_access_schedule' ||
+        detection.referenceType === 'possession_schedule_interpretation' ||
+        detection.referenceType === 'clause_conflict_interpretation';
     const blocks = attachments.map((attachment) => {
         const sourceLabel = attachment.source === 'conversation_memory'
             ? 'stored conversation document memory'
@@ -859,6 +867,8 @@ function buildAttachmentContextPrompt(
         'When you make document-specific claims, fill documentAnswer with claims and citations that use only the SOURCE_ID values shown in retrieved chunks.',
         'Every document_fact, quote, summary, comparison, interpretation, or procedural claim in documentAnswer.claims must include at least one valid sourceId.',
         'Every documentAnswer citation may include a short supports phrase copied from the cited SOURCE_ID text, but must not include file names, chunk IDs, memory generation IDs, block IDs, raw source objects, or backend metadata.',
+        shouldFillLegalInterpretation ? 'This turn is a direct order-interpretation task. Fill legalInterpretation with a direct answer, controlling clauses, competing clauses when relevant, priority language, practical meaning, and a suggested reply when useful. Keep documentAnswer as the citation-safety record for the same sourced claims.' : undefined,
+        shouldFillLegalInterpretation ? 'For legalInterpretation, use only SOURCE_ID references in sourceIds. Do not include file names, chunk IDs, memory generation IDs, block IDs, raw source objects, or backend field names.' : undefined,
         'If source packets contain usable extracted order text, answer from that text even when page metadata is incomplete. Cite page labels when available; if a page label is unavailable, keep the claim grounded in the extracted text without inventing a page number.',
         'If the retrieved chunks truly do not contain the requested fact after checking them, say what you checked and what the extracted order text does not state.',
         preferRetrievedChunks ? 'Use the retrieved chunks first for this turn; they were selected from stored document memory for the user\'s specific question.' : undefined,
@@ -915,7 +925,8 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
     const attachmentContextPrompt = buildAttachmentContextPrompt(
         attachmentContexts,
         documentReference,
-        documentSourcePackets
+        documentSourcePackets,
+        routeMode
     );
     const shouldUseUploadedDocumentMemory =
         attachmentContexts.length > 0 &&
@@ -1065,6 +1076,17 @@ function shouldRequireDocumentAnswer(args: {
         );
 }
 
+function isLegalInterpretationRoute(routeMode: RouteMode, detection: DocumentReferenceDetection) {
+    return routeMode === 'order_interpretation' ||
+        routeMode === 'possession_access_schedule' ||
+        detection.referenceType === 'possession_schedule_interpretation' ||
+        detection.referenceType === 'clause_conflict_interpretation';
+}
+
+function hasClauseConflictSignal(detection: DocumentReferenceDetection) {
+    return detection.referenceType === 'clause_conflict_interpretation';
+}
+
 function renderCitationLockedDocumentMessage(
     response: NexxAssistantResponse,
     sourcePackets: LegalDocumentSourcePacket[],
@@ -1079,6 +1101,26 @@ function renderCitationLockedDocumentMessage(
             ? renderTargetedLegalDocumentAnswerMarkdown(answer, sourcePackets, response.message)
             : renderCourtOrderAnalysisMarkdown(answer, sourcePackets, response.message),
     };
+}
+
+function renderDocumentMessage(
+    response: NexxAssistantResponse,
+    sourcePackets: LegalDocumentSourcePacket[],
+    documentReference: DocumentReferenceDetection,
+    routeMode: RouteMode
+) {
+    if (isLegalInterpretationRoute(routeMode, documentReference) && response.legalInterpretation) {
+        return {
+            ...response,
+            message: renderLegalInterpretationMarkdown(
+                response.legalInterpretation,
+                sourcePackets,
+                response.message
+            ),
+        };
+    }
+
+    return renderCitationLockedDocumentMessage(response, sourcePackets, documentReference);
 }
 
 function citationLockedFallbackResponse(
@@ -1096,6 +1138,7 @@ function citationLockedFallbackResponse(
         message: documentAnswer.answer,
         artifacts: emptyArtifacts(),
         documentAnswer,
+        legalInterpretation: null,
     };
 }
 
@@ -1333,12 +1376,23 @@ async function generateWithFallbacks({
                 routeMode,
             });
             const optionalDocumentAnswerPresent = !requiresDocumentAnswer && Boolean(parsedResponse.documentAnswer);
+            const requiresLegalInterpretation =
+                isLegalInterpretationRoute(routeMode, promptBundle.documentReference) &&
+                promptBundle.documentSourcePackets.length > 0;
             let citationVerification = verifyLegalDocumentAnswer(
                 parsedResponse.documentAnswer,
                 promptBundle.documentSourcePackets,
                 {
                     requiresDocumentAnswer: requiresDocumentAnswer || optionalDocumentAnswerPresent,
                     requiresCitation: requiresDocumentAnswer || optionalDocumentAnswerPresent,
+                }
+            );
+            let legalInterpretationVerification = verifyLegalInterpretationAnswer(
+                parsedResponse.legalInterpretation,
+                promptBundle.documentSourcePackets,
+                {
+                    requiresLegalInterpretation,
+                    hasClauseConflictSignal: hasClauseConflictSignal(promptBundle.documentReference),
                 }
             );
 
@@ -1354,14 +1408,32 @@ async function generateWithFallbacks({
                 );
             }
 
-            if (!citationVerification.passed && requiresDocumentAnswer) {
+            if (!legalInterpretationVerification.passed && !requiresLegalInterpretation) {
+                parsedResponse = { ...parsedResponse, legalInterpretation: null };
+                legalInterpretationVerification = verifyLegalInterpretationAnswer(
+                    parsedResponse.legalInterpretation,
+                    promptBundle.documentSourcePackets,
+                    {
+                        requiresLegalInterpretation: false,
+                        hasClauseConflictSignal: false,
+                    }
+                );
+            }
+
+            if (
+                (!citationVerification.passed && requiresDocumentAnswer) ||
+                (!legalInterpretationVerification.passed && requiresLegalInterpretation)
+            ) {
                 const repairedResponse = await repairCitationLockedResponse({
                     client,
                     model: step.model,
                     userMessage: context.turn.message,
                     promptBundle,
                     originalResponse: parsedResponse,
-                    verifierErrors: citationVerification.errors,
+                    verifierErrors: [
+                        ...citationVerification.errors,
+                        ...legalInterpretationVerification.errors,
+                    ],
                 });
                 if (repairedResponse) {
                     const repairedVerification = verifyLegalDocumentAnswer(
@@ -1372,10 +1444,25 @@ async function generateWithFallbacks({
                             requiresCitation: requiresDocumentAnswer,
                         }
                     );
-                    if (repairedVerification.passed) {
+                    const repairedLegalInterpretationVerification = verifyLegalInterpretationAnswer(
+                        repairedResponse.response.legalInterpretation,
+                        promptBundle.documentSourcePackets,
+                        {
+                            requiresLegalInterpretation,
+                            hasClauseConflictSignal: hasClauseConflictSignal(promptBundle.documentReference),
+                        }
+                    );
+                    if (
+                        repairedVerification.passed &&
+                        (!requiresLegalInterpretation || repairedLegalInterpretationVerification.passed)
+                    ) {
                         parsedResponse = repairedResponse.response;
+                        if (!requiresLegalInterpretation && !repairedLegalInterpretationVerification.passed) {
+                            parsedResponse = { ...parsedResponse, legalInterpretation: null };
+                        }
                         responseId = repairedResponse.responseId ?? responseId;
                         citationVerification = repairedVerification;
+                        legalInterpretationVerification = repairedLegalInterpretationVerification;
                     }
                 }
             }
@@ -1395,10 +1482,15 @@ async function generateWithFallbacks({
                 );
             }
 
-            parsedResponse = renderCitationLockedDocumentMessage(
+            if (!legalInterpretationVerification.passed && requiresLegalInterpretation && citationVerification.passed) {
+                parsedResponse = { ...parsedResponse, legalInterpretation: null };
+            }
+
+            parsedResponse = renderDocumentMessage(
                 parsedResponse,
                 promptBundle.documentSourcePackets,
-                promptBundle.documentReference
+                promptBundle.documentReference,
+                routeMode
             );
             parsedResponse.message = polishLegalResponse(parsedResponse.message);
 

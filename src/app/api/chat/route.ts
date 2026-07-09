@@ -5,6 +5,7 @@ import type { Id } from '@convex/_generated/dataModel';
 import { classifyMessage, preserveOrUpgradeDocumentRoute } from '@/lib/nexx/router';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { getModelForRoute, type SubscriptionTier } from '@/lib/tiers';
+import type { RouteMode } from '@/lib/types';
 
 const MAX_MESSAGE_LENGTH = 100_000;
 
@@ -194,10 +195,11 @@ export async function POST(req: NextRequest) {
       ? (userRecord.subscriptionTier as SubscriptionTier)
       : 'free';
 
-  const classified = classifyMessage(message);
+  const activeRouteMode = conversation.routeMode as RouteMode | undefined;
+  const classified = classifyMessage(message, undefined, activeRouteMode, sanitizedAttachments.length > 0);
   const routerResult =
     sanitizedAttachments.length > 0 && classified.mode !== 'safety_escalation'
-      ? preserveOrUpgradeDocumentRoute(classified, message)
+      ? preserveOrUpgradeDocumentRoute(classified, message, activeRouteMode)
       : classified;
   console.info('[Chat] Accepting chat turn', {
     requestId: turnRequestId,

@@ -47,6 +47,13 @@ export type LegalIntent =
   | 'evidence_strategy'
   | 'general_summary';
 
+export type FollowUpIntent =
+  | 'same_issue_yes_no'
+  | 'same_issue_what_to_say'
+  | 'same_issue_next_step'
+  | 'same_issue_rights_check'
+  | 'new_issue';
+
 // ---------------------------------------------------------------------------
 // Tool Plan — output of the router, tells the chat route which tools to wire
 // ---------------------------------------------------------------------------

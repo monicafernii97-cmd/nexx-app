@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { classifyLegalIntent } from '../legalIntent';
-import { classifyMessage, preserveOrUpgradeDocumentRoute } from '../router';
+import { classifyFollowUpIntent, classifyMessage, preserveOrUpgradeDocumentRoute } from '../router';
 
 describe('classifyMessage document follow-ups', () => {
   it.each([
@@ -78,6 +78,39 @@ describe('classifyMessage document follow-ups', () => {
     expect(upgraded.mode).toBe('possession_access_schedule');
     expect(upgraded.legalIntent).toBe('possession_access_schedule');
     expect(upgraded.requiresDocumentRetrieval).toBe(true);
+  });
+
+  it('upgrades vague active-document follow-ups into legal interpretation', () => {
+    const result = classifyMessage('Can he do that?', undefined, 'possession_access_schedule', true);
+
+    expect(classifyFollowUpIntent('Can he do that?')).toBe('same_issue_yes_no');
+    expect(result.mode).toBe('possession_access_schedule');
+    expect(result.legalIntent).toBe('direct_order_interpretation');
+    expect(result.documentReference?.referenceType).toBe('active_document_followup');
+    expect(result.requiresDocumentRetrieval).toBe(true);
+  });
+
+  it('routes what-to-say active-document follow-ups to the order interpretation path', () => {
+    const result = classifyMessage('What do I say back?', undefined, 'order_interpretation', true);
+
+    expect(classifyFollowUpIntent('What do I say back?')).toBe('same_issue_what_to_say');
+    expect(result.mode).toBe('order_interpretation');
+    expect(result.legalIntent).toBe('direct_order_interpretation');
+  });
+
+  it('does not invent active context for vague questions without a document or prior issue', () => {
+    const result = classifyMessage('Can he do that?');
+
+    expect(result.mode).toBe('adaptive_chat');
+    expect(result.documentReference?.referencesDocument).not.toBe(true);
+    expect(result.requiresDocumentRetrieval).toBeUndefined();
+  });
+
+  it('routes basic pickup-time rights questions to a direct legal answer when no order context is active', () => {
+    const result = classifyMessage('Can he just change the pickup time?');
+
+    expect(result.mode).toBe('direct_legal_answer');
+    expect(result.requiresDocumentRetrieval).toBeUndefined();
   });
 
   it('keeps generic uploaded-file prompts as document analysis', () => {

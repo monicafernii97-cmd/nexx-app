@@ -6,7 +6,7 @@ import type { ActionCtx } from './_generated/server';
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { classifyMessage } from '../src/lib/nexx/router';
+import { classifyFollowUpIntent, classifyMessage } from '../src/lib/nexx/router';
 import { buildSystemPolicyPrompt } from '../src/lib/nexx/prompts/systemPrompt';
 import { buildDeveloperBehaviorPrompt } from '../src/lib/nexx/prompts/developerPrompt';
 import { buildFeatureToolPrompt } from '../src/lib/nexx/prompts/featurePrompt';
@@ -19,6 +19,7 @@ import { recoverStructuredOutput } from '../src/lib/nexx/recovery/recoverStructu
 import { suppressWeakArtifacts } from '../src/lib/nexx/recovery/suppressWeakArtifacts';
 import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
 import { polishLegalResponse } from '../src/lib/nexx/postprocess';
+import { buildBestEffortLegalInterpretationFromDocumentAnswer } from '../src/lib/nexx/legal-engine/bestEffortLegalInterpretation';
 import { renderLegalInterpretationMarkdown } from '../src/lib/nexx/legal-engine/legalInterpretationRenderer';
 import { verifyLegalInterpretationAnswer } from '../src/lib/nexx/legal-engine/legalInterpretationVerifier';
 import {
@@ -589,6 +590,39 @@ function isDocumentContextRoute(routeMode?: RouteMode) {
         routeMode === 'possession_access_schedule';
 }
 
+function recentLegalContextSummary(messages: GenerationContext['recentMessages']) {
+    return messages
+        .filter((message) =>
+            message.status === undefined ||
+            message.status === 'committed' ||
+            message.status === 'degraded'
+        )
+        .slice(-8)
+        .map((message) => message.content.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+        .join('\n')
+        .slice(-4_000);
+}
+
+function activeFollowUpContextSummary(
+    message: string,
+    recentMessages: GenerationContext['recentMessages'],
+    routeMode?: RouteMode
+) {
+    if (classifyFollowUpIntent(message) === 'new_issue' || !isDocumentContextRoute(routeMode)) {
+        return undefined;
+    }
+    return recentLegalContextSummary(recentMessages);
+}
+
+function hasActiveDocumentContext(context: GenerationContext) {
+    return Boolean(
+        context.conversationDocumentState?.activeUploadedFileId ||
+        (context.attachmentContexts?.length ?? 0) > 0 ||
+        (context.availableDocumentContexts?.length ?? 0) > 0
+    );
+}
+
 function documentRetrievalRunCounts(attachments: AttachmentContext[]) {
     const chunks = attachments.flatMap((attachment) => attachment.documentChunks ?? []);
     return {
@@ -916,7 +950,13 @@ type StreamingResponsesClient = {
 function buildInput(context: GenerationContext, routeMode: RouteMode, contextPrompt: string) {
     const systemPrompt = buildSystemPolicyPrompt();
     const developerPrompt = buildDeveloperBehaviorPrompt(routeMode);
-    const routerResult = classifyMessage(context.turn.message);
+    const followUpSummary = activeFollowUpContextSummary(context.turn.message, context.recentMessages, routeMode);
+    const routerResult = classifyMessage(
+        context.turn.message,
+        followUpSummary,
+        routeMode,
+        hasActiveDocumentContext(context)
+    );
     const documentReference = routerResult.documentReference ?? detectDocumentReference(context.turn.message);
     const featurePrompt = buildFeatureToolPrompt(routerResult.toolPlan);
     const artifactPrompt = buildArtifactPrompt();
@@ -1107,7 +1147,8 @@ function renderDocumentMessage(
     response: NexxAssistantResponse,
     sourcePackets: LegalDocumentSourcePacket[],
     documentReference: DocumentReferenceDetection,
-    routeMode: RouteMode
+    routeMode: RouteMode,
+    userMessage: string
 ) {
     if (isLegalInterpretationRoute(routeMode, documentReference) && response.legalInterpretation) {
         return {
@@ -1115,7 +1156,8 @@ function renderDocumentMessage(
             message: renderLegalInterpretationMarkdown(
                 response.legalInterpretation,
                 sourcePackets,
-                response.message
+                response.message,
+                { userMessage }
             ),
         };
     }
@@ -1130,7 +1172,7 @@ function citationLockedFallbackResponse(
     const documentAnswer = buildBestEffortLegalDocumentAnswerFromSources(
         sourcePackets,
         errors.length > 0
-            ? 'I checked the extracted order text, but the citation verifier could not lock every model-generated claim. I will answer from the extracted provisions that are available.'
+            ? 'Here is what the visible order language supports.'
             : undefined
     );
 
@@ -1164,8 +1206,8 @@ async function repairCitationLockedResponse(args: {
                     {
                         role: 'developer',
                         content: [
-                            'The citation verifier rejected the previous document answer.',
-                            `Verifier errors: ${args.verifierErrors.slice(0, 8).join(' | ')}`,
+                            'The previous document answer did not pass source-grounding checks.',
+                            `Grounding errors: ${args.verifierErrors.slice(0, 8).join(' | ')}`,
                             'Repair the answer using only the existing SOURCE_ID values from the document context.',
                             'If usable source packets exist, answer from the extracted order text with valid sourceIds even when page metadata is incomplete. If the available source packets truly do not support the requested fact, set documentAnswer.answerType to "not_found" and do not make unsupported document claims.',
                             'Return valid JSON matching the required schema.',
@@ -1221,8 +1263,15 @@ async function generateWithFallbacks({
 }) {
     const client = getOpenAIClient();
     const responses = client.responses as unknown as StreamingResponsesClient;
-    const routerResult = classifyMessage(context.turn.message);
-    const routeMode = (context.turn.routeMode ?? routerResult.mode) as RouteMode;
+    const storedRouteMode = context.turn.routeMode as RouteMode | undefined;
+    const followUpSummary = activeFollowUpContextSummary(context.turn.message, context.recentMessages, storedRouteMode);
+    const routerResult = classifyMessage(
+        context.turn.message,
+        followUpSummary,
+        storedRouteMode,
+        hasActiveDocumentContext(context)
+    );
+    const routeMode = (storedRouteMode ?? routerResult.mode) as RouteMode;
     const model = context.turn.model ?? 'gpt-5.4';
     const temperature = context.turn.temperature ?? routerResult.temperature;
 
@@ -1483,14 +1532,38 @@ async function generateWithFallbacks({
             }
 
             if (!legalInterpretationVerification.passed && requiresLegalInterpretation && citationVerification.passed) {
-                parsedResponse = { ...parsedResponse, legalInterpretation: null };
+                const bestEffortLegalInterpretation = buildBestEffortLegalInterpretationFromDocumentAnswer(
+                    parsedResponse.documentAnswer,
+                    promptBundle.documentSourcePackets,
+                    promptBundle.documentReference,
+                    context.turn.message
+                );
+                parsedResponse = {
+                    ...parsedResponse,
+                    legalInterpretation: bestEffortLegalInterpretation,
+                };
+                legalInterpretationVerification = verifyLegalInterpretationAnswer(
+                    parsedResponse.legalInterpretation,
+                    promptBundle.documentSourcePackets,
+                    {
+                        requiresLegalInterpretation,
+                        hasClauseConflictSignal: hasClauseConflictSignal(promptBundle.documentReference),
+                    }
+                );
+                if (!legalInterpretationVerification.passed) {
+                    lastError = new Error(
+                        `legal_interpretation_verification_failed: ${legalInterpretationVerification.errors.join(' | ')}`
+                    );
+                    continue;
+                }
             }
 
             parsedResponse = renderDocumentMessage(
                 parsedResponse,
                 promptBundle.documentSourcePackets,
                 promptBundle.documentReference,
-                routeMode
+                routeMode,
+                context.turn.message
             );
             parsedResponse.message = polishLegalResponse(parsedResponse.message);
 
@@ -1644,8 +1717,19 @@ export const processChatGenerationJob = internalAction({
 
             if (lease.turnId && shouldRecordDocumentRetrievalRun) {
                 const usedChunkIds = uniqueDocumentChunkIds(result.attachmentContexts);
-                const auditRouterResult = classifyMessage(context.turn.message);
-                const auditRouteMode = (context.turn.routeMode ?? auditRouterResult.mode) as RouteMode;
+                const storedAuditRouteMode = context.turn.routeMode as RouteMode | undefined;
+                const auditFollowUpSummary = activeFollowUpContextSummary(
+                    context.turn.message,
+                    context.recentMessages,
+                    storedAuditRouteMode
+                );
+                const auditRouterResult = classifyMessage(
+                    context.turn.message,
+                    auditFollowUpSummary,
+                    storedAuditRouteMode,
+                    hasActiveDocumentContext(context)
+                );
+                const auditRouteMode = (storedAuditRouteMode ?? auditRouterResult.mode) as RouteMode;
                 const selectedUploadedFileIds = result.attachmentContexts.map((attachment) => attachment.uploadedFileId);
                 const candidateUploadedFileIds = [
                     ...new Set([

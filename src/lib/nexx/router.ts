@@ -7,7 +7,7 @@
  * Current: Regex heuristics (fast, no API call)
  */
 
-import type { LegalIntent, RouteMode, ToolPlan, RouterResult } from '../types';
+import type { FollowUpIntent, LegalIntent, RouteMode, ToolPlan, RouterResult } from '../types';
 import { detectDocumentReference, type DocumentReferenceDetection } from './documentReferenceDetection';
 import { classifyLegalIntent } from './legalIntent';
 
@@ -60,6 +60,27 @@ const SUPPORT_PATTERNS = [
   /\bfeeling?\s+(scared|overwhelmed|afraid|anxious|stressed|lost|hopeless)\b/i,
 ];
 
+const ACTIVE_DOCUMENT_FOLLOW_UP_PATTERN =
+  /\b(can|could|should|does|did|is|are|must|shall|allowed|right|mean|means|wrong|okay|ok|do that|say back|respond)\b/i;
+
+const SAME_ISSUE_WHAT_TO_SAY_PATTERN =
+  /\b(what\s+(?:do|should)\s+i\s+say(?:\s+back)?|how\s+(?:do|should)\s+i\s+(?:respond|reply)|say\s+back|respond\s+back|reply\s+back)\b/i;
+
+const SAME_ISSUE_NEXT_STEP_PATTERN =
+  /\b(what\s+(?:do|should)\s+i\s+do\s+next|next\s+step|what\s+now|how\s+do\s+i\s+handle\s+this)\b/i;
+
+const SAME_ISSUE_RIGHTS_CHECK_PATTERN =
+  /\b(is\s+that\s+allowed|am\s+i\s+wrong|is\s+that\s+(?:okay|ok)|do\s+i\s+have\s+(?:the\s+)?right|can\s+i\s+stop\s+(?:him|her|them)|does\s+that\s+mean\s+(?:he|she|they)\s+gets?)\b/i;
+
+const SAME_ISSUE_YES_NO_PATTERN =
+  /\b(can|could|should|does|did|is|are|must|shall)\b.{0,80}\b(?:do\s+that|allowed|right|wrong|okay|ok|mean|means|gets?|have\s+to|supposed\s+to|change|take|keep|stop|start|pickup|pick\s+up|exchange)\b/i;
+
+const POSSESSION_FOLLOW_UP_CONTEXT_PATTERN =
+  /\b(possession|access|visitation|schedule|father'?s day|mother'?s day|holiday|weekend|pickup|pick up|drop[-\s]?off|exchange|thursday|friday|saturday|sunday)\b/i;
+
+const LEGAL_ACTIVE_CONTEXT_PATTERN =
+  /\b(court\s+order|order|possession|access|visitation|custody|conservatorship|decision[-\s]?making|support|enforcement|contempt|other parent|father|mother|appclose|pickup|pick up|drop[-\s]?off|exchange|deadline|obligation|rights?)\b/i;
+
 // ---------------------------------------------------------------------------
 // Temperature constants by mode
 // ---------------------------------------------------------------------------
@@ -87,21 +108,89 @@ function matchesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((p) => p.test(text));
 }
 
+function isDocumentRoute(mode?: RouteMode) {
+  return mode === 'document_analysis' ||
+    mode === 'order_interpretation' ||
+    mode === 'possession_access_schedule';
+}
+
+export function classifyFollowUpIntent(message: string): FollowUpIntent {
+  const text = message.trim();
+  if (!text) return 'new_issue';
+  if (SAME_ISSUE_WHAT_TO_SAY_PATTERN.test(text)) return 'same_issue_what_to_say';
+  if (SAME_ISSUE_NEXT_STEP_PATTERN.test(text)) return 'same_issue_next_step';
+  if (SAME_ISSUE_RIGHTS_CHECK_PATTERN.test(text)) return 'same_issue_rights_check';
+  if (SAME_ISSUE_YES_NO_PATTERN.test(text)) return 'same_issue_yes_no';
+  return 'new_issue';
+}
+
+function hasActiveFamilyLawContext(
+  conversationSummary?: string,
+  activeMode?: RouteMode,
+  hasActiveDocumentContext = false
+) {
+  return hasActiveDocumentContext ||
+    isDocumentRoute(activeMode) ||
+    Boolean(conversationSummary && LEGAL_ACTIVE_CONTEXT_PATTERN.test(conversationSummary));
+}
+
+function inferFollowUpRoute(
+  message: string,
+  conversationSummary?: string,
+  activeMode?: RouteMode
+): Extract<RouteMode, 'order_interpretation' | 'possession_access_schedule'> {
+  if (activeMode === 'possession_access_schedule') return 'possession_access_schedule';
+  const contextText = `${message}\n${conversationSummary ?? ''}`;
+  return POSSESSION_FOLLOW_UP_CONTEXT_PATTERN.test(contextText)
+    ? 'possession_access_schedule'
+    : 'order_interpretation';
+}
+
+function activeDocumentFollowUpReference(message: string): DocumentReferenceDetection {
+  return {
+    referencesDocument: true,
+    confidence: 'medium',
+    referenceType: 'active_document_followup',
+    documentHints: [],
+    requestedTerms: [],
+    requestedSections: [],
+    requestedDates: [],
+    requestedDocumentTypes: [],
+    requiresExactText: false,
+    requiresPageOrSectionCitation: false,
+    mayNeedClarification: false,
+  };
+}
+
+function isBareVaguePronounFollowUp(
+  documentReference: DocumentReferenceDetection,
+  followUpIntent: FollowUpIntent
+) {
+  return followUpIntent !== 'new_issue' &&
+    documentReference.referenceType === 'implicit_followup' &&
+    documentReference.documentHints.length === 0 &&
+    documentReference.requestedTerms.length === 0 &&
+    documentReference.requestedSections.length === 0 &&
+    documentReference.requestedDates.length === 0 &&
+    documentReference.requestedDocumentTypes.length === 0;
+}
+
 /**
  * Classify a user message into a RouteMode.
  * Safety-first: safety_escalation is always checked first.
  */
 export function classifyMessage(
   message: string,
-  _conversationSummary?: string,
-  _activeMode?: RouteMode
+  conversationSummary?: string,
+  activeMode?: RouteMode,
+  hasActiveDocumentContext = false
 ): RouterResult {
-  void _conversationSummary;
-  void _activeMode;
-
   const text = message.toLowerCase();
   const documentReference = detectDocumentReference(message);
   const legalIntent = classifyLegalIntent(message);
+  const followUpIntent = classifyFollowUpIntent(message);
+  const hasActiveContext = hasActiveFamilyLawContext(conversationSummary, activeMode, hasActiveDocumentContext);
+  const bareVaguePronounFollowUp = isBareVaguePronounFollowUp(documentReference, followUpIntent);
 
   // Safety-first: always check escalation first
   if (matchesAny(text, SAFETY_PATTERNS)) {
@@ -110,6 +199,21 @@ export function classifyMessage(
 
   if (legalIntent === 'draft_response_to_other_party') {
     return buildResult('party_message_draft', documentReference, legalIntent);
+  }
+
+  if (
+    legalIntent === 'general_summary' &&
+    followUpIntent !== 'new_issue' &&
+    hasActiveContext
+  ) {
+    const activeReference = documentReference.referencesDocument && !bareVaguePronounFollowUp
+      ? documentReference
+      : activeDocumentFollowUpReference(message);
+    return buildResult(
+      inferFollowUpRoute(message, conversationSummary, activeMode),
+      activeReference,
+      'direct_order_interpretation'
+    );
   }
 
   // Explicit drafting commands should win over document words like "order" so
@@ -130,7 +234,16 @@ export function classifyMessage(
     return buildResult('order_interpretation', documentReference, legalIntent);
   }
 
-  if (matchesAny(text, DOCUMENT_ANALYSIS_PATTERNS) || documentReference.referencesDocument) {
+  if (
+    documentReference.referencesDocument &&
+    legalIntent === 'general_summary' &&
+    !bareVaguePronounFollowUp &&
+    ACTIVE_DOCUMENT_FOLLOW_UP_PATTERN.test(message)
+  ) {
+    return buildResult('order_interpretation', documentReference, 'direct_order_interpretation');
+  }
+
+  if (matchesAny(text, DOCUMENT_ANALYSIS_PATTERNS) || (documentReference.referencesDocument && !bareVaguePronounFollowUp)) {
     return buildResult('document_analysis', documentReference, legalIntent);
   }
 
@@ -165,7 +278,7 @@ export function classifyMessage(
   }
 
   // Default: check if it's clearly a legal question
-  if (/\b(law|legal|statute|code|section|rights?|custody|visitation|child\s+support|federal\s+holiday|state\s+holiday|local\s+holiday)\b/i.test(text)) {
+  if (/\b(law|legal|statute|code|section|rights?|custody|visitation|possession|access|pickup|pick up|drop[-\s]?off|exchange|child\s+support|support|federal\s+holiday|state\s+holiday|local\s+holiday)\b/i.test(text)) {
     return buildResult('direct_legal_answer', undefined, legalIntent);
   }
 
@@ -173,11 +286,31 @@ export function classifyMessage(
   return buildResult('adaptive_chat', undefined, legalIntent);
 }
 
-export function preserveOrUpgradeDocumentRoute(classified: RouterResult, message: string): RouterResult {
+export function preserveOrUpgradeDocumentRoute(
+  classified: RouterResult,
+  message: string,
+  activeMode?: RouteMode
+): RouterResult {
   if (classified.mode === 'safety_escalation') return classified;
 
   const legalIntent = classifyLegalIntent(message);
   const documentReference = classified.documentReference ?? detectDocumentReference(message);
+  const followUpIntent = classifyFollowUpIntent(message);
+  const bareVaguePronounFollowUp = isBareVaguePronounFollowUp(documentReference, followUpIntent);
+
+  if (
+    legalIntent === 'general_summary' &&
+    followUpIntent !== 'new_issue'
+  ) {
+    const activeReference = documentReference.referencesDocument && !bareVaguePronounFollowUp
+      ? documentReference
+      : activeDocumentFollowUpReference(message);
+    return buildResult(
+      inferFollowUpRoute(message, undefined, activeMode),
+      activeReference,
+      'direct_order_interpretation'
+    );
+  }
 
   if (legalIntent === 'possession_access_schedule') {
     return buildResult('possession_access_schedule', documentReference, legalIntent);
@@ -192,6 +325,15 @@ export function preserveOrUpgradeDocumentRoute(classified: RouterResult, message
 
   if (legalIntent === 'draft_response_to_other_party') {
     return buildResult('party_message_draft', documentReference, legalIntent);
+  }
+
+  if (
+    documentReference.referencesDocument &&
+    legalIntent === 'general_summary' &&
+    !bareVaguePronounFollowUp &&
+    ACTIVE_DOCUMENT_FOLLOW_UP_PATTERN.test(message)
+  ) {
+    return buildResult('order_interpretation', documentReference, 'direct_order_interpretation');
   }
 
   if (classified.mode === 'court_ready_drafting') {

@@ -7,6 +7,8 @@ import {
     detectDocumentReference,
     type DocumentReferenceDetection,
 } from '../src/lib/nexx/documentReferenceDetection';
+import { classifyFollowUpIntent, classifyMessage } from '../src/lib/nexx/router';
+import type { RouteMode } from '../src/lib/types';
 import {
     detectStoredDocumentAmbiguity,
     normalizeDocumentAlias,
@@ -489,6 +491,40 @@ function messagePreview(message: string) {
     return message.replace(/\s+/g, ' ').trim().slice(0, 300);
 }
 
+function isDocumentRouteMode(mode?: RouteMode) {
+    return mode === 'document_analysis' ||
+        mode === 'order_interpretation' ||
+        mode === 'possession_access_schedule';
+}
+
+function buildContextualFollowUpMessage(
+    message: string,
+    recentMessages: Array<{
+        role: 'user' | 'assistant';
+        content: string;
+        status?: 'draft' | 'committed' | 'degraded' | 'failed' | 'deleted';
+    }>,
+    activeMode?: RouteMode
+) {
+    if (classifyFollowUpIntent(message) === 'new_issue' || !isDocumentRouteMode(activeMode)) {
+        return message;
+    }
+
+    const recentContext = recentMessages
+        .filter((recent) =>
+            recent.status === undefined ||
+            recent.status === 'committed' ||
+            recent.status === 'degraded'
+        )
+        .slice(-8)
+        .map((recent) => recent.content.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+        .join('\n')
+        .slice(-4_000);
+
+    return recentContext ? `${message}\n\nRecent active issue context:\n${recentContext}` : message;
+}
+
 /** Preserve existing message metadata when adding structured document source summaries. */
 function asMetadataObject(metadata: unknown) {
     return metadata && typeof metadata === 'object' && !Array.isArray(metadata)
@@ -881,6 +917,26 @@ export const acceptChatTurn = mutation({
             };
         }
 
+        const existingDocumentState = await ctx.db
+            .query('conversationDocumentState')
+            .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
+            .first();
+        const hasActiveDocumentContext =
+            validatedAttachments.length > 0 ||
+            Boolean(existingDocumentState?.activeUploadedFileId);
+        const contextualRoute = classifyMessage(
+            args.message,
+            undefined,
+            conversation.routeMode as RouteMode | undefined,
+            hasActiveDocumentContext
+        );
+        const routeMode = args.routeMode === 'safety_escalation'
+            ? args.routeMode
+            : contextualRoute.mode;
+        const temperature = args.routeMode === routeMode
+            ? args.temperature
+            : contextualRoute.temperature;
+
         const turnNumber = conversation.nextTurnNumber ?? (conversation.messageCount ?? 0) + 1;
         const shouldPersistUserMessage = args.persistUserMessage !== false;
 
@@ -892,14 +948,14 @@ export const acceptChatTurn = mutation({
             turnNumber,
             mode: args.mode ?? 'send',
             status: 'accepted',
-            routeMode: args.routeMode,
+            routeMode,
             retryOfAssistantMessageId: args.retryOfAssistantMessageId,
             editOfUserMessageId: args.editOfUserMessageId,
             attempt: 0,
             maxAttempts: 3,
             provider: 'openai',
             model: args.model,
-            temperature: args.temperature,
+            temperature,
             userContextJson: args.userContextJson,
             attachmentRefsJson: validatedAttachments.length > 0 ? JSON.stringify(validatedAttachments) : undefined,
             createdAt: now,
@@ -932,7 +988,7 @@ export const acceptChatTurn = mutation({
                 requestId: `${args.requestId}-user`,
                 createdAt: now,
                 updatedAt: now,
-                mode: args.routeMode,
+                mode: routeMode,
             });
 
             for (const attachment of validatedAttachments) {
@@ -981,7 +1037,7 @@ export const acceptChatTurn = mutation({
             nextTurnNumber: turnNumber + 1,
             lastMessageAt: now,
             messageCount: (conversation.messageCount ?? 0) + (shouldPersistUserMessage ? 1 : 0),
-            routeMode: args.routeMode,
+            routeMode,
         });
 
         await insertChatAuditEvent(ctx, {
@@ -994,7 +1050,7 @@ export const acceptChatTurn = mutation({
             metadataRedacted: {
                 requestId: args.requestId,
                 mode: args.mode ?? 'send',
-                routeMode: args.routeMode,
+                routeMode,
                 attachmentCount: validatedAttachments.length,
                 persistedUserMessage: shouldPersistUserMessage,
             },
@@ -1166,7 +1222,13 @@ export const getGenerationContext = internalQuery({
             return a.createdAt - b.createdAt;
         });
 
-        const documentReference = detectDocumentReference(turn.message);
+        const routeMode = turn.routeMode ?? conversation.routeMode as RouteMode | undefined;
+        const contextualFollowUpMessage = buildContextualFollowUpMessage(
+            turn.message,
+            recentMessages.filter((m) => m.status !== 'deleted'),
+            routeMode
+        );
+        const documentReference = detectDocumentReference(contextualFollowUpMessage);
         const clerkUserId = user.clerkId;
         const activeCaseId = conversation.caseId;
         const grantedUploadedFiles = clerkUserId
@@ -1201,7 +1263,7 @@ export const getGenerationContext = internalQuery({
                     ...context,
                     documentChunks: await getRelevantDocumentChunkContexts(ctx, {
                         uploadedFileId: uploadedFile._id,
-                        message: turn.message,
+                        message: contextualFollowUpMessage,
                         detection: documentReference,
                         accessScope,
                     }),
@@ -1379,7 +1441,7 @@ export const getGenerationContext = internalQuery({
                     ...context,
                     documentChunks: await getRelevantDocumentChunkContexts(ctx, {
                         uploadedFileId: uploadedFile._id,
-                        message: turn.message,
+                        message: contextualFollowUpMessage,
                         detection: documentReference,
                         accessScope,
                     }),

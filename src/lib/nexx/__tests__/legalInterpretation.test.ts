@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { LegalDocumentSourcePacket } from '../legalDocumentAnswer';
+import type { LegalDocumentAnswer, LegalDocumentSourcePacket } from '../legalDocumentAnswer';
+import { detectDocumentReference } from '../documentReferenceDetection';
+import { buildBestEffortLegalInterpretationFromDocumentAnswer } from '../legal-engine/bestEffortLegalInterpretation';
 import { renderLegalInterpretationMarkdown } from '../legal-engine/legalInterpretationRenderer';
 import type { LegalInterpretationAnswer } from '../legal-engine/legalInterpretationSchema';
 import { validateLegalInterpretationAnswerShape } from '../legal-engine/legalInterpretationSchema';
@@ -170,6 +172,35 @@ describe('renderLegalInterpretationMarkdown', () => {
     expect(content).toContain('- The general weekend language does not override the specific Father\'s Day provision.');
   });
 
+  it('renders vague follow-ups in quick direct mode without heavy clause headings', () => {
+    const content = renderLegalInterpretationMarkdown(
+      legalInterpretation(),
+      sourcePackets,
+      'Fallback answer',
+      { renderMode: 'quick_direct', userMessage: 'Can he do that?' }
+    );
+
+    expect(content).toContain('No - my read is that Father\'s Day possession starts Friday at 6:00 p.m., not Thursday.');
+    expect(content).toContain('specific Father\'s Day provision controls over the general weekend-extension rule');
+    expect(content).toContain('I would keep it short and order-based:');
+    expect(content).not.toContain('**Controlling language:**');
+    expect(content).not.toContain('**Competing language:**');
+  });
+
+  it('renders what-to-say follow-ups as draft focused', () => {
+    const content = renderLegalInterpretationMarkdown(
+      legalInterpretation(),
+      sourcePackets,
+      'Fallback answer',
+      { renderMode: 'draft_focused', userMessage: 'What do I say back?' }
+    );
+
+    expect(content).toContain('You can say:');
+    expect(content).toContain('Based on the order, Father\'s Day possession begins Friday at 6:00 p.m.');
+    expect(content).toContain('Why this works:');
+    expect(content).not.toContain('**Controlling language:**');
+  });
+
   it('renders all necessary caveats for ambiguous interpretations', () => {
     const content = renderLegalInterpretationMarkdown(
       legalInterpretation({
@@ -185,6 +216,55 @@ describe('renderLegalInterpretationMarkdown', () => {
 
     expect(content).toContain('The order uses conflicting exchange language.');
     expect(content).toContain('A later modification should be checked before filing.');
+  });
+});
+
+describe('buildBestEffortLegalInterpretationFromDocumentAnswer', () => {
+  it('keeps legal interpretation routes legal-shaped when model legalInterpretation repair fails', () => {
+    const documentAnswer: LegalDocumentAnswer = {
+      answerType: 'interpretation',
+      answer: 'Here is what the visible order language supports.',
+      claims: [
+        {
+          claim: 'Father\'s Day possession begins Friday at 6:00 p.m. and ends Monday at 8:00 a.m.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
+        {
+          claim: 'Regular weekend possession begins on Thursday when Friday is a qualifying holiday.',
+          claimType: 'document_fact',
+          sourceIds: ['src_002'],
+        },
+      ],
+      citations: [
+        { sourceId: 'src_001', pageStart: 5, pageEnd: 5, supports: null, confidence: 'high' },
+        { sourceId: 'src_002', pageStart: 6, pageEnd: 6, supports: null, confidence: 'high' },
+      ],
+      warnings: [],
+      unsupportedClaims: [],
+      notFoundReason: null,
+    };
+    const answer = buildBestEffortLegalInterpretationFromDocumentAnswer(
+      documentAnswer,
+      sourcePackets,
+      detectDocumentReference('Which clause controls for Father\'s Day, Thursday or Friday?'),
+      'Which clause controls for Father\'s Day, Thursday or Friday?'
+    );
+
+    const verification = verifyLegalInterpretationAnswer(answer, sourcePackets, {
+      requiresLegalInterpretation: true,
+      hasClauseConflictSignal: true,
+    });
+    const content = answer
+      ? renderLegalInterpretationMarkdown(answer, sourcePackets, 'Fallback answer', { renderMode: 'standard_explanation' })
+      : '';
+
+    expect(answer).not.toBeNull();
+    expect(verification.passed).toBe(true);
+    expect(content).toContain('Here is what the visible order language supports.');
+    expect(content).toContain('specific order language is the stronger reading');
+    expect(content).not.toContain('citation verifier');
+    expect(content).not.toContain('model-generated claim');
   });
 });
 

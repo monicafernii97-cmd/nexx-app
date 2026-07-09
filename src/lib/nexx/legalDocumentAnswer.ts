@@ -367,7 +367,12 @@ const WITHIN_DAYS_PATTERN = new RegExp(
 );
 
 function deadlineTimingFromClaim(value: string) {
+  const searchableValue = protectTimeAbbreviations(value);
   const patterns = [
+    /\bfrom\s+[^.;]+?\s+(?:until|to|through)\s+[^.;]+/i,
+    /\b(?:beginning|begins|starting|starts|running|runs)\s+(?:at|on|from)\s+[^.;]+?\s+(?:and\s+)?(?:ending|ends)\s+(?:at|on)\s+[^.;]+/i,
+    /\b(?:period|possession|weekend)\b[^.;]{0,90}\b(?:begins|starts)\s+(?:at|on)\s+[^.;]+/i,
+    /\b(?:begins|starts)\s+(?:at|on)\s+[^.;]+/i,
     WITHIN_DAYS_PATTERN,
     /\bno later than\s+[^.;,]+/i,
     /\bmonthly\b/i,
@@ -375,14 +380,22 @@ function deadlineTimingFromClaim(value: string) {
     /\bby\s+[A-Z][a-z]+\s+\d{1,2}(?:,\s*\d{4})?\b/,
   ];
   for (const pattern of patterns) {
-    const match = value.match(pattern);
-    if (match?.[0]) return cleanUserFacingDocumentText(match[0]);
+    const match = searchableValue.match(pattern);
+    if (match?.[0]) return cleanUserFacingDocumentText(restoreTimeAbbreviations(match[0]));
   }
   return 'Not stated in the extracted text';
 }
 
 function isDeadlineClaim(value: string) {
   return /\b(deadline|within|no later than|monthly|every|calendar|days?|notice|payment|support|pay|due)\b/i.test(value);
+}
+
+function protectTimeAbbreviations(value: string) {
+  return value.replace(/\b([ap])\.m\./gi, (_match, meridiem: string) => `${meridiem.toLowerCase()}__m__`);
+}
+
+function restoreTimeAbbreviations(value: string) {
+  return value.replace(/\b([ap])__m__/gi, (_match, meridiem: string) => `${meridiem.toLowerCase()}.m.`);
 }
 
 function formatMarkdownList(items: string[]) {

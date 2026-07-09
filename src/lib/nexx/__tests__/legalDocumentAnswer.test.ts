@@ -423,6 +423,29 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
     expect(hundredDeadlinesSection).toContain('| The order requires a status update within one hundred and five calendar days after review. | within one hundred and five calendar days | [p. 4] |');
     expect(hundredDeadlinesSection).not.toContain('Not stated in the extracted text');
   });
+
+  it('extracts possession schedule timing instead of marking visible timing as not stated', () => {
+    const content = renderCourtOrderAnalysisMarkdown(answer({
+      claims: [
+        {
+          claim: 'If Friday is a federal, state, or local holiday, or a student holiday or teacher in-service day, the regular weekend period begins at 6:00 p.m. on Thursday.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
+        {
+          claim: 'The Father\'s Day possession period runs from 6:00 p.m. on the Friday preceding Father\'s Day until 8:00 a.m. on the Monday after Father\'s Day.',
+          claimType: 'document_fact',
+          sourceIds: ['src_001'],
+        },
+      ],
+    }), sourcePackets, 'Fallback answer');
+
+    const deadlinesSection = sectionBetween(content, '## Deadlines', '## Recommended Next Steps');
+
+    expect(deadlinesSection).toContain('| If Friday is a federal, state, or local holiday, or a student holiday or teacher in-service day, the regular weekend period begins at 6:00 p.m. on Thursday. | weekend period begins at 6:00 p.m. on Thursday | [p. 4] |');
+    expect(deadlinesSection).toContain('| The Father\'s Day possession period runs from 6:00 p.m. on the Friday preceding Father\'s Day until 8:00 a.m. on the Monday after Father\'s Day. | from 6:00 p.m. on the Friday preceding Father\'s Day until 8:00 a.m. on the Monday after Father\'s Day | [p. 4] |');
+    expect(deadlinesSection).not.toContain('Not stated in the extracted text');
+  });
 });
 
 describe('renderTargetedLegalDocumentAnswerMarkdown', () => {

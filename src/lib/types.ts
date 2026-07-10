@@ -20,7 +20,7 @@ export type { CaseGraph } from './nexx/caseGraph';
 export type { DocumentReferenceDetection } from './nexx/documentReferenceDetection';
 
 // ---------------------------------------------------------------------------
-// Route Mode — the 9 modes the router can classify a turn into
+// Route Mode — the modes the router can classify a turn into
 // ---------------------------------------------------------------------------
 
 export type RouteMode =
@@ -66,6 +66,7 @@ export type LegalIntent =
   | 'packed_case_intake'
   | 'new_court_filing_received'
   | 'court_response_deadline'
+  | 'court_response_planning'
   | 'pro_se_feasibility'
   | 'attorney_cost_question'
   | 'legal_aid_resource_request'

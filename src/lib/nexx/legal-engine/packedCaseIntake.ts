@@ -72,6 +72,7 @@ export type PackedCaseIntake = {
       | 'legal_aid'
       | 'judge_explanation'
       | 'next_steps'
+      | 'court_response_planning'
       | 'order_interpretation';
   }>;
   immediateRisks: {
@@ -254,7 +255,11 @@ function questions(text: string): PackedCaseIntake['userQuestions'] {
     items.push({ question, category });
   };
   if (/\bwhat\s+(?:do|should)\s+i\s+(?:say|respond)|how do i respond|text back|message him|message her\b/i.test(text)) add('What should I say or respond?', 'what_to_respond');
-  if (/\bwhat\s+(?:do|should)\s+i\s+file|what happens next|what do i file\b/i.test(text)) add('What do I file next?', 'what_to_file');
+  if (/\b(what\s+(?:do|should)\s+i\s+file\s+(?:in\s+)?response|what\s+do\s+i\s+need\s+to\s+file\s+next|how\s+do\s+i\s+(?:answer|respond)\s+(?:(?:to|against)\s+)?(?:his|her|the)?\s*(?:motion|petition)|response\s+to\s+(?:the\s+)?(?:motion|petition)|what\s+court\s+response|file\s+next\s+after\s+being\s+served|what\s+response\s+do\s+i\s+need\s+to\s+file)\b/i.test(text)) {
+    add('What court response do I need to file?', 'court_response_planning');
+  } else if (/\bwhat\s+(?:do|should)\s+i\s+file|what happens next|what do i file\b/i.test(text)) {
+    add('What do I file next?', 'what_to_file');
+  }
   if (/\bcan i do this myself|pro se|without (?:a|an) attorney\b/i.test(text)) add('Can I handle this myself?', 'can_i_do_this_myself');
   if (/\bhow much|cost|filing fee|attorney fee|retainer\b/i.test(text)) add('How much might this cost?', 'cost');
   if (/\blegal aid|free lawyer|resources|lawyer referral|attorney resources\b/i.test(text)) add('What legal-aid or attorney resources exist?', 'legal_aid');
@@ -355,6 +360,7 @@ export function classifyPackedCaseIntake(message: string, contextText = ''): Mul
   const secondaryIntents: LegalIntent[] = [];
   if (intake.courtPosture.otherPartyFiledSomething) secondaryIntents.push('new_court_filing_received');
   if (intake.immediateRisks.deadlineRisk) secondaryIntents.push('court_response_deadline');
+  if (intake.userQuestions.some((q) => q.category === 'court_response_planning')) secondaryIntents.push('court_response_planning');
   if (intake.coParentCommunication.userNeedsResponseDraft) secondaryIntents.push('co_parent_response_strategy');
   if (intake.emotionalState.feelsManipulatedOrPressured) secondaryIntents.push('pressure_or_manipulation_response');
   if (intake.emotionalState.overwhelmed || intake.emotionalState.scared || intake.emotionalState.confused) secondaryIntents.push('emotional_legal_support');

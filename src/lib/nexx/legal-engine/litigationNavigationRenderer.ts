@@ -8,6 +8,7 @@ import { buildIssueBreakdown, determineImmediatePriority } from './litigationPri
 import type { LitigationNavigationResponse } from './litigationNavigationSchema';
 import { parsePackedCaseIntake, type PackedCaseIntake } from './packedCaseIntake';
 import { buildProSeAssessment } from './proSePlanner';
+import type { CourtFilingExtraction } from './courtFilingExtractor';
 
 export type StrategicSupportRenderMode =
   | 'calm_grounding'
@@ -36,6 +37,7 @@ type BuildLitigationNavigationArgs = {
   state?: string;
   county?: string;
   courtName?: string;
+  courtFiling?: CourtFilingExtraction | null;
 };
 
 function list(items: string[]) {
@@ -63,7 +65,21 @@ function supportiveSummary(intake: PackedCaseIntake) {
   return 'Here is how I would organize this in a court-aware way.';
 }
 
-function courtPosture(intake: PackedCaseIntake): LitigationNavigationResponse['courtPosture'] {
+function filingTypeToPossibleResponse(
+  filingType: PackedCaseIntake['courtPosture']['filingType'] | CourtFilingExtraction['documentType']
+): LitigationNavigationResponse['courtPosture']['possibleFilingOrResponse'] {
+  if (filingType === 'petition') return 'answer';
+  if (filingType === 'motion' || filingType === 'enforcement' || filingType === 'modification' || filingType === 'protective_order') {
+    return 'response_to_motion';
+  }
+  if (filingType === 'temporary_orders') return 'temporary_orders_response';
+  return 'unknown';
+}
+
+function courtPosture(
+  intake: PackedCaseIntake,
+  courtFiling?: CourtFilingExtraction | null
+): LitigationNavigationResponse['courtPosture'] {
   const needsLocalContext = intake.courtPosture.otherPartyFiledSomething ||
     intake.immediateRisks.deadlineRisk ||
     intake.userQuestions.some((q) => [
@@ -74,6 +90,10 @@ function courtPosture(intake: PackedCaseIntake): LitigationNavigationResponse['c
       'legal_aid',
     ].includes(q.category));
   const whatWeKnow = unique([
+    courtFiling && courtFiling.documentType !== 'unknown' ? `The uploaded filing appears to be a ${courtFiling.documentType.replace(/_/g, ' ')}.` : '',
+    courtFiling?.reliefRequested.length ? `The filing appears to request: ${courtFiling.reliefRequested.slice(0, 3).join('; ')}.` : '',
+    courtFiling?.allegations.length ? `The filing includes allegations or disputed facts that need a date-order response.` : '',
+    courtFiling?.deadlinesOrHearings.some((item) => item.type === 'hearing') ? 'A hearing or court-date clue appears in the filing.' : '',
     intake.courtPosture.otherPartyFiledSomething ? 'A court filing or court threat is involved.' : '',
     intake.courtPosture.filingType !== 'unknown' ? `Possible filing type: ${intake.courtPosture.filingType.replace(/_/g, ' ')}.` : '',
     intake.courtPosture.userWasServed === true ? 'You mentioned being served.' : '',
@@ -82,47 +102,37 @@ function courtPosture(intake: PackedCaseIntake): LitigationNavigationResponse['c
   ]);
   const whatWeNeed = unique([
     intake.courtPosture.otherPartyFiledSomething ? 'the filed document' : '',
-    intake.courtPosture.otherPartyFiledSomething && intake.courtPosture.userWasServed !== true ? 'whether and when you were served' : '',
-    intake.courtPosture.otherPartyFiledSomething && !intake.courtPosture.hearingDate ? 'any hearing date or notice of hearing' : '',
+    (intake.courtPosture.otherPartyFiledSomething || courtFiling) && intake.courtPosture.userWasServed !== true && !courtFiling?.serviceClues.length ? 'whether and when you were served' : '',
+    (intake.courtPosture.otherPartyFiledSomething || courtFiling) && !intake.courtPosture.hearingDate && !courtFiling?.deadlinesOrHearings.some((item) => item.type === 'hearing') ? 'any hearing date or notice of hearing' : '',
+    courtFiling?.missingInfoNeeded.length ? courtFiling.missingInfoNeeded.join('; ') : '',
     intake.currentOrderContext.needsOrderReview ? 'the current order provision that controls this issue' : '',
     needsLocalContext && !intake.courtPosture.state ? 'state' : '',
     needsLocalContext && !intake.courtPosture.county ? 'county' : '',
   ]);
 
-  const possibleFilingOrResponse: LitigationNavigationResponse['courtPosture']['possibleFilingOrResponse'] =
-    intake.courtPosture.filingType === 'petition'
-      ? 'answer'
-      : intake.courtPosture.filingType === 'motion'
-        ? 'response_to_motion'
-        : intake.courtPosture.filingType === 'temporary_orders'
-          ? 'temporary_orders_response'
-          : intake.courtPosture.filingType === 'enforcement'
-            ? 'response_to_motion'
-            : intake.courtPosture.filingType === 'modification'
-              ? 'response_to_motion'
-              : intake.courtPosture.filingType === 'protective_order'
-                ? 'response_to_motion'
-                : 'unknown';
+  const possibleFilingOrResponse =
+    filingTypeToPossibleResponse(courtFiling?.documentType ?? intake.courtPosture.filingType);
 
   return {
     whatWeKnow,
     whatWeNeed,
     possibleFilingOrResponse,
-    deadlineNote: intake.courtPosture.otherPartyFiledSomething
+    deadlineNote: intake.courtPosture.otherPartyFiledSomething || courtFiling
       ? 'The service date, response deadline, and hearing date need to be verified before deciding what to file.'
       : null,
     hearingNote: intake.courtPosture.hearingDate
       ? `You mentioned a hearing date: ${intake.courtPosture.hearingDate}.`
-      : intake.courtPosture.otherPartyFiledSomething
+      : intake.courtPosture.otherPartyFiledSomething || courtFiling
         ? 'Check whether there is a notice of hearing or scheduled court date.'
         : null,
   };
 }
 
-function nextSteps(intake: PackedCaseIntake) {
+function nextSteps(intake: PackedCaseIntake, courtFiling?: CourtFilingExtraction | null) {
   return unique([
-    intake.courtPosture.otherPartyFiledSomething ? 'Upload or paste the court paper that was filed.' : '',
-    intake.courtPosture.otherPartyFiledSomething ? 'Tell me the date you were served and whether there is a hearing date.' : '',
+    intake.courtPosture.otherPartyFiledSomething && !courtFiling ? 'Upload or paste the court paper that was filed.' : '',
+    intake.courtPosture.otherPartyFiledSomething || courtFiling ? 'Tell me the date you were served and whether there is a hearing date.' : '',
+    courtFiling ? 'Use the filing to build a response that addresses each requested order and main allegation in date order.' : '',
     intake.currentOrderContext.needsOrderReview ? 'Upload or point me to the current order provision that controls this issue.' : '',
     intake.coParentCommunication.userNeedsResponseDraft || intake.coParentCommunication.messagesMentioned ? 'Send only one short, neutral, order-based co-parent response if a response is needed.' : '',
     'Save the message thread, relevant order pages, and any proof of attempted compliance.',
@@ -147,6 +157,17 @@ export function buildLitigationNavigationResponse(args: BuildLitigationNavigatio
   if (args.state && !intake.courtPosture.state) intake.courtPosture.state = args.state;
   if (args.county && !intake.courtPosture.county) intake.courtPosture.county = args.county;
   if (args.courtName && !intake.courtPosture.courtName) intake.courtPosture.courtName = args.courtName;
+  if (args.courtFiling) {
+    intake.courtPosture.otherPartyFiledSomething = true;
+    if (args.courtFiling.documentType !== 'unknown') {
+      intake.courtPosture.filingType = args.courtFiling.documentType === 'notice_of_hearing' || args.courtFiling.documentType === 'order'
+        ? 'unknown'
+        : args.courtFiling.documentType;
+    }
+    if (args.courtFiling.reliefRequested.length) {
+      intake.courtPosture.reliefRequested = args.courtFiling.reliefRequested;
+    }
+  }
 
   const coParentResponse = buildCoParentResponseStrategy(intake, args.recentContext);
   const evidencePlan = buildDocumentationPlan(intake);
@@ -160,7 +181,7 @@ export function buildLitigationNavigationResponse(args: BuildLitigationNavigatio
     supportiveSummary: supportiveSummary(intake),
     immediatePriority: determineImmediatePriority(intake),
     issueBreakdown: buildIssueBreakdown(intake),
-    courtPosture: courtPosture(intake),
+    courtPosture: courtPosture(intake, args.courtFiling),
     coParentResponse,
     evidencePlan,
     proSeAssessment,
@@ -168,7 +189,61 @@ export function buildLitigationNavigationResponse(args: BuildLitigationNavigatio
     resourcePlan,
     judgeExplanation,
     filingPlan,
-    nextSteps: nextSteps(intake),
+    nextSteps: nextSteps(intake, args.courtFiling),
+  };
+}
+
+export function mergeCourtFilingIntoLitigationNavigation(
+  response: LitigationNavigationResponse,
+  courtFiling?: CourtFilingExtraction | null
+): LitigationNavigationResponse {
+  if (!courtFiling) return response;
+
+  const filingLabel = courtFiling.documentType.replace(/_/g, ' ');
+  const whatWeKnow = unique([
+    ...response.courtPosture.whatWeKnow,
+    courtFiling.documentType !== 'unknown' ? `The uploaded filing appears to be a ${filingLabel}.` : '',
+    courtFiling.reliefRequested.length ? `The filing appears to request: ${courtFiling.reliefRequested.slice(0, 3).join('; ')}.` : '',
+    courtFiling.allegations.length ? 'The filing includes allegations or disputed facts that should be answered in date order.' : '',
+    courtFiling.deadlinesOrHearings.some((item) => item.type === 'hearing') ? 'A hearing or court-date clue appears in the filing.' : '',
+  ]);
+  const whatWeNeed = unique([
+    ...response.courtPosture.whatWeNeed,
+    ...courtFiling.missingInfoNeeded,
+  ]);
+
+  return {
+    ...response,
+    courtPosture: {
+      ...response.courtPosture,
+      whatWeKnow,
+      whatWeNeed,
+      possibleFilingOrResponse: response.courtPosture.possibleFilingOrResponse === 'unknown'
+        ? filingTypeToPossibleResponse(courtFiling.documentType)
+        : response.courtPosture.possibleFilingOrResponse,
+      deadlineNote: response.courtPosture.deadlineNote ??
+        'The service date, response deadline, and hearing date need to be verified before deciding what to file.',
+      hearingNote: response.courtPosture.hearingNote ??
+        (courtFiling.deadlinesOrHearings.some((item) => item.type === 'hearing')
+          ? 'A hearing clue appears in the filing. Verify the exact hearing date and time before filing.'
+          : 'Check whether there is a notice of hearing or scheduled court date.'),
+    },
+    filingPlan: {
+      ...response.filingPlan,
+      likelyNextDocument: response.filingPlan.likelyNextDocument ??
+        (filingTypeToPossibleResponse(courtFiling.documentType) === 'unknown'
+          ? null
+          : filingTypeToPossibleResponse(courtFiling.documentType).replace(/_/g, ' ')),
+      nextInfoNeededBeforeDrafting: unique([
+        ...response.filingPlan.nextInfoNeededBeforeDrafting,
+        ...courtFiling.missingInfoNeeded,
+      ]),
+    },
+    nextSteps: unique([
+      'Verify the service date and any hearing date shown or served with the filing.',
+      'Build a response that addresses each requested order and main allegation in date order.',
+      ...response.nextSteps,
+    ]),
   };
 }
 
@@ -183,6 +258,58 @@ export function renderLitigationNavigationMarkdown(
   const asksProSe = /\b(pro se|do this myself|without (?:a|an) attorney|can'?t afford|cannot afford|no money)\b/i.test(options.userMessage);
   const asksCostOrResources = /\b(cost|how much|fee|retainer|legal aid|lawyer|attorney|resources|limited[-\s]?scope)\b/i.test(options.userMessage);
   const packedOrCourtMode = mode === 'packed_case_overview' || mode === 'deadline_first' || mode === 'filing_walkthrough' || mode === 'court_ready_drafting';
+
+  if (mode === 'co_parent_response_focused') {
+    const sections = [
+      options.routeMode === 'supportive_strategy' ? response.supportiveSummary : undefined,
+      response.coParentResponse.neutralDraft
+        ? `You can say:\n\n"${response.coParentResponse.neutralDraft}"`
+        : response.coParentResponse.strategy,
+      response.coParentResponse.firmerDraft ? `Firmer version:\n\n"${response.coParentResponse.firmerDraft}"` : undefined,
+      `Why this works: ${response.coParentResponse.strategy}`,
+      `What not to say:\n${list(response.coParentResponse.whatNotToSay)}`,
+      response.evidencePlan.evidenceToSave.length > 0
+        ? `Save this for your record:\n${list(response.evidencePlan.evidenceToSave.slice(0, 4))}`
+        : undefined,
+      `Next steps:\n${numbered(response.nextSteps.slice(0, 3))}`,
+    ];
+    return sections.filter(Boolean).join('\n\n');
+  }
+
+  if (mode === 'cost_resource_guidance') {
+    return [
+      response.costOverview.costExplanation,
+      `Pro se cost categories:\n${list(response.costOverview.proSeCostCategories)}`,
+      `Attorney cost categories:\n${list(response.costOverview.attorneyCostCategories)}`,
+      response.resourcePlan.stateNeeded || response.resourcePlan.countyNeeded
+        ? 'For exact local fees and official resources, I need your county and state.'
+        : `Good official resource targets:\n${list(response.resourcePlan.suggestedSearchTargets)}`,
+      `Next steps:\n${numbered(response.nextSteps.slice(0, 3))}`,
+    ].join('\n\n');
+  }
+
+  if (mode === 'pro_se_planning' && !packedOrCourtMode) {
+    return [
+      response.proSeAssessment.practicalRead,
+      `Often manageable pro se:\n${list(response.proSeAssessment.tasksLikelyDoableProSe)}`,
+      `Higher-risk without attorney help:\n${list(response.proSeAssessment.tasksHigherRiskWithoutAttorney)}`,
+      `Limited-scope help is most useful for:\n${list(response.proSeAssessment.limitedScopeHelpRecommendedFor)}`,
+      response.resourcePlan.stateNeeded || response.resourcePlan.countyNeeded
+        ? 'Tell me your county and state so I can help identify official fee, legal-aid, and limited-scope resources.'
+        : undefined,
+      `Next steps:\n${numbered(response.nextSteps.slice(0, 4))}`,
+    ].filter(Boolean).join('\n\n');
+  }
+
+  if (mode === 'judge_narrative' && !packedOrCourtMode) {
+    return [
+      response.judgeExplanation.simpleTheory,
+      `Use this structure:\n${list(response.judgeExplanation.judgeReadyStructure)}`,
+      response.judgeExplanation.sampleOpening ? `Sample opening:\n\n"${response.judgeExplanation.sampleOpening}"` : undefined,
+      `Next steps:\n${numbered(response.nextSteps.slice(0, 3))}`,
+    ].filter(Boolean).join('\n\n');
+  }
+
   const sections: string[] = [
     response.supportiveSummary,
     `The first priority is this: ${response.immediatePriority.priority}\n\n${response.immediatePriority.whyItMatters} ${response.immediatePriority.whatToDoNow}`,
@@ -201,7 +328,7 @@ export function renderLitigationNavigationMarkdown(
     ].filter(Boolean).join('\n\n'));
   }
 
-  if (response.coParentResponse.needed || mode === 'co_parent_response_focused') {
+  if (response.coParentResponse.needed) {
     sections.push([
       '**Co-parent response**',
       response.coParentResponse.strategy,
@@ -220,7 +347,7 @@ export function renderLitigationNavigationMarkdown(
     ].filter(Boolean).join('\n\n'));
   }
 
-  if (mode === 'pro_se_planning' || asksProSe || response.issueBreakdown.some((issue) => /pro se|limited-scope/i.test(issue.issue))) {
+  if (asksProSe || response.issueBreakdown.some((issue) => /pro se|limited-scope/i.test(issue.issue))) {
     sections.push([
       '**Pro se / attorney strategy**',
       response.proSeAssessment.practicalRead,
@@ -231,7 +358,6 @@ export function renderLitigationNavigationMarkdown(
   }
 
   if (
-    mode === 'cost_resource_guidance' ||
     asksCostOrResources ||
     (packedOrCourtMode && response.issueBreakdown.some((issue) => /cost|resources/i.test(issue.issue)))
   ) {
@@ -246,7 +372,7 @@ export function renderLitigationNavigationMarkdown(
     ].join('\n\n'));
   }
 
-  if (mode === 'judge_narrative' || response.judgeExplanation.sampleOpening) {
+  if (response.judgeExplanation.sampleOpening) {
     sections.push([
       '**Judge-ready explanation**',
       response.judgeExplanation.simpleTheory,

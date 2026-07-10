@@ -15,6 +15,9 @@ import { buildContextPrompt, type ContextPacket } from '../src/lib/nexx/prompts/
 import { NEXX_RESPONSE_SCHEMA } from '../src/lib/nexx/schemas';
 import { ANALYSIS_STATUS_UI_KIND, SAFE_ANALYSIS_DRAFT_MESSAGE } from '../src/lib/chat/analysisStatus';
 import { buildOfficialLegalResearchTargets } from '../src/lib/nexx/legalResearchTargets';
+import { extractCourtFilingFromSources, type CourtFilingExtraction } from '../src/lib/nexx/legal-engine/courtFilingExtractor';
+import { composeLegalResponse } from '../src/lib/nexx/legal-engine/responseComposer';
+import { repairRenderedOutput, verifyRenderedOutput } from '../src/lib/nexx/legal-engine/renderedOutputVerifier';
 import { recoverStructuredOutput } from '../src/lib/nexx/recovery/recoverStructuredOutput';
 import { suppressWeakArtifacts } from '../src/lib/nexx/recovery/suppressWeakArtifacts';
 import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
@@ -24,6 +27,7 @@ import { renderLegalInterpretationMarkdown } from '../src/lib/nexx/legal-engine/
 import { verifyLegalInterpretationAnswer } from '../src/lib/nexx/legal-engine/legalInterpretationVerifier';
 import {
     buildLitigationNavigationResponse,
+    mergeCourtFilingIntoLitigationNavigation,
     renderLitigationNavigationMarkdown,
 } from '../src/lib/nexx/legal-engine/litigationNavigationRenderer';
 import { verifyLitigationNavigationResponse } from '../src/lib/nexx/legal-engine/litigationNavigationVerifier';
@@ -1204,17 +1208,19 @@ function renderLitigationNavigationMessage(args: {
     userMessage: string;
     recentContext?: string;
     courtSettings?: GenerationContext['courtSettings'];
+    courtFilingExtraction?: CourtFilingExtraction | null;
 }) {
     if (!isLitigationNavigationRoute(args.routeMode)) return args.response;
 
-    const candidate = args.response.litigationNavigation ?? buildLitigationNavigationResponse({
+    const candidate = mergeCourtFilingIntoLitigationNavigation(args.response.litigationNavigation ?? buildLitigationNavigationResponse({
         message: args.userMessage,
         routeMode: args.routeMode,
         recentContext: args.recentContext,
         state: args.courtSettings?.state,
         county: args.courtSettings?.county,
         courtName: args.courtSettings?.courtName,
-    });
+        courtFiling: args.courtFilingExtraction,
+    }), args.courtFilingExtraction);
     const verification = verifyLitigationNavigationResponse(candidate, {
         userMessage: args.userMessage,
     });
@@ -1227,6 +1233,7 @@ function renderLitigationNavigationMessage(args: {
             state: args.courtSettings?.state,
             county: args.courtSettings?.county,
             courtName: args.courtSettings?.courtName,
+            courtFiling: args.courtFilingExtraction,
         });
 
     const litigationMarkdown = renderLitigationNavigationMarkdown(litigationNavigation, {
@@ -1243,8 +1250,44 @@ function renderLitigationNavigationMessage(args: {
         ...args.response,
         litigationNavigation,
         message: shouldPreserveGroundedMessage
-            ? `${existingMessage}\n\n${litigationMarkdown}`
+            ? composeLegalResponse({
+                existingMessage,
+                litigationMarkdown,
+                routeMode: args.routeMode,
+                userMessage: args.userMessage,
+                hasDocumentAnswer: Boolean(args.response.documentAnswer),
+                hasLegalInterpretation: Boolean(args.response.legalInterpretation),
+                litigationNavigation,
+            })
             : litigationMarkdown,
+    };
+}
+
+function verifyAndRepairRenderedResponse(response: NexxAssistantResponse, routeMode: RouteMode, userMessage: string) {
+    const verification = verifyRenderedOutput({
+        rendered: response.message,
+        userMessage,
+        routeMode,
+    });
+    if (verification.passed) return response;
+
+    const repairedMessage = repairRenderedOutput(response.message);
+    const repairedVerification = verifyRenderedOutput({
+        rendered: repairedMessage,
+        userMessage,
+        routeMode,
+    });
+
+    if (!repairedVerification.passed) {
+        console.warn('[ChatWorker] Rendered legal output verifier failed', {
+            routeMode,
+            errors: repairedVerification.errors,
+        });
+    }
+
+    return {
+        ...response,
+        message: repairedMessage || response.message,
     };
 }
 
@@ -1655,8 +1698,10 @@ async function generateWithFallbacks({
                 userMessage: context.turn.message,
                 recentContext: recentLegalContextSummary(context.recentMessages),
                 courtSettings: context.courtSettings,
+                courtFilingExtraction: extractCourtFilingFromSources(promptBundle.documentSourcePackets),
             });
             parsedResponse.message = polishLegalResponse(parsedResponse.message);
+            parsedResponse = verifyAndRepairRenderedResponse(parsedResponse, routeMode, context.turn.message);
 
             return {
                 response: parsedResponse,

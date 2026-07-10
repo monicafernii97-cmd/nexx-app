@@ -22,6 +22,9 @@ const PARTY_MESSAGE_PATTERN =
 const COURT_FILING_PATTERN =
   /\b(draft|prepare|generate|write|create)\b.{0,100}\b(motion|petition|declaration|pleading|notice|proposed order|certificate|filing|court[-\s]?ready|affidavit|exhibit list)\b/i;
 
+const COURT_RESPONSE_PLANNING_PATTERN =
+  /\b(what\s+(?:do|should)\s+i\s+file\s+(?:in\s+)?response|what\s+do\s+i\s+need\s+to\s+file\s+next|how\s+do\s+i\s+(?:answer|respond)\s+(?:(?:to|against)\s+)?(?:his|her|the)?\s*(?:motion|petition)|response\s+to\s+(?:the\s+)?(?:motion|petition)|what\s+court\s+response|file\s+next\s+after\s+being\s+served|what\s+response\s+do\s+i\s+need\s+to\s+file)\b/i;
+
 const PROCEDURE_PATTERN =
   /\b(how do i file|where do i file|filing process|procedure|local rule|standing order|clerk|court forms?|service rules?)\b/i;
 
@@ -60,6 +63,7 @@ const FILING_WALKTHROUGH_PATTERN =
 
 export function classifyLegalIntent(message: string): LegalIntent {
   if (COURT_FILING_PATTERN.test(message)) return 'court_filing_draft';
+  if (COURT_RESPONSE_PLANNING_PATTERN.test(message)) return 'court_response_planning';
 
   const multiIntent = classifyPackedCaseIntake(message);
   if (multiIntent.primaryIntent === 'court_response_deadline') return 'court_response_deadline';

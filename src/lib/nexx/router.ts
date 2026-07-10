@@ -183,6 +183,7 @@ function shouldRouteAsActiveOrderFollowUp(
     'packed_case_intake',
     'new_court_filing_received',
     'court_response_deadline',
+    'court_response_planning',
     'filing_walkthrough',
     'pro_se_feasibility',
     'attorney_cost_question',
@@ -248,6 +249,10 @@ export function classifyMessage(
 
   if (legalIntent === 'draft_response_to_other_party') {
     return buildResult('party_message_draft', documentReference, legalIntent);
+  }
+
+  if (legalIntent === 'court_response_planning') {
+    return buildResult('court_response_planning', documentReference, legalIntent, multiIntent);
   }
 
   if (legalIntent !== 'court_filing_draft' && (legalIntent === 'packed_case_intake' || multiIntent.secondaryIntents.length >= 3)) {
@@ -437,6 +442,10 @@ export function preserveOrUpgradeDocumentRoute(
 
   if (legalIntent === 'draft_response_to_other_party') {
     return buildResult('party_message_draft', documentReference, legalIntent);
+  }
+
+  if (legalIntent === 'court_response_planning') {
+    return buildResult('court_response_planning', documentReference, legalIntent, multiIntent);
   }
 
   if (legalIntent !== 'court_filing_draft' && (legalIntent === 'packed_case_intake' || multiIntent.secondaryIntents.length >= 3)) {

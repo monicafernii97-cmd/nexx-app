@@ -498,9 +498,11 @@ function buildContextualFollowUpMessage(
 
     const recentContext = recentMessages
         .filter((recent) =>
-            recent.status === undefined ||
-            recent.status === 'committed' ||
-            recent.status === 'degraded'
+            recent.role === 'user' && (
+                recent.status === undefined ||
+                recent.status === 'committed' ||
+                recent.status === 'degraded'
+            )
         )
         .slice(-8)
         .map((recent) => recent.content.replace(/\s+/g, ' ').trim())
@@ -2057,7 +2059,7 @@ export const completeAssistant = internalMutation({
         const messageStatus = args.degraded ? 'degraded' : 'committed';
         const unsafeContent = looksLikeInternalStructuredPayload(args.content);
         const content = unsafeContent
-            ? 'Analysis completed, but the answer was withheld because it contained internal source metadata. Please regenerate this answer.'
+            ? 'I couldn\'t display that response correctly. Please retry it.'
             : args.content;
         const artifactsJson = unsafeContent ? undefined : args.artifactsJson;
         const metadata = {

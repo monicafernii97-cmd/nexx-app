@@ -41,6 +41,15 @@ export function AssistantMessageCard({
 }: AssistantMessageCardProps) {
   const { presentation, panels } = viewModel;
   const { guidance, workProduct } = splitGuidanceAndWorkProduct(panels);
+  const eyebrowLabel = presentation.intent === 'drafting'
+    ? 'Response you can send'
+    : presentation.intent === 'procedure'
+      ? 'Court next steps'
+      : presentation.intent === 'analysis'
+        ? 'My read'
+        : presentation.intent === 'strategy'
+          ? 'What this means'
+          : 'Next steps';
 
   const handleCopy = (content: string) => {
     navigator.clipboard.writeText(content).catch(() => {});
@@ -61,7 +70,7 @@ export function AssistantMessageCard({
       {/* Header: Eyebrow + Intelligence Indicators */}
       <div className="px-5 pt-4 pb-2 flex flex-wrap items-center gap-2">
         <span className="text-eyebrow text-[var(--text-muted)]">
-          Assistant Response
+          {eyebrowLabel}
         </span>
 
         {/* Pattern Detection Chips */}

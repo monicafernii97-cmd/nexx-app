@@ -17,6 +17,7 @@ export type LitigationNavigationResponse = {
   courtPosture: {
     whatWeKnow: string[];
     whatWeNeed: string[];
+    candidateResponsePaths: CandidateResponsePath[];
     possibleFilingOrResponse:
       | 'answer'
       | 'response_to_motion'
@@ -74,6 +75,14 @@ export type LitigationNavigationResponse = {
   nextSteps: string[];
 };
 
+export type CandidateResponsePath = {
+  candidate: string;
+  reason: string;
+  jurisdictionVerificationRequired: boolean;
+  localAuthoritySourceIds: string[];
+  status: 'possible' | 'verified' | 'not_applicable';
+};
+
 const POSSIBLE_FILING_OR_RESPONSE_VALUES = new Set([
   'answer',
   'response_to_motion',
@@ -120,6 +129,20 @@ export function validateLitigationNavigationResponseShape(value: unknown): value
   if (!isObject(value.courtPosture)) return false;
   if (!isStringArray(value.courtPosture.whatWeKnow)) return false;
   if (!isStringArray(value.courtPosture.whatWeNeed)) return false;
+  if (
+    value.courtPosture.candidateResponsePaths !== undefined &&
+    !(
+      Array.isArray(value.courtPosture.candidateResponsePaths) &&
+      value.courtPosture.candidateResponsePaths.every((item) =>
+        isObject(item) &&
+        typeof item.candidate === 'string' &&
+        typeof item.reason === 'string' &&
+        typeof item.jurisdictionVerificationRequired === 'boolean' &&
+        isStringArray(item.localAuthoritySourceIds) &&
+        ['possible', 'verified', 'not_applicable'].includes(String(item.status))
+      )
+    )
+  ) return false;
   if (!POSSIBLE_FILING_OR_RESPONSE_VALUES.has(String(value.courtPosture.possibleFilingOrResponse))) return false;
   if (!isOptionalString(value.courtPosture.deadlineNote)) return false;
   if (!isOptionalString(value.courtPosture.hearingNote)) return false;

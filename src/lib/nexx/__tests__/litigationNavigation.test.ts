@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { extractCourtFilingFromSources } from '../legal-engine/courtFilingExtractor';
+import { extractCourtDocumentsFromSources, extractCourtFilingFromSources } from '../legal-engine/courtFilingExtractor';
 import { buildLitigationNavigationResponse, mergeCourtFilingIntoLitigationNavigation, renderLitigationNavigationMarkdown } from '../legal-engine/litigationNavigationRenderer';
 import { verifyLitigationNavigationResponse } from '../legal-engine/litigationNavigationVerifier';
 import { composeLegalResponse } from '../legal-engine/responseComposer';
-import { verifyRenderedOutput } from '../legal-engine/renderedOutputVerifier';
+import { repairRenderedOutput, verifyRenderedOutput } from '../legal-engine/renderedOutputVerifier';
 import { classifyMessage } from '../router';
 import type { LegalDocumentSourcePacket } from '../legalDocumentAnswer';
 
@@ -52,11 +52,34 @@ describe('litigation navigation and client-care layer', () => {
 
     expect(route.mode).toBe('co_parent_response');
     expect(text).toMatch(/You can say|Neutral draft/i);
-    expect(text).toMatch(/Based on the order|current court order/i);
+    expect(text).toMatch(/specific written provision|current court order/i);
+    expect(text).not.toMatch(/6:00 p\.m\.|8:00 a\.m\./i);
     expect(text).toMatch(/Do not respond to every accusation|Do not send a long emotional explanation/i);
     expect(text).not.toMatch(/Pro se \/ attorney strategy/i);
     expect(text).not.toMatch(/Cost and resources/i);
     expect(text).not.toMatch(BACKEND_LANGUAGE);
+  });
+
+  it('uses verified order interpretation before drafting exact Father\'s Day terms', () => {
+    const message = 'What should I respond about Father\'s Day?';
+    const response = buildLitigationNavigationResponse({
+      message,
+      routeMode: 'co_parent_response',
+      recentContext: "Prior issue: Father's Day possession dispute under a court order.",
+      verifiedOrderInterpretation: {
+        directAnswer: 'No - the Father\'s Day clause starts Friday.',
+        practicalResult: 'Father\'s Day possession starts Friday at 6:00 p.m. and ends Monday at 8:00 a.m.',
+        startTime: 'Friday at 6:00 p.m.',
+        endTime: 'Monday at 8:00 a.m.',
+        sourcePages: ['p. 5'],
+      },
+    });
+    const text = renderLitigationNavigationMarkdown(response, {
+      routeMode: 'co_parent_response',
+      userMessage: message,
+    });
+
+    expect(text).toMatch(/Friday at 6:00 p\.m\..*\[p\. 5\]/i);
   });
 
   it('gives practical pro se guidance when the user cannot afford an attorney', () => {
@@ -152,6 +175,7 @@ describe('litigation navigation and client-care layer', () => {
     expect(extraction?.reliefRequested.join(' ')).toMatch(/contempt|makeup possession|attorney fees/i);
     expect(extraction?.allegations[0]?.sourceIds).toEqual(['src_001']);
     expect(extraction?.deadlinesOrHearings.some((item) => item.type === 'hearing')).toBe(true);
+    expect(extraction?.serviceClaimedInDocument).toBe(true);
 
     const message = 'I uploaded his motion. What do I need to file next?';
     const route = classifyMessage(message);
@@ -170,9 +194,53 @@ describe('litigation navigation and client-care layer', () => {
 
     expect(route.mode).toBe('court_response_planning');
     expect(text).toMatch(/uploaded filing appears to be an? enforcement|filing appears to request/i);
-    expect(text).toMatch(/service date|hearing date|deadline/i);
+    expect(text).toMatch(/actually received|hearing date|deadline/i);
+    expect(text).toMatch(/\[p\. 1\]|\[p\. 2\]/);
     expect(text).toMatch(/response|file/i);
     expect(text).not.toMatch(BACKEND_LANGUAGE);
+  });
+
+  it('extracts court filings per document instead of merging a motion and order', () => {
+    const packets: LegalDocumentSourcePacket[] = [
+      {
+        sourceId: 'src_motion',
+        fileId: 'file_motion',
+        fileName: 'motion.pdf',
+        chunkId: 'chunk_motion',
+        blockIds: [],
+        pageStart: 1,
+        pageEnd: 1,
+        text: 'Motion to Enforce Possession. Petitioner asks the Court to hold Respondent in contempt and order makeup possession.',
+      },
+      {
+        sourceId: 'src_order',
+        fileId: 'file_order',
+        fileName: 'final-order.pdf',
+        chunkId: 'chunk_order',
+        blockIds: [],
+        pageStart: 5,
+        pageEnd: 5,
+        text: 'Final Order in Suit Affecting the Parent-Child Relationship. Father\'s Day possession begins Friday at 6:00 p.m.',
+      },
+    ];
+
+    const documents = extractCourtDocumentsFromSources(packets);
+    const active = extractCourtFilingFromSources(packets);
+
+    expect(documents).toHaveLength(2);
+    expect(documents.find((doc) => doc.fileId === 'file_order')?.documentRole).toBe('controlling_order');
+    expect(active?.documentType).toBe('enforcement');
+    expect(active?.currentOrderReferences.join(' ')).not.toMatch(/Father's Day possession begins/i);
+  });
+
+  it('does not convert a threat to file into a confirmed court deadline', () => {
+    const message = 'He says he is taking me to court. What do I do?';
+    const route = classifyMessage(message);
+    const { text } = rendered(message, route.mode);
+
+    expect(route.mode).toBe('supportive_strategy');
+    expect(text).toMatch(/threat does not create a court deadline by itself|verify whether anything was actually filed/i);
+    expect(text).not.toMatch(/Protect the court deadline first/i);
   });
 
   it('keeps pro se rendering focused even when an uploaded filing creates deadline posture', () => {
@@ -262,5 +330,19 @@ describe('litigation navigation and client-care layer', () => {
       'noInventedDollarAmounts',
       'noDuplicateSections',
     ]));
+  });
+
+  it('allows sourced order amounts and rephrases diagnostic abuse labels without dropping safety facts', () => {
+    const sourcedMoney = verifyRenderedOutput({
+      rendered: 'Based on the order, the order requires $750 in monthly child support. [p. 3]',
+      userMessage: 'How much support does the order require?',
+      routeMode: 'order_interpretation',
+    });
+    expect(sourcedMoney.passed).toBe(true);
+
+    const repaired = repairRenderedOutput('He is an abuser.\n\nYou described domestic abuse allegations in the protective-order filing.');
+    expect(repaired).toContain('safety or family-violence concerns');
+    expect(repaired).toContain('domestic abuse allegations');
+    expect(repaired).not.toMatch(/\bhe is an abuser\b/i);
   });
 });

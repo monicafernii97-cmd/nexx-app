@@ -3,13 +3,13 @@ import { FILING_READINESS_CHECKLIST } from './filingReadinessChecklist';
 
 export function buildFilingPlan(intake: PackedCaseIntake) {
   const likelyNextDocument = intake.courtPosture.filingType === 'petition'
-    ? 'answer'
+    ? 'answer or other responsive pleading to verify'
     : intake.courtPosture.filingType === 'motion'
-      ? 'response to motion'
+      ? 'written response, answer, or hearing response to verify'
       : intake.courtPosture.filingType === 'temporary_orders'
-        ? 'temporary orders response'
+        ? 'temporary-orders response path to verify'
         : intake.courtPosture.otherPartyFiledSomething
-          ? 'response to the filed document'
+          ? 'responsive filing or hearing response to verify'
           : null;
 
   return {

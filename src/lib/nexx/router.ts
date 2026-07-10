@@ -17,12 +17,14 @@ import { classifyPackedCaseIntake } from './legal-engine/packedCaseIntake';
 // ---------------------------------------------------------------------------
 
 const SAFETY_PATTERNS = [
-  /\b(danger|unsafe|emergency|911|violence|threaten|harm|hurt)\b/i,
+  /\b(danger|unsafe|emergency|911|violence|harm|hurt)\b/i,
+  /\b(threaten(?:ed|ing)?|said|says?)\b.{0,60}\b(kill|hurt|harm|hit|shoot|stab|come after|take the child|kidnap)\b/i,
+  /\b(stalking|strangulation|strangled|choked|weapon|gun|knife|kidnapp?ing|refus(?:e|ing|ed) to return (?:the )?child|suicidal|suicide|child left unsafe|physical assault|sexual abuse|immediate flight risk|emergency protective order)\b/i,
   /\b(call.*police|safety plan)\b/i,
   // 'protective order' / 'restraining order' only trigger safety when paired
   // with imminent-risk words — otherwise they route to local_procedure
-  /\b(danger|emergency|threaten|harm|hurt|violence).{0,40}(protective order|restraining order)/i,
-  /\b(protective order|restraining order).{0,40}(danger|emergency|threaten|harm|hurt|violence)/i,
+  /\b(danger|emergency|threaten(?:ed|ing)? (?:to )?(?:hurt|harm|kill)|harm|hurt|violence|weapon|stalking).{0,40}(protective order|restraining order)/i,
+  /\b(protective order|restraining order).{0,40}(danger|emergency|threaten(?:ed|ing)? (?:to )?(?:hurt|harm|kill)|harm|hurt|violence|weapon|stalking)/i,
 ];
 
 const DRAFT_PATTERNS = [
@@ -137,7 +139,8 @@ function isLitigationNavigationRoute(mode?: RouteMode) {
     mode === 'pro_se_guidance' ||
     mode === 'attorney_resource_guidance' ||
     mode === 'court_narrative_builder' ||
-    mode === 'filing_walkthrough';
+    mode === 'filing_walkthrough' ||
+    mode === 'court_ready_drafting';
 }
 
 export function classifyFollowUpIntent(message: string): FollowUpIntent {
@@ -195,7 +198,7 @@ function shouldRouteAsActiveOrderFollowUp(
   ].includes(legalIntent);
 }
 
-function activeDocumentFollowUpReference(message: string): DocumentReferenceDetection {
+function activeDocumentFollowUpReference(_message: string): DocumentReferenceDetection {
   return {
     referencesDocument: true,
     confidence: 'medium',
@@ -335,7 +338,7 @@ export function classifyMessage(
   // Explicit drafting commands should win over document words like "order" so
   // the assistant drafts with document and official-source context available.
   if (matchesAny(text, EXPLICIT_DRAFT_PATTERNS)) {
-    return buildResult('court_ready_drafting', documentReference, legalIntent);
+    return buildResult('court_ready_drafting', documentReference, legalIntent, multiIntent);
   }
 
   // Document follow-ups should win over generic procedure terms like "deadline".
@@ -370,7 +373,7 @@ export function classifyMessage(
 
   // Court-ready drafting
   if (matchesAny(text, DRAFT_PATTERNS)) {
-    return buildResult('court_ready_drafting', undefined, legalIntent);
+    return buildResult('court_ready_drafting', undefined, legalIntent, multiIntent);
   }
 
   // Judge lens
@@ -515,7 +518,7 @@ export function preserveOrUpgradeDocumentRoute(
   }
 
   if (classified.mode === 'court_ready_drafting') {
-    return buildResult('court_ready_drafting', documentReference, legalIntent);
+    return buildResult('court_ready_drafting', documentReference, legalIntent, multiIntent);
   }
 
   if (classified.mode === 'judge_lens_strategy' || classified.mode === 'pattern_analysis') {

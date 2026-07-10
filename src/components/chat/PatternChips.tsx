@@ -14,12 +14,12 @@ import type { DetectedPattern, PatternType } from '@/lib/ui-intelligence/types';
 // ---------------------------------------------------------------------------
 
 const PATTERN_LABELS: Record<PatternType, string> = {
-  delay_tactic: 'Delay Tactic',
-  control_dispute: 'Control Dispute',
+  delay_tactic: 'Repeated Scheduling Conflict',
+  control_dispute: 'Communication Issue to Document',
   documentation_gap: 'Documentation Gap',
-  routine_disruption: 'Routine Disruption',
-  notice_conflict: 'Notice Conflict',
-  credibility_sensitivity: 'Credibility Sensitivity',
+  routine_disruption: 'Routine Disruption Concern',
+  notice_conflict: 'Recurring Notice Dispute',
+  credibility_sensitivity: 'Record-Clarity Concern',
 };
 
 // ---------------------------------------------------------------------------
@@ -49,7 +49,7 @@ export function PatternChips({ patterns }: PatternChipsProps) {
           title={pattern.label || PATTERN_LABELS[pattern.type]}
         >
           <span className="w-1 h-1 rounded-full bg-[var(--warning-muted)]" />
-          Pattern: {pattern.label || PATTERN_LABELS[pattern.type]}
+          {pattern.label || PATTERN_LABELS[pattern.type]}
         </span>
       ))}
     </div>

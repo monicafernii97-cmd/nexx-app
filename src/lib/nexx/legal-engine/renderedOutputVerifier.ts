@@ -1,4 +1,5 @@
 import type { RouteMode } from '../../types';
+import { markdownHeadingKey } from './markdownHeadings';
 
 export type RenderedOutputVerification = {
   passed: boolean;
@@ -20,7 +21,7 @@ const BACKEND_LANGUAGE_PATTERN =
   /\b(sourceId|chunkId|source packet|backend|model-generated claim|documentAnswer|legalInterpretation|raw JSON|metadataJson|providerResponseId)\b/i;
 
 const OCR_RETRIEVAL_VERIFIER_PATTERN =
-  /\b(OCR|retrieval|verifier|citation verifier|extraction warnings?|extracted order text|extracted text|confidence(?: labels?)?)\b/i;
+  /\b(OCR|retrieval|verifier|citation verifier|extraction warnings?|extracted order text|extracted text|confidence labels?)\b/i;
 
 const INFLAMMATORY_LABEL_PATTERN =
   /\b(narcissist|gaslighting|gaslit|crazy|psycho|abusive|abuser|monster)\b/i;
@@ -31,8 +32,8 @@ function duplicateHeadingCount(message: string) {
   const headings = message
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => /^(\*\*[^*]+\*\*|Next steps:|Neutral draft:|Firmer version:)/i.test(line))
-    .map((line) => line.toLowerCase());
+    .map((line) => markdownHeadingKey(line))
+    .filter((heading): heading is string => Boolean(heading));
   return headings.length - new Set(headings).size;
 }
 
@@ -100,12 +101,14 @@ export function repairRenderedOutput(rendered: string) {
   const lines = rendered.split('\n');
   const filtered = lines.filter((line) =>
     !BACKEND_LANGUAGE_PATTERN.test(line) &&
-    !OCR_RETRIEVAL_VERIFIER_PATTERN.test(line)
+    !OCR_RETRIEVAL_VERIFIER_PATTERN.test(line) &&
+    !INFLAMMATORY_LABEL_PATTERN.test(line) &&
+    !DOLLAR_PATTERN.test(line)
   );
   const seenHeadings = new Set<string>();
   const repaired: string[] = [];
   for (const line of filtered) {
-    const heading = line.match(/^(\*\*[^*]+\*\*|Next steps:|Neutral draft:|Firmer version:)/i)?.[1]?.toLowerCase();
+    const heading = markdownHeadingKey(line);
     if (heading) {
       if (seenHeadings.has(heading)) continue;
       seenHeadings.add(heading);

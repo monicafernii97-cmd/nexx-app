@@ -1283,6 +1283,15 @@ function verifyAndRepairRenderedResponse(response: NexxAssistantResponse, routeM
             routeMode,
             errors: repairedVerification.errors,
         });
+        if (
+            repairedVerification.errors.includes('noInflammatoryLabels') ||
+            repairedVerification.errors.includes('noInventedDollarAmounts')
+        ) {
+            return {
+                ...response,
+                message: repairedMessage || 'Here is the safest practical next step based on the information available.',
+            };
+        }
     }
 
     return {
@@ -1692,13 +1701,16 @@ async function generateWithFallbacks({
                 routeMode,
                 context.turn.message
             );
+            const courtFilingExtraction = isLitigationNavigationRoute(routeMode)
+                ? extractCourtFilingFromSources(promptBundle.documentSourcePackets)
+                : null;
             parsedResponse = renderLitigationNavigationMessage({
                 response: parsedResponse,
                 routeMode,
                 userMessage: context.turn.message,
                 recentContext: recentLegalContextSummary(context.recentMessages),
                 courtSettings: context.courtSettings,
-                courtFilingExtraction: extractCourtFilingFromSources(promptBundle.documentSourcePackets),
+                courtFilingExtraction,
             });
             parsedResponse.message = polishLegalResponse(parsedResponse.message);
             parsedResponse = verifyAndRepairRenderedResponse(parsedResponse, routeMode, context.turn.message);

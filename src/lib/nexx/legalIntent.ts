@@ -63,10 +63,21 @@ const FILING_WALKTHROUGH_PATTERN =
 
 export function classifyLegalIntent(message: string): LegalIntent {
   if (COURT_FILING_PATTERN.test(message)) return 'court_filing_draft';
-  if (COURT_RESPONSE_PLANNING_PATTERN.test(message)) return 'court_response_planning';
 
   const multiIntent = classifyPackedCaseIntake(message);
   if (multiIntent.primaryIntent === 'court_response_deadline') return 'court_response_deadline';
+  const hasPackedContextBeyondCourtResponse = multiIntent.secondaryIntents.some((intent) => ![
+    'new_court_filing_received',
+    'court_response_deadline',
+    'court_response_planning',
+  ].includes(intent));
+  if (
+    multiIntent.primaryIntent === 'packed_case_intake' &&
+    hasPackedContextBeyondCourtResponse
+  ) {
+    return 'packed_case_intake';
+  }
+  if (COURT_RESPONSE_PLANNING_PATTERN.test(message)) return 'court_response_planning';
   if (
     multiIntent.primaryIntent === 'packed_case_intake' ||
     multiIntent.secondaryIntents.length >= 3

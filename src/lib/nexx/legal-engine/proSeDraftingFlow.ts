@@ -63,6 +63,9 @@ export function buildProSeDraftingReadiness(args: {
   factsInDateOrder?: boolean;
   exhibitsKnown?: boolean;
   feeWaiverNeedKnown?: boolean;
+  certificateOfServiceKnown?: boolean;
+  signatureBlockKnown?: boolean;
+  localFormattingRulesKnown?: boolean;
   courtFiling?: CourtFilingExtraction | null;
 }): ProSeDraftingReadiness {
   const requestedDocument = inferRequestedProSeDocument(args.message);
@@ -92,9 +95,9 @@ export function buildProSeDraftingReadiness(args: {
     'your requested outcome': hasText(args.userRequestedOutcome),
     'facts in date order': Boolean(args.factsInDateOrder),
     exhibits: Boolean(args.exhibitsKnown),
-    'certificate of service requirements': false,
-    'signature and contact block': false,
-    'local formatting rules': false,
+    'certificate of service requirements': Boolean(args.certificateOfServiceKnown),
+    'signature and contact block': Boolean(args.signatureBlockKnown),
+    'local formatting rules': Boolean(args.localFormattingRulesKnown),
     'fee waiver need': Boolean(args.feeWaiverNeedKnown),
   };
 

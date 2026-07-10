@@ -35,9 +35,18 @@ export type CourtFilingExtraction = {
 
 const DATE_PHRASE =
   String.raw`(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4})`;
+const MAX_PACKET_TEXT_CHARS = 20_000;
+const MAX_COMBINED_TEXT_CHARS = 80_000;
 
 function normalize(value: string) {
   return value.replace(/\s+/g, ' ').trim();
+}
+
+function capPacket(packet: LegalDocumentSourcePacket): LegalDocumentSourcePacket {
+  return {
+    ...packet,
+    text: packet.text.slice(0, MAX_PACKET_TEXT_CHARS),
+  };
 }
 
 function unique(values: string[], maxItems = 8) {
@@ -148,23 +157,24 @@ export function extractCourtFilingFromSources(
 ): CourtFilingExtraction | null {
   if (sourcePackets.length === 0) return null;
 
-  const combinedText = normalize(sourcePackets.map((packet) => packet.text).join('\n\n')).slice(0, 80_000);
+  const cappedPackets = sourcePackets.map(capPacket);
+  const combinedText = normalize(cappedPackets.map((packet) => packet.text).join('\n\n').slice(0, MAX_COMBINED_TEXT_CHARS));
   const documentType = inferDocumentType(combinedText);
   const hasFilingSignal = documentType !== 'unknown' ||
     /\b(relief requested|prayer|petitioner|respondent|movant|motion|petition|hearing|served|asks the court)\b/i.test(combinedText);
   if (!hasFilingSignal) return null;
 
   const allegations = extractSourceBackedItems(
-    sourcePackets,
+    cappedPackets,
     /\b(?:allege[sd]?|claims?|contends?|failed to|refused to|violat(?:ed|ing|ion)|withheld|denied|interfered|arrears|contempt)\b/i,
     8
   );
-  const deadlinesOrHearings = extractDeadlinesOrHearings(sourcePackets);
-  const serviceClues = unique(sourcePackets.flatMap((packet) => {
+  const deadlinesOrHearings = extractDeadlinesOrHearings(cappedPackets);
+  const serviceClues = unique(cappedPackets.flatMap((packet) => {
     const snippet = snippetAround(packet.text, /\b(?:served|service of process|certificate of service|return of service)\b/i);
     return snippet ? [snippet] : [];
   }), 6);
-  const currentOrderReferences = unique(sourcePackets.flatMap((packet) => {
+  const currentOrderReferences = unique(cappedPackets.flatMap((packet) => {
     const snippet = snippetAround(packet.text, /\b(?:prior order|current order|final order|temporary order|possession order|parenting plan|order signed)\b/i);
     return snippet ? [snippet] : [];
   }), 6);

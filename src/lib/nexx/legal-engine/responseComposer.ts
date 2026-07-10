@@ -1,5 +1,6 @@
 import type { RouteMode } from '../../types';
 import type { LitigationNavigationResponse } from './litigationNavigationSchema';
+import { KNOWN_MARKDOWN_HEADING_PATTERN, markdownHeadingKey } from './markdownHeadings';
 
 export type ResponseCompositionInput = {
   existingMessage: string;
@@ -25,7 +26,8 @@ function extractFirstSection(markdown: string, heading: RegExp) {
   if (index < 0) return null;
   const next = lines.findIndex((line, lineIndex) =>
     lineIndex > index &&
-    (/^\*\*[^*]+\*\*/.test(line) || /^Next steps:/.test(line))
+    KNOWN_MARKDOWN_HEADING_PATTERN.test(line) &&
+    !/^(Neutral draft:|Firmer version:|You can say:)/i.test(line)
   );
   return lines.slice(index, next > index ? next : undefined).join('\n').trim();
 }
@@ -38,7 +40,7 @@ function removeDuplicateSections(markdown: string) {
   const seen = new Set<string>();
   const sections = markdown.split(/\n{2,}/);
   return sections.filter((section) => {
-    const heading = section.match(/^(\*\*[^*]+\*\*|Next steps:|The first priority is this:)/i)?.[1]?.toLowerCase();
+    const heading = markdownHeadingKey(section);
     if (!heading) return true;
     if (seen.has(heading)) return false;
     seen.add(heading);

@@ -52,6 +52,10 @@ function unique(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
+function articleFor(label: string) {
+  return /^[aeiou]/i.test(label) ? 'an' : 'a';
+}
+
 function supportiveSummary(intake: PackedCaseIntake) {
   if (intake.courtPosture.otherPartyFiledSomething && (intake.emotionalState.overwhelmed || intake.emotionalState.scared)) {
     return 'I hear you. This is a lot at once: the court issue, the accusations or messages, and the fear of handling it without enough help. We can slow it down and organize it.';
@@ -90,7 +94,7 @@ function courtPosture(
       'legal_aid',
     ].includes(q.category));
   const whatWeKnow = unique([
-    courtFiling && courtFiling.documentType !== 'unknown' ? `The uploaded filing appears to be a ${courtFiling.documentType.replace(/_/g, ' ')}.` : '',
+    courtFiling && courtFiling.documentType !== 'unknown' ? `The uploaded filing appears to be ${articleFor(courtFiling.documentType)} ${courtFiling.documentType.replace(/_/g, ' ')}.` : '',
     courtFiling?.reliefRequested.length ? `The filing appears to request: ${courtFiling.reliefRequested.slice(0, 3).join('; ')}.` : '',
     courtFiling?.allegations.length ? `The filing includes allegations or disputed facts that need a date-order response.` : '',
     courtFiling?.deadlinesOrHearings.some((item) => item.type === 'hearing') ? 'A hearing or court-date clue appears in the filing.' : '',
@@ -142,13 +146,13 @@ function nextSteps(intake: PackedCaseIntake, courtFiling?: CourtFilingExtraction
 }
 
 function inferRenderMode(response: LitigationNavigationResponse, routeMode: RouteMode, message: string): LitigationRenderMode {
-  if (response.courtPosture.deadlineNote || routeMode === 'litigation_navigation' || routeMode === 'court_response_planning') return 'deadline_first';
-  if (routeMode === 'co_parent_response' || /\bwhat\s+(?:do|should)\s+i\s+(?:say|respond)|how do i respond|tell him off|tell her off\b/i.test(message)) return 'co_parent_response_focused';
+  if (routeMode === 'packed_case_intake') return 'packed_case_overview';
   if (routeMode === 'pro_se_guidance' || /\bpro se|do this myself|without (?:a|an) attorney\b/i.test(message)) return 'pro_se_planning';
   if (routeMode === 'attorney_resource_guidance' || /\bcost|fee|legal aid|attorney|lawyer\b/i.test(message)) return 'cost_resource_guidance';
   if (routeMode === 'court_narrative_builder' || /\bjudge|explain myself|explain this\b/i.test(message)) return 'judge_narrative';
+  if (routeMode === 'co_parent_response' || /\bwhat\s+(?:do|should)\s+i\s+(?:say|respond)|how do i respond|tell him off|tell her off\b/i.test(message)) return 'co_parent_response_focused';
+  if (response.courtPosture.deadlineNote || routeMode === 'litigation_navigation' || routeMode === 'court_response_planning') return 'deadline_first';
   if (routeMode === 'filing_walkthrough' || /\bwhat do i file|how do i file\b/i.test(message)) return 'filing_walkthrough';
-  if (routeMode === 'packed_case_intake') return 'packed_case_overview';
   return 'calm_grounding';
 }
 
@@ -202,7 +206,7 @@ export function mergeCourtFilingIntoLitigationNavigation(
   const filingLabel = courtFiling.documentType.replace(/_/g, ' ');
   const whatWeKnow = unique([
     ...response.courtPosture.whatWeKnow,
-    courtFiling.documentType !== 'unknown' ? `The uploaded filing appears to be a ${filingLabel}.` : '',
+    courtFiling.documentType !== 'unknown' ? `The uploaded filing appears to be ${articleFor(filingLabel)} ${filingLabel}.` : '',
     courtFiling.reliefRequested.length ? `The filing appears to request: ${courtFiling.reliefRequested.slice(0, 3).join('; ')}.` : '',
     courtFiling.allegations.length ? 'The filing includes allegations or disputed facts that should be answered in date order.' : '',
     courtFiling.deadlinesOrHearings.some((item) => item.type === 'hearing') ? 'A hearing or court-date clue appears in the filing.' : '',

@@ -390,6 +390,7 @@ export function classifyPackedCaseIntake(message: string, contextText = ''): Mul
     requiresCourtDeadlineCheck: intake.courtPosture.otherPartyFiledSomething || intake.immediateRisks.deadlineRisk,
     requiresCoParentDraft: intake.coParentCommunication.userNeedsResponseDraft,
     requiresResourceLookup: intake.userQuestions.some((q) => q.category === 'cost' || q.category === 'legal_aid' || q.category === 'attorney_resources'),
-    requiresFilingPlanning: intake.courtPosture.otherPartyFiledSomething || intake.userQuestions.some((q) => q.category === 'what_to_file'),
+    requiresFilingPlanning: intake.courtPosture.otherPartyFiledSomething ||
+      intake.userQuestions.some((q) => q.category === 'what_to_file' || q.category === 'court_response_planning'),
   };
 }

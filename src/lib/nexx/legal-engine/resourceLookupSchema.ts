@@ -5,6 +5,7 @@ export type LocalLegalResourceLookup = {
     courtName: string | null;
   };
   feeSources: Array<{
+    sourceId: string;
     title: string;
     sourceType: 'official_court' | 'district_clerk' | 'efiling' | 'legal_aid' | 'bar_referral' | 'law_library' | 'other';
     summary: string;
@@ -29,6 +30,7 @@ export type LocalLegalResourceLookup = {
   exactFeeFindings: Array<{
     feeType: string;
     amount: string;
+    sourceId: string;
     sourceTitle: string;
     retrievedAt: string;
   }>;
@@ -60,7 +62,7 @@ export function canDisplayExactFeeFinding(
   finding: LocalLegalResourceLookup['exactFeeFindings'][number]
 ) {
   return lookup.feeSources.some((source) =>
-    source.title === finding.sourceTitle &&
+    source.sourceId === finding.sourceId &&
     OFFICIAL_FEE_SOURCE_TYPES.has(source.sourceType)
   );
 }

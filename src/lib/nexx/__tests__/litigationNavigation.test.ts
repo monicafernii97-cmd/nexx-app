@@ -175,6 +175,45 @@ describe('litigation navigation and client-care layer', () => {
     expect(text).not.toMatch(BACKEND_LANGUAGE);
   });
 
+  it('keeps pro se rendering focused even when an uploaded filing creates deadline posture', () => {
+    const extraction = extractCourtFilingFromSources([
+      {
+        sourceId: 'src_001',
+        fileId: 'file_1',
+        fileName: 'petition.pdf',
+        chunkId: 'chunk_1',
+        blockIds: [],
+        pageStart: 1,
+        pageEnd: 1,
+        text: 'Petition to Modify Parent-Child Relationship. Petitioner asks the Court to modify custody and child support.',
+      },
+      {
+        sourceId: 'src_002',
+        fileId: 'file_1',
+        fileName: 'petition.pdf',
+        chunkId: 'chunk_2',
+        blockIds: [],
+        pageStart: 2,
+        pageEnd: 2,
+        text: 'Notice of hearing. The hearing is on September 3, 2026 at 9:00 a.m. Certificate of service included.',
+      },
+    ]);
+    const response = buildLitigationNavigationResponse({
+      message: 'I cannot afford an attorney. Can I do this myself?',
+      routeMode: 'pro_se_guidance',
+      courtFiling: extraction,
+    });
+    const text = renderLitigationNavigationMarkdown(response, {
+      routeMode: 'pro_se_guidance',
+      userMessage: 'I cannot afford an attorney. Can I do this myself?',
+    });
+
+    expect(text).toMatch(/Often manageable pro se/i);
+    expect(text).toMatch(/Higher-risk without attorney help/i);
+    expect(text).not.toMatch(/^The first priority is this:/i);
+    expect(text).not.toMatch(BACKEND_LANGUAGE);
+  });
+
   it('composes grounded legal answers with navigation without duplicate sections', () => {
     const composed = composeLegalResponse({
       existingMessage: 'No — not based on the order language we have been discussing. The specific Father’s Day provision controls.',

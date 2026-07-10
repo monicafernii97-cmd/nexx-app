@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildLitigationNavigationResponse, renderLitigationNavigationMarkdown } from '../legal-engine/litigationNavigationRenderer';
+import { extractCourtFilingFromSources } from '../legal-engine/courtFilingExtractor';
+import { buildLitigationNavigationResponse, mergeCourtFilingIntoLitigationNavigation, renderLitigationNavigationMarkdown } from '../legal-engine/litigationNavigationRenderer';
 import { verifyLitigationNavigationResponse } from '../legal-engine/litigationNavigationVerifier';
+import { composeLegalResponse } from '../legal-engine/responseComposer';
+import { verifyRenderedOutput } from '../legal-engine/renderedOutputVerifier';
 import { classifyMessage } from '../router';
+import type { LegalDocumentSourcePacket } from '../legalDocumentAnswer';
 
 const BACKEND_LANGUAGE = /\b(OCR|retrieval|verifier|sourceId|chunkId|source packet|confidence label|backend|extracted text|extracted order text)\b/i;
 
@@ -32,11 +36,11 @@ describe('litigation navigation and client-care layer', () => {
     expect(text).toMatch(/I hear you|organize/i);
     expect(text).toMatch(/court deadline|served|hearing/i);
     expect(text).toMatch(/Co-parent response/i);
-    expect(text).toMatch(/Neutral draft/i);
+    expect(text).toMatch(/You can say|Neutral draft/i);
     expect(text).toMatch(/Document this neutrally/i);
     expect(text).toMatch(/Pro se \/ attorney strategy/i);
     expect(text).toMatch(/Cost and resources/i);
-    expect(text).toMatch(/Judge-ready explanation/i);
+    expect(text).toMatch(/current order/i);
     expect(text).toMatch(/county and state/i);
     expect(text).not.toMatch(BACKEND_LANGUAGE);
   });
@@ -47,7 +51,7 @@ describe('litigation navigation and client-care layer', () => {
     const { text } = rendered(message, route.mode);
 
     expect(route.mode).toBe('co_parent_response');
-    expect(text).toMatch(/Neutral draft/i);
+    expect(text).toMatch(/You can say|Neutral draft/i);
     expect(text).toMatch(/Based on the order|current court order/i);
     expect(text).toMatch(/Do not respond to every accusation|Do not send a long emotional explanation/i);
     expect(text).not.toMatch(/Pro se \/ attorney strategy/i);
@@ -74,7 +78,7 @@ describe('litigation navigation and client-care layer', () => {
     const { text } = rendered(message, route.mode);
 
     expect(route.mode).toBe('court_narrative_builder');
-    expect(text).toMatch(/Judge-ready explanation/i);
+    expect(text).toMatch(/judge-ready version|current order/i);
     expect(text).toMatch(/current order/i);
     expect(text).toMatch(/facts in date order/i);
     expect(text).toMatch(/proof/i);
@@ -102,8 +106,8 @@ describe('litigation navigation and client-care layer', () => {
 
     expect(route.mode).toBe('supportive_strategy');
     expect(text).toMatch(/not to match the pressure|stay calm/i);
-    expect(text).toMatch(/Neutral draft|Firmer version/i);
-    expect(text).toMatch(/Document this neutrally/i);
+    expect(text).toMatch(/You can say|Firmer version/i);
+    expect(text).toMatch(/Save this for your record|Document this neutrally/i);
     expect(text).not.toMatch(/\b(narcissist|gaslighting|abusive|crazy)\b/i);
     expect(text).not.toMatch(BACKEND_LANGUAGE);
   });
@@ -118,5 +122,145 @@ describe('litigation navigation and client-care layer', () => {
     expect(text).toMatch(/Save:/i);
     expect(text).toMatch(/Use dates, facts, and order language/i);
     expect(text).not.toMatch(BACKEND_LANGUAGE);
+  });
+
+  it('extracts uploaded court filing posture and enriches litigation navigation', () => {
+    const packets: LegalDocumentSourcePacket[] = [
+      {
+        sourceId: 'src_001',
+        fileId: 'file_1',
+        fileName: 'motion.pdf',
+        chunkId: 'chunk_1',
+        blockIds: [],
+        pageStart: 1,
+        pageEnd: 1,
+        text: 'Motion to Enforce Possession. Petitioner asks the Court to hold Respondent in contempt and order makeup possession and attorney fees. Petitioner alleges Respondent refused the exchange on June 1, 2026.',
+      },
+      {
+        sourceId: 'src_002',
+        fileId: 'file_1',
+        fileName: 'motion.pdf',
+        chunkId: 'chunk_2',
+        blockIds: [],
+        pageStart: 2,
+        pageEnd: 2,
+        text: 'Notice of hearing. The hearing is on July 15, 2026 at 9:00 a.m. Certificate of service states the motion was served by email.',
+      },
+    ];
+    const extraction = extractCourtFilingFromSources(packets);
+    expect(extraction?.documentType).toBe('enforcement');
+    expect(extraction?.reliefRequested.join(' ')).toMatch(/contempt|makeup possession|attorney fees/i);
+    expect(extraction?.allegations[0]?.sourceIds).toEqual(['src_001']);
+    expect(extraction?.deadlinesOrHearings.some((item) => item.type === 'hearing')).toBe(true);
+
+    const message = 'I uploaded his motion. What do I need to file next?';
+    const route = classifyMessage(message);
+    const response = mergeCourtFilingIntoLitigationNavigation(
+      buildLitigationNavigationResponse({
+        message,
+        routeMode: 'court_response_planning',
+        courtFiling: extraction,
+      }),
+      extraction
+    );
+    const text = renderLitigationNavigationMarkdown(response, {
+      routeMode: 'court_response_planning',
+      userMessage: message,
+    });
+
+    expect(route.mode).toBe('court_response_planning');
+    expect(text).toMatch(/uploaded filing appears to be an? enforcement|filing appears to request/i);
+    expect(text).toMatch(/service date|hearing date|deadline/i);
+    expect(text).toMatch(/response|file/i);
+    expect(text).not.toMatch(BACKEND_LANGUAGE);
+  });
+
+  it('keeps pro se rendering focused even when an uploaded filing creates deadline posture', () => {
+    const extraction = extractCourtFilingFromSources([
+      {
+        sourceId: 'src_001',
+        fileId: 'file_1',
+        fileName: 'petition.pdf',
+        chunkId: 'chunk_1',
+        blockIds: [],
+        pageStart: 1,
+        pageEnd: 1,
+        text: 'Petition to Modify Parent-Child Relationship. Petitioner asks the Court to modify custody and child support.',
+      },
+      {
+        sourceId: 'src_002',
+        fileId: 'file_1',
+        fileName: 'petition.pdf',
+        chunkId: 'chunk_2',
+        blockIds: [],
+        pageStart: 2,
+        pageEnd: 2,
+        text: 'Notice of hearing. The hearing is on September 3, 2026 at 9:00 a.m. Certificate of service included.',
+      },
+    ]);
+    const response = buildLitigationNavigationResponse({
+      message: 'I cannot afford an attorney. Can I do this myself?',
+      routeMode: 'pro_se_guidance',
+      courtFiling: extraction,
+    });
+    const text = renderLitigationNavigationMarkdown(response, {
+      routeMode: 'pro_se_guidance',
+      userMessage: 'I cannot afford an attorney. Can I do this myself?',
+    });
+
+    expect(text).toMatch(/Often manageable pro se/i);
+    expect(text).toMatch(/Higher-risk without attorney help/i);
+    expect(text).not.toMatch(/^The first priority is this:/i);
+    expect(text).not.toMatch(BACKEND_LANGUAGE);
+  });
+
+  it('composes grounded legal answers with navigation without duplicate sections', () => {
+    const composed = composeLegalResponse({
+      existingMessage: 'No — not based on the order language we have been discussing. The specific Father’s Day provision controls.',
+      litigationMarkdown: [
+        '**Co-parent response**',
+        'Keep it short and order-based.',
+        'Neutral draft:',
+        '',
+        '"Based on the order, Father’s Day possession begins Friday at 6:00 p.m."',
+        '',
+        'Next steps:',
+        '1. Send one calm response.',
+        '2. Save the thread.',
+        '',
+        'Next steps:',
+        '1. Duplicate section.',
+      ].join('\n'),
+      routeMode: 'co_parent_response',
+      userMessage: 'What should I say back?',
+      hasDocumentAnswer: true,
+      hasLegalInterpretation: true,
+    });
+
+    expect((composed.match(/Next steps:/g) ?? []).length).toBe(1);
+    expect((composed.match(/Neutral draft:/g) ?? []).length).toBe(1);
+    expect(composed).toMatch(/Neutral draft/i);
+  });
+
+  it('verifies rendered output for backend leaks, duplicate sections, and invented dollars', () => {
+    const good = verifyRenderedOutput({
+      rendered: 'No — based on the order. You can say:\n"Based on the order, I will follow the exchange time."\n\nNext steps:\n1. Save the thread.',
+      userMessage: 'Can he do that?',
+      routeMode: 'co_parent_response',
+    });
+    expect(good.passed).toBe(true);
+
+    const bad = verifyRenderedOutput({
+      rendered: 'The citation verifier checked sourceId src_001.\n\nCost is $350.\n\nNext steps:\n1. Save it.\n\nNext steps:\n1. File.',
+      userMessage: 'How much will it cost?',
+      routeMode: 'attorney_resource_guidance',
+    });
+    expect(bad.passed).toBe(false);
+    expect(bad.errors).toEqual(expect.arrayContaining([
+      'noBackendLanguage',
+      'noOcrRetrievalVerifierLanguage',
+      'noInventedDollarAmounts',
+      'noDuplicateSections',
+    ]));
   });
 });

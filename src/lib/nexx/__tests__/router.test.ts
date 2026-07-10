@@ -71,6 +71,25 @@ describe('classifyMessage document follow-ups', () => {
     expect(result.legalIntent).toBe('court_filing_draft');
   });
 
+  it.each([
+    'What do I file in response to his motion?',
+    'How do I answer the petition?',
+    'What response do I need to file?',
+    'What do I file next after being served?',
+  ])('routes court response planning prompts to court_response_planning: %s', (message) => {
+    const result = classifyMessage(message);
+
+    expect(result.mode).toBe('court_response_planning');
+    expect(result.legalIntent).toBe('court_response_planning');
+  });
+
+  it('keeps explicit court response drafting in court-ready drafting mode', () => {
+    const result = classifyMessage('Can you draft my response to the motion?');
+
+    expect(result.mode).toBe('court_ready_drafting');
+    expect(result.legalIntent).toBe('court_filing_draft');
+  });
+
   it('upgrades attached possession questions instead of forcing generic document analysis', () => {
     const classified = classifyMessage("Does Father's Day start Thursday or Friday?");
     const upgraded = preserveOrUpgradeDocumentRoute(classified, "Does Father's Day start Thursday or Friday?");

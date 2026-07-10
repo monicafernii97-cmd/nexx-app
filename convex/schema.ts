@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import { routeModeValidator } from './lib/routeModeValidator';
 
 const confidentialityLevelValidator = v.union(
     v.literal('normal'),
@@ -224,31 +225,7 @@ export default defineSchema({
         activeTurnRequestId: v.optional(v.string()),
         activeTurnStartedAt: v.optional(v.number()),
         nextTurnNumber: v.optional(v.number()),
-        routeMode: v.optional(v.union(
-            v.literal('adaptive_chat'),
-            v.literal('direct_legal_answer'),
-            v.literal('local_procedure'),
-            v.literal('document_analysis'),
-            v.literal('order_interpretation'),
-            v.literal('possession_access_schedule'),
-            v.literal('party_message_draft'),
-            v.literal('supportive_strategy'),
-            v.literal('co_parent_response'),
-            v.literal('documentation_strategy'),
-            v.literal('deescalation_response'),
-            v.literal('packed_case_intake'),
-            v.literal('litigation_navigation'),
-            v.literal('court_response_planning'),
-            v.literal('pro_se_guidance'),
-            v.literal('attorney_resource_guidance'),
-            v.literal('court_narrative_builder'),
-            v.literal('filing_walkthrough'),
-            v.literal('judge_lens_strategy'),
-            v.literal('court_ready_drafting'),
-            v.literal('pattern_analysis'),
-            v.literal('support_grounding'),
-            v.literal('safety_escalation')
-        )),
+        routeMode: v.optional(routeModeValidator),
         // ── Case Scoping (Sprint 5) ──
         caseId: v.optional(v.id('cases')),
     })
@@ -283,31 +260,7 @@ export default defineSchema({
         updatedAt: v.optional(v.number()),
         deletedAt: v.optional(v.number()),
         // ── NEW: Route mode + structured artifact storage ──
-        mode: v.optional(v.union(
-            v.literal('adaptive_chat'),
-            v.literal('direct_legal_answer'),
-            v.literal('local_procedure'),
-            v.literal('document_analysis'),
-            v.literal('order_interpretation'),
-            v.literal('possession_access_schedule'),
-            v.literal('party_message_draft'),
-            v.literal('supportive_strategy'),
-            v.literal('co_parent_response'),
-            v.literal('documentation_strategy'),
-            v.literal('deescalation_response'),
-            v.literal('packed_case_intake'),
-            v.literal('litigation_navigation'),
-            v.literal('court_response_planning'),
-            v.literal('pro_se_guidance'),
-            v.literal('attorney_resource_guidance'),
-            v.literal('court_narrative_builder'),
-            v.literal('filing_walkthrough'),
-            v.literal('judge_lens_strategy'),
-            v.literal('court_ready_drafting'),
-            v.literal('pattern_analysis'),
-            v.literal('support_grounding'),
-            v.literal('safety_escalation')
-        )),
+        mode: v.optional(routeModeValidator),
         artifactsJson: v.optional(v.string()),
     })
         .index('by_conversation', ['conversationId'])
@@ -335,31 +288,7 @@ export default defineSchema({
             v.literal('failed_final'),
             v.literal('cancelled')
         ),
-        routeMode: v.optional(v.union(
-            v.literal('adaptive_chat'),
-            v.literal('direct_legal_answer'),
-            v.literal('local_procedure'),
-            v.literal('document_analysis'),
-            v.literal('order_interpretation'),
-            v.literal('possession_access_schedule'),
-            v.literal('party_message_draft'),
-            v.literal('supportive_strategy'),
-            v.literal('co_parent_response'),
-            v.literal('documentation_strategy'),
-            v.literal('deescalation_response'),
-            v.literal('packed_case_intake'),
-            v.literal('litigation_navigation'),
-            v.literal('court_response_planning'),
-            v.literal('pro_se_guidance'),
-            v.literal('attorney_resource_guidance'),
-            v.literal('court_narrative_builder'),
-            v.literal('filing_walkthrough'),
-            v.literal('judge_lens_strategy'),
-            v.literal('court_ready_drafting'),
-            v.literal('pattern_analysis'),
-            v.literal('support_grounding'),
-            v.literal('safety_escalation')
-        )),
+        routeMode: v.optional(routeModeValidator),
         userMessageId: v.optional(v.id('messages')),
         assistantMessageId: v.optional(v.id('messages')),
         assistantDraftMessageId: v.optional(v.id('messages')),

@@ -1,3 +1,5 @@
+import type { LegalIntent, MultiIntentResult } from '../../types';
+
 export type PackedCaseIntake = {
   emotionalState: {
     overwhelmed: boolean;
@@ -99,6 +101,60 @@ const NUMBER_WORDS: Record<string, number> = {
   ten: 10,
 };
 
+const US_STATE_NAMES = new Set([
+  'Alabama',
+  'Alaska',
+  'Arizona',
+  'Arkansas',
+  'California',
+  'Colorado',
+  'Connecticut',
+  'Delaware',
+  'Florida',
+  'Georgia',
+  'Hawaii',
+  'Idaho',
+  'Illinois',
+  'Indiana',
+  'Iowa',
+  'Kansas',
+  'Kentucky',
+  'Louisiana',
+  'Maine',
+  'Maryland',
+  'Massachusetts',
+  'Michigan',
+  'Minnesota',
+  'Mississippi',
+  'Missouri',
+  'Montana',
+  'Nebraska',
+  'Nevada',
+  'New Hampshire',
+  'New Jersey',
+  'New Mexico',
+  'New York',
+  'North Carolina',
+  'North Dakota',
+  'Ohio',
+  'Oklahoma',
+  'Oregon',
+  'Pennsylvania',
+  'Rhode Island',
+  'South Carolina',
+  'South Dakota',
+  'Tennessee',
+  'Texas',
+  'Utah',
+  'Vermont',
+  'Virginia',
+  'Washington',
+  'West Virginia',
+  'Wisconsin',
+  'Wyoming',
+  'District of Columbia',
+]);
+
 function has(text: string, pattern: RegExp) {
   return pattern.test(text);
 }
@@ -113,6 +169,12 @@ function unique(values: string[]) {
 
 function uniqueIntents(values: LegalIntent[]) {
   return Array.from(new Set(values));
+}
+
+function validStateName(value: string | null) {
+  if (!value) return null;
+  const normalized = value.trim();
+  return US_STATE_NAMES.has(normalized) ? normalized : null;
 }
 
 function inferFilingType(text: string): PackedCaseIntake['courtPosture']['filingType'] {
@@ -205,16 +267,27 @@ function questions(text: string): PackedCaseIntake['userQuestions'] {
 export function parsePackedCaseIntake(message: string, contextText = ''): PackedCaseIntake {
   const text = `${contextText}\n${message}`;
   const lower = text.toLowerCase();
-  const userWasServed = has(lower, /\bserved|got served|was served\b/i)
-    ? true
-    : has(lower, /\bnot served|haven'?t been served|wasn'?t served\b/i)
-      ? false
+  const serviceNegated = has(lower, /\b(not served|haven'?t been served|have not been served|wasn'?t served|was not served|never served)\b/i);
+  const filingNegated = has(lower, /\b(no (?:court )?filing|nothing (?:has been )?filed|hasn'?t filed|has not filed|didn'?t file|did not file|not taking me to court|no motion|no petition)\b/i);
+  const orderNegated = has(lower, /\b(no order|no court order|don'?t have (?:a|an) order|do not have (?:a|an) order|without (?:a|an) order)\b/i);
+  const userWasServed = serviceNegated
+    ? false
+    : has(lower, /\bserved|got served|was served\b/i)
+      ? true
       : null;
-  const state = captureFirst(text, /\b(?:state is|in)\s+([A-Z][a-z]+)\b/);
+  const state = validStateName(captureFirst(text, /\b(?:state is|in)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b/));
   const county = captureFirst(text, /\b([A-Z][a-z]+)\s+County\b/);
-  const hasExistingOrder = has(lower, /\border|parenting plan|possession schedule\b/i)
-    ? true
-    : null;
+  const hasExistingOrder = orderNegated
+    ? false
+    : has(lower, /\border|parenting plan|possession schedule\b/i)
+      ? true
+      : null;
+  const hasCourtFilingSignal = has(lower, /\btaking me to court|filed|motion|petition|got served|served|hearing\b/i);
+  const otherPartyFiledSomething = !filingNegated && hasCourtFilingSignal;
+  const hasCourtDeadlineSignal = !filingNegated && (
+    otherPartyFiledSomething ||
+    has(lower, /\b(?:response|answer)\b.{0,40}\b(?:due|deadline)\b|\bserved\b|\bhearing\b|\bcourt date\b/i)
+  );
 
   return {
     emotionalState: {
@@ -227,7 +300,7 @@ export function parsePackedCaseIntake(message: string, contextText = ''): Packed
       feelsManipulatedOrPressured: has(lower, /\bpressur(?:e|ing)|twisting|manipulat(?:e|ing|ion)|won'?t stop|keeps (?:saying|calling)|threaten(?:ing)?|accus(?:e|ing)|withholding|controlling|gaslight|bully/i),
     },
     courtPosture: {
-      otherPartyFiledSomething: has(lower, /\btaking me to court|filed|motion|petition|got served|served|hearing\b/i),
+      otherPartyFiledSomething,
       userWasServed,
       servedDate: captureFirst(text, /\bserved\s+(?:on\s+)?([^.,;!?]+)/i),
       hearingDate: captureFirst(text, /\bhearing\s+(?:is\s+)?(?:on\s+)?([^.,;!?]+)/i),
@@ -259,18 +332,18 @@ export function parsePackedCaseIntake(message: string, contextText = ''): Packed
     immediateRisks: {
       safetyRisk: has(lower, /\bdanger|unsafe|violence|threaten.*hurt|911\b/i),
       childSafetyRisk: has(lower, /\bchild.*unsafe|kids?.*danger|harm.*child\b/i),
-      deadlineRisk: has(lower, /\bdeadline|due|served|filed|motion|petition|hearing\b/i),
-      hearingRisk: has(lower, /\bhearing|court date|trial\b/i),
+      deadlineRisk: hasCourtDeadlineSignal,
+      hearingRisk: !filingNegated && has(lower, /\bhearing|court date|trial\b/i),
       exchangeRisk: has(lower, /\bexchange|pickup|pick up|drop[-\s]?off|possession\b/i),
       enforcementRisk: has(lower, /\benforce|enforcement|violat(?:e|ing|ion)\b/i),
       contemptRisk: has(lower, /\bcontempt|violating|violation\b/i),
-      missingDocumentRisk: has(lower, /\bfiled|motion|petition|served|court\b/i) && !has(lower, /\buploaded|attached|paste|pasted\b/i),
+      missingDocumentRisk: !filingNegated && has(lower, /\bfiled|motion|petition|served|court\b/i) && !has(lower, /\buploaded|attached|paste|pasted\b/i),
       financialAccessRisk: has(lower, /\bno money|can'?t afford|cannot afford|cost\b/i),
     },
     missingCriticalInfo: unique([
-      has(lower, /\bfiled|motion|petition|served|court\b/i) && !has(lower, /\buploaded|attached|paste|pasted\b/i) ? 'the court paper that was filed' : '',
-      has(lower, /\bfiled|motion|petition|served|court\b/i) && userWasServed !== true ? 'whether and when you were served' : '',
-      has(lower, /\bfiled|motion|petition|served|court\b/i) && !has(lower, /\bhearing|court date\b/i) ? 'any hearing date' : '',
+      !filingNegated && has(lower, /\bfiled|motion|petition|served|court\b/i) && !has(lower, /\buploaded|attached|paste|pasted\b/i) ? 'the court paper that was filed' : '',
+      otherPartyFiledSomething && userWasServed !== true ? 'whether and when you were served' : '',
+      otherPartyFiledSomething && !has(lower, /\bhearing|court date\b/i) ? 'any hearing date' : '',
       has(lower, /\bcost|legal aid|fee|attorney|resources|pro se|filing\b/i) && !state ? 'state' : '',
       has(lower, /\bcost|legal aid|fee|attorney|resources|pro se|filing\b/i) && !county ? 'county' : '',
     ]),
@@ -314,4 +387,3 @@ export function classifyPackedCaseIntake(message: string, contextText = ''): Mul
     requiresFilingPlanning: intake.courtPosture.otherPartyFiledSomething || intake.userQuestions.some((q) => q.category === 'what_to_file'),
   };
 }
-import type { LegalIntent, MultiIntentResult } from '../../types';

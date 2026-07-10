@@ -157,6 +157,7 @@ function hasActiveFamilyLawContext(
 ) {
   return hasActiveDocumentContext ||
     isDocumentRoute(activeMode) ||
+    isLitigationNavigationRoute(activeMode) ||
     Boolean(conversationSummary && LEGAL_ACTIVE_CONTEXT_PATTERN.test(conversationSummary));
 }
 

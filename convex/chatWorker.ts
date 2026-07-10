@@ -1142,7 +1142,7 @@ function shouldRequireDocumentAnswer(args: {
         args.sourcePackets.length > 0 &&
         (
             isDocumentContextRoute(args.routeMode) ||
-            isLitigationNavigationRoute(args.routeMode) ||
+            args.attachmentContexts.some((attachment) => attachment.source === 'current_turn') ||
             args.documentReference.referencesDocument ||
             args.documentReference.requiresExactText ||
             args.documentReference.requiresPageOrSectionCitation
@@ -1229,13 +1229,22 @@ function renderLitigationNavigationMessage(args: {
             courtName: args.courtSettings?.courtName,
         });
 
+    const litigationMarkdown = renderLitigationNavigationMarkdown(litigationNavigation, {
+        routeMode: args.routeMode,
+        userMessage: args.userMessage,
+    });
+    const existingMessage = args.response.message.trim();
+    const shouldPreserveGroundedMessage = Boolean(
+        existingMessage &&
+        (args.response.documentAnswer || args.response.legalInterpretation)
+    );
+
     return {
         ...args.response,
         litigationNavigation,
-        message: renderLitigationNavigationMarkdown(litigationNavigation, {
-            routeMode: args.routeMode,
-            userMessage: args.userMessage,
-        }),
+        message: shouldPreserveGroundedMessage
+            ? `${existingMessage}\n\n${litigationMarkdown}`
+            : litigationMarkdown,
     };
 }
 

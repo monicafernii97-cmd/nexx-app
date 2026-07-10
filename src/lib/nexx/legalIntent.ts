@@ -62,6 +62,7 @@ export function classifyLegalIntent(message: string): LegalIntent {
   if (COURT_FILING_PATTERN.test(message)) return 'court_filing_draft';
 
   const multiIntent = classifyPackedCaseIntake(message);
+  if (multiIntent.primaryIntent === 'court_response_deadline') return 'court_response_deadline';
   if (
     multiIntent.primaryIntent === 'packed_case_intake' ||
     multiIntent.secondaryIntents.length >= 3

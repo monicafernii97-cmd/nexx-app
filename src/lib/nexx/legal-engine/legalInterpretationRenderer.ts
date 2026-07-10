@@ -159,16 +159,31 @@ export function renderLegalInterpretationMarkdown(
     answer.practicalMeaning.whatUserShouldDo,
   ].filter(Boolean).map((item) => cleanUserFacingText(String(item))).join(' ');
 
+  const legalReadingSourceIds = uniqueValues([
+    ...answer.priorityLanguage.flatMap((item) => item.sourceIds),
+    ...answer.controllingClauses.flatMap((clause) => clause.sourceIds),
+    ...answer.competingClauses.flatMap((clause) => clause.sourceIds),
+  ]);
+  const legalReadingWithCitations = answer.interpretation.legalReading
+    ? appendCitationLabels(
+      answer.interpretation.legalReading,
+      sourcePageLabels(legalReadingSourceIds, sourcePackets)
+    )
+    : undefined;
+  const competingRationale = answer.competingClauses
+    .slice(0, 1)
+    .map((clause) => appendCitationLabels(
+      clause.whyItDoesOrDoesNotControl,
+      sourcePageLabels(clause.sourceIds, sourcePackets)
+    ))
+    .join(' ');
   const whyText = cleanSentenceList([
-    answer.interpretation.legalReading,
+    legalReadingWithCitations,
     answer.priorityLanguage
       .slice(0, 2)
       .map((item) => appendCitationLabels(item.explanation, sourcePageLabels(item.sourceIds, sourcePackets)))
       .join(' '),
-    answer.competingClauses
-      .slice(0, 1)
-      .map((clause) => clause.whyItDoesOrDoesNotControl)
-      .join(' '),
+    competingRationale,
   ]).join(' ');
 
   const suggestedReply = answer.draftMessage?.text
@@ -240,8 +255,8 @@ export function renderLegalInterpretationMarkdown(
     controllingLines.length > 0 ? `**Controlling language:**\n${controllingLines.join('\n')}` : undefined,
     competingLines.length > 0 ? `**Competing language:**\n${competingLines.join('\n')}` : undefined,
     priorityLines.length > 0 ? `**Why this controls:**\n${priorityLines.join('\n')}` : undefined,
-    answer.interpretation.legalReading
-      ? `**Practical reading:** ${cleanUserFacingText(answer.interpretation.legalReading)}`
+    legalReadingWithCitations
+      ? `**Practical reading:** ${legalReadingWithCitations}`
       : undefined,
     practical ? `**Practical meaning:** ${practical}` : undefined,
     ambiguityNote,

@@ -98,7 +98,11 @@ function courtPosture(intake: PackedCaseIntake): LitigationNavigationResponse['c
           ? 'temporary_orders_response'
           : intake.courtPosture.filingType === 'enforcement'
             ? 'response_to_motion'
-            : 'unknown';
+            : intake.courtPosture.filingType === 'modification'
+              ? 'response_to_motion'
+              : intake.courtPosture.filingType === 'protective_order'
+                ? 'response_to_motion'
+                : 'unknown';
 
   return {
     whatWeKnow,

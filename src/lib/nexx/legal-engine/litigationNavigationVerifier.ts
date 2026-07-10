@@ -56,7 +56,7 @@ export function verifyLitigationNavigationResponse(
     acknowledgedUserOverwhelm: !userOverwhelmed || Boolean(response?.supportiveSummary && /\b(hear|understand|lot|heavy|slow|organize|overwhelm|stress|scared|confused)\b/i.test(response.supportiveSummary)),
     identifiedUrgentPriority: Boolean(response?.immediatePriority.priority && response.immediatePriority.whatToDoNow),
     addressedCourtPosture: !userAskedCourt || Boolean(response?.courtPosture.whatWeKnow.length || response?.courtPosture.whatWeNeed.length),
-    addressedDeadlineOrAskedForServiceDate: !userAskedCourt || Boolean(response?.courtPosture.deadlineNote || response?.courtPosture.whatWeNeed.some((item) => /\bserved|hearing|deadline|filed document\b/i.test(item))),
+    addressedDeadlineOrAskedForServiceDate: !userAskedCourt || Boolean(response?.courtPosture.deadlineNote || response?.courtPosture.whatWeNeed.some((item) => /\b(?:served|hearing|deadline|filed document)\b/i.test(item))),
     addressedCoParentResponseIfAsked: !userAskedCoParent || Boolean(response?.coParentResponse.neutralDraft),
     addressedEvidenceDocumentation: Boolean(response?.evidencePlan.evidenceToSave.length && response.evidencePlan.neutralFraming.length),
     addressedProSeQuestionIfAsked: !userAskedProSe || Boolean(response?.proSeAssessment.practicalRead && response.proSeAssessment.tasksHigherRiskWithoutAttorney.length),

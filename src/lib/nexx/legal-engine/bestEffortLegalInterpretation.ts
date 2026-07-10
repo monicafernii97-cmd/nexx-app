@@ -29,19 +29,22 @@ function unique(values: string[]) {
 
 function sourceIdsFromDocumentAnswer(answer: LegalDocumentAnswer, sourcePackets: LegalDocumentSourcePacket[]) {
   const knownSourceIds = new Set(sourcePackets.map((packet) => packet.sourceId));
-  return unique([
+  const supportedSourceIds = unique([
     ...answer.claims.flatMap((claim) => claim.sourceIds),
     ...answer.citations.map((citation) => citation.sourceId),
-    ...sourcePackets.map((packet) => packet.sourceId),
   ]).filter((sourceId) => knownSourceIds.has(sourceId));
+
+  return supportedSourceIds.length > 0
+    ? supportedSourceIds
+    : sourcePackets.map((packet) => packet.sourceId);
 }
 
 function sourcePriorityScore(source: LegalDocumentSourcePacket, message: string) {
   const text = `${source.sectionHeading ?? ''} ${source.text}`.toLowerCase();
   const lowerMessage = message.toLowerCase();
   let score = 0;
-  if (/\b(father'?s day|mother'?s day|holiday possession|specific)\b/i.test(text)) score += 80;
-  if (/\b(possession|access|visitation|pickup|pick up|exchange|weekend)\b/i.test(text)) score += 40;
+  if (/\b(father'?s day|mother'?s day|holiday|specific)\b/i.test(lowerMessage) && /\b(father'?s day|mother'?s day|holiday possession|specific)\b/i.test(text)) score += 80;
+  if (/\b(possession|access|visitation|pickup|pick up|exchange|weekend)\b/i.test(lowerMessage) && /\b(possession|access|visitation|pickup|pick up|exchange|weekend)\b/i.test(text)) score += 40;
   if (/\b(except as otherwise|notwithstanding|supersedes|later signed|modification)\b/i.test(text)) score += 30;
   if (/\b(order|ordered|shall|must|required|prohibited|allowed)\b/i.test(text)) score += 20;
   for (const token of lowerMessage.match(/\b[a-z]{4,}\b/g) ?? []) {
@@ -63,9 +66,9 @@ function selectSourcePackets(
     .sort((a, b) => sourcePriorityScore(b, message) - sourcePriorityScore(a, message));
 }
 
-function isCompetingGeneralClause(source: LegalDocumentSourcePacket, controlling: LegalDocumentSourcePacket | undefined) {
+function isCompetingGeneralClause(source: LegalDocumentSourcePacket, controllingSourceIds: Set<string>) {
   const text = `${source.sectionHeading ?? ''} ${source.text}`;
-  if (controlling && source.sourceId === controlling.sourceId) return false;
+  if (controllingSourceIds.has(source.sourceId)) return false;
   return /\b(regular|general|weekend|thursday|student holiday|federal|state|local holiday)\b/i.test(text);
 }
 
@@ -105,7 +108,15 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
   if (!documentAnswer) return null;
 
   const selectedSources = selectSourcePackets(documentAnswer, sourcePackets, userMessage);
-  const controllingSources = selectedSources.slice(0, 3);
+  const primaryControllingSource = selectedSources[0];
+  const preliminaryControllingSourceIds = new Set(primaryControllingSource ? [primaryControllingSource.sourceId] : []);
+  const competingSources = selectedSources
+    .filter((source) => isCompetingGeneralClause(source, preliminaryControllingSourceIds))
+    .slice(0, 2);
+  const competingSourceIds = new Set(competingSources.map((source) => source.sourceId));
+  const controllingSources = selectedSources
+    .filter((source) => !competingSourceIds.has(source.sourceId))
+    .slice(0, 3);
   const controlling = controllingSources[0];
   const hasUsableSources = controllingSources.length > 0;
   const hasClauseConflictSignal =
@@ -138,17 +149,17 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
     };
   }
 
-  const competingSources = selectedSources
-    .filter((source) => isCompetingGeneralClause(source, controlling))
-    .slice(0, 2);
   const prioritySources = selectedSources
-    .filter((source) => /\b(except as otherwise|notwithstanding|supersedes?|later signed|modification|specific|general)\b/i.test(`${source.sectionHeading ?? ''} ${source.text}`))
+    .filter((source) => /\b(except as otherwise|notwithstanding|supersedes?|later signed|modification|modified)\b/i.test(`${source.sectionHeading ?? ''} ${source.text}`))
     .slice(0, 2);
-  const prioritySourceIds = unique([
-    ...controllingSources.map((source) => source.sourceId),
-    ...competingSources.map((source) => source.sourceId),
-    ...prioritySources.map((source) => source.sourceId),
-  ]).slice(0, 4);
+  const prioritySourceIds = prioritySources.length > 0
+    ? unique(prioritySources.map((source) => source.sourceId)).slice(0, 4)
+    : competingSources.length > 0
+      ? unique([
+        ...controllingSources.map((source) => source.sourceId),
+        ...competingSources.map((source) => source.sourceId),
+      ]).slice(0, 4)
+      : [];
   const priorityExplanation = competingSources.length > 0 || hasClauseConflictSignal
     ? 'The specific order language is the stronger reading over a general provision unless a later signed order changes it.'
     : 'The signed order language should be followed as written unless a later signed order changes it.';
@@ -170,9 +181,9 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
       sourceIds: [source.sourceId],
       whyItDoesOrDoesNotControl: 'This appears to be general or competing language; it does not override a more specific provision that squarely addresses the same issue unless the order says so.',
     })),
-    priorityLanguage: prioritySourceIds.length > 0
+    priorityLanguage: (prioritySources.length > 0 || competingSources.length > 0) && prioritySourceIds.length > 0
       ? [{
-        signal: prioritySignal(prioritySources[0] ?? controlling),
+        signal: prioritySources.length > 0 ? prioritySignal(prioritySources[0]) : 'specific_over_general',
         explanation: priorityExplanation,
         sourceIds: prioritySourceIds,
       }]

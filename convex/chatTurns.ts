@@ -7,7 +7,7 @@ import {
     detectDocumentReference,
     type DocumentReferenceDetection,
 } from '../src/lib/nexx/documentReferenceDetection';
-import { classifyFollowUpIntent, classifyMessage } from '../src/lib/nexx/router';
+import { classifyFollowUpIntent, classifyMessage, preserveOrUpgradeDocumentRoute } from '../src/lib/nexx/router';
 import type { RouteMode } from '../src/lib/types';
 import {
     detectStoredDocumentAmbiguity,
@@ -41,6 +41,7 @@ import {
     userSubscriptionTier,
 } from './lib/chatRateLimitPolicy';
 import { normalizeReviewFlagMessage, sanitizeAuditMetadata } from './lib/documentTelemetry';
+import { routeModeValidator } from './lib/routeModeValidator';
 
 const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
@@ -54,32 +55,6 @@ const MAX_EXPLICIT_ALIAS_MATCHED_FILES = 50;
 const MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE = 300;
 const MAX_DOCUMENT_CHUNKS_FROM_SEARCH_PER_FILE = 80;
 const MAX_RETRIEVED_CHUNKS_PER_FILE = 12;
-
-const routeModeValidator = v.union(
-    v.literal('adaptive_chat'),
-    v.literal('direct_legal_answer'),
-    v.literal('local_procedure'),
-    v.literal('document_analysis'),
-    v.literal('order_interpretation'),
-    v.literal('possession_access_schedule'),
-    v.literal('party_message_draft'),
-    v.literal('supportive_strategy'),
-    v.literal('co_parent_response'),
-    v.literal('documentation_strategy'),
-    v.literal('deescalation_response'),
-    v.literal('packed_case_intake'),
-    v.literal('litigation_navigation'),
-    v.literal('court_response_planning'),
-    v.literal('pro_se_guidance'),
-    v.literal('attorney_resource_guidance'),
-    v.literal('court_narrative_builder'),
-    v.literal('filing_walkthrough'),
-    v.literal('judge_lens_strategy'),
-    v.literal('court_ready_drafting'),
-    v.literal('pattern_analysis'),
-    v.literal('support_grounding'),
-    v.literal('safety_escalation')
-);
 
 const documentEvidenceSourceValidator = v.object({
     uploadedFileId: v.id('uploadedFiles'),
@@ -935,12 +910,19 @@ export const acceptChatTurn = mutation({
         const hasActiveDocumentContext =
             validatedAttachments.length > 0 ||
             Boolean(existingDocumentState?.activeUploadedFileId);
-        const contextualRoute = classifyMessage(
+        const classifiedRoute = classifyMessage(
             args.message,
             undefined,
             conversation.routeMode as RouteMode | undefined,
             hasActiveDocumentContext
         );
+        const contextualRoute = hasActiveDocumentContext
+            ? preserveOrUpgradeDocumentRoute(
+                classifiedRoute,
+                args.message,
+                conversation.routeMode as RouteMode | undefined
+            )
+            : classifiedRoute;
         const routeMode = args.routeMode === 'safety_escalation'
             ? args.routeMode
             : contextualRoute.mode;

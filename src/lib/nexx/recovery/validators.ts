@@ -1,4 +1,5 @@
 import { validateLegalInterpretationAnswerShape } from '../legal-engine/legalInterpretationSchema';
+import { validateLitigationNavigationResponseShape } from '../legal-engine/litigationNavigationSchema';
 import { validateLegalDocumentAnswerShape } from '../legalDocumentAnswer';
 
 /**
@@ -37,6 +38,8 @@ export function validateAssistantResponse(parsed: unknown): boolean {
   if (obj.documentAnswer !== null && !validateLegalDocumentAnswerShape(obj.documentAnswer)) return false;
   if (!('legalInterpretation' in obj)) return false;
   if (obj.legalInterpretation !== null && !validateLegalInterpretationAnswerShape(obj.legalInterpretation)) return false;
+  if (!('litigationNavigation' in obj)) return false;
+  if (obj.litigationNavigation !== null && !validateLitigationNavigationResponseShape(obj.litigationNavigation)) return false;
 
   return true;
 }

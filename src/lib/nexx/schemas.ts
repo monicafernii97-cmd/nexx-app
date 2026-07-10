@@ -305,6 +305,166 @@ const legalInterpretationSchema = {
   ],
 } as const;
 
+const litigationNavigationIssueSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    issue: { type: 'string' },
+    priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'later'] },
+    whatItMeans: { type: 'string' },
+    nextStep: { type: 'string' },
+  },
+  required: ['issue', 'priority', 'whatItMeans', 'nextStep'],
+} as const;
+
+const stringArraySchema = { type: 'array', items: { type: 'string' } } as const;
+
+const litigationNavigationSchema = {
+  type: ['object', 'null'],
+  additionalProperties: false,
+  properties: {
+    answerType: { type: 'string', enum: ['litigation_navigation'] },
+    supportiveSummary: { type: 'string' },
+    immediatePriority: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        priority: { type: 'string' },
+        whyItMatters: { type: 'string' },
+        whatToDoNow: { type: 'string' },
+      },
+      required: ['priority', 'whyItMatters', 'whatToDoNow'],
+    },
+    issueBreakdown: {
+      type: 'array',
+      items: litigationNavigationIssueSchema,
+    },
+    courtPosture: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        whatWeKnow: stringArraySchema,
+        whatWeNeed: stringArraySchema,
+        possibleFilingOrResponse: {
+          type: 'string',
+          enum: [
+            'answer',
+            'response_to_motion',
+            'counterpetition',
+            'declaration',
+            'motion_to_modify',
+            'motion_to_enforce',
+            'temporary_orders_response',
+            'unknown',
+          ],
+        },
+        deadlineNote: { type: ['string', 'null'] },
+        hearingNote: { type: ['string', 'null'] },
+      },
+      required: ['whatWeKnow', 'whatWeNeed', 'possibleFilingOrResponse', 'deadlineNote', 'hearingNote'],
+    },
+    coParentResponse: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        needed: { type: 'boolean' },
+        strategy: { type: 'string' },
+        neutralDraft: { type: ['string', 'null'] },
+        firmerDraft: { type: ['string', 'null'] },
+        whatNotToSay: stringArraySchema,
+      },
+      required: ['needed', 'strategy', 'neutralDraft', 'firmerDraft', 'whatNotToSay'],
+    },
+    evidencePlan: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        timelineItems: stringArraySchema,
+        evidenceToSave: stringArraySchema,
+        neutralFraming: stringArraySchema,
+        exhibitIdeas: stringArraySchema,
+      },
+      required: ['timelineItems', 'evidenceToSave', 'neutralFraming', 'exhibitIdeas'],
+    },
+    proSeAssessment: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        possibleProSe: { type: 'boolean' },
+        practicalRead: { type: 'string' },
+        tasksLikelyDoableProSe: stringArraySchema,
+        tasksHigherRiskWithoutAttorney: stringArraySchema,
+        limitedScopeHelpRecommendedFor: stringArraySchema,
+      },
+      required: [
+        'possibleProSe',
+        'practicalRead',
+        'tasksLikelyDoableProSe',
+        'tasksHigherRiskWithoutAttorney',
+        'limitedScopeHelpRecommendedFor',
+      ],
+    },
+    costOverview: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        proSeCostCategories: stringArraySchema,
+        attorneyCostCategories: stringArraySchema,
+        exactCostsRequireLocalLookup: { type: 'boolean' },
+        costExplanation: { type: 'string' },
+      },
+      required: ['proSeCostCategories', 'attorneyCostCategories', 'exactCostsRequireLocalLookup', 'costExplanation'],
+    },
+    resourcePlan: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        stateNeeded: { type: 'boolean' },
+        countyNeeded: { type: 'boolean' },
+        resourceTypesToFind: stringArraySchema,
+        suggestedSearchTargets: stringArraySchema,
+      },
+      required: ['stateNeeded', 'countyNeeded', 'resourceTypesToFind', 'suggestedSearchTargets'],
+    },
+    judgeExplanation: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        simpleTheory: { type: 'string' },
+        judgeReadyStructure: stringArraySchema,
+        sampleOpening: { type: ['string', 'null'] },
+      },
+      required: ['simpleTheory', 'judgeReadyStructure', 'sampleOpening'],
+    },
+    filingPlan: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        likelyNextDocument: { type: ['string', 'null'] },
+        filingReadinessChecklist: stringArraySchema,
+        nextInfoNeededBeforeDrafting: stringArraySchema,
+      },
+      required: ['likelyNextDocument', 'filingReadinessChecklist', 'nextInfoNeededBeforeDrafting'],
+    },
+    nextSteps: stringArraySchema,
+  },
+  required: [
+    'answerType',
+    'supportiveSummary',
+    'immediatePriority',
+    'issueBreakdown',
+    'courtPosture',
+    'coParentResponse',
+    'evidencePlan',
+    'proSeAssessment',
+    'costOverview',
+    'resourcePlan',
+    'judgeExplanation',
+    'filingPlan',
+    'nextSteps',
+  ],
+} as const;
+
 // ---------------------------------------------------------------------------
 // 1. Chat Response Schema (nexx_assistant_response)
 // ---------------------------------------------------------------------------
@@ -333,8 +493,9 @@ export const NEXX_RESPONSE_SCHEMA = {
       },
       documentAnswer: legalDocumentAnswerSchema,
       legalInterpretation: legalInterpretationSchema,
+      litigationNavigation: litigationNavigationSchema,
     },
-    required: ['message', 'artifacts', 'documentAnswer', 'legalInterpretation'],
+    required: ['message', 'artifacts', 'documentAnswer', 'legalInterpretation', 'litigationNavigation'],
   },
 };
 

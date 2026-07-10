@@ -41,7 +41,13 @@ export function shouldUseOfficialLegalResearch(routeMode: RouteMode, message: st
     routeMode === 'direct_legal_answer' ||
     routeMode === 'order_interpretation' ||
     routeMode === 'possession_access_schedule' ||
-    routeMode === 'court_ready_drafting'
+    routeMode === 'court_ready_drafting' ||
+    routeMode === 'packed_case_intake' ||
+    routeMode === 'litigation_navigation' ||
+    routeMode === 'court_response_planning' ||
+    routeMode === 'pro_se_guidance' ||
+    routeMode === 'attorney_resource_guidance' ||
+    routeMode === 'filing_walkthrough'
   ) {
     return true;
   }

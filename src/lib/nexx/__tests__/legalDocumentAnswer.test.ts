@@ -221,7 +221,7 @@ describe('verifyLegalDocumentAnswer', () => {
   it('allows not-found answers without citations when the sources do not support the answer', () => {
     const result = verifyLegalDocumentAnswer(answer({
       answerType: 'not_found',
-      answer: 'I do not see that in the available extracted text.',
+      answer: 'I do not see that in the visible order language.',
       claims: [],
       citations: [],
       notFoundReason: 'term_not_found',
@@ -401,7 +401,7 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
     expect(deadlinesSection).toContain('| The order requires exchange within thirty one calendar days after request. | within thirty one calendar days | [p. 4] |');
     expect(deadlinesSection).toContain('| The order requires filing within sixty days after notice. | within sixty days | [p. 4] |');
     expect(deadlinesSection).toContain('| The order requires review within one hundred eighty days after entry. | within one hundred eighty days | [p. 4] |');
-    expect(deadlinesSection).not.toContain('Not stated in the extracted text');
+    expect(deadlinesSection).not.toContain('Not stated in the visible order language');
 
     const hundredContent = renderCourtOrderAnalysisMarkdown(answer({
       claims: [
@@ -421,7 +421,7 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
 
     expect(hundredDeadlinesSection).toContain('| The order requires a supplemental filing within one hundred twenty business days after entry. | within one hundred twenty business days | [p. 4] |');
     expect(hundredDeadlinesSection).toContain('| The order requires a status update within one hundred and five calendar days after review. | within one hundred and five calendar days | [p. 4] |');
-    expect(hundredDeadlinesSection).not.toContain('Not stated in the extracted text');
+    expect(hundredDeadlinesSection).not.toContain('Not stated in the visible order language');
   });
 
   it('extracts possession schedule timing instead of marking visible timing as not stated', () => {
@@ -450,7 +450,7 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
     expect(deadlinesSection).toContain('| If Friday is a federal, state, or local holiday, or a student holiday or teacher in-service day, the regular weekend period begins at 6:00 p.m. on Thursday. | weekend period begins at 6:00 p.m. on Thursday | [p. 4] |');
     expect(deadlinesSection).toContain('| The Father\'s Day possession period runs from 6:00 p.m. on the Friday preceding Father\'s Day until 8:00 a.m. on the Monday after Father\'s Day. | from 6:00 p.m. on the Friday preceding Father\'s Day until 8:00 a.m. on the Monday after Father\'s Day | [p. 4] |');
     expect(deadlinesSection).not.toContain('The specific Father\'s Day provision controls over the general standard weekend schedule');
-    expect(deadlinesSection).not.toContain('Not stated in the extracted text');
+    expect(deadlinesSection).not.toContain('Not stated in the visible order language');
   });
 
   it('extracts hyphenated day-count deadlines', () => {
@@ -473,7 +473,7 @@ describe('renderCourtOrderAnalysisMarkdown', () => {
 
     expect(deadlinesSection).toContain('| The order requires 10-day notice before international travel. | 10-day | [p. 4] |');
     expect(deadlinesSection).toContain('| The order requires seven-business-day notice before a schedule change. | seven-business-day | [p. 4] |');
-    expect(deadlinesSection).not.toContain('Not stated in the extracted text');
+    expect(deadlinesSection).not.toContain('Not stated in the visible order language');
   });
 });
 
@@ -523,13 +523,13 @@ describe('renderTargetedLegalDocumentAnswerMarkdown', () => {
   it('renders not-found targeted answers with plain filing-readiness language only', () => {
     const content = renderTargetedLegalDocumentAnswerMarkdown(answer({
       answerType: 'not_found',
-      answer: "I do not see a Father's Day provision in the extracted order text.",
+      answer: "I do not see a Father's Day provision in the visible order language.",
       claims: [],
       citations: [],
       notFoundReason: 'term_not_found',
     }), sourcePackets, 'Fallback answer');
 
-    expect(content).toContain("I do not see a Father's Day provision in the extracted order text.");
+    expect(content).toContain("I do not see a Father's Day provision in the visible order language.");
     expect(content).toContain('I would not rely on a missing or unreadable clause for a filing without a clearer copy or the exact page language.');
     expect(content).not.toContain('**Why:**');
     expect(content).not.toContain('## Cautions');

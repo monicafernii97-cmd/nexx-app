@@ -268,16 +268,16 @@ describe('NEXX legal agent golden behavior', () => {
     expectCleanUserAnswer(content);
   });
 
-  it('can say the extracted order lacks a requested clause without falling back to generic refusal text', () => {
+  it('can say the visible order language lacks a requested clause without falling back to generic refusal text', () => {
     const answer: LegalInterpretationAnswer = fatherDayInterpretation({
-      directAnswer: 'I do not see a Father\'s Day possession clause in the extracted order text. The visible text only supports the regular weekend possession rule.',
+      directAnswer: 'I do not see a Father\'s Day possession clause in the visible order language. The visible language only supports the regular weekend possession rule.',
       userFacingCertainty: 'insufficient_text',
       controllingClauses: [],
       competingClauses: [],
       priorityLanguage: [],
       interpretation: {
-        plainEnglish: 'The extracted text does not contain a Father\'s Day-specific clause.',
-        legalReading: 'Without a Father\'s Day-specific provision in the extracted text, I would not invent a separate holiday rule.',
+        plainEnglish: 'The visible order language does not contain a Father\'s Day-specific clause.',
+        legalReading: 'Without a Father\'s Day-specific provision in the visible order language, I would not invent a separate holiday rule.',
       },
       practicalMeaning: {
         result: 'Use the visible regular-weekend rule unless the missing page or another signed order contains a Father\'s Day-specific provision.',
@@ -286,7 +286,7 @@ describe('NEXX legal agent golden behavior', () => {
         whatUserShouldDo: 'Ask me to search a specific page or upload the missing page if you have it.',
       },
       draftMessage: null,
-      caveats: ['The extracted text does not include a Father\'s Day-specific clause.'],
+      caveats: ['The visible order language does not include a Father\'s Day-specific clause.'],
     });
     const verification = verifyLegalInterpretationAnswer(answer, fatherDaySources, {
       requiresLegalInterpretation: true,
@@ -296,7 +296,7 @@ describe('NEXX legal agent golden behavior', () => {
 
     expect(verification.passed).toBe(true);
     expect(content).toContain('I do not see a Father\'s Day possession clause');
-    expect(content).toContain('The extracted text does not include a Father\'s Day-specific clause.');
+    expect(content).toContain('The visible order language does not include a Father\'s Day-specific clause.');
     expectCleanUserAnswer(content);
   });
 

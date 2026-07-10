@@ -7,6 +7,8 @@ import {
     detectDocumentReference,
     type DocumentReferenceDetection,
 } from '../src/lib/nexx/documentReferenceDetection';
+import { classifyFollowUpIntent, classifyMessage, preserveOrUpgradeDocumentRoute } from '../src/lib/nexx/router';
+import type { RouteMode } from '../src/lib/types';
 import {
     detectStoredDocumentAmbiguity,
     normalizeDocumentAlias,
@@ -39,6 +41,7 @@ import {
     userSubscriptionTier,
 } from './lib/chatRateLimitPolicy';
 import { normalizeReviewFlagMessage, sanitizeAuditMetadata } from './lib/documentTelemetry';
+import { routeModeValidator } from './lib/routeModeValidator';
 
 const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
@@ -52,21 +55,6 @@ const MAX_EXPLICIT_ALIAS_MATCHED_FILES = 50;
 const MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE = 300;
 const MAX_DOCUMENT_CHUNKS_FROM_SEARCH_PER_FILE = 80;
 const MAX_RETRIEVED_CHUNKS_PER_FILE = 12;
-
-const routeModeValidator = v.union(
-    v.literal('adaptive_chat'),
-    v.literal('direct_legal_answer'),
-    v.literal('local_procedure'),
-    v.literal('document_analysis'),
-    v.literal('order_interpretation'),
-    v.literal('possession_access_schedule'),
-    v.literal('party_message_draft'),
-    v.literal('judge_lens_strategy'),
-    v.literal('court_ready_drafting'),
-    v.literal('pattern_analysis'),
-    v.literal('support_grounding'),
-    v.literal('safety_escalation')
-);
 
 const documentEvidenceSourceValidator = v.object({
     uploadedFileId: v.id('uploadedFiles'),
@@ -489,6 +477,40 @@ function messagePreview(message: string) {
     return message.replace(/\s+/g, ' ').trim().slice(0, 300);
 }
 
+function isDocumentRouteMode(mode?: RouteMode) {
+    return mode === 'document_analysis' ||
+        mode === 'order_interpretation' ||
+        mode === 'possession_access_schedule';
+}
+
+function buildContextualFollowUpMessage(
+    message: string,
+    recentMessages: Array<{
+        role: 'user' | 'assistant';
+        content: string;
+        status?: 'draft' | 'committed' | 'degraded' | 'failed' | 'deleted';
+    }>,
+    activeMode?: RouteMode
+) {
+    if (classifyFollowUpIntent(message) === 'new_issue' || !isDocumentRouteMode(activeMode)) {
+        return message;
+    }
+
+    const recentContext = recentMessages
+        .filter((recent) =>
+            recent.status === undefined ||
+            recent.status === 'committed' ||
+            recent.status === 'degraded'
+        )
+        .slice(-8)
+        .map((recent) => recent.content.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+        .join('\n')
+        .slice(-4_000);
+
+    return recentContext ? `${message}\n\nRecent active issue context:\n${recentContext}` : message;
+}
+
 /** Preserve existing message metadata when adding structured document source summaries. */
 function asMetadataObject(metadata: unknown) {
     return metadata && typeof metadata === 'object' && !Array.isArray(metadata)
@@ -881,6 +903,33 @@ export const acceptChatTurn = mutation({
             };
         }
 
+        const existingDocumentState = await ctx.db
+            .query('conversationDocumentState')
+            .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
+            .first();
+        const hasActiveDocumentContext =
+            validatedAttachments.length > 0 ||
+            Boolean(existingDocumentState?.activeUploadedFileId);
+        const classifiedRoute = classifyMessage(
+            args.message,
+            undefined,
+            conversation.routeMode as RouteMode | undefined,
+            hasActiveDocumentContext
+        );
+        const contextualRoute = hasActiveDocumentContext
+            ? preserveOrUpgradeDocumentRoute(
+                classifiedRoute,
+                args.message,
+                conversation.routeMode as RouteMode | undefined
+            )
+            : classifiedRoute;
+        const routeMode = args.routeMode === 'safety_escalation'
+            ? args.routeMode
+            : contextualRoute.mode;
+        const temperature = args.routeMode === routeMode
+            ? args.temperature
+            : contextualRoute.temperature;
+
         const turnNumber = conversation.nextTurnNumber ?? (conversation.messageCount ?? 0) + 1;
         const shouldPersistUserMessage = args.persistUserMessage !== false;
 
@@ -892,14 +941,14 @@ export const acceptChatTurn = mutation({
             turnNumber,
             mode: args.mode ?? 'send',
             status: 'accepted',
-            routeMode: args.routeMode,
+            routeMode,
             retryOfAssistantMessageId: args.retryOfAssistantMessageId,
             editOfUserMessageId: args.editOfUserMessageId,
             attempt: 0,
             maxAttempts: 3,
             provider: 'openai',
             model: args.model,
-            temperature: args.temperature,
+            temperature,
             userContextJson: args.userContextJson,
             attachmentRefsJson: validatedAttachments.length > 0 ? JSON.stringify(validatedAttachments) : undefined,
             createdAt: now,
@@ -932,7 +981,7 @@ export const acceptChatTurn = mutation({
                 requestId: `${args.requestId}-user`,
                 createdAt: now,
                 updatedAt: now,
-                mode: args.routeMode,
+                mode: routeMode,
             });
 
             for (const attachment of validatedAttachments) {
@@ -981,7 +1030,7 @@ export const acceptChatTurn = mutation({
             nextTurnNumber: turnNumber + 1,
             lastMessageAt: now,
             messageCount: (conversation.messageCount ?? 0) + (shouldPersistUserMessage ? 1 : 0),
-            routeMode: args.routeMode,
+            routeMode,
         });
 
         await insertChatAuditEvent(ctx, {
@@ -994,7 +1043,7 @@ export const acceptChatTurn = mutation({
             metadataRedacted: {
                 requestId: args.requestId,
                 mode: args.mode ?? 'send',
-                routeMode: args.routeMode,
+                routeMode,
                 attachmentCount: validatedAttachments.length,
                 persistedUserMessage: shouldPersistUserMessage,
             },
@@ -1166,7 +1215,13 @@ export const getGenerationContext = internalQuery({
             return a.createdAt - b.createdAt;
         });
 
-        const documentReference = detectDocumentReference(turn.message);
+        const routeMode = turn.routeMode ?? conversation.routeMode as RouteMode | undefined;
+        const contextualFollowUpMessage = buildContextualFollowUpMessage(
+            turn.message,
+            recentMessages.filter((m) => m.status !== 'deleted'),
+            routeMode
+        );
+        const documentReference = detectDocumentReference(contextualFollowUpMessage);
         const clerkUserId = user.clerkId;
         const activeCaseId = conversation.caseId;
         const grantedUploadedFiles = clerkUserId
@@ -1201,7 +1256,7 @@ export const getGenerationContext = internalQuery({
                     ...context,
                     documentChunks: await getRelevantDocumentChunkContexts(ctx, {
                         uploadedFileId: uploadedFile._id,
-                        message: turn.message,
+                        message: contextualFollowUpMessage,
                         detection: documentReference,
                         accessScope,
                     }),
@@ -1379,7 +1434,7 @@ export const getGenerationContext = internalQuery({
                     ...context,
                     documentChunks: await getRelevantDocumentChunkContexts(ctx, {
                         uploadedFileId: uploadedFile._id,
-                        message: turn.message,
+                        message: contextualFollowUpMessage,
                         detection: documentReference,
                         accessScope,
                     }),
@@ -1744,7 +1799,7 @@ export const recordDocumentAnswerEvidence = internalMutation({
                         chunkId: firstVerifiedChunk.chunk._id,
                         flagType: 'missing_citation',
                         severity: 'high',
-                        message: 'A document answer used retrieved chunks, but no citations were verified. Review the answer before relying on it.',
+                        message: 'A document answer used selected document text, but no citations were verified. Review the answer before relying on it.',
                         createdAt: now,
                     });
                 }

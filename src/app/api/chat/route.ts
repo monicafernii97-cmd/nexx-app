@@ -5,6 +5,7 @@ import type { Id } from '@convex/_generated/dataModel';
 import { classifyMessage, preserveOrUpgradeDocumentRoute } from '@/lib/nexx/router';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { getModelForRoute, type SubscriptionTier } from '@/lib/tiers';
+import type { RouteMode } from '@/lib/types';
 
 const MAX_MESSAGE_LENGTH = 100_000;
 
@@ -194,10 +195,11 @@ export async function POST(req: NextRequest) {
       ? (userRecord.subscriptionTier as SubscriptionTier)
       : 'free';
 
-  const classified = classifyMessage(message);
+  const activeRouteMode = conversation.routeMode as RouteMode | undefined;
+  const classified = classifyMessage(message, undefined, activeRouteMode, sanitizedAttachments.length > 0);
   const routerResult =
     sanitizedAttachments.length > 0 && classified.mode !== 'safety_escalation'
-      ? preserveOrUpgradeDocumentRoute(classified, message)
+      ? preserveOrUpgradeDocumentRoute(classified, message, activeRouteMode)
       : classified;
   console.info('[Chat] Accepting chat turn', {
     requestId: turnRequestId,
@@ -218,6 +220,17 @@ export async function POST(req: NextRequest) {
     order_interpretation: 'analysis',
     possession_access_schedule: 'analysis',
     party_message_draft: 'chat',
+    supportive_strategy: 'chat',
+    co_parent_response: 'chat',
+    documentation_strategy: 'analysis',
+    deescalation_response: 'chat',
+    packed_case_intake: 'analysis',
+    litigation_navigation: 'analysis',
+    court_response_planning: 'analysis',
+    pro_se_guidance: 'chat',
+    attorney_resource_guidance: 'chat',
+    court_narrative_builder: 'analysis',
+    filing_walkthrough: 'analysis',
     judge_lens_strategy: 'judge_sim',
     court_ready_drafting: 'deep_draft',
     pattern_analysis: 'analysis',

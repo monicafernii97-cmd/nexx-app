@@ -6,7 +6,7 @@ import type { ActionCtx } from './_generated/server';
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { classifyMessage } from '../src/lib/nexx/router';
+import { classifyFollowUpIntent, classifyMessage } from '../src/lib/nexx/router';
 import { buildSystemPolicyPrompt } from '../src/lib/nexx/prompts/systemPrompt';
 import { buildDeveloperBehaviorPrompt } from '../src/lib/nexx/prompts/developerPrompt';
 import { buildFeatureToolPrompt } from '../src/lib/nexx/prompts/featurePrompt';
@@ -19,8 +19,14 @@ import { recoverStructuredOutput } from '../src/lib/nexx/recovery/recoverStructu
 import { suppressWeakArtifacts } from '../src/lib/nexx/recovery/suppressWeakArtifacts';
 import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
 import { polishLegalResponse } from '../src/lib/nexx/postprocess';
+import { buildBestEffortLegalInterpretationFromDocumentAnswer } from '../src/lib/nexx/legal-engine/bestEffortLegalInterpretation';
 import { renderLegalInterpretationMarkdown } from '../src/lib/nexx/legal-engine/legalInterpretationRenderer';
 import { verifyLegalInterpretationAnswer } from '../src/lib/nexx/legal-engine/legalInterpretationVerifier';
+import {
+    buildLitigationNavigationResponse,
+    renderLitigationNavigationMarkdown,
+} from '../src/lib/nexx/legal-engine/litigationNavigationRenderer';
+import { verifyLitigationNavigationResponse } from '../src/lib/nexx/legal-engine/litigationNavigationVerifier';
 import {
     type LegalDocumentAnswerVerification,
     type LegalDocumentSourcePacket,
@@ -73,7 +79,13 @@ function emptyArtifacts(): NexxAssistantResponse['artifacts'] {
 
 /** Build a structured fallback response when provider generation fails. */
 function degradedResponse(message = DEGRADED_MESSAGE): NexxAssistantResponse {
-    return { message, artifacts: emptyArtifacts(), documentAnswer: null, legalInterpretation: null };
+    return {
+        message,
+        artifacts: emptyArtifacts(),
+        documentAnswer: null,
+        legalInterpretation: null,
+        litigationNavigation: null,
+    };
 }
 
 /** Normalize provider exceptions into retryable worker error metadata. */
@@ -579,7 +591,7 @@ function retrievalQueryTypeForDetection(
     }
     if (detection.referenceType === 'metadata_lookup') return 'metadata';
     if (detection.referenceType === 'deadline_lookup' || detection.requestedDates.length > 0) return 'timeline';
-    if (isDocumentContextRoute(routeMode) || detection.referencesDocument) return 'interpretation';
+    if (isDocumentContextRoute(routeMode) || isLitigationNavigationRoute(routeMode) || detection.referencesDocument) return 'interpretation';
     return 'summary';
 }
 
@@ -587,6 +599,53 @@ function isDocumentContextRoute(routeMode?: RouteMode) {
     return routeMode === 'document_analysis' ||
         routeMode === 'order_interpretation' ||
         routeMode === 'possession_access_schedule';
+}
+
+function isLitigationNavigationRoute(routeMode?: RouteMode) {
+    return routeMode === 'supportive_strategy' ||
+        routeMode === 'co_parent_response' ||
+        routeMode === 'documentation_strategy' ||
+        routeMode === 'deescalation_response' ||
+        routeMode === 'packed_case_intake' ||
+        routeMode === 'litigation_navigation' ||
+        routeMode === 'court_response_planning' ||
+        routeMode === 'pro_se_guidance' ||
+        routeMode === 'attorney_resource_guidance' ||
+        routeMode === 'court_narrative_builder' ||
+        routeMode === 'filing_walkthrough';
+}
+
+function recentLegalContextSummary(messages: GenerationContext['recentMessages']) {
+    return messages
+        .filter((message) =>
+            message.status === undefined ||
+            message.status === 'committed' ||
+            message.status === 'degraded'
+        )
+        .slice(-8)
+        .map((message) => message.content.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+        .join('\n')
+        .slice(-4_000);
+}
+
+function activeFollowUpContextSummary(
+    message: string,
+    recentMessages: GenerationContext['recentMessages'],
+    routeMode?: RouteMode
+) {
+    if (classifyFollowUpIntent(message) === 'new_issue' || !(isDocumentContextRoute(routeMode) || isLitigationNavigationRoute(routeMode))) {
+        return undefined;
+    }
+    return recentLegalContextSummary(recentMessages);
+}
+
+function hasActiveDocumentContext(context: GenerationContext) {
+    return Boolean(
+        context.conversationDocumentState?.activeUploadedFileId ||
+        (context.attachmentContexts?.length ?? 0) > 0 ||
+        (context.availableDocumentContexts?.length ?? 0) > 0
+    );
 }
 
 function documentRetrievalRunCounts(attachments: AttachmentContext[]) {
@@ -782,7 +841,9 @@ function selectAttachmentContextsForPrompt(
     const shouldLoadStoredDocuments =
         availableDocuments.length > 0 &&
         (isDocumentContextRoute(routeMode) ||
+            isLitigationNavigationRoute(routeMode) ||
             isDocumentContextRoute(routerResult.mode) ||
+            isLitigationNavigationRoute(routerResult.mode) ||
             routerResult.documentReference?.referencesDocument ||
             detectDocumentReference(context.turn.message).referencesDocument);
 
@@ -810,6 +871,7 @@ function buildAttachmentContextPrompt(
         routeMode === 'possession_access_schedule' ||
         detection.referenceType === 'possession_schedule_interpretation' ||
         detection.referenceType === 'clause_conflict_interpretation';
+    const shouldFillLitigationNavigation = isLitigationNavigationRoute(routeMode);
     const blocks = attachments.map((attachment) => {
         const sourceLabel = attachment.source === 'conversation_memory'
             ? 'stored conversation document memory'
@@ -827,7 +889,7 @@ function buildAttachmentContextPrompt(
         if (!attachment.chatContextText?.trim() && !retrievedChunkPrompt) {
             return [
                 `<DOCUMENT uploadedFileId="${attachment.uploadedFileId}" filename="${escapeXmlAttribute(attachment.filename)}" source="${sourceLabel}" status="${attachment.status}">`,
-                '<WARNINGS>No readable extracted context was available. Do not analyze this document unless file search returns relevant text.</WARNINGS>',
+                '<WARNINGS>No readable document language was available. Do not analyze this document unless file search returns relevant text.</WARNINGS>',
                 '</DOCUMENT>',
             ].join('\n');
         }
@@ -857,22 +919,24 @@ function buildAttachmentContextPrompt(
         'Use these excerpts only to answer the user\'s document-related question.',
         'When uploaded document memory is present, it is the source of truth for document re-analysis. Do not rely on older pasted order text in chat history unless the user explicitly asks you to analyze that pasted text.',
         'Do not describe uploaded document memory as "the text you provided" or "pasted text"; identify the uploaded document by filename/source instead.',
-        'When retrieved chunks contain relevant provisions, answer substantively from those chunks and cite them. Do not collapse a useful answer into a generic "not enough text" fallback just because the document is long or the exact issue requires explanation.',
-        'When retrieved CHUNK attributes include retrievalBuckets, compare the controlling_specific_clause, competing_general_clause, exception_priority_language, later_modification_language, and definition_language buckets before answering a possession or clause-conflict question.',
-        'If the excerpts do not contain the answer after checking the retrieved chunks, say what you checked and what the available extracted text does not show.',
+        'When selected document excerpts contain relevant provisions, answer substantively from those excerpts and cite them. Do not collapse a useful answer into a generic "not enough text" fallback just because the document is long or the exact issue requires explanation.',
+        'When selected excerpt attributes include clause-priority buckets, compare the controlling_specific_clause, competing_general_clause, exception_priority_language, later_modification_language, and definition_language buckets before answering a possession or clause-conflict question.',
+        'If the visible order language does not contain the answer, say plainly what the order language available here does and does not state.',
         'If SOURCE_ID chunks are present for a document, make document-specific claims about that document only from those SOURCE_ID chunks. Uncited extracted context is not enough for a document-specific claim for that document.',
         'For court-order review, identify which document was reviewed and cite compact page labels like [p. 2] or [pp. 2-3] when available.',
         'Quote short exact phrases only when exact wording matters.',
         'Never reveal SOURCE_ID values, backend field names, chunk IDs, memory generation IDs, block IDs, raw JSON, or retrieval metadata in the user-facing message.',
-        'When you make document-specific claims, fill documentAnswer with claims and citations that use only the SOURCE_ID values shown in retrieved chunks.',
+        'When you make document-specific claims, fill documentAnswer with claims and citations that use only the SOURCE_ID values shown in selected document excerpts.',
         'Every document_fact, quote, summary, comparison, interpretation, or procedural claim in documentAnswer.claims must include at least one valid sourceId.',
         'Every documentAnswer citation may include a short supports phrase copied from the cited SOURCE_ID text, but must not include file names, chunk IDs, memory generation IDs, block IDs, raw source objects, or backend metadata.',
         shouldFillLegalInterpretation ? 'This turn is a direct order-interpretation task. Fill legalInterpretation with a direct answer, controlling clauses, competing clauses when relevant, priority language, practical meaning, and a suggested reply when useful. Keep documentAnswer as the citation-safety record for the same sourced claims.' : undefined,
         shouldFillLegalInterpretation ? 'For legalInterpretation, use only SOURCE_ID references in sourceIds. Do not include file names, chunk IDs, memory generation IDs, block IDs, raw source objects, or backend field names.' : undefined,
-        'If source packets contain usable extracted order text, answer from that text even when page metadata is incomplete. Cite page labels when available; if a page label is unavailable, keep the claim grounded in the extracted text without inventing a page number.',
-        'If the retrieved chunks truly do not contain the requested fact after checking them, say what you checked and what the extracted order text does not state.',
-        preferRetrievedChunks ? 'Use the retrieved chunks first for this turn; they were selected from stored document memory for the user\'s specific question.' : undefined,
-        detection.requiresExactText ? 'This turn requires exact wording: verify terms against the extracted text and do not infer missing words.' : undefined,
+        shouldFillLitigationNavigation ? 'This turn needs client-care litigation navigation. Fill litigationNavigation with supportive summary, immediate priority, issue breakdown, court posture, co-parent response strategy, evidence plan, pro se/cost/resource guidance, judge explanation, filing plan, and next steps when relevant.' : undefined,
+        shouldFillLitigationNavigation ? 'For litigationNavigation, do not include backend metadata, source IDs, chunk IDs, retrieval language, OCR language, verifier language, inflammatory labels, or invented local fees/deadlines.' : undefined,
+        'If source packets contain usable order language, answer from that language even when page metadata is incomplete. Cite page labels when available; if a page label is unavailable, keep the claim grounded in the visible order language without inventing a page number.',
+        'If the available order language truly does not contain the requested fact, say what the visible order language does not state.',
+        preferRetrievedChunks ? 'Use the selected document excerpts first for this turn; do not describe this selection process to the user.' : undefined,
+        detection.requiresExactText ? 'This turn requires exact wording: verify terms against the visible order language and do not infer missing words.' : undefined,
         detection.requiresPageOrSectionCitation ? 'This turn asks for source location: cite available page, section, paragraph, or document metadata when possible.' : undefined,
         '<DOCUMENT_CONTEXT>',
         ...blocks,
@@ -916,7 +980,13 @@ type StreamingResponsesClient = {
 function buildInput(context: GenerationContext, routeMode: RouteMode, contextPrompt: string) {
     const systemPrompt = buildSystemPolicyPrompt();
     const developerPrompt = buildDeveloperBehaviorPrompt(routeMode);
-    const routerResult = classifyMessage(context.turn.message);
+    const followUpSummary = activeFollowUpContextSummary(context.turn.message, context.recentMessages, routeMode);
+    const routerResult = classifyMessage(
+        context.turn.message,
+        followUpSummary,
+        routeMode,
+        hasActiveDocumentContext(context)
+    );
     const documentReference = routerResult.documentReference ?? detectDocumentReference(context.turn.message);
     const featurePrompt = buildFeatureToolPrompt(routerResult.toolPlan);
     const artifactPrompt = buildArtifactPrompt();
@@ -931,7 +1001,9 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
     const shouldUseUploadedDocumentMemory =
         attachmentContexts.length > 0 &&
         (isDocumentContextRoute(routeMode) ||
+            isLitigationNavigationRoute(routeMode) ||
             isDocumentContextRoute(routerResult.mode) ||
+            isLitigationNavigationRoute(routerResult.mode) ||
             documentReference.referencesDocument);
     const preservePastedHistory = messageExplicitlyRequestsPastedDocumentText(context.turn.message);
 
@@ -1009,7 +1081,7 @@ function determineRetrievalReason(
     if (selected.some((attachment) => attachment.source === 'user_private_memory')) return 'user_private_memory' as const;
     if (selected.some((attachment) => attachment.source === 'shared_memory')) return 'shared_memory' as const;
     if (documentReference.referencesDocument) return 'recent_reference' as const;
-    if (isDocumentContextRoute(routeMode)) return 'document_analysis_route' as const;
+    if (isDocumentContextRoute(routeMode) || isLitigationNavigationRoute(routeMode)) return 'document_analysis_route' as const;
     return 'conversation_memory' as const;
 }
 
@@ -1070,6 +1142,7 @@ function shouldRequireDocumentAnswer(args: {
         args.sourcePackets.length > 0 &&
         (
             isDocumentContextRoute(args.routeMode) ||
+            args.attachmentContexts.some((attachment) => attachment.source === 'current_turn') ||
             args.documentReference.referencesDocument ||
             args.documentReference.requiresExactText ||
             args.documentReference.requiresPageOrSectionCitation
@@ -1107,7 +1180,8 @@ function renderDocumentMessage(
     response: NexxAssistantResponse,
     sourcePackets: LegalDocumentSourcePacket[],
     documentReference: DocumentReferenceDetection,
-    routeMode: RouteMode
+    routeMode: RouteMode,
+    userMessage: string
 ) {
     if (isLegalInterpretationRoute(routeMode, documentReference) && response.legalInterpretation) {
         return {
@@ -1115,12 +1189,63 @@ function renderDocumentMessage(
             message: renderLegalInterpretationMarkdown(
                 response.legalInterpretation,
                 sourcePackets,
-                response.message
+                response.message,
+                { userMessage }
             ),
         };
     }
 
     return renderCitationLockedDocumentMessage(response, sourcePackets, documentReference);
+}
+
+function renderLitigationNavigationMessage(args: {
+    response: NexxAssistantResponse;
+    routeMode: RouteMode;
+    userMessage: string;
+    recentContext?: string;
+    courtSettings?: GenerationContext['courtSettings'];
+}) {
+    if (!isLitigationNavigationRoute(args.routeMode)) return args.response;
+
+    const candidate = args.response.litigationNavigation ?? buildLitigationNavigationResponse({
+        message: args.userMessage,
+        routeMode: args.routeMode,
+        recentContext: args.recentContext,
+        state: args.courtSettings?.state,
+        county: args.courtSettings?.county,
+        courtName: args.courtSettings?.courtName,
+    });
+    const verification = verifyLitigationNavigationResponse(candidate, {
+        userMessage: args.userMessage,
+    });
+    const litigationNavigation = verification.passed
+        ? candidate
+        : buildLitigationNavigationResponse({
+            message: args.userMessage,
+            routeMode: args.routeMode,
+            recentContext: args.recentContext,
+            state: args.courtSettings?.state,
+            county: args.courtSettings?.county,
+            courtName: args.courtSettings?.courtName,
+        });
+
+    const litigationMarkdown = renderLitigationNavigationMarkdown(litigationNavigation, {
+        routeMode: args.routeMode,
+        userMessage: args.userMessage,
+    });
+    const existingMessage = args.response.message.trim();
+    const shouldPreserveGroundedMessage = Boolean(
+        existingMessage &&
+        (args.response.documentAnswer || args.response.legalInterpretation)
+    );
+
+    return {
+        ...args.response,
+        litigationNavigation,
+        message: shouldPreserveGroundedMessage
+            ? `${existingMessage}\n\n${litigationMarkdown}`
+            : litigationMarkdown,
+    };
 }
 
 function citationLockedFallbackResponse(
@@ -1130,7 +1255,7 @@ function citationLockedFallbackResponse(
     const documentAnswer = buildBestEffortLegalDocumentAnswerFromSources(
         sourcePackets,
         errors.length > 0
-            ? 'I checked the extracted order text, but the citation verifier could not lock every model-generated claim. I will answer from the extracted provisions that are available.'
+            ? 'Here is what the visible order language supports.'
             : undefined
     );
 
@@ -1139,6 +1264,7 @@ function citationLockedFallbackResponse(
         artifacts: emptyArtifacts(),
         documentAnswer,
         legalInterpretation: null,
+        litigationNavigation: null,
     };
 }
 
@@ -1164,10 +1290,10 @@ async function repairCitationLockedResponse(args: {
                     {
                         role: 'developer',
                         content: [
-                            'The citation verifier rejected the previous document answer.',
-                            `Verifier errors: ${args.verifierErrors.slice(0, 8).join(' | ')}`,
+                            'The previous document answer did not pass source-grounding checks.',
+                            `Grounding errors: ${args.verifierErrors.slice(0, 8).join(' | ')}`,
                             'Repair the answer using only the existing SOURCE_ID values from the document context.',
-                            'If usable source packets exist, answer from the extracted order text with valid sourceIds even when page metadata is incomplete. If the available source packets truly do not support the requested fact, set documentAnswer.answerType to "not_found" and do not make unsupported document claims.',
+                            'If usable source packets exist, answer from the visible order language with valid sourceIds even when page metadata is incomplete. If the available source packets truly do not support the requested fact, set documentAnswer.answerType to "not_found" and do not make unsupported document claims.',
                             'Return valid JSON matching the required schema.',
                             `Rejected response JSON: ${JSON.stringify(args.originalResponse).slice(0, 8_000)}`,
                         ].join('\n'),
@@ -1221,8 +1347,15 @@ async function generateWithFallbacks({
 }) {
     const client = getOpenAIClient();
     const responses = client.responses as unknown as StreamingResponsesClient;
-    const routerResult = classifyMessage(context.turn.message);
-    const routeMode = (context.turn.routeMode ?? routerResult.mode) as RouteMode;
+    const storedRouteMode = context.turn.routeMode as RouteMode | undefined;
+    const followUpSummary = activeFollowUpContextSummary(context.turn.message, context.recentMessages, storedRouteMode);
+    const routerResult = classifyMessage(
+        context.turn.message,
+        followUpSummary,
+        storedRouteMode,
+        hasActiveDocumentContext(context)
+    );
+    const routeMode = (storedRouteMode ?? routerResult.mode) as RouteMode;
     const model = context.turn.model ?? 'gpt-5.4';
     const temperature = context.turn.temperature ?? routerResult.temperature;
 
@@ -1483,15 +1616,46 @@ async function generateWithFallbacks({
             }
 
             if (!legalInterpretationVerification.passed && requiresLegalInterpretation && citationVerification.passed) {
-                parsedResponse = { ...parsedResponse, legalInterpretation: null };
+                const bestEffortLegalInterpretation = buildBestEffortLegalInterpretationFromDocumentAnswer(
+                    parsedResponse.documentAnswer,
+                    promptBundle.documentSourcePackets,
+                    promptBundle.documentReference,
+                    context.turn.message
+                );
+                parsedResponse = {
+                    ...parsedResponse,
+                    legalInterpretation: bestEffortLegalInterpretation,
+                };
+                legalInterpretationVerification = verifyLegalInterpretationAnswer(
+                    parsedResponse.legalInterpretation,
+                    promptBundle.documentSourcePackets,
+                    {
+                        requiresLegalInterpretation,
+                        hasClauseConflictSignal: hasClauseConflictSignal(promptBundle.documentReference),
+                    }
+                );
+                if (!legalInterpretationVerification.passed) {
+                    lastError = new Error(
+                        `legal_interpretation_verification_failed: ${legalInterpretationVerification.errors.join(' | ')}`
+                    );
+                    continue;
+                }
             }
 
             parsedResponse = renderDocumentMessage(
                 parsedResponse,
                 promptBundle.documentSourcePackets,
                 promptBundle.documentReference,
-                routeMode
+                routeMode,
+                context.turn.message
             );
+            parsedResponse = renderLitigationNavigationMessage({
+                response: parsedResponse,
+                routeMode,
+                userMessage: context.turn.message,
+                recentContext: recentLegalContextSummary(context.recentMessages),
+                courtSettings: context.courtSettings,
+            });
             parsedResponse.message = polishLegalResponse(parsedResponse.message);
 
             return {
@@ -1644,8 +1808,19 @@ export const processChatGenerationJob = internalAction({
 
             if (lease.turnId && shouldRecordDocumentRetrievalRun) {
                 const usedChunkIds = uniqueDocumentChunkIds(result.attachmentContexts);
-                const auditRouterResult = classifyMessage(context.turn.message);
-                const auditRouteMode = (context.turn.routeMode ?? auditRouterResult.mode) as RouteMode;
+                const storedAuditRouteMode = context.turn.routeMode as RouteMode | undefined;
+                const auditFollowUpSummary = activeFollowUpContextSummary(
+                    context.turn.message,
+                    context.recentMessages,
+                    storedAuditRouteMode
+                );
+                const auditRouterResult = classifyMessage(
+                    context.turn.message,
+                    auditFollowUpSummary,
+                    storedAuditRouteMode,
+                    hasActiveDocumentContext(context)
+                );
+                const auditRouteMode = (storedAuditRouteMode ?? auditRouterResult.mode) as RouteMode;
                 const selectedUploadedFileIds = result.attachmentContexts.map((attachment) => attachment.uploadedFileId);
                 const candidateUploadedFileIds = [
                     ...new Set([

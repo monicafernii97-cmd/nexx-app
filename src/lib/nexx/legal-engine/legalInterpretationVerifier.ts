@@ -29,6 +29,7 @@ const INTERNAL_LEAK_KEYS = [
   'documentAnswer',
   'retrievalBuckets',
   'retrievalReasons',
+  'filingRetrievalBuckets',
 ];
 
 function collectText(value: unknown): string {

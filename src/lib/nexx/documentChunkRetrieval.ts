@@ -1,13 +1,17 @@
 import type { DocumentReferenceDetection } from './documentReferenceDetection';
 import {
   buildClauseRetrievalPlan,
+  buildFilingRetrievalPlan,
   type ClauseRetrievalBucket,
   type ClauseRetrievalBucketPlan,
+  type FilingRetrievalBucket,
+  type FilingRetrievalBucketPlan,
 } from './legal-engine/retrievalPlan';
 
 export type DocumentChunkRetrievalReason =
   | 'exact_term'
   | 'deadline_pattern'
+  | 'filing_bucket'
   | 'holiday_possession'
   | 'clause_bucket'
   | 'heading_match'
@@ -50,6 +54,7 @@ export type RetrievedDocumentChunk = DocumentChunkRetrievalCandidate & {
   retrievalScore: number;
   retrievalReasons: DocumentChunkRetrievalReason[];
   retrievalBuckets?: ClauseRetrievalBucket[];
+  filingRetrievalBuckets?: FilingRetrievalBucket[];
 };
 
 const DEADLINE_KEYWORDS = [
@@ -187,6 +192,10 @@ function buildBucketTerms(plan: ClauseRetrievalBucketPlan[]) {
   return new Map(plan.map(({ bucket, queries }) => [bucket, normalizeBucketTerms(queries)]));
 }
 
+function buildFilingBucketTerms(plan: FilingRetrievalBucketPlan[]) {
+  return new Map(plan.map(({ bucket, queries }) => [bucket, normalizeBucketTerms(queries)]));
+}
+
 function extractRequestedPages(sections: string[]) {
   return unique(
     sections
@@ -229,7 +238,8 @@ function pageRangeContains(chunk: DocumentChunkRetrievalCandidate, page: number)
 function buildSearchTerms(
   message: string,
   detection: DocumentReferenceDetection,
-  clausePlan = buildClauseRetrievalPlan(message, detection)
+  clausePlan = buildClauseRetrievalPlan(message, detection),
+  filingPlan = buildFilingRetrievalPlan(message, detection)
 ) {
   const messageTerms = words(message).slice(0, 16);
   const requestedTerms = normalizeTerms(detection.requestedTerms);
@@ -237,17 +247,19 @@ function buildSearchTerms(
   const sectionTerms = extractSectionTerms(detection.requestedSections);
   const locationIdentifierTerms = extractLocationIdentifierTerms(message);
   const clauseTerms = normalizeBucketTerms(clausePlan.flatMap((item) => item.queries));
+  const filingTerms = normalizeBucketTerms(filingPlan.flatMap((item) => item.queries));
 
   if (detection.referenceType === 'deadline_lookup') {
-    return unique([...requestedTerms, ...requestedDates, ...sectionTerms, ...locationIdentifierTerms, ...clauseTerms, ...DEADLINE_KEYWORDS, ...messageTerms]);
+    return unique([...requestedTerms, ...requestedDates, ...sectionTerms, ...locationIdentifierTerms, ...clauseTerms, ...filingTerms, ...DEADLINE_KEYWORDS, ...messageTerms]);
   }
 
-  return unique([...requestedTerms, ...requestedDates, ...sectionTerms, ...locationIdentifierTerms, ...clauseTerms, ...messageTerms]);
+  return unique([...requestedTerms, ...requestedDates, ...sectionTerms, ...locationIdentifierTerms, ...clauseTerms, ...filingTerms, ...messageTerms]);
 }
 
 /** Build a compact full-text query for the Convex search index before in-memory reranking. */
 export function buildDocumentChunkSearchQuery(message: string, detection: DocumentReferenceDetection) {
   const clausePlan = buildClauseRetrievalPlan(message, detection);
+  const filingPlan = buildFilingRetrievalPlan(message, detection);
   const prioritizedTerms = [
     ...normalizeTerms(detection.requestedTerms),
     ...normalizeTerms(detection.requestedDates),
@@ -256,7 +268,7 @@ export function buildDocumentChunkSearchQuery(message: string, detection: Docume
   ];
   const terms = unique([
     ...prioritizedTerms,
-    ...buildSearchTerms(message, detection, clausePlan),
+    ...buildSearchTerms(message, detection, clausePlan, filingPlan),
   ])
     .filter((term) => term.length >= 3 || /^\d+$/.test(term))
     .slice(0, detection.requiresExactText ? 18 : 24);
@@ -268,6 +280,7 @@ function canAnchorNeighborExpansion(chunk: RetrievedDocumentChunk) {
   return chunk.retrievalReasons.some((reason) =>
     reason === 'exact_term' ||
     reason === 'holiday_possession' ||
+    reason === 'filing_bucket' ||
     reason === 'clause_bucket' ||
     reason === 'page_match' ||
     reason === 'section_match' ||
@@ -300,13 +313,48 @@ function scoreClauseBuckets(args: {
   return { score, retrievalBuckets };
 }
 
+function scoreFilingBuckets(args: {
+  normalizedChunkText: string;
+  normalizedHeading: string;
+  bucketTerms: Map<FilingRetrievalBucket, string[]>;
+}) {
+  const filingRetrievalBuckets: FilingRetrievalBucket[] = [];
+  let score = 0;
+
+  for (const [bucket, terms] of args.bucketTerms.entries()) {
+    const hits = terms.filter((term) =>
+      textContainsTerm(args.normalizedChunkText, term) ||
+      textContainsTerm(args.normalizedHeading, term)
+    );
+    if (hits.length === 0) continue;
+
+    filingRetrievalBuckets.push(bucket);
+    const phraseHits = hits.filter((term) => term.includes(' ')).length;
+    score += 105 + hits.length * 12 + phraseHits * 28;
+  }
+
+  return { score, filingRetrievalBuckets };
+}
+
 function selectRankedChunks(args: {
   ranked: RetrievedDocumentChunk[];
   maxChunks: number;
   bucketOrder: ClauseRetrievalBucket[];
+  filingBucketOrder: FilingRetrievalBucket[];
 }) {
   const selected: RetrievedDocumentChunk[] = [];
   const selectedIds = new Set<string>();
+
+  for (const bucket of args.filingBucketOrder) {
+    if (selected.length >= args.maxChunks) return selected;
+    const bucketHit = args.ranked.find((chunk) =>
+      chunk.filingRetrievalBuckets?.includes(bucket) &&
+      !selectedIds.has(chunk.chunkId)
+    );
+    if (!bucketHit) continue;
+    selectedIds.add(bucketHit.chunkId);
+    selected.push(bucketHit);
+  }
 
   for (const bucket of args.bucketOrder) {
     if (selected.length >= args.maxChunks) return selected;
@@ -374,7 +422,8 @@ export function retrieveRelevantDocumentChunks(args: {
   if (args.maxChunks <= 0 || args.chunks.length === 0) return [];
 
   const clausePlan = buildClauseRetrievalPlan(args.message, args.detection);
-  const searchTerms = buildSearchTerms(args.message, args.detection, clausePlan);
+  const filingPlan = buildFilingRetrievalPlan(args.message, args.detection);
+  const searchTerms = buildSearchTerms(args.message, args.detection, clausePlan, filingPlan);
   const requestedPages = extractRequestedPages(args.detection.requestedSections);
   const sectionTerms = extractSectionTerms(args.detection.requestedSections);
   const needsDeadline = args.detection.referenceType === 'deadline_lookup';
@@ -382,7 +431,9 @@ export function retrieveRelevantDocumentChunks(args: {
   const needsSection = args.detection.referenceType === 'section_lookup';
   const needsHolidayPossession = messageNeedsHolidayPossessionRetrieval(args.message, args.detection);
   const bucketTerms = buildBucketTerms(clausePlan);
+  const filingBucketTerms = buildFilingBucketTerms(filingPlan);
   const bucketOrder = clausePlan.map((item) => item.bucket);
+  const filingBucketOrder = filingPlan.map((item) => item.bucket);
   const hasOrderLanguageIntent = /\b(?:order|ordered|orders|shall|must|restrained|granted|denied|requires?|requirement)\b/i.test(args.message);
   const asksForTables = /\b(?:table|schedule|calendar|chart|row|column|amounts?|payments?|fees?|arrears)\b/i.test(args.message);
   const asksForMoney = /\b(?:money|amount|payment|fee|fees|arrears|support|reimburse|costs?|dollars?|\$)\b/i.test(args.message);
@@ -396,6 +447,7 @@ export function retrieveRelevantDocumentChunks(args: {
     let retrievalScore = Math.max(0, 20 - chunk.chunkIndex);
     const retrievalReasons: DocumentChunkRetrievalReason[] = ['early_context'];
     const retrievalBuckets: ClauseRetrievalBucket[] = [];
+    const filingRetrievalBuckets: FilingRetrievalBucket[] = [];
 
     for (const page of requestedPages) {
       if (pageRangeContains(chunk, page)) {
@@ -450,6 +502,19 @@ export function retrieveRelevantDocumentChunks(args: {
       }
     }
 
+    if (filingBucketTerms.size > 0) {
+      const filingBucketScore = scoreFilingBuckets({
+        normalizedChunkText,
+        normalizedHeading,
+        bucketTerms: filingBucketTerms,
+      });
+      if (filingBucketScore.filingRetrievalBuckets.length > 0) {
+        retrievalScore += filingBucketScore.score;
+        retrievalReasons.push('filing_bucket');
+        filingRetrievalBuckets.push(...filingBucketScore.filingRetrievalBuckets);
+      }
+    }
+
     if (metadata?.containsTable && asksForTables) {
       retrievalScore += 65;
       retrievalReasons.push('metadata_match');
@@ -475,6 +540,7 @@ export function retrieveRelevantDocumentChunks(args: {
       retrievalScore,
       retrievalReasons: unique(retrievalReasons),
       retrievalBuckets: unique(retrievalBuckets),
+      filingRetrievalBuckets: unique(filingRetrievalBuckets),
     };
   });
 
@@ -485,7 +551,7 @@ export function retrieveRelevantDocumentChunks(args: {
 
   const neighborCandidates = ranked.filter((chunk, index) => index < args.maxChunks || chunk.retrievalScore > 40);
   const shouldExpandWithNeighbors =
-    needsExact || needsHolidayPossession || bucketOrder.length > 0 || needsSection || needsDeadline || needsMetadataContext || requestedPages.length > 0;
+    needsExact || needsHolidayPossession || bucketOrder.length > 0 || filingBucketOrder.length > 0 || needsSection || needsDeadline || needsMetadataContext || requestedPages.length > 0;
   const hasNeighborAnchor = shouldExpandWithNeighbors && neighborCandidates.some(canAnchorNeighborExpansion);
   const bucketCoverageCount = bucketOrder.length > 0
     ? Math.min(
@@ -497,13 +563,24 @@ export function retrieveRelevantDocumentChunks(args: {
       ).size
     )
     : 0;
+  const filingBucketCoverageCount = filingBucketOrder.length > 0
+    ? Math.min(
+      args.maxChunks,
+      new Set(
+        neighborCandidates
+          .filter((chunk) => (chunk.filingRetrievalBuckets ?? []).some((bucket) => filingBucketOrder.includes(bucket)))
+          .map((chunk) => chunk.chunkId)
+      ).size
+    )
+    : 0;
   const initialChunkLimit = hasNeighborAnchor
-    ? Math.max(bucketCoverageCount || 1, args.maxChunks - 2)
+    ? Math.max(bucketCoverageCount || filingBucketCoverageCount || 1, args.maxChunks - 2)
     : args.maxChunks;
   const selected = selectRankedChunks({
     ranked: neighborCandidates,
     maxChunks: initialChunkLimit,
     bucketOrder,
+    filingBucketOrder,
   });
 
   const expanded = hasNeighborAnchor

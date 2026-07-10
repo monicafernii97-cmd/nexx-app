@@ -10,7 +10,23 @@ export function determineImmediatePriority(intake: PackedCaseIntake): Litigation
     };
   }
 
-  if (intake.courtPosture.otherPartyFiledSomething || intake.immediateRisks.deadlineRisk || intake.immediateRisks.hearingRisk) {
+  if (intake.courtPosture.proceedingStatus === 'threat_only') {
+    return {
+      priority: 'Verify whether there is a real court case first.',
+      whyItMatters: 'A threat to file does not create a court deadline by itself.',
+      whatToDoNow: 'Check whether anything was actually filed, served, or noticed for hearing before treating it like a deadline.',
+    };
+  }
+
+  if (intake.courtPosture.proceedingStatus === 'filing_claimed_not_seen') {
+    return {
+      priority: 'Confirm the filing and service status first.',
+      whyItMatters: 'A claimed filing may matter, but the actual filed paper, service date, and hearing notice control next steps.',
+      whatToDoNow: 'Get the filed document or docket notice, then confirm when and how you actually received it.',
+    };
+  }
+
+  if (intake.immediateRisks.deadlineRisk || intake.immediateRisks.hearingRisk) {
     return {
       priority: 'Protect the court deadline first.',
       whyItMatters: 'If a motion or petition was filed, the service date, response deadline, and hearing date control how fast you need to act.',
@@ -36,12 +52,23 @@ export function determineImmediatePriority(intake: PackedCaseIntake): Litigation
 export function buildIssueBreakdown(intake: PackedCaseIntake): LitigationNavigationResponse['issueBreakdown'] {
   const issues: LitigationNavigationResponse['issueBreakdown'] = [];
 
+  if (intake.courtPosture.proceedingStatus === 'threat_only') {
+    issues.push({
+      issue: 'Court threat',
+      priority: 'medium',
+      whatItMeans: 'A threat to file is not the same as an actual filed or served case.',
+      nextStep: 'Verify whether anything was actually filed or served before treating it as a court deadline.',
+    });
+  }
+
   if (intake.courtPosture.otherPartyFiledSomething) {
     issues.push({
       issue: 'Court case',
-      priority: 'urgent',
-      whatItMeans: 'A filed court paper creates deadline and hearing risk until the filing, service date, and requested relief are checked.',
-      nextStep: 'Upload or paste the filed document and identify when you were served.',
+      priority: intake.immediateRisks.deadlineRisk || intake.immediateRisks.hearingRisk ? 'urgent' : 'high',
+      whatItMeans: intake.immediateRisks.deadlineRisk || intake.immediateRisks.hearingRisk
+        ? 'A filed court paper creates deadline and hearing risk until the filing, service date, and requested relief are checked.'
+        : 'A filing has been claimed, but the actual filed document and service details still need to be verified.',
+      nextStep: 'Upload or paste the filed document and identify when and how you actually received it.',
     });
   }
 

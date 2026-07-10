@@ -43,8 +43,11 @@ const RESPONSE_STRATEGY_PATTERN =
 const DOCUMENTATION_PATTERN =
   /\b(should i document|document this|save this|record this|make a timeline|timeline this|court record)\b/i;
 
+const COURT_THREAT_ONLY_PATTERN =
+  /\b(taking me to court|take me (?:back )?to court|threaten(?:ed|ing)? to file|says? (?:he|she|they) (?:is|are|will|would) (?:taking|take) me to court)\b/i;
+
 const COURT_FILING_RECEIVED_PATTERN =
-  /\b(taking me to court|got served|served me|filed something|filed (?:a|the) (?:motion|petition|enforcement|modification)|(?:motion|petition) (?:against me|was filed)|hearing|court date|lied in the motion)\b/i;
+  /\b(got served|served me|filed something|filed (?:a|the) (?:motion|petition|enforcement|modification)|(?:motion|petition) (?:against me|was filed)|hearing|court date|lied in the motion)\b/i;
 
 const PRO_SE_PATTERN =
   /\b(pro se|can i do this myself|without (?:a|an) attorney|can'?t afford (?:a|an) attorney|cannot afford (?:a|an) attorney|no money for (?:a|an) attorney)\b/i;
@@ -86,6 +89,9 @@ export function classifyLegalIntent(message: string): LegalIntent {
   }
 
   if (FILING_WALKTHROUGH_PATTERN.test(message)) return 'filing_walkthrough';
+  if (COURT_THREAT_ONLY_PATTERN.test(message) && !COURT_FILING_RECEIVED_PATTERN.test(message)) {
+    return 'pressure_or_manipulation_response';
+  }
   if (COURT_FILING_RECEIVED_PATTERN.test(message)) return 'new_court_filing_received';
   if (PRO_SE_PATTERN.test(message)) return 'pro_se_feasibility';
   if (COST_PATTERN.test(message)) return 'attorney_cost_question';

@@ -6,7 +6,7 @@ const GENERIC_DOCUMENT_ANSWER_PATTERN =
   /\b(i found usable court-order language|organized the visible provisions|cite exact pages|stay grounded in the visible order language)\b/i;
 
 const INTERNAL_FIELD_PATTERN =
-  /\b(?:SOURCE_ID|sourceId|fileId|fileName|memoryGenerationId|chunkId|pageStart|pageEnd|blockIds|quotedText|documentAnswer|retrievalBuckets|retrievalReasons|citation\s+verifier|model-generated\s+claim)\b:?/gi;
+  /\b(?:SOURCE_ID|sourceId|fileId|fileName|memoryGenerationId|chunkId|pageStart|pageEnd|blockIds|quotedText|documentAnswer|retrievalBuckets|retrievalReasons|filingRetrievalBuckets|citation\s+verifier|model-generated\s+claim)\b:?/gi;
 
 function cleanUserFacingText(value: string) {
   return value

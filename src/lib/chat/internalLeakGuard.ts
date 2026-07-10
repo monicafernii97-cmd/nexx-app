@@ -9,6 +9,9 @@ export const INTERNAL_LEAK_KEYS = [
   'blockIds',
   'quotedText',
   'documentAnswer',
+  'retrievalBuckets',
+  'retrievalReasons',
+  'filingRetrievalBuckets',
 ] as const;
 
 const INTERNAL_LEAK_KEY_SET = new Set<string>(INTERNAL_LEAK_KEYS);

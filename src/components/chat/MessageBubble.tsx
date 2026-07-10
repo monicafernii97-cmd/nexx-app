@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Check, ArrowsClockwise, PencilSimple, X, PaperPlaneRight, CaretDown, Scales, Sword, FileText, CalendarBlank, ListBullets, Quotes, ShieldCheck, WarningCircle } from '@phosphor-icons/react';
+import { Copy, Check, ArrowsClockwise, PencilSimple, X, PaperPlaneRight, CaretDown, Scales, Sword, FileText, CalendarBlank, ListBullets, Quotes } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, useCallback, useMemo, useId } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -167,6 +167,16 @@ function getMetadataString(metadata: unknown, key: string) {
     return typeof value === 'string' ? value : undefined;
 }
 
+function getMetadataBoolean(metadata: unknown, key: string) {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false;
+    return (metadata as Record<string, unknown>)[key] === true;
+}
+
+function shouldShowDocumentEvidence(metadata: unknown) {
+    return getMetadataBoolean(metadata, 'showDocumentSources') ||
+        getMetadataString(metadata, 'sourceDisplayMode') === 'expanded';
+}
+
 function getSourceLabel(source: DocumentSourceMetadata['source']) {
     if (source === 'case_memory') return 'Case document';
     if (source === 'user_private_memory') return 'Saved document';
@@ -176,8 +186,7 @@ function getSourceLabel(source: DocumentSourceMetadata['source']) {
 }
 
 function citationBadge(status: DocumentCitationMetadata['citationVerifierStatus']) {
-    if (status === 'failed') return 'Needs review';
-    if (status === 'partial') return 'Check wording';
+    void status;
     return 'Source';
 }
 
@@ -199,8 +208,6 @@ function DocumentEvidencePanel({
     const visibleSources = citations.length > 0
         ? sources.filter((source) => citedSourceNames.includes(source.filename))
         : sources;
-    const hasPartialExtraction = visibleSources.some((source) => source.status === 'partial' || source.status === 'failed');
-    const hasFocusedPassages = !hasPartialExtraction && visibleSources.some((source) => source.contextTruncated);
     const citationCountLabel = citations.length > 0
         ? `${citations.length} citation${citations.length === 1 ? '' : 's'}`
         : null;
@@ -238,16 +245,6 @@ function DocumentEvidencePanel({
                         {citations.length} cited passage{citations.length === 1 ? '' : 's'}
                     </span>
                 )}
-                {hasPartialExtraction && (
-                    <span className={isLight ? 'text-amber-600' : 'text-amber-200'}>
-                        Extracted text may be incomplete
-                    </span>
-                )}
-                {hasFocusedPassages && (
-                    <span className={isLight ? 'text-blue-500' : 'text-sky-200/70'}>
-                        Showing selected passages
-                    </span>
-                )}
             </div>
             <div className={`mt-2 flex flex-wrap items-center gap-2 text-xs ${isLight ? 'text-blue-950' : 'text-white'}`}>
                 <FileText size={13} weight="regular" className="shrink-0" />
@@ -259,7 +256,7 @@ function DocumentEvidencePanel({
                         className={`rounded px-2 py-1 text-[11px] font-bold transition-colors ${isLight ? 'bg-white text-blue-700 hover:bg-blue-100' : 'bg-white/10 text-sky-100 hover:bg-white/15'}`}
                         aria-expanded={detailsOpen}
                     >
-                        {detailsOpen ? 'Hide details' : 'View source details'}
+                        {detailsOpen ? 'Hide sources' : 'Show sources'}
                     </button>
                 )}
             </div>
@@ -269,7 +266,7 @@ function DocumentEvidencePanel({
                         const citationId = citation.id;
                         const isOpen = openCitationId === citationId;
                         const status = citationBadge(citation.citationVerifierStatus);
-                        const locationLabel = citation.pageLabel || citation.citationLabel || 'Page metadata unavailable';
+                        const locationLabel = citation.pageLabel || citation.citationLabel || 'Source passage';
                         return (
                             <div
                                 key={citationId}
@@ -290,15 +287,7 @@ function DocumentEvidencePanel({
                                             Short source preview
                                         </span>
                                     </span>
-                                    <span className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${citation.citationVerifierStatus === 'failed'
-                                        ? isLight ? 'bg-rose-100 text-rose-700' : 'bg-rose-300/15 text-rose-100'
-                                        : citation.citationVerifierStatus === 'partial'
-                                            ? isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-300/15 text-amber-100'
-                                            : isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-300/15 text-emerald-100'
-                                        }`}>
-                                        {citation.citationVerifierStatus === 'verified'
-                                            ? <ShieldCheck size={11} weight="fill" />
-                                            : <WarningCircle size={11} weight="fill" />}
+                                    <span className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${isLight ? 'bg-blue-50 text-blue-700' : 'bg-white/10 text-sky-100'}`}>
                                         {status}
                                     </span>
                                 </button>
@@ -350,15 +339,58 @@ function DocumentEvidencePanel({
     );
 }
 
-function AnalysisStatusCard({ isLight }: { isLight: boolean }) {
+function analysisStatusCopy(routeMode?: string) {
+    switch (routeMode) {
+        case 'order_interpretation':
+        case 'possession_access_schedule':
+        case 'document_analysis':
+            return {
+                title: 'Reviewing the order',
+                detail: 'Checking the controlling provisions and organizing the answer.',
+            };
+        case 'court_response_planning':
+        case 'litigation_navigation':
+        case 'packed_case_intake':
+            return {
+                title: 'Reviewing the filing',
+                detail: 'Checking dates, service, requested relief, and next steps.',
+            };
+        case 'co_parent_response':
+        case 'party_message_draft':
+            return {
+                title: 'Drafting a response',
+                detail: 'Preparing calm, court-appropriate wording.',
+            };
+        case 'filing_walkthrough':
+        case 'court_ready_drafting':
+            return {
+                title: 'Building the filing plan',
+                detail: 'Organizing the draft, missing facts, and review checklist.',
+            };
+        case 'attorney_resource_guidance':
+        case 'pro_se_guidance':
+            return {
+                title: 'Checking practical options',
+                detail: 'Organizing pro se, cost, and resource next steps.',
+            };
+        default:
+            return {
+                title: 'Preparing the answer',
+                detail: 'Organizing the issue and next steps.',
+            };
+    }
+}
+
+function AnalysisStatusCard({ isLight, routeMode }: { isLight: boolean; routeMode?: string }) {
+    const copy = analysisStatusCopy(routeMode);
     return (
         <div className={`rounded-xl border px-4 py-3 text-sm ${isLight
             ? 'border-blue-100 bg-blue-50 text-blue-950'
             : 'border-sky-300/15 bg-sky-300/10 text-sky-50'
             }`}>
-            <p className="font-semibold">Analyzing court order</p>
+            <p className="font-semibold">{copy.title}</p>
             <p className={`mt-1 text-xs ${isLight ? 'text-blue-700' : 'text-sky-100/75'}`}>
-                Preparing a clean summary, deadlines, risks, and source references.
+                {copy.detail}
             </p>
         </div>
     );
@@ -392,7 +424,7 @@ const COURT_ORDER_FOLLOW_UPS = [
 ] as const;
 
 const REDACTED_ASSISTANT_COPY_TEXT =
-    'Analysis was withheld because it contained internal source metadata. Please retry this answer.';
+    'I couldn\'t display that response correctly. Please retry it.';
 
 function CourtOrderFollowUpChips({
     isLight,
@@ -704,6 +736,8 @@ export default function MessageBubble({
     const documentSources = useMemo(() => getDocumentSources(metadata), [metadata]);
     const documentCitations = useMemo(() => getDocumentCitations(metadata), [metadata]);
     const metadataUiKind = getMetadataString(metadata, 'uiKind');
+    const metadataRouteMode = getMetadataString(metadata, 'routeMode') || getMetadataString(metadata, 'mode');
+    const showDocumentEvidencePanel = shouldShowDocumentEvidence(metadata);
     const hasInternalAssistantContent = role === 'assistant' && looksLikeInternalStructuredPayload(content);
     const isAnalysisStatusMessage = role === 'assistant' && (
         metadataUiKind === ANALYSIS_STATUS_UI_KIND ||
@@ -880,7 +914,7 @@ export default function MessageBubble({
                 {/* Structured response rendering (AssistantMessageCard) */}
                 {unsafeAssistantContent ? (
                     <>
-                        <AnalysisStatusCard isLight={isLight} />
+                        <AnalysisStatusCard isLight={isLight} routeMode={metadataRouteMode} />
                         <div className="mt-3">
                             <PlayAloudButton text={REDACTED_ASSISTANT_COPY_TEXT} />
                         </div>
@@ -898,7 +932,7 @@ export default function MessageBubble({
                         )}
                     </>
                 ) : isAnalysisStatusMessage ? (
-                    <AnalysisStatusCard isLight={isLight} />
+                    <AnalysisStatusCard isLight={isLight} routeMode={metadataRouteMode} />
                 ) : structuredViewModel && !isStreaming ? (
                     <>
                         <AssistantMessageCard
@@ -907,7 +941,9 @@ export default function MessageBubble({
                             procedureInfo={procedureInfo}
                             onAction={(action, content) => onAction?.(action, content)}
                         />
-                        <DocumentEvidencePanel sources={documentSources} citations={documentCitations} isLight={isLight} />
+                        {showDocumentEvidencePanel && (
+                            <DocumentEvidencePanel sources={documentSources} citations={documentCitations} isLight={isLight} />
+                        )}
                         {shouldShowCourtOrderFollowUps && (
                             <CourtOrderFollowUpChips isLight={isLight} onSuggestedPrompt={onSuggestedPrompt} />
                         )}
@@ -929,7 +965,7 @@ export default function MessageBubble({
                 </div>
 
                 {/* ── Artifact Panels ── */}
-                {!isStreaming && (
+                {!isStreaming && showDocumentEvidencePanel && (
                     <DocumentEvidencePanel sources={documentSources} citations={documentCitations} isLight={isLight} />
                 )}
 
@@ -946,7 +982,7 @@ export default function MessageBubble({
                 {hasAnyArtifact && !isStreaming && (
                     <div className="mt-4 space-y-1">
                         {artifacts.draftReady && (
-                            <ArtifactPanel icon={FileText} label="Court-Ready Draft" isLight={isLight} accentColor="#C75A5A">
+                            <ArtifactPanel icon={FileText} label="Draft for Review" isLight={isLight} accentColor="#C75A5A">
                                 <div className="prose prose-sm max-w-none">
                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                         {renderDraftReadyMarkdown(artifacts.draftReady)}

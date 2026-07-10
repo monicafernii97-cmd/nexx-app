@@ -83,6 +83,59 @@ describe('retrieveRelevantDocumentChunks', () => {
     expect(result.find((chunk) => chunk.chunkId === 'chunk-3')?.retrievalReasons).toContain('deadline_pattern');
   });
 
+  it('covers filing-specific buckets across a long filing', () => {
+    const filingChunks: DocumentChunkRetrievalCandidate[] = Array.from({ length: 30 }, (_, index) => ({
+      chunkId: `filing-${index + 1}`,
+      uploadedFileId: 'file-filing',
+      chunkIndex: index,
+      text: `Filler page ${index + 1}. General background text without the key filing sections.`,
+      textLength: 72,
+      pageStart: index + 1,
+      pageEnd: index + 1,
+      sectionHeading: `Page ${index + 1}`,
+      warnings: [],
+    }));
+    filingChunks[0] = {
+      ...filingChunks[0],
+      text: 'Cause No. 123. In the Interest of A Child. Motion to Enforce Possession filed by Petitioner against Respondent.',
+      sectionHeading: 'Caption and Motion Title',
+    };
+    filingChunks[5] = {
+      ...filingChunks[5],
+      text: 'Factual allegations and grounds. Petitioner alleges Respondent failed to surrender the child and violated the possession order.',
+      sectionHeading: 'Allegations and Grounds',
+    };
+    filingChunks[23] = {
+      ...filingChunks[23],
+      text: 'Prayer. Petitioner requests that the Court hold Respondent in contempt, order makeup possession, and award attorney fees.',
+      sectionHeading: 'Prayer for Relief',
+    };
+    filingChunks[26] = {
+      ...filingChunks[26],
+      text: 'Notice of hearing. The hearing is set for July 15, 2026 at 9:00 a.m. A written response deadline may apply.',
+      sectionHeading: 'Notice of Hearing',
+    };
+    filingChunks[28] = {
+      ...filingChunks[28],
+      text: 'Certificate of service. This filing was served by email on July 1, 2026.',
+      sectionHeading: 'Certificate of Service',
+    };
+
+    const detection = detectDocumentReference('What do I file next after being served with this motion?');
+    const result = retrieveRelevantDocumentChunks({
+      message: 'What do I file next after being served with this motion?',
+      detection,
+      chunks: filingChunks,
+      maxChunks: 12,
+    });
+
+    expect(result.find((chunk) => chunk.chunkId === 'filing-1')?.filingRetrievalBuckets).toContain('caption_and_document_type');
+    expect(result.find((chunk) => chunk.chunkId === 'filing-6')?.filingRetrievalBuckets).toContain('allegations_and_grounds');
+    expect(result.find((chunk) => chunk.chunkId === 'filing-24')?.filingRetrievalBuckets).toContain('relief_and_prayer');
+    expect(result.find((chunk) => chunk.chunkId === 'filing-27')?.filingRetrievalBuckets).toContain('hearing_and_deadline');
+    expect(result.find((chunk) => chunk.chunkId === 'filing-29')?.filingRetrievalBuckets).toContain('service_and_certificate');
+  });
+
   it('honors explicit page requests', () => {
     const pageDisambiguationChunks: DocumentChunkRetrievalCandidate[] = [
       ...chunks,

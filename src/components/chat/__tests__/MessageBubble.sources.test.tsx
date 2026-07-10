@@ -58,8 +58,36 @@ describe('MessageBubble document evidence panel', () => {
     document.body.innerHTML = '';
   });
 
+  it('keeps source metadata hidden by default for ordinary assistant answers', async () => {
+    const { container, root } = await renderMessage({
+      sourceDisplayMode: 'collapsed',
+      documentSources: [{
+        uploadedFileId: 'file_123',
+        filename: 'Final Order.pdf',
+        source: 'case_memory',
+        status: 'ready',
+      }],
+      documentCitations: [{
+        chatAnswerSourceId: 'source_123',
+        uploadedFileId: 'file_123',
+        filename: 'Final Order.pdf',
+        pageLabel: 'p. 4',
+        quotedText: 'Respondent shall pay by Friday.',
+        citationVerifierStatus: 'verified',
+      }],
+    });
+    roots.push(root);
+
+    expect(container.textContent).toContain('The order requires payment by Friday.');
+    expect(container.textContent).not.toContain('Sources');
+    expect(container.textContent).not.toContain('Final Order.pdf');
+    expect(container.textContent).not.toContain('Show sources');
+    expect(container.textContent).not.toContain('Respondent shall pay by Friday.');
+  });
+
   it('renders verified citation quote and source metadata from message metadata', async () => {
     const { container, root } = await renderMessage({
+      sourceDisplayMode: 'expanded',
       documentSources: [{
         uploadedFileId: 'file_123',
         filename: 'Final Order.pdf',
@@ -82,7 +110,7 @@ describe('MessageBubble document evidence panel', () => {
 
     expect(container.textContent).toContain('1 cited passage');
     expect(container.textContent).toContain('Final Order.pdf');
-    expect(container.textContent).toContain('View source details');
+    expect(container.textContent).toContain('Show sources');
     expect(container.textContent).not.toContain('p. 4');
     expect(container.textContent).not.toContain('Case document');
     expect(container.textContent).not.toContain('Respondent shall pay by Friday.');
@@ -92,7 +120,7 @@ describe('MessageBubble document evidence panel', () => {
     expect(container.textContent).not.toContain('Partial');
 
     const detailsButton = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('View source details')
+      button.textContent?.includes('Show sources')
     );
     expect(detailsButton?.getAttribute('aria-expanded')).toBe('false');
 
@@ -122,6 +150,7 @@ describe('MessageBubble document evidence panel', () => {
   it('does not render legacy confidence artifacts to the user', async () => {
     const { container, root } = await renderMessage(
       {
+        sourceDisplayMode: 'expanded',
         documentSources: [{
           uploadedFileId: 'file_123',
           filename: 'Final Order.pdf',
@@ -144,7 +173,7 @@ describe('MessageBubble document evidence panel', () => {
 
     expect(container.textContent).toContain('Final Order.pdf');
     expect(container.textContent).not.toContain('Saved in this chat');
-    expect(container.textContent).toContain('Extracted text may be incomplete');
+    expect(container.textContent).not.toContain('Extracted text may be incomplete');
     expect(container.textContent).not.toMatch(/high confidence/i);
     expect(container.textContent).not.toContain('Internal source review');
     expect(container.textContent).not.toContain('Enough support');
@@ -153,7 +182,7 @@ describe('MessageBubble document evidence panel', () => {
     expect(container.textContent).not.toContain('Partial');
 
     const detailsButton = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('View source details')
+      button.textContent?.includes('Show sources')
     );
 
     await act(async () => {
@@ -165,6 +194,7 @@ describe('MessageBubble document evidence panel', () => {
 
   it('distinguishes focused passages from incomplete extraction', async () => {
     const { container, root } = await renderMessage({
+      sourceDisplayMode: 'expanded',
       documentSources: [{
         uploadedFileId: 'file_123',
         filename: 'Long Final Order.pdf',
@@ -175,12 +205,13 @@ describe('MessageBubble document evidence panel', () => {
     });
     roots.push(root);
 
-    expect(container.textContent).toContain('Showing selected passages');
+    expect(container.textContent).not.toContain('Showing selected passages');
     expect(container.textContent).not.toContain('Extracted text may be incomplete');
   });
 
   it('suppresses focused-passages notice when extraction is partial', async () => {
     const { container, root } = await renderMessage({
+      sourceDisplayMode: 'expanded',
       documentSources: [{
         uploadedFileId: 'file_456',
         filename: 'Partial Order.pdf',
@@ -191,7 +222,7 @@ describe('MessageBubble document evidence panel', () => {
     });
     roots.push(root);
 
-    expect(container.textContent).toContain('Extracted text may be incomplete');
+    expect(container.textContent).not.toContain('Extracted text may be incomplete');
     expect(container.textContent).not.toContain('Showing selected passages');
   });
 
@@ -201,7 +232,7 @@ describe('MessageBubble document evidence panel', () => {
     const { container, root } = await renderMessage({}, undefined, rawPayload, { onRetry });
     roots.push(root);
 
-    expect(container.textContent).toContain('Analyzing court order');
+    expect(container.textContent).toContain('Preparing the answer');
     expect(container.querySelector('button[aria-label="Retry response"]')).toBeTruthy();
     expect(container.querySelector('button[aria-label="Copy recovery notice"]')).toBeTruthy();
     expect(container.textContent).not.toContain('sourceId');
@@ -221,7 +252,7 @@ describe('MessageBubble document evidence panel', () => {
 
     expect(container.textContent).toContain('Court Order Analysis');
     expect(container.textContent).toContain('possession begins Friday');
-    expect(container.textContent).not.toContain('Analyzing court order');
+    expect(container.textContent).not.toContain('Preparing the answer');
   });
 
   it('withholds unsafe structured payloads even while streaming', async () => {
@@ -229,7 +260,7 @@ describe('MessageBubble document evidence panel', () => {
     const { container, root } = await renderMessage({}, undefined, rawPayload, { isStreaming: true });
     roots.push(root);
 
-    expect(container.textContent).toContain('Analyzing court order');
+    expect(container.textContent).toContain('Preparing the answer');
     expect(container.textContent).not.toContain('sourceId');
     expect(container.textContent).not.toContain('quotedText');
     expect(container.textContent).not.toContain('secret');
@@ -258,6 +289,7 @@ describe('MessageBubble document evidence panel', () => {
 
   it('summarizes cited documents instead of unrelated source metadata', async () => {
     const { container, root } = await renderMessage({
+      sourceDisplayMode: 'expanded',
       documentSources: [
         {
           uploadedFileId: 'file_current',
@@ -290,7 +322,7 @@ describe('MessageBubble document evidence panel', () => {
     expect(container.textContent).not.toContain('Older Case Order.pdf');
 
     const detailsButton = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('View source details')
+      button.textContent?.includes('Show sources')
     );
 
     await act(async () => {
@@ -348,10 +380,10 @@ describe('MessageBubble document evidence panel', () => {
     );
     roots.push(root);
 
-    expect(container.textContent).toContain('Court-Ready Draft');
+    expect(container.textContent).toContain('Draft for Review');
 
     const draftButton = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Court-Ready Draft')
+      button.textContent?.includes('Draft for Review')
     );
     expect(draftButton?.getAttribute('aria-expanded')).toBe('false');
 

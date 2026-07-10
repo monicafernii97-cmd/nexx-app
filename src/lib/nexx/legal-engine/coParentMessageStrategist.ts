@@ -1,5 +1,14 @@
 import type { PackedCaseIntake } from './packedCaseIntake';
 
+export type VerifiedOrderInterpretationForDraft = {
+  directAnswer: string;
+  controllingQuote?: string;
+  practicalResult?: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  sourcePages?: string[];
+};
+
 function textFrom(intake: PackedCaseIntake, contextText = '') {
   return [
     contextText,
@@ -9,17 +18,38 @@ function textFrom(intake: PackedCaseIntake, contextText = '') {
   ].join(' ');
 }
 
-function fatherDayDrafts(hasOrderContext: boolean) {
-  return hasOrderContext ? {
+function summarizeVerifiedOrderInterpretation(verified?: VerifiedOrderInterpretationForDraft | null) {
+  if (!verified?.directAnswer && !verified?.practicalResult) return null;
+
+  const timing = verified.startTime && verified.endTime
+    ? ` The practical timing I am following is ${verified.startTime} to ${verified.endTime}.`
+    : '';
+  const pages = verified.sourcePages?.length ? ` ${verified.sourcePages.map((page) => `[${page}]`).join(' ')}` : '';
+  return `${verified.practicalResult || verified.directAnswer}${timing}${pages}`.trim();
+}
+
+function fatherDayDrafts(
+  hasOrderContext: boolean,
+  verifiedOrderInterpretation?: VerifiedOrderInterpretationForDraft | null
+) {
+  const verifiedSummary = summarizeVerifiedOrderInterpretation(verifiedOrderInterpretation);
+
+  if (verifiedSummary) {
+    return {
+      neutralDraft:
+        `My understanding from the order language is: ${verifiedSummary} I plan to follow that written provision.`,
+      firmerDraft:
+        `I do not agree to a possession-time change based on an unstated provision. My reading of the order language is: ${verifiedSummary} If you believe a different signed-order provision controls, please identify that specific language.`,
+    };
+  }
+
+  return {
     neutralDraft:
-      'Based on the order, Father\'s Day possession begins at 6:00 p.m. on the Friday preceding Father\'s Day and ends at 8:00 a.m. on the Monday after Father\'s Day. I plan to follow that provision as written.',
+      'Please identify the specific written provision you are relying on for Father\'s Day possession. I want to keep this focused on the order and avoid arguing.',
     firmerDraft:
-      'I do not agree that Father\'s Day possession begins Thursday. The order specifically states Friday at 6:00 p.m. through Monday at 8:00 a.m. Unless there is a later signed order changing that language, I will follow the Father\'s Day provision.',
-  } : {
-    neutralDraft:
-      'Please send the specific order language you are relying on for Father\'s Day possession. I want to keep this focused on the written schedule and avoid arguing.',
-    firmerDraft:
-      'I am not agreeing to a possession-time change without confirming the specific written provision. Please identify the order language you believe controls Father\'s Day.',
+      hasOrderContext
+        ? 'I am not agreeing to a possession-time change without confirming the specific written provision. Please identify the order language you believe controls Father\'s Day.'
+        : 'I am not agreeing to a possession-time change without seeing the written schedule. Please identify the specific order language you are relying on.',
   };
 }
 
@@ -51,12 +81,16 @@ function generalDrafts(hasOrderContext: boolean) {
   };
 }
 
-export function buildCoParentResponseStrategy(intake: PackedCaseIntake, contextText = '') {
+export function buildCoParentResponseStrategy(
+  intake: PackedCaseIntake,
+  contextText = '',
+  verifiedOrderInterpretation?: VerifiedOrderInterpretationForDraft | null
+) {
   const issueText = textFrom(intake, contextText);
   const hasOrderContext = intake.currentOrderContext.hasExistingOrder === true ||
     /\b(court order|order language|written order|signed order)\b/i.test(contextText);
   const drafts = /father'?s day/i.test(issueText)
-    ? fatherDayDrafts(hasOrderContext)
+    ? fatherDayDrafts(hasOrderContext, verifiedOrderInterpretation)
     : /\b(exchange|pickup|pick up|drop[-\s]?off)\b/i.test(issueText)
       ? pickupDrafts(hasOrderContext)
       : generalDrafts(hasOrderContext);

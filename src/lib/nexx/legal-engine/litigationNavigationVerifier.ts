@@ -23,7 +23,7 @@ export type LitigationNavigationVerification = {
 };
 
 const BACKEND_PATTERN =
-  /\b(OCR|retrieval|verifier|sourceId|chunkId|memoryGenerationId|source packet|confidence label|backend|documentAnswer|legalInterpretation)\b/i;
+  /\b(OCR|retrieval|verifier|sourceId|chunkId|memoryGenerationId|source packet|confidence label|backend|documentAnswer|legalInterpretation|retrievalBuckets|retrievalReasons|filingRetrievalBuckets)\b/i;
 
 const INFLAMMATORY_LABEL_PATTERN =
   /\b(narcissist|gaslighting|gaslighter|abuser|abusive|psycho|crazy)\b/i;

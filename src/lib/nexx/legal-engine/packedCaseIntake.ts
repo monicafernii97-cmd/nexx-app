@@ -1,5 +1,13 @@
 import type { LegalIntent, MultiIntentResult } from '../../types';
 
+export type CourtProceedingStatus =
+  | 'threat_only'
+  | 'filing_claimed_not_seen'
+  | 'filing_uploaded'
+  | 'served_user_confirmed'
+  | 'hearing_confirmed'
+  | 'unknown';
+
 export type PackedCaseIntake = {
   emotionalState: {
     overwhelmed: boolean;
@@ -11,6 +19,7 @@ export type PackedCaseIntake = {
     feelsManipulatedOrPressured: boolean;
   };
   courtPosture: {
+    proceedingStatus: CourtProceedingStatus;
     otherPartyFiledSomething: boolean;
     userWasServed: boolean | null;
     servedDate: string | null;
@@ -189,6 +198,26 @@ function inferFilingType(text: string): PackedCaseIntake['courtPosture']['filing
   return 'unknown';
 }
 
+function inferCourtProceedingStatus(args: {
+  lower: string;
+  filingNegated: boolean;
+  userWasServed: boolean | null;
+}): CourtProceedingStatus {
+  if (args.filingNegated) return 'unknown';
+  if (has(args.lower, /\b(uploaded|attached|pasted|shared)\b/i) && has(args.lower, /\b(filing|filed|motion|petition|enforcement|modification|protective order)\b/i)) {
+    return 'filing_uploaded';
+  }
+  if (args.userWasServed === true) return 'served_user_confirmed';
+  if (has(args.lower, /\b(hearing|court date|trial)\b/i)) return 'hearing_confirmed';
+  if (has(args.lower, /\bfiled something|filed (?:a|the) (?:motion|petition|enforcement|modification)|(?:motion|petition) (?:against me|was filed)|lied in the motion\b/i)) {
+    return 'filing_claimed_not_seen';
+  }
+  if (has(args.lower, /\b(taking me to court|take me (?:back )?to court|threaten(?:ed|ing)? to file|says? (?:he|she|they) (?:is|are|will|would) (?:taking|take) me to court)\b/i)) {
+    return 'threat_only';
+  }
+  return 'unknown';
+}
+
 function inferMessageCount(text: string) {
   const numeric = text.match(/\b(\d+)\s+(?:texts?|messages?|emails?)\b/i)?.[1];
   if (numeric) return Number(numeric);
@@ -203,6 +232,16 @@ function inferLogisticsIssue(text: string) {
   if (/\b(school|medical|doctor|therapy|decision)\b/i.test(text)) return 'decision-making';
   if (/\b(message|text|appclose|ourfamilywizard)\b/i.test(text)) return 'co-parent communication';
   return null;
+}
+
+function hasPhysicalSafetySignal(lower: string) {
+  return has(lower, /\bdanger|unsafe|violence|911\b/i) ||
+    has(lower, /\b(threaten(?:ed|ing)?|said|says?)\b.{0,60}\b(kill|hurt|harm|hit|shoot|stab|come after|take the child|kidnap)\b/i) ||
+    has(lower, /\b(stalking|strangulation|strangled|choked|weapon|gun|knife|kidnapp?ing|refus(?:e|ing|ed) to return (?:the )?child|suicidal|suicide|child left unsafe|physical assault|sexual abuse|immediate flight risk|emergency protective order)\b/i);
+}
+
+function hasChildSafetySignal(lower: string) {
+  return has(lower, /\bchild.*unsafe|kids?.*danger|harm.*child|refus(?:e|ing|ed) to return (?:the )?child|kidnapp?ing|sexual abuse|child left unsafe\b/i);
 }
 
 function relevantOrderIssues(text: string) {
@@ -280,6 +319,7 @@ export function parsePackedCaseIntake(message: string, contextText = ''): Packed
     : has(lower, /\bserved|got served|was served\b/i)
       ? true
       : null;
+  const proceedingStatus = inferCourtProceedingStatus({ lower, filingNegated, userWasServed });
   const state = validStateName(captureFirst(text, /\b(?:state is|in)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b/));
   const county = captureFirst(text, /\b([A-Z][a-z]+)\s+County\b/);
   const hasExistingOrder = orderNegated
@@ -287,11 +327,19 @@ export function parsePackedCaseIntake(message: string, contextText = ''): Packed
     : has(lower, /\border|parenting plan|possession schedule\b/i)
       ? true
       : null;
-  const hasCourtFilingSignal = has(lower, /\btaking me to court|filed|motion|petition|got served|served|hearing\b/i);
-  const otherPartyFiledSomething = !filingNegated && hasCourtFilingSignal;
+  const otherPartyFiledSomething = [
+    'filing_claimed_not_seen',
+    'filing_uploaded',
+    'served_user_confirmed',
+    'hearing_confirmed',
+  ].includes(proceedingStatus);
+  const hasConfirmedDeadlineTrigger = proceedingStatus === 'filing_uploaded' ||
+    proceedingStatus === 'served_user_confirmed' ||
+    proceedingStatus === 'hearing_confirmed' ||
+    has(lower, /\b(?:response|answer)\b.{0,40}\b(?:due|deadline)\b/i);
   const hasCourtDeadlineSignal = !filingNegated && (
-    otherPartyFiledSomething ||
-    has(lower, /\b(?:response|answer)\b.{0,40}\b(?:due|deadline)\b|\bserved\b|\bhearing\b|\bcourt date\b/i)
+    hasConfirmedDeadlineTrigger ||
+    has(lower, /\bhearing notice|official notice|docket\b/i)
   );
 
   return {
@@ -305,6 +353,7 @@ export function parsePackedCaseIntake(message: string, contextText = ''): Packed
       feelsManipulatedOrPressured: has(lower, /\bpressur(?:e|ing)|twisting|manipulat(?:e|ing|ion)|won'?t stop|keeps (?:saying|calling)|threaten(?:ing)?|accus(?:e|ing)|withholding|controlling|gaslight|bully/i),
     },
     courtPosture: {
+      proceedingStatus,
       otherPartyFiledSomething,
       userWasServed,
       servedDate: captureFirst(text, /\bserved\s+(?:on\s+)?([^.,;!?]+)/i),
@@ -335,8 +384,8 @@ export function parsePackedCaseIntake(message: string, contextText = ''): Packed
     accusationsOrDisputes: accusations(text),
     userQuestions: questions(text),
     immediateRisks: {
-      safetyRisk: has(lower, /\bdanger|unsafe|violence|threaten.*hurt|911\b/i),
-      childSafetyRisk: has(lower, /\bchild.*unsafe|kids?.*danger|harm.*child\b/i),
+      safetyRisk: hasPhysicalSafetySignal(lower),
+      childSafetyRisk: hasChildSafetySignal(lower),
       deadlineRisk: hasCourtDeadlineSignal,
       hearingRisk: !filingNegated && has(lower, /\bhearing|court date|trial\b/i),
       exchangeRisk: has(lower, /\bexchange|pickup|pick up|drop[-\s]?off|possession\b/i),
@@ -346,6 +395,7 @@ export function parsePackedCaseIntake(message: string, contextText = ''): Packed
       financialAccessRisk: has(lower, /\bno money|can'?t afford|cannot afford|cost\b/i),
     },
     missingCriticalInfo: unique([
+      proceedingStatus === 'threat_only' ? 'whether anything was actually filed or served' : '',
       !filingNegated && has(lower, /\bfiled|motion|petition|served|court\b/i) && !has(lower, /\buploaded|attached|paste|pasted\b/i) ? 'the court paper that was filed' : '',
       otherPartyFiledSomething && userWasServed !== true ? 'whether and when you were served' : '',
       otherPartyFiledSomething && !has(lower, /\bhearing|court date\b/i) ? 'any hearing date' : '',

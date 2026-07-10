@@ -14,7 +14,7 @@ type LegalInterpretationRenderOptions = {
 };
 
 const INTERNAL_FIELD_PATTERN =
-  /\b(?:sourceId|fileId|fileName|memoryGenerationId|chunkId|pageStart|pageEnd|blockIds|quotedText|documentAnswer|retrievalBuckets|retrievalReasons)\b:?/g;
+  /\b(?:sourceId|fileId|fileName|memoryGenerationId|chunkId|pageStart|pageEnd|blockIds|quotedText|documentAnswer|retrievalBuckets|retrievalReasons|filingRetrievalBuckets)\b:?/g;
 
 function cleanUserFacingText(value: string) {
   return value

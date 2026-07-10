@@ -189,7 +189,7 @@ export function getArtifactSummary(response: NexxAssistantResponse): string[] {
   const { artifacts } = response;
   const present: string[] = [];
 
-  if (artifacts.draftReady) present.push('Court-Ready Draft');
+  if (artifacts.draftReady) present.push('Draft for Review');
   if (artifacts.timelineReady) present.push('Timeline');
   if (artifacts.exhibitReady) present.push('Exhibit Index');
   if (artifacts.judgeSimulation) present.push('Judge Simulation');

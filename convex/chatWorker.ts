@@ -547,6 +547,7 @@ type DocumentChunkContext = {
     retrievalScore: number;
     retrievalReasons: string[];
     retrievalBuckets?: string[];
+    filingRetrievalBuckets?: string[];
 };
 
 function escapeXmlAttribute(value?: string) {
@@ -616,15 +617,18 @@ function isLitigationNavigationRoute(routeMode?: RouteMode) {
         routeMode === 'pro_se_guidance' ||
         routeMode === 'attorney_resource_guidance' ||
         routeMode === 'court_narrative_builder' ||
-        routeMode === 'filing_walkthrough';
+        routeMode === 'filing_walkthrough' ||
+        routeMode === 'court_ready_drafting';
 }
 
 function recentLegalContextSummary(messages: GenerationContext['recentMessages']) {
     return messages
         .filter((message) =>
-            message.status === undefined ||
-            message.status === 'committed' ||
-            message.status === 'degraded'
+            message.role === 'user' && (
+                message.status === undefined ||
+                message.status === 'committed' ||
+                message.status === 'degraded'
+            )
         )
         .slice(-8)
         .map((message) => message.content.replace(/\s+/g, ' ').trim())
@@ -734,6 +738,7 @@ function mergeAttachmentContext(existing: AttachmentContext, incoming: Attachmen
             retrievalScore: Math.max(previous.retrievalScore, chunk.retrievalScore),
             retrievalReasons: Array.from(new Set([...previous.retrievalReasons, ...chunk.retrievalReasons])),
             retrievalBuckets: Array.from(new Set([...(previous.retrievalBuckets ?? []), ...(chunk.retrievalBuckets ?? [])])),
+            filingRetrievalBuckets: Array.from(new Set([...(previous.filingRetrievalBuckets ?? []), ...(chunk.filingRetrievalBuckets ?? [])])),
         });
     }
 
@@ -796,7 +801,7 @@ function buildRetrievedChunkPrompt(chunks: DocumentChunkContext[], sourcePackets
         ...chunks.map((chunk) => {
             const sourcePacket = packetsByChunkId.get(chunk.chunkId.toString());
             return [
-            `<CHUNK sourceId="${escapeXmlAttribute(sourcePacket?.sourceId)}" pageStart="${chunk.pageStart ?? ''}" pageEnd="${chunk.pageEnd ?? ''}" sectionHeading="${escapeXmlAttribute(chunk.sectionHeading)}" retrievalReasons="${escapeXmlAttribute(chunk.retrievalReasons.join(', '))}" retrievalBuckets="${escapeXmlAttribute((chunk.retrievalBuckets ?? []).join(', '))}" extractionMethod="${escapeXmlAttribute(chunk.extractionMethod ?? 'unknown')}" confidence="${chunk.ocrConfidence ?? ''}">`,
+            `<CHUNK sourceId="${escapeXmlAttribute(sourcePacket?.sourceId)}" pageStart="${chunk.pageStart ?? ''}" pageEnd="${chunk.pageEnd ?? ''}" sectionHeading="${escapeXmlAttribute(chunk.sectionHeading)}" retrievalReasons="${escapeXmlAttribute(chunk.retrievalReasons.join(', '))}" retrievalBuckets="${escapeXmlAttribute((chunk.retrievalBuckets ?? []).join(', '))}" filingRetrievalBuckets="${escapeXmlAttribute((chunk.filingRetrievalBuckets ?? []).join(', '))}" extractionMethod="${escapeXmlAttribute(chunk.extractionMethod ?? 'unknown')}" confidence="${chunk.ocrConfidence ?? ''}">`,
             `SOURCE_ID: ${sourcePacket?.sourceId ?? ''}`,
             `FILE: ${escapeXmlText(sourcePacket?.fileName ?? '')}`,
             `PAGES: ${chunk.pageStart ?? ''}${chunk.pageEnd && chunk.pageEnd !== chunk.pageStart ? `-${chunk.pageEnd}` : ''}`,
@@ -1211,8 +1216,8 @@ function renderLitigationNavigationMessage(args: {
     courtFilingExtraction?: CourtFilingExtraction | null;
 }) {
     if (!isLitigationNavigationRoute(args.routeMode)) return args.response;
-
-    const candidate = mergeCourtFilingIntoLitigationNavigation(args.response.litigationNavigation ?? buildLitigationNavigationResponse({
+    const verifiedOrderInterpretation = verifiedOrderInterpretationForDraft(args.response);
+    const deterministicNavigation = buildLitigationNavigationResponse({
         message: args.userMessage,
         routeMode: args.routeMode,
         recentContext: args.recentContext,
@@ -1220,21 +1225,28 @@ function renderLitigationNavigationMessage(args: {
         county: args.courtSettings?.county,
         courtName: args.courtSettings?.courtName,
         courtFiling: args.courtFilingExtraction,
-    }), args.courtFilingExtraction);
+        verifiedOrderInterpretation,
+    });
+    const baseNavigation = args.response.litigationNavigation
+        ? {
+            ...args.response.litigationNavigation,
+            courtPosture: args.courtFilingExtraction
+                ? deterministicNavigation.courtPosture
+                : args.response.litigationNavigation.courtPosture,
+            coParentResponse: deterministicNavigation.coParentResponse,
+            filingPlan: args.courtFilingExtraction
+                ? deterministicNavigation.filingPlan
+                : args.response.litigationNavigation.filingPlan,
+        }
+        : deterministicNavigation;
+
+    const candidate = mergeCourtFilingIntoLitigationNavigation(baseNavigation, args.courtFilingExtraction);
     const verification = verifyLitigationNavigationResponse(candidate, {
         userMessage: args.userMessage,
     });
     const litigationNavigation = verification.passed
         ? candidate
-        : buildLitigationNavigationResponse({
-            message: args.userMessage,
-            routeMode: args.routeMode,
-            recentContext: args.recentContext,
-            state: args.courtSettings?.state,
-            county: args.courtSettings?.county,
-            courtName: args.courtSettings?.courtName,
-            courtFiling: args.courtFilingExtraction,
-        });
+        : deterministicNavigation;
 
     const litigationMarkdown = renderLitigationNavigationMarkdown(litigationNavigation, {
         routeMode: args.routeMode,
@@ -1263,6 +1275,86 @@ function renderLitigationNavigationMessage(args: {
     };
 }
 
+function compactPageLabel(pageStart?: number | null, pageEnd?: number | null) {
+    if (!pageStart) return null;
+    return pageEnd && pageEnd !== pageStart
+        ? `pp. ${pageStart}-${pageEnd}`
+        : `p. ${pageStart}`;
+}
+
+function verifiedOrderInterpretationForDraft(response: NexxAssistantResponse) {
+    const interpretation = response.legalInterpretation;
+    if (!interpretation || interpretation.controllingClauses.length === 0) return null;
+    const sourcePages = Array.from(new Set(
+        interpretation.controllingClauses
+            .map((clause) => compactPageLabel(clause.pageStart, clause.pageEnd))
+            .filter((page): page is string => Boolean(page))
+    ));
+    const hasSourceSupport = interpretation.controllingClauses.some((clause) => clause.sourceIds.length > 0);
+    if (!hasSourceSupport) return null;
+
+    return {
+        directAnswer: interpretation.directAnswer,
+        controllingQuote: interpretation.controllingClauses[0]?.quote,
+        practicalResult: interpretation.practicalMeaning.result,
+        startTime: interpretation.practicalMeaning.startTime,
+        endTime: interpretation.practicalMeaning.endTime,
+        sourcePages,
+    };
+}
+
+function courtFiledRenderedSignal(message: string, routeMode?: RouteMode) {
+    return routeMode === 'court_response_planning' ||
+        routeMode === 'packed_case_intake' ||
+        routeMode === 'litigation_navigation' ||
+        /\b(got served|served|filed|motion|petition|hearing)\b/i.test(message);
+}
+
+function repairInjectionsForRenderedFailure(
+    response: NexxAssistantResponse,
+    errors: string[],
+    routeMode: RouteMode,
+    userMessage: string
+) {
+    return {
+        directAnswer: errors.includes('includesDirectAnswerWhenNeeded')
+            ? response.legalInterpretation?.directAnswer || response.documentAnswer?.answer || null
+            : null,
+        draftText: errors.includes('includesDraftWhenUserAskedWhatToSay')
+            ? response.litigationNavigation?.coParentResponse.neutralDraft ||
+                response.legalInterpretation?.draftMessage?.text ||
+                null
+            : null,
+        deadlineCheck: errors.includes('includesDeadlineCheckWhenCourtFiled') && courtFiledRenderedSignal(userMessage, routeMode)
+            ? 'Before filing, confirm the date you were served, the response deadline, and any hearing date.'
+            : null,
+    };
+}
+
+function deterministicRenderedFallback(
+    response: NexxAssistantResponse,
+    repairedMessage: string,
+    routeMode: RouteMode,
+    userMessage: string
+) {
+    const directAnswer = response.legalInterpretation?.directAnswer || response.documentAnswer?.answer || '';
+    const draftText = response.litigationNavigation?.coParentResponse.neutralDraft ||
+        response.legalInterpretation?.draftMessage?.text ||
+        '';
+    const deadlineCheck = courtFiledRenderedSignal(userMessage, routeMode)
+        ? 'Before filing, confirm the date you were served, the response deadline, and any hearing date.'
+        : '';
+    const sections = [
+        directAnswer,
+        draftText ? `You can say:\n\n"${draftText}"` : '',
+        deadlineCheck,
+        repairedMessage,
+    ].filter((section) => section.trim().length > 0);
+
+    return Array.from(new Set(sections)).join('\n\n').slice(0, 4_000).trim() ||
+        'Here is the safest practical next step based on the information available.';
+}
+
 function verifyAndRepairRenderedResponse(response: NexxAssistantResponse, routeMode: RouteMode, userMessage: string) {
     const verification = verifyRenderedOutput({
         rendered: response.message,
@@ -1271,7 +1363,10 @@ function verifyAndRepairRenderedResponse(response: NexxAssistantResponse, routeM
     });
     if (verification.passed) return response;
 
-    const repairedMessage = repairRenderedOutput(response.message);
+    const repairedMessage = repairRenderedOutput(
+        response.message,
+        repairInjectionsForRenderedFailure(response, verification.errors, routeMode, userMessage)
+    );
     const repairedVerification = verifyRenderedOutput({
         rendered: repairedMessage,
         userMessage,
@@ -1283,15 +1378,14 @@ function verifyAndRepairRenderedResponse(response: NexxAssistantResponse, routeM
             routeMode,
             errors: repairedVerification.errors,
         });
-        if (
-            repairedVerification.errors.includes('noInflammatoryLabels') ||
-            repairedVerification.errors.includes('noInventedDollarAmounts')
-        ) {
-            return {
-                ...response,
-                message: repairedMessage || 'Here is the safest practical next step based on the information available.',
-            };
-        }
+        const fallbackMessage = repairRenderedOutput(
+            deterministicRenderedFallback(response, repairedMessage, routeMode, userMessage),
+            repairInjectionsForRenderedFailure(response, repairedVerification.errors, routeMode, userMessage)
+        );
+        return {
+            ...response,
+            message: fallbackMessage || 'Here is the safest practical next step based on the information available.',
+        };
     }
 
     return {
@@ -1500,6 +1594,7 @@ async function generateWithFallbacks({
                         await saveDraft(ctx, jobId, leaseOwner, SAFE_ANALYSIS_DRAFT_MESSAGE, {
                             uiKind: ANALYSIS_STATUS_UI_KIND,
                             phase: 'preparing_answer',
+                            routeMode,
                         });
                     }
                 } else if (streamEvent.type === 'response.completed') {

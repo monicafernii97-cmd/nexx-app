@@ -18,15 +18,47 @@ export type RenderedOutputVerification = {
 };
 
 const BACKEND_LANGUAGE_PATTERN =
-  /\b(sourceId|chunkId|source packet|backend|model-generated claim|documentAnswer|legalInterpretation|raw JSON|metadataJson|providerResponseId)\b/i;
+  /\b(sourceId|chunkId|source packet|backend|model-generated claim|documentAnswer|legalInterpretation|raw JSON|metadataJson|providerResponseId|retrievalBuckets|retrievalReasons|filingRetrievalBuckets)\b/i;
 
 const OCR_RETRIEVAL_VERIFIER_PATTERN =
   /\b(OCR|retrieval|verifier|citation verifier|extraction warnings?|extracted order text|extracted text|confidence labels?)\b/i;
 
 const INFLAMMATORY_LABEL_PATTERN =
-  /\b(narcissist|gaslighting|gaslit|crazy|psycho|abusive|abuser|monster)\b/i;
+  /\b(narcissist|gaslighting|gaslit|crazy|psycho|monster)\b/i;
+
+const DIAGNOSTIC_ABUSE_LABEL_PATTERN =
+  /\b(?:he|she|they|you|the other parent)\s+(?:is|are|was|were)\s+(?:an?\s+)?(?:abuser|abusive)\b/i;
 
 const DOLLAR_PATTERN = /\$\s?\d[\d,]*(?:\.\d{2})?|\b\d{2,}\s*dollars\b/i;
+
+export type MoneyClaimType =
+  | 'order_amount'
+  | 'arrears_amount'
+  | 'property_value'
+  | 'official_filing_fee'
+  | 'attorney_market_estimate'
+  | 'unsupported_estimate';
+
+function classifyMoneyClaim(line: string): MoneyClaimType {
+  if (!DOLLAR_PATTERN.test(line)) return 'unsupported_estimate';
+  if (/\[(?:p\.|pp\.)\s*\d+/i.test(line) && /\b(order|ordered|requires?|shall|support|arrears|reimburse|property|asset|debt)\b/i.test(line)) {
+    if (/\barrears?\b/i.test(line)) return 'arrears_amount';
+    if (/\bproperty|asset|debt|value\b/i.test(line)) return 'property_value';
+    return 'order_amount';
+  }
+  if (/\bofficial\b/i.test(line) && /\b(filing fee|fee schedule|clerk|court)\b/i.test(line) && /\bhttps?:\/\/|\[[^\]]+\]/i.test(line)) {
+    return 'official_filing_fee';
+  }
+  if (/\b(attorney|lawyer|retainer|hourly|market|range)\b/i.test(line) && /\b(estimate|range|varies|dated|source)\b/i.test(line)) {
+    return 'attorney_market_estimate';
+  }
+  return 'unsupported_estimate';
+}
+
+function hasOnlyAllowedMoneyClaims(rendered: string) {
+  const moneyLines = rendered.split('\n').filter((line) => DOLLAR_PATTERN.test(line));
+  return moneyLines.every((line) => classifyMoneyClaim(line) !== 'unsupported_estimate');
+}
 
 function duplicateHeadingCount(message: string) {
   const headings = message
@@ -75,8 +107,8 @@ export function verifyRenderedOutput(args: {
   const checks: RenderedOutputVerification['checks'] = {
     noBackendLanguage: !BACKEND_LANGUAGE_PATTERN.test(rendered),
     noOcrRetrievalVerifierLanguage: !OCR_RETRIEVAL_VERIFIER_PATTERN.test(rendered),
-    noInflammatoryLabels: !INFLAMMATORY_LABEL_PATTERN.test(rendered),
-    noInventedDollarAmounts: args.exactFeesSourceBacked === true || !DOLLAR_PATTERN.test(rendered),
+    noInflammatoryLabels: !INFLAMMATORY_LABEL_PATTERN.test(rendered) && !DIAGNOSTIC_ABUSE_LABEL_PATTERN.test(rendered),
+    noInventedDollarAmounts: args.exactFeesSourceBacked === true || !DOLLAR_PATTERN.test(rendered) || hasOnlyAllowedMoneyClaims(rendered),
     noDuplicateSections: duplicateHeadingCount(rendered) === 0,
     includesDirectAnswerWhenNeeded: !needsDirectAnswerFirst(args.userMessage, args.routeMode) ||
       /\b(no|yes|probably|my read|based on|usually)\b/i.test(rendered.slice(0, 240)),
@@ -97,14 +129,27 @@ export function verifyRenderedOutput(args: {
   };
 }
 
-export function repairRenderedOutput(rendered: string) {
+function repairInflammatoryLabels(line: string) {
+  if (DIAGNOSTIC_ABUSE_LABEL_PATTERN.test(line)) {
+    return 'You described conduct that may be relevant to safety or family-violence concerns.';
+  }
+  return line;
+}
+
+export function repairRenderedOutput(rendered: string, injections?: {
+  directAnswer?: string | null;
+  draftText?: string | null;
+  deadlineCheck?: string | null;
+}) {
   const lines = rendered.split('\n');
-  const filtered = lines.filter((line) =>
-    !BACKEND_LANGUAGE_PATTERN.test(line) &&
-    !OCR_RETRIEVAL_VERIFIER_PATTERN.test(line) &&
-    !INFLAMMATORY_LABEL_PATTERN.test(line) &&
-    !DOLLAR_PATTERN.test(line)
-  );
+  const filtered = lines
+    .map(repairInflammatoryLabels)
+    .filter((line) =>
+      !BACKEND_LANGUAGE_PATTERN.test(line) &&
+      !OCR_RETRIEVAL_VERIFIER_PATTERN.test(line) &&
+      !INFLAMMATORY_LABEL_PATTERN.test(line) &&
+      (!DOLLAR_PATTERN.test(line) || classifyMoneyClaim(line) !== 'unsupported_estimate')
+    );
   const seenHeadings = new Set<string>();
   const repaired: string[] = [];
   for (const line of filtered) {
@@ -115,5 +160,12 @@ export function repairRenderedOutput(rendered: string) {
     }
     repaired.push(line);
   }
-  return repaired.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  const body = repaired.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  const additions = [
+    injections?.directAnswer?.trim(),
+    injections?.draftText?.trim() ? `You can say:\n\n"${injections.draftText.trim()}"` : '',
+    injections?.deadlineCheck?.trim(),
+  ].filter(Boolean);
+
+  return [body, ...additions].filter(Boolean).join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
 }

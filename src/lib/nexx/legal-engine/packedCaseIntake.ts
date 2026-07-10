@@ -241,7 +241,7 @@ function hasPhysicalSafetySignal(lower: string) {
 }
 
 function hasChildSafetySignal(lower: string) {
-  return has(lower, /\bchild.*unsafe|kids?.*danger|harm.*child|refus(?:e|ing|ed) to return (?:the )?child|kidnapp?ing|sexual abuse|child left unsafe\b/i);
+  return has(lower, /\bchild.{0,60}unsafe|kids?.{0,60}danger|harm.{0,60}child|refus(?:e|ing|ed) to return (?:the )?child|kidnapp?ing|sexual abuse|child left unsafe\b/i);
 }
 
 function relevantOrderIssues(text: string) {
@@ -396,7 +396,7 @@ export function parsePackedCaseIntake(message: string, contextText = ''): Packed
     },
     missingCriticalInfo: unique([
       proceedingStatus === 'threat_only' ? 'whether anything was actually filed or served' : '',
-      !filingNegated && has(lower, /\bfiled|motion|petition|served|court\b/i) && !has(lower, /\buploaded|attached|paste|pasted\b/i) ? 'the court paper that was filed' : '',
+      otherPartyFiledSomething && !filingNegated && has(lower, /\bfiled|motion|petition|served|court\b/i) && !has(lower, /\buploaded|attached|paste|pasted\b/i) ? 'the court paper that was filed' : '',
       otherPartyFiledSomething && userWasServed !== true ? 'whether and when you were served' : '',
       otherPartyFiledSomething && !has(lower, /\bhearing|court date\b/i) ? 'any hearing date' : '',
       has(lower, /\bcost|legal aid|fee|attorney|resources|pro se|filing\b/i) && !state ? 'state' : '',

@@ -232,6 +232,16 @@ export function buildLitigationNavigationResponse(args: BuildLitigationNavigatio
     if (args.courtFiling.reliefRequested.length) {
       intake.courtPosture.reliefRequested = args.courtFiling.reliefRequested;
     }
+    const responseDeadline = args.courtFiling.deadlinesOrHearings.find((item) => item.type === 'response_deadline');
+    if (responseDeadline && !intake.courtPosture.responseDeadline) {
+      intake.courtPosture.responseDeadline = responseDeadline.dateOrTime;
+      intake.immediateRisks.deadlineRisk = true;
+    }
+    const hearing = args.courtFiling.deadlinesOrHearings.find((item) => item.type === 'hearing');
+    if (hearing && !intake.courtPosture.hearingDate) {
+      intake.courtPosture.hearingDate = hearing.dateOrTime;
+      intake.immediateRisks.hearingRisk = true;
+    }
   }
 
   const coParentResponse = buildCoParentResponseStrategy(
@@ -298,8 +308,9 @@ export function mergeCourtFilingIntoLitigationNavigation(
     },
     filingPlan: {
       ...response.filingPlan,
-      likelyNextDocument: response.filingPlan.likelyNextDocument ??
-        (candidateResponsePaths[0]?.candidate ?? null),
+      likelyNextDocument: candidateResponsePaths[0]?.candidate ??
+        response.filingPlan.likelyNextDocument ??
+        null,
       nextInfoNeededBeforeDrafting: unique([
         ...response.filingPlan.nextInfoNeededBeforeDrafting,
         ...courtFiling.missingInfoNeeded,

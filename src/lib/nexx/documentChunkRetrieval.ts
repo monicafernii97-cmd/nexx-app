@@ -188,6 +188,28 @@ function normalizeBucketTerms(queries: string[]) {
     .filter((term) => term.includes(' ') || (term.length >= 4 && !BUCKET_TERM_STOP_WORDS.has(term)));
 }
 
+function usableSearchTerm(term: string) {
+  return term.length >= 3 || /^\d+$/.test(term);
+}
+
+function appendSearchTerms(target: string[], values: string[], limit: number) {
+  for (const value of values) {
+    if (target.length >= limit) break;
+    const term = normalizeText(value);
+    if (!usableSearchTerm(term) || target.includes(term)) continue;
+    target.push(term);
+  }
+}
+
+function representativeFilingTerms(filingPlan: FilingRetrievalBucketPlan[]) {
+  return filingPlan
+    .map(({ queries }) => {
+      const terms = normalizeBucketTerms(queries);
+      return terms.find((term) => term.includes(' ')) ?? terms[0] ?? '';
+    })
+    .filter(Boolean);
+}
+
 function buildBucketTerms(plan: ClauseRetrievalBucketPlan[]) {
   return new Map(plan.map(({ bucket, queries }) => [bucket, normalizeBucketTerms(queries)]));
 }
@@ -260,18 +282,31 @@ function buildSearchTerms(
 export function buildDocumentChunkSearchQuery(message: string, detection: DocumentReferenceDetection) {
   const clausePlan = buildClauseRetrievalPlan(message, detection);
   const filingPlan = buildFilingRetrievalPlan(message, detection);
+  const termLimit = detection.requiresExactText ? 18 : 24;
   const prioritizedTerms = [
     ...normalizeTerms(detection.requestedTerms),
     ...normalizeTerms(detection.requestedDates),
     ...extractSectionTerms(detection.requestedSections),
     ...extractLocationIdentifierTerms(message),
   ];
-  const terms = unique([
-    ...prioritizedTerms,
-    ...buildSearchTerms(message, detection, clausePlan, filingPlan),
-  ])
-    .filter((term) => term.length >= 3 || /^\d+$/.test(term))
-    .slice(0, detection.requiresExactText ? 18 : 24);
+  const filingRepresentativeTerms = representativeFilingTerms(filingPlan);
+  const reservedFilingSlots = Math.min(filingRepresentativeTerms.length, termLimit);
+  const nonFilingLimit = termLimit - reservedFilingSlots;
+  const terms: string[] = [];
+
+  appendSearchTerms(terms, prioritizedTerms, nonFilingLimit);
+  appendSearchTerms(terms, words(message).slice(0, 16), nonFilingLimit);
+  appendSearchTerms(terms, filingRepresentativeTerms, termLimit);
+  appendSearchTerms(
+    terms,
+    [
+      ...(detection.referenceType === 'deadline_lookup' ? DEADLINE_KEYWORDS : []),
+      ...normalizeBucketTerms(clausePlan.flatMap((item) => item.queries)),
+      ...normalizeBucketTerms(filingPlan.flatMap((item) => item.queries)),
+      ...buildSearchTerms(message, detection, clausePlan, filingPlan),
+    ],
+    termLimit
+  );
 
   return terms.join(' ').slice(0, 400).trim();
 }
@@ -574,7 +609,7 @@ export function retrieveRelevantDocumentChunks(args: {
     )
     : 0;
   const initialChunkLimit = hasNeighborAnchor
-    ? Math.max(bucketCoverageCount || filingBucketCoverageCount || 1, args.maxChunks - 2)
+    ? Math.max(bucketCoverageCount, filingBucketCoverageCount, 1, args.maxChunks - 2)
     : args.maxChunks;
   const selected = selectRankedChunks({
     ranked: neighborCandidates,

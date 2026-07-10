@@ -106,6 +106,11 @@ export async function recoverStructuredOutput(
       documentAnswer: null,
       legalInterpretation: null,
       litigationNavigation: null,
+      localResourceLookup: null,
+      proSeDraftingReadiness: null,
+      orderVersion: null,
+      legalBasis: [],
+      deadlineAnalysis: null,
     },
     stage: 'fallback',
   };

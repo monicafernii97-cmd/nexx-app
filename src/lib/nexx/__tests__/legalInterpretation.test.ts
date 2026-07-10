@@ -87,6 +87,16 @@ function legalInterpretation(overrides: Partial<LegalInterpretationAnswer> = {})
   };
 }
 
+function deterministicLegalFields() {
+  return {
+    localResourceLookup: null,
+    proSeDraftingReadiness: null,
+    orderVersion: null,
+    legalBasis: [],
+    deadlineAnalysis: null,
+  };
+}
+
 describe('legal interpretation response shape', () => {
   it('validates the new NexxAssistantResponse legalInterpretation field', () => {
     expect(validateAssistantResponse({
@@ -102,6 +112,7 @@ describe('legal interpretation response shape', () => {
       documentAnswer: null,
       legalInterpretation: legalInterpretation(),
       litigationNavigation: null,
+      ...deterministicLegalFields(),
     })).toBe(true);
 
     expect(validateAssistantResponse({

@@ -319,6 +319,193 @@ const litigationNavigationIssueSchema = {
 
 const stringArraySchema = { type: 'array', items: { type: 'string' } } as const;
 
+const localLegalResourceLookupSchema = {
+  type: ['object', 'null'],
+  additionalProperties: false,
+  properties: {
+    jurisdiction: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        state: nullableString,
+        county: nullableString,
+        courtName: nullableString,
+      },
+      required: ['state', 'county', 'courtName'],
+    },
+    feeSources: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          sourceId: { type: 'string' },
+          title: { type: 'string' },
+          sourceType: {
+            type: 'string',
+            enum: ['official_court', 'district_clerk', 'efiling', 'legal_aid', 'bar_referral', 'law_library', 'other'],
+          },
+          summary: { type: 'string' },
+          url: nullableString,
+          retrievedAt: { type: 'string' },
+        },
+        required: ['sourceId', 'title', 'sourceType', 'summary', 'url', 'retrievedAt'],
+      },
+    },
+    resources: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          name: { type: 'string' },
+          type: {
+            type: 'string',
+            enum: [
+              'legal_aid',
+              'lawyer_referral',
+              'limited_scope',
+              'district_clerk',
+              'official_fee_schedule',
+              'bar_referral',
+              'court_forms',
+              'fee_waiver',
+              'law_library',
+              'self_help',
+              'efiling',
+            ],
+          },
+          summary: { type: 'string' },
+          url: nullableString,
+          retrievedAt: { type: 'string' },
+        },
+        required: ['name', 'type', 'summary', 'url', 'retrievedAt'],
+      },
+    },
+    exactFeeFindings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          feeType: { type: 'string' },
+          amount: { type: 'string' },
+          sourceId: { type: 'string' },
+          sourceTitle: { type: 'string' },
+          retrievedAt: { type: 'string' },
+        },
+        required: ['feeType', 'amount', 'sourceId', 'sourceTitle', 'retrievedAt'],
+      },
+    },
+    warnings: stringArraySchema,
+  },
+  required: ['jurisdiction', 'feeSources', 'resources', 'exactFeeFindings', 'warnings'],
+} as const;
+
+const proSeDraftingReadinessSchema = {
+  type: ['object', 'null'],
+  additionalProperties: false,
+  properties: {
+    requestedDocument: {
+      type: 'string',
+      enum: ['answer', 'response_to_motion', 'declaration', 'fee_waiver', 'exhibit_list', 'hearing_outline', 'co_parent_message', 'timeline'],
+    },
+    readinessStage: {
+      type: 'string',
+      enum: ['working_draft', 'missing_case_facts', 'structurally_complete', 'local_rules_verified', 'ready_for_final_filing_review'],
+    },
+    isFilingReady: { type: 'boolean' },
+    confirmedFacts: stringArraySchema,
+    missingFacts: stringArraySchema,
+    notApplicableFacts: stringArraySchema,
+    draftingNote: { type: 'string' },
+  },
+  required: ['requestedDocument', 'readinessStage', 'isFilingReady', 'confirmedFacts', 'missingFacts', 'notApplicableFacts', 'draftingNote'],
+} as const;
+
+const orderAuthorityStatusSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    status: {
+      type: 'string',
+      enum: ['signed_and_entered', 'signed_not_confirmed_entered', 'temporary_active', 'temporary_expired', 'proposed_unsigned', 'superseded', 'unknown'],
+    },
+    signedDate: nullableString,
+    filedDate: nullableString,
+    supersededBy: nullableString,
+    enforceabilityConfirmed: { type: 'boolean' },
+    sourceIds: stringArraySchema,
+  },
+  required: ['status', 'signedDate', 'filedDate', 'supersededBy', 'enforceabilityConfirmed', 'sourceIds'],
+} as const;
+
+const orderVersionSchema = {
+  type: ['object', 'null'],
+  additionalProperties: false,
+  properties: {
+    activeOrderFileId: nullableString,
+    activeOrderFileName: nullableString,
+    authorityStatus: orderAuthorityStatusSchema,
+    candidateCount: { type: 'number' },
+    needsUserSelection: { type: 'boolean' },
+  },
+  required: ['activeOrderFileId', 'activeOrderFileName', 'authorityStatus', 'candidateCount', 'needsUserSelection'],
+} as const;
+
+const legalBasisSchema = {
+  type: 'array',
+  items: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      basisType: {
+        type: 'string',
+        enum: ['signed_order', 'later_modification', 'statute', 'state_rule', 'local_rule', 'official_form_instruction', 'general_practice', 'reasoned_interpretation'],
+      },
+      proposition: { type: 'string' },
+      jurisdiction: nullableString,
+      citation: nullableString,
+      effectiveDate: nullableString,
+      sourceIds: stringArraySchema,
+    },
+    required: ['basisType', 'proposition', 'jurisdiction', 'citation', 'effectiveDate', 'sourceIds'],
+  },
+} as const;
+
+const deadlineAnalysisSchema = {
+  type: ['object', 'null'],
+  additionalProperties: false,
+  properties: {
+    status: { type: 'string', enum: ['not_applicable', 'needs_inputs', 'express_date_only', 'calculation_ready', 'calculated'] },
+    trigger: nullableString,
+    serviceMethod: nullableString,
+    governingRule: nullableString,
+    jurisdiction: nullableString,
+    timezone: nullableString,
+    calendarTreatment: nullableString,
+    calendarDate: nullableString,
+    sourcedDates: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          label: { type: 'string' },
+          value: { type: 'string' },
+          sourceIds: stringArraySchema,
+          pageStart: { type: ['number', 'null'] },
+          pageEnd: { type: ['number', 'null'] },
+        },
+        required: ['label', 'value', 'sourceIds', 'pageStart', 'pageEnd'],
+      },
+    },
+    missingInputs: stringArraySchema,
+    explanation: { type: 'string' },
+  },
+  required: ['status', 'trigger', 'serviceMethod', 'governingRule', 'jurisdiction', 'timezone', 'calendarTreatment', 'calendarDate', 'sourcedDates', 'missingInputs', 'explanation'],
+} as const;
+
 const litigationNavigationSchema = {
   type: ['object', 'null'],
   additionalProperties: false,
@@ -494,8 +681,24 @@ export const NEXX_RESPONSE_SCHEMA = {
       documentAnswer: legalDocumentAnswerSchema,
       legalInterpretation: legalInterpretationSchema,
       litigationNavigation: litigationNavigationSchema,
+      localResourceLookup: localLegalResourceLookupSchema,
+      proSeDraftingReadiness: proSeDraftingReadinessSchema,
+      orderVersion: orderVersionSchema,
+      legalBasis: legalBasisSchema,
+      deadlineAnalysis: deadlineAnalysisSchema,
     },
-    required: ['message', 'artifacts', 'documentAnswer', 'legalInterpretation', 'litigationNavigation'],
+    required: [
+      'message',
+      'artifacts',
+      'documentAnswer',
+      'legalInterpretation',
+      'litigationNavigation',
+      'localResourceLookup',
+      'proSeDraftingReadiness',
+      'orderVersion',
+      'legalBasis',
+      'deadlineAnalysis',
+    ],
   },
 };
 

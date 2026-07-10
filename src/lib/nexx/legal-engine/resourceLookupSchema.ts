@@ -9,7 +9,7 @@ export type LocalLegalResourceLookup = {
     title: string;
     sourceType: 'official_court' | 'district_clerk' | 'efiling' | 'legal_aid' | 'bar_referral' | 'law_library' | 'other';
     summary: string;
-    url?: string;
+    url: string | null;
     retrievedAt: string;
   }>;
   resources: Array<{
@@ -18,13 +18,16 @@ export type LocalLegalResourceLookup = {
       | 'legal_aid'
       | 'lawyer_referral'
       | 'limited_scope'
+      | 'district_clerk'
+      | 'official_fee_schedule'
+      | 'bar_referral'
       | 'court_forms'
       | 'fee_waiver'
       | 'law_library'
       | 'self_help'
       | 'efiling';
     summary: string;
-    url?: string;
+    url: string | null;
     retrievedAt: string;
   }>;
   exactFeeFindings: Array<{

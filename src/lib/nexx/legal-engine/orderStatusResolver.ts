@@ -25,6 +25,8 @@ const FILED_DATE_PATTERNS = [
   new RegExp(String.raw`\bfiled\s+(?:on\s+)?(${DATE_PHRASE})`, 'i'),
   new RegExp(String.raw`\bentered\s+(?:on\s+)?(${DATE_PHRASE})`, 'i'),
 ];
+const SIGNATURE_AUTHORITY_PATTERN =
+  /\b(?:signed\s+(?:on\s+|by\s+)?|date\s+signed\s*:|signature\s+of\s+(?:the\s+)?judge|judge(?:'s)?\s+signature|signed\s*:|\/s\/\s*(?:judge|hon\.?))\b/i;
 
 function unique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
@@ -58,7 +60,7 @@ export function resolveOrderAuthorityStatus(sourcePackets: LegalDocumentSourcePa
   const proposedSources = sourcesMatching(sourcePackets, /\b(proposed order|unsigned|draft order)\b/i);
   const supersededSources = sourcesMatching(sourcePackets, /\b(superseded|replaced by|amended order|modified by)\b/i);
   const temporarySources = sourcesMatching(sourcePackets, /\btemporary orders?\b/i);
-  const signedSources = sourcesMatching(sourcePackets, /\b(signed|judge|entered|ordered|decreed)\b/i);
+  const signedSources = sourcesMatching(sourcePackets, SIGNATURE_AUTHORITY_PATTERN);
   const filedSources = sourcesMatching(sourcePackets, /\b(file stamp|filed|entered)\b/i);
   const expiredSources = sourcesMatching(sourcePackets, /\b(expired|expires|until further order|temporary orders? terminated)\b/i);
   const signedDate = firstMatch(combined, SIGNED_DATE_PATTERNS) ?? null;

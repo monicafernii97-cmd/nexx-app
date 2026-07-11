@@ -155,6 +155,20 @@ describe('P1 legal workflow integration helpers', () => {
     expect(orderVersion.authorityStatus.supersededBy).toBeNull();
   });
 
+  it('does not infer signed status from generic ordered or judge language', () => {
+    const orderVersion = resolveOrderVersion([
+      packet({
+        sourceId: 'src_generic_proposed',
+        fileId: 'file_generic_proposed',
+        fileName: 'proposed-temporary-orders.pdf',
+        text: 'Proposed Order. This draft order is unsigned. The judge ordered that the parties appear, and the clerk entered the proposed form into the record.',
+      }),
+    ]);
+
+    expect(orderVersion.authorityStatus.status).toBe('proposed_unsigned');
+    expect(orderVersion.authorityStatus.enforceabilityConfirmed).toBe(false);
+  });
+
   it('prefers a signed entered order when multiple order-like documents are present', () => {
     const orderVersion = resolveOrderVersion([
       packet({

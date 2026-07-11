@@ -1,10 +1,7 @@
 import type { PackedCaseIntake } from './packedCaseIntake';
 import { FILING_READINESS_CHECKLIST } from './filingReadinessChecklist';
 import { getFamilyLawIssuePacksByIds } from './issuePacks/familyLawIssuePacks';
-
-function unique(values: string[]) {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
-}
+import { unique } from './stringUtils';
 
 export function buildFilingPlan(intake: PackedCaseIntake) {
   const issuePacks = getFamilyLawIssuePacksByIds(intake.issuePackIds);

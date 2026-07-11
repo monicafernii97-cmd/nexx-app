@@ -1,5 +1,5 @@
 import type { PackedCaseIntake } from './packedCaseIntake';
-import { getFamilyLawIssuePacksByIds } from './issuePacks/familyLawIssuePacks';
+import { getFamilyLawIssuePacksByIds, priorityForIssuePack } from './issuePacks/familyLawIssuePacks';
 
 export type VerifiedOrderInterpretationForDraft = {
   directAnswer: string;
@@ -82,9 +82,23 @@ function generalDrafts(hasOrderContext: boolean) {
   };
 }
 
-function issuePackDrafts(intake: PackedCaseIntake) {
-  const pack = getFamilyLawIssuePacksByIds(intake.issuePackIds)
-    .find((item) => item.courtSafeResponseDrafts.neutral);
+const PRIORITY_SCORE = {
+  urgent: 4,
+  high: 3,
+  medium: 2,
+  later: 1,
+};
+
+function issuePackDrafts(intake: PackedCaseIntake, issueText: string) {
+  const candidates = getFamilyLawIssuePacksByIds(intake.issuePackIds)
+    .filter((item) => item.courtSafeResponseDrafts.neutral)
+    .map((item) => ({
+      item,
+      relevance: item.triggerPatterns.some((pattern) => pattern.test(issueText)) ? 100 : 0,
+      priority: PRIORITY_SCORE[priorityForIssuePack(item)],
+    }))
+    .sort((a, b) => (b.relevance + b.priority) - (a.relevance + a.priority));
+  const pack = candidates[0]?.item;
   if (!pack) return null;
 
   return {
@@ -105,7 +119,7 @@ export function buildCoParentResponseStrategy(
     ? fatherDayDrafts(hasOrderContext, verifiedOrderInterpretation)
     : /\b(exchange|pickup|pick up|drop[-\s]?off)\b/i.test(issueText)
       ? pickupDrafts(hasOrderContext)
-      : issuePackDrafts(intake) ?? generalDrafts(hasOrderContext);
+      : issuePackDrafts(intake, issueText) ?? generalDrafts(hasOrderContext);
 
   const needed = intake.coParentCommunication.userNeedsResponseDraft ||
     intake.coParentCommunication.messagesMentioned ||

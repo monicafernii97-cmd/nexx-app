@@ -13,6 +13,7 @@ import { parsePackedCaseIntake, type PackedCaseIntake } from './packedCaseIntake
 import { buildProSeAssessment } from './proSePlanner';
 import type { CourtFilingExtraction, SourcedCourtFact } from './courtFilingExtractor';
 import { detectFamilyLawIssuePackIds, type FamilyLawIssuePackId } from './issuePacks/familyLawIssuePacks';
+import { unique } from './stringUtils';
 
 export type StrategicSupportRenderMode =
   | 'calm_grounding'
@@ -51,10 +52,6 @@ function list(items: string[]) {
 
 function numbered(items: string[]) {
   return items.map((item, index) => `${index + 1}. ${item}`).join('\n');
-}
-
-function unique(values: string[]) {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
 function uniqueIssuePackIds(values: FamilyLawIssuePackId[]) {

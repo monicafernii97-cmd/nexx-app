@@ -1026,7 +1026,11 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
     const artifactPrompt = buildArtifactPrompt();
     const attachmentContexts = selectAttachmentContextsForPrompt(context, routerResult, routeMode);
     const documentSourcePackets = buildDocumentSourcePackets(attachmentContexts);
-    const issuePacks = detectedFamilyLawIssuePacks(context.turn.message, followUpSummary);
+    const issuePacks = detectedFamilyLawIssuePacks(
+        context.turn.message,
+        followUpSummary,
+        documentSourcePackets.map((packet) => packet.text).join(' ')
+    );
     const deterministicFieldPrompt = [
         'Response schema note: include localResourceLookup, proSeDraftingReadiness, orderVersion, deadlineAnalysis, and legalBasis in the JSON shape.',
         'Set localResourceLookup, proSeDraftingReadiness, orderVersion, and deadlineAnalysis to null, and legalBasis to [], unless the answer already has verified source-backed data for those fields.',

@@ -183,7 +183,9 @@ export const FAMILY_LAW_ISSUE_PACKS: FamilyLawIssuePack[] = [
     summary: 'Exchange disputes turn on the possession schedule, exact pickup/drop-off terms, exceptions, and proof of attempted compliance.',
     intentTriggers: ['exchange', 'pickup', 'drop off', 'late', 'wrong location'],
     triggerPatterns: [
-      /\b(exchange|pickup|pick up|drop[-\s]?off|late|surrender the child|return the child|wrong location|police department)\b/i,
+      /\b(exchange|pickup|pick up|drop[-\s]?off|surrender the child|return the child|wrong location|police department)\b/i,
+      /\blate\s+(?:for|to)\s+(?:pickup|pick up|drop[-\s]?off|exchange|visitation|possession)\b/i,
+      /\b(?:pickup|pick up|drop[-\s]?off|exchange|visitation|possession)\b.{0,40}\blate\b/i,
     ],
     documentRetrievalBuckets: [
       {

@@ -4,6 +4,7 @@ import {
   getFamilyLawIssuePacksByIds,
   type FamilyLawIssuePackId,
 } from './issuePacks/familyLawIssuePacks';
+import { unique } from './stringUtils';
 
 export type CourtProceedingStatus =
   | 'threat_only'
@@ -177,10 +178,6 @@ function has(text: string, pattern: RegExp) {
 
 function captureFirst(text: string, pattern: RegExp) {
   return text.match(pattern)?.[1]?.trim() ?? null;
-}
-
-function unique(values: string[]) {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
 function uniqueIntents(values: LegalIntent[]) {

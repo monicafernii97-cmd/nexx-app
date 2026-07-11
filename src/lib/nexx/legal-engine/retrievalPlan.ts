@@ -4,6 +4,7 @@ import {
   TEXAS_POSSESSION_ISSUE_TERMS,
 } from './issuePacks/texasPossession';
 import { detectedFamilyLawIssuePacks } from './issuePacks/familyLawIssuePacks';
+import { unique } from './stringUtils';
 
 export type ClauseRetrievalBucket =
   | 'controlling_specific_clause'
@@ -138,10 +139,6 @@ function normalizeForIssuePack(value: string) {
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-function unique(values: string[]) {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
 export function needsTexasPossessionIssuePack(message: string, detection: DocumentReferenceDetection) {

@@ -1,4 +1,9 @@
 import type { LegalIntent, MultiIntentResult } from '../../types';
+import {
+  detectFamilyLawIssuePackIds,
+  getFamilyLawIssuePacksByIds,
+  type FamilyLawIssuePackId,
+} from './issuePacks/familyLawIssuePacks';
 
 export type CourtProceedingStatus =
   | 'threat_only'
@@ -9,6 +14,7 @@ export type CourtProceedingStatus =
   | 'unknown';
 
 export type PackedCaseIntake = {
+  issuePackIds: FamilyLawIssuePackId[];
   emotionalState: {
     overwhelmed: boolean;
     scared: boolean;
@@ -311,6 +317,8 @@ function questions(text: string): PackedCaseIntake['userQuestions'] {
 export function parsePackedCaseIntake(message: string, contextText = ''): PackedCaseIntake {
   const text = `${contextText}\n${message}`;
   const lower = text.toLowerCase();
+  const issuePackIds = detectFamilyLawIssuePackIds(text);
+  const issuePackLabels = getFamilyLawIssuePacksByIds(issuePackIds).map((pack) => pack.label);
   const serviceNegated = has(lower, /\b(not served|haven'?t been served|have not been served|wasn'?t served|was not served|never served)\b/i);
   const filingNegated = has(lower, /\b(no (?:court )?filing|nothing (?:has been )?filed|hasn'?t filed|has not filed|didn'?t file|did not file|not taking me to court|no motion|no petition)\b/i);
   const orderNegated = has(lower, /\b(no order|no court order|don'?t have (?:a|an) order|do not have (?:a|an) order|without (?:a|an) order)\b/i);
@@ -343,6 +351,7 @@ export function parsePackedCaseIntake(message: string, contextText = ''): Packed
   );
 
   return {
+    issuePackIds,
     emotionalState: {
       overwhelmed: has(lower, /\boverwhelmed|freaking out|panicking|stressed\b/i),
       scared: has(lower, /\bscared|afraid|fear|terrified\b/i),
@@ -369,7 +378,7 @@ export function parsePackedCaseIntake(message: string, contextText = ''): Packed
     currentOrderContext: {
       hasExistingOrder,
       orderUploaded: has(lower, /\buploaded|attached|shared\b/i) && hasExistingOrder === true,
-      relevantOrderIssues: relevantOrderIssues(text),
+      relevantOrderIssues: unique([...relevantOrderIssues(text), ...issuePackLabels]),
       needsOrderReview: hasExistingOrder === true || has(lower, /\bwhat does the order|order says|according to the order\b/i),
     },
     coParentCommunication: {
@@ -407,6 +416,9 @@ export function parsePackedCaseIntake(message: string, contextText = ''): Packed
 
 export function classifyPackedCaseIntake(message: string, contextText = ''): MultiIntentResult {
   const intake = parsePackedCaseIntake(message, contextText);
+  const text = `${contextText}\n${message}`;
+  const issuePackNeedsDocumentReview = intake.issuePackIds.length > 0 &&
+    /\b(order|court order|under my order|filed|served|motion|petition|subpoena|discovery request|notice|hearing|support order|payment record|passport|geographic restriction)\b/i.test(text);
   const secondaryIntents: LegalIntent[] = [];
   if (intake.courtPosture.otherPartyFiledSomething) secondaryIntents.push('new_court_filing_received');
   if (intake.immediateRisks.deadlineRisk) secondaryIntents.push('court_response_deadline');
@@ -419,6 +431,7 @@ export function classifyPackedCaseIntake(message: string, contextText = ''): Mul
   if (intake.userQuestions.some((q) => q.category === 'legal_aid')) secondaryIntents.push('legal_aid_resource_request');
   if (intake.userQuestions.some((q) => q.category === 'judge_explanation')) secondaryIntents.push('judge_explanation_strategy');
   if (intake.factualTimeline.length > 0 || intake.coParentCommunication.messagesMentioned) secondaryIntents.push('documentation_guidance');
+  if (intake.issuePackIds.length > 0 && !secondaryIntents.includes('documentation_guidance')) secondaryIntents.push('evidence_timeline_strategy');
 
   const urgency = intake.immediateRisks.safetyRisk || intake.immediateRisks.childSafetyRisk
     ? 'urgent'
@@ -436,7 +449,7 @@ export function classifyPackedCaseIntake(message: string, contextText = ''): Mul
     primaryIntent,
     secondaryIntents: uniqueIntents(secondaryIntents),
     urgency,
-    requiresDocumentReview: intake.currentOrderContext.needsOrderReview || intake.courtPosture.otherPartyFiledSomething,
+    requiresDocumentReview: intake.currentOrderContext.needsOrderReview || intake.courtPosture.otherPartyFiledSomething || issuePackNeedsDocumentReview,
     requiresCourtDeadlineCheck: intake.courtPosture.otherPartyFiledSomething || intake.immediateRisks.deadlineRisk,
     requiresCoParentDraft: intake.coParentCommunication.userNeedsResponseDraft,
     requiresResourceLookup: intake.userQuestions.some((q) => q.category === 'cost' || q.category === 'legal_aid' || q.category === 'attorney_resources'),

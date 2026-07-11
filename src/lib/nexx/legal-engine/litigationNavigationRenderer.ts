@@ -12,6 +12,7 @@ import type { CandidateResponsePath, LitigationNavigationResponse } from './liti
 import { parsePackedCaseIntake, type PackedCaseIntake } from './packedCaseIntake';
 import { buildProSeAssessment } from './proSePlanner';
 import type { CourtFilingExtraction, SourcedCourtFact } from './courtFilingExtractor';
+import { detectFamilyLawIssuePackIds, type FamilyLawIssuePackId } from './issuePacks/familyLawIssuePacks';
 
 export type StrategicSupportRenderMode =
   | 'calm_grounding'
@@ -54,6 +55,10 @@ function numbered(items: string[]) {
 
 function unique(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function uniqueIssuePackIds(values: FamilyLawIssuePackId[]) {
+  return Array.from(new Set(values));
 }
 
 function articleFor(label: string) {
@@ -133,6 +138,17 @@ function removeUnsourcedFilingFacts(values: string[]) {
   return values.filter((value) =>
     !/\b(?:uploaded filing appears|filing appears to request|filing includes allegations|hearing or court-date clue|possible filing type|motion asks|petition alleges|filing requests|certificate states)\b/i.test(value)
   );
+}
+
+function issuePackTextFromCourtFiling(courtFiling: CourtFilingExtraction) {
+  return [
+    courtFiling.documentType,
+    ...courtFiling.reliefRequested,
+    ...courtFiling.requestedOrders,
+    ...courtFiling.allegations.map((item) => item.allegation),
+    ...courtFiling.sourcedFacts.map((fact) => fact.text),
+    ...courtFiling.serviceClues,
+  ].join(' ');
 }
 
 function courtPosture(
@@ -242,6 +258,10 @@ export function buildLitigationNavigationResponse(args: BuildLitigationNavigatio
       intake.courtPosture.hearingDate = hearing.dateOrTime;
       intake.immediateRisks.hearingRisk = true;
     }
+    intake.issuePackIds = uniqueIssuePackIds([
+      ...intake.issuePackIds,
+      ...detectFamilyLawIssuePackIds(issuePackTextFromCourtFiling(args.courtFiling)),
+    ]);
   }
 
   const coParentResponse = buildCoParentResponseStrategy(

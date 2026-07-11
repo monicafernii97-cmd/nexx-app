@@ -1,4 +1,5 @@
 import type { PackedCaseIntake } from './packedCaseIntake';
+import { getFamilyLawIssuePacksByIds } from './issuePacks/familyLawIssuePacks';
 
 export type VerifiedOrderInterpretationForDraft = {
   directAnswer: string;
@@ -81,6 +82,17 @@ function generalDrafts(hasOrderContext: boolean) {
   };
 }
 
+function issuePackDrafts(intake: PackedCaseIntake) {
+  const pack = getFamilyLawIssuePacksByIds(intake.issuePackIds)
+    .find((item) => item.courtSafeResponseDrafts.neutral);
+  if (!pack) return null;
+
+  return {
+    neutralDraft: pack.courtSafeResponseDrafts.neutral,
+    firmerDraft: pack.courtSafeResponseDrafts.firmer ?? pack.courtSafeResponseDrafts.neutral,
+  };
+}
+
 export function buildCoParentResponseStrategy(
   intake: PackedCaseIntake,
   contextText = '',
@@ -93,7 +105,7 @@ export function buildCoParentResponseStrategy(
     ? fatherDayDrafts(hasOrderContext, verifiedOrderInterpretation)
     : /\b(exchange|pickup|pick up|drop[-\s]?off)\b/i.test(issueText)
       ? pickupDrafts(hasOrderContext)
-      : generalDrafts(hasOrderContext);
+      : issuePackDrafts(intake) ?? generalDrafts(hasOrderContext);
 
   const needed = intake.coParentCommunication.userNeedsResponseDraft ||
     intake.coParentCommunication.messagesMentioned ||

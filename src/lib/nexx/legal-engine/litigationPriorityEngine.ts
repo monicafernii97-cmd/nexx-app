@@ -1,5 +1,16 @@
 import type { PackedCaseIntake } from './packedCaseIntake';
 import type { LitigationNavigationResponse } from './litigationNavigationSchema';
+import { getFamilyLawIssuePacksByIds, priorityForIssuePack } from './issuePacks/familyLawIssuePacks';
+
+function uniqueIssueBreakdown(issues: LitigationNavigationResponse['issueBreakdown']) {
+  const seen = new Set<string>();
+  return issues.filter((issue) => {
+    const key = issue.issue.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 export function determineImmediatePriority(intake: PackedCaseIntake): LitigationNavigationResponse['immediatePriority'] {
   if (intake.immediateRisks.safetyRisk || intake.immediateRisks.childSafetyRisk) {
@@ -117,7 +128,16 @@ export function buildIssueBreakdown(intake: PackedCaseIntake): LitigationNavigat
     });
   }
 
-  return issues.length > 0 ? issues : [{
+  for (const pack of getFamilyLawIssuePacksByIds(intake.issuePackIds)) {
+    issues.push({
+      issue: pack.label,
+      priority: priorityForIssuePack(pack),
+      whatItMeans: pack.summary,
+      nextStep: `Review ${pack.orderHierarchy[0]} and preserve ${pack.requiredEvidence.slice(0, 2).join(' plus ')}.`,
+    });
+  }
+
+  return issues.length > 0 ? uniqueIssueBreakdown(issues) : [{
     issue: 'Main legal issue',
     priority: 'medium',
     whatItMeans: 'The issue needs to be tied back to the order, facts, and next court or communication step.',

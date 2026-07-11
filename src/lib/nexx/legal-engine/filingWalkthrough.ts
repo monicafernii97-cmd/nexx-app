@@ -1,7 +1,13 @@
 import type { PackedCaseIntake } from './packedCaseIntake';
 import { FILING_READINESS_CHECKLIST } from './filingReadinessChecklist';
+import { getFamilyLawIssuePacksByIds } from './issuePacks/familyLawIssuePacks';
+
+function unique(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
 
 export function buildFilingPlan(intake: PackedCaseIntake) {
+  const issuePacks = getFamilyLawIssuePacksByIds(intake.issuePackIds);
   const likelyNextDocument = intake.courtPosture.filingType === 'petition'
     ? 'answer or other responsive pleading to verify'
     : intake.courtPosture.filingType === 'motion'
@@ -14,16 +20,23 @@ export function buildFilingPlan(intake: PackedCaseIntake) {
 
   return {
     likelyNextDocument,
-    filingReadinessChecklist: FILING_READINESS_CHECKLIST,
+    filingReadinessChecklist: unique([
+      ...FILING_READINESS_CHECKLIST,
+      ...issuePacks.flatMap((pack) => pack.filingReadinessRequirements),
+    ]),
     nextInfoNeededBeforeDrafting: intake.missingCriticalInfo.length > 0
-      ? intake.missingCriticalInfo
-      : [
+      ? unique([
+        ...intake.missingCriticalInfo,
+        ...issuePacks.flatMap((pack) => pack.filingReadinessRequirements.slice(0, 4)),
+      ])
+      : unique([
         'the filed document',
         'service date',
         'hearing date if one exists',
         'current order',
         'facts in date order',
-      ],
+        ...issuePacks.flatMap((pack) => pack.filingReadinessRequirements.slice(0, 4)),
+      ]),
   };
 }
 

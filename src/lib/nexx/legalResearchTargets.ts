@@ -1,8 +1,10 @@
 import type { RouteMode } from '../types';
+import { detectedFamilyLawIssuePacks } from './legal-engine/issuePacks/familyLawIssuePacks';
 
 export type OfficialResearchTargetKind =
   | 'state_statutes'
   | 'state_court_rules'
+  | 'issue_authority'
   | 'county_clerk'
   | 'local_rules'
   | 'court_forms'
@@ -85,6 +87,15 @@ export function buildOfficialLegalResearchTargets(args: {
       query: `${state} official court rules family law filing forms service deadlines`,
       preferredDomains: domains,
     });
+
+    for (const pack of detectedFamilyLawIssuePacks(args.message).slice(0, 2)) {
+      targets.push({
+        kind: 'issue_authority',
+        title: `${state} ${pack.label.toLowerCase()} authority`,
+        query: `${state} official ${pack.statutoryAndLocalRuleTargets.join(' ')}`,
+        preferredDomains: domains,
+      });
+    }
   }
 
   if (state && county) {
@@ -139,5 +150,5 @@ export function buildOfficialLegalResearchTargets(args: {
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  }).slice(0, 6);
+  }).slice(0, 8);
 }

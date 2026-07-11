@@ -17,7 +17,7 @@ export type LegalAuthoritySource = {
     | 'secondary_authority';
   jurisdiction: string;
   retrievedAt: string;
-  effectiveDate?: string | null;
+  effectiveDate: string | null;
 };
 
 export type ExternalLegalClaim = {
@@ -36,7 +36,6 @@ function authoritySourceType(sourceType: LocalLegalResourceLookup['feeSources'][
   if (sourceType === 'district_clerk') return 'district_clerk';
   if (sourceType === 'legal_aid') return 'legal_aid';
   if (sourceType === 'bar_referral') return 'bar_referral';
-  if (sourceType === 'law_library') return 'secondary_authority';
   return 'secondary_authority';
 }
 
@@ -78,9 +77,11 @@ export function buildLegalAuthoritiesEnvelope(args: {
     });
   }
 
+  const availableSourceIds = new Set(sources.map((source) => source.id));
   for (const basis of args.legalBasis ?? []) {
     if (!['statute', 'state_rule', 'local_rule', 'official_form_instruction'].includes(basis.basisType)) continue;
     if (basis.sourceIds.length === 0) continue;
+    if (!basis.sourceIds.every((sourceId) => availableSourceIds.has(sourceId))) continue;
     claims.push({
       proposition: basis.proposition,
       sourceIds: basis.sourceIds,

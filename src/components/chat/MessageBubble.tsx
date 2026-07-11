@@ -278,7 +278,7 @@ function DocumentEvidencePanel({
                                             {locationLabel}
                                         </span>
                                         <span className={isLight ? 'text-blue-500' : 'text-white/55'}>
-                                            Page preview
+                                            Source preview
                                         </span>
                                     </span>
                                 </button>

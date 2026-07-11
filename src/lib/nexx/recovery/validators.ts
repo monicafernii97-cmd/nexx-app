@@ -75,7 +75,7 @@ function validateProSeDraftingReadiness(value: unknown) {
     typeof requirement.label === 'string' &&
     ['confirmed', 'missing', 'not_applicable', 'needs_authority_check'].includes(String(requirement.status)) &&
     isOptionalString(requirement.value) &&
-    (requirement.sourceClaimIds === undefined || isStringArray(requirement.sourceClaimIds));
+    isStringArray(requirement.sourceClaimIds);
 
   return typeof value.requestedDocument === 'string' &&
     typeof value.readinessStage === 'string' &&
@@ -101,6 +101,7 @@ function validateLegalAuthorities(value: unknown) {
     typeof source.title === 'string' &&
     typeof source.url === 'string' &&
     typeof source.sourceType === 'string' &&
+    ['statute', 'court_rule', 'official_court', 'district_clerk', 'official_form', 'state_self_help', 'legal_aid', 'bar_referral', 'secondary_authority'].includes(source.sourceType) &&
     typeof source.jurisdiction === 'string' &&
     typeof source.retrievedAt === 'string' &&
     isOptionalString(source.effectiveDate);

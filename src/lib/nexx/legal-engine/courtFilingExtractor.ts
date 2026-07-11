@@ -597,7 +597,7 @@ function toCourtDocumentRole(
   const fileText = normalize(`${packets[0]?.fileName ?? ''} ${packets.slice(0, 2).map((packet) => packet.text).join(' ')}`);
   if (legacyRole === 'notice') return 'notice';
   if (legacyRole === 'controlling_order') {
-    return /\bproposed|unsigned|draft\b/i.test(fileText) ? 'proposed_order' : 'controlling_order';
+    return /\b(?:proposed|unsigned|draft)\b/i.test(fileText) ? 'proposed_order' : 'controlling_order';
   }
   if (legacyRole === 'exhibit') return 'exhibit';
   if (legacyRole === 'current_filing' || legacyRole === 'prior_filing') {

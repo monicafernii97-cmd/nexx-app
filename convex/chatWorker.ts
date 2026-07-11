@@ -654,6 +654,7 @@ function isHighStakesSubstantiveLegalRoute(routeMode?: RouteMode) {
         routeMode === 'packed_case_intake' ||
         routeMode === 'litigation_navigation' ||
         routeMode === 'court_response_planning' ||
+        routeMode === 'pro_se_guidance' ||
         routeMode === 'court_ready_drafting' ||
         routeMode === 'filing_walkthrough';
 }
@@ -1023,7 +1024,12 @@ type StreamingResponsesClient = {
 };
 
 /** Compose all system, developer, context, and recent-message inputs. */
-function buildInput(context: GenerationContext, routeMode: RouteMode, contextPrompt: string) {
+function buildInput(
+    context: GenerationContext,
+    routeMode: RouteMode,
+    contextPrompt: string,
+    officialResearchTargetsInjected: boolean
+) {
     const systemPrompt = buildSystemPolicyPrompt();
     const developerPrompt = buildDeveloperBehaviorPrompt(routeMode);
     const followUpSummary = activeFollowUpContextSummary(context.turn.message, context.recentMessages, routeMode);
@@ -1038,7 +1044,7 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
         routerResult.toolPlan,
         actualToolCapabilitiesFromPlan(routerResult.toolPlan, {
             hasVectorStore: Boolean(context.conversation?.vectorStoreId),
-            localCourtSourcesInjected: /Official Legal Research Targets/i.test(contextPrompt),
+            localCourtSourcesInjected: officialResearchTargetsInjected,
         })
     );
     const artifactPrompt = buildArtifactPrompt();
@@ -1727,9 +1733,10 @@ async function generateWithFallbacks({
         );
     }
     addOfficialResearchTargets(contextPacket, routeMode, context.turn.message, routerResult.toolPlan.useWebSearch);
+    const officialResearchTargetsInjected = Boolean(contextPacket.officialResearchTargets?.length);
 
     const contextPrompt = buildContextPrompt(contextPacket);
-    const promptBundle = buildInput(context, routeMode, contextPrompt);
+    const promptBundle = buildInput(context, routeMode, contextPrompt, officialResearchTargetsInjected);
     const attachmentContextPrompt = promptBundle.attachmentContextPrompt;
     const hostedTools = buildHostedTools(routerResult, context.conversation?.vectorStoreId);
     const fileSearchOnlyTools =

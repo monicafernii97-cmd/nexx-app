@@ -39,8 +39,17 @@ function hasOnlyAllowedMoneyClaims(text: string) {
     .split(/(?<=[.!?])\s+|\\n|","/)
     .filter((fragment) => INVENTED_COST_PATTERN.test(fragment));
   return moneyFragments.every((fragment) =>
-    /\b(order|ordered|support|arrears|reimburse|property|debt|user said|you said|reported|alleges?|official|clerk|court fee|filing fee|estimate|range|varies)\b/i.test(fragment) ||
-    /\[(?:p\.|pp\.)\s*\d+/i.test(fragment)
+    /\[(?:p\.|pp\.)\s*\d+/i.test(fragment) ||
+    /\b(user said|you said|user reported|reported paying|reported amount)\b/i.test(fragment) ||
+    /\b(order|ordered|support|arrears|reimburse|property|debt|alleges?)\b/i.test(fragment) ||
+    (
+      /\b(official|clerk|court|district clerk|fee schedule|e-?filing)\b/i.test(fragment) &&
+      /\b(source|retrieved|https?:\/\/|\[[^\]]+\])\b/i.test(fragment)
+    ) ||
+    (
+      /\b(attorney|lawyer|market|retainer|hourly)\b/i.test(fragment) &&
+      /\b(estimate|range|varies|dated|source|survey)\b/i.test(fragment)
+    )
   );
 }
 

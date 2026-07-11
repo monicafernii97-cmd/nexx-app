@@ -10,7 +10,6 @@ import type { ToolPlan } from '../../types';
 export type ActualToolCapabilities = {
   fileSearch: boolean;
   webSearch: boolean;
-  codeInterpreter: boolean;
   createIncident: boolean;
   appendTimeline: boolean;
   generateDraft: boolean;
@@ -31,7 +30,6 @@ export function actualToolCapabilitiesFromPlan(
   return {
     fileSearch: Boolean(toolPlan.useFileSearch && options.hasVectorStore),
     webSearch: Boolean(toolPlan.useWebSearch),
-    codeInterpreter: false,
     createIncident: false,
     appendTimeline: false,
     generateDraft: false,
@@ -69,14 +67,6 @@ You have access to web_search for retrieving current legal information.
 - Use the Official Legal Research Targets in the context packet when they are present.
 - Separate uploaded-document facts from external law/procedure sources.
 - Cite official source URLs for legal/procedure statements that are not directly from the uploaded document.`);
-  }
-
-  if (capabilities.codeInterpreter) {
-    sections.push(`
-### Code Interpreter
-You have access to code_interpreter for structured data tasks.
-- Use it for building timelines from multiple events, creating exhibit indexes, extracting tables from documents, PDF text cleanup, and chronological event summaries.
-- Output structured data that can be rendered by the frontend.`);
   }
 
   if (capabilities.localCourtRetriever) {

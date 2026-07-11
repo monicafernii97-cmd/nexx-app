@@ -8,6 +8,9 @@ export const INTERNAL_LEAK_KEYS = [
   'pageEnd',
   'blockIds',
   'quotedText',
+  'citationVerifierStatus',
+  'contextTruncated',
+  'extractionMethod',
   'documentAnswer',
   'legalInterpretation',
   'litigationNavigation',
@@ -34,6 +37,8 @@ const PDF_FILENAME_PATTERN = /\.pdf\b/i;
 const PAGE_LOCATION_PATTERN = /,\s*p{1,2}\.\s*\d+/i;
 const SOURCE_ID_PREFIX_PATTERN = /\bsrc_\d{3,}\s*:/i;
 const SOURCE_ID_PAREN_PREFIX_PATTERN = /\(src_\d{3,}\)\s*:/i;
+const INTERNAL_SOURCE_METADATA_PATTERN =
+  /\b(?:citationVerifierStatus|contextTruncated|extractionMethod|retrievalReasons|retrievalBuckets|filingRetrievalBuckets|OCRConfidence)\b\s*[:=]|\b(?:chunk|retrieval|verifier|confidence|OCR|extraction|source packet)\s+(?:id|status|score|warning|metadata)\b/i;
 const BARE_INTERNAL_KEY_ASSIGNMENT_PATTERNS = INTERNAL_LEAK_KEYS.map(
   (key) => new RegExp(`(?:^|[\\s{\\[,])${key}\\s*:`)
 );
@@ -94,7 +99,7 @@ function stripSourceSection(content: string) {
     LEGACY_SOURCE_ID_PATTERN.test(sourceSection) ||
     hasBareInternalKeyAssignment(sourceSection) ||
     hasJsonInternalKeyMarker(sourceSection) ||
-    /\b(chunk|retrieval|verifier|confidence|OCR|extraction|source packet|memoryGenerationId)\b/i.test(sourceSection);
+    INTERNAL_SOURCE_METADATA_PATTERN.test(sourceSection);
 
   return containsInternalMetadata
     ? content.slice(0, sourceSectionMatch.index).trimEnd()

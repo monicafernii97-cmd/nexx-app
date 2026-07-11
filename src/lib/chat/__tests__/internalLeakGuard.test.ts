@@ -63,6 +63,8 @@ describe('looksLikeInternalStructuredPayload', () => {
 
     expect(sanitized).toContain('Sources');
     expect(sanitized).toContain('Signed Final Order.pdf, p. 2');
+    expect(sanitized).not.toMatch(/\b(chunk|retrieval|verifier|confidence|OCR|extraction|source packet|memoryGenerationId)\b/i);
+    expect(sanitized).not.toContain('src_');
   });
 
   it('drops legacy source-id bullet lines even without a source heading', () => {

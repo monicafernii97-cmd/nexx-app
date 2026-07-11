@@ -32,12 +32,14 @@ describe('official legal research targets', () => {
     expect(targets.map((target) => target.kind)).toEqual([
       'state_statutes',
       'state_court_rules',
+      'issue_authority',
       'county_clerk',
       'local_rules',
       'court_forms',
       'court_specific',
     ]);
     expect(targets.some((target) => target.query.includes('Fort Bend County Texas official district clerk'))).toBe(true);
+    expect(targets.some((target) => target.query.includes('contempt pleading rule'))).toBe(true);
     expect(targets.some((target) => target.preferredDomains.includes('txcourts.gov'))).toBe(true);
   });
 

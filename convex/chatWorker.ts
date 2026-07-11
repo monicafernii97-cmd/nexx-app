@@ -21,6 +21,7 @@ import { buildLegalBasisList } from '../src/lib/nexx/legal-engine/legalAuthority
 import { buildLocalLegalResourceLookup, renderLocalResourceLookupMarkdown, shouldBuildLocalResourceLookup } from '../src/lib/nexx/legal-engine/localResourceLookup';
 import { resolveOrderVersion } from '../src/lib/nexx/legal-engine/orderVersionResolver';
 import { buildProSeDraftingReadiness, renderProSeDraftingReadinessMarkdown, shouldBuildProSeDraftingReadiness } from '../src/lib/nexx/legal-engine/proSeDraftingFlow';
+import { detectedFamilyLawIssuePacks } from '../src/lib/nexx/legal-engine/issuePacks/familyLawIssuePacks';
 import { composeLegalResponse } from '../src/lib/nexx/legal-engine/responseComposer';
 import { repairRenderedOutput, verifyRenderedOutput } from '../src/lib/nexx/legal-engine/renderedOutputVerifier';
 import { recoverStructuredOutput } from '../src/lib/nexx/recovery/recoverStructuredOutput';
@@ -1025,11 +1026,19 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
     const artifactPrompt = buildArtifactPrompt();
     const attachmentContexts = selectAttachmentContextsForPrompt(context, routerResult, routeMode);
     const documentSourcePackets = buildDocumentSourcePackets(attachmentContexts);
+    const issuePacks = detectedFamilyLawIssuePacks(
+        context.turn.message,
+        followUpSummary,
+        documentSourcePackets.map((packet) => packet.text).join(' ')
+    );
     const deterministicFieldPrompt = [
         'Response schema note: include localResourceLookup, proSeDraftingReadiness, orderVersion, deadlineAnalysis, and legalBasis in the JSON shape.',
         'Set localResourceLookup, proSeDraftingReadiness, orderVersion, and deadlineAnalysis to null, and legalBasis to [], unless the answer already has verified source-backed data for those fields.',
         'Do not invent local resources, court fees, filing deadlines, order enforceability, or local-rule authority. Deterministic post-processing may fill those fields after provider parsing.',
-    ].join('\n');
+        issuePacks.length
+            ? `Internal issue-pack hints for this turn: ${issuePacks.map((pack) => pack.label).join('; ')}. Use these only to choose relevant legal tracks, evidence needs, counterarguments, and filing-readiness questions. Do not mention issue packs or internal taxonomy to the user.`
+            : undefined,
+    ].filter(Boolean).join('\n');
     const attachmentContextPrompt = buildAttachmentContextPrompt(
         attachmentContexts,
         documentReference,

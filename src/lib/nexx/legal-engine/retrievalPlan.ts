@@ -3,6 +3,8 @@ import {
   TEXAS_POSSESSION_BUCKET_QUERIES,
   TEXAS_POSSESSION_ISSUE_TERMS,
 } from './issuePacks/texasPossession';
+import { detectedFamilyLawIssuePacks } from './issuePacks/familyLawIssuePacks';
+import { unique } from './stringUtils';
 
 export type ClauseRetrievalBucket =
   | 'controlling_specific_clause'
@@ -156,12 +158,35 @@ export function buildClauseRetrievalPlan(
   message: string,
   detection: DocumentReferenceDetection
 ): ClauseRetrievalBucketPlan[] {
-  if (!needsTexasPossessionIssuePack(message, detection)) return [];
+  const queriesByBucket = new Map<ClauseRetrievalBucket, string[]>();
+  const addQueries = (bucket: ClauseRetrievalBucket, queries: string[]) => {
+    queriesByBucket.set(bucket, unique([...(queriesByBucket.get(bucket) ?? []), ...queries]));
+  };
 
-  return BUCKET_ORDER.map((bucket) => ({
-    bucket,
-    queries: TEXAS_POSSESSION_BUCKET_QUERIES[bucket],
-  }));
+  if (needsTexasPossessionIssuePack(message, detection)) {
+    for (const bucket of BUCKET_ORDER) {
+      addQueries(bucket, TEXAS_POSSESSION_BUCKET_QUERIES[bucket]);
+    }
+  }
+
+  const packs = detectedFamilyLawIssuePacks(
+    message,
+    detection.requestedTerms.join(' '),
+    detection.requestedDocumentTypes.join(' ')
+  );
+
+  for (const pack of packs) {
+    for (const target of pack.documentRetrievalBuckets) {
+      addQueries(target.bucket, target.queries);
+    }
+  }
+
+  return BUCKET_ORDER
+    .filter((bucket) => (queriesByBucket.get(bucket) ?? []).length > 0)
+    .map((bucket) => ({
+      bucket,
+      queries: queriesByBucket.get(bucket) ?? [],
+    }));
 }
 
 export function needsFilingRetrievalPlan(message: string, detection: DocumentReferenceDetection) {

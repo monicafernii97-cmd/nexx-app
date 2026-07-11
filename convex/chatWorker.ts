@@ -16,6 +16,11 @@ import { NEXX_RESPONSE_SCHEMA } from '../src/lib/nexx/schemas';
 import { ANALYSIS_STATUS_UI_KIND, SAFE_ANALYSIS_DRAFT_MESSAGE } from '../src/lib/chat/analysisStatus';
 import { buildOfficialLegalResearchTargets } from '../src/lib/nexx/legalResearchTargets';
 import { extractCourtFilingFromSources, type CourtFilingExtraction } from '../src/lib/nexx/legal-engine/courtFilingExtractor';
+import { buildDeadlineAnalysis, hasDeadlineQuestion, renderDeadlineAnalysisMarkdown } from '../src/lib/nexx/legal-engine/deadlineEngine';
+import { buildLegalBasisList } from '../src/lib/nexx/legal-engine/legalAuthority';
+import { buildLocalLegalResourceLookup, renderLocalResourceLookupMarkdown, shouldBuildLocalResourceLookup } from '../src/lib/nexx/legal-engine/localResourceLookup';
+import { resolveOrderVersion } from '../src/lib/nexx/legal-engine/orderVersionResolver';
+import { buildProSeDraftingReadiness, renderProSeDraftingReadinessMarkdown, shouldBuildProSeDraftingReadiness } from '../src/lib/nexx/legal-engine/proSeDraftingFlow';
 import { composeLegalResponse } from '../src/lib/nexx/legal-engine/responseComposer';
 import { repairRenderedOutput, verifyRenderedOutput } from '../src/lib/nexx/legal-engine/renderedOutputVerifier';
 import { recoverStructuredOutput } from '../src/lib/nexx/recovery/recoverStructuredOutput';
@@ -81,6 +86,19 @@ function emptyArtifacts(): NexxAssistantResponse['artifacts'] {
     };
 }
 
+function emptyDeterministicLegalFields(): Pick<
+    NexxAssistantResponse,
+    'localResourceLookup' | 'proSeDraftingReadiness' | 'orderVersion' | 'legalBasis' | 'deadlineAnalysis'
+> {
+    return {
+        localResourceLookup: null,
+        proSeDraftingReadiness: null,
+        orderVersion: null,
+        legalBasis: [],
+        deadlineAnalysis: null,
+    };
+}
+
 /** Build a structured fallback response when provider generation fails. */
 function degradedResponse(message = DEGRADED_MESSAGE): NexxAssistantResponse {
     return {
@@ -89,6 +107,7 @@ function degradedResponse(message = DEGRADED_MESSAGE): NexxAssistantResponse {
         documentAnswer: null,
         legalInterpretation: null,
         litigationNavigation: null,
+        ...emptyDeterministicLegalFields(),
     };
 }
 
@@ -485,6 +504,11 @@ type GenerationContext = {
         petitionerLegalName?: string;
         petitionerRole?: 'petitioner' | 'respondent';
         children?: { name: string; age: number }[];
+        formattingOverrides?: unknown;
+        formattingOverridesV2?: { certificateSeparatePage?: boolean } | null;
+        profileKey?: string;
+        profileVersion?: string;
+        aiVerified?: boolean;
     } | null;
     activeCase?: {
         title?: string;
@@ -1001,6 +1025,11 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
     const artifactPrompt = buildArtifactPrompt();
     const attachmentContexts = selectAttachmentContextsForPrompt(context, routerResult, routeMode);
     const documentSourcePackets = buildDocumentSourcePackets(attachmentContexts);
+    const deterministicFieldPrompt = [
+        'Response schema note: include localResourceLookup, proSeDraftingReadiness, orderVersion, deadlineAnalysis, and legalBasis in the JSON shape.',
+        'Set localResourceLookup, proSeDraftingReadiness, orderVersion, and deadlineAnalysis to null, and legalBasis to [], unless the answer already has verified source-backed data for those fields.',
+        'Do not invent local resources, court fees, filing deadlines, order enforceability, or local-rule authority. Deterministic post-processing may fill those fields after provider parsing.',
+    ].join('\n');
     const attachmentContextPrompt = buildAttachmentContextPrompt(
         attachmentContexts,
         documentReference,
@@ -1065,11 +1094,13 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
         attachmentContexts,
         documentSourcePackets,
         documentReference,
+        deterministicFieldPrompt,
         input: [
             { role: 'system', content: systemPrompt },
             { role: 'developer', content: developerPrompt },
             { role: 'developer', content: featurePrompt },
             { role: 'developer', content: artifactPrompt },
+            { role: 'developer', content: deterministicFieldPrompt },
             { role: 'developer', content: contextPrompt },
             ...(attachmentContextPrompt
                 ? [{ role: 'developer' as const, content: attachmentContextPrompt }]
@@ -1275,6 +1306,148 @@ function renderLitigationNavigationMessage(args: {
     };
 }
 
+function shouldAppendResourceSection(message: string, routeMode: RouteMode) {
+    return shouldBuildLocalResourceLookup({ message, routeMode });
+}
+
+function shouldAppendDeadlineSection(message: string, routeMode: RouteMode) {
+    return hasDeadlineQuestion(message, routeMode);
+}
+
+function shouldBuildProSeReadiness(message: string, routeMode: RouteMode) {
+    return shouldBuildProSeDraftingReadiness({ message, routeMode });
+}
+
+function appendUniqueMarkdownSections(base: string, sections: string[]) {
+    const existing = base.trim();
+    const additions = sections
+        .map((section) => section.trim())
+        .filter((section) => section.length > 0 && !existing.includes(section));
+    return [existing, ...additions].filter(Boolean).join('\n\n');
+}
+
+function firstCourtFilingDate(courtFiling: CourtFilingExtraction | null | undefined, type: 'hearing' | 'response_deadline') {
+    return courtFiling?.deadlinesOrHearings.find((item) => item.type === type)?.dateOrTime ?? null;
+}
+
+function userRequestedOutcome(message: string) {
+    return message.match(/\bi\s+(?:want|need|am asking for)\s+([^.!?]{3,160})/i)?.[1]?.trim() ?? null;
+}
+
+function hasCertificateOfServiceSignal(
+    courtFiling: CourtFilingExtraction | null,
+    message: string,
+    courtSettings: GenerationContext['courtSettings']
+) {
+    const formattingMentionsCertificate = Boolean(
+        courtSettings?.formattingOverridesV2?.certificateSeparatePage !== undefined ||
+        /certificate\s+of\s+service/i.test(JSON.stringify(courtSettings?.formattingOverrides ?? {}))
+    );
+    return Boolean(
+        formattingMentionsCertificate ||
+        courtFiling?.serviceClues.some((clue) => /\bcertificate\s+of\s+service\b/i.test(clue)) ||
+        /\bcertificate\s+of\s+service\b/i.test(message)
+    );
+}
+
+function hasLocalFormattingRulesSignal(courtSettings: GenerationContext['courtSettings']) {
+    return Boolean(
+        courtSettings?.aiVerified ||
+        courtSettings?.profileKey ||
+        courtSettings?.profileVersion ||
+        courtSettings?.formattingOverrides ||
+        courtSettings?.formattingOverridesV2
+    );
+}
+
+function enrichDeterministicLegalFields(args: {
+    response: NexxAssistantResponse;
+    routeMode: RouteMode;
+    userMessage: string;
+    context: GenerationContext;
+    sourcePackets: LegalDocumentSourcePacket[];
+    courtFilingExtraction: CourtFilingExtraction | null;
+}) {
+    const state = args.context.courtSettings?.state;
+    const county = args.context.courtSettings?.county;
+    const courtName = args.context.courtSettings?.courtName;
+    const orderVersion = args.sourcePackets.length > 0
+        ? resolveOrderVersion(args.sourcePackets)
+        : null;
+    const localResourceLookup = buildLocalLegalResourceLookup({
+        message: args.userMessage,
+        routeMode: args.routeMode,
+        state,
+        county,
+        courtName,
+    });
+    const proSeDraftingReadiness = shouldBuildProSeReadiness(args.userMessage, args.routeMode)
+        ? buildProSeDraftingReadiness({
+            message: args.userMessage,
+            courtName,
+            causeNumberKnown: Boolean(args.context.courtSettings?.causeNumber),
+            partyNamesKnown: Boolean(args.context.courtSettings?.petitionerLegalName && args.context.courtSettings?.respondentLegalName),
+            serviceDate: null,
+            hearingDate: firstCourtFilingDate(args.courtFilingExtraction, 'hearing'),
+            responseDeadline: firstCourtFilingDate(args.courtFilingExtraction, 'response_deadline'),
+            hasCurrentOrder: orderVersion?.authorityStatus.enforceabilityConfirmed ?? null,
+            userRequestedOutcome: userRequestedOutcome(args.userMessage),
+            factsInDateOrder: Boolean(args.courtFilingExtraction?.allegations.length || /\b(?:today|yesterday|on\s+[A-Z][a-z]+\s+\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b/.test(args.userMessage)),
+            exhibitsKnown: /\b(exhibit|screenshot|attached|uploaded|photo|record|message)\b/i.test(args.userMessage),
+            feeWaiverNeedKnown: /\b(fee waiver|statement of inability|no money|can'?t afford|cannot afford|low income)\b/i.test(args.userMessage),
+            certificateOfServiceKnown: hasCertificateOfServiceSignal(
+                args.courtFilingExtraction,
+                args.userMessage,
+                args.context.courtSettings
+            ),
+            signatureBlockKnown: Boolean(args.context.courtSettings?.petitionerLegalName || args.context.courtSettings?.respondentLegalName),
+            localFormattingRulesKnown: hasLocalFormattingRulesSignal(args.context.courtSettings),
+            courtFiling: args.courtFilingExtraction,
+        })
+        : null;
+    const deadlineAnalysis = buildDeadlineAnalysis({
+        message: args.userMessage,
+        routeMode: args.routeMode,
+        courtFiling: args.courtFilingExtraction,
+        jurisdiction: { state, county, courtName },
+        userConfirmedReceiptDate: null,
+        userConfirmedService: null,
+        serviceMethod: args.courtFilingExtraction?.claimedServiceMethod ?? null,
+        timezone: null,
+    });
+    const legalBasis = buildLegalBasisList({
+        documentAnswer: args.response.documentAnswer,
+        legalInterpretation: args.response.legalInterpretation,
+        litigationNavigation: args.response.litigationNavigation,
+        localResourceLookup,
+        jurisdiction: [county, state].filter(Boolean).join(', ') || null,
+    });
+    const extraSections = [
+        shouldAppendDeadlineSection(args.userMessage, args.routeMode)
+            ? renderDeadlineAnalysisMarkdown(deadlineAnalysis)
+            : '',
+        shouldAppendResourceSection(args.userMessage, args.routeMode)
+            ? renderLocalResourceLookupMarkdown(localResourceLookup)
+            : '',
+        shouldBuildProSeReadiness(args.userMessage, args.routeMode)
+            ? renderProSeDraftingReadinessMarkdown(proSeDraftingReadiness)
+            : '',
+        orderVersion && !orderVersion.authorityStatus.enforceabilityConfirmed && orderVersion.candidateCount > 0
+            ? 'I would not treat the order as enforceable from this text alone until the signed, entered, and currently controlling version is confirmed.'
+            : '',
+    ];
+
+    return {
+        ...args.response,
+        localResourceLookup,
+        proSeDraftingReadiness,
+        orderVersion,
+        legalBasis,
+        deadlineAnalysis,
+        message: appendUniqueMarkdownSections(args.response.message, extraSections),
+    };
+}
+
 function compactPageLabel(pageStart?: number | null, pageEnd?: number | null) {
     if (!pageStart) return null;
     return pageEnd && pageEnd !== pageStart
@@ -1411,6 +1584,7 @@ function citationLockedFallbackResponse(
         documentAnswer,
         legalInterpretation: null,
         litigationNavigation: null,
+        ...emptyDeterministicLegalFields(),
     };
 }
 
@@ -1458,6 +1632,7 @@ async function repairCitationLockedResponse(args: {
                 args.promptBundle.developerPrompt,
                 args.promptBundle.featurePrompt,
                 args.promptBundle.artifactPrompt,
+                args.promptBundle.deterministicFieldPrompt,
                 args.promptBundle.attachmentContextPrompt,
             ].join('\n\n'),
             userPayload: { message: args.userMessage },
@@ -1633,6 +1808,7 @@ async function generateWithFallbacks({
                     promptBundle.developerPrompt,
                     promptBundle.featurePrompt,
                     promptBundle.artifactPrompt,
+                    promptBundle.deterministicFieldPrompt,
                     contextPrompt,
                     attachmentContextPrompt,
                 ].join('\n\n'),
@@ -1807,6 +1983,14 @@ async function generateWithFallbacks({
                 courtSettings: context.courtSettings,
                 courtFilingExtraction,
             });
+            parsedResponse = enrichDeterministicLegalFields({
+                response: parsedResponse,
+                routeMode,
+                userMessage: context.turn.message,
+                context,
+                sourcePackets: promptBundle.documentSourcePackets,
+                courtFilingExtraction,
+            });
             parsedResponse.message = polishLegalResponse(parsedResponse.message);
             parsedResponse = verifyAndRepairRenderedResponse(parsedResponse, routeMode, context.turn.message);
 
@@ -1819,6 +2003,7 @@ async function generateWithFallbacks({
                 attachmentContexts: promptBundle.attachmentContexts,
                 documentSourcePackets: promptBundle.documentSourcePackets,
                 documentReference: promptBundle.documentReference,
+                routeMode,
             };
         } catch (error) {
             const normalized = normalizeProviderError(error);
@@ -1832,8 +2017,19 @@ async function generateWithFallbacks({
     }
 
     const normalized = normalizeProviderError(lastError);
-    return {
+    const degradedCourtFilingExtraction = isLitigationNavigationRoute(routeMode)
+        ? extractCourtFilingFromSources(promptBundle.documentSourcePackets)
+        : null;
+    const enrichedDegradedResponse = enrichDeterministicLegalFields({
         response: degradedResponse(),
+        routeMode,
+        userMessage: context.turn.message,
+        context,
+        sourcePackets: promptBundle.documentSourcePackets,
+        courtFilingExtraction: degradedCourtFilingExtraction,
+    });
+    return {
+        response: enrichedDegradedResponse,
         responseId: undefined,
         model,
         degraded: true,
@@ -1847,6 +2043,7 @@ async function generateWithFallbacks({
         attachmentContexts: promptBundle.attachmentContexts,
         documentSourcePackets: promptBundle.documentSourcePackets,
         documentReference: promptBundle.documentReference,
+        routeMode,
     };
 }
 
@@ -1943,6 +2140,14 @@ export const processChatGenerationJob = internalAction({
                 leaseOwner,
                 content: result.response.message,
                 artifactsJson: JSON.stringify(result.response.artifacts),
+                metadataJson: JSON.stringify({
+                    routeMode: result.routeMode,
+                    localResourceLookup: result.response.localResourceLookup,
+                    proSeDraftingReadiness: result.response.proSeDraftingReadiness,
+                    orderVersion: result.response.orderVersion,
+                    legalBasis: result.response.legalBasis,
+                    deadlineAnalysis: result.response.deadlineAnalysis,
+                }),
                 providerResponseId: result.responseId,
                 degraded: result.degraded,
                 errorCode: result.errorCode,

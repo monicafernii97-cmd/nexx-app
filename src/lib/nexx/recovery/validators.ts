@@ -7,13 +7,123 @@ import { validateLegalDocumentAnswerShape } from '../legalDocumentAnswer';
  * Checks structural validity of parsed responses.
  */
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isOptionalString(value: unknown) {
+  return value === undefined || value === null || typeof value === 'string';
+}
+
+function validateFeeSource(value: unknown) {
+  return isObject(value) &&
+    typeof value.sourceId === 'string' &&
+    typeof value.title === 'string' &&
+    typeof value.sourceType === 'string' &&
+    typeof value.summary === 'string' &&
+    isOptionalString(value.url) &&
+    typeof value.retrievedAt === 'string';
+}
+
+function validateResource(value: unknown) {
+  return isObject(value) &&
+    typeof value.name === 'string' &&
+    typeof value.type === 'string' &&
+    typeof value.summary === 'string' &&
+    isOptionalString(value.url) &&
+    typeof value.retrievedAt === 'string';
+}
+
+function validateExactFeeFinding(value: unknown) {
+  return isObject(value) &&
+    typeof value.feeType === 'string' &&
+    typeof value.amount === 'string' &&
+    typeof value.sourceId === 'string' &&
+    typeof value.sourceTitle === 'string' &&
+    typeof value.retrievedAt === 'string';
+}
+
+function validateSourcedDate(value: unknown) {
+  return isObject(value) &&
+    typeof value.label === 'string' &&
+    typeof value.value === 'string' &&
+    isStringArray(value.sourceIds) &&
+    (value.pageStart === undefined || value.pageStart === null || typeof value.pageStart === 'number') &&
+    (value.pageEnd === undefined || value.pageEnd === null || typeof value.pageEnd === 'number');
+}
+
+function validateLocalResourceLookup(value: unknown) {
+  if (value === null) return true;
+  if (!isObject(value)) return false;
+  if (!isObject(value.jurisdiction)) return false;
+  if (!isOptionalString(value.jurisdiction.state) || !isOptionalString(value.jurisdiction.county) || !isOptionalString(value.jurisdiction.courtName)) return false;
+  if (!Array.isArray(value.feeSources) || !value.feeSources.every(validateFeeSource)) return false;
+  if (!Array.isArray(value.resources) || !value.resources.every(validateResource)) return false;
+  if (!Array.isArray(value.exactFeeFindings) || !value.exactFeeFindings.every(validateExactFeeFinding)) return false;
+  return isStringArray(value.warnings);
+}
+
+function validateProSeDraftingReadiness(value: unknown) {
+  if (value === null) return true;
+  if (!isObject(value)) return false;
+  return typeof value.requestedDocument === 'string' &&
+    typeof value.readinessStage === 'string' &&
+    typeof value.isFilingReady === 'boolean' &&
+    isStringArray(value.confirmedFacts) &&
+    isStringArray(value.missingFacts) &&
+    isStringArray(value.notApplicableFacts) &&
+    typeof value.draftingNote === 'string';
+}
+
+function validateOrderVersion(value: unknown) {
+  if (value === null) return true;
+  if (!isObject(value) || !isObject(value.authorityStatus)) return false;
+  return isOptionalString(value.activeOrderFileId) &&
+    isOptionalString(value.activeOrderFileName) &&
+    typeof value.candidateCount === 'number' &&
+    typeof value.needsUserSelection === 'boolean' &&
+    typeof value.authorityStatus.status === 'string' &&
+    typeof value.authorityStatus.enforceabilityConfirmed === 'boolean' &&
+    isStringArray(value.authorityStatus.sourceIds);
+}
+
+function validateLegalBasis(value: unknown) {
+  return Array.isArray(value) && value.every((basis) =>
+    isObject(basis) &&
+    typeof basis.basisType === 'string' &&
+    typeof basis.proposition === 'string' &&
+    isStringArray(basis.sourceIds)
+  );
+}
+
+function validateDeadlineAnalysis(value: unknown) {
+  if (value === null) return true;
+  if (!isObject(value)) return false;
+  return typeof value.status === 'string' &&
+    isOptionalString(value.trigger) &&
+    isOptionalString(value.serviceMethod) &&
+    isOptionalString(value.governingRule) &&
+    isOptionalString(value.jurisdiction) &&
+    isOptionalString(value.timezone) &&
+    isOptionalString(value.calendarTreatment) &&
+    isOptionalString(value.calendarDate) &&
+    Array.isArray(value.sourcedDates) &&
+    value.sourcedDates.every(validateSourcedDate) &&
+    isStringArray(value.missingInputs) &&
+    typeof value.explanation === 'string';
+}
+
 /**
  * Validate that a parsed object matches the NexxAssistantResponse shape.
  */
 export function validateAssistantResponse(parsed: unknown): boolean {
-  if (!parsed || typeof parsed !== 'object') return false;
+  if (!isObject(parsed)) return false;
 
-  const obj = parsed as Record<string, unknown>;
+  const obj = parsed;
 
   // Must have a non-empty message string
   if (typeof obj.message !== 'string' || obj.message.length === 0) return false;
@@ -40,6 +150,11 @@ export function validateAssistantResponse(parsed: unknown): boolean {
   if (obj.legalInterpretation !== null && !validateLegalInterpretationAnswerShape(obj.legalInterpretation)) return false;
   if (!('litigationNavigation' in obj)) return false;
   if (obj.litigationNavigation !== null && !validateLitigationNavigationResponseShape(obj.litigationNavigation)) return false;
+  if (!('localResourceLookup' in obj) || !validateLocalResourceLookup(obj.localResourceLookup)) return false;
+  if (!('proSeDraftingReadiness' in obj) || !validateProSeDraftingReadiness(obj.proSeDraftingReadiness)) return false;
+  if (!('orderVersion' in obj) || !validateOrderVersion(obj.orderVersion)) return false;
+  if (!('legalBasis' in obj) || !validateLegalBasis(obj.legalBasis)) return false;
+  if (!('deadlineAnalysis' in obj) || !validateDeadlineAnalysis(obj.deadlineAnalysis)) return false;
 
   return true;
 }

@@ -17,6 +17,14 @@ export type OrderAuthorityStatus = {
 };
 
 const DATE_PHRASE = String.raw`(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4})`;
+const SIGNED_DATE_PATTERNS = [
+  new RegExp(String.raw`\bsigned\s+(?:on\s+)?(${DATE_PHRASE})`, 'i'),
+  new RegExp(String.raw`\bdate\s+signed\s*:?\s*(${DATE_PHRASE})`, 'i'),
+];
+const FILED_DATE_PATTERNS = [
+  new RegExp(String.raw`\bfiled\s+(?:on\s+)?(${DATE_PHRASE})`, 'i'),
+  new RegExp(String.raw`\bentered\s+(?:on\s+)?(${DATE_PHRASE})`, 'i'),
+];
 
 function unique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
@@ -53,14 +61,8 @@ export function resolveOrderAuthorityStatus(sourcePackets: LegalDocumentSourcePa
   const signedSources = sourcesMatching(sourcePackets, /\b(signed|judge|entered|ordered|decreed)\b/i);
   const filedSources = sourcesMatching(sourcePackets, /\b(file stamp|filed|entered)\b/i);
   const expiredSources = sourcesMatching(sourcePackets, /\b(expired|expires|until further order|temporary orders? terminated)\b/i);
-  const signedDate = firstMatch(combined, [
-    new RegExp(String.raw`\bsigned\s+(?:on\s+)?(${DATE_PHRASE})`, 'i'),
-    new RegExp(String.raw`\bdate\s+signed\s*:?\s*(${DATE_PHRASE})`, 'i'),
-  ]) ?? null;
-  const filedDate = firstMatch(combined, [
-    new RegExp(String.raw`\bfiled\s+(?:on\s+)?(${DATE_PHRASE})`, 'i'),
-    new RegExp(String.raw`\bentered\s+(?:on\s+)?(${DATE_PHRASE})`, 'i'),
-  ]) ?? null;
+  const signedDate = firstMatch(combined, SIGNED_DATE_PATTERNS) ?? null;
+  const filedDate = firstMatch(combined, FILED_DATE_PATTERNS) ?? null;
   const supersededBy = firstMatch(combined, [
     /\bsuperseded\s+by\s+([^.\n]{3,120})/i,
     /\breplaced\s+by\s+([^.\n]{3,120})/i,

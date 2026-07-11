@@ -19,12 +19,51 @@ function isOptionalString(value: unknown) {
   return value === undefined || value === null || typeof value === 'string';
 }
 
+function validateFeeSource(value: unknown) {
+  return isObject(value) &&
+    typeof value.sourceId === 'string' &&
+    typeof value.title === 'string' &&
+    typeof value.sourceType === 'string' &&
+    typeof value.summary === 'string' &&
+    isOptionalString(value.url) &&
+    typeof value.retrievedAt === 'string';
+}
+
+function validateResource(value: unknown) {
+  return isObject(value) &&
+    typeof value.name === 'string' &&
+    typeof value.type === 'string' &&
+    typeof value.summary === 'string' &&
+    isOptionalString(value.url) &&
+    typeof value.retrievedAt === 'string';
+}
+
+function validateExactFeeFinding(value: unknown) {
+  return isObject(value) &&
+    typeof value.feeType === 'string' &&
+    typeof value.amount === 'string' &&
+    typeof value.sourceId === 'string' &&
+    typeof value.sourceTitle === 'string' &&
+    typeof value.retrievedAt === 'string';
+}
+
+function validateSourcedDate(value: unknown) {
+  return isObject(value) &&
+    typeof value.label === 'string' &&
+    typeof value.value === 'string' &&
+    isStringArray(value.sourceIds) &&
+    (value.pageStart === undefined || value.pageStart === null || typeof value.pageStart === 'number') &&
+    (value.pageEnd === undefined || value.pageEnd === null || typeof value.pageEnd === 'number');
+}
+
 function validateLocalResourceLookup(value: unknown) {
   if (value === null) return true;
   if (!isObject(value)) return false;
   if (!isObject(value.jurisdiction)) return false;
   if (!isOptionalString(value.jurisdiction.state) || !isOptionalString(value.jurisdiction.county) || !isOptionalString(value.jurisdiction.courtName)) return false;
-  if (!Array.isArray(value.feeSources) || !Array.isArray(value.resources) || !Array.isArray(value.exactFeeFindings)) return false;
+  if (!Array.isArray(value.feeSources) || !value.feeSources.every(validateFeeSource)) return false;
+  if (!Array.isArray(value.resources) || !value.resources.every(validateResource)) return false;
+  if (!Array.isArray(value.exactFeeFindings) || !value.exactFeeFindings.every(validateExactFeeFinding)) return false;
   return isStringArray(value.warnings);
 }
 
@@ -73,6 +112,7 @@ function validateDeadlineAnalysis(value: unknown) {
     isOptionalString(value.calendarTreatment) &&
     isOptionalString(value.calendarDate) &&
     Array.isArray(value.sourcedDates) &&
+    value.sourcedDates.every(validateSourcedDate) &&
     isStringArray(value.missingInputs) &&
     typeof value.explanation === 'string';
 }

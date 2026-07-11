@@ -1,4 +1,5 @@
 import type { CourtFilingExtraction } from './courtFilingExtractor';
+import type { RouteMode } from '../../types';
 
 export type ProSeDraftingDocumentType =
   | 'answer'
@@ -123,6 +124,24 @@ const DOCUMENT_FACT_REQUIREMENTS: Record<ProSeDraftingDocumentType, DraftFact[]>
   timeline: [],
 };
 
+const CORE_CASE_FACTS: DraftFact[] = [
+  'court name',
+  'cause number',
+  'party names',
+  'filing type',
+  'service date',
+  'response deadline',
+  'hearing date',
+  'relief requested by the other party',
+];
+
+const PRO_SE_READINESS_ROUTE_MODES = new Set<RouteMode>([
+  'court_ready_drafting',
+  'court_response_planning',
+  'filing_walkthrough',
+  'pro_se_guidance',
+]);
+
 function hasText(value: string | null | undefined) {
   return Boolean(value && value.trim());
 }
@@ -136,6 +155,13 @@ export function inferRequestedProSeDocument(message: string): ProSeDraftingDocum
   if (/\bco[-\s]?parent|text|message|respond\s+to\s+(?:him|her)\b/i.test(message)) return 'co_parent_message';
   if (/\banswer\b/i.test(message)) return 'answer';
   return 'response_to_motion';
+}
+
+export function shouldBuildProSeDraftingReadiness(args: { message: string; routeMode?: RouteMode }) {
+  return Boolean(
+    (args.routeMode && PRO_SE_READINESS_ROUTE_MODES.has(args.routeMode)) ||
+    /\b(draft|file|answer|response|declaration|pro se|without (?:a|an) attorney|hearing outline|fee waiver)\b/i.test(args.message)
+  );
 }
 
 export function buildProSeDraftingReadiness(args: {
@@ -169,8 +195,8 @@ export function buildProSeDraftingReadiness(args: {
     };
   }
 
-  const confirmedFacts: string[] = [];
-  const missingFacts: string[] = [];
+  const confirmedFacts: DraftFact[] = [];
+  const missingFacts: DraftFact[] = [];
   const filing = args.courtFiling;
   const applicableFacts = DOCUMENT_FACT_REQUIREMENTS[requestedDocument];
   const checks: Record<DraftFact, boolean> = {
@@ -200,18 +226,7 @@ export function buildProSeDraftingReadiness(args: {
   const localRulesRequired = applicableFacts.includes('local formatting rules');
   const missingWithoutLocalRules = missingFacts.filter((fact) => fact !== 'local formatting rules');
   const readinessStage: DraftReadinessStage = missingWithoutLocalRules.length > 0
-    ? missingWithoutLocalRules.some((fact) =>
-      [
-        'court name',
-        'cause number',
-        'party names',
-        'filing type',
-        'service date',
-        'response deadline',
-        'hearing date',
-        'relief requested by the other party',
-      ].includes(fact)
-    )
+    ? missingWithoutLocalRules.some((fact) => CORE_CASE_FACTS.includes(fact))
       ? 'missing_case_facts'
       : 'working_draft'
     : localRulesRequired && !args.localFormattingRulesKnown

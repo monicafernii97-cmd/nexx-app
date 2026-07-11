@@ -131,24 +131,24 @@ function addCountyResource(lookup: LocalLegalResourceLookup, retrievedAt: string
   if (!county) return;
 
   const knownCounty = state === 'texas' ? TEXAS_COUNTY_CLERKS[county] : undefined;
+  if (!knownCounty) return;
+
   lookup.resources.unshift({
-    name: knownCounty?.title ?? `${normalized(lookup.jurisdiction.county)} District Clerk`,
+    name: knownCounty.title,
     type: 'district_clerk',
     summary: 'Use the official district clerk or court website to confirm filing fees, local forms, accepted filing methods, and hearing settings.',
-    url: knownCounty?.url ?? null,
+    url: knownCounty.url,
     retrievedAt,
   });
 
-  if (knownCounty) {
-    lookup.feeSources.push({
-      sourceId: `tx_${county.replace(/\s+/g, '_')}_district_clerk`,
-      title: knownCounty.title,
-      sourceType: 'district_clerk',
-      summary: 'County district clerk site. Check its current fee schedule before relying on any amount.',
-      url: knownCounty.url,
-      retrievedAt,
-    });
-  }
+  lookup.feeSources.push({
+    sourceId: `tx_${county.replace(/\s+/g, '_')}_district_clerk`,
+    title: knownCounty.title,
+    sourceType: 'district_clerk',
+    summary: 'County district clerk site. Check its current fee schedule before relying on any amount.',
+    url: knownCounty.url,
+    retrievedAt,
+  });
 }
 
 function addGenericResources(lookup: LocalLegalResourceLookup, retrievedAt: string) {

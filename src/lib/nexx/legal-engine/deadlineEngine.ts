@@ -21,7 +21,7 @@ export type DeadlineAnalysis = {
   explanation: string;
 };
 
-function hasDeadlineQuestion(message: string, routeMode?: RouteMode) {
+export function hasDeadlineQuestion(message: string, routeMode?: RouteMode) {
   return routeMode === 'court_response_planning' ||
     routeMode === 'filing_walkthrough' ||
     routeMode === 'court_ready_drafting' ||
@@ -81,6 +81,8 @@ export function buildDeadlineAnalysis(args: {
   }
 
   return {
+    // The governing rule is intentionally always required until a sourced
+    // deadline-rule resolver is added, so this builder should not calculate.
     status: missingInputs.length > 0 ? 'needs_inputs' : 'calculation_ready',
     trigger: args.userConfirmedReceiptDate ?? null,
     serviceMethod: args.serviceMethod ?? args.courtFiling?.claimedServiceMethod ?? null,

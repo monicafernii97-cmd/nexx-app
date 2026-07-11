@@ -16,11 +16,11 @@ import { NEXX_RESPONSE_SCHEMA } from '../src/lib/nexx/schemas';
 import { ANALYSIS_STATUS_UI_KIND, SAFE_ANALYSIS_DRAFT_MESSAGE } from '../src/lib/chat/analysisStatus';
 import { buildOfficialLegalResearchTargets } from '../src/lib/nexx/legalResearchTargets';
 import { extractCourtFilingFromSources, type CourtFilingExtraction } from '../src/lib/nexx/legal-engine/courtFilingExtractor';
-import { buildDeadlineAnalysis, renderDeadlineAnalysisMarkdown } from '../src/lib/nexx/legal-engine/deadlineEngine';
+import { buildDeadlineAnalysis, hasDeadlineQuestion, renderDeadlineAnalysisMarkdown } from '../src/lib/nexx/legal-engine/deadlineEngine';
 import { buildLegalBasisList } from '../src/lib/nexx/legal-engine/legalAuthority';
-import { buildLocalLegalResourceLookup, renderLocalResourceLookupMarkdown } from '../src/lib/nexx/legal-engine/localResourceLookup';
+import { buildLocalLegalResourceLookup, renderLocalResourceLookupMarkdown, shouldBuildLocalResourceLookup } from '../src/lib/nexx/legal-engine/localResourceLookup';
 import { resolveOrderVersion } from '../src/lib/nexx/legal-engine/orderVersionResolver';
-import { buildProSeDraftingReadiness, renderProSeDraftingReadinessMarkdown } from '../src/lib/nexx/legal-engine/proSeDraftingFlow';
+import { buildProSeDraftingReadiness, renderProSeDraftingReadinessMarkdown, shouldBuildProSeDraftingReadiness } from '../src/lib/nexx/legal-engine/proSeDraftingFlow';
 import { composeLegalResponse } from '../src/lib/nexx/legal-engine/responseComposer';
 import { repairRenderedOutput, verifyRenderedOutput } from '../src/lib/nexx/legal-engine/renderedOutputVerifier';
 import { recoverStructuredOutput } from '../src/lib/nexx/recovery/recoverStructuredOutput';
@@ -504,6 +504,11 @@ type GenerationContext = {
         petitionerLegalName?: string;
         petitionerRole?: 'petitioner' | 'respondent';
         children?: { name: string; age: number }[];
+        formattingOverrides?: unknown;
+        formattingOverridesV2?: { certificateSeparatePage?: boolean } | null;
+        profileKey?: string;
+        profileVersion?: string;
+        aiVerified?: boolean;
     } | null;
     activeCase?: {
         title?: string;
@@ -1302,24 +1307,15 @@ function renderLitigationNavigationMessage(args: {
 }
 
 function shouldAppendResourceSection(message: string, routeMode: RouteMode) {
-    return routeMode === 'attorney_resource_guidance' ||
-        routeMode === 'pro_se_guidance' ||
-        /\b(resource|legal aid|lawyer referral|limited[-\s]?scope|filing fee|fee waiver|law library|e[-\s]?file)\b/i.test(message);
+    return shouldBuildLocalResourceLookup({ message, routeMode });
 }
 
 function shouldAppendDeadlineSection(message: string, routeMode: RouteMode) {
-    return routeMode === 'court_response_planning' ||
-        routeMode === 'filing_walkthrough' ||
-        routeMode === 'court_ready_drafting' ||
-        /\b(deadline|due|served|hearing|court date|response date|answer date)\b/i.test(message);
+    return hasDeadlineQuestion(message, routeMode);
 }
 
 function shouldBuildProSeReadiness(message: string, routeMode: RouteMode) {
-    return routeMode === 'court_ready_drafting' ||
-        routeMode === 'court_response_planning' ||
-        routeMode === 'filing_walkthrough' ||
-        routeMode === 'pro_se_guidance' ||
-        /\b(draft|file|answer|response|declaration|pro se|without (?:a|an) attorney|hearing outline|fee waiver)\b/i.test(message);
+    return shouldBuildProSeDraftingReadiness({ message, routeMode });
 }
 
 function appendUniqueMarkdownSections(base: string, sections: string[]) {
@@ -1336,6 +1332,32 @@ function firstCourtFilingDate(courtFiling: CourtFilingExtraction | null | undefi
 
 function userRequestedOutcome(message: string) {
     return message.match(/\bi\s+(?:want|need|am asking for)\s+([^.!?]{3,160})/i)?.[1]?.trim() ?? null;
+}
+
+function hasCertificateOfServiceSignal(
+    courtFiling: CourtFilingExtraction | null,
+    message: string,
+    courtSettings: GenerationContext['courtSettings']
+) {
+    const formattingMentionsCertificate = Boolean(
+        courtSettings?.formattingOverridesV2?.certificateSeparatePage !== undefined ||
+        /certificate\s+of\s+service/i.test(JSON.stringify(courtSettings?.formattingOverrides ?? {}))
+    );
+    return Boolean(
+        formattingMentionsCertificate ||
+        courtFiling?.serviceClues.some((clue) => /\bcertificate\s+of\s+service\b/i.test(clue)) ||
+        /\bcertificate\s+of\s+service\b/i.test(message)
+    );
+}
+
+function hasLocalFormattingRulesSignal(courtSettings: GenerationContext['courtSettings']) {
+    return Boolean(
+        courtSettings?.aiVerified ||
+        courtSettings?.profileKey ||
+        courtSettings?.profileVersion ||
+        courtSettings?.formattingOverrides ||
+        courtSettings?.formattingOverridesV2
+    );
 }
 
 function enrichDeterministicLegalFields(args: {
@@ -1373,9 +1395,13 @@ function enrichDeterministicLegalFields(args: {
             factsInDateOrder: Boolean(args.courtFilingExtraction?.allegations.length || /\b(?:today|yesterday|on\s+[A-Z][a-z]+\s+\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b/.test(args.userMessage)),
             exhibitsKnown: /\b(exhibit|screenshot|attached|uploaded|photo|record|message)\b/i.test(args.userMessage),
             feeWaiverNeedKnown: /\b(fee waiver|statement of inability|no money|can'?t afford|cannot afford|low income)\b/i.test(args.userMessage),
-            certificateOfServiceKnown: false,
+            certificateOfServiceKnown: hasCertificateOfServiceSignal(
+                args.courtFilingExtraction,
+                args.userMessage,
+                args.context.courtSettings
+            ),
             signatureBlockKnown: Boolean(args.context.courtSettings?.petitionerLegalName || args.context.courtSettings?.respondentLegalName),
-            localFormattingRulesKnown: false,
+            localFormattingRulesKnown: hasLocalFormattingRulesSignal(args.context.courtSettings),
             courtFiling: args.courtFilingExtraction,
         })
         : null;
@@ -1991,8 +2017,19 @@ async function generateWithFallbacks({
     }
 
     const normalized = normalizeProviderError(lastError);
-    return {
+    const degradedCourtFilingExtraction = isLitigationNavigationRoute(routeMode)
+        ? extractCourtFilingFromSources(promptBundle.documentSourcePackets)
+        : null;
+    const enrichedDegradedResponse = enrichDeterministicLegalFields({
         response: degradedResponse(),
+        routeMode,
+        userMessage: context.turn.message,
+        context,
+        sourcePackets: promptBundle.documentSourcePackets,
+        courtFilingExtraction: degradedCourtFilingExtraction,
+    });
+    return {
+        response: enrichedDegradedResponse,
         responseId: undefined,
         model,
         degraded: true,

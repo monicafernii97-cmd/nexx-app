@@ -14,9 +14,9 @@ export type LegalBasis = {
     | 'general_practice'
     | 'reasoned_interpretation';
   proposition: string;
-  jurisdiction?: string;
-  citation?: string;
-  effectiveDate?: string;
+  jurisdiction: string | null;
+  citation: string | null;
+  effectiveDate: string | null;
   sourceIds: string[];
 };
 
@@ -38,8 +38,9 @@ export function buildLegalBasisList(args: {
       bases.push({
         basisType: 'signed_order',
         proposition: clause.label || args.legalInterpretation.directAnswer,
-        jurisdiction: args.jurisdiction ?? undefined,
-        citation: clause.pageStart ? `p. ${clause.pageStart}` : undefined,
+        jurisdiction: args.jurisdiction ?? null,
+        citation: clause.pageStart ? `p. ${clause.pageStart}` : null,
+        effectiveDate: null,
         sourceIds: clause.sourceIds,
       });
     }
@@ -47,7 +48,9 @@ export function buildLegalBasisList(args: {
       bases.push({
         basisType: priority.signal === 'later_modification' ? 'later_modification' : 'reasoned_interpretation',
         proposition: priority.explanation,
-        jurisdiction: args.jurisdiction ?? undefined,
+        jurisdiction: args.jurisdiction ?? null,
+        citation: null,
+        effectiveDate: null,
         sourceIds: priority.sourceIds,
       });
     }
@@ -58,7 +61,9 @@ export function buildLegalBasisList(args: {
       bases.push({
         basisType: claim.claimType === 'procedural' ? 'general_practice' : 'reasoned_interpretation',
         proposition: claim.claim,
-        jurisdiction: args.jurisdiction ?? undefined,
+        jurisdiction: args.jurisdiction ?? null,
+        citation: null,
+        effectiveDate: null,
         sourceIds: claim.sourceIds,
       });
     }
@@ -69,7 +74,9 @@ export function buildLegalBasisList(args: {
       bases.push({
         basisType: path.localAuthoritySourceIds.length > 0 ? 'local_rule' : 'general_practice',
         proposition: `${path.candidate}: ${path.reason}`,
-        jurisdiction: args.jurisdiction ?? undefined,
+        jurisdiction: args.jurisdiction ?? null,
+        citation: null,
+        effectiveDate: null,
         sourceIds: path.localAuthoritySourceIds,
       });
     }
@@ -83,7 +90,7 @@ export function buildLegalBasisList(args: {
         jurisdiction: compact([
           args.localResourceLookup.jurisdiction.county,
           args.localResourceLookup.jurisdiction.state,
-        ]).join(', ') || undefined,
+        ]).join(', ') || null,
         citation: source.title,
         effectiveDate: source.retrievedAt,
         sourceIds: [source.sourceId],

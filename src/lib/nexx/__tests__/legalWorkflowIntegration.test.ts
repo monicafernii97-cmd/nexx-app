@@ -79,6 +79,19 @@ describe('P1 legal workflow integration helpers', () => {
     expect(lookup?.exactFeeFindings).toEqual([]);
   });
 
+  it('keeps generic resources for non-Texas counties without a verified clerk source', () => {
+    const lookup = buildLocalLegalResourceLookup({
+      message: 'I need legal aid and court forms.',
+      routeMode: 'pro_se_guidance',
+      state: 'Pennsylvania',
+      county: 'Allegheny County',
+    });
+
+    expect(lookup?.resources.some((resource) => resource.name === 'LawHelp.org')).toBe(true);
+    expect(lookup?.resources.some((resource) => resource.name.includes('National Center for State Courts'))).toBe(true);
+    expect(lookup?.resources.some((resource) => resource.type === 'district_clerk' && resource.url === null)).toBe(false);
+  });
+
   it('keeps pro se readiness document-specific instead of using one universal checklist', () => {
     const readiness = buildProSeDraftingReadiness({
       message: 'Help me build a hearing outline.',
@@ -97,6 +110,32 @@ describe('P1 legal workflow integration helpers', () => {
     expect(readiness.missingFacts).not.toContain('fee waiver need');
     expect(readiness.notApplicableFacts).toContain('certificate of service requirements');
     expect(readiness.notApplicableFacts).toContain('fee waiver need');
+  });
+
+  it('allows a response draft to reach final-review readiness when applicable facts are known', () => {
+    const readiness = buildProSeDraftingReadiness({
+      message: 'Draft my response to the motion.',
+      courtName: '245th District Court',
+      causeNumberKnown: true,
+      partyNamesKnown: true,
+      serviceDate: 'July 10, 2026',
+      hearingDate: 'August 5, 2026',
+      responseDeadline: 'July 24, 2026',
+      hasCurrentOrder: true,
+      userRequestedOutcome: 'deny the motion',
+      factsInDateOrder: true,
+      exhibitsKnown: true,
+      feeWaiverNeedKnown: true,
+      certificateOfServiceKnown: true,
+      signatureBlockKnown: true,
+      localFormattingRulesKnown: true,
+      courtFiling: filing(),
+    });
+
+    expect(readiness.requestedDocument).toBe('response_to_motion');
+    expect(readiness.missingFacts).toEqual([]);
+    expect(readiness.readinessStage).toBe('ready_for_final_filing_review');
+    expect(readiness.isFilingReady).toBe(true);
   });
 
   it('does not treat a proposed order as an enforceable controlling order', () => {

@@ -107,6 +107,7 @@ export async function recoverStructuredOutput(
       legalInterpretation: null,
       litigationNavigation: null,
       localResourceLookup: null,
+      legalAuthorities: null,
       proSeDraftingReadiness: null,
       orderVersion: null,
       legalBasis: [],

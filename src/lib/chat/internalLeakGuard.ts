@@ -9,6 +9,16 @@ export const INTERNAL_LEAK_KEYS = [
   'blockIds',
   'quotedText',
   'documentAnswer',
+  'legalInterpretation',
+  'litigationNavigation',
+  'localLegalResources',
+  'localResourceLookup',
+  'legalAuthorities',
+  'courtFilingExtraction',
+  'draftingReadiness',
+  'proSeDraftingReadiness',
+  'deadlineAnalysis',
+  'legalBasis',
   'retrievalBuckets',
   'retrievalReasons',
   'filingRetrievalBuckets',
@@ -79,7 +89,16 @@ function looksStructuredForBareKeys(content: string) {
 function stripSourceSection(content: string) {
   const sourceSectionMatch = content.match(SOURCE_SECTION_PATTERN);
   if (sourceSectionMatch?.index === undefined) return content;
-  return content.slice(0, sourceSectionMatch.index).trimEnd();
+  const sourceSection = content.slice(sourceSectionMatch.index);
+  const containsInternalMetadata =
+    LEGACY_SOURCE_ID_PATTERN.test(sourceSection) ||
+    hasBareInternalKeyAssignment(sourceSection) ||
+    hasJsonInternalKeyMarker(sourceSection) ||
+    /\b(chunk|retrieval|verifier|confidence|OCR|extraction|source packet|memoryGenerationId)\b/i.test(sourceSection);
+
+  return containsInternalMetadata
+    ? content.slice(0, sourceSectionMatch.index).trimEnd()
+    : content;
 }
 
 function dropLegacySourceCitationLines(content: string) {

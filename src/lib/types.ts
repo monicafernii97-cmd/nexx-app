@@ -7,6 +7,7 @@ import type { LegalInterpretationAnswer } from './nexx/legal-engine/legalInterpr
 import type { LitigationNavigationResponse } from './nexx/legal-engine/litigationNavigationSchema';
 import type { DeadlineAnalysis } from './nexx/legal-engine/deadlineEngine';
 import type { LegalBasis } from './nexx/legal-engine/legalAuthority';
+import type { LegalAuthoritiesEnvelope } from './nexx/legal-engine/legalAuthoritySchema';
 import type { ResolvedOrderVersion } from './nexx/legal-engine/orderVersionResolver';
 import type { ProSeDraftingReadiness } from './nexx/legal-engine/proSeDraftingFlow';
 import type { LocalLegalResourceLookup } from './nexx/legal-engine/resourceLookupSchema';
@@ -149,6 +150,7 @@ export interface NexxAssistantResponse {
   legalInterpretation: LegalInterpretationAnswer | null;
   litigationNavigation: LitigationNavigationResponse | null;
   localResourceLookup: LocalLegalResourceLookup | null;
+  legalAuthorities: LegalAuthoritiesEnvelope | null;
   proSeDraftingReadiness: ProSeDraftingReadiness | null;
   orderVersion: ResolvedOrderVersion | null;
   legalBasis: LegalBasis[];

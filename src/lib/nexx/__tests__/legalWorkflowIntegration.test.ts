@@ -27,7 +27,9 @@ function filing(overrides: Partial<CourtFilingExtraction> = {}): CourtFilingExtr
     documentType: 'modification',
     filedBy: 'Petitioner',
     filedAgainst: 'Respondent',
+    partyFacts: [],
     reliefRequested: ['modify conservatorship'],
+    reliefRequestedClaims: [],
     reliefRequestedFacts: [],
     allegations: [
       {
@@ -47,10 +49,13 @@ function filing(overrides: Partial<CourtFilingExtraction> = {}): CourtFilingExtr
       },
     ],
     requestedOrders: ['modify conservatorship'],
+    requestedOrderClaims: [],
     requestedOrderFacts: [],
     currentOrderReferences: [],
+    currentOrderReferenceClaims: [],
     missingInfoNeeded: [],
     serviceClues: ['Certificate of service states service by email.'],
+    serviceClueClaims: [],
     serviceClaimedInDocument: true,
     claimedServiceDate: null,
     claimedServiceMethod: 'email',
@@ -135,7 +140,34 @@ describe('P1 legal workflow integration helpers', () => {
     expect(readiness.requestedDocument).toBe('response_to_motion');
     expect(readiness.missingFacts).toEqual([]);
     expect(readiness.readinessStage).toBe('ready_for_final_filing_review');
-    expect(readiness.isFilingReady).toBe(true);
+    expect(readiness.readyForAttorneyOrClerkReview).toBe(true);
+    expect(readiness.readyForFilingSubmission).toBe(false);
+    expect(readiness.isFilingReady).toBe(false);
+  });
+
+  it('does not treat a certificate of service in the filing as the user service date', () => {
+    const readiness = buildProSeDraftingReadiness({
+      message: 'Draft my response to the motion.',
+      courtName: '245th District Court',
+      causeNumberKnown: true,
+      partyNamesKnown: true,
+      hearingDate: 'August 5, 2026',
+      responseDeadline: 'July 24, 2026',
+      hasCurrentOrder: true,
+      userRequestedOutcome: 'deny the motion',
+      factsInDateOrder: true,
+      exhibitsKnown: true,
+      feeWaiverNeedKnown: true,
+      certificateOfServiceKnown: true,
+      signatureBlockKnown: true,
+      localFormattingRulesKnown: true,
+      courtFiling: filing(),
+    });
+
+    expect(readiness.missingFacts).toContain('service date');
+    expect(readiness.requirements).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'service date', status: 'missing' }),
+    ]));
   });
 
   it('does not treat a proposed order as an enforceable controlling order', () => {

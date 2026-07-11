@@ -90,6 +90,7 @@ function legalInterpretation(overrides: Partial<LegalInterpretationAnswer> = {})
 function deterministicLegalFields() {
   return {
     localResourceLookup: null,
+    legalAuthorities: null,
     proSeDraftingReadiness: null,
     orderVersion: null,
     legalBasis: [],

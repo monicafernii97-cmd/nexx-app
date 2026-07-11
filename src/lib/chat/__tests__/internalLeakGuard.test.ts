@@ -52,7 +52,7 @@ describe('looksLikeInternalStructuredPayload', () => {
     expect(sanitized).toBe('The order requires notice within 14 days. [p. 2]');
   });
 
-  it('strips bulky source sections even without legacy source ids', () => {
+  it('preserves clean source sections without internal metadata', () => {
     const sanitized = sanitizeVisibleAssistantContent([
       'The order requires notice within 14 days. [p. 2]',
       '',
@@ -61,7 +61,8 @@ describe('looksLikeInternalStructuredPayload', () => {
       'Signed Final Order.pdf, p. 2: "notice language"',
     ].join('\n'));
 
-    expect(sanitized).toBe('The order requires notice within 14 days. [p. 2]');
+    expect(sanitized).toContain('Sources');
+    expect(sanitized).toContain('Signed Final Order.pdf, p. 2');
   });
 
   it('drops legacy source-id bullet lines even without a source heading', () => {

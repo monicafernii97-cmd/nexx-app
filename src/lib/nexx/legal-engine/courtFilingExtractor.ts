@@ -1,4 +1,5 @@
 import type { LegalDocumentSourcePacket } from '../legalDocumentAnswer';
+import type { ClaimSourceRef } from './groundedClaims';
 
 export type CourtFilingExtraction = {
   documentType:
@@ -13,7 +14,9 @@ export type CourtFilingExtraction = {
     | 'unknown';
   filedBy: string | null;
   filedAgainst: string | null;
+  partyFacts: SourceBackedFilingClaim[];
   reliefRequested: string[];
+  reliefRequestedClaims: SourceBackedFilingClaim[];
   reliefRequestedFacts: SourcedCourtFact[];
   allegations: Array<{
     allegation: string;
@@ -27,10 +30,16 @@ export type CourtFilingExtraction = {
     sourceIds: string[];
     pageStart?: number | null;
     pageEnd?: number | null;
+    supportingExcerpt?: string;
+    fileId?: string;
+    fileName?: string;
+    verificationStatus?: 'verified' | 'reported' | 'unresolved';
   }>;
   requestedOrders: string[];
+  requestedOrderClaims: SourceBackedFilingClaim[];
   requestedOrderFacts: SourcedCourtFact[];
   serviceClues: string[];
+  serviceClueClaims: SourceBackedFilingClaim[];
   serviceClaimedInDocument: boolean;
   claimedServiceDate: string | null;
   claimedServiceMethod: string | null;
@@ -38,8 +47,21 @@ export type CourtFilingExtraction = {
   userConfirmedService: boolean | null;
   serviceValidityVerified: boolean;
   currentOrderReferences: string[];
+  currentOrderReferenceClaims: SourceBackedFilingClaim[];
   sourcedFacts: SourcedCourtFact[];
   missingInfoNeeded: string[];
+};
+
+export type SourceBackedFilingClaim = {
+  text: string;
+  sourceIds: string[];
+  pageStart?: number | null;
+  pageEnd?: number | null;
+  supportingExcerpt: string;
+  fileId?: string;
+  fileName?: string;
+  sourceRefs?: ClaimSourceRef[];
+  verificationStatus?: 'verified' | 'reported' | 'unresolved';
 };
 
 export type SourcedCourtFact = {
@@ -51,15 +73,22 @@ export type SourcedCourtFact = {
     | 'hearing'
     | 'service'
     | 'deadline'
-    | 'requested_order';
+    | 'requested_order'
+    | 'party_identity'
+    | 'order_reference';
   sourceIds: string[];
   pageStart?: number | null;
   pageEnd?: number | null;
+  supportingExcerpt?: string;
+  fileId?: string;
+  fileName?: string;
+  verificationStatus?: 'verified' | 'reported' | 'unresolved';
 };
 
 export type ExtractedCourtDocument = {
   fileId: string;
   fileName: string;
+  role: CourtDocumentRole;
   documentRole:
     | 'current_filing'
     | 'controlling_order'
@@ -69,6 +98,16 @@ export type ExtractedCourtDocument = {
     | 'unknown';
   extraction: CourtFilingExtraction;
 };
+
+export type CourtDocumentRole =
+  | 'initiating_filing'
+  | 'responsive_filing'
+  | 'notice'
+  | 'controlling_order'
+  | 'proposed_order'
+  | 'exhibit'
+  | 'message_evidence'
+  | 'unknown';
 
 const DATE_PHRASE =
   String.raw`(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4})`;
@@ -105,6 +144,26 @@ function uniqueFacts(values: SourcedCourtFact[], maxItems = 8) {
   return facts;
 }
 
+function uniqueClaims(values: SourceBackedFilingClaim[], maxItems = 8) {
+  const seen = new Set<string>();
+  const claims: SourceBackedFilingClaim[] = [];
+  for (const value of values) {
+    const text = normalize(value.text);
+    if (!text || value.sourceIds.length === 0 || !value.supportingExcerpt.trim()) continue;
+    const key = `${text.toLowerCase()}:${value.sourceIds.join(',')}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    claims.push({
+      ...value,
+      text,
+      supportingExcerpt: normalize(value.supportingExcerpt),
+      verificationStatus: value.verificationStatus ?? 'verified',
+    });
+    if (claims.length >= maxItems) break;
+  }
+  return claims;
+}
+
 function snippetAround(text: string, pattern: RegExp) {
   const match = pattern.exec(text);
   if (!match) return null;
@@ -130,10 +189,34 @@ function captureParty(text: string, label: RegExp) {
   return match?.[1] ? normalize(match[1]).slice(0, 120) : null;
 }
 
+function capturePartyClaim(packets: LegalDocumentSourcePacket[], label: RegExp) {
+  for (const packet of packets) {
+    const match = packet.text.match(label);
+    if (!match?.[1]) continue;
+    return claimFromPacket(packet, normalize(match[1]).slice(0, 120), match[0]);
+  }
+  return null;
+}
+
+function extractPartyClaims(packets: LegalDocumentSourcePacket[]) {
+  return uniqueClaims([
+    capturePartyClaim(packets, /\b(?:filed by|petitioner|movant)\s*:?\s*([A-Z][^.;\n]{2,100})/i),
+    capturePartyClaim(packets, /\b(?:filed against|respondent|responding party)\s*:?\s*([A-Z][^.;\n]{2,100})/i),
+  ].filter((claim): claim is SourceBackedFilingClaim => Boolean(claim)), 4);
+}
+
+function extractCurrentOrderReferenceClaims(packets: LegalDocumentSourcePacket[]) {
+  return uniqueClaims(packets.flatMap((packet) => {
+    const snippet = snippetAround(packet.text, /\b(?:prior order|current order|final order|temporary order|possession order|parenting plan|order signed)\b/i);
+    return snippet ? [claimFromPacket(packet, snippet, snippet)] : [];
+  }), 6);
+}
+
 function factFromPacket(
   packet: LegalDocumentSourcePacket,
   factType: SourcedCourtFact['factType'],
-  text: string
+  text: string,
+  supportingExcerpt?: string
 ): SourcedCourtFact {
   return {
     text,
@@ -141,6 +224,54 @@ function factFromPacket(
     sourceIds: [packet.sourceId],
     pageStart: packet.pageStart ?? null,
     pageEnd: packet.pageEnd ?? null,
+    supportingExcerpt: supportingExcerpt ?? text,
+    fileId: packet.fileId,
+    fileName: packet.fileName,
+    verificationStatus: 'verified',
+  };
+}
+
+function claimFromPacket(
+  packet: LegalDocumentSourcePacket,
+  text: string,
+  supportingExcerpt?: string
+): SourceBackedFilingClaim {
+  return {
+    text,
+    sourceIds: [packet.sourceId],
+    pageStart: packet.pageStart ?? null,
+    pageEnd: packet.pageEnd ?? null,
+    supportingExcerpt: supportingExcerpt ?? text,
+    fileId: packet.fileId,
+    fileName: packet.fileName,
+    sourceRefs: [{
+      sourceId: packet.sourceId,
+      fileId: packet.fileId,
+      fileName: packet.fileName,
+      pageStart: packet.pageStart ?? null,
+      pageEnd: packet.pageEnd ?? null,
+    }],
+    verificationStatus: 'verified',
+  };
+}
+
+function claimFromFact(fact: SourcedCourtFact): SourceBackedFilingClaim {
+  return {
+    text: fact.text,
+    sourceIds: fact.sourceIds,
+    pageStart: fact.pageStart ?? null,
+    pageEnd: fact.pageEnd ?? null,
+    supportingExcerpt: fact.supportingExcerpt ?? fact.text,
+    fileId: fact.fileId,
+    fileName: fact.fileName,
+    sourceRefs: fact.sourceIds.map((sourceId) => ({
+      sourceId,
+      fileId: fact.fileId,
+      fileName: fact.fileName,
+      pageStart: fact.pageStart ?? null,
+      pageEnd: fact.pageEnd ?? null,
+    })),
+    verificationStatus: fact.verificationStatus ?? 'verified',
   };
 }
 
@@ -154,13 +285,14 @@ function extractReliefFacts(packets: LegalDocumentSourcePacket[]) {
         .split(/(?:\n|\.|;)/)
         .map(normalize)
         .filter((line) => /\b(request|ask|order|award|grant|modify|enforce|contempt|possession|support|attorney'?s fees?)\b/i.test(line));
-      relief.push(...sentences.map((line) => factFromPacket(packet, 'relief_requested', line)));
+      relief.push(...sentences.map((line) => factFromPacket(packet, 'relief_requested', line, prayer)));
     }
     const targeted = text.match(/\b(?:requests?|asks?)\s+(?:that\s+)?(?:the\s+)?court\s+(?:to\s+)?([^.;\n]{10,220})/gi) ?? [];
     relief.push(...targeted.map((item) => factFromPacket(
       packet,
       'relief_requested',
-      item.replace(/\b(?:requests?|asks?)\s+(?:that\s+)?(?:the\s+)?court\s+(?:to\s+)?/i, '')
+      item.replace(/\b(?:requests?|asks?)\s+(?:that\s+)?(?:the\s+)?court\s+(?:to\s+)?/i, ''),
+      item
     )));
   }
 
@@ -186,7 +318,7 @@ function extractRequestedOrderFacts(packets: LegalDocumentSourcePacket[]) {
   const facts: SourcedCourtFact[] = [];
   for (const packet of packets) {
     const matches = packet.text.match(/\b(?:order(?:ed)?|orders?|grant(?:ed)?|award(?:ed)?|modify|enforce)\b[^.;\n]{12,220}/gi) ?? [];
-    facts.push(...matches.map((match) => factFromPacket(packet, 'requested_order', match)));
+    facts.push(...matches.map((match) => factFromPacket(packet, 'requested_order', match, match)));
   }
   return uniqueFacts(facts, 10);
 }
@@ -237,6 +369,10 @@ function extractDeadlinesOrHearings(packets: LegalDocumentSourcePacket[]): Court
         sourceIds: [packet.sourceId],
         pageStart: packet.pageStart ?? null,
         pageEnd: packet.pageEnd ?? null,
+        supportingExcerpt: snippet,
+        fileId: packet.fileId,
+        fileName: packet.fileName,
+        verificationStatus: type === 'service_claim' ? 'reported' : 'verified',
       });
     }
   }
@@ -251,10 +387,12 @@ function extractDeadlinesOrHearings(packets: LegalDocumentSourcePacket[]): Court
 }
 
 function extractServiceDetails(packets: LegalDocumentSourcePacket[]) {
-  const serviceSnippets = packets.flatMap((packet) => {
+  const serviceClaims = packets.flatMap((packet) => {
     const snippet = snippetAround(packet.text, /\b(?:served|service of process|certificate of service|return of service)\b/i);
-    return snippet ? [snippet] : [];
+    return snippet ? [claimFromPacket(packet, snippet, snippet)] : [];
   });
+  const serviceClueClaims = uniqueClaims(serviceClaims, 6);
+  const serviceSnippets = serviceClueClaims.map((claim) => claim.text);
   const joined = serviceSnippets.join(' ');
   const claimedServiceDate =
     joined.match(new RegExp(String.raw`\b(?:served|service|certificate of service|return of service)\b[^.\n]{0,120}\b(${DATE_PHRASE})`, 'i'))?.[1] ??
@@ -265,6 +403,7 @@ function extractServiceDetails(packets: LegalDocumentSourcePacket[]) {
 
   return {
     serviceClues: unique(serviceSnippets, 6),
+    serviceClueClaims,
     serviceClaimedInDocument: serviceSnippets.length > 0,
     claimedServiceDate: claimedServiceDate ? normalize(claimedServiceDate) : null,
     claimedServiceMethod: claimedServiceMethod ? normalize(claimedServiceMethod) : null,
@@ -290,12 +429,13 @@ function extractionFromSingleDocument(
   );
   const deadlinesOrHearings = extractDeadlinesOrHearings(cappedPackets);
   const serviceDetails = extractServiceDetails(cappedPackets);
-  const currentOrderReferences = unique(cappedPackets.flatMap((packet) => {
-    const snippet = snippetAround(packet.text, /\b(?:prior order|current order|final order|temporary order|possession order|parenting plan|order signed)\b/i);
-    return snippet ? [snippet] : [];
-  }), 6);
+  const currentOrderReferenceClaims = extractCurrentOrderReferenceClaims(cappedPackets);
+  const currentOrderReferences = currentOrderReferenceClaims.map((claim) => claim.text);
   const reliefRequestedFacts = extractReliefFacts(cappedPackets);
+  const reliefRequestedClaims = uniqueClaims(reliefRequestedFacts.map(claimFromFact), 10);
   const requestedOrderFacts = extractRequestedOrderFacts(cappedPackets);
+  const requestedOrderClaims = uniqueClaims(requestedOrderFacts.map(claimFromFact), 10);
+  const partyFacts = extractPartyClaims(cappedPackets);
   const hearingFacts: SourcedCourtFact[] = deadlinesOrHearings
     .filter((item) => item.type === 'hearing')
     .map((item) => ({
@@ -304,6 +444,10 @@ function extractionFromSingleDocument(
       sourceIds: item.sourceIds,
       pageStart: item.pageStart,
       pageEnd: item.pageEnd,
+      supportingExcerpt: item.supportingExcerpt ?? item.dateOrTime,
+      fileId: item.fileId,
+      fileName: item.fileName,
+      verificationStatus: 'verified',
     }));
   const deadlineFacts: SourcedCourtFact[] = deadlinesOrHearings
     .filter((item) => item.type === 'response_deadline')
@@ -313,6 +457,10 @@ function extractionFromSingleDocument(
       sourceIds: item.sourceIds,
       pageStart: item.pageStart,
       pageEnd: item.pageEnd,
+      supportingExcerpt: item.supportingExcerpt ?? item.dateOrTime,
+      fileId: item.fileId,
+      fileName: item.fileName,
+      verificationStatus: 'verified',
     }));
   const serviceFacts: SourcedCourtFact[] = deadlinesOrHearings
     .filter((item) => item.type === 'service_claim')
@@ -322,6 +470,10 @@ function extractionFromSingleDocument(
       sourceIds: item.sourceIds,
       pageStart: item.pageStart,
       pageEnd: item.pageEnd,
+      supportingExcerpt: item.dateOrTime,
+      fileId: item.fileId,
+      fileName: item.fileName,
+      verificationStatus: 'reported',
     }));
   const allegationFacts: SourcedCourtFact[] = allegations.map((item) => ({
     text: item.allegation,
@@ -336,23 +488,53 @@ function extractionFromSingleDocument(
     sourceIds: cappedPackets[0] ? [cappedPackets[0].sourceId] : [],
     pageStart: cappedPackets[0]?.pageStart ?? null,
     pageEnd: cappedPackets[0]?.pageEnd ?? null,
+    supportingExcerpt: cappedPackets[0]?.text.slice(0, 300) ?? documentType.replace(/_/g, ' '),
+    fileId: cappedPackets[0]?.fileId,
+    fileName: cappedPackets[0]?.fileName,
+    verificationStatus: 'verified',
   }];
+  const partySourcedFacts: SourcedCourtFact[] = partyFacts.map((claim) => ({
+    text: claim.text,
+    factType: 'party_identity',
+    sourceIds: claim.sourceIds,
+    pageStart: claim.pageStart,
+    pageEnd: claim.pageEnd,
+    supportingExcerpt: claim.supportingExcerpt,
+    fileId: claim.fileId,
+    fileName: claim.fileName,
+    verificationStatus: 'verified',
+  }));
+  const currentOrderReferenceFacts: SourcedCourtFact[] = currentOrderReferenceClaims.map((claim) => ({
+    text: claim.text,
+    factType: 'order_reference',
+    sourceIds: claim.sourceIds,
+    pageStart: claim.pageStart,
+    pageEnd: claim.pageEnd,
+    supportingExcerpt: claim.supportingExcerpt,
+    fileId: claim.fileId,
+    fileName: claim.fileName,
+    verificationStatus: 'verified',
+  }));
 
   return {
     documentType,
     filedBy: captureParty(combinedText, /\b(?:filed by|petitioner|movant)\s*:?\s*([A-Z][^.;\n]{2,100})/i),
     filedAgainst: captureParty(combinedText, /\b(?:filed against|respondent|responding party)\s*:?\s*([A-Z][^.;\n]{2,100})/i),
+    partyFacts,
     reliefRequested: reliefRequestedFacts.length
       ? reliefRequestedFacts.map((fact) => fact.text)
       : extractRelief(combinedText),
+    reliefRequestedClaims,
     reliefRequestedFacts,
     allegations,
     deadlinesOrHearings,
     requestedOrders: requestedOrderFacts.length
       ? requestedOrderFacts.map((fact) => fact.text)
       : extractRequestedOrders(combinedText),
+    requestedOrderClaims,
     requestedOrderFacts,
     serviceClues: serviceDetails.serviceClues,
+    serviceClueClaims: serviceDetails.serviceClueClaims,
     serviceClaimedInDocument: serviceDetails.serviceClaimedInDocument,
     claimedServiceDate: serviceDetails.claimedServiceDate,
     claimedServiceMethod: serviceDetails.claimedServiceMethod,
@@ -360,14 +542,17 @@ function extractionFromSingleDocument(
     userConfirmedService: null,
     serviceValidityVerified: false,
     currentOrderReferences,
+    currentOrderReferenceClaims,
     sourcedFacts: uniqueFacts([
       ...documentTypeFact,
+      ...partySourcedFacts,
       ...reliefRequestedFacts,
       ...requestedOrderFacts,
       ...allegationFacts,
       ...hearingFacts,
       ...deadlineFacts,
       ...serviceFacts,
+      ...currentOrderReferenceFacts,
     ], 40),
     missingInfoNeeded: unique([
       'when you actually received the filing and how you received it',
@@ -404,6 +589,27 @@ function inferDocumentRole(
   return 'unknown';
 }
 
+function toCourtDocumentRole(
+  legacyRole: ExtractedCourtDocument['documentRole'],
+  extraction: CourtFilingExtraction,
+  packets: LegalDocumentSourcePacket[]
+): CourtDocumentRole {
+  const fileText = normalize(`${packets[0]?.fileName ?? ''} ${packets.slice(0, 2).map((packet) => packet.text).join(' ')}`);
+  if (legacyRole === 'notice') return 'notice';
+  if (legacyRole === 'controlling_order') {
+    return /\bproposed|unsigned|draft\b/i.test(fileText) ? 'proposed_order' : 'controlling_order';
+  }
+  if (legacyRole === 'exhibit') return 'exhibit';
+  if (legacyRole === 'current_filing' || legacyRole === 'prior_filing') {
+    if (/\b(response|answer|opposition)\b/i.test(fileText)) return 'responsive_filing';
+    return ['petition', 'motion', 'enforcement', 'modification', 'temporary_orders', 'protective_order'].includes(extraction.documentType)
+      ? 'initiating_filing'
+      : 'unknown';
+  }
+  if (/\b(text message|email thread|appclose|ourfamilywizard)\b/i.test(fileText)) return 'message_evidence';
+  return 'unknown';
+}
+
 export function extractCourtDocumentsFromSources(
   sourcePackets: LegalDocumentSourcePacket[]
 ): ExtractedCourtDocument[] {
@@ -411,10 +617,12 @@ export function extractCourtDocumentsFromSources(
   for (const [fileId, packets] of groupPacketsByFile(sourcePackets)) {
     const extraction = extractionFromSingleDocument(packets);
     if (!extraction) continue;
+    const documentRole = inferDocumentRole(extraction, packets);
     documents.push({
       fileId,
       fileName: packets[0]?.fileName ?? 'Unknown document',
-      documentRole: inferDocumentRole(extraction, packets),
+      role: toCourtDocumentRole(documentRole, extraction, packets),
+      documentRole,
       extraction,
     });
   }

@@ -1,0 +1,290 @@
+{
+  "title": "NEXX Anti-Caution Production QA",
+  "environment": {
+    "executionMode": "local_deterministic_production_like",
+    "liveBrowserExecution": "blocked_missing_dedicated_qa_credentials",
+    "baseCommit": "07cbbe68ffbeebbf55019d76b1545bf90c479248",
+    "branch": "agent/anti-caution-production-qa",
+    "deployment": [
+      "https://nexproof.io",
+      "https://nexx-24jwad456-monicafernii97-cmds-projects.vercel.app"
+    ],
+    "tester": "Codex",
+    "date": "2026-07-12T17:02:49.4951349-05:00"
+  },
+  "summary": {
+    "totalScenarios": 8,
+    "deterministicPassed": 8,
+    "deterministicFailed": 0,
+    "releaseBlockerPresent": true,
+    "releaseBlockerReason": "Final live staging and production browser smoke require dedicated QA credentials or a pre-authenticated QA browser session.",
+    "deterministicMatrixRecommendation": "approved_after_QA_001_fix",
+    "finalLiveReleaseRecommendation": "blocked_pending_live_qa_credentials"
+  },
+  "fixtures": [
+    "qa/fixtures/anti-caution/clear-order.pdf",
+    "qa/fixtures/anti-caution/partial-relevant-readable.pdf",
+    "qa/fixtures/anti-caution/irrelevant-page-unreadable.pdf",
+    "qa/fixtures/anti-caution/controlling-language-unreadable.pdf",
+    "qa/fixtures/anti-caution/no-fathers-day-clause.pdf"
+  ],
+  "automatedCoverage": [
+    "src/lib/nexx/__tests__/antiCautionProductionQa.test.ts",
+    "qa/e2e/anti-caution-document-behavior.spec.ts"
+  ],
+  "forbiddenLanguageAssertions": {
+    "internalLanguage": "\\b(OCR|retrieval|verifier|citation verifier|sourceId|chunkId|source packet|confidence label|backend|extraction warning|extracted text)\\b",
+    "forbiddenHeadings": "\\b(Cautions|Risks and Cautions|Source Details|Retrieval Details|Verifier Status|Document Extraction)\\b"
+  },
+  "scenarios": [
+    {
+      "id": "test_1_clear_document",
+      "fixture": "clear-order.pdf",
+      "prompt": "Under this order, does Father's Day possession start Thursday because Friday is a holiday, or does it start Friday?",
+      "route": "possession_access_schedule",
+      "legalIntent": "possession_access_schedule",
+      "documentAnswerType": "deterministic_legal_interpretation",
+      "certainty": "clear",
+      "sourcePages": {
+        "controlling": [5],
+        "competing": [3]
+      },
+      "visibleResponse": "No - my read is that Father's Day possession starts Friday at 6:00 p.m., not Thursday. [p. 5]\n\nWhy: The specific Father's Day provision controls over the general weekend-extension clause. [p. 5] [p. 3] The Father's Day provision is specific, while the Thursday-start language is a general weekend-extension rule. [p. 5] [p. 3] That is a general weekend-extension rule; it does not override the specific Father's Day provision. [p. 3]\n\nPractical meaning: The practical period is Friday at 6:00 p.m. through Monday at 8:00 a.m. Start: Friday at 6:00 p.m. End: Monday at 8:00 a.m. Use the specific Father's Day language if you respond.",
+      "checks": {
+        "directAnswerFirst": "pass",
+        "correctOrderInterpretation": "pass",
+        "noGenericCaution": "pass",
+        "noInternalTerminology": "pass",
+        "sourcePanelClean": "not_executed_live_browser_blocked",
+        "conversationalQuality": "pass",
+        "actionability": "pass"
+      },
+      "screenshot": null,
+      "status": "pass"
+    },
+    {
+      "id": "test_2_partially_readable_relevant_clause",
+      "fixture": "partial-relevant-readable.pdf",
+      "prompt": "Under this order, does Father's Day possession start Thursday because Friday is a holiday, or does it start Friday?",
+      "route": "possession_access_schedule",
+      "legalIntent": "possession_access_schedule",
+      "documentAnswerType": "deterministic_legal_interpretation",
+      "certainty": "best_reading",
+      "sourcePages": {
+        "controlling": [5],
+        "competing": [3]
+      },
+      "visibleResponse": "No - my read is that Father's Day possession starts Friday at 6:00 p.m., not Thursday. [p. 5]\n\nWhy: The specific Father's Day provision controls over the general weekend-extension clause. [p. 5] [p. 3] The Father's Day provision is specific, while the Thursday-start language is a general weekend-extension rule. [p. 5] [p. 3] That is a general weekend-extension rule; it does not override the specific Father's Day provision. [p. 3]\n\nPractical meaning: The practical period is Friday at 6:00 p.m. through Monday at 8:00 a.m. Start: Friday at 6:00 p.m. End: Monday at 8:00 a.m. Use the specific Father's Day language if you respond.",
+      "checks": {
+        "substantiveAnswerSameAsClear": "pass",
+        "noDocumentQualityWarning": "pass",
+        "noInternalTerminology": "pass",
+        "directness": "pass"
+      },
+      "screenshot": null,
+      "status": "pass"
+    },
+    {
+      "id": "test_3_unreadable_irrelevant_section",
+      "fixture": "irrelevant-page-unreadable.pdf",
+      "prompt": "Under this order, does Father's Day possession start Thursday because Friday is a holiday, or does it start Friday?",
+      "route": "possession_access_schedule",
+      "legalIntent": "possession_access_schedule",
+      "documentAnswerType": "deterministic_legal_interpretation",
+      "certainty": "clear",
+      "sourcePages": {
+        "controlling": [5],
+        "competing": [3]
+      },
+      "visibleResponse": "No - my read is that Father's Day possession starts Friday at 6:00 p.m., not Thursday. [p. 5]\n\nWhy: The specific Father's Day provision controls over the general weekend-extension clause. [p. 5] [p. 3] The Father's Day provision is specific, while the Thursday-start language is a general weekend-extension rule. [p. 5] [p. 3] That is a general weekend-extension rule; it does not override the specific Father's Day provision. [p. 3]\n\nPractical meaning: The practical period is Friday at 6:00 p.m. through Monday at 8:00 a.m. Start: Friday at 6:00 p.m. End: Monday at 8:00 a.m. Use the specific Father's Day language if you respond.",
+      "checks": {
+        "noMentionOfIrrelevantUnreadablePage": "pass",
+        "noDocumentQualityWarning": "pass",
+        "correctOrderInterpretation": "pass",
+        "noInternalTerminology": "pass"
+      },
+      "screenshot": null,
+      "status": "pass"
+    },
+    {
+      "id": "test_4_controlling_language_unreadable",
+      "fixture": "controlling-language-unreadable.pdf",
+      "prompt": "What time does Father's Day possession begin under this order?",
+      "route": "order_interpretation",
+      "legalIntent": "direct_order_interpretation",
+      "documentAnswerType": "insufficient_text",
+      "certainty": "insufficient_text",
+      "sourcePages": {
+        "partialControlling": [5]
+      },
+      "visibleResponse": "I cannot verify the exact Father's Day start time from this copy because the start-time phrase on page 5 is unclear. The ending time appears to be Monday at 8:00 a.m. [p. 5] A clearer copy of page 5 would let me confirm the start time.",
+      "checks": {
+        "doesNotGuessStartTime": "pass",
+        "statesReadableEnding": "pass",
+        "specificPlainEnglishLimitation": "pass",
+        "noInternalTerminology": "pass",
+        "noGenericCaution": "pass"
+      },
+      "screenshot": null,
+      "status": "pass"
+    },
+    {
+      "id": "test_5_relevant_clause_absent",
+      "fixture": "no-fathers-day-clause.pdf",
+      "prompt": "What does this order say about when Father's Day possession begins?",
+      "route": "order_interpretation",
+      "legalIntent": "direct_order_interpretation",
+      "documentAnswerType": "not_found",
+      "certainty": "insufficient_text",
+      "sourcePages": {
+        "generalWeekendClause": [3]
+      },
+      "visibleResponse": "I do not see a separate Father's Day provision in this order. The order contains a general Friday-holiday weekend-extension rule, but that is not the same as an express Father's Day provision. I would not state a specific Father's Day start time from this document alone. [p. 3]",
+      "checks": {
+        "distinguishesAbsentFromUnreadable": "pass",
+        "doesNotInventSchedule": "pass",
+        "doesNotApplyExternalDefault": "pass",
+        "noInternalTerminology": "pass"
+      },
+      "screenshot": null,
+      "status": "pass"
+    },
+    {
+      "id": "test_6_vague_context_follow_up",
+      "fixture": "clear-order.pdf",
+      "prompt": "Can he do that?",
+      "route": "possession_access_schedule",
+      "legalIntent": "direct_order_interpretation",
+      "documentAnswerType": "context_follow_up",
+      "certainty": "clear",
+      "sourcePages": {
+        "controlling": [5],
+        "competing": [3]
+      },
+      "visibleResponse": "No - not based on the order language we just reviewed. The specific Father's Day provision begins Friday at 6:00 p.m. and ends Monday at 8:00 a.m. [p. 5] The general Thursday-start language does not override that specific provision. [p. 3]",
+      "checks": {
+        "usesActiveContext": "pass",
+        "doesNotAskCanWhoDoWhat": "pass",
+        "directAnswerFirst": "pass",
+        "noInternalTerminology": "pass"
+      },
+      "screenshot": null,
+      "status": "pass"
+    },
+    {
+      "id": "test_7_verified_coparent_response_draft",
+      "fixture": "clear-order.pdf",
+      "prompt": "What should I respond?",
+      "route": "co_parent_response",
+      "legalIntent": "co_parent_response",
+      "documentAnswerType": "verified_order_based_draft",
+      "certainty": "uses_verified_interpretation",
+      "sourcePages": {
+        "controlling": [5]
+      },
+      "visibleResponse": "You can say:\n\n\"Based on the order, Father's Day possession begins Friday at 6:00 p.m. and ends Monday at 8:00 a.m. I plan to follow that provision as written.\"\n\nKeep it there. Do not argue about motives or answer every accusation.",
+      "checks": {
+        "draftFirst": "pass",
+        "usesOnlyVerifiedTerms": "pass",
+        "neutralTone": "pass",
+        "noWarningBeforeDraft": "pass",
+        "noInternalTerminology": "pass"
+      },
+      "screenshot": null,
+      "status": "pass"
+    },
+    {
+      "id": "test_8_unverified_coparent_response_draft",
+      "fixture": "controlling-language-unreadable.pdf_or_no-fathers-day-clause.pdf",
+      "prompt": "What should I respond to him about the Father's Day start time?",
+      "route": "co_parent_response",
+      "legalIntent": "co_parent_response",
+      "documentAnswerType": "unverified_order_based_draft",
+      "certainty": "no_exact_order_term_inserted",
+      "sourcePages": {
+        "startTime": []
+      },
+      "visibleResponse": "You can say:\n\n\"Please identify the specific written provision you are relying on for Father's Day possession. I want to keep this focused on the order and avoid arguing.\"",
+      "checks": {
+        "noExactUnverifiedTime": "pass",
+        "asksForWrittenProvision": "pass",
+        "neutralTone": "pass",
+        "noInternalTerminology": "pass"
+      },
+      "screenshot": null,
+      "status": "pass"
+    }
+  ],
+  "sourceDisplayQa": {
+    "defaultState": "not_executed_live_browser_blocked",
+    "expandedState": "not_executed_live_browser_blocked",
+    "expectedVisibleContent": [
+      "filename",
+      "page labels",
+      "short relevant passage"
+    ],
+    "forbiddenVisibleContent": [
+      "OCR status",
+      "extraction status",
+      "retrieval status",
+      "confidence status",
+      "citation verifier status",
+      "source ID",
+      "chunk ID",
+      "backend metadata"
+    ]
+  },
+  "defects": [
+    {
+      "id": "QA-001",
+      "severity": "P1",
+      "scenario": "Tests 4 and 5",
+      "expected": "Direct insufficient-text answers beginning with 'I cannot verify...' or 'I do not see...' should pass rendered-output verification.",
+      "actual": "Rendered-output verifier reported includesDirectAnswerWhenNeeded.",
+      "likelyLayer": "verifier",
+      "fix": "Updated startsWithDirectAnswer handling in renderedOutputVerifier.ts to recognize direct insufficient-text answers.",
+      "status": "fixed_and_rerun_passed"
+    },
+    {
+      "id": "QA-002",
+      "severity": "execution_blocker_for_live_release_signoff",
+      "scenario": "Staging and production browser smoke",
+      "expected": "Sign in with dedicated QA account, upload fixtures, capture screenshots, verify source panel.",
+      "actual": "No dedicated QA credentials were present in .env.local; no live authenticated browser run was performed.",
+      "likelyLayer": "qa_environment",
+      "fix": "Provide dedicated QA account credentials or a pre-authenticated browser session; then run qa/e2e/anti-caution-document-behavior.spec.ts through a browser driver.",
+      "status": "open"
+    }
+  ],
+  "validation": {
+    "completed": [
+      {
+        "command": "node qa/scripts/generate-anti-caution-fixtures.mjs",
+        "status": "pass"
+      },
+      {
+        "command": "npx.cmd tsc --noEmit",
+        "status": "pass"
+      },
+      {
+        "command": "npx.cmd vitest run src/lib/nexx/__tests__/antiCautionProductionQa.test.ts",
+        "status": "pass",
+        "summary": "8 tests passed"
+      },
+      {
+        "command": "npx.cmd vitest run",
+        "status": "pass",
+        "summary": "85 files passed, 1 skipped; 1083 tests passed, 3 skipped"
+      },
+      {
+        "command": "npm.cmd run lint",
+        "status": "pass",
+        "summary": "0 errors, existing warnings only"
+      },
+      {
+        "command": "NEXT_PUBLIC_CONVEX_URL=https://placeholder.convex.cloud npm.cmd run build",
+        "status": "pass"
+      }
+    ]
+  }
+}

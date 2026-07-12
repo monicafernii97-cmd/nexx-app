@@ -96,6 +96,12 @@ function needsDirectAnswerFirst(message: string, routeMode?: RouteMode) {
     /\b(can|does|is|are|am i wrong|allowed)\b/i.test(message);
 }
 
+function startsWithDirectAnswer(rendered: string) {
+  return /\b(no|yes|probably|my read|based on|usually|cannot verify|can't verify|cannot confirm|can't confirm|i do not see|i don't see|not enough supported|not enough visible)\b/i.test(
+    rendered.slice(0, 240)
+  );
+}
+
 export function verifyRenderedOutput(args: {
   rendered: string;
   userMessage: string;
@@ -111,7 +117,7 @@ export function verifyRenderedOutput(args: {
     noInventedDollarAmounts: args.exactFeesSourceBacked === true || !DOLLAR_PATTERN.test(rendered) || hasOnlyAllowedMoneyClaims(rendered),
     noDuplicateSections: duplicateHeadingCount(rendered) === 0,
     includesDirectAnswerWhenNeeded: !needsDirectAnswerFirst(args.userMessage, args.routeMode) ||
-      /\b(no|yes|probably|my read|based on|usually)\b/i.test(rendered.slice(0, 240)),
+      startsWithDirectAnswer(rendered),
     includesDraftWhenUserAskedWhatToSay: !asksWhatToSay(args.userMessage) ||
       /\b(Neutral draft|Suggested response|You can say|Send this)\b/i.test(rendered),
     includesDeadlineCheckWhenCourtFiled: !courtFiledSignal(args.userMessage, args.routeMode) ||

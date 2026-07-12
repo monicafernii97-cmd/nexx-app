@@ -1,6 +1,7 @@
 import type { RouteMode } from '../../types';
 import {
   buildCoParentResponseStrategy,
+  type VerifiedExchangeForDraft,
   type VerifiedOrderInterpretationForDraft,
 } from './coParentMessageStrategist';
 import { buildCostResourcePlan } from './costResourcePlanner';
@@ -44,6 +45,7 @@ type BuildLitigationNavigationArgs = {
   courtName?: string;
   courtFiling?: CourtFilingExtraction | null;
   verifiedOrderInterpretation?: VerifiedOrderInterpretationForDraft | null;
+  verifiedExchange?: VerifiedExchangeForDraft | null;
 };
 
 function list(items: string[]) {
@@ -264,7 +266,8 @@ export function buildLitigationNavigationResponse(args: BuildLitigationNavigatio
   const coParentResponse = buildCoParentResponseStrategy(
     intake,
     args.recentContext,
-    args.verifiedOrderInterpretation
+    args.verifiedOrderInterpretation,
+    args.verifiedExchange
   );
   const evidencePlan = buildDocumentationPlan(intake);
   const proSeAssessment = buildProSeAssessment(intake);

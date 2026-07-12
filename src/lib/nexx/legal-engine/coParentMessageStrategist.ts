@@ -10,6 +10,13 @@ export type VerifiedOrderInterpretationForDraft = {
   sourcePages?: string[];
 };
 
+export type VerifiedExchangeForDraft = {
+  time?: string | null;
+  location?: string | null;
+  date?: string | null;
+  sourcePages?: string[];
+};
+
 function textFrom(intake: PackedCaseIntake, contextText = '') {
   return [
     contextText,
@@ -54,12 +61,47 @@ function fatherDayDrafts(
   };
 }
 
-function pickupDrafts(hasOrderContext: boolean) {
+function formatSourcePages(sourcePages?: string[]) {
+  return sourcePages?.length ? ` ${sourcePages.map((page) => `[${page}]`).join(' ')}` : '';
+}
+
+function punctuateSentence(value: string) {
+  return /[.!?]$/.test(value.trim()) ? value.trim() : `${value.trim()}.`;
+}
+
+function pickupDrafts(
+  hasOrderContext: boolean,
+  verifiedExchange?: VerifiedExchangeForDraft | null
+) {
+  const pages = formatSourcePages(verifiedExchange?.sourcePages);
+  if (verifiedExchange?.time) {
+    const location = verifiedExchange.location ? ` at ${verifiedExchange.location}` : '';
+    const date = verifiedExchange.date ? ` on ${verifiedExchange.date}` : '';
+    const detail = punctuateSentence(`${verifiedExchange.time}${location}${date}`);
+    return {
+      neutralDraft:
+        `The order lists the exchange time as ${detail}${pages} I will make the child available then.`,
+      firmerDraft:
+        `I disagree with changing the exchange time outside the order. The exchange time I have verified from the order is ${detail}${pages} I will follow that written provision.`,
+    };
+  }
+
+  if (verifiedExchange?.location) {
+    const date = verifiedExchange.date ? ` on ${verifiedExchange.date}` : '';
+    const detail = punctuateSentence(`${verifiedExchange.location}${date}`);
+    return {
+      neutralDraft:
+        `The order lists the exchange location as ${detail}${pages} I will use that written exchange location.`,
+      firmerDraft:
+        `I am not agreeing to a changed exchange location outside the order. The exchange location I have verified from the order is ${detail}${pages}`,
+    };
+  }
+
   return hasOrderContext ? {
     neutralDraft:
-      'The order lists the exchange time as ____. I am available for the exchange at the court-ordered time.',
+      'Please identify the specific exchange time and written provision you are relying on. I want to keep this focused on the order and the child.',
     firmerDraft:
-      'I disagree with changing the exchange time outside the order. I will make the child available at the court-ordered exchange time of ____.',
+      'I am not agreeing to a changed exchange time without confirming the specific written provision. Please identify the exchange time and order language you believe controls.',
   } : {
     neutralDraft:
       'Please confirm the exchange time you are requesting and the written provision you are relying on. I want to keep this focused on logistics and the child.',
@@ -110,7 +152,8 @@ function issuePackDrafts(intake: PackedCaseIntake, issueText: string) {
 export function buildCoParentResponseStrategy(
   intake: PackedCaseIntake,
   contextText = '',
-  verifiedOrderInterpretation?: VerifiedOrderInterpretationForDraft | null
+  verifiedOrderInterpretation?: VerifiedOrderInterpretationForDraft | null,
+  verifiedExchange?: VerifiedExchangeForDraft | null
 ) {
   const issueText = textFrom(intake, contextText);
   const hasOrderContext = intake.currentOrderContext.hasExistingOrder === true ||
@@ -118,7 +161,7 @@ export function buildCoParentResponseStrategy(
   const drafts = /father'?s day/i.test(issueText)
     ? fatherDayDrafts(hasOrderContext, verifiedOrderInterpretation)
     : /\b(exchange|pickup|pick up|drop[-\s]?off)\b/i.test(issueText)
-      ? pickupDrafts(hasOrderContext)
+      ? pickupDrafts(hasOrderContext, verifiedExchange)
       : issuePackDrafts(intake, issueText) ?? generalDrafts(hasOrderContext);
 
   const needed = intake.coParentCommunication.userNeedsResponseDraft ||

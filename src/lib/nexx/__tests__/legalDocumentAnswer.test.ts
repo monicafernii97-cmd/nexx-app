@@ -255,10 +255,12 @@ describe('buildBestEffortLegalDocumentAnswerFromSources', () => {
     const content = renderCourtOrderAnalysisMarkdown(bestEffort, sourcePackets, 'Fallback answer');
 
     expect(bestEffort.answerType).toBe('summary');
+    expect(bestEffort.answer).toBe('Here are the key provisions in the order.');
     expect(bestEffort.claims).toHaveLength(1);
     expect(verification.passed).toBe(true);
     expect(content).toContain('## Executive Summary');
     expect(content).toContain('[p. 4]');
+    expect(content).not.toContain('I found usable court-order language');
     expect(content).not.toContain('I cannot safely support');
     expect(content).not.toContain('sourceId');
     expect(content).not.toContain('chunkId');
@@ -274,6 +276,26 @@ describe('buildBestEffortLegalDocumentAnswerFromSources', () => {
     }]);
 
     expect(bestEffort.citations[0]?.confidence).toBe('low');
+  });
+
+  it('leads targeted best-effort answers with the strongest supported finding', () => {
+    const bestEffort = buildBestEffortLegalDocumentAnswerFromSources(
+      sourcePackets,
+      undefined,
+      { isTargetedQuestion: true }
+    );
+
+    expect(bestEffort.answer).toBe('It is ORDERED that Respondent shall pay $500 no later than June 14, 2026.');
+    expect(bestEffort.answer).not.toContain('I found usable');
+    expect(bestEffort.answer).not.toContain('organized the visible provisions');
+
+    const content = renderTargetedLegalDocumentAnswerMarkdown(bestEffort, sourcePackets, 'Fallback answer');
+
+    expect(content).toContain('It is ORDERED that Respondent shall pay $500 no later than June 14, 2026. [p. 4]');
+    expect(content).not.toContain('**Why:**');
+    expect(content.indexOf('It is ORDERED that Respondent shall pay $500')).toBe(
+      content.lastIndexOf('It is ORDERED that Respondent shall pay $500')
+    );
   });
 });
 
@@ -490,7 +512,7 @@ describe('renderTargetedLegalDocumentAnswerMarkdown', () => {
 
     expect(content).toContain('The order requires payment by June 14, 2026. [p. 4]');
     expect(content).toContain('**Why:**');
-    expect(content).toContain('**Practical meaning:**');
+    expect(content).not.toContain('**Practical meaning:**');
     expect(content).toContain('[p. 4]');
     expect(content).not.toContain('# Court Order Analysis');
     expect(content).not.toContain('## Direct Answer');
@@ -499,6 +521,7 @@ describe('renderTargetedLegalDocumentAnswerMarkdown', () => {
     expect(content).not.toContain('## Source Details');
     expect(content).not.toContain('may control');
     expect(content).not.toContain('licensed attorney');
+    expect(content).not.toContain('Use the signed order language');
     expect(content).not.toContain('sourceId');
     expect(content).not.toContain('chunkId');
     expect(content).not.toContain('memoryGenerationId');
@@ -517,7 +540,7 @@ describe('renderTargetedLegalDocumentAnswerMarkdown', () => {
     expect(content).toContain(direct);
     expect(content).not.toContain('**Why:**');
     expect(content.indexOf(direct)).toBe(content.lastIndexOf(direct));
-    expect(content).toContain('**Practical meaning:**');
+    expect(content).not.toContain('**Practical meaning:**');
   });
 
   it('renders not-found targeted answers with plain filing-readiness language only', () => {

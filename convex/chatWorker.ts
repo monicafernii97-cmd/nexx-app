@@ -1281,6 +1281,7 @@ function renderLitigationNavigationMessage(args: {
 }) {
     if (!isLitigationNavigationRoute(args.routeMode)) return args.response;
     const verifiedOrderInterpretation = verifiedOrderInterpretationForDraft(args.response);
+    const verifiedExchange = verifiedExchangeForDraft(args.response);
     const deterministicNavigation = buildLitigationNavigationResponse({
         message: args.userMessage,
         routeMode: args.routeMode,
@@ -1290,6 +1291,7 @@ function renderLitigationNavigationMessage(args: {
         courtName: args.courtSettings?.courtName,
         courtFiling: args.courtFilingExtraction,
         verifiedOrderInterpretation,
+        verifiedExchange,
     });
     const baseNavigation = args.response.litigationNavigation
         ? {
@@ -1514,6 +1516,41 @@ function verifiedOrderInterpretationForDraft(response: NexxAssistantResponse) {
     };
 }
 
+function verifiedExchangeForDraft(response: NexxAssistantResponse) {
+    const interpretation = response.legalInterpretation;
+    if (!interpretation || interpretation.controllingClauses.length === 0) return null;
+    const hasSourceSupport = interpretation.controllingClauses.some((clause) => clause.sourceIds.length > 0);
+    if (!hasSourceSupport) return null;
+
+    const exchangeText = [
+        interpretation.directAnswer,
+        interpretation.practicalMeaning.result,
+        interpretation.practicalMeaning.whatUserShouldDo ?? '',
+        ...interpretation.controllingClauses.map((clause) => `${clause.label} ${clause.quote}`),
+    ].join(' ');
+    if (!/\b(exchange|pickup|pick up|drop[-\s]?off|surrender|return the child|make the child available)\b/i.test(exchangeText)) {
+        return null;
+    }
+
+    const time = interpretation.practicalMeaning.startTime ||
+        interpretation.practicalMeaning.endTime ||
+        null;
+    if (!time) return null;
+
+    const sourcePages = Array.from(new Set(
+        interpretation.controllingClauses
+            .map((clause) => compactPageLabel(clause.pageStart, clause.pageEnd))
+            .filter((page): page is string => Boolean(page))
+    ));
+
+    return {
+        time,
+        location: null,
+        date: null,
+        sourcePages,
+    };
+}
+
 function courtFiledRenderedSignal(message: string, routeMode?: RouteMode) {
     return routeMode === 'court_response_planning' ||
         routeMode === 'packed_case_intake' ||
@@ -1607,13 +1644,15 @@ function verifyAndRepairRenderedResponse(response: NexxAssistantResponse, routeM
 
 function citationLockedFallbackResponse(
     errors: string[],
-    sourcePackets: LegalDocumentSourcePacket[]
+    sourcePackets: LegalDocumentSourcePacket[],
+    documentReference: DocumentReferenceDetection
 ): NexxAssistantResponse {
     const documentAnswer = buildBestEffortLegalDocumentAnswerFromSources(
         sourcePackets,
         errors.length > 0
             ? 'Here is what the visible order language supports.'
-            : undefined
+            : undefined,
+        { isTargetedQuestion: shouldRenderTargetedDocumentAnswer(documentReference) }
     );
 
     return {
@@ -1971,7 +2010,8 @@ async function generateWithFallbacks({
             if (!citationVerification.passed && requiresDocumentAnswer) {
                 parsedResponse = citationLockedFallbackResponse(
                     citationVerification.errors,
-                    promptBundle.documentSourcePackets
+                    promptBundle.documentSourcePackets,
+                    promptBundle.documentReference
                 );
                 citationVerification = verifyLegalDocumentAnswer(
                     parsedResponse.documentAnswer,

@@ -77,9 +77,6 @@ const NOT_FOUND_PRACTICAL_MEANING =
 const NEEDS_REVIEW_PRACTICAL_MEANING =
   'I can work from the visible language, but I would review the exact signed-order wording before using this for filing or enforcement.';
 
-const DEFAULT_PRACTICAL_MEANING =
-  'Use the signed order language for exact filing or enforcement wording. When provisions overlap, read the specific provision, exception language, notwithstanding language, and later-modification language together. If the order clearly gives a specific rule, state that rule directly.';
-
 export type LegalDocumentAnswerVerification = {
   passed: boolean;
   errors: string[];
@@ -258,7 +255,8 @@ function confidenceLabel(confidence?: number): 'high' | 'medium' | 'low' {
 
 export function buildBestEffortLegalDocumentAnswerFromSources(
   sourcePackets: LegalDocumentSourcePacket[],
-  fallbackMessage?: string
+  fallbackMessage?: string,
+  options: { isTargetedQuestion?: boolean } = {}
 ): LegalDocumentAnswer {
   const usableSources = sourcePackets
     .map((source) => ({ source, claim: sourceTextToSupportedClaim(source) }))
@@ -280,9 +278,26 @@ export function buildBestEffortLegalDocumentAnswerFromSources(
     };
   }
 
+  const strongestSupportedClaim = [...usableSources]
+    .sort((a, b) => {
+      const aScore = claimSortScore({
+        claim: a.claim,
+        claimType: isDeadlineClaim(a.claim) ? 'procedural' : 'document_fact',
+        sourceIds: [a.source.sourceId],
+      });
+      const bScore = claimSortScore({
+        claim: b.claim,
+        claimType: isDeadlineClaim(b.claim) ? 'procedural' : 'document_fact',
+        sourceIds: [b.source.sourceId],
+      });
+      return aScore - bScore;
+    })[0]?.claim;
+
   return {
     answerType: 'summary',
-    answer: 'I found usable court-order language and organized the visible provisions below. I will cite exact pages when page data is available and otherwise stay grounded in the visible order language.',
+    answer: options.isTargetedQuestion && strongestSupportedClaim
+      ? strongestSupportedClaim
+      : 'Here are the key provisions in the order.',
     claims: usableSources.map(({ source, claim }) => ({
       claim,
       claimType: isDeadlineClaim(claim) ? 'procedural' : 'document_fact',
@@ -506,22 +521,25 @@ export function renderTargetedLegalDocumentAnswerMarkdown(
     .filter((claim) => claim.claim.trim().length > 0)
     .sort((a, b) => claimSortScore(a) - claimSortScore(b))
     .slice(0, 8);
+  const normalizedDirectAnswer = normalizeForFuzzyMatch(cleanAnswer);
   const findingItems = supportedClaims.length > 0
-    ? supportedClaims.map((claim) => appendCitationLabels(
-      claim.claim,
-      labelsForSourceIds(claim.sourceIds, citationMap)
-    ))
+    ? supportedClaims
+      .filter((claim) => normalizeForFuzzyMatch(claim.claim) !== normalizedDirectAnswer)
+      .map((claim) => appendCitationLabels(
+        claim.claim,
+        labelsForSourceIds(claim.sourceIds, citationMap)
+      ))
     : [];
   const practicalMeaning = answer.answerType === 'not_found'
     ? NOT_FOUND_PRACTICAL_MEANING
     : answer.answerType === 'needs_review'
       ? NEEDS_REVIEW_PRACTICAL_MEANING
-      : DEFAULT_PRACTICAL_MEANING;
+      : undefined;
 
   return [
     directAnswer || 'I do not see enough visible order language to answer that directly.',
     findingItems.length > 0 ? `**Why:**\n${formatMarkdownList(findingItems)}` : undefined,
-    `**Practical meaning:** ${practicalMeaning}`,
+    practicalMeaning ? `**Practical meaning:** ${practicalMeaning}` : undefined,
   ].filter(Boolean).join('\n\n');
 }
 

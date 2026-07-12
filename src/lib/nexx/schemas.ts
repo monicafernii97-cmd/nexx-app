@@ -414,13 +414,101 @@ const proSeDraftingReadinessSchema = {
       type: 'string',
       enum: ['working_draft', 'missing_case_facts', 'structurally_complete', 'local_rules_verified', 'ready_for_final_filing_review'],
     },
+    readyToDraft: { type: 'boolean' },
+    readyForUserReview: { type: 'boolean' },
+    readyForAttorneyOrClerkReview: { type: 'boolean' },
+    readyForFilingSubmission: { type: 'boolean' },
     isFilingReady: { type: 'boolean' },
+    requirements: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          label: { type: 'string' },
+          status: {
+            type: 'string',
+            enum: ['confirmed', 'missing', 'not_applicable', 'needs_authority_check'],
+          },
+          value: nullableString,
+          sourceClaimIds: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['label', 'status', 'value', 'sourceClaimIds'],
+      },
+    },
     confirmedFacts: stringArraySchema,
     missingFacts: stringArraySchema,
     notApplicableFacts: stringArraySchema,
     draftingNote: { type: 'string' },
   },
-  required: ['requestedDocument', 'readinessStage', 'isFilingReady', 'confirmedFacts', 'missingFacts', 'notApplicableFacts', 'draftingNote'],
+  required: [
+    'requestedDocument',
+    'readinessStage',
+    'readyToDraft',
+    'readyForUserReview',
+    'readyForAttorneyOrClerkReview',
+    'readyForFilingSubmission',
+    'isFilingReady',
+    'requirements',
+    'confirmedFacts',
+    'missingFacts',
+    'notApplicableFacts',
+    'draftingNote',
+  ],
+} as const;
+
+const legalAuthoritiesSchema = {
+  type: ['object', 'null'],
+  additionalProperties: false,
+  properties: {
+    sources: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          id: { type: 'string' },
+          title: { type: 'string' },
+          url: { type: 'string' },
+          sourceType: {
+            type: 'string',
+            enum: [
+              'statute',
+              'court_rule',
+              'official_court',
+              'district_clerk',
+              'official_form',
+              'state_self_help',
+              'legal_aid',
+              'bar_referral',
+              'secondary_authority',
+            ],
+          },
+          jurisdiction: { type: 'string' },
+          retrievedAt: { type: 'string' },
+          effectiveDate: nullableString,
+        },
+        required: ['id', 'title', 'url', 'sourceType', 'jurisdiction', 'retrievedAt', 'effectiveDate'],
+      },
+    },
+    claims: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          proposition: { type: 'string' },
+          sourceIds: { type: 'array', items: { type: 'string' } },
+          authorityLevel: {
+            type: 'string',
+            enum: ['primary', 'official_guidance', 'secondary'],
+          },
+        },
+        required: ['proposition', 'sourceIds', 'authorityLevel'],
+      },
+    },
+  },
+  required: ['sources', 'claims'],
 } as const;
 
 const orderAuthorityStatusSchema = {
@@ -682,6 +770,7 @@ export const NEXX_RESPONSE_SCHEMA = {
       legalInterpretation: legalInterpretationSchema,
       litigationNavigation: litigationNavigationSchema,
       localResourceLookup: localLegalResourceLookupSchema,
+      legalAuthorities: legalAuthoritiesSchema,
       proSeDraftingReadiness: proSeDraftingReadinessSchema,
       orderVersion: orderVersionSchema,
       legalBasis: legalBasisSchema,
@@ -694,6 +783,7 @@ export const NEXX_RESPONSE_SCHEMA = {
       'legalInterpretation',
       'litigationNavigation',
       'localResourceLookup',
+      'legalAuthorities',
       'proSeDraftingReadiness',
       'orderVersion',
       'legalBasis',

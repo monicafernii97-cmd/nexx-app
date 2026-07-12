@@ -122,6 +122,20 @@ describe('litigation navigation and client-care layer', () => {
     expect(text).not.toMatch(BACKEND_LANGUAGE);
   });
 
+  it('rejects unsupported exact filing-fee amounts in litigation navigation', () => {
+    const message = 'How much is the filing fee?';
+    const response = buildLitigationNavigationResponse({
+      message,
+      routeMode: 'attorney_resource_guidance',
+    });
+    response.costOverview.costExplanation = 'The filing fee is $435.';
+
+    const verification = verifyLitigationNavigationResponse(response, { userMessage: message });
+
+    expect(verification.passed).toBe(false);
+    expect(verification.errors).toContain('Response appears to invent exact costs, local rules, or deadlines.');
+  });
+
   it('handles pressure without inflammatory labels and gives a court-safe response', () => {
     const message = 'He keeps calling me controlling and saying I am withholding. I want to tell him off.';
     const route = classifyMessage(message);

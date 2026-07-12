@@ -21,11 +21,29 @@ export type DraftReadinessStage =
 export type ProSeDraftingReadiness = {
   requestedDocument: ProSeDraftingDocumentType;
   readinessStage: DraftReadinessStage;
+  readyToDraft: boolean;
+  readyForUserReview: boolean;
+  readyForAttorneyOrClerkReview: boolean;
+  readyForFilingSubmission: boolean;
   isFilingReady: boolean;
+  requirements: DraftingRequirement[];
   confirmedFacts: string[];
   missingFacts: string[];
   notApplicableFacts: string[];
   draftingNote: string;
+};
+
+export type RequirementStatus =
+  | 'confirmed'
+  | 'missing'
+  | 'not_applicable'
+  | 'needs_authority_check';
+
+export type DraftingRequirement = {
+  label: DraftFact;
+  status: RequirementStatus;
+  value: string | null;
+  sourceClaimIds: string[];
 };
 
 const FACT_LABELS = [
@@ -187,7 +205,12 @@ export function buildProSeDraftingReadiness(args: {
     return {
       requestedDocument,
       readinessStage: 'structurally_complete',
-      isFilingReady: true,
+      readyToDraft: true,
+      readyForUserReview: true,
+      readyForAttorneyOrClerkReview: false,
+      readyForFilingSubmission: false,
+      isFilingReady: false,
+      requirements: FACT_LABELS.map((label) => ({ label, status: 'not_applicable', value: null, sourceClaimIds: [] })),
       confirmedFacts: ['requested document type'],
       missingFacts: [],
       notApplicableFacts: [...FACT_LABELS],
@@ -199,12 +222,14 @@ export function buildProSeDraftingReadiness(args: {
   const missingFacts: DraftFact[] = [];
   const filing = args.courtFiling;
   const applicableFacts = DOCUMENT_FACT_REQUIREMENTS[requestedDocument];
+  const serviceDateConfirmed = hasText(args.serviceDate) ||
+    Boolean(filing?.userConfirmedReceiptDate && filing.userConfirmedService === true);
   const checks: Record<DraftFact, boolean> = {
     'court name': hasText(args.courtName),
     'cause number': Boolean(args.causeNumberKnown),
     'party names': Boolean(args.partyNamesKnown || filing?.filedBy || filing?.filedAgainst),
     'filing type': Boolean(filing && filing.documentType !== 'unknown'),
-    'service date': hasText(args.serviceDate) || Boolean(filing?.serviceClues.length),
+    'service date': serviceDateConfirmed,
     'hearing date': hasText(args.hearingDate) || Boolean(filing?.deadlinesOrHearings.some((item) => item.type === 'hearing')),
     'response deadline': hasText(args.responseDeadline) || Boolean(filing?.deadlinesOrHearings.some((item) => item.type === 'response_deadline')),
     'current order': args.hasCurrentOrder === true || Boolean(filing?.currentOrderReferences.length),
@@ -217,6 +242,26 @@ export function buildProSeDraftingReadiness(args: {
     'local formatting rules': Boolean(args.localFormattingRulesKnown),
     'fee waiver need': Boolean(args.feeWaiverNeedKnown),
   };
+
+  const requirements: DraftingRequirement[] = FACT_LABELS.map((label) => {
+    if (!applicableFacts.includes(label)) {
+      return { label, status: 'not_applicable', value: null, sourceClaimIds: [] };
+    }
+    if (checks[label]) {
+      const value = label === 'service date'
+        ? args.serviceDate ?? filing?.userConfirmedReceiptDate ?? null
+        : label === 'hearing date'
+          ? args.hearingDate ?? filing?.deadlinesOrHearings.find((item) => item.type === 'hearing')?.dateOrTime ?? null
+          : label === 'response deadline'
+            ? args.responseDeadline ?? filing?.deadlinesOrHearings.find((item) => item.type === 'response_deadline')?.dateOrTime ?? null
+            : null;
+      return { label, status: 'confirmed', value, sourceClaimIds: [] };
+    }
+    if (label === 'local formatting rules' || label === 'certificate of service requirements') {
+      return { label, status: 'needs_authority_check', value: null, sourceClaimIds: [] };
+    }
+    return { label, status: 'missing', value: null, sourceClaimIds: [] };
+  });
 
   for (const item of applicableFacts) {
     if (checks[item]) confirmedFacts.push(item);
@@ -232,11 +277,21 @@ export function buildProSeDraftingReadiness(args: {
     : localRulesRequired && !args.localFormattingRulesKnown
       ? 'structurally_complete'
       : 'ready_for_final_filing_review';
+  const readyToDraft = confirmedFacts.includes('filing type') || Boolean(filing);
+  const readyForUserReview = missingFacts.filter((fact) => CORE_CASE_FACTS.includes(fact)).length === 0;
+  const readyForAttorneyOrClerkReview = readinessStage === 'structurally_complete' ||
+    readinessStage === 'ready_for_final_filing_review';
+  const readyForFilingSubmission = false;
 
   return {
     requestedDocument,
     readinessStage,
-    isFilingReady: readinessStage === 'ready_for_final_filing_review',
+    readyToDraft,
+    readyForUserReview,
+    readyForAttorneyOrClerkReview,
+    readyForFilingSubmission,
+    isFilingReady: readyForFilingSubmission,
+    requirements,
     confirmedFacts,
     missingFacts,
     notApplicableFacts,

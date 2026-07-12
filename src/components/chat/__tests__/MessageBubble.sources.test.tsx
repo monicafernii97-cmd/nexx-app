@@ -108,7 +108,7 @@ describe('MessageBubble document evidence panel', () => {
     });
     roots.push(root);
 
-    expect(container.textContent).toContain('1 cited passage');
+    expect(container.textContent).toContain('1 source');
     expect(container.textContent).toContain('Final Order.pdf');
     expect(container.textContent).toContain('Show sources');
     expect(container.textContent).not.toContain('p. 4');
@@ -130,7 +130,6 @@ describe('MessageBubble document evidence panel', () => {
 
     expect(detailsButton?.getAttribute('aria-expanded')).toBe('true');
     expect(container.textContent).toContain('p. 4');
-    expect(container.textContent).toContain('Source');
     expect(container.textContent).toContain('Case document');
     expect(container.textContent).not.toContain('Respondent shall pay by Friday.');
 
@@ -317,7 +316,7 @@ describe('MessageBubble document evidence panel', () => {
     });
     roots.push(root);
 
-    expect(container.textContent).toContain('Uploaded Order.pdf · 1 citation');
+    expect(container.textContent).toContain('Uploaded Order.pdf · 1 source');
     expect(container.textContent).not.toContain('2 sources');
     expect(container.textContent).not.toContain('Older Case Order.pdf');
 

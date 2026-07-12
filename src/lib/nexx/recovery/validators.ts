@@ -70,13 +70,52 @@ function validateLocalResourceLookup(value: unknown) {
 function validateProSeDraftingReadiness(value: unknown) {
   if (value === null) return true;
   if (!isObject(value)) return false;
+  const validRequirement = (requirement: unknown) =>
+    isObject(requirement) &&
+    typeof requirement.label === 'string' &&
+    ['confirmed', 'missing', 'not_applicable', 'needs_authority_check'].includes(String(requirement.status)) &&
+    isOptionalString(requirement.value) &&
+    isStringArray(requirement.sourceClaimIds);
+
   return typeof value.requestedDocument === 'string' &&
     typeof value.readinessStage === 'string' &&
+    typeof value.readyToDraft === 'boolean' &&
+    typeof value.readyForUserReview === 'boolean' &&
+    typeof value.readyForAttorneyOrClerkReview === 'boolean' &&
+    typeof value.readyForFilingSubmission === 'boolean' &&
     typeof value.isFilingReady === 'boolean' &&
+    Array.isArray(value.requirements) &&
+    value.requirements.every(validRequirement) &&
     isStringArray(value.confirmedFacts) &&
     isStringArray(value.missingFacts) &&
     isStringArray(value.notApplicableFacts) &&
     typeof value.draftingNote === 'string';
+}
+
+function validateLegalAuthorities(value: unknown) {
+  if (value === null) return true;
+  if (!isObject(value)) return false;
+  const validSource = (source: unknown) =>
+    isObject(source) &&
+    typeof source.id === 'string' &&
+    typeof source.title === 'string' &&
+    typeof source.url === 'string' &&
+    typeof source.sourceType === 'string' &&
+    ['statute', 'court_rule', 'official_court', 'district_clerk', 'official_form', 'state_self_help', 'legal_aid', 'bar_referral', 'secondary_authority'].includes(source.sourceType) &&
+    typeof source.jurisdiction === 'string' &&
+    typeof source.retrievedAt === 'string' &&
+    isOptionalString(source.effectiveDate);
+  const validClaim = (claim: unknown) =>
+    isObject(claim) &&
+    typeof claim.proposition === 'string' &&
+    isStringArray(claim.sourceIds) &&
+    claim.sourceIds.length > 0 &&
+    ['primary', 'official_guidance', 'secondary'].includes(String(claim.authorityLevel));
+
+  return Array.isArray(value.sources) &&
+    value.sources.every(validSource) &&
+    Array.isArray(value.claims) &&
+    value.claims.every(validClaim);
 }
 
 function validateOrderVersion(value: unknown) {
@@ -151,6 +190,7 @@ export function validateAssistantResponse(parsed: unknown): boolean {
   if (!('litigationNavigation' in obj)) return false;
   if (obj.litigationNavigation !== null && !validateLitigationNavigationResponseShape(obj.litigationNavigation)) return false;
   if (!('localResourceLookup' in obj) || !validateLocalResourceLookup(obj.localResourceLookup)) return false;
+  if (!('legalAuthorities' in obj) || !validateLegalAuthorities(obj.legalAuthorities)) return false;
   if (!('proSeDraftingReadiness' in obj) || !validateProSeDraftingReadiness(obj.proSeDraftingReadiness)) return false;
   if (!('orderVersion' in obj) || !validateOrderVersion(obj.orderVersion)) return false;
   if (!('legalBasis' in obj) || !validateLegalBasis(obj.legalBasis)) return false;

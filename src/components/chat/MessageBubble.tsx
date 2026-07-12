@@ -185,11 +185,6 @@ function getSourceLabel(source: DocumentSourceMetadata['source']) {
     return 'Uploaded document';
 }
 
-function citationBadge(status: DocumentCitationMetadata['citationVerifierStatus']) {
-    void status;
-    return 'Source';
-}
-
 function DocumentEvidencePanel({
     sources,
     citations,
@@ -209,7 +204,7 @@ function DocumentEvidencePanel({
         ? sources.filter((source) => citedSourceNames.includes(source.filename))
         : sources;
     const citationCountLabel = citations.length > 0
-        ? `${citations.length} citation${citations.length === 1 ? '' : 's'}`
+        ? `${citations.length} source${citations.length === 1 ? '' : 's'}`
         : null;
     const sourceSummaryBase = displaySourceNames.length === 0
         ? 'Uploaded document'
@@ -242,7 +237,7 @@ function DocumentEvidencePanel({
                 <span className={isLight ? 'text-blue-700' : 'text-sky-200'}>Sources</span>
                 {citations.length > 0 && (
                     <span className={isLight ? 'text-blue-500' : 'text-sky-200/70'}>
-                        {citations.length} cited passage{citations.length === 1 ? '' : 's'}
+                        {citations.length}
                     </span>
                 )}
             </div>
@@ -265,7 +260,6 @@ function DocumentEvidencePanel({
                     {citations.map((citation) => {
                         const citationId = citation.id;
                         const isOpen = openCitationId === citationId;
-                        const status = citationBadge(citation.citationVerifierStatus);
                         const locationLabel = citation.pageLabel || citation.citationLabel || 'Source passage';
                         return (
                             <div
@@ -284,11 +278,8 @@ function DocumentEvidencePanel({
                                             {locationLabel}
                                         </span>
                                         <span className={isLight ? 'text-blue-500' : 'text-white/55'}>
-                                            Short source preview
+                                            Source preview
                                         </span>
-                                    </span>
-                                    <span className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${isLight ? 'bg-blue-50 text-blue-700' : 'bg-white/10 text-sky-100'}`}>
-                                        {status}
                                     </span>
                                 </button>
                                 {isOpen && (

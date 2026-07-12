@@ -9,7 +9,7 @@ import type { Id } from './_generated/dataModel';
 import { classifyFollowUpIntent, classifyMessage } from '../src/lib/nexx/router';
 import { buildSystemPolicyPrompt } from '../src/lib/nexx/prompts/systemPrompt';
 import { buildDeveloperBehaviorPrompt } from '../src/lib/nexx/prompts/developerPrompt';
-import { buildFeatureToolPrompt } from '../src/lib/nexx/prompts/featurePrompt';
+import { actualToolCapabilitiesFromPlan, buildFeatureToolPrompt } from '../src/lib/nexx/prompts/featurePrompt';
 import { buildArtifactPrompt } from '../src/lib/nexx/prompts/artifactPrompt';
 import { buildContextPrompt, type ContextPacket } from '../src/lib/nexx/prompts/contextPrompt';
 import { NEXX_RESPONSE_SCHEMA } from '../src/lib/nexx/schemas';
@@ -18,6 +18,7 @@ import { buildOfficialLegalResearchTargets } from '../src/lib/nexx/legalResearch
 import { extractCourtFilingFromSources, type CourtFilingExtraction } from '../src/lib/nexx/legal-engine/courtFilingExtractor';
 import { buildDeadlineAnalysis, hasDeadlineQuestion, renderDeadlineAnalysisMarkdown } from '../src/lib/nexx/legal-engine/deadlineEngine';
 import { buildLegalBasisList } from '../src/lib/nexx/legal-engine/legalAuthority';
+import { buildLegalAuthoritiesEnvelope } from '../src/lib/nexx/legal-engine/legalAuthoritySchema';
 import { buildLocalLegalResourceLookup, renderLocalResourceLookupMarkdown, shouldBuildLocalResourceLookup } from '../src/lib/nexx/legal-engine/localResourceLookup';
 import { resolveOrderVersion } from '../src/lib/nexx/legal-engine/orderVersionResolver';
 import { buildProSeDraftingReadiness, renderProSeDraftingReadinessMarkdown, shouldBuildProSeDraftingReadiness } from '../src/lib/nexx/legal-engine/proSeDraftingFlow';
@@ -89,10 +90,11 @@ function emptyArtifacts(): NexxAssistantResponse['artifacts'] {
 
 function emptyDeterministicLegalFields(): Pick<
     NexxAssistantResponse,
-    'localResourceLookup' | 'proSeDraftingReadiness' | 'orderVersion' | 'legalBasis' | 'deadlineAnalysis'
+    'localResourceLookup' | 'legalAuthorities' | 'proSeDraftingReadiness' | 'orderVersion' | 'legalBasis' | 'deadlineAnalysis'
 > {
     return {
         localResourceLookup: null,
+        legalAuthorities: null,
         proSeDraftingReadiness: null,
         orderVersion: null,
         legalBasis: [],
@@ -646,6 +648,17 @@ function isLitigationNavigationRoute(routeMode?: RouteMode) {
         routeMode === 'court_ready_drafting';
 }
 
+function isHighStakesSubstantiveLegalRoute(routeMode?: RouteMode) {
+    return routeMode === 'order_interpretation' ||
+        routeMode === 'possession_access_schedule' ||
+        routeMode === 'packed_case_intake' ||
+        routeMode === 'litigation_navigation' ||
+        routeMode === 'court_response_planning' ||
+        routeMode === 'pro_se_guidance' ||
+        routeMode === 'court_ready_drafting' ||
+        routeMode === 'filing_walkthrough';
+}
+
 function recentLegalContextSummary(messages: GenerationContext['recentMessages']) {
     return messages
         .filter((message) =>
@@ -1011,7 +1024,12 @@ type StreamingResponsesClient = {
 };
 
 /** Compose all system, developer, context, and recent-message inputs. */
-function buildInput(context: GenerationContext, routeMode: RouteMode, contextPrompt: string) {
+function buildInput(
+    context: GenerationContext,
+    routeMode: RouteMode,
+    contextPrompt: string,
+    officialResearchTargetsInjected: boolean
+) {
     const systemPrompt = buildSystemPolicyPrompt();
     const developerPrompt = buildDeveloperBehaviorPrompt(routeMode);
     const followUpSummary = activeFollowUpContextSummary(context.turn.message, context.recentMessages, routeMode);
@@ -1022,7 +1040,13 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
         hasActiveDocumentContext(context)
     );
     const documentReference = routerResult.documentReference ?? detectDocumentReference(context.turn.message);
-    const featurePrompt = buildFeatureToolPrompt(routerResult.toolPlan);
+    const featurePrompt = buildFeatureToolPrompt(
+        routerResult.toolPlan,
+        actualToolCapabilitiesFromPlan(routerResult.toolPlan, {
+            hasVectorStore: Boolean(context.conversation?.vectorStoreId),
+            localCourtSourcesInjected: officialResearchTargetsInjected,
+        })
+    );
     const artifactPrompt = buildArtifactPrompt();
     const attachmentContexts = selectAttachmentContextsForPrompt(context, routerResult, routeMode);
     const documentSourcePackets = buildDocumentSourcePackets(attachmentContexts);
@@ -1032,8 +1056,8 @@ function buildInput(context: GenerationContext, routeMode: RouteMode, contextPro
         documentSourcePackets.map((packet) => packet.text).join(' ')
     );
     const deterministicFieldPrompt = [
-        'Response schema note: include localResourceLookup, proSeDraftingReadiness, orderVersion, deadlineAnalysis, and legalBasis in the JSON shape.',
-        'Set localResourceLookup, proSeDraftingReadiness, orderVersion, and deadlineAnalysis to null, and legalBasis to [], unless the answer already has verified source-backed data for those fields.',
+        'Response schema note: include localResourceLookup, legalAuthorities, proSeDraftingReadiness, orderVersion, deadlineAnalysis, and legalBasis in the JSON shape.',
+        'Set localResourceLookup, legalAuthorities, proSeDraftingReadiness, orderVersion, and deadlineAnalysis to null, and legalBasis to [], unless the answer already has verified source-backed data for those fields.',
         'Do not invent local resources, court fees, filing deadlines, order enforceability, or local-rule authority. Deterministic post-processing may fill those fields after provider parsing.',
         issuePacks.length
             ? `Internal issue-pack hints for this turn: ${issuePacks.map((pack) => pack.label).join('; ')}. Use these only to choose relevant legal tracks, evidence needs, counterarguments, and filing-readiness questions. Do not mention issue packs or internal taxonomy to the user.`
@@ -1431,6 +1455,10 @@ function enrichDeterministicLegalFields(args: {
         localResourceLookup,
         jurisdiction: [county, state].filter(Boolean).join(', ') || null,
     });
+    const legalAuthorities = buildLegalAuthoritiesEnvelope({
+        localResourceLookup,
+        legalBasis,
+    });
     const extraSections = [
         shouldAppendDeadlineSection(args.userMessage, args.routeMode)
             ? renderDeadlineAnalysisMarkdown(deadlineAnalysis)
@@ -1449,6 +1477,7 @@ function enrichDeterministicLegalFields(args: {
     return {
         ...args.response,
         localResourceLookup,
+        legalAuthorities,
         proSeDraftingReadiness,
         orderVersion,
         legalBasis,
@@ -1704,9 +1733,10 @@ async function generateWithFallbacks({
         );
     }
     addOfficialResearchTargets(contextPacket, routeMode, context.turn.message, routerResult.toolPlan.useWebSearch);
+    const officialResearchTargetsInjected = Boolean(contextPacket.officialResearchTargets?.length);
 
     const contextPrompt = buildContextPrompt(contextPacket);
-    const promptBundle = buildInput(context, routeMode, contextPrompt);
+    const promptBundle = buildInput(context, routeMode, contextPrompt, officialResearchTargetsInjected);
     const attachmentContextPrompt = promptBundle.attachmentContextPrompt;
     const hostedTools = buildHostedTools(routerResult, context.conversation?.vectorStoreId);
     const fileSearchOnlyTools =
@@ -1714,7 +1744,11 @@ async function generateWithFallbacks({
             ? buildHostedTools({ ...routerResult, toolPlan: { ...routerResult.toolPlan, useWebSearch: false } }, context.conversation.vectorStoreId)
             : undefined;
 
-    const steps = [
+    const steps: Array<{
+        model: string;
+        input: typeof promptBundle.input;
+        tools: ReturnType<typeof buildHostedTools>;
+    }> = [
         {
             model,
             input: promptBundle.input,
@@ -1725,12 +1759,14 @@ async function generateWithFallbacks({
             input: promptBundle.input,
             tools: fileSearchOnlyTools,
         },
-        {
+    ];
+    if (!isHighStakesSubstantiveLegalRoute(routeMode)) {
+        steps.push({
             model: 'gpt-5.4-mini',
             input: promptBundle.input,
             tools: fileSearchOnlyTools,
-        },
-    ];
+        });
+    }
 
     let lastError: unknown = null;
     for (const step of steps) {
@@ -2152,6 +2188,7 @@ export const processChatGenerationJob = internalAction({
                 metadataJson: JSON.stringify({
                     routeMode: result.routeMode,
                     localResourceLookup: result.response.localResourceLookup,
+                    legalAuthorities: result.response.legalAuthorities,
                     proSeDraftingReadiness: result.response.proSeDraftingReadiness,
                     orderVersion: result.response.orderVersion,
                     legalBasis: result.response.legalBasis,

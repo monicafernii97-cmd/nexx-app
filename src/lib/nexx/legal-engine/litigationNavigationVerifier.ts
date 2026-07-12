@@ -26,10 +26,32 @@ const BACKEND_PATTERN =
   /\b(OCR|retrieval|verifier|sourceId|chunkId|memoryGenerationId|source packet|confidence label|backend|documentAnswer|legalInterpretation|retrievalBuckets|retrievalReasons|filingRetrievalBuckets)\b/i;
 
 const INFLAMMATORY_LABEL_PATTERN =
-  /\b(narcissist|gaslighting|gaslighter|abuser|abusive|psycho|crazy)\b/i;
+  /\b(narcissist|gaslighting|gaslighter|psycho|crazy)\b/i;
+
+const DIAGNOSTIC_ABUSE_LABEL_PATTERN =
+  /\b(?:he|she|they|you|the other parent)\s+(?:is|are|was|were)\s+(?:an?\s+)?(?:abuser|abusive)\b/i;
 
 const INVENTED_COST_PATTERN =
   /\$\s?\d+|\b\d{2,}\s*dollars\b/i;
+
+function hasOnlyAllowedMoneyClaims(text: string) {
+  const moneyFragments = text
+    .split(/(?<=[.!?])\s+|\\n|","/)
+    .filter((fragment) => INVENTED_COST_PATTERN.test(fragment));
+  return moneyFragments.every((fragment) =>
+    /\[(?:p\.|pp\.)\s*\d+/i.test(fragment) ||
+    /\b(user said|you said|user reported|reported paying|reported amount)\b/i.test(fragment) ||
+    /\b(order|ordered|support|arrears|reimburse|property|debt|alleges?)\b/i.test(fragment) ||
+    (
+      /\b(official|clerk|court|district clerk|fee schedule|e-?filing)\b/i.test(fragment) &&
+      /\b(source|retrieved|https?:\/\/|\[[^\]]+\])\b/i.test(fragment)
+    ) ||
+    (
+      /\b(attorney|lawyer|market|retainer|hourly)\b/i.test(fragment) &&
+      /\b(estimate|range|varies|dated|source|survey)\b/i.test(fragment)
+    )
+  );
+}
 
 function collectText(response: LitigationNavigationResponse) {
   return JSON.stringify(response);
@@ -61,12 +83,12 @@ export function verifyLitigationNavigationResponse(
     addressedEvidenceDocumentation: Boolean(response?.evidencePlan.evidenceToSave.length && response.evidencePlan.neutralFraming.length),
     addressedProSeQuestionIfAsked: !userAskedProSe || Boolean(response?.proSeAssessment.practicalRead && response.proSeAssessment.tasksHigherRiskWithoutAttorney.length),
     addressedCostQuestionIfAsked: !userAskedCost || Boolean(response?.costOverview.costExplanation && response.costOverview.proSeCostCategories.length && response.costOverview.attorneyCostCategories.length),
-    avoidedInventedLocalCostsOrRules: !INVENTED_COST_PATTERN.test(text) && !/\bexact deadline is\b/i.test(text),
+    avoidedInventedLocalCostsOrRules: (!INVENTED_COST_PATTERN.test(text) || hasOnlyAllowedMoneyClaims(text)) && !/\bexact deadline is\b/i.test(text),
     offeredResourceLookupIfCountyNeeded: !countyNeeded || Boolean(response?.resourcePlan.resourceTypesToFind.length && /\bcounty|state\b/i.test(response.costOverview.costExplanation + response.nextSteps.join(' '))),
     addressedJudgeExplanationIfAsked: !userAskedJudge || Boolean(response?.judgeExplanation.judgeReadyStructure.length && response.judgeExplanation.simpleTheory),
     gaveNextSteps: Boolean(response?.nextSteps.length),
     noBackendArtifacts: !BACKEND_PATTERN.test(text),
-    noInflammatoryLabels: !INFLAMMATORY_LABEL_PATTERN.test(text),
+    noInflammatoryLabels: !INFLAMMATORY_LABEL_PATTERN.test(text) && !DIAGNOSTIC_ABUSE_LABEL_PATTERN.test(text),
     noGenericAttorneyOnlyAnswer:
       (!/^consult an attorney\.?$/i.test(text.trim()) && !/\bconsult an attorney\b/i.test(text)) ||
       /\b(limited-scope|pro se|next step|document|deadline)\b/i.test(text),

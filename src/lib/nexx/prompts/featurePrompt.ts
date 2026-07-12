@@ -1,29 +1,64 @@
 /**
- * Layer C — Feature/Tool Instructions Prompt
- * 
- * Tells the model when and how to use available tools:
- * file search, web search, code interpreter, and function tools.
+ * Layer C - Feature/tool instructions prompt.
+ *
+ * This prompt must describe only capabilities that are actually callable in the
+ * provider request or deterministically injected by the worker.
  */
 
 import type { ToolPlan } from '../../types';
 
-export function buildFeatureToolPrompt(toolPlan: ToolPlan): string {
-  const sections: string[] = [];
+export type ActualToolCapabilities = {
+  fileSearch: boolean;
+  webSearch: boolean;
+  createIncident: boolean;
+  appendTimeline: boolean;
+  generateDraft: boolean;
+  saveCaseNote: boolean;
+  markEvidenceTheme: boolean;
+  createExhibitIndex: boolean;
+  linkIncidentToMotion: boolean;
+  localCourtRetriever: boolean;
+};
 
-  sections.push(`## Available Tools and When to Use Them`);
+export function actualToolCapabilitiesFromPlan(
+  toolPlan: ToolPlan,
+  options: {
+    hasVectorStore?: boolean;
+    localCourtSourcesInjected?: boolean;
+  } = {}
+): ActualToolCapabilities {
+  return {
+    fileSearch: Boolean(toolPlan.useFileSearch && options.hasVectorStore),
+    webSearch: Boolean(toolPlan.useWebSearch),
+    createIncident: false,
+    appendTimeline: false,
+    generateDraft: false,
+    saveCaseNote: false,
+    markEvidenceTheme: false,
+    createExhibitIndex: false,
+    linkIncidentToMotion: false,
+    localCourtRetriever: Boolean(toolPlan.useLocalCourtRetriever && options.localCourtSourcesInjected),
+  };
+}
 
-  if (toolPlan.useFileSearch) {
+export function buildFeatureToolPrompt(
+  toolPlan: ToolPlan,
+  capabilities: ActualToolCapabilities = actualToolCapabilitiesFromPlan(toolPlan)
+): string {
+  const sections: string[] = ['## Available Tools and When to Use Them'];
+
+  if (capabilities.fileSearch) {
     sections.push(`
 ### File Search
 The user has uploaded documents to a vector store. You have access to file_search.
 - Use it when the user asks about "my order", "the document", or references specific filings.
-- Uploaded documents may include an extracted/OCR companion text file. Prefer that companion text when available because it is normalized for retrieval.
+- Uploaded documents may include an extracted companion text file. Prefer that companion text when available because it is normalized for retrieval.
 - If the user's message includes an "Extracted text preview", analyze that text directly and use file_search to fill gaps beyond the preview.
 - Always cite which document you're referencing in your response.
-- If file search returns no relevant results, say so — don't make up content.`);
+- If file search returns no relevant results, say so in plain language. Do not make up content.`);
   }
 
-  if (toolPlan.useWebSearch) {
+  if (capabilities.webSearch) {
     sections.push(`
 ### Web Search
 You have access to web_search for retrieving current legal information.
@@ -34,44 +69,42 @@ You have access to web_search for retrieving current legal information.
 - Cite official source URLs for legal/procedure statements that are not directly from the uploaded document.`);
   }
 
-  if (toolPlan.useCodeInterpreter) {
+  if (capabilities.localCourtRetriever) {
     sections.push(`
-### Code Interpreter
-You have access to code_interpreter for structured data tasks.
-- Use it for: building timelines from multiple events, creating exhibit indexes, extracting tables from documents, PDF text cleanup, building chronological event summaries.
-- Output structured data that can be rendered by the frontend.`);
-  }
-
-  if (toolPlan.useLocalCourtRetriever) {
-    sections.push(`
-### Local Court Retriever
-The system will inject local court source data when available.
-- Court rules are retrieved first, then you normalize them — NEVER invent rules.
+### Local Court Source Data
+The system has injected local court source data for this turn.
+- Court rules are retrieved first, then normalized. Never invent rules.
 - If a retrieved source conflicts with your knowledge, prefer the retrieved source.
 - Always provide a court-ready summary alongside plain-language explanations.
 - When drafting, use saved court settings for caption/court/party details if present, and ask only for fields that are truly missing.`);
   }
 
-  sections.push(`
-### Function Tools
-You have access to backend function tools for creating records:
-- create_incident_from_chat: Create incident records from facts discussed
-- append_to_timeline: Add timeline events from discussed facts
-- generate_docuvault_draft: Trigger document drafting from chat context
-- save_case_note: Save strategic notes
-- mark_evidence_theme: Flag evidence themes in the case graph
-- create_exhibit_index: Build exhibit indexes
-- link_incident_to_motion: Cross-reference incidents to motions
-- fetch_user_court_settings: Retrieve saved court formatting settings
+  const hasRecordCreationTool = capabilities.createIncident ||
+    capabilities.appendTimeline ||
+    capabilities.generateDraft ||
+    capabilities.saveCaseNote ||
+    capabilities.markEvidenceTheme ||
+    capabilities.createExhibitIndex ||
+    capabilities.linkIncidentToMotion;
 
-Use these when the conversation naturally produces work-product (incidents, timeline events, drafts) that should be persisted. Always confirm with the user before creating records.`);
+  if (hasRecordCreationTool) {
+    sections.push(`
+### Backend Function Tools
+Only say that an incident, timeline entry, draft, case note, evidence theme, exhibit index, or link was saved after the corresponding backend tool succeeds.`);
+  } else {
+    sections.push(`
+### Tool Capability Boundary
+No backend record-creation tools are available in this provider call.
+- Do not say you saved a case note, created an incident, appended a timeline event, created a draft record, marked an evidence theme, created an exhibit index, or linked an incident to a motion.
+- You may offer text the user can review or copy, and you may suggest the next action, but do not claim the action already happened.`);
+  }
 
   sections.push(`
 ### Judge-Lens Engine Rules
 When analyzing from the judge's perspective:
-1. Start with EVIDENCE — what is documented, verifiable, and admissible
-2. Build the NARRATIVE — how the evidence tells a story
-3. Frame for FILING — how to present this in court-appropriate language
+1. Start with evidence: what is documented, verifiable, and admissible.
+2. Build the narrative: how the evidence tells a story.
+3. Frame for filing: how to present this in court-appropriate language.
 Never skip from raw events to court language without the evidence evaluation step.`);
 
   return sections.join('\n');

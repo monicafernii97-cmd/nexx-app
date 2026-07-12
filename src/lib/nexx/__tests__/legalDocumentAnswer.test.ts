@@ -288,6 +288,14 @@ describe('buildBestEffortLegalDocumentAnswerFromSources', () => {
     expect(bestEffort.answer).toBe('It is ORDERED that Respondent shall pay $500 no later than June 14, 2026.');
     expect(bestEffort.answer).not.toContain('I found usable');
     expect(bestEffort.answer).not.toContain('organized the visible provisions');
+
+    const content = renderTargetedLegalDocumentAnswerMarkdown(bestEffort, sourcePackets, 'Fallback answer');
+
+    expect(content).toContain('It is ORDERED that Respondent shall pay $500 no later than June 14, 2026. [p. 4]');
+    expect(content).not.toContain('**Why:**');
+    expect(content.indexOf('It is ORDERED that Respondent shall pay $500')).toBe(
+      content.lastIndexOf('It is ORDERED that Respondent shall pay $500')
+    );
   });
 });
 

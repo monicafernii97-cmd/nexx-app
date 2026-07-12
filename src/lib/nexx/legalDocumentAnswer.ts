@@ -521,11 +521,14 @@ export function renderTargetedLegalDocumentAnswerMarkdown(
     .filter((claim) => claim.claim.trim().length > 0)
     .sort((a, b) => claimSortScore(a) - claimSortScore(b))
     .slice(0, 8);
+  const normalizedDirectAnswer = normalizeForFuzzyMatch(cleanAnswer);
   const findingItems = supportedClaims.length > 0
-    ? supportedClaims.map((claim) => appendCitationLabels(
-      claim.claim,
-      labelsForSourceIds(claim.sourceIds, citationMap)
-    ))
+    ? supportedClaims
+      .filter((claim) => normalizeForFuzzyMatch(claim.claim) !== normalizedDirectAnswer)
+      .map((claim) => appendCitationLabels(
+        claim.claim,
+        labelsForSourceIds(claim.sourceIds, citationMap)
+      ))
     : [];
   const practicalMeaning = answer.answerType === 'not_found'
     ? NOT_FOUND_PRACTICAL_MEANING

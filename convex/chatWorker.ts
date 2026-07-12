@@ -1532,8 +1532,8 @@ function verifiedExchangeForDraft(response: NexxAssistantResponse) {
         return null;
     }
 
-    const time = interpretation.practicalMeaning.startTime ??
-        interpretation.practicalMeaning.endTime ??
+    const time = interpretation.practicalMeaning.startTime ||
+        interpretation.practicalMeaning.endTime ||
         null;
     if (!time) return null;
 

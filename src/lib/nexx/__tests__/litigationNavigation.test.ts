@@ -100,6 +100,8 @@ describe('litigation navigation and client-care layer', () => {
 
     expect(text).toContain('The order lists the exchange time as 6:00 p.m. [p. 7]');
     expect(text).toContain('I will make the child available then.');
+    expect(text).toContain('I disagree with changing the exchange time outside the order');
+    expect(text).toContain('I will follow that written provision.');
   });
 
   it('does not state an exchange time from order context alone', () => {

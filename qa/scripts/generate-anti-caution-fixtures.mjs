@@ -33,7 +33,7 @@ function makePdf(pages) {
     return objects.length;
   };
 
-  const catalogId = add('<< /Type /Catalog /Pages 2 0 R >>');
+  const catalogId = add('');
   const pagesId = add('');
   const pageIds = [];
   const fontId = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
@@ -45,7 +45,8 @@ function makePdf(pages) {
   }
 
   objects[pagesId - 1] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`;
-  if (catalogId !== 1) throw new Error('Unexpected catalog object id');
+  objects[catalogId - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
+  if (catalogId !== 1 || pagesId !== 2) throw new Error('Unexpected PDF root object allocation');
 
   const parts = ['%PDF-1.4\n%\xE2\xE3\xCF\xD3\n'];
   const offsets = [0];

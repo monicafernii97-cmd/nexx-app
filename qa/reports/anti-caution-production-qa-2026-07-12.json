@@ -7,7 +7,7 @@
     "branch": "agent/anti-caution-production-qa",
     "deployment": [
       "https://nexproof.io",
-      "https://nexx-24jwad456-monicafernii97-cmds-projects.vercel.app"
+      "Vercel production deployment hostname redacted in committed QA artifact"
     ],
     "tester": "Codex",
     "date": "2026-07-12T17:02:49.4951349-05:00"
@@ -117,7 +117,7 @@
       "sourcePages": {
         "partialControlling": [5]
       },
-      "visibleResponse": "I cannot verify the exact Father's Day start time from this copy because the start-time phrase on page 5 is unclear. The ending time appears to be Monday at 8:00 a.m. [p. 5] A clearer copy of page 5 would let me confirm the start time.",
+      "visibleResponse": "The order separately provides for Father's Day possession, but I cannot verify the exact start time from this copy because that part of the sentence is unclear. The ending time appears to be Monday at 8:00 a.m. [p. 5]\n\nA clearer image of page 5 is needed to confirm the start time. End: Monday at 8:00 a.m. Upload a clearer image of page 5 before using the start time in a filing or message.\n\nOnly the start-time phrase is unclear; the ending time appears to be Monday at 8:00 a.m.",
       "checks": {
         "doesNotGuessStartTime": "pass",
         "statesReadableEnding": "pass",
@@ -161,7 +161,7 @@
         "controlling": [5],
         "competing": [3]
       },
-      "visibleResponse": "No - not based on the order language we just reviewed. The specific Father's Day provision begins Friday at 6:00 p.m. and ends Monday at 8:00 a.m. [p. 5] The general Thursday-start language does not override that specific provision. [p. 3]",
+      "visibleResponse": "No - my read is that Father's Day possession starts Friday at 6:00 p.m., not Thursday. [p. 5]\n\nThe specific Father's Day provision controls over the general weekend-extension clause. [p. 5] [p. 3] The Father's Day provision is specific, while the Thursday-start language is a general weekend-extension rule. [p. 5] [p. 3] That is a general weekend-extension rule; it does not override the specific Father's Day provision. [p. 3]\n\nThe practical period is Friday at 6:00 p.m. through Monday at 8:00 a.m. Start: Friday at 6:00 p.m. End: Monday at 8:00 a.m. Use the specific Father's Day language if you respond.",
       "checks": {
         "usesActiveContext": "pass",
         "doesNotAskCanWhoDoWhat": "pass",
@@ -182,7 +182,7 @@
       "sourcePages": {
         "controlling": [5]
       },
-      "visibleResponse": "You can say:\n\n\"Based on the order, Father's Day possession begins Friday at 6:00 p.m. and ends Monday at 8:00 a.m. I plan to follow that provision as written.\"\n\nKeep it there. Do not argue about motives or answer every accusation.",
+      "visibleResponse": "You can say:\n\n\"My understanding from the order language is: Father's Day possession begins Friday at 6:00 p.m. and ends Monday at 8:00 a.m. The practical timing I am following is Friday at 6:00 p.m. to Monday at 8:00 a.m. [p. 5] I plan to follow that written provision.\"\n\nFirmer version:\n\n\"I do not agree to a possession-time change based on an unstated provision. My reading of the order language is: Father's Day possession begins Friday at 6:00 p.m. and ends Monday at 8:00 a.m. The practical timing I am following is Friday at 6:00 p.m. to Monday at 8:00 a.m. [p. 5] If you believe a different signed-order provision controls, please identify that specific language.\"",
       "checks": {
         "draftFirst": "pass",
         "usesOnlyVerifiedTerms": "pass",
@@ -195,7 +195,8 @@
     },
     {
       "id": "test_8_unverified_coparent_response_draft",
-      "fixture": "controlling-language-unreadable.pdf_or_no-fathers-day-clause.pdf",
+      "fixture": null,
+      "syntheticInput": "recentContext: Father's Day start time is disputed, but the controlling start-time words are not verified from the order.",
       "prompt": "What should I respond to him about the Father's Day start time?",
       "route": "co_parent_response",
       "legalIntent": "co_parent_response",

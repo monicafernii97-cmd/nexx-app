@@ -1,14 +1,11 @@
-export const INTERNAL_LANGUAGE =
-  /\b(OCR|retrieval|verifier|citation verifier|sourceId|chunkId|source packet|confidence label|backend|extraction warning|extracted text)\b/i;
+import { FORBIDDEN_HEADINGS, INTERNAL_LANGUAGE } from '../../src/lib/nexx/__tests__/antiCautionGuardrails';
 
-export const FORBIDDEN_HEADINGS =
-  /\b(Cautions|Risks and Cautions|Source Details|Retrieval Details|Verifier Status|Document Extraction)\b/i;
+export { FORBIDDEN_HEADINGS, INTERNAL_LANGUAGE };
 
 export type AntiCautionBrowserScenario = {
   id: string;
   fixture: string;
   prompt: string;
-  continuationOf?: string;
   required: RegExp[];
   forbidden?: RegExp[];
 };
@@ -69,27 +66,39 @@ export async function runAntiCautionDocumentBehaviorSpec(driver: AntiCautionBrow
     await driver.createConversation();
     await driver.uploadFixture(scenario.fixture);
     await driver.sendPrompt(scenario.prompt);
-    const answerText = await driver.waitForFinalAnswer();
+    let primaryError: unknown;
+    try {
+      const answerText = await driver.waitForFinalAnswer();
 
-    if (INTERNAL_LANGUAGE.test(answerText)) {
-      throw new Error(`${scenario.id}: internal language leaked in answer`);
-    }
-    if (FORBIDDEN_HEADINGS.test(answerText)) {
-      throw new Error(`${scenario.id}: forbidden caution/source heading appeared`);
-    }
-    for (const pattern of scenario.required) {
-      if (!pattern.test(answerText)) throw new Error(`${scenario.id}: missing required pattern ${pattern}`);
-    }
-    for (const pattern of scenario.forbidden ?? []) {
-      if (pattern.test(answerText)) throw new Error(`${scenario.id}: matched forbidden pattern ${pattern}`);
+      if (INTERNAL_LANGUAGE.test(answerText)) {
+        throw new Error(`${scenario.id}: internal language leaked in answer`);
+      }
+      if (FORBIDDEN_HEADINGS.test(answerText)) {
+        throw new Error(`${scenario.id}: forbidden caution/source heading appeared`);
+      }
+      for (const pattern of scenario.required) {
+        if (!pattern.test(answerText)) throw new Error(`${scenario.id}: missing required pattern ${pattern}`);
+      }
+      for (const pattern of scenario.forbidden ?? []) {
+        if (pattern.test(answerText)) throw new Error(`${scenario.id}: matched forbidden pattern ${pattern}`);
+      }
+
+      await driver.assertSourcePanelDefaultClean();
+      const sourceText = await driver.openSourcesAndReturnText();
+      if (INTERNAL_LANGUAGE.test(sourceText) || FORBIDDEN_HEADINGS.test(sourceText)) {
+        throw new Error(`${scenario.id}: internal source-panel language leaked`);
+      }
+    } catch (error) {
+      primaryError = error;
+    } finally {
+      try {
+        await driver.screenshot(`qa/reports/screenshots/${scenario.id}.png`);
+        await driver.trace(`qa/reports/traces/${scenario.id}.zip`);
+      } catch (diagnosticError) {
+        if (!primaryError) primaryError = diagnosticError;
+      }
     }
 
-    await driver.assertSourcePanelDefaultClean();
-    const sourceText = await driver.openSourcesAndReturnText();
-    if (INTERNAL_LANGUAGE.test(sourceText) || FORBIDDEN_HEADINGS.test(sourceText)) {
-      throw new Error(`${scenario.id}: internal source-panel language leaked`);
-    }
-    await driver.screenshot(`qa/reports/screenshots/${scenario.id}.png`);
-    await driver.trace(`qa/reports/traces/${scenario.id}.zip`);
+    if (primaryError) throw primaryError;
   }
 }

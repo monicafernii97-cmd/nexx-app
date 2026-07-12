@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { classifyMessage } from '../router';
+import type { RouteMode } from '../../types';
 import { renderLegalInterpretationMarkdown } from '../legal-engine/legalInterpretationRenderer';
 import type { LegalInterpretationAnswer } from '../legal-engine/legalInterpretationSchema';
 import { verifyRenderedOutput } from '../legal-engine/renderedOutputVerifier';
@@ -8,11 +9,7 @@ import {
   buildLitigationNavigationResponse,
   renderLitigationNavigationMarkdown,
 } from '../legal-engine/litigationNavigationRenderer';
-
-const INTERNAL_LANGUAGE =
-  /\b(OCR|retrieval|verifier|citation verifier|sourceId|chunkId|source packet|confidence label|backend|extraction warning|extracted text)\b/i;
-const FORBIDDEN_HEADINGS =
-  /\b(Cautions|Risks and Cautions|Source Details|Retrieval Details|Verifier Status|Document Extraction)\b/i;
+import { FORBIDDEN_HEADINGS, INTERNAL_LANGUAGE } from './antiCautionGuardrails';
 
 const fatherDayPrompt =
   "Under this order, does Father's Day possession start Thursday because Friday is a holiday, or does it start Friday?";
@@ -113,7 +110,7 @@ function expectDirectWithinFirstThirtyWords(text: string) {
   expect(firstThirtyWords).toMatch(/\b(no|yes|my read is|the order says|based on the order)\b/i);
 }
 
-function expectRenderedOutputPasses(text: string, userMessage: string, routeMode = 'possession_access_schedule' as const) {
+function expectRenderedOutputPasses(text: string, userMessage: string, routeMode: RouteMode = 'possession_access_schedule') {
   const verification = verifyRenderedOutput({ rendered: text, userMessage, routeMode });
   expect(verification.passed, verification.errors.join('; ')).toBe(true);
 }
@@ -277,6 +274,7 @@ describe('NEXX anti-caution production QA matrix', () => {
     expect(text).not.toMatch(/can who do what/i);
     expectDirectWithinFirstThirtyWords(text);
     expectNoInternalOrCaution(text);
+    expectRenderedOutputPasses(text, prompt, 'possession_access_schedule');
   });
 
   it('Test 7 - verified co-parent draft uses exact verified order terms', () => {
@@ -303,6 +301,7 @@ describe('NEXX anti-caution production QA matrix', () => {
     expect(text).toContain('I plan to follow that written provision.');
     expect(text).not.toMatch(/\bmanipulat|abusive|gaslighting|consult an attorney\b/i);
     expectNoInternalOrCaution(text);
+    expectRenderedOutputPasses(text, prompt, 'co_parent_response');
   });
 
   it('Test 8 - unverified co-parent draft does not insert an exact start time', () => {
@@ -320,5 +319,6 @@ describe('NEXX anti-caution production QA matrix', () => {
     expect(text).toContain('Please identify the specific written provision');
     expect(text).not.toMatch(/\b6:00 p\.m\.|8:00 a\.m\.|Friday at|Monday at\b/i);
     expectNoInternalOrCaution(text);
+    expectRenderedOutputPasses(text, prompt, 'co_parent_response');
   });
 });

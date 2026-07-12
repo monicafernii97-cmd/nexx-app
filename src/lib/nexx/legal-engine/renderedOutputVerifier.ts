@@ -97,8 +97,8 @@ function needsDirectAnswerFirst(message: string, routeMode?: RouteMode) {
 }
 
 function startsWithDirectAnswer(rendered: string) {
-  return /\b(no|yes|probably|my read|based on|usually|cannot verify|can't verify|cannot confirm|can't confirm|i do not see|i don't see|not enough supported|not enough visible)\b/i.test(
-    rendered.slice(0, 240)
+  return /^(?:\s|[*_>"'`-])*(?:no\b|yes\b|probably\b|my read\b|based on\b|usually\b|the order\b|(?:i\s+)?cannot verify\b|(?:i\s+)?can't verify\b|(?:i\s+)?cannot confirm\b|(?:i\s+)?can't confirm\b|i do not see\b|i don't see\b|not enough supported\b|not enough visible\b)/i.test(
+    rendered
   );
 }
 

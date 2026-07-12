@@ -3,7 +3,7 @@
 Environment: Local deterministic production-like QA against a branch based on current main; live staging/production browser login not executed because no dedicated QA credentials are present in the environment.
 Base commit: `07cbbe68ffbeebbf55019d76b1545bf90c479248`
 Branch: `agent/anti-caution-production-qa`
-Deployment: `https://nexproof.io` / Vercel production `https://nexx-24jwad456-monicafernii97-cmds-projects.vercel.app`
+Deployment: `https://nexproof.io` / Vercel production deployment hostname redacted in committed QA artifact
 Tester: Codex
 Date: 2026-07-12T17:02:49.4951349-05:00
 
@@ -251,7 +251,7 @@ Notes: The exact schedule appears only because verified interpretation data was 
 
 ### Test 8 - Unverified Co-Parent Response Draft
 
-Fixture: `controlling-language-unreadable.pdf` or `no-fathers-day-clause.pdf`
+Fixture: none in deterministic regression; live manual scenario should use `controlling-language-unreadable.pdf` or `no-fathers-day-clause.pdf`
 Prompt: `What should I respond to him about the Father's Day start time?`
 Route: `co_parent_response`
 Legal intent: co-parent response draft without verified timing

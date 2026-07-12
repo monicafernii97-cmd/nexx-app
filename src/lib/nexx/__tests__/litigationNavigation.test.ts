@@ -82,6 +82,43 @@ describe('litigation navigation and client-care layer', () => {
     expect(text).toMatch(/Friday at 6:00 p\.m\..*\[p\. 5\]/i);
   });
 
+  it('uses verified exchange terms before drafting exact exchange-time language', () => {
+    const message = 'What should I say about the pickup time?';
+    const response = buildLitigationNavigationResponse({
+      message,
+      routeMode: 'co_parent_response',
+      recentContext: 'Prior issue: exchange logistics under a signed court order.',
+      verifiedExchange: {
+        time: '6:00 p.m.',
+        sourcePages: ['p. 7'],
+      },
+    });
+    const text = renderLitigationNavigationMarkdown(response, {
+      routeMode: 'co_parent_response',
+      userMessage: message,
+    });
+
+    expect(text).toContain('The order lists the exchange time as 6:00 p.m. [p. 7]');
+    expect(text).toContain('I will make the child available then.');
+  });
+
+  it('does not state an exchange time from order context alone', () => {
+    const message = 'What should I say about the pickup time?';
+    const response = buildLitigationNavigationResponse({
+      message,
+      routeMode: 'co_parent_response',
+      recentContext: 'Prior issue: exchange logistics under a signed court order.',
+    });
+    const text = renderLitigationNavigationMarkdown(response, {
+      routeMode: 'co_parent_response',
+      userMessage: message,
+    });
+
+    expect(text).toContain('Please identify the specific exchange time and written provision');
+    expect(text).not.toContain('The order lists the exchange time as');
+    expect(text).not.toContain('court-ordered exchange time of ____');
+  });
+
   it('gives practical pro se guidance when the user cannot afford an attorney', () => {
     const message = 'I do not have money for an attorney. Can I do this myself?';
     const route = classifyMessage(message);

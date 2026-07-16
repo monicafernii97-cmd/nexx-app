@@ -1,6 +1,14 @@
 import type { LegalDocumentAnswer, LegalDocumentSourcePacket } from '../legalDocumentAnswer';
 import type { DocumentReferenceDetection } from '../documentReferenceDetection';
 import type { LegalInterpretationAnswer, LegalInterpretationPrioritySignal } from './legalInterpretationSchema';
+import {
+  containsFathersDay,
+  inferClauseRelationship,
+  sourceContainsGeneralHolidayExtension,
+  sourceContainsOperativeFatherDaySchedule,
+  sourceContainsPriorityCarveout,
+  sourceIsRelevantToIssue,
+} from './clauseRelationship';
 
 const GENERIC_DOCUMENT_ANSWER_PATTERN =
   /\b(i found usable court-order language|organized the visible provisions|cite exact pages|stay grounded in the visible order language)\b/i;
@@ -66,12 +74,6 @@ function selectSourcePackets(
     .sort((a, b) => sourcePriorityScore(b, message) - sourcePriorityScore(a, message));
 }
 
-function isCompetingGeneralClause(source: LegalDocumentSourcePacket, controllingSourceIds: Set<string>) {
-  const text = `${source.sectionHeading ?? ''} ${source.text}`;
-  if (controllingSourceIds.has(source.sourceId)) return false;
-  return /\b(regular|general|weekend|thursday|student holiday|federal|state|local holiday)\b/i.test(text);
-}
-
 function prioritySignal(source: LegalDocumentSourcePacket): LegalInterpretationPrioritySignal {
   const text = `${source.sectionHeading ?? ''} ${source.text}`;
   if (/\bnotwithstanding\b/i.test(text)) return 'notwithstanding';
@@ -108,15 +110,15 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
   if (!documentAnswer) return null;
 
   const selectedSources = selectSourcePackets(documentAnswer, sourcePackets, userMessage);
-  const primaryControllingSource = selectedSources[0];
-  const preliminaryControllingSourceIds = new Set(primaryControllingSource ? [primaryControllingSource.sourceId] : []);
+  const asksFatherDay = containsFathersDay(userMessage) ||
+    documentReference.requestedTerms.some(containsFathersDay);
+  const controllingSources = asksFatherDay
+    ? selectedSources.filter(sourceContainsOperativeFatherDaySchedule).slice(0, 1)
+    : selectedSources.filter((source) => sourceIsRelevantToIssue(source, userMessage)).slice(0, 1);
   const competingSources = selectedSources
-    .filter((source) => isCompetingGeneralClause(source, preliminaryControllingSourceIds))
-    .slice(0, 2);
-  const competingSourceIds = new Set(competingSources.map((source) => source.sourceId));
-  const controllingSources = selectedSources
-    .filter((source) => !competingSourceIds.has(source.sourceId))
-    .slice(0, 3);
+    .filter((source) => !controllingSources.some((controllingSource) => controllingSource.sourceId === source.sourceId))
+    .filter((source) => asksFatherDay ? sourceContainsGeneralHolidayExtension(source) : inferClauseRelationship(source) === 'general_default')
+    .slice(0, 1);
   const controlling = controllingSources[0];
   const hasUsableSources = controllingSources.length > 0;
   const hasClauseConflictSignal =
@@ -131,6 +133,8 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
       userFacingCertainty: 'insufficient_text',
       controllingClauses: [],
       competingClauses: [],
+      interactingClauses: [],
+      explanationSteps: [],
       priorityLanguage: [],
       interpretation: {
         plainEnglish: answerText,
@@ -146,22 +150,29 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
       },
       draftMessage: null,
       caveats: ['The visible order language available here does not answer every part of the question.'],
+      materialLimitation: 'The operative provision needed to answer this question is not visible in the available order language.',
     };
   }
 
   const prioritySources = selectedSources
-    .filter((source) => /\b(except as otherwise|notwithstanding|supersedes?|later signed|modification|modified)\b/i.test(`${source.sectionHeading ?? ''} ${source.text}`))
+    .filter((source) => sourceContainsPriorityCarveout(source) || /\b(supersedes?|later signed|modification|modified)\b/i.test(`${source.sectionHeading ?? ''} ${source.text}`))
     .slice(0, 2);
   const prioritySourceIds = prioritySources.length > 0
-    ? unique(prioritySources.map((source) => source.sourceId)).slice(0, 4)
+    ? unique([
+      ...controllingSources.map((source) => source.sourceId),
+      ...prioritySources.map((source) => source.sourceId),
+      ...competingSources.map((source) => source.sourceId),
+    ]).slice(0, 4)
     : competingSources.length > 0
       ? unique([
         ...controllingSources.map((source) => source.sourceId),
         ...competingSources.map((source) => source.sourceId),
       ]).slice(0, 4)
-      : [];
-  const priorityExplanation = competingSources.length > 0 || hasClauseConflictSignal
-    ? 'The specific order language is the stronger reading over a general provision unless a later signed order changes it.'
+      : controllingSources.map((source) => source.sourceId).slice(0, 4);
+  const priorityExplanation = asksFatherDay && prioritySources.some(sourceContainsPriorityCarveout)
+    ? 'The phrase “Except as otherwise expressly provided” means the Thursday extension is only the default when another part of the order does not provide a separate schedule. The Father’s Day paragraph provides that separate schedule, so the provisions do not contradict each other. The general rule remains valid for weekend periods within its scope.'
+    : competingSources.length > 0 || hasClauseConflictSignal
+      ? 'The provision written specifically for this event applies, while the general rule remains in effect for situations within its own scope.'
     : 'The signed order language should be followed as written unless a later signed order changes it.';
 
   return {
@@ -176,11 +187,34 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
       pageEnd: source.pageEnd ?? source.pageStart ?? null,
     })),
     competingClauses: competingSources.map((source) => ({
-      label: source.sectionHeading || 'Potential competing provision',
+      label: source.sectionHeading || 'General default provision',
       quote: truncate(source.text, 500),
       sourceIds: [source.sourceId],
-      whyItDoesOrDoesNotControl: 'This appears to be general or competing language; it does not override a more specific provision that squarely addresses the same issue unless the order says so.',
+      whyItDoesOrDoesNotControl: 'This is the general default for qualifying weekend periods. It remains valid, but it does not replace a separately stated schedule for this event.',
     })),
+    interactingClauses: unique([...competingSources, ...prioritySources].map((source) => source.sourceId))
+      .map((sourceId) => selectedSources.find((source) => source.sourceId === sourceId))
+      .filter((source): source is LegalDocumentSourcePacket => Boolean(source))
+      .map((source) => ({
+        label: source.sectionHeading || (sourceContainsPriorityCarveout(source) ? 'Scope language' : 'General default provision'),
+        relationship: inferClauseRelationship(source),
+        quote: truncate(source.text, 500),
+        sourceIds: [source.sourceId],
+        scope: sourceContainsPriorityCarveout(source)
+          ? 'This language limits when the general rule applies.'
+          : 'This language applies to qualifying weekend possession periods without a separately stated schedule.',
+        effectOnOutcome: asksFatherDay
+          ? sourceContainsPriorityCarveout(source)
+            ? 'It directs the reader to use the separately stated Father’s Day schedule.'
+            : 'It does not move the separately scheduled Father’s Day period to Thursday.'
+          : sourceContainsPriorityCarveout(source)
+            ? 'It directs the reader to use the separately stated provision for this issue.'
+            : 'The general provision remains valid only for situations within its stated scope.',
+      })),
+    explanationSteps: [{
+      point: priorityExplanation,
+      sourceIds: prioritySourceIds,
+    }],
     priorityLanguage: (prioritySources.length > 0 || competingSources.length > 0) && prioritySourceIds.length > 0
       ? [{
         signal: prioritySources.length > 0 ? prioritySignal(prioritySources[0]) : 'specific_over_general',
@@ -206,5 +240,6 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
     },
     draftMessage: draftFromAnswer(documentAnswer, controlling),
     caveats: [],
+    materialLimitation: null,
   };
 }

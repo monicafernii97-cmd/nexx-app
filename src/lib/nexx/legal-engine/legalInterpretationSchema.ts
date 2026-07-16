@@ -11,6 +11,15 @@ export type LegalInterpretationPrioritySignal =
   | 'later_modification'
   | 'other';
 
+export type LegalClauseRelationship =
+  | 'general_default'
+  | 'express_exception'
+  | 'special_rule'
+  | 'supplemental'
+  | 'superseded'
+  | 'genuine_conflict'
+  | 'unrelated';
+
 export type LegalInterpretationAnswer = {
   answerType: 'order_interpretation';
   directAnswer: string;
@@ -27,6 +36,18 @@ export type LegalInterpretationAnswer = {
     quote: string;
     sourceIds: string[];
     whyItDoesOrDoesNotControl: string;
+  }>;
+  interactingClauses?: Array<{
+    label: string;
+    relationship: LegalClauseRelationship;
+    quote: string;
+    sourceIds: string[];
+    scope: string;
+    effectOnOutcome: string;
+  }>;
+  explanationSteps?: Array<{
+    point: string;
+    sourceIds: string[];
   }>;
   priorityLanguage: Array<{
     signal: LegalInterpretationPrioritySignal;
@@ -50,6 +71,7 @@ export type LegalInterpretationAnswer = {
     text: string;
   } | null;
   caveats: string[];
+  materialLimitation?: string | null;
 };
 
 const CERTAINTY_VALUES = new Set<LegalInterpretationCertainty>([
@@ -68,6 +90,15 @@ const PRIORITY_SIGNAL_VALUES = new Set<LegalInterpretationPrioritySignal>([
 ]);
 
 const DRAFT_TONES = new Set(['neutral', 'firm', 'court_ready']);
+const CLAUSE_RELATIONSHIPS = new Set<LegalClauseRelationship>([
+  'general_default',
+  'express_exception',
+  'special_rule',
+  'supplemental',
+  'superseded',
+  'genuine_conflict',
+  'unrelated',
+]);
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -104,6 +135,23 @@ export function validateLegalInterpretationAnswerShape(value: unknown): value is
   if (!CERTAINTY_VALUES.has(value.userFacingCertainty as LegalInterpretationCertainty)) return false;
   if (!Array.isArray(value.controllingClauses) || !value.controllingClauses.every((clause) => validateClause(clause))) return false;
   if (!Array.isArray(value.competingClauses) || !value.competingClauses.every((clause) => validateClause(clause, true))) return false;
+  if (value.interactingClauses !== undefined && (
+    !Array.isArray(value.interactingClauses) ||
+    !value.interactingClauses.every((item) => (
+      isObject(item) &&
+      typeof item.label === 'string' &&
+      typeof item.relationship === 'string' &&
+      CLAUSE_RELATIONSHIPS.has(item.relationship as LegalClauseRelationship) &&
+      typeof item.quote === 'string' &&
+      isStringArray(item.sourceIds) &&
+      typeof item.scope === 'string' &&
+      typeof item.effectOnOutcome === 'string'
+    ))
+  )) return false;
+  if (value.explanationSteps !== undefined && (
+    !Array.isArray(value.explanationSteps) ||
+    !value.explanationSteps.every((item) => isObject(item) && typeof item.point === 'string' && isStringArray(item.sourceIds))
+  )) return false;
   if (!Array.isArray(value.priorityLanguage)) return false;
   if (!value.priorityLanguage.every((item) => (
     isObject(item) &&
@@ -128,5 +176,6 @@ export function validateLegalInterpretationAnswerShape(value: unknown): value is
     if (typeof value.draftMessage.text !== 'string') return false;
   }
   if (!isStringArray(value.caveats)) return false;
+  if (!isOptionalString(value.materialLimitation)) return false;
   return true;
 }

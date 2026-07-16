@@ -149,10 +149,11 @@ describe('renderLegalInterpretationMarkdown', () => {
 
     expect(content).toContain('No - my read is that Father\'s Day possession starts Friday at 6:00 p.m., not Thursday. [p. 5]');
     expect(content).toContain('**Controlling language:**');
-    expect(content).toContain('**Competing language:**');
+    expect(content).toContain('**How the provisions work together:**');
+    expect(content).not.toContain('**Competing language:**');
     expect(content).toContain('**Why this controls:**');
     expect(content).toContain('**Practical meaning:**');
-    expect(content).toContain('**Suggested reply:**');
+    expect(content).not.toContain('**Suggested reply:**');
     expect(content).toContain('[p. 5]');
     expect(content).toContain('[p. 6]');
     expect(content).not.toContain('# Court Order Analysis');
@@ -181,7 +182,7 @@ describe('renderLegalInterpretationMarkdown', () => {
       'Fallback answer'
     );
 
-    expect(content).toContain('**Competing language:**');
+    expect(content).toContain('**How the provisions work together:**');
     expect(content).toContain('- The general weekend language does not override the specific Father\'s Day provision.');
   });
 
@@ -194,8 +195,8 @@ describe('renderLegalInterpretationMarkdown', () => {
     );
 
     expect(content).toContain('No - my read is that Father\'s Day possession starts Friday at 6:00 p.m., not Thursday.');
-    expect(content).toContain('specific Father\'s Day provision controls over the general weekend-extension rule');
-    expect(content).toContain('I would keep it short and order-based:');
+    expect(content).toContain('holiday-specific clause supplies the start and end times');
+    expect(content).not.toContain('I would keep it short and order-based:');
     expect(content).not.toContain('**Controlling language:**');
     expect(content).not.toContain('**Competing language:**');
   });
@@ -275,7 +276,7 @@ describe('buildBestEffortLegalInterpretationFromDocumentAnswer', () => {
     expect(answer).not.toBeNull();
     expect(verification.passed).toBe(true);
     expect(content).toContain('Here is what the visible order language supports.');
-    expect(content).toContain('specific order language is the stronger reading');
+    expect(content).toContain('provision written specifically for this event applies');
     expect(content).not.toContain('citation verifier');
     expect(content).not.toContain('model-generated claim');
   });

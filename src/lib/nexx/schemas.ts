@@ -216,6 +216,41 @@ const legalInterpretationCompetingClauseSchema = {
   required: ['label', 'quote', 'sourceIds', 'whyItDoesOrDoesNotControl'],
 } as const;
 
+const legalInterpretationInteractingClauseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    label: { type: 'string' },
+    relationship: {
+      type: 'string',
+      enum: [
+        'general_default',
+        'express_exception',
+        'special_rule',
+        'supplemental',
+        'superseded',
+        'genuine_conflict',
+        'unrelated',
+      ],
+    },
+    quote: { type: 'string' },
+    sourceIds: { type: 'array', items: { type: 'string' } },
+    scope: { type: 'string' },
+    effectOnOutcome: { type: 'string' },
+  },
+  required: ['label', 'relationship', 'quote', 'sourceIds', 'scope', 'effectOnOutcome'],
+} as const;
+
+const legalInterpretationExplanationStepSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    point: { type: 'string' },
+    sourceIds: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['point', 'sourceIds'],
+} as const;
+
 const legalInterpretationPriorityLanguageSchema = {
   type: 'object',
   additionalProperties: false,
@@ -254,6 +289,14 @@ const legalInterpretationSchema = {
       type: 'array',
       items: legalInterpretationCompetingClauseSchema,
     },
+    interactingClauses: {
+      type: 'array',
+      items: legalInterpretationInteractingClauseSchema,
+    },
+    explanationSteps: {
+      type: 'array',
+      items: legalInterpretationExplanationStepSchema,
+    },
     priorityLanguage: {
       type: 'array',
       items: legalInterpretationPriorityLanguageSchema,
@@ -290,6 +333,7 @@ const legalInterpretationSchema = {
       required: ['tone', 'text'],
     },
     caveats: { type: 'array', items: { type: 'string' } },
+    materialLimitation: { type: ['string', 'null'] },
   },
   required: [
     'answerType',
@@ -297,11 +341,14 @@ const legalInterpretationSchema = {
     'userFacingCertainty',
     'controllingClauses',
     'competingClauses',
+    'interactingClauses',
+    'explanationSteps',
     'priorityLanguage',
     'interpretation',
     'practicalMeaning',
     'draftMessage',
     'caveats',
+    'materialLimitation',
   ],
 } as const;
 

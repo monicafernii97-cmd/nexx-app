@@ -24,7 +24,11 @@ import { resolveOrderVersion } from '../src/lib/nexx/legal-engine/orderVersionRe
 import { buildProSeDraftingReadiness, renderProSeDraftingReadinessMarkdown, shouldBuildProSeDraftingReadiness } from '../src/lib/nexx/legal-engine/proSeDraftingFlow';
 import { detectedFamilyLawIssuePacks } from '../src/lib/nexx/legal-engine/issuePacks/familyLawIssuePacks';
 import { composeLegalResponse } from '../src/lib/nexx/legal-engine/responseComposer';
-import { repairRenderedOutput, verifyRenderedOutput } from '../src/lib/nexx/legal-engine/renderedOutputVerifier';
+import { repairRenderedOutput, truncateAtSentenceBoundary, verifyRenderedOutput } from '../src/lib/nexx/legal-engine/renderedOutputVerifier';
+import { responsePlanFromLegalInterpretation, userAskedForDraft } from '../src/lib/nexx/legal-engine/responsePlan';
+import { normalizeLegalProposition, repeatedLegalPropositions, semanticallyEquivalentLegalText } from '../src/lib/nexx/legal-engine/semanticDedup';
+import { resolveRequestedFathersDaySchedule } from '../src/lib/nexx/legal-engine/possessionCalendar';
+import { inferClauseRelationship } from '../src/lib/nexx/legal-engine/clauseRelationship';
 import { recoverStructuredOutput } from '../src/lib/nexx/recovery/recoverStructuredOutput';
 import { suppressWeakArtifacts } from '../src/lib/nexx/recovery/suppressWeakArtifacts';
 import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
@@ -1581,35 +1585,135 @@ function repairInjectionsForRenderedFailure(
 
 function deterministicRenderedFallback(
     response: NexxAssistantResponse,
-    repairedMessage: string,
     routeMode: RouteMode,
     userMessage: string
 ) {
-    const directAnswer = response.legalInterpretation?.directAnswer || response.documentAnswer?.answer || '';
-    const draftText = response.litigationNavigation?.coParentResponse.neutralDraft ||
-        response.legalInterpretation?.draftMessage?.text ||
-        '';
+    const interpretationPlan = response.legalInterpretation
+        ? responsePlanFromLegalInterpretation(response.legalInterpretation, userMessage)
+        : null;
+    const directAnswer = interpretationPlan?.directAnswer || response.documentAnswer?.answer || '';
+    const explanation = interpretationPlan?.explanationSteps[0]?.point || '';
+    const practical = interpretationPlan?.practicalOutcome &&
+        !semanticallyEquivalentLegalText(directAnswer, interpretationPlan.practicalOutcome)
+        ? interpretationPlan.practicalOutcome
+        : '';
+    const draftText = userAskedForDraft(userMessage)
+        ? response.litigationNavigation?.coParentResponse.neutralDraft || interpretationPlan?.communicationDraft?.text || ''
+        : '';
     const deadlineCheck = courtFiledRenderedSignal(userMessage, routeMode)
         ? 'Before filing, confirm the date you were served, the response deadline, and any hearing date.'
         : '';
     const sections = [
         directAnswer,
-        draftText ? `You can say:\n\n"${draftText}"` : '',
+        explanation,
+        practical,
         deadlineCheck,
-        repairedMessage,
+        draftText ? `You can say:\n\n"${draftText}"` : '',
     ].filter((section) => section.trim().length > 0);
 
-    return Array.from(new Set(sections)).join('\n\n').slice(0, 4_000).trim() ||
+    return truncateAtSentenceBoundary(Array.from(new Set(sections)).join('\n\n'), 4_000) ||
         'Here is the safest practical next step based on the information available.';
 }
 
-function verifyAndRepairRenderedResponse(response: NexxAssistantResponse, routeMode: RouteMode, userMessage: string) {
+function enrichFathersDayCalendar(
+    response: NexxAssistantResponse,
+    userMessage: string
+): NexxAssistantResponse {
+    const answer = response.legalInterpretation;
+    if (!answer || !/father'?s day/i.test(userMessage)) return response;
+    const controllingText = answer.controllingClauses.map((clause) => clause.quote).join(' ');
+    const calendar = resolveRequestedFathersDaySchedule({ userMessage, controllingText });
+    if (!calendar) return response;
+    return {
+        ...response,
+        legalInterpretation: {
+            ...answer,
+            practicalMeaning: {
+                ...answer.practicalMeaning,
+                result: `For ${calendar.year}, Father's Day possession runs from ${calendar.startLabel} through ${calendar.endLabel}.`,
+                startTime: calendar.startLabel,
+                endTime: calendar.endLabel,
+            },
+        },
+    };
+}
+
+function verifyAndRepairRenderedResponse(
+    response: NexxAssistantResponse,
+    routeMode: RouteMode,
+    userMessage: string,
+    sourcePackets: LegalDocumentSourcePacket[] = []
+) {
+    const canonicalDirectAnswer = response.legalInterpretation?.directAnswer || response.documentAnswer?.answer || null;
+    const draftRequired = userAskedForDraft(userMessage);
+    const traceEvidence = () => {
+        const answer = response.legalInterpretation;
+        const sourceRoles = [
+            ...(answer?.controllingClauses ?? []).flatMap((clause) => clause.sourceIds.map((sourceId) => {
+                const typedRole = answer?.interactingClauses?.find((candidate) =>
+                    candidate.sourceIds.includes(sourceId)
+                )?.relationship;
+                return {
+                    sourceId,
+                    role: typedRole ?? inferClauseRelationship({
+                        sourceId,
+                        fileId: 'composition-trace',
+                        fileName: 'composition-trace',
+                        chunkId: sourceId,
+                        blockIds: [],
+                        text: clause.quote,
+                        sectionHeading: clause.label,
+                    }),
+                    pages: [clause.pageStart, clause.pageEnd].filter((page): page is number => typeof page === 'number'),
+                };
+            })),
+            ...(answer?.interactingClauses ?? []).flatMap((clause) => clause.sourceIds.map((sourceId) => ({
+                sourceId,
+                role: clause.relationship,
+                pages: sourcePackets
+                    .filter((packet) => packet.sourceId === sourceId)
+                    .flatMap((packet) => [packet.pageStart, packet.pageEnd])
+                    .filter((page): page is number => typeof page === 'number'),
+            }))),
+        ];
+        return {
+            selectedSourceRoles: sourceRoles.filter((item, index) =>
+                sourceRoles.findIndex((candidate) => candidate.sourceId === item.sourceId && candidate.role === item.role) === index
+            ),
+            clauseRoleResults: (answer?.interactingClauses ?? []).map((clause) => ({
+                label: clause.label,
+                relationship: clause.relationship,
+                sourceIds: clause.sourceIds,
+            })),
+        };
+    };
     const verification = verifyRenderedOutput({
         rendered: response.message,
         userMessage,
         routeMode,
+        canonicalDirectAnswer,
+        draftRequired,
     });
-    if (verification.passed) return response;
+    if (verification.passed) {
+        return {
+            ...response,
+            responseCompositionTrace: {
+                renderMode: routeMode,
+                canonicalDirectAnswerFingerprint: canonicalDirectAnswer
+                    ? normalizeLegalProposition(canonicalDirectAnswer).slice(0, 160)
+                    : null,
+                ...traceEvidence(),
+                initialErrors: [],
+                repairedErrors: [],
+                repairCount: 0,
+                fallbackStage: 'none' as const,
+                semanticDuplicateCount: repeatedLegalPropositions(response.message, 0.9).length,
+                lengthTruncated: false,
+                finalPassed: true,
+                finalLength: response.message.length,
+            },
+        };
+    }
 
     const repairedMessage = repairRenderedOutput(
         response.message,
@@ -1619,6 +1723,8 @@ function verifyAndRepairRenderedResponse(response: NexxAssistantResponse, routeM
         rendered: repairedMessage,
         userMessage,
         routeMode,
+        canonicalDirectAnswer,
+        draftRequired,
     });
 
     if (!repairedVerification.passed) {
@@ -1626,19 +1732,56 @@ function verifyAndRepairRenderedResponse(response: NexxAssistantResponse, routeM
             routeMode,
             errors: repairedVerification.errors,
         });
-        const fallbackMessage = repairRenderedOutput(
-            deterministicRenderedFallback(response, repairedMessage, routeMode, userMessage),
-            repairInjectionsForRenderedFailure(response, repairedVerification.errors, routeMode, userMessage)
-        );
+        const fallbackMessage = deterministicRenderedFallback(response, routeMode, userMessage);
+        const fallbackVerification = verifyRenderedOutput({
+            rendered: fallbackMessage,
+            userMessage,
+            routeMode,
+            canonicalDirectAnswer,
+            draftRequired,
+        });
+        if (!fallbackVerification.passed) {
+            throw new Error(`rendered_output_final_fallback_failed: ${fallbackVerification.errors.join(' | ')}`);
+        }
         return {
             ...response,
             message: fallbackMessage || 'Here is the safest practical next step based on the information available.',
+            responseCompositionTrace: {
+                renderMode: routeMode,
+                canonicalDirectAnswerFingerprint: canonicalDirectAnswer
+                    ? normalizeLegalProposition(canonicalDirectAnswer).slice(0, 160)
+                    : null,
+                ...traceEvidence(),
+                initialErrors: verification.errors,
+                repairedErrors: repairedVerification.errors,
+                repairCount: 1,
+                fallbackStage: 'minimal' as const,
+                semanticDuplicateCount: repeatedLegalPropositions(fallbackMessage, 0.9).length,
+                lengthTruncated: fallbackMessage.length >= 3_990,
+                finalPassed: fallbackVerification.passed,
+                finalLength: fallbackMessage.length,
+            },
         };
     }
 
     return {
         ...response,
         message: repairedMessage || response.message,
+        responseCompositionTrace: {
+            renderMode: routeMode,
+            canonicalDirectAnswerFingerprint: canonicalDirectAnswer
+                ? normalizeLegalProposition(canonicalDirectAnswer).slice(0, 160)
+                : null,
+            ...traceEvidence(),
+            initialErrors: verification.errors,
+            repairedErrors: [],
+            repairCount: 1,
+            fallbackStage: 'repair' as const,
+            semanticDuplicateCount: repeatedLegalPropositions(repairedMessage, 0.9).length,
+            lengthTruncated: false,
+            finalPassed: true,
+            finalLength: repairedMessage.length,
+        },
     };
 }
 
@@ -1933,6 +2076,7 @@ async function generateWithFallbacks({
                 {
                     requiresLegalInterpretation,
                     hasClauseConflictSignal: hasClauseConflictSignal(promptBundle.documentReference),
+                    userMessage: [context.turn.message, followUpSummary].filter(Boolean).join('\n'),
                 }
             );
 
@@ -1990,6 +2134,7 @@ async function generateWithFallbacks({
                         {
                             requiresLegalInterpretation,
                             hasClauseConflictSignal: hasClauseConflictSignal(promptBundle.documentReference),
+                            userMessage: [context.turn.message, followUpSummary].filter(Boolean).join('\n'),
                         }
                     );
                     if (
@@ -2028,7 +2173,7 @@ async function generateWithFallbacks({
                     parsedResponse.documentAnswer,
                     promptBundle.documentSourcePackets,
                     promptBundle.documentReference,
-                    context.turn.message
+                    [context.turn.message, followUpSummary].filter(Boolean).join('\n')
                 );
                 parsedResponse = {
                     ...parsedResponse,
@@ -2040,6 +2185,7 @@ async function generateWithFallbacks({
                     {
                         requiresLegalInterpretation,
                         hasClauseConflictSignal: hasClauseConflictSignal(promptBundle.documentReference),
+                        userMessage: [context.turn.message, followUpSummary].filter(Boolean).join('\n'),
                     }
                 );
                 if (!legalInterpretationVerification.passed) {
@@ -2050,6 +2196,10 @@ async function generateWithFallbacks({
                 }
             }
 
+            parsedResponse = enrichFathersDayCalendar(
+                parsedResponse,
+                [context.turn.message, followUpSummary].filter(Boolean).join('\n')
+            );
             parsedResponse = renderDocumentMessage(
                 parsedResponse,
                 promptBundle.documentSourcePackets,
@@ -2077,7 +2227,12 @@ async function generateWithFallbacks({
                 courtFilingExtraction,
             });
             parsedResponse.message = polishLegalResponse(parsedResponse.message);
-            parsedResponse = verifyAndRepairRenderedResponse(parsedResponse, routeMode, context.turn.message);
+            parsedResponse = verifyAndRepairRenderedResponse(
+                parsedResponse,
+                routeMode,
+                context.turn.message,
+                promptBundle.documentSourcePackets
+            );
 
             return {
                 response: parsedResponse,
@@ -2233,6 +2388,7 @@ export const processChatGenerationJob = internalAction({
                     orderVersion: result.response.orderVersion,
                     legalBasis: result.response.legalBasis,
                     deadlineAnalysis: result.response.deadlineAnalysis,
+                    responseCompositionTrace: result.response.responseCompositionTrace,
                 }),
                 providerResponseId: result.responseId,
                 degraded: result.degraded,

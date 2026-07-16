@@ -1,11 +1,11 @@
 # NEXX Overhaul Plans — Master Index
 
-> All plans from April 9–13, 2026 organized chronologically.  
+> Plans from April 9–13 and July 16, 2026, organized chronologically.
 > Open any file below to read the full plan, then check off what's done.
 
 ---
 
-## 📋 The 10 Plans (in execution order)
+## 📋 The 11 Plans (in execution order)
 
 ### 1. [Responses API Initial](./01_responses_api_initial.md) — 361 lines
 **Date**: Apr 9  
@@ -94,6 +94,13 @@
 
 ---
 
+### 11. [NEXX Family-Law Case Strategist Response Quality](./11_nexx_family_law_case_strategist.md)
+**Date**: Jul 16
+**What it covers**: Direct-first court-order interpretation, plain-language clause relationships, proposition-level source grounding, semantic deduplication, idempotent response repair, calendar resolution, and the broader NEXX family-law strategist behavior contract.
+**Status**: Implemented; release validation complete
+
+---
+
 ## 📊 Audit Documents
 
 These cross-reference the plans against the actual code:
@@ -110,8 +117,8 @@ These cross-reference the plans against the actual code:
 
 | Metric | Count |
 |--------|-------|
-| Total plans | 10 |
-| Total lines across all plans | ~3,400 |
+| Total plans | 11 |
+| Total lines across all plans | ~3,833 |
 | New files planned | ~70 (arch + UI combined) |
 | New files built | ~60 |
 | Convex tables added | 7 → now 22 total |

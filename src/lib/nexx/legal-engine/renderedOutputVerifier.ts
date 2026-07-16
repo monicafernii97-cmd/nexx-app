@@ -108,9 +108,8 @@ function startsWithDirectAnswer(rendered: string, canonicalDirectAnswer?: string
   if (canonicalDirectAnswer?.trim()) {
     const canonical = normalizeLegalProposition(canonicalDirectAnswer);
     const opening = normalizeLegalProposition(firstBlock);
-    if (opening.startsWith(canonical) || semanticallyEquivalentLegalText(firstBlock, canonicalDirectAnswer, 0.76)) {
-      return true;
-    }
+    return opening === canonical ||
+      semanticallyEquivalentLegalText(firstBlock, canonicalDirectAnswer, 0.76);
   }
   return /^(?:\s|[*_>"'`-])*(?:no\b|yes\b|probably\b|my read\b|based on\b|usually\b|the order\b|(?:i\s+)?cannot verify\b|(?:i\s+)?can't verify\b|(?:i\s+)?cannot confirm\b|(?:i\s+)?can't confirm\b|i do not see\b|i don't see\b|not enough supported\b|not enough visible\b)/i.test(
     rendered

@@ -2,6 +2,10 @@ import type { LegalDocumentSourcePacket } from '../legalDocumentAnswer';
 import { fuzzyTextContains } from '../legalDocumentAnswer';
 import type { LegalClauseRelationship } from './legalInterpretationSchema';
 
+export function containsFathersDay(value: string) {
+  return /\bfather'?s day\b/i.test(value.replace(/[’‘]/g, "'"));
+}
+
 function combinedText(source: LegalDocumentSourcePacket) {
   return `${source.sectionHeading ?? ''} ${source.text}`;
 }
@@ -13,7 +17,7 @@ export function inferClauseRelationship(source: LegalDocumentSourcePacket): Lega
   if (/\b(later signed|modification|modified order|amended order|supersedes?)\b/i.test(text)) {
     return 'superseded';
   }
-  if (/\bfather'?s day\b/i.test(text) && /\b(begin(?:ning|s)?|start(?:ing|s)?|ending|ends?)\b/i.test(text)) {
+  if (containsFathersDay(text) && /\b(begin(?:ning|s)?|start(?:ing|s)?|ending|ends?)\b/i.test(text)) {
     return 'special_rule';
   }
   if (/\b(regular|weekend period|weekend possession)\b/i.test(text)) return 'general_default';
@@ -22,7 +26,7 @@ export function inferClauseRelationship(source: LegalDocumentSourcePacket): Lega
 
 export function sourceContainsOperativeFatherDaySchedule(source: LegalDocumentSourcePacket) {
   const text = combinedText(source);
-  return /\bfather'?s day\b/i.test(text) &&
+  return containsFathersDay(text) &&
     /\b(begin(?:ning|s)?|start(?:ing|s)?)\b/i.test(text) &&
     /\bfriday\b/i.test(text) &&
     /\b(end(?:ing|s)?)\b/i.test(text) &&
@@ -51,7 +55,7 @@ export function clauseQuoteSupported(quote: string, sourceIds: string[], sources
 
 export function sourceIsRelevantToIssue(source: LegalDocumentSourcePacket, userMessage = '') {
   if (!userMessage.trim()) return true;
-  const asksFatherDay = /\bfather'?s day\b/i.test(userMessage);
+  const asksFatherDay = containsFathersDay(userMessage);
   if (!asksFatherDay) return true;
   return sourceContainsOperativeFatherDaySchedule(source) ||
     sourceContainsGeneralHolidayExtension(source) ||

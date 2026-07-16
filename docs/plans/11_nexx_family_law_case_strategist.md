@@ -178,13 +178,13 @@ type ResponsePlan = {
   userGoal: string;
   directAnswer: string;
   explanationSteps: Array<{ point: string; sourceIds: string[] }>;
-  practicalOutcome?: string | null;
-  nextAction?: string | null;
+  practicalOutcome: string | null;
+  nextAction: string | null;
   communicationDraft?: {
     text: string;
     includeBecause: 'user_requested' | 'clearly_actionable';
   } | null;
-  materialLimitation?: string | null;
+  materialLimitation: string | null;
 };
 ```
 

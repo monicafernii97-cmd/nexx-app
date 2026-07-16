@@ -2,6 +2,7 @@ import type { LegalDocumentAnswer, LegalDocumentSourcePacket } from '../legalDoc
 import type { DocumentReferenceDetection } from '../documentReferenceDetection';
 import type { LegalInterpretationAnswer, LegalInterpretationPrioritySignal } from './legalInterpretationSchema';
 import {
+  containsFathersDay,
   inferClauseRelationship,
   sourceContainsGeneralHolidayExtension,
   sourceContainsOperativeFatherDaySchedule,
@@ -109,8 +110,8 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
   if (!documentAnswer) return null;
 
   const selectedSources = selectSourcePackets(documentAnswer, sourcePackets, userMessage);
-  const asksFatherDay = /\bfather'?s day\b/i.test(userMessage) ||
-    documentReference.requestedTerms.some((term) => /father'?s day/i.test(term));
+  const asksFatherDay = containsFathersDay(userMessage) ||
+    documentReference.requestedTerms.some(containsFathersDay);
   const controllingSources = asksFatherDay
     ? selectedSources.filter(sourceContainsOperativeFatherDaySchedule).slice(0, 1)
     : selectedSources.filter((source) => sourceIsRelevantToIssue(source, userMessage)).slice(0, 1);
@@ -167,7 +168,7 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
         ...controllingSources.map((source) => source.sourceId),
         ...competingSources.map((source) => source.sourceId),
       ]).slice(0, 4)
-      : [];
+      : controllingSources.map((source) => source.sourceId).slice(0, 4);
   const priorityExplanation = asksFatherDay && prioritySources.some(sourceContainsPriorityCarveout)
     ? 'The phrase “Except as otherwise expressly provided” means the Thursday extension is only the default when another part of the order does not provide a separate schedule. The Father’s Day paragraph provides that separate schedule, so the provisions do not contradict each other. The general rule remains valid for weekend periods within its scope.'
     : competingSources.length > 0 || hasClauseConflictSignal
@@ -202,9 +203,13 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
         scope: sourceContainsPriorityCarveout(source)
           ? 'This language limits when the general rule applies.'
           : 'This language applies to qualifying weekend possession periods without a separately stated schedule.',
-        effectOnOutcome: sourceContainsPriorityCarveout(source)
-          ? 'It directs the reader to use the separately stated Father’s Day schedule.'
-          : 'It does not move the separately scheduled Father’s Day period to Thursday.',
+        effectOnOutcome: asksFatherDay
+          ? sourceContainsPriorityCarveout(source)
+            ? 'It directs the reader to use the separately stated Father’s Day schedule.'
+            : 'It does not move the separately scheduled Father’s Day period to Thursday.'
+          : sourceContainsPriorityCarveout(source)
+            ? 'It directs the reader to use the separately stated provision for this issue.'
+            : 'The general provision remains valid only for situations within its stated scope.',
       })),
     explanationSteps: [{
       point: priorityExplanation,

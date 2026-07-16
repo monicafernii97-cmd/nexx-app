@@ -12,6 +12,7 @@ import {
 } from '../legal-engine/renderedOutputVerifier';
 import { resolveRequestedFathersDaySchedule } from '../legal-engine/possessionCalendar';
 import { fathersDayJuneteenth46PagePackets as packets } from './fixtures/fathersDayJuneteenth46Page';
+import { semanticallyEquivalentLegalText } from '../legal-engine/semanticDedup';
 
 const documentAnswer: LegalDocumentAnswer = {
   answerType: 'interpretation',
@@ -67,6 +68,11 @@ describe("Father's Day and Juneteenth production incident", () => {
     });
     expect(schedule?.startLabel).toBe('Friday, June 19, 2026 at 6:00 p.m.');
     expect(schedule?.endLabel).toBe('Monday, June 22, 2026 at 8:00 a.m.');
+    expect(resolveRequestedFathersDaySchedule({
+      userMessage: 'What dates does Father’s Day mean for 2026?',
+      controllingText: packets.find((packet) => packet.sourceId === 'father_page_16')!.text.replaceAll("'", '’'),
+      timeZone: 'America/Chicago',
+    })?.startDate).toBe('2026-06-19');
   });
 
   it('recognizes a clause-controls opening, repairs by prepending once, and never cuts midword', () => {
@@ -82,6 +88,15 @@ describe("Father's Day and Juneteenth production incident", () => {
     const truncated = truncateAtSentenceBoundary('Complete first sentence. ' + 'word '.repeat(30), 45);
     expect(truncated).toMatch(/(?:[.!?]|…|â€¦)$/);
     expect(truncated).not.toMatch(/\bwo(?:…|â€¦)$/);
+
+    expect(verifyRenderedOutput({
+      rendered: 'Yes, the Thursday rule controls.',
+      userMessage: 'Does it start Thursday?', canonicalDirectAnswer: direct,
+    }).checks.includesDirectAnswerWhenNeeded).toBe(false);
+    expect(semanticallyEquivalentLegalText(
+      "Father's Day begins Friday at 6:00 p.m.",
+      "Father's Day does not begin Friday at 8:00 p.m."
+    )).toBe(false);
   });
 
   it('rejects a real but unrelated source id as support for a claim', () => {

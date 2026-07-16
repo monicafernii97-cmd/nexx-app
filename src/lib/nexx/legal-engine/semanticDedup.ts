@@ -26,19 +26,42 @@ function propositionTokens(value: string) {
   );
 }
 
+function materialTerms(value: string) {
+  const normalized = normalizeLegalProposition(value);
+  const tokens = normalized.split(' ');
+  return {
+    numbers: new Set(tokens.filter((token) => /^\d+$/.test(token))),
+    negations: new Set(tokens.filter((token) => ['no', 'not', 'never', 'without', 'cannot', 'cant', 'doesnt', 'isnt'].includes(token))),
+    exceptions: new Set(tokens.filter((token) => ['except', 'unless', 'notwithstanding', 'subject'].includes(token))),
+  };
+}
+
+function setsEqual(left: Set<string>, right: Set<string>) {
+  return left.size === right.size && [...left].every((value) => right.has(value));
+}
+
+function materialTermsMatch(left: string, right: string) {
+  const a = materialTerms(left);
+  const b = materialTerms(right);
+  return setsEqual(a.numbers, b.numbers) &&
+    setsEqual(a.negations, b.negations) &&
+    setsEqual(a.exceptions, b.exceptions);
+}
+
 export function legalPropositionSimilarity(left: string, right: string) {
   const a = propositionTokens(left);
   const b = propositionTokens(right);
   if (a.size === 0 || b.size === 0) return 0;
   let intersection = 0;
   for (const token of a) if (b.has(token)) intersection += 1;
-  return intersection / Math.min(a.size, b.size);
+  return intersection / (a.size + b.size - intersection);
 }
 
 export function semanticallyEquivalentLegalText(left: string, right: string, threshold = 0.82) {
   const normalizedLeft = normalizeLegalProposition(left);
   const normalizedRight = normalizeLegalProposition(right);
   if (!normalizedLeft || !normalizedRight) return false;
+  if (!materialTermsMatch(left, right)) return false;
   if (normalizedLeft === normalizedRight) return true;
   if (normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft)) {
     const shorter = Math.min(normalizedLeft.length, normalizedRight.length);
@@ -61,7 +84,7 @@ export function uniqueLegalPropositions(values: Array<string | null | undefined>
 
 export function repeatedLegalPropositions(markdown: string, threshold = 0.82) {
   const analysisBody = markdown
-    .split(/\n(?:You can say:|\*\*Suggested reply:\*\*|Neutral draft:|Firmer version:)/i)[0];
+    .split(/\n(?:You can say:|I would keep it short and order-based:|\*\*Suggested reply:\*\*|Neutral draft:|Firmer version:)/i)[0];
   const sentences = analysisBody
     .split(/\n{2,}|(?<=[.!?])\s+/)
     .map((value) => value.replace(/^\s*(?:[-*]|\d+\.)\s*/, '').trim())

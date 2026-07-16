@@ -28,6 +28,7 @@ import { repairRenderedOutput, truncateAtSentenceBoundary, verifyRenderedOutput 
 import { responsePlanFromLegalInterpretation, userAskedForDraft } from '../src/lib/nexx/legal-engine/responsePlan';
 import { normalizeLegalProposition, repeatedLegalPropositions, semanticallyEquivalentLegalText } from '../src/lib/nexx/legal-engine/semanticDedup';
 import { resolveRequestedFathersDaySchedule } from '../src/lib/nexx/legal-engine/possessionCalendar';
+import { inferClauseRelationship } from '../src/lib/nexx/legal-engine/clauseRelationship';
 import { recoverStructuredOutput } from '../src/lib/nexx/recovery/recoverStructuredOutput';
 import { suppressWeakArtifacts } from '../src/lib/nexx/recovery/suppressWeakArtifacts';
 import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
@@ -1648,11 +1649,24 @@ function verifyAndRepairRenderedResponse(
     const traceEvidence = () => {
         const answer = response.legalInterpretation;
         const sourceRoles = [
-            ...(answer?.controllingClauses ?? []).flatMap((clause) => clause.sourceIds.map((sourceId) => ({
-                sourceId,
-                role: 'special_rule',
-                pages: [clause.pageStart, clause.pageEnd].filter((page): page is number => typeof page === 'number'),
-            }))),
+            ...(answer?.controllingClauses ?? []).flatMap((clause) => clause.sourceIds.map((sourceId) => {
+                const typedRole = answer?.interactingClauses?.find((candidate) =>
+                    candidate.sourceIds.includes(sourceId)
+                )?.relationship;
+                return {
+                    sourceId,
+                    role: typedRole ?? inferClauseRelationship({
+                        sourceId,
+                        fileId: 'composition-trace',
+                        fileName: 'composition-trace',
+                        chunkId: sourceId,
+                        blockIds: [],
+                        text: clause.quote,
+                        sectionHeading: clause.label,
+                    }),
+                    pages: [clause.pageStart, clause.pageEnd].filter((page): page is number => typeof page === 'number'),
+                };
+            })),
             ...(answer?.interactingClauses ?? []).flatMap((clause) => clause.sourceIds.map((sourceId) => ({
                 sourceId,
                 role: clause.relationship,
@@ -1726,6 +1740,9 @@ function verifyAndRepairRenderedResponse(
             canonicalDirectAnswer,
             draftRequired,
         });
+        if (!fallbackVerification.passed) {
+            throw new Error(`rendered_output_final_fallback_failed: ${fallbackVerification.errors.join(' | ')}`);
+        }
         return {
             ...response,
             message: fallbackMessage || 'Here is the safest practical next step based on the information available.',
@@ -2179,7 +2196,10 @@ async function generateWithFallbacks({
                 }
             }
 
-            parsedResponse = enrichFathersDayCalendar(parsedResponse, context.turn.message);
+            parsedResponse = enrichFathersDayCalendar(
+                parsedResponse,
+                [context.turn.message, followUpSummary].filter(Boolean).join('\n')
+            );
             parsedResponse = renderDocumentMessage(
                 parsedResponse,
                 promptBundle.documentSourcePackets,

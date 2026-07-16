@@ -220,10 +220,11 @@ describe('NEXX legal agent golden behavior', () => {
 
     expect(content).toContain('No - Father\'s Day possession starts Friday at 6:00 p.m., not Thursday. [p. 5]');
     expect(content).toContain('**Controlling language:**');
-    expect(content).toContain('**Competing language:**');
+    expect(content).toContain('**How the provisions work together:**');
+    expect(content).not.toContain('**Competing language:**');
     expect(content).toContain('**Why this controls:**');
     expect(content).toContain('**Practical meaning:**');
-    expect(content).toContain('**Suggested reply:**');
+    expect(content).not.toContain('**Suggested reply:**');
     expect(content).not.toContain('may control');
     expect(content).not.toContain('non-frivolous');
     expectCleanUserAnswer(content);
@@ -296,7 +297,7 @@ describe('NEXX legal agent golden behavior', () => {
 
     expect(verification.passed).toBe(true);
     expect(content).toContain('I do not see a Father\'s Day possession clause');
-    expect(content).toContain('The visible order language does not include a Father\'s Day-specific clause.');
+    expect(content).toContain('visible language only supports the regular weekend possession rule');
     expectCleanUserAnswer(content);
   });
 

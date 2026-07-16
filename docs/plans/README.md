@@ -5,7 +5,7 @@
 
 ---
 
-## 📋 The 10 Plans (in execution order)
+## 📋 The 11 Plans (in execution order)
 
 ### 1. [Responses API Initial](./01_responses_api_initial.md) — 361 lines
 **Date**: Apr 9  
@@ -94,6 +94,13 @@
 
 ---
 
+### 11. [NEXX Family-Law Case Strategist Response Quality](./11_nexx_family_law_case_strategist.md)
+**Date**: Jul 16
+**What it covers**: Direct-first court-order interpretation, plain-language clause relationships, proposition-level source grounding, semantic deduplication, idempotent response repair, calendar resolution, and the broader NEXX family-law strategist behavior contract.
+**Status**: Ready for implementation; P0 release blocker
+
+---
+
 ## 📊 Audit Documents
 
 These cross-reference the plans against the actual code:
@@ -110,7 +117,7 @@ These cross-reference the plans against the actual code:
 
 | Metric | Count |
 |--------|-------|
-| Total plans | 10 |
+| Total plans | 11 |
 | Total lines across all plans | ~3,400 |
 | New files planned | ~70 (arch + UI combined) |
 | New files built | ~60 |

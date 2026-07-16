@@ -66,7 +66,7 @@ describe('live-style legal agent scenarios', () => {
     expect(result.route.mode).toBe('co_parent_response');
     expect(result.text).toMatch(/Neutral draft|You can say|Co-parent response/i);
     expect(result.text).not.toMatch(/Pro se \/ attorney strategy|Cost and resources/i);
-    expect(result.verification.passed).toBe(true);
+    expect(result.verification.passed, result.verification.errors.join('; ')).toBe(true);
   });
 
   it('handles packed emotional court messages across every major track', () => {
@@ -81,7 +81,7 @@ describe('live-style legal agent scenarios', () => {
     expect(result.text).toMatch(/Cost and resources/i);
     expect(result.text).toMatch(/Judge-ready explanation/i);
     expect(result.text).toMatch(/county and state/i);
-    expect(result.verification.passed).toBe(true);
+    expect(result.verification.passed, result.verification.errors.join('; ')).toBe(true);
   });
 
   it('keeps cost/resource questions source-safe', () => {
@@ -91,7 +91,7 @@ describe('live-style legal agent scenarios', () => {
     expect(result.text).toMatch(/Pro se cost categories/i);
     expect(result.text).toMatch(/Attorney cost categories/i);
     expect(result.text).not.toMatch(/\$\s?\d+|\b\d{2,}\s*dollars\b/i);
-    expect(result.verification.passed).toBe(true);
+    expect(result.verification.passed, result.verification.errors.join('; ')).toBe(true);
   });
 
   it('turns judge explanation requests into a court-ready structure', () => {

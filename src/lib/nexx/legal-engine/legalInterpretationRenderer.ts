@@ -1,5 +1,11 @@
 import type { LegalDocumentSourcePacket } from '../legalDocumentAnswer';
 import type { LegalInterpretationAnswer } from './legalInterpretationSchema';
+import { responsePlanFromLegalInterpretation } from './responsePlan';
+import {
+  normalizeLegalProposition,
+  semanticallyEquivalentLegalText,
+  uniqueLegalPropositions,
+} from './semanticDedup';
 
 export type ConversationalLegalRenderMode =
   | 'quick_direct'
@@ -105,20 +111,15 @@ function inferRenderMode(
   return 'quick_direct';
 }
 
-function cleanSentenceList(values: Array<string | undefined>) {
-  return values
-    .map((value) => value ? cleanUserFacingText(value) : '')
-    .filter(Boolean);
-}
-
 export function renderLegalInterpretationMarkdown(
   answer: LegalInterpretationAnswer,
   sourcePackets: LegalDocumentSourcePacket[],
   fallbackMessage: string,
   options?: LegalInterpretationRenderOptions
 ) {
+  const plan = responsePlanFromLegalInterpretation(answer, options?.userMessage ?? '');
   const directAnswer = appendCitationLabels(
-    answer.directAnswer || answer.interpretation.plainEnglish || fallbackMessage,
+    plan.directAnswer || answer.interpretation.plainEnglish || fallbackMessage,
     sourcePageLabels(answer.controllingClauses.flatMap((clause) => clause.sourceIds), sourcePackets)
   );
 
@@ -143,63 +144,61 @@ export function renderLegalInterpretationMarkdown(
     })
     .filter(Boolean);
 
-  const priorityLines = answer.priorityLanguage
+  const interactingLines = (answer.interactingClauses ?? [])
+    .filter((clause) => clause.relationship !== 'unrelated')
     .slice(0, 3)
-    .map((item) => appendCitationLabels(
-      cleanUserFacingText(item.explanation),
-      sourcePageLabels(item.sourceIds, sourcePackets)
-    ))
-    .filter(Boolean)
-    .map((item) => `- ${item}`);
+    .map((clause) => {
+      const quote = quoteLine(clause.label, clause.quote, sourcePageLabels(clause.sourceIds, sourcePackets));
+      const effect = cleanUserFacingText(clause.effectOnOutcome);
+      return [quote, effect ? `  ${effect}` : undefined].filter(Boolean).join('\n');
+    })
+    .filter(Boolean);
 
-  const practical = [
-    answer.practicalMeaning.result,
-    answer.practicalMeaning.startTime ? `Start: ${answer.practicalMeaning.startTime}.` : undefined,
-    answer.practicalMeaning.endTime ? `End: ${answer.practicalMeaning.endTime}.` : undefined,
-    answer.practicalMeaning.whatUserShouldDo,
-  ].filter(Boolean).map((item) => cleanUserFacingText(String(item))).join(' ');
-
-  const legalReadingSourceIds = uniqueValues([
-    ...answer.priorityLanguage.flatMap((item) => item.sourceIds),
-    ...answer.controllingClauses.flatMap((clause) => clause.sourceIds),
-    ...answer.competingClauses.flatMap((clause) => clause.sourceIds),
-  ]);
-  const legalReadingWithCitations = answer.interpretation.legalReading
-    ? appendCitationLabels(
-      answer.interpretation.legalReading,
-      sourcePageLabels(legalReadingSourceIds, sourcePackets)
-    )
-    : undefined;
-  const competingRationale = answer.competingClauses
-    .slice(0, 1)
-    .map((clause) => appendCitationLabels(
-      clause.whyItDoesOrDoesNotControl,
-      sourcePageLabels(clause.sourceIds, sourcePackets)
-    ))
-    .join(' ');
-  const whyText = cleanSentenceList([
-    legalReadingWithCitations,
-    answer.priorityLanguage
-      .slice(0, 2)
-      .map((item) => appendCitationLabels(item.explanation, sourcePageLabels(item.sourceIds, sourcePackets)))
-      .join(' '),
-    competingRationale,
+  const practicalResult = cleanUserFacingText(plan.practicalOutcome ?? '');
+  const normalizedPractical = normalizeLegalProposition(practicalResult);
+  const timeDetails = [
+    answer.practicalMeaning.startTime && !normalizedPractical.includes(normalizeLegalProposition(answer.practicalMeaning.startTime))
+      ? `Start: ${answer.practicalMeaning.startTime}.`
+      : undefined,
+    answer.practicalMeaning.endTime && !normalizedPractical.includes(normalizeLegalProposition(answer.practicalMeaning.endTime))
+      ? `End: ${answer.practicalMeaning.endTime}.`
+      : undefined,
+  ];
+  const practical = uniqueLegalPropositions([
+    practicalResult,
+    ...timeDetails,
+    plan.nextAction,
   ]).join(' ');
 
-  const suggestedReply = answer.draftMessage?.text
-    ? `**Suggested reply:**\n\n"${cleanUserFacingText(answer.draftMessage.text)}"`
+  const whyText = uniqueLegalPropositions(
+    plan.explanationSteps.map((step) => appendCitationLabels(
+      step.point,
+      sourcePageLabels(step.sourceIds, sourcePackets)
+    ))
+  ).join(' ');
+  const relationshipText = uniqueLegalPropositions([
+    ...(answer.interactingClauses ?? [])
+      .filter((clause) => clause.relationship !== 'unrelated')
+      .map((clause) => cleanUserFacingText(clause.effectOnOutcome)),
+    ...answer.competingClauses.map((clause) => cleanUserFacingText(clause.whyItDoesOrDoesNotControl)),
+  ]).filter((value) => !semanticallyEquivalentLegalText(value, whyText)).join(' ');
+
+  const suggestedReply = plan.communicationDraft?.text
+    ? `**Suggested reply:**\n\n"${cleanUserFacingText(plan.communicationDraft.text)}"`
     : undefined;
 
-  const conversationalDraft = answer.draftMessage?.text
-    ? `I would keep it short and order-based:\n\n"${cleanUserFacingText(answer.draftMessage.text)}"`
+  const conversationalDraft = plan.communicationDraft?.text
+    ? `I would keep it short and order-based:\n\n"${cleanUserFacingText(plan.communicationDraft.text)}"`
     : undefined;
 
   const ambiguityNote = answer.userFacingCertainty === 'ambiguous' && answer.caveats.length > 0
     ? `**Where it is genuinely unclear:** ${answer.caveats.map(cleanUserFacingText).filter(Boolean).join(' ')}`
     : undefined;
 
-  const insufficientNote = answer.userFacingCertainty === 'insufficient_text' && answer.caveats.length > 0
-    ? answer.caveats.map(cleanUserFacingText).filter(Boolean).join(' ')
+  const insufficientNote = answer.userFacingCertainty === 'insufficient_text' && plan.materialLimitation &&
+    !semanticallyEquivalentLegalText(directAnswer, plan.materialLimitation, 0.64) &&
+    !semanticallyEquivalentLegalText(practical, plan.materialLimitation, 0.64)
+    ? cleanUserFacingText(plan.materialLimitation)
     : undefined;
 
   const renderMode = inferRenderMode(answer, options);
@@ -217,8 +216,8 @@ export function renderLegalInterpretationMarkdown(
 
   if (renderMode === 'draft_focused') {
     return [
-      answer.draftMessage?.text
-        ? `You can say:\n\n"${cleanUserFacingText(answer.draftMessage.text)}"`
+      plan.communicationDraft?.text
+        ? `You can say:\n\n"${cleanUserFacingText(plan.communicationDraft.text)}"`
         : directAnswer || 'I would keep the response short and tied to the order.',
       whyText ? `Why this works: ${whyText}` : undefined,
       practical ? `Practical point: ${practical}` : undefined,
@@ -230,6 +229,7 @@ export function renderLegalInterpretationMarkdown(
   if (renderMode === 'standard_explanation') {
     return [
       directAnswer || 'I do not see enough supported order text to answer that directly.',
+      relationshipText ? `**How the provisions work together:** ${relationshipText}` : undefined,
       whyText ? `**Why:** ${whyText}` : undefined,
       practical ? `**Practical meaning:** ${practical}` : undefined,
       ambiguityNote,
@@ -253,11 +253,12 @@ export function renderLegalInterpretationMarkdown(
   return [
     directAnswer || 'I do not see enough supported order text to answer that directly.',
     controllingLines.length > 0 ? `**Controlling language:**\n${controllingLines.join('\n')}` : undefined,
-    competingLines.length > 0 ? `**Competing language:**\n${competingLines.join('\n')}` : undefined,
-    priorityLines.length > 0 ? `**Why this controls:**\n${priorityLines.join('\n')}` : undefined,
-    legalReadingWithCitations
-      ? `**Practical reading:** ${legalReadingWithCitations}`
-      : undefined,
+    interactingLines.length > 0
+      ? `**How the provisions work together:**\n${interactingLines.join('\n')}`
+      : competingLines.length > 0
+        ? `**How the provisions work together:**\n${competingLines.join('\n')}`
+        : undefined,
+    whyText ? `**Why this controls:** ${whyText}` : undefined,
     practical ? `**Practical meaning:** ${practical}` : undefined,
     ambiguityNote,
     insufficientNote,

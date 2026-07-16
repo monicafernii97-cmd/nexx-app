@@ -242,6 +242,6 @@ describe('family-law issue packs', () => {
     ]));
     expect(rendered).toContain('when you actually received the filing and how you received it');
     expect(rendered).not.toMatch(/\b(?:OCR|retrieval|verifier|sourceId|chunkId|confidence|internal metadata)\b/i);
-    expect(verification.passed).toBe(true);
+    expect(verification.passed, verification.errors.join('; ')).toBe(true);
   });
 });

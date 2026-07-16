@@ -1,6 +1,7 @@
 import type { RouteMode } from '../../types';
 import type { LitigationNavigationResponse } from './litigationNavigationSchema';
 import { KNOWN_MARKDOWN_HEADING_PATTERN, markdownHeadingKey } from './markdownHeadings';
+import { semanticallyEquivalentLegalText } from './semanticDedup';
 
 export type ResponseCompositionInput = {
   existingMessage: string;
@@ -38,10 +39,18 @@ function extractNextSteps(markdown: string) {
 
 function removeDuplicateSections(markdown: string) {
   const seen = new Set<string>();
+  const semanticSections: string[] = [];
   const sections = markdown.split(/\n{2,}/);
   return sections.filter((section) => {
     const heading = markdownHeadingKey(section);
-    if (!heading) return true;
+    if (!heading) {
+      const isDraft = /^(?:Neutral draft:|Firmer version:|You can say:|"|“)/i.test(section.trim());
+      if (!isDraft && semanticSections.some((existing) => semanticallyEquivalentLegalText(existing, section))) {
+        return false;
+      }
+      if (!isDraft) semanticSections.push(section);
+      return true;
+    }
     if (seen.has(heading)) return false;
     seen.add(heading);
     return true;

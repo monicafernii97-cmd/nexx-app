@@ -1,5 +1,10 @@
 import type { RouteMode } from '../../types';
 import { markdownHeadingKey } from './markdownHeadings';
+import {
+  normalizeLegalProposition,
+  repeatedLegalPropositions,
+  semanticallyEquivalentLegalText,
+} from './semanticDedup';
 
 export type RenderedOutputVerification = {
   passed: boolean;
@@ -10,6 +15,8 @@ export type RenderedOutputVerification = {
     noInflammatoryLabels: boolean;
     noInventedDollarAmounts: boolean;
     noDuplicateSections: boolean;
+    noSemanticRepetition: boolean;
+    endsCleanly: boolean;
     includesDirectAnswerWhenNeeded: boolean;
     includesDraftWhenUserAskedWhatToSay: boolean;
     includesDeadlineCheckWhenCourtFiled: boolean;
@@ -96,10 +103,18 @@ function needsDirectAnswerFirst(message: string, routeMode?: RouteMode) {
     /\b(can|does|is|are|am i wrong|allowed)\b/i.test(message);
 }
 
-function startsWithDirectAnswer(rendered: string) {
+function startsWithDirectAnswer(rendered: string, canonicalDirectAnswer?: string | null) {
+  const firstBlock = rendered.split(/\n{2,}/)[0]?.trim() ?? '';
+  if (canonicalDirectAnswer?.trim()) {
+    const canonical = normalizeLegalProposition(canonicalDirectAnswer);
+    const opening = normalizeLegalProposition(firstBlock);
+    if (opening.startsWith(canonical) || semanticallyEquivalentLegalText(firstBlock, canonicalDirectAnswer, 0.76)) {
+      return true;
+    }
+  }
   return /^(?:\s|[*_>"'`-])*(?:no\b|yes\b|probably\b|my read\b|based on\b|usually\b|the order\b|(?:i\s+)?cannot verify\b|(?:i\s+)?can't verify\b|(?:i\s+)?cannot confirm\b|(?:i\s+)?can't confirm\b|i do not see\b|i don't see\b|not enough supported\b|not enough visible\b)/i.test(
     rendered
-  );
+  ) || /^(?:\s|[*_>"'`-])*(?:the\s+[^.!?\n]{1,80}\s+(?:clause|provision)\s+controls\b|[^.!?\n]{1,100}\s+(?:possession\s+)?(?:begins|starts|ends|controls)\b)/i.test(rendered);
 }
 
 export function verifyRenderedOutput(args: {
@@ -107,18 +122,25 @@ export function verifyRenderedOutput(args: {
   userMessage: string;
   routeMode?: RouteMode;
   exactFeesSourceBacked?: boolean;
+  canonicalDirectAnswer?: string | null;
+  draftRequired?: boolean;
 }): RenderedOutputVerification {
   const rendered = args.rendered.trim();
   const simplePrompt = args.userMessage.length < 90 && !courtFiledSignal(args.userMessage, args.routeMode);
+  const enforceSemanticDeduplication = Boolean(args.canonicalDirectAnswer?.trim()) ||
+    args.routeMode === 'order_interpretation' ||
+    args.routeMode === 'possession_access_schedule';
   const checks: RenderedOutputVerification['checks'] = {
     noBackendLanguage: !BACKEND_LANGUAGE_PATTERN.test(rendered),
     noOcrRetrievalVerifierLanguage: !OCR_RETRIEVAL_VERIFIER_PATTERN.test(rendered),
     noInflammatoryLabels: !INFLAMMATORY_LABEL_PATTERN.test(rendered) && !DIAGNOSTIC_ABUSE_LABEL_PATTERN.test(rendered),
     noInventedDollarAmounts: args.exactFeesSourceBacked === true || !DOLLAR_PATTERN.test(rendered) || hasOnlyAllowedMoneyClaims(rendered),
     noDuplicateSections: duplicateHeadingCount(rendered) === 0,
+    noSemanticRepetition: !enforceSemanticDeduplication || repeatedLegalPropositions(rendered, 0.9).length === 0,
+    endsCleanly: rendered.length < 3_990 || /[.!?\]”)'`]$/.test(rendered),
     includesDirectAnswerWhenNeeded: !needsDirectAnswerFirst(args.userMessage, args.routeMode) ||
-      startsWithDirectAnswer(rendered),
-    includesDraftWhenUserAskedWhatToSay: !asksWhatToSay(args.userMessage) ||
+      startsWithDirectAnswer(rendered, args.canonicalDirectAnswer),
+    includesDraftWhenUserAskedWhatToSay: !(args.draftRequired ?? asksWhatToSay(args.userMessage)) ||
       /\b(Neutral draft|Suggested response|You can say|Send this)\b/i.test(rendered),
     includesDeadlineCheckWhenCourtFiled: !courtFiledSignal(args.userMessage, args.routeMode) ||
       /\b(service date|served|deadline|hearing date|court date)\b/i.test(rendered),
@@ -167,11 +189,43 @@ export function repairRenderedOutput(rendered: string, injections?: {
     repaired.push(line);
   }
   const body = repaired.join('\n').replace(/\n{3,}/g, '\n\n').trim();
-  const additions = [
-    injections?.directAnswer?.trim(),
-    injections?.draftText?.trim() ? `You can say:\n\n"${injections.draftText.trim()}"` : '',
-    injections?.deadlineCheck?.trim(),
-  ].filter(Boolean);
+  const blocks = body.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
+  const dedupedBlocks: string[] = [];
+  for (const block of blocks) {
+    const isHeading = Boolean(markdownHeadingKey(block));
+    if (!isHeading && dedupedBlocks.some((existing) =>
+      !markdownHeadingKey(existing) && semanticallyEquivalentLegalText(existing, block)
+    )) continue;
+    dedupedBlocks.push(block);
+  }
 
-  return [body, ...additions].filter(Boolean).join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+  const directAnswer = injections?.directAnswer?.trim();
+  if (directAnswer && !startsWithDirectAnswer(dedupedBlocks.join('\n\n'), directAnswer)) {
+    dedupedBlocks.unshift(directAnswer);
+  }
+  const draftText = injections?.draftText?.trim();
+  if (draftText && !dedupedBlocks.some((block) => block.includes(draftText))) {
+    dedupedBlocks.push(`You can say:\n\n"${draftText}"`);
+  }
+  const deadlineCheck = injections?.deadlineCheck?.trim();
+  if (deadlineCheck && !dedupedBlocks.some((block) => semanticallyEquivalentLegalText(block, deadlineCheck))) {
+    dedupedBlocks.push(deadlineCheck);
+  }
+
+  return dedupedBlocks.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+export function truncateAtSentenceBoundary(value: string, maxLength: number) {
+  const clean = value.trim();
+  if (clean.length <= maxLength) return clean;
+  const candidate = clean.slice(0, maxLength + 1);
+  const boundary = Math.max(
+    candidate.lastIndexOf('. '),
+    candidate.lastIndexOf('? '),
+    candidate.lastIndexOf('! '),
+    candidate.lastIndexOf('\n\n')
+  );
+  if (boundary >= Math.floor(maxLength * 0.55)) return candidate.slice(0, boundary + 1).trim();
+  const wordBoundary = candidate.lastIndexOf(' ');
+  return `${candidate.slice(0, Math.max(0, wordBoundary)).trim()}…`;
 }

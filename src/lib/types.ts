@@ -155,6 +155,20 @@ export interface NexxAssistantResponse {
   orderVersion: ResolvedOrderVersion | null;
   legalBasis: LegalBasis[];
   deadlineAnalysis: DeadlineAnalysis | null;
+  responseCompositionTrace?: {
+    renderMode: string;
+    canonicalDirectAnswerFingerprint: string | null;
+    selectedSourceRoles: Array<{ sourceId: string; role: string; pages: number[] }>;
+    clauseRoleResults: Array<{ label: string; relationship: string; sourceIds: string[] }>;
+    initialErrors: string[];
+    repairedErrors: string[];
+    repairCount: number;
+    fallbackStage: 'none' | 'repair' | 'minimal';
+    semanticDuplicateCount: number;
+    lengthTruncated: boolean;
+    finalPassed: boolean;
+    finalLength: number;
+  };
 }
 
 // ---------------------------------------------------------------------------

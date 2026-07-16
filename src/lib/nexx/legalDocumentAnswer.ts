@@ -115,6 +115,43 @@ function normalizeWordsForCitation(value: string) {
     .filter(Boolean);
 }
 
+const SUPPORT_STOP_WORDS = new Set([
+  'a', 'an', 'and', 'as', 'at', 'be', 'because', 'by', 'for', 'from', 'in',
+  'is', 'it', 'of', 'on', 'or', 'that', 'the', 'this', 'to', 'under', 'with',
+  'order', 'provision', 'language', 'court', 'says', 'states',
+]);
+
+function supportTokens(value: string) {
+  return normalizeWordsForCitation(value)
+    .filter((word) => word.length > 1 && !SUPPORT_STOP_WORDS.has(word));
+}
+
+function requiredOperativeAnchors(value: string) {
+  const normalized = normalizeForFuzzyMatch(value);
+  return Array.from(new Set([
+    ...(normalized.match(/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/g) ?? []),
+    ...(normalized.match(/\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?\b/g) ?? []),
+    ...(normalized.match(/\b(?:father'?s day|mother'?s day|juneteenth|thanksgiving|christmas)\b/g) ?? []),
+  ]));
+}
+
+function claimSupportedBySources(
+  claim: LegalDocumentAnswer['claims'][number],
+  sources: LegalDocumentSourcePacket[]
+) {
+  if (sources.length === 0) return false;
+  if (claim.claimType === 'quote') return sources.some((source) => fuzzyTextContains(source.text, claim.claim));
+  const combined = sources.map((source) => `${source.sectionHeading ?? ''} ${source.text}`).join(' ');
+  const combinedNormalized = normalizeForFuzzyMatch(combined);
+  const anchors = requiredOperativeAnchors(claim.claim);
+  if (!anchors.every((anchor) => combinedNormalized.includes(anchor))) return false;
+  const tokens = supportTokens(claim.claim);
+  if (tokens.length === 0) return true;
+  const sourceTokenSet = new Set(supportTokens(combined));
+  const matched = tokens.filter((token) => sourceTokenSet.has(token)).length;
+  return matched / tokens.length >= 0.48;
+}
+
 function contiguousWindowCoverage(sourceWords: string[], quoteWords: string[]) {
   if (quoteWords.length === 0 || quoteWords.length > sourceWords.length) return 0;
 
@@ -693,6 +730,16 @@ export function verifyLegalDocumentAnswer(
       } else {
         addVerifiedCitation(sourceId);
       }
+    }
+    const claimSources = claim.sourceIds
+      .map((sourceId) => packetsBySourceId.get(sourceId))
+      .filter((source): source is LegalDocumentSourcePacket => Boolean(source));
+    if (
+      DOCUMENT_FACT_CLAIM_TYPES.has(claim.claimType) &&
+      claim.sourceIds.length > 0 &&
+      !claimSupportedBySources(claim, claimSources)
+    ) {
+      errors.push(`Document claim is not supported by its cited source text: ${claim.claim.slice(0, 120)}`);
     }
   }
 

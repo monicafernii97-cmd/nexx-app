@@ -152,7 +152,12 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
     .slice(0, 1);
   const controlling = controllingSources[0];
   const canonicalAnswer = asksFatherDay
-    ? fathersDayOutcome(controlling) ?? cleanAnswer(documentAnswer)
+    ? (() => {
+      const outcome = fathersDayOutcome(controlling) ?? cleanAnswer(documentAnswer);
+      return /\bthursday\b/i.test(userMessage)
+        ? `No. ${outcome}, not Thursday. The general Thursday-start rule does not move this separately scheduled Father's Day period.`
+        : outcome;
+    })()
     : cleanAnswer(documentAnswer);
   const hasUsableSources = controllingSources.length > 0;
   const hasClauseConflictSignal =
@@ -204,9 +209,9 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
       ]).slice(0, 4)
       : controllingSources.map((source) => source.sourceId).slice(0, 4);
   const priorityExplanation = asksFatherDay && prioritySources.some(sourceContainsPriorityCarveout)
-    ? 'The phrase “Except as otherwise expressly provided” means the Thursday extension is only the default when another part of the order does not provide a separate schedule. The Father’s Day paragraph provides that separate schedule, so the provisions do not contradict each other. The general rule remains valid for weekend periods within its scope.'
+    ? '“Except as otherwise expressly provided” makes the Thursday extension a default, not a rule that changes a separate schedule. The Father’s Day paragraph supplies that schedule, so the provisions do not contradict each other. The general rule remains valid within its scope.'
     : competingSources.length > 0 || hasClauseConflictSignal
-      ? 'The provision written specifically for this event applies, while the general rule remains in effect for situations within its own scope.'
+      ? 'The separately stated schedule applies to this possession period. The broader weekend rule remains valid only for weekends within its stated scope.'
     : 'The signed order language should be followed as written unless a later signed order changes it.';
 
   return {
@@ -263,14 +268,18 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
         ? 'The other parent may be relying on the broader or general provision.'
         : null,
       responseToOpposingArgument: competingSources.length > 0
-        ? 'The practical response is to stay anchored to the specific order language that addresses this issue.'
+        ? asksFatherDay
+          ? 'The other parent is focusing on the Friday-holiday rule but leaving out its opening exception and the separately stated Father\'s Day schedule.'
+          : 'The practical response is to identify the separate schedule and the scope language that limits the broader rule.'
         : null,
     },
     practicalMeaning: {
       result: canonicalAnswer,
       startTime: null,
       endTime: null,
-      whatUserShouldDo: 'Keep any response calm, short, and tied to the order language.',
+      whatUserShouldDo: asksFatherDay && /\b(?:argues?|fights? back|keeps? saying|what if)\b/i.test(userMessage)
+        ? 'If the other parent continues to dispute it, respond briefly with the Father\'s Day start time and the opening exception in the general holiday rule.'
+        : 'Keep any response calm, short, and tied to the order language.',
     },
     draftMessage: draftFromAnswer(documentAnswer, controlling, asksFatherDay, canonicalAnswer),
     caveats: [],

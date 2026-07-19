@@ -6,7 +6,7 @@ import type { ActionCtx } from './_generated/server';
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { classifyFollowUpIntent, classifyMessage } from '../src/lib/nexx/router';
+import { classifyMessage } from '../src/lib/nexx/router';
 import { buildSystemPolicyPrompt } from '../src/lib/nexx/prompts/systemPrompt';
 import { buildDeveloperBehaviorPrompt } from '../src/lib/nexx/prompts/developerPrompt';
 import { actualToolCapabilitiesFromPlan, buildFeatureToolPrompt } from '../src/lib/nexx/prompts/featurePrompt';
@@ -40,6 +40,10 @@ import { shouldRequireDocumentGroundedDraftInterpretation } from '../src/lib/nex
 import { buildBestEffortLegalInterpretationFromDocumentAnswer } from '../src/lib/nexx/legal-engine/bestEffortLegalInterpretation';
 import { renderLegalInterpretationMarkdown } from '../src/lib/nexx/legal-engine/legalInterpretationRenderer';
 import { verifyLegalInterpretationAnswer } from '../src/lib/nexx/legal-engine/legalInterpretationVerifier';
+import { isGenericCanonicalLegalAnswer } from '../src/lib/nexx/legal-engine/genericAnswerPolicy';
+import { buildActiveLegalIssueSnapshot, summarizeActiveLegalIssue } from '../src/lib/nexx/legal-engine/activeIssueContract';
+import { resolveContinuity } from '../src/lib/nexx/legal-engine/continuityResolver';
+import { buildLegalQuestionContract } from '../src/lib/nexx/legal-engine/questionContract';
 import {
     containsUserFacingExtractionDebris,
     isCompleteUserFacingLegalText,
@@ -498,6 +502,8 @@ function sanitizePromptMetadata(value?: string) {
 type GenerationContext = {
     turn: {
         _id?: Id<'chatTurns'>;
+        conversationId?: Id<'conversations'>;
+        userId?: Id<'users'>;
         message: string;
         routeMode?: RouteMode;
         model?: string;
@@ -536,6 +542,15 @@ type GenerationContext = {
     conversationDocumentState?: {
         activeUploadedFileId?: Id<'uploadedFiles'>;
         lastReferencedUploadedFileIds?: Id<'uploadedFiles'>[];
+    } | null;
+    activeLegalIssueState?: {
+        issueKey: string;
+        label: string;
+        routeMode?: RouteMode;
+        userQuestion: string;
+        controllingConclusion: string;
+        issueTerms: string[];
+        sourceAnchors: Array<{ uploadedFileId: Id<'uploadedFiles'>; pageStart?: number; pageEnd?: number }>;
     } | null;
     documentAmbiguity?: StoredDocumentAmbiguity | null;
     attachmentContexts?: AttachmentContext[];
@@ -691,12 +706,25 @@ function recentLegalContextSummary(messages: GenerationContext['recentMessages']
 function activeFollowUpContextSummary(
     message: string,
     recentMessages: GenerationContext['recentMessages'],
-    routeMode?: RouteMode
+    routeMode?: RouteMode,
+    activeIssue?: GenerationContext['activeLegalIssueState']
 ) {
-    if (classifyFollowUpIntent(message) === 'new_issue' || !(isDocumentContextRoute(routeMode) || isLitigationNavigationRoute(routeMode))) {
+    if (!(isDocumentContextRoute(routeMode) || isLitigationNavigationRoute(routeMode))) {
         return undefined;
     }
-    return recentLegalContextSummary(recentMessages);
+    const persisted = activeIssue ? summarizeActiveLegalIssue({
+        ...activeIssue,
+        sourceAnchors: activeIssue.sourceAnchors.map((anchor) => ({ ...anchor, uploadedFileId: anchor.uploadedFileId.toString() })),
+    }) : undefined;
+    const recent = recentLegalContextSummary(recentMessages);
+    const continuity = resolveContinuity({
+        message,
+        activeMode: routeMode,
+        hasActiveDocumentContext: true,
+        activeIssueText: [persisted, recent].filter(Boolean).join('\n'),
+    });
+    if (continuity.kind === 'new_issue') return undefined;
+    return [persisted, recent].filter(Boolean).join('\n').slice(-4_000);
 }
 
 function hasActiveDocumentContext(context: GenerationContext) {
@@ -1045,7 +1073,7 @@ function buildInput(
 ) {
     const systemPrompt = buildSystemPolicyPrompt();
     const developerPrompt = buildDeveloperBehaviorPrompt(routeMode);
-    const followUpSummary = activeFollowUpContextSummary(context.turn.message, context.recentMessages, routeMode);
+    const followUpSummary = activeFollowUpContextSummary(context.turn.message, context.recentMessages, routeMode, context.activeLegalIssueState);
     const routerResult = classifyMessage(
         context.turn.message,
         followUpSummary,
@@ -1620,7 +1648,7 @@ function deterministicRenderedFallback(
         ? responsePlanFromLegalInterpretation(response.legalInterpretation, userMessage)
         : null;
     const candidateDirectAnswer = interpretationPlan?.directAnswer || response.documentAnswer?.answer || '';
-    const directAnswer = isCompleteUserFacingLegalText(candidateDirectAnswer)
+    const directAnswer = isCompleteUserFacingLegalText(candidateDirectAnswer) && !isGenericCanonicalLegalAnswer(candidateDirectAnswer)
         ? candidateDirectAnswer
         : 'I cannot verify a complete answer from the order language available for this turn.';
     const candidateExplanation = interpretationPlan?.explanationSteps[0]?.point || '';
@@ -1725,7 +1753,24 @@ function verifyAndRepairRenderedResponse(
                     .filter((page): page is number => typeof page === 'number'),
             }))),
         ];
+        const issueText = recentLegalContextSummary([]);
+        const continuity = resolveContinuity({
+            message: userMessage,
+            activeMode: routeMode,
+            hasActiveDocumentContext: sourcePackets.length > 0,
+            activeIssueText: groundingUserMessage === userMessage ? issueText : groundingUserMessage,
+        });
+        const question = buildLegalQuestionContract(groundingUserMessage);
         return {
+            traceVersion: 2 as const,
+            continuityKind: continuity.kind,
+            continuityScore: continuity.score,
+            continuityReasonCodes: continuity.reasonCodes,
+            questionKind: question.kind,
+            requiredAnswerTerms: question.requiredAnswerTerms,
+            canonicalPlanSource: answer ? 'provider' as const : 'limitation' as const,
+            genericAnswerRejected: Boolean(canonicalDirectAnswer && isGenericCanonicalLegalAnswer(canonicalDirectAnswer)),
+            responsivenessPassed: interpretationVerification?.checks.answeredDirectly ?? true,
             selectedSourceRoles: sourceRoles.filter((item, index) =>
                 sourceRoles.findIndex((candidate) => candidate.sourceId === item.sourceId && candidate.role === item.role) === index
             ),
@@ -1955,7 +2000,7 @@ async function generateWithFallbacks({
     const client = getOpenAIClient();
     const responses = client.responses as unknown as StreamingResponsesClient;
     const storedRouteMode = context.turn.routeMode as RouteMode | undefined;
-    const followUpSummary = activeFollowUpContextSummary(context.turn.message, context.recentMessages, storedRouteMode);
+    const followUpSummary = activeFollowUpContextSummary(context.turn.message, context.recentMessages, storedRouteMode, context.activeLegalIssueState);
     const routerResult = classifyMessage(
         context.turn.message,
         followUpSummary,
@@ -2477,6 +2522,44 @@ export const processChatGenerationJob = internalAction({
                 errorMessage: result.errorMessage,
             });
 
+            if (
+                !result.degraded &&
+                result.response.legalInterpretation &&
+                context.turn.conversationId &&
+                context.turn.userId
+            ) {
+                const sourceAnchors = result.attachmentContexts.flatMap((attachment) => {
+                    const firstChunk = attachment.documentChunks?.[0];
+                    return [{
+                        uploadedFileId: attachment.uploadedFileId,
+                        pageStart: firstChunk?.pageStart,
+                        pageEnd: firstChunk?.pageEnd,
+                    }];
+                }).slice(0, 16);
+                const snapshot = buildActiveLegalIssueSnapshot({
+                    userQuestion: context.turn.message,
+                    controllingConclusion: result.response.legalInterpretation.directAnswer,
+                    routeMode: result.routeMode,
+                    uploadedFileIds: result.attachmentContexts.map((attachment) => attachment.uploadedFileId.toString()),
+                    pages: sourceAnchors.map((anchor) => ({
+                        uploadedFileId: anchor.uploadedFileId.toString(),
+                        pageStart: anchor.pageStart,
+                        pageEnd: anchor.pageEnd,
+                    })),
+                });
+                await ctx.runMutation(internal.chatTurns.upsertFocusedLegalIssue, {
+                    conversationId: context.turn.conversationId,
+                    userId: context.turn.userId,
+                    issueKey: snapshot.issueKey,
+                    label: snapshot.label,
+                    routeMode: snapshot.routeMode,
+                    userQuestion: snapshot.userQuestion,
+                    controllingConclusion: snapshot.controllingConclusion,
+                    issueTerms: snapshot.issueTerms,
+                    sourceAnchors,
+                });
+            }
+
             const shouldRecordDocumentRetrievalRun = Boolean(
                 lease.turnId &&
                 (
@@ -2492,7 +2575,8 @@ export const processChatGenerationJob = internalAction({
                 const auditFollowUpSummary = activeFollowUpContextSummary(
                     context.turn.message,
                     context.recentMessages,
-                    storedAuditRouteMode
+                    storedAuditRouteMode,
+                    context.activeLegalIssueState
                 );
                 const auditRouterResult = classifyMessage(
                     context.turn.message,

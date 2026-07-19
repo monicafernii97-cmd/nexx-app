@@ -94,6 +94,13 @@ const HOLIDAY_POSSESSION_TERMS = [
   'extended summer',
   'summer possession',
   'weekend possession',
+  'federal holiday',
+  'state holiday',
+  'local holiday',
+  'friday holiday',
+  'juneteenth',
+  'summer months',
+  'school not in session',
 ];
 
 const CLAUSE_CONFLICT_TERMS = [
@@ -234,7 +241,9 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
       clauseConflictTerms.length > 0 ||
       /\b(?:which|what)\s+(?:clause|provision|rule)\s+controls\b/i.test(text) ||
       /\b(?:general|regular)\s+(?:weekend|possession|provision|clause|rule)\b/i.test(text) ||
-      /\b(?:specific|holiday|father'?s\s+day|mother'?s\s+day)\s+(?:provision|clause|rule)\b/i.test(text)
+      /\b(?:specific|holiday|father'?s\s+day|mother'?s\s+day)\s+(?:provision|clause|rule)\b/i.test(text) ||
+      /\b(?:something different|other|different)\b.{0,80}\b(?:order|paragraph|provision|clause|rule)\b/i.test(text) ||
+      /\b(?:order|paragraph|provision|clause|rule)\b.{0,80}\b(?:different|other|instead|thursday|friday)\b/i.test(text)
     );
   const hasDocumentSignal = documentHints.length > 0 || requestedDocumentTypes.length > 0;
   const hasSectionSignal = requestedSections.length > 0 && (hasDocumentSignal || hasImplicitFollowUp || asksForSpecificLocation);
@@ -262,12 +271,12 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
   }
 
   let referenceType: DocumentReferenceDetection['referenceType'] = 'implicit_followup';
-  if (asksForComparison) referenceType = 'comparison_request';
+  if (hasClauseConflictSignal) referenceType = 'clause_conflict_interpretation';
+  else if (asksForComparison) referenceType = 'comparison_request';
   else if (asksForSource) referenceType = 'source_location_request';
   else if (hasExactSignal || asksForQuote) referenceType = asksForQuote ? 'quote_request' : 'terminology_check';
   else if (hasSectionSignal) referenceType = 'section_lookup';
   else if (hasDeadlineSignal) referenceType = 'deadline_lookup';
-  else if (hasClauseConflictSignal) referenceType = 'clause_conflict_interpretation';
   else if (hasHolidayPossessionSignal) referenceType = 'possession_schedule_interpretation';
   else if (documentHints.some((hint) => /\b(uploaded|attached|shared|prior|previous)\b/i.test(hint))) referenceType = 'explicit_prior_upload';
   else if (documentHints.length > 0) referenceType = 'active_document_followup';

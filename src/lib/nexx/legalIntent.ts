@@ -2,7 +2,7 @@ import type { LegalIntent } from '../types';
 import { classifyPackedCaseIntake } from './legal-engine/packedCaseIntake';
 
 const POSSESSION_HOLIDAY_PATTERN =
-  /\b(father'?s day|mother'?s day|thanksgiving|christmas|spring break|summer possession|extended summer|holiday possession|holiday schedule|student holiday|teacher in-service|weekend possession|thursday|friday|saturday|sunday)\b/i;
+  /\b(father'?s day|mother'?s day|thanksgiving|christmas|spring break|juneteenth|federal holiday|state holiday|local holiday|friday holiday|summer months|school not in session|summer possession|extended summer|holiday possession|holiday schedule|student holiday|teacher in-service|weekend possession|thursday|friday|saturday|sunday)\b/i;
 
 const POSSESSION_CONTEXT_PATTERN =
   /\b(possession|access|visitation|schedule|start|starts|begin|begins|end|ends|pickup|pick up|drop[-\s]?off|exchange|weekend|clause|provision|paragraph|period)\b/i;

@@ -156,6 +156,16 @@ export interface NexxAssistantResponse {
   legalBasis: LegalBasis[];
   deadlineAnalysis: DeadlineAnalysis | null;
   responseCompositionTrace?: {
+    traceVersion?: 2;
+    activeIssueId?: string | null;
+    continuityKind?: 'same_issue' | 'related_extension' | 'new_issue' | 'uncertain';
+    continuityScore?: number;
+    continuityReasonCodes?: string[];
+    questionKind?: string;
+    requiredAnswerTerms?: string[];
+    canonicalPlanSource?: 'provider' | 'deterministic_synthesis' | 'limitation';
+    genericAnswerRejected?: boolean;
+    responsivenessPassed?: boolean;
     renderMode: string;
     canonicalDirectAnswerFingerprint: string | null;
     selectedSourceRoles: Array<{ sourceId: string; role: string; pages: number[] }>;

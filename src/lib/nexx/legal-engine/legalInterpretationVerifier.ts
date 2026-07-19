@@ -15,6 +15,9 @@ import {
   extractFathersDayScheduleTerms,
   textMatchesFathersDaySchedule,
 } from './fathersDayScheduleTerms';
+import { isGenericCanonicalLegalAnswer } from './genericAnswerPolicy';
+import { buildLegalQuestionContract } from './questionContract';
+import { verifyAnswerResponsiveness } from './answerResponsivenessVerifier';
 
 export type LegalInterpretationVerification = {
   passed: boolean;
@@ -138,7 +141,22 @@ export function verifyLegalInterpretationAnswer(
   }
 
   const text = answerText(answer);
-  const answeredDirectly = answer.directAnswer.trim().length >= 12;
+  const question = buildLegalQuestionContract(options.userMessage ?? '');
+  const normalizedDirectAnswer = answer.directAnswer.toLowerCase();
+  const answersRequiredTerms = question.requiredAnswerTerms.length === 0 || question.requiredAnswerTerms.every((term) => {
+    const normalized = term.toLowerCase();
+    if (normalized === "father's day possession") return /father[’']?s day/i.test(answer.directAnswer);
+    return normalizedDirectAnswer.includes(normalized);
+  });
+  const responsiveness = verifyAnswerResponsiveness({
+    userMessage: options.userMessage ?? '',
+    directAnswer: answer.directAnswer,
+    practicalMeaning: answer.practicalMeaning.result,
+    nextAction: answer.practicalMeaning.whatUserShouldDo ?? undefined,
+  });
+  const answeredDirectly = responsiveness.passed &&
+    !isGenericCanonicalLegalAnswer(answer.directAnswer) &&
+    (!question.requiresDirectDisposition || answersRequiredTerms);
   const hasControllingClause =
     answer.userFacingCertainty === 'insufficient_text' ||
     answer.controllingClauses.some((clause) => hasValidSourceIds(clause.sourceIds, sourcePackets));
@@ -203,6 +221,9 @@ export function verifyLegalInterpretationAnswer(
   );
   const answerPropositionSupported = answer.userFacingCertainty === 'insufficient_text' || (
     answerScheduleMatches &&
+    !isGenericCanonicalLegalAnswer(answer.directAnswer) &&
+    !isGenericCanonicalLegalAnswer(answer.practicalMeaning.result) &&
+    (!question.requiresDirectDisposition || answersRequiredTerms) &&
     isCompleteUserFacingLegalText(answer.directAnswer) &&
     isCompleteUserFacingLegalText(answer.practicalMeaning.result)
   );

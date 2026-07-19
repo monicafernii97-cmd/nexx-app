@@ -1,6 +1,7 @@
 import type { RouteMode } from '../types';
 import { classifyFollowUpIntent } from './router';
 import type { DocumentReferenceDetection } from './documentReferenceDetection';
+import { resolveContinuity } from './legal-engine/continuityResolver';
 
 export type FollowUpContextMessage = {
   role: 'user' | 'assistant';
@@ -59,11 +60,24 @@ export function buildContextualDocumentFollowUpMessage(
   message: string,
   recentMessages: FollowUpContextMessage[],
   activeMode?: RouteMode,
-  maxContextCharacters = 4_000
+  maxContextCharacters = 4_000,
+  persistedActiveIssueText?: string
 ) {
   const currentMessage = normalizedMessage(message);
+  const recentUserContext = recentMessages
+    .filter((recent) => recent.role === 'user' && recent.status !== 'deleted' && recent.status !== 'failed')
+    .slice(-8)
+    .map((recent) => normalizedMessage(recent.content))
+    .filter(Boolean)
+    .join('\n');
+  const continuity = resolveContinuity({
+    message,
+    activeMode,
+    hasActiveDocumentContext: isDocumentGroundedFollowUpRoute(activeMode),
+    activeIssueText: [persistedActiveIssueText, recentUserContext].filter(Boolean).join('\n'),
+  });
   if (
-    classifyFollowUpIntent(message) === 'new_issue' ||
+    (classifyFollowUpIntent(message) === 'new_issue' && continuity.kind === 'new_issue') ||
     !isDocumentGroundedFollowUpRoute(activeMode)
   ) {
     return currentMessage;
@@ -94,6 +108,7 @@ export function buildContextualDocumentFollowUpMessage(
     used += addedLength;
   }
 
-  if (selected.length === 0) return currentMessage;
-  return `${currentMessage}\n\nRecent active issue context:\n${selected.join('\n')}`;
+  const contextBlocks = [persistedActiveIssueText?.trim(), ...selected].filter(Boolean) as string[];
+  if (contextBlocks.length === 0) return currentMessage;
+  return `${currentMessage}\n\nRecent active issue context:\n${contextBlocks.join('\n')}`;
 }

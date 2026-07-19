@@ -6,6 +6,7 @@ import {
   semanticallyEquivalentLegalText,
 } from './semanticDedup';
 import { containsUserFacingExtractionDebris } from './userFacingLegalText';
+import { isGenericCanonicalLegalAnswer } from './genericAnswerPolicy';
 
 export type RenderedOutputVerification = {
   passed: boolean;
@@ -107,6 +108,9 @@ function needsDirectAnswerFirst(message: string, routeMode?: RouteMode) {
 
 function startsWithDirectAnswer(rendered: string, canonicalDirectAnswer?: string | null) {
   const firstBlock = rendered.split(/\n{2,}/)[0]?.trim() ?? '';
+  if (isGenericCanonicalLegalAnswer(firstBlock) || (canonicalDirectAnswer && isGenericCanonicalLegalAnswer(canonicalDirectAnswer))) {
+    return false;
+  }
   if (canonicalDirectAnswer?.trim()) {
     const canonical = normalizeLegalProposition(canonicalDirectAnswer);
     const opening = normalizeLegalProposition(firstBlock);

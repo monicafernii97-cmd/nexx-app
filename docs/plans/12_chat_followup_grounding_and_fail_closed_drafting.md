@@ -1,6 +1,6 @@
 # NEXX Follow-Up Grounding and Fail-Closed Drafting Specification
 
-**Status:** Implemented; release validation in progress
+**Status:** Implemented and release-validated
 **Priority:** P0 correctness, trust, and production reliability
 **Incident date:** July 18, 2026
 **Incident:** A Father’s Day follow-up asking what to say returned a generic OCR fragment as the answer and embedded that fragment in a proposed co-parent message.

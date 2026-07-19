@@ -9,6 +9,10 @@ import {
   sourceContainsPriorityCarveout,
   sourceIsRelevantToIssue,
 } from './clauseRelationship';
+import {
+  displayScheduleTime,
+  extractFathersDayScheduleTerms,
+} from './fathersDayScheduleTerms';
 
 const GENERIC_DOCUMENT_ANSWER_PATTERN =
   /\b(i found usable court-order language|organized the visible provisions|cite exact pages|stay grounded in the visible order language)\b/i;
@@ -91,23 +95,11 @@ function cleanAnswer(answer: LegalDocumentAnswer) {
   return clean;
 }
 
-function timeForDay(value: string, day: 'Friday' | 'Monday') {
-  const protectedValue = value.replace(/\b([ap])\.m\./gi, (_match, meridiem: string) => `${meridiem.toLowerCase()}__m__`);
-  const match = protectedValue.match(
-    new RegExp(`\\b(?:at\\s+)?(\\d{1,2}(?::\\d{2})?\\s*[ap]__m__)\\s+on\\s+(?:the\\s+)?${day}\\b`, 'i')
-  )?.[1];
-  return match
-    ?.replace(/\b([ap])__m__/gi, (_match, meridiem: string) => `${meridiem.toLowerCase()}.m.`) ?? null;
-}
-
 function fathersDayOutcome(controlling: LegalDocumentSourcePacket | undefined) {
   if (!controlling || !sourceContainsOperativeFatherDaySchedule(controlling)) return null;
-  const start = timeForDay(controlling.text, 'Friday');
-  const end = timeForDay(controlling.text, 'Monday');
-  if (start && end) {
-    return `Father's Day possession begins Friday at ${start} and ends Monday at ${end}${end.endsWith('.') ? '' : '.'}`;
-  }
-  return "Father's Day possession begins on Friday and ends on Monday.";
+  const schedule = extractFathersDayScheduleTerms(`${controlling.sectionHeading ?? ''} ${controlling.text}`);
+  if (!schedule) return null;
+  return `Father's Day possession begins Friday at ${displayScheduleTime(schedule.startTime)} and ends Monday at ${displayScheduleTime(schedule.endTime)}`;
 }
 
 function draftFromAnswer(

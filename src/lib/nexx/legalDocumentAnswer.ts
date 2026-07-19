@@ -2,6 +2,12 @@ import {
   containsUserFacingExtractionDebris,
   isCompleteUserFacingLegalText,
 } from './legal-engine/userFacingLegalText';
+import {
+  containsFathersDayTerm,
+  displayScheduleTime,
+  extractFathersDayScheduleTerms,
+  textMatchesFathersDaySchedule,
+} from './legal-engine/fathersDayScheduleTerms';
 
 export type LegalDocumentAnswerType =
   | 'direct_quote'
@@ -211,32 +217,17 @@ function cleanUserFacingDocumentText(value: string) {
 }
 
 function containsFathersDay(value: string) {
-  return /\bfather'?s day\b/i.test(value.replace(/[’‘]/g, "'"));
+  return containsFathersDayTerm(value);
 }
 
 function containsOperativeFathersDaySchedule(source: LegalDocumentSourcePacket) {
-  const text = `${source.sectionHeading ?? ''} ${source.text}`;
-  return containsFathersDay(text) &&
-    /\b(?:begin(?:ning|s)?|start(?:ing|s)?)\b/i.test(text) &&
-    /\bfriday\b/i.test(text) &&
-    /\b(?:end(?:ing|s)?)\b/i.test(text) &&
-    /\bmonday\b/i.test(text);
-}
-
-function timeBeforeDay(value: string, day: 'Friday' | 'Monday') {
-  const protectedValue = protectTimeAbbreviations(value);
-  const pattern = new RegExp(`\\b(?:at\\s+)?(\\d{1,2}(?::\\d{2})?\\s*[ap]__m__)\\s+on\\s+(?:the\\s+)?${day}\\b`, 'i');
-  const match = protectedValue.match(pattern)?.[1];
-  return match ? restoreTimeAbbreviations(match).replace(/\s+/g, ' ').trim() : null;
+  return Boolean(extractFathersDayScheduleTerms(`${source.sectionHeading ?? ''} ${source.text}`));
 }
 
 function fathersDaySupportedClaim(source: LegalDocumentSourcePacket) {
-  const start = timeBeforeDay(source.text, 'Friday');
-  const end = timeBeforeDay(source.text, 'Monday');
-  if (start && end) {
-    return `Father's Day possession begins Friday at ${start} and ends Monday at ${end}${end.endsWith('.') ? '' : '.'}`;
-  }
-  return "Father's Day possession begins on Friday and ends on Monday.";
+  const schedule = extractFathersDayScheduleTerms(`${source.sectionHeading ?? ''} ${source.text}`);
+  if (!schedule) return "Father's Day schedule could not be verified from the available order language.";
+  return `Father's Day possession begins Friday at ${displayScheduleTime(schedule.startTime)} and ends Monday at ${displayScheduleTime(schedule.endTime)}`;
 }
 
 function citationMapForAnswer(answer: LegalDocumentAnswer, sourcePackets: LegalDocumentSourcePacket[]) {
@@ -803,12 +794,19 @@ export function verifyLegalDocumentAnswer(
   const answerHasExtractionDebris = containsUserFacingExtractionDebris(answer.answer);
   const answerIsComplete = answer.answerType === 'not_found' || isCompleteUserFacingLegalText(answer.answer);
   const asksFathersDay = containsFathersDay(options.userMessage ?? '');
+  const citedSourceIds = new Set([
+    ...answer.claims.flatMap((claim) => claim.sourceIds),
+    ...answer.citations.map((citation) => citation.sourceId),
+  ]);
+  const operativeFathersDaySchedule = asksFathersDay
+    ? sourcePackets
+      .filter((source) => citedSourceIds.has(source.sourceId))
+      .map((source) => extractFathersDayScheduleTerms(`${source.sectionHeading ?? ''} ${source.text}`))
+      .find((schedule) => schedule !== null) ?? null
+    : null;
   const answerAddressesFathersDay = !asksFathersDay ||
     answer.answerType === 'not_found' ||
-    (
-      containsFathersDay(answer.answer) &&
-      /\bfriday\b/i.test(answer.answer)
-    );
+    Boolean(operativeFathersDaySchedule && textMatchesFathersDaySchedule(answer.answer, operativeFathersDaySchedule));
   if (answerHasExtractionDebris) {
     errors.push('Document answer contains extraction or page-layout debris.');
   }
@@ -816,7 +814,7 @@ export function verifyLegalDocumentAnswer(
     errors.push('Document answer is not a complete user-facing legal proposition.');
   }
   if (!answerAddressesFathersDay) {
-    errors.push('Document answer does not state the requested Father’s Day result.');
+    errors.push('Document answer does not match the cited Father’s Day start and end schedule.');
   }
 
   for (const claim of answer.claims) {

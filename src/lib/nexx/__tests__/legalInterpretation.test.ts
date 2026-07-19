@@ -40,7 +40,7 @@ const sourcePackets: LegalDocumentSourcePacket[] = [
 function legalInterpretation(overrides: Partial<LegalInterpretationAnswer> = {}): LegalInterpretationAnswer {
   return {
     answerType: 'order_interpretation',
-    directAnswer: 'No - my read is that Father\'s Day possession starts Friday at 6:00 p.m., not Thursday.',
+    directAnswer: 'No - my read is that Father\'s Day possession starts Friday at 6:00 p.m. and ends Monday at 8:00 a.m., not Thursday.',
     userFacingCertainty: 'clear',
     controllingClauses: [
       {
@@ -147,7 +147,7 @@ describe('renderLegalInterpretationMarkdown', () => {
       'Fallback answer'
     );
 
-    expect(content).toContain('No - my read is that Father\'s Day possession starts Friday at 6:00 p.m., not Thursday. [p. 5]');
+    expect(content).toContain('No - my read is that Father\'s Day possession starts Friday at 6:00 p.m. and ends Monday at 8:00 a.m., not Thursday. [p. 5]');
     expect(content).toContain('**Controlling language:**');
     expect(content).toContain('**How the provisions work together:**');
     expect(content).not.toContain('**Competing language:**');
@@ -194,7 +194,7 @@ describe('renderLegalInterpretationMarkdown', () => {
       { renderMode: 'quick_direct', userMessage: 'Can he do that?' }
     );
 
-    expect(content).toContain('No - my read is that Father\'s Day possession starts Friday at 6:00 p.m., not Thursday.');
+    expect(content).toContain('No - my read is that Father\'s Day possession starts Friday at 6:00 p.m. and ends Monday at 8:00 a.m., not Thursday.');
     expect(content).toContain('holiday-specific clause supplies the start and end times');
     expect(content).not.toContain('I would keep it short and order-based:');
     expect(content).not.toContain('**Controlling language:**');
@@ -306,5 +306,30 @@ describe('verifyLegalInterpretationAnswer', () => {
 
     expect(result.passed).toBe(false);
     expect(result.errors.join(' ')).toContain('over-hedged');
+  });
+
+  it('rejects a Father’s Day answer or draft whose times do not match the cited clause', () => {
+    const wrongAnswer = legalInterpretation({
+      directAnswer: "Father's Day possession starts Friday at 8:00 p.m. and ends Monday at 8:00 a.m.",
+    });
+    const answerResult = verifyLegalInterpretationAnswer(wrongAnswer, sourcePackets, {
+      requiresLegalInterpretation: true,
+      hasClauseConflictSignal: true,
+      userMessage: "When does Father's Day possession begin?",
+    });
+    expect(answerResult.checks.answerPropositionSupported).toBe(false);
+
+    const wrongDraft = legalInterpretation({
+      draftMessage: {
+        tone: 'firm',
+        text: "Father's Day possession begins Friday at 6:00 p.m. and ends Monday at 6:00 p.m.",
+      },
+    });
+    const draftResult = verifyLegalInterpretationAnswer(wrongDraft, sourcePackets, {
+      requiresLegalInterpretation: true,
+      hasClauseConflictSignal: true,
+      userMessage: "What should I say about Father's Day?",
+    });
+    expect(draftResult.checks.draftPropositionSupported).toBe(false);
   });
 });

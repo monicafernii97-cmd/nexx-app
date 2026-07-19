@@ -36,6 +36,7 @@ import { recoverStructuredOutput } from '../src/lib/nexx/recovery/recoverStructu
 import { suppressWeakArtifacts } from '../src/lib/nexx/recovery/suppressWeakArtifacts';
 import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
 import { polishLegalResponse } from '../src/lib/nexx/postprocess';
+import { shouldRequireDocumentGroundedDraftInterpretation } from '../src/lib/nexx/followUpContext';
 import { buildBestEffortLegalInterpretationFromDocumentAnswer } from '../src/lib/nexx/legal-engine/bestEffortLegalInterpretation';
 import { renderLegalInterpretationMarkdown } from '../src/lib/nexx/legal-engine/legalInterpretationRenderer';
 import { verifyLegalInterpretationAnswer } from '../src/lib/nexx/legal-engine/legalInterpretationVerifier';
@@ -1687,7 +1688,7 @@ function verifyAndRepairRenderedResponse(
         ? candidateCanonicalDirectAnswer
         : 'I cannot verify a complete answer from the order language available for this turn.';
     const draftRequired = userAskedForDraft(userMessage);
-    const traceEvidence = () => {
+    const traceEvidence = (renderedMessage = response.message) => {
         const answer = response.legalInterpretation;
         const interpretationVerification = answer
             ? verifyLegalInterpretationAnswer(answer, sourcePackets, {
@@ -1745,7 +1746,7 @@ function verifyAndRepairRenderedResponse(
             ),
             answerPropositionValidationPassed: interpretationVerification?.checks.answerPropositionSupported ?? true,
             draftPropositionValidationPassed: interpretationVerification?.checks.draftPropositionSupported ?? true,
-            extractionDebrisRejected: !containsUserFacingExtractionDebris(response.message),
+            extractionDebrisRejected: !containsUserFacingExtractionDebris(renderedMessage),
         };
     };
     const verification = verifyRenderedOutput({
@@ -1812,7 +1813,7 @@ function verifyAndRepairRenderedResponse(
                 canonicalDirectAnswerFingerprint: canonicalDirectAnswer
                     ? normalizeLegalProposition(canonicalDirectAnswer).slice(0, 160)
                     : null,
-                ...traceEvidence(),
+                ...traceEvidence(fallbackMessage),
                 initialErrors: verification.errors,
                 repairedErrors: repairedVerification.errors,
                 repairCount: 1,
@@ -1833,7 +1834,7 @@ function verifyAndRepairRenderedResponse(
             canonicalDirectAnswerFingerprint: canonicalDirectAnswer
                 ? normalizeLegalProposition(canonicalDirectAnswer).slice(0, 160)
                 : null,
-            ...traceEvidence(),
+            ...traceEvidence(repairedMessage),
             initialErrors: verification.errors,
             repairedErrors: [],
             repairCount: 1,
@@ -2125,10 +2126,13 @@ async function generateWithFallbacks({
             });
             const groundingUserMessage = [context.turn.message, followUpSummary].filter(Boolean).join('\n');
             const optionalDocumentAnswerPresent = !requiresDocumentAnswer && Boolean(parsedResponse.documentAnswer);
-            const isOrderGroundedDraftFollowUp =
-                (routeMode === 'co_parent_response' || routeMode === 'party_message_draft') &&
-                promptBundle.documentSourcePackets.length > 0 &&
-                hasActiveDocumentContext(context);
+            const isOrderGroundedDraftFollowUp = shouldRequireDocumentGroundedDraftInterpretation({
+                routeMode,
+                sourcePacketCount: promptBundle.documentSourcePackets.length,
+                hasActiveDocumentContext: hasActiveDocumentContext(context),
+                followUpSummary,
+                documentReference: promptBundle.documentReference,
+            });
             const requiresLegalInterpretation =
                 (isLegalInterpretationRoute(routeMode, promptBundle.documentReference) || isOrderGroundedDraftFollowUp) &&
                 promptBundle.documentSourcePackets.length > 0;

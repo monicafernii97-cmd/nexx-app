@@ -11,6 +11,10 @@ import {
   isCompleteUserFacingLegalText,
   isSafeCommunicationDraft,
 } from './userFacingLegalText';
+import {
+  extractFathersDayScheduleTerms,
+  textMatchesFathersDaySchedule,
+} from './fathersDayScheduleTerms';
 
 export type LegalInterpretationVerification = {
   passed: boolean;
@@ -184,29 +188,30 @@ export function verifyLegalInterpretationAnswer(
           : sourceIsRelevantToIssue(source, options.userMessage)
       ));
     }));
-  const operativeFathersDayClause = !asksFathersDay || answer.controllingClauses.some((clause) =>
-    clause.sourceIds.some((sourceId) => {
-      const source = packetsById.get(sourceId);
-      return Boolean(source && sourceContainsOperativeFatherDaySchedule(source));
-    })
-  );
-  const userFacingOutcome = `${answer.directAnswer} ${answer.practicalMeaning.result}`.replace(/\s+/g, ' ').trim();
-  const statesFathersDayFridayResult = !asksFathersDay || (
-    containsFathersDay(userFacingOutcome) &&
-    /\b(?:begins?|starts?)\b.{0,80}\bfriday\b/i.test(userFacingOutcome)
+  const operativeFathersDaySchedule = asksFathersDay
+    ? answer.controllingClauses
+      .flatMap((clause) => clause.sourceIds)
+      .map((sourceId) => packetsById.get(sourceId))
+      .filter((source): source is LegalDocumentSourcePacket => Boolean(source))
+      .map((source) => extractFathersDayScheduleTerms(`${source.sectionHeading ?? ''} ${source.text}`))
+      .find((schedule) => schedule !== null) ?? null
+    : null;
+  const answerScheduleMatches = !asksFathersDay || Boolean(
+    operativeFathersDaySchedule &&
+    textMatchesFathersDaySchedule(answer.directAnswer, operativeFathersDaySchedule) &&
+    textMatchesFathersDaySchedule(answer.practicalMeaning.result, operativeFathersDaySchedule)
   );
   const answerPropositionSupported = answer.userFacingCertainty === 'insufficient_text' || (
-    operativeFathersDayClause &&
-    statesFathersDayFridayResult &&
+    answerScheduleMatches &&
     isCompleteUserFacingLegalText(answer.directAnswer) &&
     isCompleteUserFacingLegalText(answer.practicalMeaning.result)
   );
   const draftPropositionSupported = !answer.draftMessage?.text || (
     isSafeCommunicationDraft(answer.draftMessage.text) &&
     (
-      !asksFathersDay || (
-        containsFathersDay(answer.draftMessage.text) &&
-        /\b(?:begins?|starts?)\b.{0,80}\bfriday\b/i.test(answer.draftMessage.text)
+      !asksFathersDay || Boolean(
+        operativeFathersDaySchedule &&
+        textMatchesFathersDaySchedule(answer.draftMessage.text, operativeFathersDaySchedule)
       )
     )
   );

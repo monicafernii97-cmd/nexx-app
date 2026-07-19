@@ -5,7 +5,10 @@ import {
   retrieveRelevantDocumentChunks,
   type DocumentChunkRetrievalCandidate,
 } from '../documentChunkRetrieval';
-import { buildContextualDocumentFollowUpMessage } from '../followUpContext';
+import {
+  buildContextualDocumentFollowUpMessage,
+  shouldRequireDocumentGroundedDraftInterpretation,
+} from '../followUpContext';
 import {
   buildBestEffortLegalDocumentAnswerFromSources,
   verifyLegalDocumentAnswer,
@@ -161,5 +164,23 @@ describe('production incident: grounded drafting follow-up', () => {
       messages,
       'co_parent_response'
     )).toBe('What is the deadline in a new motion?');
+  });
+
+  it('does not apply stale order interpretation to a new drafting issue', () => {
+    expect(shouldRequireDocumentGroundedDraftInterpretation({
+      routeMode: 'co_parent_response',
+      sourcePacketCount: 3,
+      hasActiveDocumentContext: true,
+      followUpSummary: undefined,
+      documentReference: { referencesDocument: false },
+    })).toBe(false);
+
+    expect(shouldRequireDocumentGroundedDraftInterpretation({
+      routeMode: 'co_parent_response',
+      sourcePacketCount: 3,
+      hasActiveDocumentContext: true,
+      followUpSummary: "The active issue is Father's Day possession.",
+      documentReference: { referencesDocument: false },
+    })).toBe(true);
   });
 });

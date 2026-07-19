@@ -276,7 +276,8 @@ describe('buildBestEffortLegalInterpretationFromDocumentAnswer', () => {
     expect(answer).not.toBeNull();
     expect(verification.passed).toBe(true);
     expect(content).toContain("Father's Day possession begins Friday at 6:00 p.m. and ends Monday at 8:00 a.m.");
-    expect(content).toContain('provision written specifically for this event applies');
+    expect(content).toContain("Father's Day possession begins Friday");
+    expect(content).toContain('general Thursday-start rule does not move');
     expect(content).not.toContain('citation verifier');
     expect(content).not.toContain('model-generated claim');
   });

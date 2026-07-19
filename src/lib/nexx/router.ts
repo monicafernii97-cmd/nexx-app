@@ -11,6 +11,7 @@ import type { FollowUpIntent, LegalIntent, RouteMode, ToolPlan, RouterResult } f
 import { detectDocumentReference, type DocumentReferenceDetection } from './documentReferenceDetection';
 import { classifyLegalIntent } from './legalIntent';
 import { classifyPackedCaseIntake } from './legal-engine/packedCaseIntake';
+import { hasConversationalContinuationSignal } from './legal-engine/legalSignals';
 
 // ---------------------------------------------------------------------------
 // Keyword/pattern maps for Phase 1 heuristic classification
@@ -150,6 +151,7 @@ export function classifyFollowUpIntent(message: string): FollowUpIntent {
   if (SAME_ISSUE_NEXT_STEP_PATTERN.test(text)) return 'same_issue_next_step';
   if (SAME_ISSUE_RIGHTS_CHECK_PATTERN.test(text)) return 'same_issue_rights_check';
   if (SAME_ISSUE_YES_NO_PATTERN.test(text)) return 'same_issue_yes_no';
+  if (hasConversationalContinuationSignal(text)) return 'same_issue_yes_no';
   return 'new_issue';
 }
 

@@ -1,6 +1,6 @@
 import type { LegalDocumentSourcePacket } from '../legalDocumentAnswer';
 import type { LegalInterpretationAnswer } from './legalInterpretationSchema';
-import { responsePlanFromLegalInterpretation } from './responsePlan';
+import { canonicalAnswerPlanFromLegalInterpretation } from './canonicalAnswerPlan';
 import {
   normalizeLegalProposition,
   semanticallyEquivalentLegalText,
@@ -117,7 +117,15 @@ export function renderLegalInterpretationMarkdown(
   fallbackMessage: string,
   options?: LegalInterpretationRenderOptions
 ) {
-  const plan = responsePlanFromLegalInterpretation(answer, options?.userMessage ?? '');
+  const canonicalPlan = canonicalAnswerPlanFromLegalInterpretation(answer, options?.userMessage ?? '');
+  const plan = {
+    directAnswer: canonicalPlan.conclusion.proposition,
+    explanationSteps: canonicalPlan.reasons.map((reason) => ({ point: reason.proposition, sourceIds: reason.sourceIds })),
+    practicalOutcome: canonicalPlan.practicalOutcome?.proposition ?? null,
+    nextAction: canonicalPlan.nextAction,
+    communicationDraft: canonicalPlan.communicationDraft,
+    materialLimitation: canonicalPlan.materialLimitation,
+  };
   const directAnswer = appendCitationLabels(
     plan.directAnswer || answer.interpretation.plainEnglish || fallbackMessage,
     sourcePageLabels(answer.controllingClauses.flatMap((clause) => clause.sourceIds), sourcePackets)

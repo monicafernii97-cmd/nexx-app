@@ -10,6 +10,7 @@ import {
 import { classifyMessage, preserveOrUpgradeDocumentRoute } from '../src/lib/nexx/router';
 import type { RouteMode } from '../src/lib/types';
 import { buildContextualDocumentFollowUpMessage } from '../src/lib/nexx/followUpContext';
+import { summarizeActiveLegalIssue } from '../src/lib/nexx/legal-engine/activeIssueContract';
 import {
     detectStoredDocumentAmbiguity,
     normalizeDocumentAlias,
@@ -1144,7 +1145,7 @@ export const getGenerationContext = internalQuery({
         const turn = await ctx.db.get(args.turnId);
         if (!turn) return null;
 
-        const [conversation, user, summaryDoc, caseGraphDoc, courtSettings] = await Promise.all([
+        const [conversation, user, summaryDoc, caseGraphDoc, courtSettings, activeLegalIssueState] = await Promise.all([
             ctx.db.get(turn.conversationId),
             ctx.db.get(turn.userId),
             ctx.db
@@ -1158,6 +1159,11 @@ export const getGenerationContext = internalQuery({
             ctx.db
                 .query('userCourtSettings')
                 .withIndex('by_user', (q) => q.eq('userId', turn.userId))
+                .first(),
+            ctx.db
+                .query('conversationLegalIssueState')
+                .withIndex('by_conversation_status', (q) => q.eq('conversationId', turn.conversationId).eq('status', 'focused'))
+                .order('desc')
                 .first(),
         ]);
 
@@ -1186,7 +1192,21 @@ export const getGenerationContext = internalQuery({
         const contextualFollowUpMessage = buildContextualDocumentFollowUpMessage(
             turn.message,
             recentMessages.filter((m) => m.status !== 'deleted'),
-            routeMode
+            routeMode,
+            4_000,
+            summarizeActiveLegalIssue(activeLegalIssueState ? {
+                issueKey: activeLegalIssueState.issueKey,
+                label: activeLegalIssueState.label,
+                routeMode: activeLegalIssueState.routeMode,
+                userQuestion: activeLegalIssueState.userQuestion,
+                controllingConclusion: activeLegalIssueState.controllingConclusion,
+                issueTerms: activeLegalIssueState.issueTerms,
+                sourceAnchors: activeLegalIssueState.sourceAnchors.map((anchor) => ({
+                    uploadedFileId: anchor.uploadedFileId.toString(),
+                    pageStart: anchor.pageStart,
+                    pageEnd: anchor.pageEnd,
+                })),
+            } : null)
         );
         const documentReference = detectDocumentReference(contextualFollowUpMessage);
         const clerkUserId = user.clerkId;
@@ -1424,11 +1444,67 @@ export const getGenerationContext = internalQuery({
             summaryDoc,
             caseGraphDoc,
             conversationDocumentState: documentState,
+            activeLegalIssueState,
             documentAmbiguity,
             attachmentContexts,
             availableDocumentContexts,
             recentMessages: recentMessages.filter((m) => m.status !== 'deleted'),
         };
+    },
+});
+
+export const upsertFocusedLegalIssue = internalMutation({
+    args: {
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        issueKey: v.string(),
+        label: v.string(),
+        routeMode: v.optional(routeModeValidator),
+        userQuestion: v.string(),
+        controllingConclusion: v.string(),
+        issueTerms: v.array(v.string()),
+        sourceAnchors: v.array(v.object({
+            uploadedFileId: v.id('uploadedFiles'),
+            pageStart: v.optional(v.number()),
+            pageEnd: v.optional(v.number()),
+        })),
+    },
+    handler: async (ctx, args) => {
+        const conversation = await ctx.db.get(args.conversationId);
+        if (!conversation || conversation.userId !== args.userId) return null;
+        const now = Date.now();
+        const focused = await ctx.db
+            .query('conversationLegalIssueState')
+            .withIndex('by_conversation_status', (q) => q.eq('conversationId', args.conversationId).eq('status', 'focused'))
+            .collect();
+        for (const issue of focused) {
+            if (issue.issueKey !== args.issueKey) await ctx.db.patch(issue._id, { status: 'active', updatedAt: now });
+        }
+        const existing = await ctx.db
+            .query('conversationLegalIssueState')
+            .withIndex('by_conversation_issue', (q) => q.eq('conversationId', args.conversationId).eq('issueKey', args.issueKey))
+            .first();
+        const value = {
+            status: 'focused' as const,
+            label: args.label,
+            routeMode: args.routeMode,
+            userQuestion: args.userQuestion,
+            controllingConclusion: args.controllingConclusion,
+            issueTerms: args.issueTerms,
+            sourceAnchors: args.sourceAnchors,
+            updatedAt: now,
+        };
+        if (existing) {
+            await ctx.db.patch(existing._id, value);
+            return existing._id;
+        }
+        return ctx.db.insert('conversationLegalIssueState', {
+            conversationId: args.conversationId,
+            userId: args.userId,
+            issueKey: args.issueKey,
+            ...value,
+            createdAt: now,
+        });
     },
 });
 

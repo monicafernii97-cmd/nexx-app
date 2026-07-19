@@ -8,6 +8,8 @@ import {
   extractFathersDayScheduleTerms,
   textMatchesFathersDaySchedule,
 } from './legal-engine/fathersDayScheduleTerms';
+import { isGenericCanonicalLegalAnswer } from './legal-engine/genericAnswerPolicy';
+import { buildLegalQuestionContract } from './legal-engine/questionContract';
 
 export type LegalDocumentAnswerType =
   | 'direct_quote'
@@ -404,7 +406,9 @@ export function buildBestEffortLegalDocumentAnswerFromSources(
     answerType: 'summary',
     answer: options.isTargetedQuestion && strongestSupportedClaim
       ? strongestSupportedClaim
-      : 'Here are the key provisions in the order.',
+      : options.isTargetedQuestion
+        ? 'I found relevant order language, but not enough to answer this specific question reliably.'
+        : 'This order contains the following relevant provisions.',
     claims: usableSources.map(({ source, claim }) => ({
       claim,
       claimType: isDeadlineClaim(claim) ? 'procedural' : 'document_fact',
@@ -792,7 +796,11 @@ export function verifyLegalDocumentAnswer(
   }
 
   const answerHasExtractionDebris = containsUserFacingExtractionDebris(answer.answer);
-  const answerIsComplete = answer.answerType === 'not_found' || isCompleteUserFacingLegalText(answer.answer);
+  const question = buildLegalQuestionContract(options.userMessage ?? '');
+  const answerIsComplete = answer.answerType === 'not_found' || (
+    isCompleteUserFacingLegalText(answer.answer) &&
+    (!question.requiresDirectDisposition || !isGenericCanonicalLegalAnswer(answer.answer))
+  );
   const asksFathersDay = containsFathersDay(options.userMessage ?? '');
   const citedSourceIds = new Set([
     ...answer.claims.flatMap((claim) => claim.sourceIds),

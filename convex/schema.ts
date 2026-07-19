@@ -469,6 +469,28 @@ export default defineSchema({
         .index('by_conversation', ['conversationId'])
         .index('by_user_updated', ['userId', 'updatedAt']),
 
+    conversationLegalIssueState: defineTable({
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        issueKey: v.string(),
+        status: v.union(v.literal('focused'), v.literal('active'), v.literal('dormant')),
+        label: v.string(),
+        routeMode: v.optional(routeModeValidator),
+        userQuestion: v.string(),
+        controllingConclusion: v.string(),
+        issueTerms: v.array(v.string()),
+        sourceAnchors: v.array(v.object({
+            uploadedFileId: v.id('uploadedFiles'),
+            pageStart: v.optional(v.number()),
+            pageEnd: v.optional(v.number()),
+        })),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_conversation_status', ['conversationId', 'status'])
+        .index('by_conversation_issue', ['conversationId', 'issueKey'])
+        .index('by_user_updated', ['userId', 'updatedAt']),
+
     documentRetrievalAudit: defineTable({
         conversationId: v.id('conversations'),
         userId: v.id('users'),

@@ -298,7 +298,7 @@ describe('buildBestEffortLegalDocumentAnswerFromSources', () => {
     const content = renderCourtOrderAnalysisMarkdown(bestEffort, sourcePackets, 'Fallback answer');
 
     expect(bestEffort.answerType).toBe('summary');
-    expect(bestEffort.answer).toBe('Here are the key provisions in the order.');
+    expect(bestEffort.answer).toBe('This order contains the following relevant provisions.');
     expect(bestEffort.claims).toHaveLength(1);
     expect(verification.passed).toBe(true);
     expect(content).toContain('## Executive Summary');

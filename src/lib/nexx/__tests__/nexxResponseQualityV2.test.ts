@@ -5,6 +5,8 @@ import { classifyFollowUpIntent } from '../router';
 import { resolveContinuity } from '../legal-engine/continuityResolver';
 import { verifyAnswerResponsiveness } from '../legal-engine/answerResponsivenessVerifier';
 import { buildActiveLegalIssueSnapshot, summarizeActiveLegalIssue } from '../legal-engine/activeIssueContract';
+import { buildLegalQuestionContract } from '../legal-engine/questionContract';
+import { userAskedForDraft } from '../legal-engine/responsePlan';
 
 const activeQuestion = "Does Father's Day start Thursday because Friday is Juneteenth, or Friday under the Father's Day provision?";
 
@@ -94,6 +96,16 @@ describe('NEXX response quality v2', () => {
     expect(detection.referencesDocument).toBe(true);
     expect(detection.referenceType).toBe('clause_conflict_interpretation');
     expect(detection.requestedTerms).toContain('federal holiday');
+  });
+
+  it.each([
+    'Please tell me what I should say.',
+    'Tell me how I should respond.',
+    'Show me what to reply.',
+    'Give me a response.',
+  ])('treats natural draft requests as communication requests: %s', (message) => {
+    expect(buildLegalQuestionContract(message).kind).toBe('communication');
+    expect(userAskedForDraft(message)).toBe(true);
   });
 
   it('keeps deterministic contract work bounded under sustained evaluation', () => {

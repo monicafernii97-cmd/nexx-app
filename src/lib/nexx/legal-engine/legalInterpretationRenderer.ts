@@ -1,6 +1,7 @@
 import type { LegalDocumentSourcePacket } from '../legalDocumentAnswer';
 import type { LegalInterpretationAnswer } from './legalInterpretationSchema';
 import { canonicalAnswerPlanFromLegalInterpretation } from './canonicalAnswerPlan';
+import { requestsCommunicationDraft } from './legalSignals';
 import {
   normalizeLegalProposition,
   semanticallyEquivalentLegalText,
@@ -87,7 +88,7 @@ function inferRenderMode(
   if (!options?.userMessage) return 'structured_clause_analysis';
 
   const message = options.userMessage;
-  if (/\b(what\s+(?:do|should)\s+i\s+say(?:\s+back)?|how\s+(?:do|should)\s+i\s+(?:respond|reply)|say\s+back|respond\s+back|reply\s+back)\b/i.test(message)) {
+  if (requestsCommunicationDraft(message)) {
     return 'draft_focused';
   }
   if (/\b(show\s+me\s+why|where\s+exactly|quote|exact\s+(?:wording|language)|which\s+(?:clause|provision)|clause\s+controls?|explain\s+the\s+clauses?)\b/i.test(message)) {

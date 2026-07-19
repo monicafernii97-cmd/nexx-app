@@ -1,4 +1,5 @@
 import type { LegalInterpretationAnswer } from './legalInterpretationSchema';
+import { requestsCommunicationDraft } from './legalSignals';
 import { uniqueLegalPropositions } from './semanticDedup';
 
 export type LegalResponsePlan = {
@@ -15,7 +16,7 @@ export type LegalResponsePlan = {
 };
 
 export function userAskedForDraft(message = '') {
-  return /\b(what\s+(?:do|should)\s+i\s+(?:say|respond)|how\s+(?:do|should)\s+i\s+(?:respond|reply)|draft|reply|text back|message (?:him|her|them)|say back)\b/i.test(message);
+  return requestsCommunicationDraft(message);
 }
 
 export function responsePlanFromLegalInterpretation(

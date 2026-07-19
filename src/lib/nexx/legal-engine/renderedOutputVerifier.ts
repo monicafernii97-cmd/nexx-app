@@ -7,6 +7,7 @@ import {
 } from './semanticDedup';
 import { containsUserFacingExtractionDebris } from './userFacingLegalText';
 import { isGenericCanonicalLegalAnswer } from './genericAnswerPolicy';
+import { requestsCommunicationDraft } from './legalSignals';
 
 export type RenderedOutputVerification = {
   passed: boolean;
@@ -80,7 +81,7 @@ function duplicateHeadingCount(message: string) {
 }
 
 function asksWhatToSay(message: string) {
-  return /\b(what\s+(?:do|should)\s+i\s+(?:say|respond)|how\s+do\s+i\s+respond|text back|message him|message her|reply back)\b/i.test(message);
+  return requestsCommunicationDraft(message);
 }
 
 function courtFiledSignal(message: string, routeMode?: RouteMode) {

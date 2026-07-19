@@ -1,6 +1,20 @@
 import type { LegalDocumentSourcePacket } from '../legalDocumentAnswer';
 import type { LegalInterpretationAnswer } from './legalInterpretationSchema';
-import { clauseQuoteSupported, sourceIsRelevantToIssue } from './clauseRelationship';
+import {
+  clauseQuoteSupported,
+  containsFathersDay,
+  sourceContainsOperativeFatherDaySchedule,
+  sourceIsRelevantToIssue,
+} from './clauseRelationship';
+import {
+  containsUserFacingExtractionDebris,
+  isCompleteUserFacingLegalText,
+  isSafeCommunicationDraft,
+} from './userFacingLegalText';
+import {
+  extractFathersDayScheduleTerms,
+  textMatchesFathersDaySchedule,
+} from './fathersDayScheduleTerms';
 
 export type LegalInterpretationVerification = {
   passed: boolean;
@@ -15,6 +29,9 @@ export type LegalInterpretationVerification = {
     citationsValid: boolean;
     quotesSupported: boolean;
     clauseRolesRelevant: boolean;
+    answerPropositionSupported: boolean;
+    draftPropositionSupported: boolean;
+    noExtractionDebris: boolean;
     noBackendArtifacts: boolean;
   };
 };
@@ -90,6 +107,9 @@ export function verifyLegalInterpretationAnswer(
         citationsValid: true,
         quotesSupported: true,
         clauseRolesRelevant: true,
+        answerPropositionSupported: true,
+        draftPropositionSupported: true,
+        noExtractionDebris: true,
         noBackendArtifacts: true,
       },
     };
@@ -109,6 +129,9 @@ export function verifyLegalInterpretationAnswer(
         citationsValid: false,
         quotesSupported: false,
         clauseRolesRelevant: false,
+        answerPropositionSupported: false,
+        draftPropositionSupported: false,
+        noExtractionDebris: true,
         noBackendArtifacts: true,
       },
     };
@@ -155,11 +178,51 @@ export function verifyLegalInterpretationAnswer(
   const quotesSupported = answer.userFacingCertainty === 'insufficient_text' ||
     quotedClauses.every((clause) => clauseQuoteSupported(clause.quote, clause.sourceIds, sourcePackets));
   const packetsById = new Map(sourcePackets.map((packet) => [packet.sourceId, packet]));
+  const asksFathersDay = containsFathersDay(options.userMessage ?? '');
   const clauseRolesRelevant = answer.userFacingCertainty === 'insufficient_text' ||
     answer.controllingClauses.every((clause) => clause.sourceIds.some((sourceId) => {
       const source = packetsById.get(sourceId);
-      return Boolean(source && sourceIsRelevantToIssue(source, options.userMessage));
+      return Boolean(source && (
+        asksFathersDay
+          ? sourceContainsOperativeFatherDaySchedule(source)
+          : sourceIsRelevantToIssue(source, options.userMessage)
+      ));
     }));
+  const operativeFathersDaySchedule = asksFathersDay
+    ? answer.controllingClauses
+      .flatMap((clause) => clause.sourceIds)
+      .map((sourceId) => packetsById.get(sourceId))
+      .filter((source): source is LegalDocumentSourcePacket => Boolean(source))
+      .map((source) => extractFathersDayScheduleTerms(source.text))
+      .find((schedule) => schedule !== null) ?? null
+    : null;
+  const answerScheduleMatches = !asksFathersDay || Boolean(
+    operativeFathersDaySchedule &&
+    textMatchesFathersDaySchedule(answer.directAnswer, operativeFathersDaySchedule) &&
+    textMatchesFathersDaySchedule(answer.practicalMeaning.result, operativeFathersDaySchedule)
+  );
+  const answerPropositionSupported = answer.userFacingCertainty === 'insufficient_text' || (
+    answerScheduleMatches &&
+    isCompleteUserFacingLegalText(answer.directAnswer) &&
+    isCompleteUserFacingLegalText(answer.practicalMeaning.result)
+  );
+  const draftPropositionSupported = !answer.draftMessage?.text || (
+    isSafeCommunicationDraft(answer.draftMessage.text) &&
+    (
+      !asksFathersDay || Boolean(
+        operativeFathersDaySchedule &&
+        textMatchesFathersDaySchedule(answer.draftMessage.text, operativeFathersDaySchedule)
+      )
+    )
+  );
+  const noExtractionDebris = ![
+    answer.directAnswer,
+    answer.practicalMeaning.result,
+    answer.draftMessage?.text ?? '',
+    ...answer.controllingClauses.map((clause) => clause.quote),
+    ...answer.competingClauses.map((clause) => clause.quote),
+    ...(answer.interactingClauses ?? []).map((clause) => clause.quote),
+  ].some(containsUserFacingExtractionDebris);
 
   if (!answeredDirectly) errors.push('Legal interpretation did not answer directly.');
   if (!hasControllingClause) errors.push('Legal interpretation is missing a valid controlling clause source.');
@@ -170,6 +233,9 @@ export function verifyLegalInterpretationAnswer(
   if (!citationsValid) errors.push('Legal interpretation cites unknown source IDs.');
   if (!quotesSupported) errors.push('Legal interpretation clause quote is not supported by its cited source.');
   if (!clauseRolesRelevant) errors.push('Legal interpretation controlling clause is not operative for the user issue.');
+  if (!answerPropositionSupported) errors.push('Legal interpretation does not state a source-supported result for the user issue.');
+  if (!draftPropositionSupported) errors.push('Legal interpretation draft is not a safe source-supported communication.');
+  if (!noExtractionDebris) errors.push('Legal interpretation contains extraction or page-layout debris.');
   if (!noBackendArtifacts) errors.push('Legal interpretation contains backend/internal artifact labels.');
 
   return {
@@ -185,6 +251,9 @@ export function verifyLegalInterpretationAnswer(
       citationsValid,
       quotesSupported,
       clauseRolesRelevant,
+      answerPropositionSupported,
+      draftPropositionSupported,
+      noExtractionDebris,
       noBackendArtifacts,
     },
   };

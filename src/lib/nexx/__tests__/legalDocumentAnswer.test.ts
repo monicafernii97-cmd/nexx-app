@@ -60,6 +60,49 @@ function sectionBetween(content: string, startHeading: string, endHeading: strin
 }
 
 describe('verifyLegalDocumentAnswer', () => {
+  it('rejects extraction debris in the canonical answer even when claims are sourced', () => {
+    const result = verifyLegalDocumentAnswer(answer({
+      answer: '1. Weekends — -- 10 of 46 -- possession of the child as follows: 1.',
+    }), sourcePackets, {
+      requiresDocumentAnswer: true,
+      requiresCitation: true,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.errors.join(' ')).toMatch(/extraction|complete user-facing/i);
+  });
+
+  it('rejects a Father’s Day answer whose times differ from the cited operative schedule', () => {
+    const fatherSource: LegalDocumentSourcePacket = {
+      sourceId: 'father_schedule',
+      fileId: 'file_1',
+      fileName: 'Final Order.pdf',
+      chunkId: 'father_schedule',
+      blockIds: ['father_schedule'],
+      text: "Father's Day possession begins at 6:00 p.m. on the Friday preceding Father's Day and ends at 8:00 a.m. on the Monday after Father's Day.",
+    };
+    const result = verifyLegalDocumentAnswer({
+      answerType: 'interpretation',
+      answer: "Father's Day possession begins Friday at 8:00 p.m. and ends Monday at 8:00 a.m.",
+      claims: [{
+        claim: "Father's Day possession begins Friday at 8:00 p.m. and ends Monday at 8:00 a.m.",
+        claimType: 'document_fact',
+        sourceIds: ['father_schedule'],
+      }],
+      citations: [{ sourceId: 'father_schedule', confidence: 'high', supports: null }],
+      warnings: [],
+      unsupportedClaims: [],
+      notFoundReason: null,
+    }, [fatherSource], {
+      requiresDocumentAnswer: true,
+      requiresCitation: true,
+      userMessage: "When does Father's Day possession begin?",
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.errors.join(' ')).toMatch(/does not match.*start and end schedule/i);
+  });
+
   it('passes sourced claims with quotes found in source packets', () => {
     const result = verifyLegalDocumentAnswer(answer(), sourcePackets, {
       requiresDocumentAnswer: true,

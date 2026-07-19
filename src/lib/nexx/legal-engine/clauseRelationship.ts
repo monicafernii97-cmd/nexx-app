@@ -1,9 +1,10 @@
 import type { LegalDocumentSourcePacket } from '../legalDocumentAnswer';
 import { fuzzyTextContains } from '../legalDocumentAnswer';
 import type { LegalClauseRelationship } from './legalInterpretationSchema';
+import { containsFathersDayTerm, extractFathersDayScheduleTerms } from './fathersDayScheduleTerms';
 
 export function containsFathersDay(value: string) {
-  return /\bfather'?s day\b/i.test(value.replace(/[’‘]/g, "'"));
+  return containsFathersDayTerm(value);
 }
 
 function combinedText(source: LegalDocumentSourcePacket) {
@@ -25,12 +26,7 @@ export function inferClauseRelationship(source: LegalDocumentSourcePacket): Lega
 }
 
 export function sourceContainsOperativeFatherDaySchedule(source: LegalDocumentSourcePacket) {
-  const text = combinedText(source);
-  return containsFathersDay(text) &&
-    /\b(begin(?:ning|s)?|start(?:ing|s)?)\b/i.test(text) &&
-    /\bfriday\b/i.test(text) &&
-    /\b(end(?:ing|s)?)\b/i.test(text) &&
-    /\bmonday\b/i.test(text);
+  return Boolean(extractFathersDayScheduleTerms(source.text));
 }
 
 export function sourceContainsGeneralHolidayExtension(source: LegalDocumentSourcePacket) {

@@ -1,3 +1,14 @@
+import {
+  containsUserFacingExtractionDebris,
+  isCompleteUserFacingLegalText,
+} from './legal-engine/userFacingLegalText';
+import {
+  containsFathersDayTerm,
+  displayScheduleTime,
+  extractFathersDayScheduleTerms,
+  textMatchesFathersDaySchedule,
+} from './legal-engine/fathersDayScheduleTerms';
+
 export type LegalDocumentAnswerType =
   | 'direct_quote'
   | 'summary'
@@ -188,6 +199,7 @@ function uniqueValues(values: string[]) {
 
 function cleanUserFacingDocumentText(value: string) {
   return value
+    .replace(/--\s*\d+\s+of\s+\d+\s*--/gi, ' ')
     .replace(/\bSOURCE_ID\b:?/gi, 'source')
     .replace(/\bsourceId\b:?/g, 'source')
     .replace(/\bchunkId\b:?/g, 'source')
@@ -202,6 +214,20 @@ function cleanUserFacingDocumentText(value: string) {
     .replace(/\s+([,.;:])/g, '$1')
     .replace(/[^\S\n]{2,}/g, ' ')
     .trim();
+}
+
+function containsFathersDay(value: string) {
+  return containsFathersDayTerm(value);
+}
+
+function containsOperativeFathersDaySchedule(source: LegalDocumentSourcePacket) {
+  return Boolean(extractFathersDayScheduleTerms(source.text));
+}
+
+function fathersDaySupportedClaim(source: LegalDocumentSourcePacket) {
+  const schedule = extractFathersDayScheduleTerms(source.text);
+  if (!schedule) return "Father's Day schedule could not be verified from the available order language.";
+  return `Father's Day possession begins Friday at ${displayScheduleTime(schedule.startTime)} and ends Monday at ${displayScheduleTime(schedule.endTime)}`;
 }
 
 function citationMapForAnswer(answer: LegalDocumentAnswer, sourcePackets: LegalDocumentSourcePacket[]) {
@@ -293,11 +319,55 @@ function confidenceLabel(confidence?: number): 'high' | 'medium' | 'low' {
 export function buildBestEffortLegalDocumentAnswerFromSources(
   sourcePackets: LegalDocumentSourcePacket[],
   fallbackMessage?: string,
-  options: { isTargetedQuestion?: boolean } = {}
+  options: { isTargetedQuestion?: boolean; userMessage?: string } = {}
 ): LegalDocumentAnswer {
+  const asksFathersDay = containsFathersDay(options.userMessage ?? '');
+  const operativeFathersDaySource = asksFathersDay
+    ? sourcePackets.find(containsOperativeFathersDaySchedule)
+    : undefined;
+
+  if (asksFathersDay && options.isTargetedQuestion) {
+    if (!operativeFathersDaySource) {
+      return {
+        answerType: 'not_found',
+        answer: "I cannot verify the Father’s Day start time from the order language available for this turn.",
+        claims: [],
+        citations: [],
+        warnings: [],
+        unsupportedClaims: [],
+        notFoundReason: 'operative_fathers_day_schedule_not_found',
+      };
+    }
+
+    const claim = fathersDaySupportedClaim(operativeFathersDaySource);
+    return {
+      answerType: 'interpretation',
+      answer: claim,
+      claims: [{
+        claim,
+        claimType: 'document_fact',
+        sourceIds: [operativeFathersDaySource.sourceId],
+      }],
+      citations: [{
+        sourceId: operativeFathersDaySource.sourceId,
+        pageStart: operativeFathersDaySource.pageStart,
+        pageEnd: operativeFathersDaySource.pageEnd,
+        supports: null,
+        confidence: confidenceLabel(operativeFathersDaySource.confidence),
+      }],
+      warnings: [],
+      unsupportedClaims: [],
+      notFoundReason: null,
+    };
+  }
+
   const usableSources = sourcePackets
     .map((source) => ({ source, claim: sourceTextToSupportedClaim(source) }))
-    .filter(({ claim }) => claim.length > 0)
+    .filter(({ claim }) =>
+      claim.length > 0 &&
+      isCompleteUserFacingLegalText(claim) &&
+      !containsUserFacingExtractionDebris(claim)
+    )
     .slice(0, 8);
 
   if (usableSources.length === 0) {
@@ -670,6 +740,7 @@ export function verifyLegalDocumentAnswer(
   options: {
     requiresDocumentAnswer: boolean;
     requiresCitation: boolean;
+    userMessage?: string;
   }
 ): LegalDocumentAnswerVerification {
   const errors: string[] = [];
@@ -720,7 +791,39 @@ export function verifyLegalDocumentAnswer(
     };
   }
 
+  const answerHasExtractionDebris = containsUserFacingExtractionDebris(answer.answer);
+  const answerIsComplete = answer.answerType === 'not_found' || isCompleteUserFacingLegalText(answer.answer);
+  const asksFathersDay = containsFathersDay(options.userMessage ?? '');
+  const citedSourceIds = new Set([
+    ...answer.claims.flatMap((claim) => claim.sourceIds),
+    ...answer.citations.map((citation) => citation.sourceId),
+  ]);
+  const operativeFathersDaySchedule = asksFathersDay
+    ? sourcePackets
+      .filter((source) => citedSourceIds.has(source.sourceId))
+      .map((source) => extractFathersDayScheduleTerms(source.text))
+      .find((schedule) => schedule !== null) ?? null
+    : null;
+  const answerAddressesFathersDay = !asksFathersDay ||
+    answer.answerType === 'not_found' ||
+    Boolean(operativeFathersDaySchedule && textMatchesFathersDaySchedule(answer.answer, operativeFathersDaySchedule));
+  if (answerHasExtractionDebris) {
+    errors.push('Document answer contains extraction or page-layout debris.');
+  }
+  if (!answerIsComplete) {
+    errors.push('Document answer is not a complete user-facing legal proposition.');
+  }
+  if (!answerAddressesFathersDay) {
+    errors.push('Document answer does not match the cited Father’s Day start and end schedule.');
+  }
+
   for (const claim of answer.claims) {
+    if (
+      containsUserFacingExtractionDebris(claim.claim) ||
+      !isCompleteUserFacingLegalText(claim.claim)
+    ) {
+      errors.push(`Document claim is not complete user-facing text: ${claim.claim.slice(0, 120)}`);
+    }
     if (DOCUMENT_FACT_CLAIM_TYPES.has(claim.claimType) && claim.sourceIds.length === 0) {
       errors.push(`Document claim is missing sources: ${claim.claim.slice(0, 120)}`);
     }

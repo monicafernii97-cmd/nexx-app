@@ -160,6 +160,12 @@ export interface NexxAssistantResponse {
     canonicalDirectAnswerFingerprint: string | null;
     selectedSourceRoles: Array<{ sourceId: string; role: string; pages: number[] }>;
     clauseRoleResults: Array<{ label: string; relationship: string; sourceIds: string[] }>;
+    followUpContextApplied: boolean;
+    activeIssueTerms: string[];
+    operativeClauseValidationPassed: boolean;
+    answerPropositionValidationPassed: boolean;
+    draftPropositionValidationPassed: boolean;
+    extractionDebrisRejected: boolean;
     initialErrors: string[];
     repairedErrors: string[];
     repairCount: number;

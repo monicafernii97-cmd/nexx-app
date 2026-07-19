@@ -9,6 +9,10 @@ import {
   sourceContainsPriorityCarveout,
   sourceIsRelevantToIssue,
 } from './clauseRelationship';
+import {
+  displayScheduleTime,
+  extractFathersDayScheduleTerms,
+} from './fathersDayScheduleTerms';
 
 const GENERIC_DOCUMENT_ANSWER_PATTERN =
   /\b(i found usable court-order language|organized the visible provisions|cite exact pages|stay grounded in the visible order language)\b/i;
@@ -18,6 +22,7 @@ const INTERNAL_FIELD_PATTERN =
 
 function cleanUserFacingText(value: string) {
   return value
+    .replace(/--\s*\d+\s+of\s+\d+\s*--/gi, ' ')
     .replace(INTERNAL_FIELD_PATTERN, 'source')
     .replace(/\bsrc_\d+\b/gi, 'source')
     .replace(/\s+([,.;:])/g, '$1')
@@ -90,14 +95,31 @@ function cleanAnswer(answer: LegalDocumentAnswer) {
   return clean;
 }
 
-function draftFromAnswer(answer: LegalDocumentAnswer, controlling: LegalDocumentSourcePacket | undefined) {
-  const controllingText = controlling?.text ? truncate(controlling.text, 220) : '';
+function fathersDayOutcome(controlling: LegalDocumentSourcePacket | undefined) {
+  if (!controlling || !sourceContainsOperativeFatherDaySchedule(controlling)) return null;
+  const schedule = extractFathersDayScheduleTerms(controlling.text);
+  if (!schedule) return null;
+  return `Father's Day possession begins Friday at ${displayScheduleTime(schedule.startTime)} and ends Monday at ${displayScheduleTime(schedule.endTime)}`;
+}
+
+function draftFromAnswer(
+  answer: LegalDocumentAnswer,
+  controlling: LegalDocumentSourcePacket | undefined,
+  asksFatherDay: boolean,
+  canonicalAnswer: string
+) {
   if (answer.answerType === 'not_found') return null;
+  if (asksFatherDay) {
+    const outcome = fathersDayOutcome(controlling);
+    if (!outcome) return null;
+    return {
+      tone: 'neutral' as const,
+      text: `I reviewed the Father’s Day provisions. ${outcome} I plan to follow that specific schedule.`,
+    };
+  }
   return {
     tone: 'neutral' as const,
-    text: controllingText
-      ? `Based on the order language I can see, I plan to follow this provision as written: "${controllingText}"`
-      : 'Based on the order language I can see, I plan to follow the order as written.',
+    text: `Based on the order language I reviewed, ${canonicalAnswer} I plan to follow the order as written.`,
   };
 }
 
@@ -109,9 +131,18 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
 ): LegalInterpretationAnswer | null {
   if (!documentAnswer) return null;
 
-  const selectedSources = selectSourcePackets(documentAnswer, sourcePackets, userMessage);
   const asksFatherDay = containsFathersDay(userMessage) ||
     documentReference.requestedTerms.some(containsFathersDay);
+  const answerSelectedSources = selectSourcePackets(documentAnswer, sourcePackets, userMessage);
+  const selectedSources = asksFatherDay
+    ? [
+      ...answerSelectedSources,
+      ...sourcePackets.filter((source) =>
+        sourceIsRelevantToIssue(source, userMessage) &&
+        !answerSelectedSources.some((selected) => selected.sourceId === source.sourceId)
+      ),
+    ].sort((a, b) => sourcePriorityScore(b, userMessage) - sourcePriorityScore(a, userMessage))
+    : answerSelectedSources;
   const controllingSources = asksFatherDay
     ? selectedSources.filter(sourceContainsOperativeFatherDaySchedule).slice(0, 1)
     : selectedSources.filter((source) => sourceIsRelevantToIssue(source, userMessage)).slice(0, 1);
@@ -120,6 +151,9 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
     .filter((source) => asksFatherDay ? sourceContainsGeneralHolidayExtension(source) : inferClauseRelationship(source) === 'general_default')
     .slice(0, 1);
   const controlling = controllingSources[0];
+  const canonicalAnswer = asksFatherDay
+    ? fathersDayOutcome(controlling) ?? cleanAnswer(documentAnswer)
+    : cleanAnswer(documentAnswer);
   const hasUsableSources = controllingSources.length > 0;
   const hasClauseConflictSignal =
     documentReference.referenceType === 'clause_conflict_interpretation' ||
@@ -177,7 +211,7 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
 
   return {
     answerType: 'order_interpretation',
-    directAnswer: cleanAnswer(documentAnswer),
+    directAnswer: canonicalAnswer,
     userFacingCertainty: documentAnswer.answerType === 'needs_review' ? 'best_reading' : 'best_reading',
     controllingClauses: controllingSources.map((source) => ({
       label: source.sectionHeading || 'Visible order provision',
@@ -223,7 +257,7 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
       }]
       : [],
     interpretation: {
-      plainEnglish: cleanAnswer(documentAnswer),
+      plainEnglish: canonicalAnswer,
       legalReading: priorityExplanation,
       opposingArgument: competingSources.length > 0
         ? 'The other parent may be relying on the broader or general provision.'
@@ -233,12 +267,12 @@ export function buildBestEffortLegalInterpretationFromDocumentAnswer(
         : null,
     },
     practicalMeaning: {
-      result: cleanAnswer(documentAnswer),
+      result: canonicalAnswer,
       startTime: null,
       endTime: null,
       whatUserShouldDo: 'Keep any response calm, short, and tied to the order language.',
     },
-    draftMessage: draftFromAnswer(documentAnswer, controlling),
+    draftMessage: draftFromAnswer(documentAnswer, controlling, asksFatherDay, canonicalAnswer),
     caveats: [],
     materialLimitation: null,
   };

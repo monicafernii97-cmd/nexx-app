@@ -30,10 +30,9 @@ function summarizeVerifiedOrderInterpretation(verified?: VerifiedOrderInterpreta
   if (!verified?.directAnswer && !verified?.practicalResult) return null;
 
   const timing = verified.startTime && verified.endTime
-    ? ` The practical timing I am following is ${verified.startTime} to ${verified.endTime}.`
+    ? ` The practical timing I am following is ${verified.startTime} to ${verified.endTime}${verified.endTime.trim().endsWith('.') ? '' : '.'}`
     : '';
-  const pages = verified.sourcePages?.length ? ` ${verified.sourcePages.map((page) => `[${page}]`).join(' ')}` : '';
-  return `${verified.practicalResult || verified.directAnswer}${timing}${pages}`.trim();
+  return `${verified.practicalResult || verified.directAnswer}${timing}`.trim();
 }
 
 function fatherDayDrafts(

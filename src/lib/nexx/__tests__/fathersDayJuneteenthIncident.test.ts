@@ -3,6 +3,7 @@ import type { LegalDocumentAnswer } from '../legalDocumentAnswer';
 import { verifyLegalDocumentAnswer } from '../legalDocumentAnswer';
 import { detectDocumentReference } from '../documentReferenceDetection';
 import { buildBestEffortLegalInterpretationFromDocumentAnswer } from '../legal-engine/bestEffortLegalInterpretation';
+import { verifyLegalInterpretationAnswer } from '../legal-engine/legalInterpretationVerifier';
 import { renderLegalInterpretationMarkdown } from '../legal-engine/legalInterpretationRenderer';
 import { resolveFathersDayPossession } from '../legal-engine/possessionCalendar';
 import {
@@ -106,5 +107,41 @@ describe("Father's Day and Juneteenth production incident", () => {
     }, packets, { requiresDocumentAnswer: true, requiresCitation: true });
     expect(result.passed).toBe(false);
     expect(result.errors.join(' ')).toMatch(/unrelated|support/i);
+  });
+
+  it('rejects a generic weekend fragment and unsafe draft despite valid source ids', () => {
+    const prompt = "What should I say about whether Father's Day starts Thursday or Friday?";
+    const answer = buildBestEffortLegalInterpretationFromDocumentAnswer(
+      documentAnswer,
+      packets,
+      detectDocumentReference(prompt),
+      prompt
+    )!;
+    const malformed = {
+      ...answer,
+      directAnswer: '1. Weekends — -- 10 of 46 -- possession of the child as follows: 1.',
+      practicalMeaning: {
+        ...answer.practicalMeaning,
+        result: '1. Weekends — -- 10 of 46 -- possession of the child as follows: 1.',
+      },
+      controllingClauses: [{
+        label: '1. Weekends',
+        quote: packets.find((packet) => packet.sourceId === 'general_page_15')!.text,
+        sourceIds: ['general_page_15'],
+        pageStart: 4,
+        pageEnd: 4,
+      }],
+      draftMessage: {
+        tone: 'neutral' as const,
+        text: 'My understanding is -- 10 of 46 -- possession of the child as follows: 1.',
+      },
+    };
+    const verification = verifyLegalInterpretationAnswer(malformed, packets, {
+      requiresLegalInterpretation: true,
+      hasClauseConflictSignal: true,
+      userMessage: prompt,
+    });
+    expect(verification.passed).toBe(false);
+    expect(verification.errors.join(' ')).toMatch(/operative|source-supported|extraction|draft/i);
   });
 });

@@ -28,7 +28,10 @@ import { repairRenderedOutput, truncateAtSentenceBoundary, verifyRenderedOutput 
 import { responsePlanFromLegalInterpretation, userAskedForDraft } from '../src/lib/nexx/legal-engine/responsePlan';
 import { normalizeLegalProposition, repeatedLegalPropositions, semanticallyEquivalentLegalText } from '../src/lib/nexx/legal-engine/semanticDedup';
 import { resolveRequestedFathersDaySchedule } from '../src/lib/nexx/legal-engine/possessionCalendar';
-import { inferClauseRelationship } from '../src/lib/nexx/legal-engine/clauseRelationship';
+import {
+    inferClauseRelationship,
+    sourceContainsOperativeFatherDaySchedule,
+} from '../src/lib/nexx/legal-engine/clauseRelationship';
 import { recoverStructuredOutput } from '../src/lib/nexx/recovery/recoverStructuredOutput';
 import { suppressWeakArtifacts } from '../src/lib/nexx/recovery/suppressWeakArtifacts';
 import { extractOutputText } from '../src/lib/nexx/validation/nexxArtifacts';
@@ -36,6 +39,11 @@ import { polishLegalResponse } from '../src/lib/nexx/postprocess';
 import { buildBestEffortLegalInterpretationFromDocumentAnswer } from '../src/lib/nexx/legal-engine/bestEffortLegalInterpretation';
 import { renderLegalInterpretationMarkdown } from '../src/lib/nexx/legal-engine/legalInterpretationRenderer';
 import { verifyLegalInterpretationAnswer } from '../src/lib/nexx/legal-engine/legalInterpretationVerifier';
+import {
+    containsUserFacingExtractionDebris,
+    isCompleteUserFacingLegalText,
+    isSafeCommunicationDraft,
+} from '../src/lib/nexx/legal-engine/userFacingLegalText';
 import {
     buildLitigationNavigationResponse,
     mergeCourtFilingIntoLitigationNavigation,
@@ -1282,9 +1290,14 @@ function renderLitigationNavigationMessage(args: {
     recentContext?: string;
     courtSettings?: GenerationContext['courtSettings'];
     courtFilingExtraction?: CourtFilingExtraction | null;
+    sourcePackets?: LegalDocumentSourcePacket[];
 }) {
     if (!isLitigationNavigationRoute(args.routeMode)) return args.response;
-    const verifiedOrderInterpretation = verifiedOrderInterpretationForDraft(args.response);
+    const verifiedOrderInterpretation = verifiedOrderInterpretationForDraft(
+        args.response,
+        args.sourcePackets ?? [],
+        [args.userMessage, args.recentContext].filter(Boolean).join('\n')
+    );
     const verifiedExchange = verifiedExchangeForDraft(args.response);
     const deterministicNavigation = buildLitigationNavigationResponse({
         message: args.userMessage,
@@ -1499,9 +1512,19 @@ function compactPageLabel(pageStart?: number | null, pageEnd?: number | null) {
         : `p. ${pageStart}`;
 }
 
-function verifiedOrderInterpretationForDraft(response: NexxAssistantResponse) {
+function verifiedOrderInterpretationForDraft(
+    response: NexxAssistantResponse,
+    sourcePackets: LegalDocumentSourcePacket[],
+    userMessage: string
+) {
     const interpretation = response.legalInterpretation;
     if (!interpretation || interpretation.controllingClauses.length === 0) return null;
+    const verification = verifyLegalInterpretationAnswer(interpretation, sourcePackets, {
+        requiresLegalInterpretation: true,
+        hasClauseConflictSignal: /\b(?:conflict|controls?|thursday|friday|except as otherwise)\b/i.test(userMessage),
+        userMessage,
+    });
+    if (!verification.passed || interpretation.userFacingCertainty === 'insufficient_text') return null;
     const sourcePages = Array.from(new Set(
         interpretation.controllingClauses
             .map((clause) => compactPageLabel(clause.pageStart, clause.pageEnd))
@@ -1509,6 +1532,10 @@ function verifiedOrderInterpretationForDraft(response: NexxAssistantResponse) {
     ));
     const hasSourceSupport = interpretation.controllingClauses.some((clause) => clause.sourceIds.length > 0);
     if (!hasSourceSupport) return null;
+    if (
+        !isCompleteUserFacingLegalText(interpretation.directAnswer) ||
+        !isCompleteUserFacingLegalText(interpretation.practicalMeaning.result)
+    ) return null;
 
     return {
         directAnswer: interpretation.directAnswer,
@@ -1591,14 +1618,24 @@ function deterministicRenderedFallback(
     const interpretationPlan = response.legalInterpretation
         ? responsePlanFromLegalInterpretation(response.legalInterpretation, userMessage)
         : null;
-    const directAnswer = interpretationPlan?.directAnswer || response.documentAnswer?.answer || '';
-    const explanation = interpretationPlan?.explanationSteps[0]?.point || '';
+    const candidateDirectAnswer = interpretationPlan?.directAnswer || response.documentAnswer?.answer || '';
+    const directAnswer = isCompleteUserFacingLegalText(candidateDirectAnswer)
+        ? candidateDirectAnswer
+        : 'I cannot verify a complete answer from the order language available for this turn.';
+    const candidateExplanation = interpretationPlan?.explanationSteps[0]?.point || '';
+    const explanation = isCompleteUserFacingLegalText(candidateExplanation) ? candidateExplanation : '';
     const practical = interpretationPlan?.practicalOutcome &&
+        isCompleteUserFacingLegalText(interpretationPlan.practicalOutcome) &&
         !semanticallyEquivalentLegalText(directAnswer, interpretationPlan.practicalOutcome)
         ? interpretationPlan.practicalOutcome
         : '';
-    const draftText = userAskedForDraft(userMessage)
+    const candidateDraftText = userAskedForDraft(userMessage)
         ? response.litigationNavigation?.coParentResponse.neutralDraft || interpretationPlan?.communicationDraft?.text || ''
+        : '';
+    const draftText = userAskedForDraft(userMessage)
+        ? candidateDraftText && isSafeCommunicationDraft(candidateDraftText)
+            ? candidateDraftText
+            : 'Please identify the specific written provision you are relying on. I want to keep this focused on the order and avoid arguing.'
         : '';
     const deadlineCheck = courtFiledRenderedSignal(userMessage, routeMode)
         ? 'Before filing, confirm the date you were served, the response deadline, and any hearing date.'
@@ -1642,12 +1679,23 @@ function verifyAndRepairRenderedResponse(
     response: NexxAssistantResponse,
     routeMode: RouteMode,
     userMessage: string,
-    sourcePackets: LegalDocumentSourcePacket[] = []
+    sourcePackets: LegalDocumentSourcePacket[] = [],
+    groundingUserMessage = userMessage
 ) {
-    const canonicalDirectAnswer = response.legalInterpretation?.directAnswer || response.documentAnswer?.answer || null;
+    const candidateCanonicalDirectAnswer = response.legalInterpretation?.directAnswer || response.documentAnswer?.answer || null;
+    const canonicalDirectAnswer = candidateCanonicalDirectAnswer && isCompleteUserFacingLegalText(candidateCanonicalDirectAnswer)
+        ? candidateCanonicalDirectAnswer
+        : 'I cannot verify a complete answer from the order language available for this turn.';
     const draftRequired = userAskedForDraft(userMessage);
     const traceEvidence = () => {
         const answer = response.legalInterpretation;
+        const interpretationVerification = answer
+            ? verifyLegalInterpretationAnswer(answer, sourcePackets, {
+                requiresLegalInterpretation: true,
+                hasClauseConflictSignal: /\b(?:conflict|controls?|thursday|friday|except as otherwise)\b/i.test(groundingUserMessage),
+                userMessage: groundingUserMessage,
+            })
+            : null;
         const sourceRoles = [
             ...(answer?.controllingClauses ?? []).flatMap((clause) => clause.sourceIds.map((sourceId) => {
                 const typedRole = answer?.interactingClauses?.find((candidate) =>
@@ -1685,6 +1733,19 @@ function verifyAndRepairRenderedResponse(
                 relationship: clause.relationship,
                 sourceIds: clause.sourceIds,
             })),
+            followUpContextApplied: groundingUserMessage.trim() !== userMessage.trim(),
+            activeIssueTerms: Array.from(new Set(
+                groundingUserMessage.toLowerCase().match(/father'?s day|mother'?s day|juneteenth|holiday|weekend|thursday|friday|possession|exchange|pickup/g) ?? []
+            )).slice(0, 12),
+            operativeClauseValidationPassed: Boolean(
+                answer?.controllingClauses.some((clause) => clause.sourceIds.some((sourceId) => {
+                    const source = sourcePackets.find((packet) => packet.sourceId === sourceId);
+                    return Boolean(source && sourceContainsOperativeFatherDaySchedule(source));
+                })) || !/father'?s day/i.test(groundingUserMessage)
+            ),
+            answerPropositionValidationPassed: interpretationVerification?.checks.answerPropositionSupported ?? true,
+            draftPropositionValidationPassed: interpretationVerification?.checks.draftPropositionSupported ?? true,
+            extractionDebrisRejected: !containsUserFacingExtractionDebris(response.message),
         };
     };
     const verification = verifyRenderedOutput({
@@ -1788,14 +1849,18 @@ function verifyAndRepairRenderedResponse(
 function citationLockedFallbackResponse(
     errors: string[],
     sourcePackets: LegalDocumentSourcePacket[],
-    documentReference: DocumentReferenceDetection
+    documentReference: DocumentReferenceDetection,
+    userMessage: string
 ): NexxAssistantResponse {
     const documentAnswer = buildBestEffortLegalDocumentAnswerFromSources(
         sourcePackets,
         errors.length > 0
             ? 'Here is what the visible order language supports.'
             : undefined,
-        { isTargetedQuestion: shouldRenderTargetedDocumentAnswer(documentReference) }
+        {
+            isTargetedQuestion: shouldRenderTargetedDocumentAnswer(documentReference),
+            userMessage,
+        }
     );
 
     return {
@@ -2058,9 +2123,14 @@ async function generateWithFallbacks({
                 documentReference: promptBundle.documentReference,
                 routeMode,
             });
+            const groundingUserMessage = [context.turn.message, followUpSummary].filter(Boolean).join('\n');
             const optionalDocumentAnswerPresent = !requiresDocumentAnswer && Boolean(parsedResponse.documentAnswer);
+            const isOrderGroundedDraftFollowUp =
+                (routeMode === 'co_parent_response' || routeMode === 'party_message_draft') &&
+                promptBundle.documentSourcePackets.length > 0 &&
+                hasActiveDocumentContext(context);
             const requiresLegalInterpretation =
-                isLegalInterpretationRoute(routeMode, promptBundle.documentReference) &&
+                (isLegalInterpretationRoute(routeMode, promptBundle.documentReference) || isOrderGroundedDraftFollowUp) &&
                 promptBundle.documentSourcePackets.length > 0;
             let citationVerification = verifyLegalDocumentAnswer(
                 parsedResponse.documentAnswer,
@@ -2068,6 +2138,7 @@ async function generateWithFallbacks({
                 {
                     requiresDocumentAnswer: requiresDocumentAnswer || optionalDocumentAnswerPresent,
                     requiresCitation: requiresDocumentAnswer || optionalDocumentAnswerPresent,
+                    userMessage: groundingUserMessage,
                 }
             );
             let legalInterpretationVerification = verifyLegalInterpretationAnswer(
@@ -2076,7 +2147,7 @@ async function generateWithFallbacks({
                 {
                     requiresLegalInterpretation,
                     hasClauseConflictSignal: hasClauseConflictSignal(promptBundle.documentReference),
-                    userMessage: [context.turn.message, followUpSummary].filter(Boolean).join('\n'),
+                    userMessage: groundingUserMessage,
                 }
             );
 
@@ -2088,6 +2159,7 @@ async function generateWithFallbacks({
                     {
                         requiresDocumentAnswer: false,
                         requiresCitation: false,
+                        userMessage: groundingUserMessage,
                     }
                 );
             }
@@ -2126,6 +2198,7 @@ async function generateWithFallbacks({
                         {
                             requiresDocumentAnswer,
                             requiresCitation: requiresDocumentAnswer,
+                            userMessage: groundingUserMessage,
                         }
                     );
                     const repairedLegalInterpretationVerification = verifyLegalInterpretationAnswer(
@@ -2134,7 +2207,7 @@ async function generateWithFallbacks({
                         {
                             requiresLegalInterpretation,
                             hasClauseConflictSignal: hasClauseConflictSignal(promptBundle.documentReference),
-                            userMessage: [context.turn.message, followUpSummary].filter(Boolean).join('\n'),
+                            userMessage: groundingUserMessage,
                         }
                     );
                     if (
@@ -2156,7 +2229,8 @@ async function generateWithFallbacks({
                 parsedResponse = citationLockedFallbackResponse(
                     citationVerification.errors,
                     promptBundle.documentSourcePackets,
-                    promptBundle.documentReference
+                    promptBundle.documentReference,
+                    groundingUserMessage
                 );
                 citationVerification = verifyLegalDocumentAnswer(
                     parsedResponse.documentAnswer,
@@ -2164,6 +2238,7 @@ async function generateWithFallbacks({
                     {
                         requiresDocumentAnswer: true,
                         requiresCitation: promptBundle.documentSourcePackets.length > 0,
+                        userMessage: groundingUserMessage,
                     }
                 );
             }
@@ -2173,7 +2248,7 @@ async function generateWithFallbacks({
                     parsedResponse.documentAnswer,
                     promptBundle.documentSourcePackets,
                     promptBundle.documentReference,
-                    [context.turn.message, followUpSummary].filter(Boolean).join('\n')
+                    groundingUserMessage
                 );
                 parsedResponse = {
                     ...parsedResponse,
@@ -2185,7 +2260,7 @@ async function generateWithFallbacks({
                     {
                         requiresLegalInterpretation,
                         hasClauseConflictSignal: hasClauseConflictSignal(promptBundle.documentReference),
-                        userMessage: [context.turn.message, followUpSummary].filter(Boolean).join('\n'),
+                        userMessage: groundingUserMessage,
                     }
                 );
                 if (!legalInterpretationVerification.passed) {
@@ -2217,6 +2292,7 @@ async function generateWithFallbacks({
                 recentContext: recentLegalContextSummary(context.recentMessages),
                 courtSettings: context.courtSettings,
                 courtFilingExtraction,
+                sourcePackets: promptBundle.documentSourcePackets,
             });
             parsedResponse = enrichDeterministicLegalFields({
                 response: parsedResponse,
@@ -2231,7 +2307,8 @@ async function generateWithFallbacks({
                 parsedResponse,
                 routeMode,
                 context.turn.message,
-                promptBundle.documentSourcePackets
+                promptBundle.documentSourcePackets,
+                groundingUserMessage
             );
 
             return {

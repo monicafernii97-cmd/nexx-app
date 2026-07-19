@@ -7,8 +7,9 @@ import {
     detectDocumentReference,
     type DocumentReferenceDetection,
 } from '../src/lib/nexx/documentReferenceDetection';
-import { classifyFollowUpIntent, classifyMessage, preserveOrUpgradeDocumentRoute } from '../src/lib/nexx/router';
+import { classifyMessage, preserveOrUpgradeDocumentRoute } from '../src/lib/nexx/router';
 import type { RouteMode } from '../src/lib/types';
+import { buildContextualDocumentFollowUpMessage } from '../src/lib/nexx/followUpContext';
 import {
     detectStoredDocumentAmbiguity,
     normalizeDocumentAlias,
@@ -475,42 +476,6 @@ function uniqueRecentUploadedFileIds(ids: Id<'uploadedFiles'>[]) {
 
 function messagePreview(message: string) {
     return message.replace(/\s+/g, ' ').trim().slice(0, 300);
-}
-
-function isDocumentRouteMode(mode?: RouteMode) {
-    return mode === 'document_analysis' ||
-        mode === 'order_interpretation' ||
-        mode === 'possession_access_schedule';
-}
-
-function buildContextualFollowUpMessage(
-    message: string,
-    recentMessages: Array<{
-        role: 'user' | 'assistant';
-        content: string;
-        status?: 'draft' | 'committed' | 'degraded' | 'failed' | 'deleted';
-    }>,
-    activeMode?: RouteMode
-) {
-    if (classifyFollowUpIntent(message) === 'new_issue' || !isDocumentRouteMode(activeMode)) {
-        return message;
-    }
-
-    const recentContext = recentMessages
-        .filter((recent) =>
-            recent.role === 'user' && (
-                recent.status === undefined ||
-                recent.status === 'committed' ||
-                recent.status === 'degraded'
-            )
-        )
-        .slice(-8)
-        .map((recent) => recent.content.replace(/\s+/g, ' ').trim())
-        .filter(Boolean)
-        .join('\n')
-        .slice(-4_000);
-
-    return recentContext ? `${message}\n\nRecent active issue context:\n${recentContext}` : message;
 }
 
 /** Preserve existing message metadata when adding structured document source summaries. */
@@ -1218,7 +1183,7 @@ export const getGenerationContext = internalQuery({
         });
 
         const routeMode = turn.routeMode ?? conversation.routeMode as RouteMode | undefined;
-        const contextualFollowUpMessage = buildContextualFollowUpMessage(
+        const contextualFollowUpMessage = buildContextualDocumentFollowUpMessage(
             turn.message,
             recentMessages.filter((m) => m.status !== 'deleted'),
             routeMode

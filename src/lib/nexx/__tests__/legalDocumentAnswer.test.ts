@@ -60,6 +60,18 @@ function sectionBetween(content: string, startHeading: string, endHeading: strin
 }
 
 describe('verifyLegalDocumentAnswer', () => {
+  it('rejects extraction debris in the canonical answer even when claims are sourced', () => {
+    const result = verifyLegalDocumentAnswer(answer({
+      answer: '1. Weekends — -- 10 of 46 -- possession of the child as follows: 1.',
+    }), sourcePackets, {
+      requiresDocumentAnswer: true,
+      requiresCitation: true,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.errors.join(' ')).toMatch(/extraction|complete user-facing/i);
+  });
+
   it('passes sourced claims with quotes found in source packets', () => {
     const result = verifyLegalDocumentAnswer(answer(), sourcePackets, {
       requiresDocumentAnswer: true,

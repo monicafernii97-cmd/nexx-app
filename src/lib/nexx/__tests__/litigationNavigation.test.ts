@@ -79,7 +79,8 @@ describe('litigation navigation and client-care layer', () => {
       userMessage: message,
     });
 
-    expect(text).toMatch(/Friday at 6:00 p\.m\..*\[p\. 5\]/i);
+    expect(text).toMatch(/Friday at 6:00 p\.m\..*Monday at 8:00 a\.m\./i);
+    expect(text).not.toMatch(/\[p\. 5\]/i);
   });
 
   it('uses verified exchange terms before drafting exact exchange-time language', () => {

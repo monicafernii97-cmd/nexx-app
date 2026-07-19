@@ -5,6 +5,7 @@ import {
   repeatedLegalPropositions,
   semanticallyEquivalentLegalText,
 } from './semanticDedup';
+import { containsUserFacingExtractionDebris } from './userFacingLegalText';
 
 export type RenderedOutputVerification = {
   passed: boolean;
@@ -16,6 +17,7 @@ export type RenderedOutputVerification = {
     noInventedDollarAmounts: boolean;
     noDuplicateSections: boolean;
     noSemanticRepetition: boolean;
+    noExtractionDebris: boolean;
     endsCleanly: boolean;
     includesDirectAnswerWhenNeeded: boolean;
     includesDraftWhenUserAskedWhatToSay: boolean;
@@ -136,6 +138,7 @@ export function verifyRenderedOutput(args: {
     noInventedDollarAmounts: args.exactFeesSourceBacked === true || !DOLLAR_PATTERN.test(rendered) || hasOnlyAllowedMoneyClaims(rendered),
     noDuplicateSections: duplicateHeadingCount(rendered) === 0,
     noSemanticRepetition: !enforceSemanticDeduplication || repeatedLegalPropositions(rendered, 0.9).length === 0,
+    noExtractionDebris: !containsUserFacingExtractionDebris(rendered),
     endsCleanly: rendered.length < 3_990 || /[.!?\]”)'`]$/.test(rendered),
     includesDirectAnswerWhenNeeded: !needsDirectAnswerFirst(args.userMessage, args.routeMode) ||
       startsWithDirectAnswer(rendered, args.canonicalDirectAnswer),
@@ -174,6 +177,7 @@ export function repairRenderedOutput(rendered: string, injections?: {
     .filter((line) =>
       !BACKEND_LANGUAGE_PATTERN.test(line) &&
       !OCR_RETRIEVAL_VERIFIER_PATTERN.test(line) &&
+      !containsUserFacingExtractionDebris(line) &&
       !INFLAMMATORY_LABEL_PATTERN.test(line) &&
       (!DOLLAR_PATTERN.test(line) || classifyMoneyClaim(line) !== 'unsupported_estimate')
     );

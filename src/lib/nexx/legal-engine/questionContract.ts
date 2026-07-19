@@ -1,5 +1,5 @@
 import { containsFathersDay } from './clauseRelationship';
-import { extractSharedLegalTerms } from './legalSignals';
+import { extractSharedLegalTerms, requestsCommunicationDraft } from './legalSignals';
 
 export type LegalQuestionContract = {
   kind: 'yes_no' | 'either_or' | 'meaning' | 'schedule' | 'communication' | 'other';
@@ -13,7 +13,7 @@ export type LegalQuestionContract = {
 export function buildLegalQuestionContract(message: string): LegalQuestionContract {
   const terms = extractSharedLegalTerms(message);
   const alternatives = ['thursday', 'friday', 'saturday', 'sunday', 'monday'].filter((day) => new RegExp(`\\b${day}\\b`, 'i').test(message));
-  const communication = /\b(?:what|how)\s+(?:should|do)\s+i\s+(?:say|respond|reply)|message|text back\b/i.test(message);
+  const communication = requestsCommunicationDraft(message);
   const direct = /\?|\b(?:mean|means|start|starts|begin|begins|control|controls|allowed|can|does|is|are|what if)\b/i.test(message);
   const subjectLabel = containsFathersDay(message)
     ? "Father's Day possession"

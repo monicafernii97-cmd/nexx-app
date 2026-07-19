@@ -43,6 +43,10 @@ export function hasConversationalContinuationSignal(value: string) {
   return CONTINUATION_PATTERNS.some((pattern) => pattern.test(value));
 }
 
+export function requestsCommunicationDraft(value: string) {
+  return /\b(?:what\s+(?:do|should|can)\s+i\s+(?:say|respond|reply)|how\s+(?:do|should|can)\s+i\s+(?:say|respond|reply)|tell\s+me\s+(?:what|how)\s+i\s+should\s+(?:say|respond|reply)|(?:please\s+)?(?:tell|show)\s+me\s+what\s+to\s+(?:say|respond|reply)|(?:draft|write|give\s+me)\s+(?:a\s+)?(?:message|reply|response)|text\s+back|message\s+(?:him|her|them)|say\s+back|reply\s+back)\b/i.test(value);
+}
+
 export function hasExplicitNewIssueSignal(value: string) {
   return EXPLICIT_NEW_ISSUE_PATTERNS.some((pattern) => pattern.test(value));
 }

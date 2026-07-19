@@ -221,11 +221,11 @@ function containsFathersDay(value: string) {
 }
 
 function containsOperativeFathersDaySchedule(source: LegalDocumentSourcePacket) {
-  return Boolean(extractFathersDayScheduleTerms(`${source.sectionHeading ?? ''} ${source.text}`));
+  return Boolean(extractFathersDayScheduleTerms(source.text));
 }
 
 function fathersDaySupportedClaim(source: LegalDocumentSourcePacket) {
-  const schedule = extractFathersDayScheduleTerms(`${source.sectionHeading ?? ''} ${source.text}`);
+  const schedule = extractFathersDayScheduleTerms(source.text);
   if (!schedule) return "Father's Day schedule could not be verified from the available order language.";
   return `Father's Day possession begins Friday at ${displayScheduleTime(schedule.startTime)} and ends Monday at ${displayScheduleTime(schedule.endTime)}`;
 }
@@ -801,7 +801,7 @@ export function verifyLegalDocumentAnswer(
   const operativeFathersDaySchedule = asksFathersDay
     ? sourcePackets
       .filter((source) => citedSourceIds.has(source.sourceId))
-      .map((source) => extractFathersDayScheduleTerms(`${source.sectionHeading ?? ''} ${source.text}`))
+      .map((source) => extractFathersDayScheduleTerms(source.text))
       .find((schedule) => schedule !== null) ?? null
     : null;
   const answerAddressesFathersDay = !asksFathersDay ||

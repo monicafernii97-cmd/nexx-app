@@ -37,11 +37,26 @@ export function containsFathersDayTerm(value: string) {
 }
 
 export function extractFathersDayScheduleTerms(value: string): FathersDayScheduleTerms | null {
-  const text = value.replace(/[’‘]/g, "'");
-  if (!containsFathersDayTerm(text) || !/\bfriday\b/i.test(text) || !/\bmonday\b/i.test(text)) return null;
-  const startTime = timeAtBoundary(text, 'start');
-  const endTime = timeAtBoundary(text, 'end');
-  return startTime && endTime ? { startTime, endTime } : null;
+  const text = value
+    .replace(/[’‘]/g, "'")
+    .replace(/\b([ap])\.m\./gi, '$1m');
+  const provisions = text
+    .split(/\n\s*\n/)
+    .flatMap((paragraph) => paragraph.split(/(?<=;)\s*|(?<=[.!?])\s+(?=[A-Z0-9])/))
+    .map((provision) => provision.replace(/\s+/g, ' ').trim())
+    .filter((provision) => provision.length > 0 && provision.length <= 1_200);
+
+  for (const provision of provisions) {
+    if (
+      !containsFathersDayTerm(provision) ||
+      !/\bfriday\b/i.test(provision) ||
+      !/\bmonday\b/i.test(provision)
+    ) continue;
+    const startTime = timeAtBoundary(provision, 'start');
+    const endTime = timeAtBoundary(provision, 'end');
+    if (startTime && endTime) return { startTime, endTime };
+  }
+  return null;
 }
 
 export function textMatchesFathersDaySchedule(value: string, expected: FathersDayScheduleTerms) {

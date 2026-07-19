@@ -193,7 +193,7 @@ export function verifyLegalInterpretationAnswer(
       .flatMap((clause) => clause.sourceIds)
       .map((sourceId) => packetsById.get(sourceId))
       .filter((source): source is LegalDocumentSourcePacket => Boolean(source))
-      .map((source) => extractFathersDayScheduleTerms(`${source.sectionHeading ?? ''} ${source.text}`))
+      .map((source) => extractFathersDayScheduleTerms(source.text))
       .find((schedule) => schedule !== null) ?? null
     : null;
   const answerScheduleMatches = !asksFathersDay || Boolean(

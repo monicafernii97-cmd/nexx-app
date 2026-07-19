@@ -97,7 +97,7 @@ function cleanAnswer(answer: LegalDocumentAnswer) {
 
 function fathersDayOutcome(controlling: LegalDocumentSourcePacket | undefined) {
   if (!controlling || !sourceContainsOperativeFatherDaySchedule(controlling)) return null;
-  const schedule = extractFathersDayScheduleTerms(`${controlling.sectionHeading ?? ''} ${controlling.text}`);
+  const schedule = extractFathersDayScheduleTerms(controlling.text);
   if (!schedule) return null;
   return `Father's Day possession begins Friday at ${displayScheduleTime(schedule.startTime)} and ends Monday at ${displayScheduleTime(schedule.endTime)}`;
 }

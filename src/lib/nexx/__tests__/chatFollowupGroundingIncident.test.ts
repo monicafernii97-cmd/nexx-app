@@ -141,6 +141,24 @@ describe('production incident: grounded drafting follow-up', () => {
     expect(malformedAnswer.answer).not.toContain('-- 10 of 46 --');
   });
 
+  it('does not combine a Father’s Day mention with unrelated schedule times in the same chunk', () => {
+    const mixedPacket: LegalDocumentSourcePacket = {
+      ...genericWeekendPacket,
+      sourceId: 'mixed_unrelated_schedule',
+      chunkId: 'mixed_unrelated_schedule',
+      sectionHeading: "Father's Day and regular weekends",
+      text: "Father's Day is listed as a holiday. Regular weekend possession begins Friday at 8:00 p.m. and ends Monday at 8:00 a.m.",
+    };
+    const result = buildBestEffortLegalDocumentAnswerFromSources(
+      [mixedPacket],
+      undefined,
+      { isTargetedQuestion: true, userMessage: "When does Father's Day possession begin?" }
+    );
+
+    expect(result.answerType).toBe('not_found');
+    expect(result.notFoundReason).toBe('operative_fathers_day_schedule_not_found');
+  });
+
   it('bounds and isolates follow-up context under a large message history', () => {
     const messages = Array.from({ length: 200 }, (_, index) => ({
       role: 'user' as const,

@@ -26,7 +26,7 @@ export function inferClauseRelationship(source: LegalDocumentSourcePacket): Lega
 }
 
 export function sourceContainsOperativeFatherDaySchedule(source: LegalDocumentSourcePacket) {
-  return Boolean(extractFathersDayScheduleTerms(combinedText(source)));
+  return Boolean(extractFathersDayScheduleTerms(source.text));
 }
 
 export function sourceContainsGeneralHolidayExtension(source: LegalDocumentSourcePacket) {

@@ -318,6 +318,7 @@ describe('verifyLegalInterpretationAnswer', () => {
       userMessage: "When does Father's Day possession begin?",
     });
     expect(answerResult.checks.answerPropositionSupported).toBe(false);
+    expect(answerResult.passed).toBe(false);
 
     const wrongDraft = legalInterpretation({
       draftMessage: {
@@ -331,5 +332,6 @@ describe('verifyLegalInterpretationAnswer', () => {
       userMessage: "What should I say about Father's Day?",
     });
     expect(draftResult.checks.draftPropositionSupported).toBe(false);
+    expect(draftResult.passed).toBe(false);
   });
 });

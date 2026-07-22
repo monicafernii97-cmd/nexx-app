@@ -68,7 +68,7 @@ import {
     prepareRecentMessagesForDocumentRecall,
     toProviderInputMessages,
 } from '../src/lib/nexx/providerInput';
-import { detectDocumentReference, isDocumentAvailabilityQuestion, type DocumentReferenceDetection } from '../src/lib/nexx/documentReferenceDetection';
+import { detectDocumentReference, isDocumentAvailabilityQuestion, type DocumentReferenceDetection, type DocumentType } from '../src/lib/nexx/documentReferenceDetection';
 import type { StoredDocumentAmbiguity } from '../src/lib/nexx/documentSelection';
 import type { NexxAssistantResponse, RouteMode } from '../src/lib/types';
 
@@ -1081,6 +1081,26 @@ type StreamingResponsesClient = {
     ) => Promise<AsyncIterable<ResponseStreamEvent>>;
 };
 
+function documentMetadataMatchesType(document: AttachmentContext, requestedType: DocumentType) {
+    const metadata = `${document.filename} ${document.detectedType ?? ''}`
+        .toLowerCase()
+        .replace(/[_-]+/g, ' ');
+    const patterns: Partial<Record<DocumentType, RegExp>> = {
+        court_order: /\b(?:court|final|temporary|amended)?\s*orders?\b|\bparenting\s+plan\b/i,
+        temporary_order: /\btemporary\s+orders?\b/i,
+        amended_order: /\bamended\s+(?:temporary\s+)?orders?\b/i,
+        final_order: /\bfinal\s+orders?\b/i,
+        proposed_order: /\bproposed\s+orders?\b/i,
+        parenting_plan: /\bparenting\s+plan\b/i,
+        motion: /\bmotion\b/i,
+        petition: /\bpetition\b/i,
+        exhibit: /\bexhibit\b/i,
+        notice: /\bnotice\b/i,
+        docket_sheet: /\bdocket\s+sheet\b/i,
+    };
+    return requestedType === 'unknown' || (patterns[requestedType]?.test(metadata) ?? false);
+}
+
 /** Compose all system, developer, context, and recent-message inputs. */
 function buildInput(
     context: GenerationContext,
@@ -1121,12 +1141,23 @@ function buildInput(
             ? `Internal issue-pack hints for this turn: ${issuePacks.map((pack) => pack.label).join('; ')}. Use these only to choose relevant legal tracks, evidence needs, counterarguments, and filing-readiness questions. Do not mention issue packs or internal taxonomy to the user.`
             : undefined,
     ].filter(Boolean).join('\n');
+    const visibleAvailabilityDocuments = Array.from(new Map(
+        [...(context.attachmentContexts ?? []), ...(context.availableDocumentContexts ?? [])]
+            .map((document) => [document.uploadedFileId.toString(), document])
+    ).values());
+    const requestedAvailabilityTypes = documentReference.requestedDocumentTypes;
+    const matchingAvailabilityDocuments = requestedAvailabilityTypes.length > 0
+        ? visibleAvailabilityDocuments.filter((document) =>
+            requestedAvailabilityTypes.some((type) => documentMetadataMatchesType(document, type)))
+        : visibleAvailabilityDocuments;
     const documentAvailabilityPrompt = isDocumentAvailabilityQuestion(context.turn.message)
         ? [
             'The user is asking only whether a document is available in their NEXX case. Answer that question directly in one or two natural sentences. Do not analyze clauses, list order terms, discuss deadlines, or produce a legal warning.',
-            (context.availableDocumentContexts ?? []).length > 0
-                ? `Available case documents: ${(context.availableDocumentContexts ?? []).map((document) => document.filename).join('; ')}.`
-                : 'No available case document is present in the current generation context. Say you do not currently see it and ask the user to upload it; do not claim it is permanently absent.',
+            matchingAvailabilityDocuments.length > 0
+                ? `Matching visible file names: ${matchingAvailabilityDocuments.map((document) => document.filename).join('; ')}. Confirm only that these named files are visible. Do not assert a document type beyond what the filename or metadata establishes.`
+                : visibleAvailabilityDocuments.length > 0
+                    ? `No file matching the requested document type is visible from metadata. Other visible file names: ${visibleAvailabilityDocuments.map((document) => document.filename).join('; ')}. Mention the visible filename if useful, but do not claim it is the requested document. Ask the user to upload the requested document if they need it reviewed.`
+                    : 'No matching case document is present in the current generation context. Say you do not currently see it and ask the user to upload it; do not claim it is permanently absent.',
         ].join('\n')
         : '';
     const attachmentContextPrompt = buildAttachmentContextPrompt(

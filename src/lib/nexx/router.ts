@@ -54,11 +54,14 @@ const PATTERN_ANALYSIS_PATTERNS = [
 ];
 
 const CONVERSATION_REVIEW_PATTERNS = [
-  /\b(?:review|analy[sz]e|assessment|feedback)\b.{0,100}\b(?:thread|conversation|exchange|messages?|communication)\b/i,
-  /\b(?:thread|conversation|exchange|messages?|communication)\b.{0,100}\b(?:review|analy[sz]e|assessment|feedback)\b/i,
+  /\b(?:review|analy[sz]e|assessment|feedback)\b.{0,100}\b(?:thread|conversation|exchange|multiple\s+messages|message\s+thread|communication\s+history)\b/i,
+  /\b(?:thread|conversation|exchange|multiple\s+messages|message\s+thread|communication\s+history)\b.{0,100}\b(?:review|analy[sz]e|assessment|feedback)\b/i,
   /\bwhat\s+do\s+you\s+see\b.{0,80}\b(?:both\s+sides|from\s+(?:his|her|my|each)\s+side|transparently|human)\b/i,
   /\b(?:reading|read)\s+this\b.{0,80}\b(?:not\s+as\s+a\s+judge|as\s+a\s+human|from\s+both\s+sides)\b/i,
 ];
+
+const SINGLE_MESSAGE_REPLY_DRAFT_PATTERN =
+  /\b(?:(?:review|analy[sz]e)\b.{0,60}\b(?:this|one|the)\s+message\b.{0,80}\b(?:draft|write|reply|respond)|draft\s+(?:a\s+)?reply|write\s+(?:a\s+)?response)\b/i;
 
 const DOCUMENT_ANALYSIS_PATTERNS = [
   /\b(this\s+document|this\s+order|what\s+does\s+(this|that|the)\s+(document|order|file|pdf)\s+say|interpret\s+(this|that|the)\s+(document|order|file|pdf)|analysis.*file|uploaded)\b/i,
@@ -265,14 +268,18 @@ export function classifyMessage(
     return buildResult('adaptive_chat', documentReference, 'general_summary');
   }
 
-  // A request to understand a conversation is a whole-thread reasoning task,
-  // even when the pasted exchange mentions orders, filings, or many dates.
-  if (matchesAny(text, CONVERSATION_REVIEW_PATTERNS)) {
-    return buildResult('pattern_analysis', documentReference, legalIntent, multiIntent);
+  if (SINGLE_MESSAGE_REPLY_DRAFT_PATTERN.test(message)) {
+    return buildResult('party_message_draft', documentReference, 'draft_response_to_other_party');
   }
 
   if (legalIntent === 'draft_response_to_other_party') {
     return buildResult('party_message_draft', documentReference, legalIntent);
+  }
+
+  // A request to understand a conversation is a whole-thread reasoning task,
+  // even when the pasted exchange mentions orders, filings, or many dates.
+  if (matchesAny(text, CONVERSATION_REVIEW_PATTERNS)) {
+    return buildResult('pattern_analysis', documentReference, legalIntent, multiIntent);
   }
 
   if (legalIntent === 'court_response_planning') {

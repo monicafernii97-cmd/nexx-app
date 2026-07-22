@@ -143,6 +143,12 @@ const GENERIC_LEGAL_QUESTION_PATTERN =
 const EXPLICIT_STORED_DOCUMENT_SIGNAL_PATTERN =
   /\b(?:uploaded|attached|shared|prior|previous|refer\s+back|look\s+back|pull\s+up|open\s+(?:it|that|the\s+(?:file|document|order))|double[-\s]?check|verify|re-?read|review\s+again|according\s+to|based\s+on|from\s+the)\b/i;
 
+/** True when the user is asking whether a document is available, not asking to analyze it. */
+export function isDocumentAvailabilityQuestion(message: string) {
+  return /\b(?:do|does|did|can)\s+you\s+(?:still\s+)?(?:have|keep|save|store|remember|see|access)\b.{0,80}\b(?:court\s+order|order|document|file|pdf|upload)\b/i.test(message) ||
+    /\b(?:court\s+order|order|document|file|pdf|upload)\b.{0,80}\b(?:saved|stored|available|on\s+file|in\s+(?:the\s+)?case)\b/i.test(message);
+}
+
 function unique(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
@@ -217,6 +223,13 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
   if (!text) return getBaseDetection();
 
   const lower = text.toLowerCase();
+  if (isDocumentAvailabilityQuestion(text)) {
+    return {
+      ...getBaseDetection(),
+      referenceType: 'metadata_lookup',
+      requestedDocumentTypes: detectDocumentTypes(text),
+    };
+  }
   const documentHints = collectPatternMatches(text, DOCUMENT_HINT_PATTERNS);
   const requestedSections = unique(Array.from(text.matchAll(SECTION_PATTERN)).map((match) => match[0]));
   const requestedDates = unique(Array.from(text.matchAll(DATE_PATTERN)).map((match) => match[0]));

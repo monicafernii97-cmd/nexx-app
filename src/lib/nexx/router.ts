@@ -8,7 +8,7 @@
  */
 
 import type { FollowUpIntent, LegalIntent, RouteMode, ToolPlan, RouterResult } from '../types';
-import { detectDocumentReference, type DocumentReferenceDetection } from './documentReferenceDetection';
+import { detectDocumentReference, isDocumentAvailabilityQuestion, type DocumentReferenceDetection } from './documentReferenceDetection';
 import { classifyLegalIntent } from './legalIntent';
 import { classifyPackedCaseIntake } from './legal-engine/packedCaseIntake';
 import { hasConversationalContinuationSignal } from './legal-engine/legalSignals';
@@ -51,6 +51,13 @@ const PROCEDURE_PATTERNS = [
 
 const PATTERN_ANALYSIS_PATTERNS = [
   /\b(pattern|always|every\s+time|keeps?\s+doing|repeated|history|trend)\b/i,
+];
+
+const CONVERSATION_REVIEW_PATTERNS = [
+  /\b(?:review|analy[sz]e|assessment|feedback)\b.{0,100}\b(?:thread|conversation|exchange|messages?|communication)\b/i,
+  /\b(?:thread|conversation|exchange|messages?|communication)\b.{0,100}\b(?:review|analy[sz]e|assessment|feedback)\b/i,
+  /\bwhat\s+do\s+you\s+see\b.{0,80}\b(?:both\s+sides|from\s+(?:his|her|my|each)\s+side|transparently|human)\b/i,
+  /\b(?:reading|read)\s+this\b.{0,80}\b(?:not\s+as\s+a\s+judge|as\s+a\s+human|from\s+both\s+sides)\b/i,
 ];
 
 const DOCUMENT_ANALYSIS_PATTERNS = [
@@ -250,6 +257,18 @@ export function classifyMessage(
   // Safety-first: always check escalation first
   if (matchesAny(text, SAFETY_PATTERNS)) {
     return buildResult('safety_escalation', undefined, legalIntent);
+  }
+
+  // Storage/availability questions are conversational metadata checks. They
+  // must not trigger order analysis, clause extraction, or deadline workflows.
+  if (isDocumentAvailabilityQuestion(message)) {
+    return buildResult('adaptive_chat', documentReference, 'general_summary');
+  }
+
+  // A request to understand a conversation is a whole-thread reasoning task,
+  // even when the pasted exchange mentions orders, filings, or many dates.
+  if (matchesAny(text, CONVERSATION_REVIEW_PATTERNS)) {
+    return buildResult('pattern_analysis', documentReference, legalIntent, multiIntent);
   }
 
   if (legalIntent === 'draft_response_to_other_party') {

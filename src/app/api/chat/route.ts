@@ -8,6 +8,8 @@ import { getModelForRoute, type SubscriptionTier } from '@/lib/tiers';
 import type { RouteMode } from '@/lib/types';
 
 const MAX_MESSAGE_LENGTH = 100_000;
+const MAX_REQUEST_ID_LENGTH = 256;
+const MAX_USER_CONTEXT_LENGTH = 50_000;
 
 type ChatAttachmentRef = {
   uploadedFileId: string;
@@ -114,12 +116,36 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'conversationId is required' }, { status: 400 });
   }
 
-  const turnRequestId =
+  const resolvedMode = mode ?? (persistUserMessage === false ? 'retry' : 'send');
+  if (!['send', 'retry', 'edit'].includes(resolvedMode)) {
+    return Response.json({ error: 'Invalid chat mode' }, { status: 400 });
+  }
+  const hasRetryTarget = typeof retryOfAssistantMessageId === 'string' && retryOfAssistantMessageId.length > 0;
+  const hasEditTarget = typeof editOfUserMessageId === 'string' && editOfUserMessageId.length > 0;
+  const invalidModeTargets =
+    (resolvedMode === 'send' && (hasRetryTarget || hasEditTarget || persistUserMessage === false)) ||
+    (resolvedMode === 'retry' && (!hasRetryTarget || hasEditTarget || persistUserMessage !== false)) ||
+    (resolvedMode === 'edit' && (!hasEditTarget || hasRetryTarget || persistUserMessage !== false));
+  if (invalidModeTargets) {
+    return Response.json({ error: 'Chat action does not match its target message.' }, { status: 400 });
+  }
+
+  const suppliedRequestId =
     typeof clientTurnId === 'string' && clientTurnId.trim().length > 0
-      ? clientTurnId
+      ? clientTurnId.trim()
       : typeof requestId === 'string' && requestId.trim().length > 0
-      ? requestId
-      : crypto.randomUUID();
+        ? requestId.trim()
+        : undefined;
+  if (suppliedRequestId && suppliedRequestId.length > MAX_REQUEST_ID_LENGTH) {
+    return Response.json({ error: 'Invalid request id' }, { status: 400 });
+  }
+
+  let userContextJson = userContext ? JSON.stringify(userContext) : undefined;
+  if (userContextJson && userContextJson.length > MAX_USER_CONTEXT_LENGTH) {
+    return Response.json({ error: 'User context is too large' }, { status: 400 });
+  }
+
+  const turnRequestId = suppliedRequestId ?? crypto.randomUUID();
 
   const convex = await getAuthenticatedConvexClient();
   const typedConversationId = conversationId as Id<'conversations'>;
@@ -135,6 +161,38 @@ export async function POST(req: NextRequest) {
   if (!userRecord) {
     return Response.json({ error: 'User not found' }, { status: 403 });
   }
+
+  // Build authoritative generation context on the server so first-turn chat
+  // and slow client hydration cannot silently omit the user's saved profile.
+  let nexProfile;
+  try {
+    nexProfile = await convex.query(api.nexProfiles.getByUser, {});
+  } catch (error) {
+    console.warn('[Chat] Failed to fetch NEX profile; continuing with account context:', error);
+  }
+  userContextJson = JSON.stringify({
+    userName: userRecord.name,
+    state: userRecord.state,
+    county: userRecord.county,
+    custodyType: userRecord.custodyType,
+    children: userRecord.children ?? userRecord.childrenNames?.map((name, index) => ({
+      name,
+      age: userRecord.childrenAges?.[index] ?? 0,
+    })),
+    courtCaseNumber: userRecord.courtCaseNumber,
+    hasAttorney: userRecord.hasAttorney,
+    hasTherapist: userRecord.hasTherapist,
+    tonePreference: userRecord.tonePreference,
+    emotionalState: userRecord.emotionalState,
+    nexBehaviors: nexProfile?.behaviors,
+    nexNickname: nexProfile?.nickname,
+    nexCommunicationStyle: nexProfile?.communicationStyle,
+    nexManipulationTactics: nexProfile?.manipulationTactics,
+    nexTriggerPatterns: nexProfile?.triggerPatterns,
+    nexAiInsights: nexProfile?.aiInsights,
+    nexDangerLevel: nexProfile?.dangerLevel,
+    nexDetectedPatterns: nexProfile?.detectedPatterns,
+  });
 
   let conversation;
   try {
@@ -245,11 +303,11 @@ export async function POST(req: NextRequest) {
       conversationId: typedConversationId,
       requestId: turnRequestId,
       message,
-      mode: mode ?? (persistUserMessage === false ? 'retry' : 'send'),
+      mode: resolvedMode,
       routeMode: routerResult.mode,
       model,
       temperature: routerResult.temperature,
-      userContextJson: userContext ? JSON.stringify(userContext) : undefined,
+      userContextJson,
       attachments: sanitizedAttachments.map((attachment) => ({
         uploadedFileId: attachment.uploadedFileId as Id<'uploadedFiles'>,
         uploadSessionId: attachment.uploadSessionId as Id<'chatUploadSessions'>,

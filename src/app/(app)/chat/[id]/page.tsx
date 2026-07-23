@@ -6,7 +6,7 @@ import { useConvex, useMutation, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { useParams, useRouter } from 'next/navigation';
-import { Archive, ClockCounterClockwise, Lock, Sun, Moon } from '@phosphor-icons/react';
+import { Archive, ClockCounterClockwise, Lock, Sun, Moon, WarningCircle, X } from '@phosphor-icons/react';
 import MessageBubble, { type ChatTheme } from '@/components/chat/MessageBubble';
 import ChatInput, { type ChatInputUploadCallbacks } from '@/components/chat/ChatInput';
 import { WorkspaceClient } from '@/components/chat/WorkspaceClient';
@@ -14,6 +14,7 @@ import { AnalysisStatusStrip, DEFAULT_ANALYSIS_STEPS, getStepsByElapsed } from '
 import type { ActionType, AnalysisStep } from '@/lib/ui-intelligence/types';
 import type { ChatAttachmentRef } from '@/lib/chat/uploadConfig';
 import { recoverPendingChatUploadAttaches, type ChatComposerFileState, uploadFileForConversation } from '@/lib/chat/uploadClient';
+import { createChatRequestId, readChatAdmissionError } from '@/lib/chat/admission';
 
 /** Premium full-screen chat interface for a single NEXX AI conversation. */
 export default function ConversationPage() {
@@ -28,29 +29,31 @@ export default function ConversationPage() {
     const convex = useConvex();
     const messages = useQuery(api.messages.list, isValidId ? { conversationId } : 'skip');
     const activeTurns = useQuery(api.chatTurns.activeForConversation, isValidId ? { conversationId } : 'skip');
-    const userProfile = useQuery(api.users.me);
-    const nexProfile = useQuery(api.nexProfiles.getByUser);
-    const prepareRegenerate = useMutation(api.messages.prepareRegenerate);
     const archiveConversation = useMutation(api.conversations.archive);
 
     const [isStreaming, setIsStreaming] = useState(false);
     const [isPending, setIsPending] = useState(false);
-    const [streamingContent, setStreamingContent] = useState('');
+    const [awaitingTurnId, setAwaitingTurnId] = useState<string | null>(null);
+    const [chatError, setChatError] = useState<string | null>(null);
     const [analysisSteps, setAnalysisSteps] = useState<AnalysisStep[]>(DEFAULT_ANALYSIS_STEPS);
     const streamStartRef = useRef<number>(0);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const composerRef = useRef<HTMLDivElement>(null);
     const pendingInitialSentRef = useRef(false);
+    const retryableRequestRef = useRef<{ signature: string; requestId: string } | null>(null);
+    const shouldAutoScrollRef = useRef(true);
     const hasActiveTurn = (activeTurns?.length ?? 0) > 0;
-    const isGenerating = isStreaming || hasActiveTurn;
+    const isGenerating = isStreaming || awaitingTurnId !== null || hasActiveTurn;
     const hasDraftAssistantMessage = Boolean(messages?.some((message) => message.role === 'assistant' && message.status === 'draft'));
 
     // ── Theme state (persisted to localStorage) ──
     const [theme, setTheme] = useState<ChatTheme>('dark');
     useEffect(() => {
         const saved = localStorage.getItem('nexx-chat-theme');
-        if (saved === 'light' || saved === 'dark') setTheme(saved);
+        if (saved !== 'light' && saved !== 'dark') return;
+        const timeoutId = window.setTimeout(() => setTheme(saved), 0);
+        return () => window.clearTimeout(timeoutId);
     }, []);
 
     /** Toggle between light and dark chat themes, persisting the choice to localStorage. */
@@ -76,15 +79,24 @@ export default function ConversationPage() {
     // Analysis step progression during streaming
     useEffect(() => {
         if (!isGenerating) {
-            setAnalysisSteps(DEFAULT_ANALYSIS_STEPS);
+            streamStartRef.current = 0;
             return;
+        }
+        if (streamStartRef.current === 0) {
+            streamStartRef.current = activeTurns?.[0]?.createdAt ?? Date.now();
         }
         const interval = setInterval(() => {
             const elapsed = (Date.now() - streamStartRef.current) / 1000;
             setAnalysisSteps(getStepsByElapsed(elapsed));
         }, 500);
         return () => clearInterval(interval);
-    }, [isGenerating]);
+    }, [isGenerating, activeTurns]);
+
+    const isNearBottom = useCallback(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return true;
+        return container.scrollHeight - container.scrollTop - container.clientHeight < 160;
+    }, []);
 
     const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
         window.requestAnimationFrame(() => {
@@ -100,18 +112,12 @@ export default function ConversationPage() {
     // Auto-scroll to bottom on new messages. Scroll the chat pane itself so
     // bottom padding/spacers are honored instead of aligning only the sentinel.
     useEffect(() => {
-        scrollMessagesToBottom('smooth');
-    }, [messages, streamingContent, isGenerating, scrollMessagesToBottom]);
+        if (shouldAutoScrollRef.current) scrollMessagesToBottom('smooth');
+    }, [messages, isGenerating, scrollMessagesToBottom]);
 
     useLayoutEffect(() => {
         const composer = composerRef.current;
         if (!composer) return;
-
-        const isNearBottom = () => {
-            const container = scrollContainerRef.current;
-            if (!container) return true;
-            return container.scrollHeight - container.scrollTop - container.clientHeight < 160;
-        };
 
         const updateComposerHeight = () => {
             const shouldStayPinned = isNearBottom();
@@ -132,7 +138,7 @@ export default function ConversationPage() {
             observer.disconnect();
             window.removeEventListener('resize', updateComposerHeight);
         };
-    }, [scrollMessagesToBottom]);
+    }, [isNearBottom, scrollMessagesToBottom]);
 
     // Redirect if ID is invalid (after all hooks)
     useEffect(() => {
@@ -147,27 +153,21 @@ export default function ConversationPage() {
         void recoverPendingChatUploadAttaches(convex);
     }, [convex]);
 
-    /** Build the user context payload sent to the chat API (shared between send/retry/edit). */
-    const buildUserContext = useCallback(() => ({
-        userName: userProfile?.name,
-        state: userProfile?.state,
-        county: userProfile?.county,
-        custodyType: userProfile?.custodyType,
-        children: userProfile?.children ?? (userProfile?.childrenNames?.map((n, i) => ({ name: n, age: userProfile?.childrenAges?.[i] ?? 0 }))),
-        courtCaseNumber: userProfile?.courtCaseNumber,
-        hasAttorney: userProfile?.hasAttorney,
-        hasTherapist: userProfile?.hasTherapist,
-        tonePreference: userProfile?.tonePreference,
-        emotionalState: userProfile?.emotionalState,
-        nexBehaviors: nexProfile?.behaviors,
-        nexNickname: nexProfile?.nickname,
-        nexCommunicationStyle: nexProfile?.communicationStyle,
-        nexManipulationTactics: nexProfile?.manipulationTactics,
-        nexTriggerPatterns: nexProfile?.triggerPatterns,
-        nexAiInsights: nexProfile?.aiInsights,
-        nexDangerLevel: nexProfile?.dangerLevel,
-        nexDetectedPatterns: nexProfile?.detectedPatterns,
-    }), [userProfile, nexProfile]);
+    // Keep the local accepted state until Convex shows either the active turn
+    // or its terminal assistant message. This closes the admission/realtime gap.
+    useEffect(() => {
+        if (!awaitingTurnId || !activeTurns || !messages) return;
+        const activeIsVisible = activeTurns.some((turn) => turn._id.toString() === awaitingTurnId);
+        const completedIsVisible = messages.some((message) =>
+            message.turnId?.toString() === awaitingTurnId &&
+            message.role === 'assistant' &&
+            message.status !== 'draft'
+        );
+        if (activeIsVisible || completedIsVisible) {
+            const timeoutId = window.setTimeout(() => setAwaitingTurnId(null), 0);
+            return () => window.clearTimeout(timeoutId);
+        }
+    }, [activeTurns, awaitingTurnId, messages]);
 
     /**
      * Accept a durable chat turn. Provider generation runs in a Convex worker;
@@ -185,10 +185,24 @@ export default function ConversationPage() {
         }
     ) => {
         setIsStreaming(true);
-        setStreamingContent('');
+        setChatError(null);
+        setAnalysisSteps(DEFAULT_ANALYSIS_STEPS);
+        shouldAutoScrollRef.current = true;
         streamStartRef.current = Date.now();
 
-        const requestId = options?.clientTurnId ?? `${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const signature = JSON.stringify({
+            message,
+            mode: options?.mode ?? 'send',
+            retryOfAssistantMessageId: options?.retryOfAssistantMessageId,
+            editOfUserMessageId: options?.editOfUserMessageId,
+            attachments: options?.attachments?.map((attachment) => attachment.uploadedFileId),
+        });
+        const requestId = options?.clientTurnId ?? (
+            retryableRequestRef.current?.signature === signature
+                ? retryableRequestRef.current.requestId
+                : createChatRequestId(conversationId)
+        );
+        retryableRequestRef.current = { signature, requestId };
 
         try {
             const response = await fetch('/api/chat', {
@@ -203,31 +217,38 @@ export default function ConversationPage() {
                     retryOfAssistantMessageId: options?.retryOfAssistantMessageId,
                     editOfUserMessageId: options?.editOfUserMessageId,
                     attachments: options?.attachments,
-                    userContext: buildUserContext(),
                     conversationId,
                 }),
             });
 
             if (!response.ok) {
-                const errorText = await response.text().catch(() => '');
-                throw new Error(`Failed to accept chat turn: ${response.status} ${errorText}`);
+                throw new Error(await readChatAdmissionError(response));
             }
 
-            const data = await response.json();
+            const data = await response.json() as {
+                ok?: boolean;
+                accepted?: boolean;
+                error?: string;
+                turn?: { turnId?: string };
+            };
             if (!data.ok || !data.accepted) {
                 throw new Error(data.error || 'Chat turn was not accepted');
             }
-
-            setStreamingContent('');
+            if (!data.turn?.turnId) throw new Error('Chat turn was accepted without a tracking id.');
+            setAwaitingTurnId(String(data.turn.turnId));
+            retryableRequestRef.current = null;
         } catch (error) {
             console.error('Chat API error:', error);
-            setStreamingContent('Message was not sent. Please try again.');
-            window.setTimeout(() => setStreamingContent(''), 4000);
+            const rawMessage = error instanceof Error ? error.message : '';
+            const message = rawMessage === 'Failed to fetch' || rawMessage.toLowerCase().includes('network')
+                ? 'The connection was interrupted while sending. Try again—NEXX will safely reuse the same request if it was already accepted.'
+                : rawMessage || 'NEXX could not send this message. Please try again.';
+            setChatError(message);
             throw error;
         } finally {
             setIsStreaming(false);
         }
-    }, [conversationId, buildUserContext]);
+    }, [conversationId]);
     /** Send a new user message and stream the AI response. */
     const handleSend = useCallback(
         async (
@@ -266,9 +287,6 @@ export default function ConversationPage() {
                 await callChatAPI(input, { attachments, clientTurnId: fileState?.clientTurnId });
             } catch (error) {
                 console.error('Send error:', error);
-                const message = error instanceof Error ? error.message : 'Upload or send failed. Please try again.';
-                setStreamingContent(message);
-                window.setTimeout(() => setStreamingContent(''), 5000);
                 throw error;
             } finally {
                 setIsPending(false);
@@ -325,13 +343,10 @@ export default function ConversationPage() {
             setIsPending(true);
 
             try {
-                const history = await prepareRegenerate({
-                    conversationId,
-                    targetMessageId: assistantMessageId,
-                });
-
-                // Extract the last user message from history for the server
-                const lastUserMsg = [...history].reverse().find(m => m.role === 'user');
+                const targetIndex = messages.findIndex((message) => message._id === assistantMessageId);
+                const lastUserMsg = targetIndex >= 0
+                    ? messages.slice(0, targetIndex).reverse().find((message) => message.role === 'user')
+                    : undefined;
                 if (!lastUserMsg) throw new Error('No user message found for retry');
 
                 await callChatAPI(lastUserMsg.content, {
@@ -341,11 +356,12 @@ export default function ConversationPage() {
                 });
             } catch (error) {
                 console.error('Retry error:', error);
+                setChatError(error instanceof Error ? error.message : 'NEXX could not retry this response.');
             } finally {
                 setIsPending(false);
             }
         },
-        [conversationId, messages, isGenerating, isPending, prepareRegenerate, callChatAPI]
+        [messages, isGenerating, isPending, callChatAPI]
     );
 
     /**
@@ -358,13 +374,6 @@ export default function ConversationPage() {
             setIsPending(true);
 
             try {
-                await prepareRegenerate({
-                    conversationId,
-                    targetMessageId: messageId,
-                    newContent,
-                });
-
-                // For edits, the new content IS the message text
                 await callChatAPI(newContent, {
                     persistUserMessage: false,
                     mode: 'edit',
@@ -372,11 +381,12 @@ export default function ConversationPage() {
                 });
             } catch (error) {
                 console.error('Edit error:', error);
+                setChatError(error instanceof Error ? error.message : 'NEXX could not edit this message.');
             } finally {
                 setIsPending(false);
             }
         },
-        [conversationId, messages, isGenerating, isPending, prepareRegenerate, callChatAPI]
+        [messages, isGenerating, isPending, callChatAPI]
     );
 
     // Early return AFTER all hooks
@@ -467,6 +477,9 @@ export default function ConversationPage() {
             {/* Messages Area */}
             <div
                 ref={scrollContainerRef}
+                onScroll={() => {
+                    shouldAutoScrollRef.current = isNearBottom();
+                }}
                 className={`flex-1 min-h-0 overflow-y-auto overscroll-contain w-full no-scrollbar px-1 lg:px-6 relative scroll-smooth flex flex-col transition-colors duration-300 ${isLight ? 'bg-white' : ''}`}
                 style={{
                     scrollPaddingBottom: 'calc(var(--chat-composer-height, 176px) + env(safe-area-inset-bottom) + 40px)',
@@ -554,18 +567,8 @@ export default function ConversationPage() {
                     />
                 ))}
 
-                {/* Streaming / preserved message */}
-                {streamingContent && (
-                    <MessageBubble
-                        role="assistant"
-                        content={streamingContent}
-                        isStreaming={isStreaming}
-                        theme={theme}
-                    />
-                )}
-
                 {/* Pre-draft analysis status. Once Convex writes a safe draft, MessageBubble owns the status card. */}
-                {isGenerating && !streamingContent && !hasDraftAssistantMessage && (
+                {isGenerating && !hasDraftAssistantMessage && (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -602,6 +605,26 @@ export default function ConversationPage() {
                 transition={{ delay: 0.2 }}
                 className="pt-2 pb-6 px-1 lg:px-6 shrink-0 relative z-20"
             >
+                {chatError && (
+                    <div
+                        role="alert"
+                        className={`mb-2 flex items-start gap-2 rounded-xl border px-3 py-2 text-xs ${isLight
+                            ? 'border-red-200 bg-red-50 text-red-800'
+                            : 'border-red-400/25 bg-red-500/10 text-red-100'
+                        }`}
+                    >
+                        <WarningCircle size={16} weight="fill" className="mt-0.5 shrink-0" />
+                        <span className="flex-1 leading-relaxed">{chatError}</span>
+                        <button
+                            type="button"
+                            onClick={() => setChatError(null)}
+                            className="rounded p-0.5 opacity-70 transition hover:opacity-100"
+                            aria-label="Dismiss chat error"
+                        >
+                            <X size={14} weight="bold" />
+                        </button>
+                    </div>
+                )}
                 <div className={`rounded-2xl p-1.5 transition-colors duration-300 ${isLight
                     ? 'bg-white border border-gray-200 shadow-[0_8px_32px_rgba(0,0,0,0.05)]'
                     : 'hyper-glass shadow-[0_8px_32px_rgba(0,0,0,0.4)]'

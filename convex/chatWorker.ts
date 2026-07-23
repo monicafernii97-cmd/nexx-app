@@ -13,7 +13,11 @@ import { actualToolCapabilitiesFromPlan, buildFeatureToolPrompt } from '../src/l
 import { buildArtifactPrompt } from '../src/lib/nexx/prompts/artifactPrompt';
 import { buildContextPrompt, type ContextPacket } from '../src/lib/nexx/prompts/contextPrompt';
 import { NEXX_RESPONSE_SCHEMA } from '../src/lib/nexx/schemas';
-import { ANALYSIS_STATUS_UI_KIND, SAFE_ANALYSIS_DRAFT_MESSAGE } from '../src/lib/chat/analysisStatus';
+import {
+    ANALYSIS_STATUS_UI_KIND,
+    ASSISTANT_ANSWER_UI_KIND,
+    SAFE_ANALYSIS_DRAFT_MESSAGE,
+} from '../src/lib/chat/analysisStatus';
 import { buildOfficialLegalResearchTargets } from '../src/lib/nexx/legalResearchTargets';
 import { extractCourtFilingFromSources, type CourtFilingExtraction } from '../src/lib/nexx/legal-engine/courtFilingExtractor';
 import { buildDeadlineAnalysis, hasDeadlineQuestion, renderDeadlineAnalysisMarkdown } from '../src/lib/nexx/legal-engine/deadlineEngine';
@@ -69,6 +73,11 @@ import {
     toProviderInputMessages,
 } from '../src/lib/nexx/providerInput';
 import { detectDocumentReference, isDocumentAvailabilityQuestion, type DocumentReferenceDetection, type DocumentType } from '../src/lib/nexx/documentReferenceDetection';
+import {
+    plainTextAssistantResponse,
+    reasoningEffortForRoute,
+    usesPlainTextResponse,
+} from '../src/lib/nexx/responseTransport';
 import type { StoredDocumentAmbiguity } from '../src/lib/nexx/documentSelection';
 import type { NexxAssistantResponse, RouteMode } from '../src/lib/types';
 
@@ -91,21 +100,6 @@ function getOpenAIClient() {
 /** Return false for model families that reject caller-supplied temperature. */
 function supportsTemperature(model: string): boolean {
     return !['gpt-5', 'o1', 'o3', 'o4'].some((prefix) => model.startsWith(prefix));
-}
-
-/** Allocate deeper internal reasoning to multi-layer case and conversation analysis. */
-function reasoningEffortForRoute(routeMode: RouteMode): 'medium' | 'high' {
-    return [
-        'document_analysis',
-        'order_interpretation',
-        'possession_access_schedule',
-        'packed_case_intake',
-        'court_response_planning',
-        'court_narrative_builder',
-        'judge_lens_strategy',
-        'court_ready_drafting',
-        'pattern_analysis',
-    ].includes(routeMode) ? 'high' : 'medium';
 }
 
 /** Build the empty artifact envelope used for degraded responses. */
@@ -1106,7 +1100,8 @@ function buildInput(
     context: GenerationContext,
     routeMode: RouteMode,
     contextPrompt: string,
-    officialResearchTargetsInjected: boolean
+    officialResearchTargetsInjected: boolean,
+    plainTextResponse: boolean,
 ) {
     const systemPrompt = buildSystemPolicyPrompt();
     const developerPrompt = buildDeveloperBehaviorPrompt(routeMode);
@@ -1141,6 +1136,9 @@ function buildInput(
             ? `Internal issue-pack hints for this turn: ${issuePacks.map((pack) => pack.label).join('; ')}. Use these only to choose relevant legal tracks, evidence needs, counterarguments, and filing-readiness questions. Do not mention issue packs or internal taxonomy to the user.`
             : undefined,
     ].filter(Boolean).join('\n');
+    const plainTextResponsePrompt = plainTextResponse
+        ? 'Return only the natural user-facing answer in Markdown. Do not return JSON, an artifacts object, schema fields, or backend metadata.'
+        : '';
     const visibleAvailabilityDocuments = Array.from(new Map(
         [...(context.attachmentContexts ?? []), ...(context.availableDocumentContexts ?? [])]
             .map((document) => [document.uploadedFileId.toString(), document])
@@ -1229,8 +1227,12 @@ function buildInput(
             { role: 'system', content: systemPrompt },
             { role: 'developer', content: developerPrompt },
             { role: 'developer', content: featurePrompt },
-            { role: 'developer', content: artifactPrompt },
-            { role: 'developer', content: deterministicFieldPrompt },
+            ...(plainTextResponse
+                ? [{ role: 'developer' as const, content: plainTextResponsePrompt }]
+                : [
+                    { role: 'developer' as const, content: artifactPrompt },
+                    { role: 'developer' as const, content: deterministicFieldPrompt },
+                ]),
             ...(documentAvailabilityPrompt
                 ? [{ role: 'developer' as const, content: documentAvailabilityPrompt }]
                 : []),
@@ -2088,7 +2090,19 @@ async function generateWithFallbacks({
     const officialResearchTargetsInjected = Boolean(contextPacket.officialResearchTargets?.length);
 
     const contextPrompt = buildContextPrompt(contextPacket);
-    const promptBundle = buildInput(context, routeMode, contextPrompt, officialResearchTargetsInjected);
+    const currentDocumentReference = routerResult.documentReference ?? detectDocumentReference(context.turn.message);
+    const mayRequireGroundedDraft =
+        (routeMode === 'party_message_draft' || routeMode === 'co_parent_response') &&
+        hasActiveDocumentContext(context) &&
+        (Boolean(followUpSummary?.trim()) || currentDocumentReference.referencesDocument);
+    const usePlainText = usesPlainTextResponse(routeMode) && !mayRequireGroundedDraft;
+    const promptBundle = buildInput(
+        context,
+        routeMode,
+        contextPrompt,
+        officialResearchTargetsInjected,
+        usePlainText,
+    );
     const attachmentContextPrompt = promptBundle.attachmentContextPrompt;
     const hostedTools = buildHostedTools(routerResult, context.conversation?.vectorStoreId);
     const fileSearchOnlyTools =
@@ -2106,12 +2120,14 @@ async function generateWithFallbacks({
             input: promptBundle.input,
             tools: hostedTools,
         },
-        {
+    ];
+    if (JSON.stringify(hostedTools ?? []) !== JSON.stringify(fileSearchOnlyTools ?? [])) {
+        steps.push({
             model,
             input: promptBundle.input,
             tools: fileSearchOnlyTools,
-        },
-    ];
+        });
+    }
     if (!isHighStakesSubstantiveLegalRoute(routeMode)) {
         steps.push({
             model: 'gpt-5.4-mini',
@@ -2121,8 +2137,24 @@ async function generateWithFallbacks({
     }
 
     let lastError: unknown = null;
-    for (const step of steps) {
+    for (const [attemptIndex, step] of steps.entries()) {
         try {
+            // Renew the lease before every potentially long provider attempt and
+            // make the queued turn visible before the model emits its first token.
+            await saveDraft(ctx, jobId, leaseOwner, SAFE_ANALYSIS_DRAFT_MESSAGE, {
+                uiKind: ANALYSIS_STATUS_UI_KIND,
+                phase: 'preparing_answer',
+                routeMode,
+            });
+            const attemptStartedAt = Date.now();
+            console.info('[ChatWorker] Provider attempt started', {
+                jobId,
+                routeMode,
+                model: step.model,
+                attempt: attemptIndex + 1,
+                plainText: usePlainText,
+                toolCount: step.tools?.length ?? 0,
+            });
             const streamResponse = await responses.create(
                 {
                     model: step.model,
@@ -2130,7 +2162,9 @@ async function generateWithFallbacks({
                     reasoning: { effort: reasoningEffortForRoute(routeMode) },
                     input: step.input,
                     tools: step.tools,
-                    text: { format: NEXX_RESPONSE_SCHEMA },
+                    text: usePlainText
+                        ? { format: { type: 'text' }, verbosity: routeMode === 'pattern_analysis' ? 'medium' : 'low' }
+                        : { format: NEXX_RESPONSE_SCHEMA },
                     stream: true,
                 },
                 { timeout: PROVIDER_TIMEOUT_MS, maxRetries: 0 }
@@ -2161,12 +2195,12 @@ async function generateWithFallbacks({
                     structuredBuffer += delta;
 
                     const now = Date.now();
-                    if (!safeDraftWritten || now - lastDraftSavedAt > 5000) {
+                    if (!safeDraftWritten || now - lastDraftSavedAt > (usePlainText ? 1500 : 5000)) {
                         safeDraftWritten = true;
                         lastDraftSavedAt = now;
-                        await saveDraft(ctx, jobId, leaseOwner, SAFE_ANALYSIS_DRAFT_MESSAGE, {
-                            uiKind: ANALYSIS_STATUS_UI_KIND,
-                            phase: 'preparing_answer',
+                        await saveDraft(ctx, jobId, leaseOwner, usePlainText ? structuredBuffer : SAFE_ANALYSIS_DRAFT_MESSAGE, {
+                            uiKind: usePlainText ? ASSISTANT_ANSWER_UI_KIND : ANALYSIS_STATUS_UI_KIND,
+                            phase: usePlainText ? 'writing_answer' : 'preparing_answer',
                             routeMode,
                         });
                     }
@@ -2200,29 +2234,41 @@ async function generateWithFallbacks({
             }
 
             const rawText = structuredBuffer || extractOutputText(lastResponse);
-            const recoveryResult = await recoverStructuredOutput(rawText, {
-                systemPrompt: promptBundle.systemPrompt,
-                developerPrompt: [
-                    promptBundle.developerPrompt,
-                    promptBundle.featurePrompt,
-                    promptBundle.artifactPrompt,
-                    promptBundle.deterministicFieldPrompt,
-                    contextPrompt,
-                    attachmentContextPrompt,
-                ].join('\n\n'),
-                userPayload: { message: context.turn.message },
-                model: step.model,
-                requestOptions: { timeout: PROVIDER_TIMEOUT_MS, maxRetries: 0 },
-            });
+            let parsedResponse: NexxAssistantResponse;
+            if (usePlainText) {
+                if (!rawText.trim()) {
+                    throw new Error('Provider returned an empty conversational response.');
+                }
+                parsedResponse = plainTextAssistantResponse(rawText.trim());
+            } else {
+                await saveDraft(ctx, jobId, leaseOwner, SAFE_ANALYSIS_DRAFT_MESSAGE, {
+                    uiKind: ANALYSIS_STATUS_UI_KIND,
+                    phase: 'validating_answer',
+                    routeMode,
+                });
+                const recoveryResult = await recoverStructuredOutput(rawText, {
+                    systemPrompt: promptBundle.systemPrompt,
+                    developerPrompt: [
+                        promptBundle.developerPrompt,
+                        promptBundle.featurePrompt,
+                        promptBundle.artifactPrompt,
+                        promptBundle.deterministicFieldPrompt,
+                        contextPrompt,
+                        attachmentContextPrompt,
+                    ].join('\n\n'),
+                    userPayload: { message: context.turn.message },
+                    model: step.model,
+                    requestOptions: { timeout: PROVIDER_TIMEOUT_MS, maxRetries: 0 },
+                });
 
-            if (recoveryResult.stage === 'fallback') {
-                lastError = new Error(
-                    'structured_output_recovery_failed: Provider response could not be parsed into the required schema.'
-                );
-                continue;
+                if (recoveryResult.stage === 'fallback') {
+                    lastError = new Error(
+                        'structured_output_recovery_failed: Provider response could not be parsed into the required schema.'
+                    );
+                    continue;
+                }
+                parsedResponse = suppressWeakArtifacts(recoveryResult.data);
             }
-
-            let parsedResponse = suppressWeakArtifacts(recoveryResult.data);
             const requiresDocumentAnswer = shouldRequireDocumentAnswer({
                 sourcePackets: promptBundle.documentSourcePackets,
                 attachmentContexts: promptBundle.attachmentContexts,
@@ -2289,6 +2335,11 @@ async function generateWithFallbacks({
                 (!citationVerification.passed && requiresDocumentAnswer) ||
                 (!legalInterpretationVerification.passed && requiresLegalInterpretation)
             ) {
+                await saveDraft(ctx, jobId, leaseOwner, SAFE_ANALYSIS_DRAFT_MESSAGE, {
+                    uiKind: ANALYSIS_STATUS_UI_KIND,
+                    phase: 'verifying_sources',
+                    routeMode,
+                });
                 const repairedResponse = await repairCitationLockedResponse({
                     client,
                     model: step.model,
@@ -2420,6 +2471,15 @@ async function generateWithFallbacks({
                 groundingUserMessage
             );
 
+            console.info('[ChatWorker] Provider attempt completed', {
+                jobId,
+                routeMode,
+                model: step.model,
+                attempt: attemptIndex + 1,
+                durationMs: Date.now() - attemptStartedAt,
+                responseLength: parsedResponse.message.length,
+            });
+
             return {
                 response: parsedResponse,
                 responseId,
@@ -2493,13 +2553,19 @@ async function saveDraft(
 export const processChatGenerationJob = internalAction({
     args: { jobId: v.id('chatGenerationJobs') },
     handler: async (ctx, args) => {
+        const workerStartedAt = Date.now();
         const leaseOwner = crypto.randomUUID();
         const lease = await ctx.runMutation(internal.chatTurns.leaseGenerationJob, {
             jobId: args.jobId,
             leaseOwner,
         });
 
-        if (lease.status !== 'leased') return null;
+        if (lease.status !== 'leased') {
+            console.info('[ChatWorker] Job not leased', { jobId: args.jobId, leaseStatus: lease.status });
+            return null;
+        }
+
+        console.info('[ChatWorker] Job leased', { jobId: args.jobId, turnId: lease.turnId });
 
         try {
             const context = await ctx.runQuery(internal.chatTurns.getGenerationContext, {
@@ -2580,6 +2646,14 @@ export const processChatGenerationJob = internalAction({
                 degraded: result.degraded,
                 errorCode: result.errorCode,
                 errorMessage: result.errorMessage,
+            });
+            console.info('[ChatWorker] Job completed', {
+                jobId: args.jobId,
+                turnId: lease.turnId,
+                routeMode: result.routeMode,
+                model: result.model,
+                degraded: result.degraded,
+                durationMs: Date.now() - workerStartedAt,
             });
 
             if (

@@ -23,6 +23,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { consumeCourtHandoff, buildHandoffPrompt, HANDOFF_FALLBACK_MESSAGE } from '@/lib/exports/courtHandoff';
 import type { ChatAttachmentRef } from '@/lib/chat/uploadConfig';
 import { recoverPendingChatUploadAttaches, type ChatComposerFileState, uploadFileForConversation } from '@/lib/chat/uploadClient';
+import { createChatRequestId, readChatAdmissionError } from '@/lib/chat/admission';
 
 type ConversationDoc = Doc<'conversations'>;
 
@@ -55,6 +56,7 @@ function ChatListContent() {
     const handoffProcessedRef = useRef(false);
     const creatingRef = useRef(false);
     const draftConversationIdRef = useRef<Id<'conversations'> | null>(null);
+    const retryableRequestRef = useRef<{ signature: string; requestId: string } | null>(null);
     const isHistoryOpen = searchParams.get('history') === '1';
 
     const setHistoryOpen = useCallback((open: boolean) => {
@@ -149,7 +151,17 @@ function ChatListContent() {
                 attachments = [upload.attachmentRef];
             }
 
-            const requestId = fileState?.clientTurnId ?? `${String(id)}-${crypto.randomUUID()}`;
+            const requestSignature = JSON.stringify({
+                conversationId: id,
+                message,
+                attachments: attachments?.map((attachment) => attachment.uploadedFileId),
+            });
+            const requestId = fileState?.clientTurnId ?? (
+                retryableRequestRef.current?.signature === requestSignature
+                    ? retryableRequestRef.current.requestId
+                    : createChatRequestId(String(id))
+            );
+            retryableRequestRef.current = { signature: requestSignature, requestId };
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -165,8 +177,7 @@ function ChatListContent() {
             });
 
             if (!response.ok) {
-                const errorText = await response.text().catch(() => '');
-                throw new Error(`Failed to accept chat turn: ${response.status} ${errorText}`);
+                throw new Error(await readChatAdmissionError(response));
             }
             const data = await response.json();
             if (!data.ok || !data.accepted) {
@@ -174,6 +185,7 @@ function ChatListContent() {
             }
 
             await activateDraftConversation({ id });
+            retryableRequestRef.current = null;
             draftConversationIdRef.current = null;
             router.push(`/chat/${id}`);
         } catch (error) {

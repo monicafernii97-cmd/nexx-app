@@ -271,21 +271,17 @@ export const list = query({
                 .filter((message) => message.role === 'assistant')
                 .map((message) => message._id.toString())
         );
-        const answerSourceEntries = assistantMessageIds.size > 0
-            ? await Promise.all(
-                visibleRows
-                    .filter((message) => message.role === 'assistant')
-                    .map(async (message) => [
-                        message._id.toString(),
-                        await ctx.db
-                            .query('chatAnswerSources')
-                            .withIndex('by_message', (q) => q.eq('messageId', message._id))
-                            .take(50),
-                    ] as const)
-            )
+        // Fetch citations once per conversation instead of issuing one query per
+        // assistant message. The old N+1 pattern made long chats progressively
+        // slower and could exhaust Convex read limits near the 200-message cap.
+        const recentAnswerSources = assistantMessageIds.size > 0
+            ? await ctx.db
+                .query('chatAnswerSources')
+                .withIndex('by_conversation_created', (q) => q.eq('conversationId', args.conversationId))
+                .order('desc')
+                .take(1000)
             : [];
-        const scopedAnswerSources = answerSourceEntries
-            .flatMap(([, sources]) => sources)
+        const scopedAnswerSources = recentAnswerSources
             .filter((source) =>
                 source.messageId &&
                 assistantMessageIds.has(source.messageId.toString()) &&

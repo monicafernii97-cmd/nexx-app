@@ -994,7 +994,7 @@ export default function MessageBubble({
                                         ))}
                                     </div>
                                 ) : (
-                                    <pre className="text-[12px] whitespace-pre-wrap">{JSON.stringify(artifacts.timelineReady, null, 2)}</pre>
+                                    <p className="text-sm opacity-75">Timeline details are unavailable for this response.</p>
                                 )}
                             </ArtifactPanel>
                         )}
@@ -1011,7 +1011,7 @@ export default function MessageBubble({
                                         ))}
                                     </div>
                                 ) : (
-                                    <pre className="text-[12px] whitespace-pre-wrap">{JSON.stringify(artifacts.exhibitReady, null, 2)}</pre>
+                                    <p className="text-sm opacity-75">Exhibit details are unavailable for this response.</p>
                                 )}
                             </ArtifactPanel>
                         )}

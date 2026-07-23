@@ -37,6 +37,11 @@ import {
 } from '../src/lib/chat/analysisStatus';
 import { looksLikeInternalStructuredPayload } from '../src/lib/chat/internalLeakGuard';
 import {
+    buildChatRegenerationPlan,
+    type ChatRegenerationMode,
+    type ChatRegenerationPlan,
+} from '../src/lib/chat/regeneration';
+import {
     CHAT_RATE_LIMIT_WINDOW_MS,
     chatRateLimitKeyForModel,
     fixedWindowStartMs,
@@ -847,6 +852,43 @@ export const acceptChatTurn = mutation({
             };
         }
 
+        const mode = (args.mode ?? 'send') as ChatRegenerationMode;
+        const shouldPersistUserMessage = mode === 'send';
+        if (args.persistUserMessage !== undefined && args.persistUserMessage !== shouldPersistUserMessage) {
+            throw new Error('Chat turn persistence does not match the requested mode.');
+        }
+
+        let effectiveMessage = args.message;
+        let regenerationMessages: Doc<'messages'>[] = [];
+        let regenerationPlan: ChatRegenerationPlan = mode === 'send'
+            ? buildChatRegenerationPlan({
+                mode,
+                message: args.message,
+                messages: [],
+                retryOfAssistantMessageId: args.retryOfAssistantMessageId?.toString(),
+                editOfUserMessageId: args.editOfUserMessageId?.toString(),
+            })
+            : { promptMessage: args.message, deleteMessageIds: [] as string[] };
+        if (mode !== 'send') {
+            regenerationMessages = await ctx.db
+                .query('messages')
+                .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
+                .order('asc')
+                .collect();
+            regenerationPlan = buildChatRegenerationPlan({
+                mode,
+                message: args.message,
+                messages: regenerationMessages.map((candidate) => ({
+                    id: candidate._id.toString(),
+                    role: candidate.role,
+                    content: candidate.content,
+                })),
+                retryOfAssistantMessageId: args.retryOfAssistantMessageId?.toString(),
+                editOfUserMessageId: args.editOfUserMessageId?.toString(),
+            });
+            effectiveMessage = regenerationPlan.promptMessage;
+        }
+
         const rateLimitPolicy = rateLimitPolicyForTurn(user, args.model);
         const rateLimit = await consumeTurnRateLimit(
             ctx,
@@ -871,6 +913,24 @@ export const acceptChatTurn = mutation({
             };
         }
 
+        if (regenerationPlan.editedUserMessageId) {
+            const editedMessage = regenerationMessages.find(
+                (candidate) => candidate._id.toString() === regenerationPlan.editedUserMessageId
+            );
+            if (!editedMessage) throw new Error('The message selected for editing is no longer available.');
+            await ctx.db.patch(editedMessage._id, {
+                content: effectiveMessage,
+                version: (editedMessage.version ?? 1) + 1,
+                updatedAt: now,
+            });
+        }
+        const deletedMessageIds = new Set(regenerationPlan.deleteMessageIds);
+        for (const candidate of regenerationMessages) {
+            if (deletedMessageIds.has(candidate._id.toString())) {
+                await ctx.db.delete(candidate._id);
+            }
+        }
+
         const existingDocumentState = await ctx.db
             .query('conversationDocumentState')
             .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
@@ -879,7 +939,7 @@ export const acceptChatTurn = mutation({
             validatedAttachments.length > 0 ||
             Boolean(existingDocumentState?.activeUploadedFileId);
         const classifiedRoute = classifyMessage(
-            args.message,
+            effectiveMessage,
             undefined,
             conversation.routeMode as RouteMode | undefined,
             hasActiveDocumentContext
@@ -887,7 +947,7 @@ export const acceptChatTurn = mutation({
         const contextualRoute = hasActiveDocumentContext
             ? preserveOrUpgradeDocumentRoute(
                 classifiedRoute,
-                args.message,
+                effectiveMessage,
                 conversation.routeMode as RouteMode | undefined
             )
             : classifiedRoute;
@@ -899,15 +959,13 @@ export const acceptChatTurn = mutation({
             : contextualRoute.temperature;
 
         const turnNumber = conversation.nextTurnNumber ?? (conversation.messageCount ?? 0) + 1;
-        const shouldPersistUserMessage = args.persistUserMessage !== false;
-
         const turnId = await ctx.db.insert('chatTurns', {
             conversationId: args.conversationId,
             userId: user._id,
             requestId: args.requestId,
-            message: args.message,
+            message: effectiveMessage,
             turnNumber,
-            mode: args.mode ?? 'send',
+            mode,
             status: 'accepted',
             routeMode,
             retryOfAssistantMessageId: args.retryOfAssistantMessageId,
@@ -930,7 +988,7 @@ export const acceptChatTurn = mutation({
                 userId: user._id,
                 turnId,
                 role: 'user',
-                content: args.message,
+                content: effectiveMessage,
                 status: 'committed',
                 turnNumber,
                 roleOrder: 0,
@@ -997,7 +1055,7 @@ export const acceptChatTurn = mutation({
         await ctx.db.patch(args.conversationId, {
             nextTurnNumber: turnNumber + 1,
             lastMessageAt: now,
-            messageCount: (conversation.messageCount ?? 0) + (shouldPersistUserMessage ? 1 : 0),
+            messageCount: Math.max(0, (conversation.messageCount ?? 0) - deletedMessageIds.size) + (shouldPersistUserMessage ? 1 : 0),
             routeMode,
         });
 
@@ -1010,7 +1068,7 @@ export const acceptChatTurn = mutation({
             messageId: userMessageId,
             metadataRedacted: {
                 requestId: args.requestId,
-                mode: args.mode ?? 'send',
+                mode,
                 routeMode,
                 attachmentCount: validatedAttachments.length,
                 persistedUserMessage: shouldPersistUserMessage,
@@ -1044,7 +1102,17 @@ export const activeForConversation = query({
 
         return recent
             .filter((turn) => !isTerminalTurnStatus(turn.status))
-            .sort((a, b) => a.turnNumber - b.turnNumber);
+            .sort((a, b) => a.turnNumber - b.turnNumber)
+            .map((turn) => ({
+                _id: turn._id,
+                status: turn.status,
+                routeMode: turn.routeMode,
+                turnNumber: turn.turnNumber,
+                createdAt: turn.createdAt,
+                startedAt: turn.startedAt,
+                updatedAt: turn.updatedAt,
+                errorCode: turn.errorCode,
+            }));
     },
 });
 

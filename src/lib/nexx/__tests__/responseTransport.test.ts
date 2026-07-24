@@ -12,9 +12,9 @@ describe('chat response transport policy', () => {
     expect(usesPlainTextResponse('order_interpretation')).toBe(false);
   });
 
-  it('does not spend high reasoning effort on simple chat', () => {
-    expect(reasoningEffortForRoute('adaptive_chat')).toBe('low');
-    expect(reasoningEffortForRoute('pattern_analysis')).toBe('medium');
+  it('uses at least medium reasoning for chat and high effort for complex relational work', () => {
+    expect(reasoningEffortForRoute('adaptive_chat')).toBe('medium');
+    expect(reasoningEffortForRoute('pattern_analysis')).toBe('high');
     expect(reasoningEffortForRoute('document_analysis')).toBe('high');
   });
 

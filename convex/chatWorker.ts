@@ -30,6 +30,7 @@ import { detectedFamilyLawIssuePacks } from '../src/lib/nexx/legal-engine/issueP
 import { composeLegalResponse } from '../src/lib/nexx/legal-engine/responseComposer';
 import { repairRenderedOutput, truncateAtSentenceBoundary, verifyRenderedOutput } from '../src/lib/nexx/legal-engine/renderedOutputVerifier';
 import { responsePlanFromLegalInterpretation, userAskedForDraft } from '../src/lib/nexx/legal-engine/responsePlan';
+import { summarizeConversation } from '../src/lib/nexx/memory';
 import { normalizeLegalProposition, repeatedLegalPropositions, semanticallyEquivalentLegalText } from '../src/lib/nexx/legal-engine/semanticDedup';
 import { resolveRequestedFathersDaySchedule } from '../src/lib/nexx/legal-engine/possessionCalendar';
 import {
@@ -78,6 +79,16 @@ import {
     reasoningEffortForRoute,
     usesPlainTextResponse,
 } from '../src/lib/nexx/responseTransport';
+import {
+    explicitlyRequestsStoredDocumentForTurn,
+    responseLifecyclePolicy,
+    shouldApplyDeterministicLegalEnrichment,
+    shouldApplyDeterministicLitigationRenderer,
+    shouldApplyRenderedLegalVerifier,
+    shouldForceStoredDocumentGrounding,
+} from '../src/lib/nexx/responseLifecycle';
+import { verifyPlainTextDocumentGrounding } from '../src/lib/nexx/plainTextGrounding';
+import { canonicalConversationMemoryPage } from '../src/lib/nexx/conversationMemoryPolicy';
 import type { StoredDocumentAmbiguity } from '../src/lib/nexx/documentSelection';
 import type { NexxAssistantResponse, RouteMode } from '../src/lib/types';
 
@@ -200,6 +211,11 @@ function asString(value: unknown): string | undefined {
 
 function asBoolean(value: unknown): boolean | undefined {
     return typeof value === 'boolean' ? value : undefined;
+}
+
+function asBoundedNumber(value: unknown, minimum: number, maximum: number): number | undefined {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+    return Math.min(maximum, Math.max(minimum, value));
 }
 
 function asStringArray(value: unknown, maxItems = 50): string[] | undefined {
@@ -402,19 +418,40 @@ function buildUserContext(rawJson?: string): ContextPacket {
             contextPacket.userProfile = userProfile;
         }
 
+        const styleProfile = {
+            tonePreference: asString(userContext.tonePreference),
+        };
+        if (styleProfile.tonePreference) {
+            contextPacket.styleProfile = styleProfile;
+        }
+
+        const supportProfile = {
+            emotionalState: asString(userContext.emotionalState),
+            hasTherapist: asBoolean(userContext.hasTherapist),
+        };
+        if (supportProfile.emotionalState || supportProfile.hasTherapist !== undefined) {
+            contextPacket.supportProfile = supportProfile;
+        }
+
         const nexProfile = {
             nickname: asString(userContext.nexNickname),
             communicationStyle: asString(userContext.nexCommunicationStyle),
+            behaviors: asStringArray(userContext.nexBehaviors),
             manipulationTactics: asStringArray(userContext.nexManipulationTactics),
             triggerPatterns: asStringArray(userContext.nexTriggerPatterns),
             detectedPatterns: asStringArray(userContext.nexDetectedPatterns),
+            aiInsights: asString(userContext.nexAiInsights),
+            dangerLevel: asBoundedNumber(userContext.nexDangerLevel, 0, 5),
         };
         if (
             nexProfile.nickname ||
             nexProfile.communicationStyle ||
+            nexProfile.behaviors?.length ||
             nexProfile.manipulationTactics?.length ||
             nexProfile.triggerPatterns?.length ||
-            nexProfile.detectedPatterns?.length
+            nexProfile.detectedPatterns?.length ||
+            nexProfile.aiInsights ||
+            nexProfile.dangerLevel !== undefined
         ) {
             contextPacket.nexProfile = {
                 ...nexProfile,
@@ -569,6 +606,7 @@ type GenerationContext = {
         role: 'user' | 'assistant';
         content: string;
         status?: 'draft' | 'committed' | 'degraded' | 'failed' | 'deleted';
+        mode?: string;
     }>;
 };
 
@@ -668,6 +706,39 @@ function isDocumentContextRoute(routeMode?: RouteMode) {
     return routeMode === 'document_analysis' ||
         routeMode === 'order_interpretation' ||
         routeMode === 'possession_access_schedule';
+}
+
+function explicitlyRequestsStoredDocument(
+    message: string,
+    detection: DocumentReferenceDetection,
+    routeMode: RouteMode,
+) {
+    return explicitlyRequestsStoredDocumentForTurn({
+        message,
+        routeMode,
+        detectedExplicitPriorUpload: detection.referenceType === 'explicit_prior_upload',
+        isDocumentAvailabilityQuestion: isDocumentAvailabilityQuestion(message),
+    });
+}
+
+function isShortActiveDocumentFollowUp(
+    context: GenerationContext,
+    detection: DocumentReferenceDetection
+) {
+    if (
+        context.turn.message.trim().length > 350 ||
+        (
+            detection.referenceType !== 'active_document_followup' &&
+            detection.referenceType !== 'implicit_followup'
+        )
+    ) {
+        return false;
+    }
+
+    return context.recentMessages
+        .filter((message) => message.status !== 'deleted')
+        .slice(-4)
+        .some((message) => isDocumentContextRoute(message.mode as RouteMode | undefined));
 }
 
 function isLitigationNavigationRoute(routeMode?: RouteMode) {
@@ -937,14 +1008,21 @@ function selectAttachmentContextsForPrompt(
     }
 
     const availableDocuments = context.availableDocumentContexts ?? [];
+    const explicitStoredDocumentRequest = explicitlyRequestsStoredDocument(
+        context.turn.message,
+        documentReference,
+        routeMode,
+    );
+    const activeDocumentFollowUp = isShortActiveDocumentFollowUp(context, documentReference);
     const shouldLoadStoredDocuments =
         availableDocuments.length > 0 &&
-        (isDocumentContextRoute(routeMode) ||
-            isLitigationNavigationRoute(routeMode) ||
-            isDocumentContextRoute(routerResult.mode) ||
-            isLitigationNavigationRoute(routerResult.mode) ||
-            routerResult.documentReference?.referencesDocument ||
-            detectDocumentReference(context.turn.message).referencesDocument);
+        shouldForceStoredDocumentGrounding({
+            routeMode,
+            hasStoredDocument: true,
+            currentTurnReferencesDocument: documentReference.referencesDocument,
+            currentTurnExplicitlyRequestsStoredDocument: explicitStoredDocumentRequest,
+            isActiveDocumentFollowUp: activeDocumentFollowUp,
+        });
 
     if (!shouldLoadStoredDocuments) return selected;
 
@@ -1113,9 +1191,19 @@ function buildInput(
         hasActiveDocumentContext(context)
     );
     const documentReference = routerResult.documentReference ?? detectDocumentReference(context.turn.message);
+    const allowStoredFileSearch =
+        !responseLifecyclePolicy(routeMode).preserveProviderProse ||
+        explicitlyRequestsStoredDocument(context.turn.message, documentReference, routeMode);
+    const effectiveRouterResult = {
+        ...routerResult,
+        toolPlan: {
+            ...routerResult.toolPlan,
+            useFileSearch: routerResult.toolPlan.useFileSearch && allowStoredFileSearch,
+        },
+    };
     const featurePrompt = buildFeatureToolPrompt(
-        routerResult.toolPlan,
-        actualToolCapabilitiesFromPlan(routerResult.toolPlan, {
+        effectiveRouterResult.toolPlan,
+        actualToolCapabilitiesFromPlan(effectiveRouterResult.toolPlan, {
             hasVectorStore: Boolean(context.conversation?.vectorStoreId),
             localCourtSourcesInjected: officialResearchTargetsInjected,
         })
@@ -1222,6 +1310,7 @@ function buildInput(
         attachmentContexts,
         documentSourcePackets,
         documentReference,
+        routerResult: effectiveRouterResult,
         deterministicFieldPrompt,
         input: [
             { role: 'system', content: systemPrompt },
@@ -1313,15 +1402,20 @@ function shouldRequireDocumentAnswer(args: {
     documentReference: DocumentReferenceDetection;
     routeMode: RouteMode;
 }) {
-    return args.attachmentContexts.length > 0 &&
-        args.sourcePackets.length > 0 &&
-        (
-            isDocumentContextRoute(args.routeMode) ||
-            args.attachmentContexts.some((attachment) => attachment.source === 'current_turn') ||
-            args.documentReference.referencesDocument ||
-            args.documentReference.requiresExactText ||
-            args.documentReference.requiresPageOrSectionCitation
-        );
+    if (args.attachmentContexts.length === 0 || args.sourcePackets.length === 0) {
+        return false;
+    }
+
+    if (responseLifecyclePolicy(args.routeMode).preserveProviderProse) {
+        return args.documentReference.requiresExactText ||
+            args.documentReference.requiresPageOrSectionCitation;
+    }
+
+    return isDocumentContextRoute(args.routeMode) ||
+        args.attachmentContexts.some((attachment) => attachment.source === 'current_turn') ||
+        args.documentReference.referencesDocument ||
+        args.documentReference.requiresExactText ||
+        args.documentReference.requiresPageOrSectionCitation;
 }
 
 function isLegalInterpretationRoute(routeMode: RouteMode, detection: DocumentReferenceDetection) {
@@ -1382,7 +1476,7 @@ function renderLitigationNavigationMessage(args: {
     courtFilingExtraction?: CourtFilingExtraction | null;
     sourcePackets?: LegalDocumentSourcePacket[];
 }) {
-    if (!isLitigationNavigationRoute(args.routeMode)) return args.response;
+    if (!shouldApplyDeterministicLitigationRenderer(args.routeMode)) return args.response;
     const verifiedOrderInterpretation = verifiedOrderInterpretationForDraft(
         args.response,
         args.sourcePackets ?? [],
@@ -2090,12 +2184,13 @@ async function generateWithFallbacks({
     const officialResearchTargetsInjected = Boolean(contextPacket.officialResearchTargets?.length);
 
     const contextPrompt = buildContextPrompt(contextPacket);
-    const currentDocumentReference = routerResult.documentReference ?? detectDocumentReference(context.turn.message);
-    const mayRequireGroundedDraft =
-        (routeMode === 'party_message_draft' || routeMode === 'co_parent_response') &&
-        hasActiveDocumentContext(context) &&
-        (Boolean(followUpSummary?.trim()) || currentDocumentReference.referencesDocument);
-    const usePlainText = usesPlainTextResponse(routeMode) && !mayRequireGroundedDraft;
+    const highComplexityTurn =
+        context.turn.message.length > 2_000 ||
+        Boolean(followUpSummary && followUpSummary.length > 4_000);
+    const lifecyclePolicy = responseLifecyclePolicy(routeMode, {
+        highComplexity: highComplexityTurn,
+    });
+    const usePlainText = usesPlainTextResponse(routeMode);
     const promptBundle = buildInput(
         context,
         routeMode,
@@ -2104,10 +2199,16 @@ async function generateWithFallbacks({
         usePlainText,
     );
     const attachmentContextPrompt = promptBundle.attachmentContextPrompt;
-    const hostedTools = buildHostedTools(routerResult, context.conversation?.vectorStoreId);
+    const hostedTools = buildHostedTools(promptBundle.routerResult, context.conversation?.vectorStoreId);
     const fileSearchOnlyTools =
-        routerResult.toolPlan.useFileSearch && context.conversation?.vectorStoreId
-            ? buildHostedTools({ ...routerResult, toolPlan: { ...routerResult.toolPlan, useWebSearch: false } }, context.conversation.vectorStoreId)
+        promptBundle.routerResult.toolPlan.useFileSearch && context.conversation?.vectorStoreId
+            ? buildHostedTools({
+                ...promptBundle.routerResult,
+                toolPlan: {
+                    ...promptBundle.routerResult.toolPlan,
+                    useWebSearch: false,
+                },
+            }, context.conversation.vectorStoreId)
             : undefined;
 
     const steps: Array<{
@@ -2159,11 +2260,18 @@ async function generateWithFallbacks({
                 {
                     model: step.model,
                     ...(supportsTemperature(step.model) ? { temperature } : {}),
-                    reasoning: { effort: reasoningEffortForRoute(routeMode) },
+                    reasoning: {
+                        effort: reasoningEffortForRoute(routeMode, {
+                            highComplexity: highComplexityTurn,
+                        }),
+                    },
                     input: step.input,
                     tools: step.tools,
                     text: usePlainText
-                        ? { format: { type: 'text' }, verbosity: routeMode === 'pattern_analysis' ? 'medium' : 'low' }
+                        ? {
+                            format: { type: 'text' },
+                            verbosity: lifecyclePolicy.verbosity,
+                        }
                         : { format: NEXX_RESPONSE_SCHEMA },
                     stream: true,
                 },
@@ -2239,7 +2347,7 @@ async function generateWithFallbacks({
                 if (!rawText.trim()) {
                     throw new Error('Provider returned an empty conversational response.');
                 }
-                parsedResponse = plainTextAssistantResponse(rawText.trim());
+                parsedResponse = plainTextAssistantResponse(rawText);
             } else {
                 await saveDraft(ctx, jobId, leaseOwner, SAFE_ANALYSIS_DRAFT_MESSAGE, {
                     uiKind: ANALYSIS_STATUS_UI_KIND,
@@ -2269,6 +2377,43 @@ async function generateWithFallbacks({
                 }
                 parsedResponse = suppressWeakArtifacts(recoveryResult.data);
             }
+
+            if (usePlainText && lifecyclePolicy.preserveProviderProse) {
+                const citationVerification = verifyPlainTextDocumentGrounding({
+                    message: parsedResponse.message,
+                    sourcePackets: promptBundle.documentSourcePackets,
+                    documentReference: promptBundle.documentReference,
+                });
+                if (!citationVerification.passed) {
+                    lastError = new Error(
+                        `plain_text_document_grounding_failed: ${citationVerification.errors.join(' | ')}`
+                    );
+                    continue;
+                }
+                console.info('[ChatWorker] Natural response preserved', {
+                    jobId,
+                    routeMode,
+                    model: step.model,
+                    attempt: attemptIndex + 1,
+                    durationMs: Date.now() - attemptStartedAt,
+                    responseLength: parsedResponse.message.length,
+                    deterministicRendererApplied: false,
+                    legalEnrichmentApplied: false,
+                    renderedVerifierApplied: false,
+                });
+                return {
+                    response: parsedResponse,
+                    responseId,
+                    model: step.model,
+                    degraded: false,
+                    citationVerification,
+                    attachmentContexts: promptBundle.attachmentContexts,
+                    documentSourcePackets: promptBundle.documentSourcePackets,
+                    documentReference: promptBundle.documentReference,
+                    routeMode,
+                };
+            }
+
             const requiresDocumentAnswer = shouldRequireDocumentAnswer({
                 sourcePackets: promptBundle.documentSourcePackets,
                 attachmentContexts: promptBundle.attachmentContexts,
@@ -2442,7 +2587,10 @@ async function generateWithFallbacks({
                 routeMode,
                 context.turn.message
             );
-            const courtFilingExtraction = isLitigationNavigationRoute(routeMode)
+            const courtFilingExtraction = (
+                shouldApplyDeterministicLitigationRenderer(routeMode) ||
+                shouldApplyDeterministicLegalEnrichment(routeMode)
+            )
                 ? extractCourtFilingFromSources(promptBundle.documentSourcePackets)
                 : null;
             parsedResponse = renderLitigationNavigationMessage({
@@ -2454,22 +2602,26 @@ async function generateWithFallbacks({
                 courtFilingExtraction,
                 sourcePackets: promptBundle.documentSourcePackets,
             });
-            parsedResponse = enrichDeterministicLegalFields({
-                response: parsedResponse,
-                routeMode,
-                userMessage: context.turn.message,
-                context,
-                sourcePackets: promptBundle.documentSourcePackets,
-                courtFilingExtraction,
-            });
+            if (shouldApplyDeterministicLegalEnrichment(routeMode)) {
+                parsedResponse = enrichDeterministicLegalFields({
+                    response: parsedResponse,
+                    routeMode,
+                    userMessage: context.turn.message,
+                    context,
+                    sourcePackets: promptBundle.documentSourcePackets,
+                    courtFilingExtraction,
+                });
+            }
             parsedResponse.message = polishLegalResponse(parsedResponse.message);
-            parsedResponse = verifyAndRepairRenderedResponse(
-                parsedResponse,
-                routeMode,
-                context.turn.message,
-                promptBundle.documentSourcePackets,
-                groundingUserMessage
-            );
+            if (shouldApplyRenderedLegalVerifier(routeMode)) {
+                parsedResponse = verifyAndRepairRenderedResponse(
+                    parsedResponse,
+                    routeMode,
+                    context.turn.message,
+                    promptBundle.documentSourcePackets,
+                    groundingUserMessage
+                );
+            }
 
             console.info('[ChatWorker] Provider attempt completed', {
                 jobId,
@@ -2503,17 +2655,23 @@ async function generateWithFallbacks({
     }
 
     const normalized = normalizeProviderError(lastError);
-    const degradedCourtFilingExtraction = isLitigationNavigationRoute(routeMode)
+    const degradedCourtFilingExtraction = (
+        shouldApplyDeterministicLitigationRenderer(routeMode) ||
+        shouldApplyDeterministicLegalEnrichment(routeMode)
+    )
         ? extractCourtFilingFromSources(promptBundle.documentSourcePackets)
         : null;
-    const enrichedDegradedResponse = enrichDeterministicLegalFields({
-        response: degradedResponse(),
-        routeMode,
-        userMessage: context.turn.message,
-        context,
-        sourcePackets: promptBundle.documentSourcePackets,
-        courtFilingExtraction: degradedCourtFilingExtraction,
-    });
+    const baseDegradedResponse = degradedResponse();
+    const enrichedDegradedResponse = shouldApplyDeterministicLegalEnrichment(routeMode)
+        ? enrichDeterministicLegalFields({
+            response: baseDegradedResponse,
+            routeMode,
+            userMessage: context.turn.message,
+            context,
+            sourcePackets: promptBundle.documentSourcePackets,
+            courtFilingExtraction: degradedCourtFilingExtraction,
+        })
+        : baseDegradedResponse;
     return {
         response: enrichedDegradedResponse,
         responseId: undefined,
@@ -2548,6 +2706,113 @@ async function saveDraft(
         metadataJson: metadata ? JSON.stringify(metadata) : undefined,
     });
 }
+
+/**
+ * Compact durable conversation memory every six completed user turns.
+ * Failures are isolated from the already-committed chat response.
+ */
+export const persistConversationMemory = internalAction({
+    args: { turnId: v.id('chatTurns') },
+    handler: async (ctx, args): Promise<{ turnCount: number } | null> => {
+        try {
+            const work: {
+                conversationId: Id<'conversations'>;
+                userId: Id<'users'>;
+                turnCount: number;
+                fromTurnExclusive: number;
+                existingSummaryJson?: string;
+            } | null = await ctx.runQuery(internal.chatTurns.getConversationMemoryWork, {
+                turnId: args.turnId,
+            });
+            if (!work) return null;
+
+            let rollingSummary = work.existingSummaryJson
+                ? parseContextJson(work.existingSummaryJson, sanitizeConversationSummary)
+                : undefined;
+            let cursor: string | null = null;
+            let processedMessages = 0;
+            let batch: Array<{ role: string; content: string }> = [];
+            let batchChars = 0;
+
+            const flushBatch = async () => {
+                if (batch.length === 0) return;
+                rollingSummary = await summarizeConversation({
+                    messages: batch,
+                    existingSummary: rollingSummary,
+                });
+                processedMessages += batch.length;
+                batch = [];
+                batchChars = 0;
+            };
+
+            while (true) {
+                const page: {
+                    page: Array<{
+                        role: string;
+                        content: string;
+                        status?: string;
+                        turnNumber: number;
+                        roleOrder: number;
+                    }>;
+                    continueCursor: string;
+                    isDone: boolean;
+                } | null = await ctx.runQuery(internal.chatTurns.getConversationMemoryPage, {
+                    turnId: args.turnId,
+                    cursor,
+                });
+                if (!page) return null;
+
+                const canonicalMessages = canonicalConversationMemoryPage({
+                    messages: page.page,
+                    fromTurnExclusive: work.fromTurnExclusive,
+                    throughTurnInclusive: work.turnCount,
+                });
+
+                for (const message of canonicalMessages) {
+                    const content = message.content.slice(0, 12_000);
+                    if (!content) continue;
+                    if (batch.length > 0 && batchChars + content.length > 50_000) {
+                        await flushBatch();
+                    }
+                    batch.push({ role: message.role, content });
+                    batchChars += content.length;
+                }
+
+                if (page.isDone) break;
+                if (!page.continueCursor || page.continueCursor === cursor) {
+                    throw new Error('Conversation memory pagination did not advance.');
+                }
+                cursor = page.continueCursor;
+            }
+
+            await flushBatch();
+            if (!rollingSummary || processedMessages === 0) return null;
+
+            const durableSummary = {
+                ...rollingSummary,
+                turnCount: work.turnCount,
+            };
+            await ctx.runMutation(internal.chatTurns.upsertConversationSummaryInternal, {
+                conversationId: work.conversationId,
+                userId: work.userId,
+                summary: JSON.stringify(durableSummary),
+                turnCount: work.turnCount,
+            });
+            console.info('[ChatWorker] Conversation memory compacted', {
+                conversationId: work.conversationId,
+                turnCount: work.turnCount,
+                segmentMessages: processedMessages,
+            });
+            return { turnCount: work.turnCount };
+        } catch (error) {
+            console.error('[ChatWorker] Conversation memory compaction failed', {
+                turnId: args.turnId,
+                error: error instanceof Error ? error.message : String(error),
+            });
+            return null;
+        }
+    },
+});
 
 /** Lease and process one chat generation job from the Convex queue. */
 export const processChatGenerationJob = internalAction({
@@ -2584,7 +2849,11 @@ export const processChatGenerationJob = internalAction({
                 return null;
             }
 
-            if (context.documentAmbiguity?.requiresClarification) {
+            const persistedRouteMode = context.turn.routeMode as RouteMode | undefined;
+            if (
+                context.documentAmbiguity?.requiresClarification &&
+                isDocumentContextRoute(persistedRouteMode)
+            ) {
                 const documentReference = detectDocumentReference(context.turn.message);
                 await ctx.runMutation(internal.chatTurns.completeAssistant, {
                     jobId: args.jobId,
@@ -2655,6 +2924,12 @@ export const processChatGenerationJob = internalAction({
                 degraded: result.degraded,
                 durationMs: Date.now() - workerStartedAt,
             });
+
+            if (completion && !result.degraded) {
+                await ctx.scheduler.runAfter(0, internal.chatWorker.persistConversationMemory, {
+                    turnId: lease.turnId,
+                });
+            }
 
             if (
                 !result.degraded &&

@@ -18,15 +18,27 @@ import { hasConversationalContinuationSignal } from './legal-engine/legalSignals
 // ---------------------------------------------------------------------------
 
 const SAFETY_PATTERNS = [
-  /\b(danger|unsafe|emergency|911|violence|harm|hurt)\b/i,
   /\b(threaten(?:ed|ing)?|said|says?)\b.{0,60}\b(kill|hurt|harm|hit|shoot|stab|come after|take the child|kidnap)\b/i,
+  /\b(?:he|she|they|the\s+other\s+parent|my\s+ex)\s+(?:is\s+going\s+to|will|plans?\s+to|intends?\s+to|wants?\s+to)\s+(?:kill|hurt|harm|hit|shoot|stab|come\s+after|take\s+the\s+child|kidnap)\b/i,
+  /\b(?:told|texted|wrote\s+to|messaged)\s+(?:me|us)\b.{0,70}\b(?:will|is\s+going\s+to|plans?\s+to|intends?\s+to)\b.{0,25}\b(?:kill|hurt|harm|hit|shoot|stab|come\s+after|take\s+the\s+child|kidnap)\b/i,
   /\b(stalking|strangulation|strangled|choked|weapon|gun|knife|kidnapp?ing|refus(?:e|ing|ed) to return (?:the )?child|suicidal|suicide|child left unsafe|physical assault|sexual abuse|immediate flight risk|emergency protective order)\b/i,
-  /\b(call.*police|safety plan)\b/i,
+  /\b(call\s+(?:the\s+)?police|call\s+911|need\s+(?:a\s+)?safety plan|help\s+me\s+make\s+(?:a\s+)?safety plan)\b/i,
+  /\b(?:i|we|my child|our child|my daughter|my son|the child)\s+(?:am|are|is|feel)\s+(?:in\s+)?(?:immediate\s+)?(?:danger|unsafe)\b/i,
+  /\b(?:danger|unsafe|emergency)\s+(?:right\s+now|now|today|tonight|currently|immediately)\b/i,
   // 'protective order' / 'restraining order' only trigger safety when paired
   // with imminent-risk words — otherwise they route to local_procedure
   /\b(danger|emergency|threaten(?:ed|ing)? (?:to )?(?:hurt|harm|kill)|harm|hurt|violence|weapon|stalking).{0,40}(protective order|restraining order)/i,
   /\b(protective order|restraining order).{0,40}(danger|emergency|threaten(?:ed|ing)? (?:to )?(?:hurt|harm|kill)|harm|hurt|violence|weapon|stalking)/i,
 ];
+
+const HISTORICAL_SAFETY_CONTEXT_PATTERN =
+  /\b(?:years?\s+ago|in\s+(?:19|20)\d{2}|when\s+(?:we|i)\s+(?:were|was)\s+together|during\s+our\s+relationship|previously|in\s+the\s+past|used\s+to)\b/i;
+
+const CURRENT_SAFETY_GRAMMAR_PATTERN =
+  /\b(?:is|are|am|has\s+been|have\s+been|keeps?|continues?)\s+(?:currently\s+)?(?:stalking|threatening|following|harassing|refusing\s+to\s+return|keeping\s+the\s+child)\b|\b(?:says?|threatens?|told|texted|wrote\s+to|messaged)\b.{0,70}\b(?:will|is\s+going\s+to|plans?\s+to|intends?\s+to|wants?\s+to)\b.{0,25}\b(?:kill|hurt|harm|hit|shoot|stab|come\s+after|take\s+the\s+child|kidnap)\b|\b(?:he|she|they|the\s+other\s+parent|my\s+ex)\s+(?:is\s+going\s+to|will|plans?\s+to|intends?\s+to|wants?\s+to)\s+(?:kill|hurt|harm|hit|shoot|stab|come\s+after|take\s+the\s+child|kidnap)\b|\bis\s+threatening\b.{0,40}\b(?:kill|hurt|harm|hit|shoot|stab|come\s+after|take\s+the\s+child|kidnap)\b|\brefuses?\s+to\s+return\s+(?:the\s+)?child\b/i;
+
+const CURRENT_SAFETY_NEGATION_PATTERN =
+  /\b(?:not\s+(?:because\s+)?(?:i|we|my child|our child|my daughter|my son|the child)\s+(?:am|are|is)\s+(?:currently\s+)?(?:in\s+)?(?:danger|unsafe)|not\s+in\s+danger\s+now|no\s+(?:current|immediate)\s+safety\s+concern)\b/i;
 
 const DRAFT_PATTERNS = [
   /\b(draft|write|motion|petition|declaration|pleading|template)\b/i,
@@ -57,6 +69,8 @@ const CONVERSATION_REVIEW_PATTERNS = [
   /\b(?:review|analy[sz]e|assessment|feedback)\b.{0,100}\b(?:thread|conversation|exchange|multiple\s+messages|message\s+thread|communication\s+history)\b/i,
   /\b(?:thread|conversation|exchange|multiple\s+messages|message\s+thread|communication\s+history)\b.{0,100}\b(?:review|analy[sz]e|assessment|feedback)\b/i,
   /\bwhat\s+do\s+you\s+see\b.{0,80}\b(?:both\s+sides|from\s+(?:his|her|my|each)\s+side|transparently|human)\b/i,
+  /\b(?:with|given)\s+(?:that|this)\s+context\b.{0,120}\bwhat\s+do\s+you\s+see\b/i,
+  /\bwhat\s+do\s+you\s+see\b.{0,120}\b(?:behavior|words|dynamic|interaction|communication|pattern)\b/i,
   /\b(?:reading|read)\s+this\b.{0,80}\b(?:not\s+as\s+a\s+judge|as\s+a\s+human|from\s+both\s+sides)\b/i,
 ];
 
@@ -72,6 +86,14 @@ const SUPPORT_PATTERNS = [
   /\b(scared|overwhelmed|can't\s+do\s+this|afraid|anxious|stressed|exhausted)\b/i,
   /\b(help\s+me|don'?t\s+know\s+what\s+to\s+do)\b/i,
   /\bfeeling?\s+(scared|overwhelmed|afraid|anxious|stressed|lost|hopeless)\b/i,
+];
+
+const RELATIONAL_STRATEGY_PATTERNS = [
+  /\b(?:emotionally|emotional)\s+(?:detach|detachment|protect|regulate|process)\b/i,
+  /\bwithout\s+becoming\s+(?:cold|hostile|reactive)\b/i,
+  /\bprotect\b.{0,40}\b(?:child|daughter|son|kid)\b.{0,40}\bemotionally\b/i,
+  /\b(?:psychological|emotional)\s+(?:trap|dynamic|pattern|impact)\b/i,
+  /\b(?:nervous\s+system|trauma\s+response|relational\s+dynamic|parallel\s+parenting)\b/i,
 ];
 
 const ACTIVE_DOCUMENT_FOLLOW_UP_PATTERN =
@@ -94,6 +116,24 @@ const POSSESSION_FOLLOW_UP_CONTEXT_PATTERN =
 
 const LEGAL_ACTIVE_CONTEXT_PATTERN =
   /\b(court\s+order|order|possession|access|visitation|custody|conservatorship|decision[-\s]?making|support|enforcement|contempt|other parent|father|mother|appclose|pickup|pick up|drop[-\s]?off|exchange|deadline|obligation|rights?)\b/i;
+
+const SHORT_CONTINUATION_PATTERN =
+  /^(?:(?:yes|yeah|yep|okay|ok|sure|right)[,;]?\s+)?(?:please\s+)?(?:yes|yeah|yep|okay|ok|sure|right|go ahead|let'?s do (?:that|it|all(?:\s+\d+)?))(?:[.!])?$/i;
+
+const EXPLANATION_CONTINUATION_PATTERN =
+  /\b(?:can|could|would)\s+you\s+(?:explain|expand|elaborate|go\s+deeper|say\s+more)\b|\b(?:tell|show)\s+me\s+more\b|\bwhat\s+do\s+you\s+mean\b|\b(?:can|could|should)\s+we\s+(?:rephrase|rewrite|make|change|shorten|remove|adjust)\b|\bi\s+(?:do\s+not|don'?t)\s+(?:want|need)\s+(?:to\s+)?(?:say|include|add|invite|remind)\b|\bi\s+think\b.{0,100}\bi\s+(?:do\s+not|don'?t)\s+need\b/i;
+
+const NON_DOCUMENT_CONTINUATION_MODES: RouteMode[] = [
+  'adaptive_chat',
+  'party_message_draft',
+  'supportive_strategy',
+  'co_parent_response',
+  'documentation_strategy',
+  'deescalation_response',
+  'judge_lens_strategy',
+  'pattern_analysis',
+  'support_grounding',
+];
 
 // ---------------------------------------------------------------------------
 // Temperature constants by mode
@@ -133,6 +173,26 @@ function matchesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((p) => p.test(text));
 }
 
+function hasSafetyEscalationSignal(message: string) {
+  if (!matchesAny(message, SAFETY_PATTERNS)) return false;
+
+  // Scope historical suppression to the sentence that contains the safety
+  // signal. A historical disclosure in one sentence must never suppress a new
+  // current-risk report elsewhere in the same turn.
+  const safetySegments = message
+    .split(/(?<=[.!?;])\s+|\r?\n+|,\s+(?=(?:and|but)\b)|\s+(?:and|but)\s+(?=(?:he|she|they|i|we|now|today|tonight|currently)\b)/i)
+    .map((segment) => segment.trim())
+    .filter((segment) => matchesAny(segment, SAFETY_PATTERNS));
+
+  return safetySegments.some((segment) => {
+    if (CURRENT_SAFETY_NEGATION_PATTERN.test(segment)) return false;
+    const isHistorical =
+      HISTORICAL_SAFETY_CONTEXT_PATTERN.test(segment) &&
+      !CURRENT_SAFETY_GRAMMAR_PATTERN.test(segment);
+    return !isHistorical;
+  });
+}
+
 function isDocumentRoute(mode?: RouteMode) {
   return mode === 'document_analysis' ||
     mode === 'order_interpretation' ||
@@ -157,6 +217,9 @@ function isLitigationNavigationRoute(mode?: RouteMode) {
 export function classifyFollowUpIntent(message: string): FollowUpIntent {
   const text = message.trim();
   if (!text) return 'new_issue';
+  if (SHORT_CONTINUATION_PATTERN.test(text) || EXPLANATION_CONTINUATION_PATTERN.test(text)) {
+    return 'same_issue_yes_no';
+  }
   if (SAME_ISSUE_WHAT_TO_SAY_PATTERN.test(text)) return 'same_issue_what_to_say';
   if (SAME_ISSUE_NEXT_STEP_PATTERN.test(text)) return 'same_issue_next_step';
   if (SAME_ISSUE_RIGHTS_CHECK_PATTERN.test(text)) return 'same_issue_rights_check';
@@ -168,12 +231,16 @@ export function classifyFollowUpIntent(message: string): FollowUpIntent {
 function hasActiveFamilyLawContext(
   conversationSummary?: string,
   activeMode?: RouteMode,
-  hasActiveDocumentContext = false
+  _hasActiveDocumentContext = false
 ) {
-  return hasActiveDocumentContext ||
-    isDocumentRoute(activeMode) ||
+  void _hasActiveDocumentContext;
+  return isDocumentRoute(activeMode) ||
     isLitigationNavigationRoute(activeMode) ||
     Boolean(conversationSummary && LEGAL_ACTIVE_CONTEXT_PATTERN.test(conversationSummary));
+}
+
+function isNonDocumentContinuationMode(mode?: RouteMode): mode is RouteMode {
+  return Boolean(mode && NON_DOCUMENT_CONTINUATION_MODES.includes(mode));
 }
 
 function inferFollowUpRoute(
@@ -194,23 +261,18 @@ function shouldRouteAsActiveOrderFollowUp(
   hasActiveContext: boolean
 ) {
   if (!hasActiveContext || followUpIntent === 'new_issue') return false;
-  return ![
-    'packed_case_intake',
-    'new_court_filing_received',
-    'court_response_deadline',
-    'court_response_planning',
-    'filing_walkthrough',
-    'pro_se_feasibility',
-    'attorney_cost_question',
-    'legal_aid_resource_request',
-    'judge_explanation_strategy',
-    'co_parent_response_strategy',
-    'court_filing_draft',
-    'draft_response_to_other_party',
+  if (followUpIntent === 'same_issue_rights_check') return true;
+  return [
+    'general_summary',
+    'direct_order_interpretation',
+    'rights_obligations_question',
+    'possession_access_schedule',
+    'deadline_or_timing_question',
   ].includes(legalIntent);
 }
 
 function activeDocumentFollowUpReference(_message: string): DocumentReferenceDetection {
+  void _message;
   return {
     referencesDocument: true,
     confidence: 'medium',
@@ -258,7 +320,7 @@ export function classifyMessage(
   const bareVaguePronounFollowUp = isBareVaguePronounFollowUp(documentReference, followUpIntent);
 
   // Safety-first: always check escalation first
-  if (matchesAny(text, SAFETY_PATTERNS)) {
+  if (hasSafetyEscalationSignal(message)) {
     return buildResult('safety_escalation', undefined, legalIntent);
   }
 
@@ -280,6 +342,32 @@ export function classifyMessage(
   // even when the pasted exchange mentions orders, filings, or many dates.
   if (matchesAny(text, CONVERSATION_REVIEW_PATTERNS)) {
     return buildResult('pattern_analysis', documentReference, legalIntent, multiIntent);
+  }
+
+  if (
+    matchesAny(text, RELATIONAL_STRATEGY_PATTERNS) &&
+    ![
+      'court_filing_draft',
+      'court_response_planning',
+      'filing_walkthrough',
+      'pro_se_feasibility',
+      'attorney_cost_question',
+      'legal_aid_resource_request',
+      'procedure_question',
+    ].includes(legalIntent)
+  ) {
+    return buildResult('supportive_strategy', documentReference, legalIntent, multiIntent);
+  }
+
+  // Short acknowledgements and requests to elaborate should continue the
+  // active relational task instead of being converted into order analysis
+  // merely because a document remains attached to the conversation.
+  if (
+    legalIntent === 'general_summary' &&
+    followUpIntent !== 'new_issue' &&
+    isNonDocumentContinuationMode(activeMode)
+  ) {
+    return buildResult(activeMode, documentReference, legalIntent, multiIntent);
   }
 
   if (legalIntent === 'court_response_planning') {
@@ -439,84 +527,52 @@ export function preserveOrUpgradeDocumentRoute(
   activeMode?: RouteMode
 ): RouterResult {
   if (classified.mode === 'safety_escalation') return classified;
+  if (isDocumentAvailabilityQuestion(message)) return classified;
 
   const legalIntent = classifyLegalIntent(message);
-  const multiIntent = classifyPackedCaseIntake(message);
   const documentReference = classified.documentReference ?? detectDocumentReference(message);
   const followUpIntent = classifyFollowUpIntent(message);
   const bareVaguePronounFollowUp = isBareVaguePronounFollowUp(documentReference, followUpIntent);
 
+  // Classification has already considered the user's request. An attachment
+  // should enrich a relational, drafting, procedure, or support route—not
+  // replace that route with generic document analysis.
   if (
-    legalIntent === 'general_summary' &&
-    followUpIntent !== 'new_issue'
+    !isDocumentRoute(classified.mode) &&
+    classified.mode !== 'adaptive_chat' &&
+    classified.mode !== 'direct_legal_answer'
   ) {
-    const activeReference = documentReference.referencesDocument && !bareVaguePronounFollowUp
-      ? documentReference
-      : activeDocumentFollowUpReference(message);
-    return buildResult(
-      inferFollowUpRoute(message, undefined, activeMode),
-      activeReference,
-      'direct_order_interpretation'
-    );
+    return classified;
   }
 
+  if (isDocumentRoute(classified.mode)) return classified;
+
+  const hasExplicitDocumentRequest =
+    documentReference.referencesDocument && !bareVaguePronounFollowUp;
+  const isActiveDocumentContinuation =
+    isDocumentRoute(activeMode) && followUpIntent !== 'new_issue';
+
+  if (!hasExplicitDocumentRequest && !isActiveDocumentContinuation) {
+    return classified;
+  }
+
+  const activeReference = hasExplicitDocumentRequest
+    ? documentReference
+    : activeDocumentFollowUpReference(message);
+
   if (legalIntent === 'possession_access_schedule') {
-    return buildResult('possession_access_schedule', documentReference, legalIntent);
+    return buildResult('possession_access_schedule', activeReference, legalIntent);
   }
 
   if (
     legalIntent === 'direct_order_interpretation' ||
-    legalIntent === 'rights_obligations_question'
+    legalIntent === 'rights_obligations_question' ||
+    (
+      isActiveDocumentContinuation &&
+      legalIntent === 'general_summary' &&
+      ACTIVE_DOCUMENT_FOLLOW_UP_PATTERN.test(message)
+    )
   ) {
-    return buildResult('order_interpretation', documentReference, legalIntent);
-  }
-
-  if (legalIntent === 'draft_response_to_other_party') {
-    return buildResult('party_message_draft', documentReference, legalIntent);
-  }
-
-  if (legalIntent === 'court_response_planning') {
-    return buildResult('court_response_planning', documentReference, legalIntent, multiIntent);
-  }
-
-  if (legalIntent !== 'court_filing_draft' && (legalIntent === 'packed_case_intake' || multiIntent.secondaryIntents.length >= 3)) {
-    return buildResult('packed_case_intake', documentReference, legalIntent, multiIntent);
-  }
-
-  if (legalIntent === 'new_court_filing_received' || legalIntent === 'court_response_deadline') {
-    return buildResult('litigation_navigation', documentReference, legalIntent, multiIntent);
-  }
-
-  if (
-    legalIntent === 'co_parent_response_strategy' &&
-    followUpIntent === 'same_issue_what_to_say'
-  ) {
-    const activeReference = documentReference.referencesDocument && !bareVaguePronounFollowUp
-      ? documentReference
-      : activeDocumentFollowUpReference(message);
-    return buildResult('co_parent_response', activeReference, legalIntent, multiIntent);
-  }
-
-  if (legalIntent === 'filing_walkthrough') {
-    return buildResult('filing_walkthrough', documentReference, legalIntent, multiIntent);
-  }
-
-  if (legalIntent === 'pro_se_feasibility') {
-    return buildResult('pro_se_guidance', documentReference, legalIntent, multiIntent);
-  }
-
-  if (legalIntent === 'attorney_cost_question' || legalIntent === 'legal_aid_resource_request') {
-    return buildResult('attorney_resource_guidance', documentReference, legalIntent, multiIntent);
-  }
-
-  if (legalIntent === 'judge_explanation_strategy') {
-    return buildResult('court_narrative_builder', documentReference, legalIntent, multiIntent);
-  }
-
-  if (shouldRouteAsActiveOrderFollowUp(legalIntent, followUpIntent, true)) {
-    const activeReference = documentReference.referencesDocument && !bareVaguePronounFollowUp
-      ? documentReference
-      : activeDocumentFollowUpReference(message);
     return buildResult(
       inferFollowUpRoute(message, undefined, activeMode),
       activeReference,
@@ -524,36 +580,28 @@ export function preserveOrUpgradeDocumentRoute(
     );
   }
 
-  if (legalIntent === 'co_parent_response_strategy') {
-    return buildResult('co_parent_response', documentReference, legalIntent, multiIntent);
-  }
+  return hasExplicitDocumentRequest
+    ? buildResult('document_analysis', activeReference, legalIntent)
+    : classified;
+}
 
-  if (legalIntent === 'pressure_or_manipulation_response' || legalIntent === 'emotional_legal_support') {
-    return buildResult('supportive_strategy', documentReference, legalIntent, multiIntent);
-  }
+/** One authoritative route resolver shared by API admission and turn persistence. */
+export function resolveTurnRoute(args: {
+  message: string;
+  conversationSummary?: string;
+  activeMode?: RouteMode;
+  hasActiveDocumentContext?: boolean;
+}) {
+  const classified = classifyMessage(
+    args.message,
+    args.conversationSummary,
+    args.activeMode,
+    args.hasActiveDocumentContext ?? false
+  );
 
-  if (legalIntent === 'documentation_guidance') {
-    return buildResult('documentation_strategy', documentReference, legalIntent, multiIntent);
-  }
-
-  if (
-    documentReference.referencesDocument &&
-    legalIntent === 'general_summary' &&
-    !bareVaguePronounFollowUp &&
-    ACTIVE_DOCUMENT_FOLLOW_UP_PATTERN.test(message)
-  ) {
-    return buildResult('order_interpretation', documentReference, 'direct_order_interpretation');
-  }
-
-  if (classified.mode === 'court_ready_drafting') {
-    return buildResult('court_ready_drafting', documentReference, legalIntent, multiIntent);
-  }
-
-  if (classified.mode === 'judge_lens_strategy' || classified.mode === 'pattern_analysis') {
-    return buildResult(classified.mode, documentReference, legalIntent);
-  }
-
-  return buildResult('document_analysis', documentReference, legalIntent);
+  return args.hasActiveDocumentContext && classified.mode !== 'safety_escalation'
+    ? preserveOrUpgradeDocumentRoute(classified, args.message, args.activeMode)
+    : classified;
 }
 
 // ---------------------------------------------------------------------------

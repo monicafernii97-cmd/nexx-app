@@ -14,9 +14,9 @@ const GROUNDING_STOP_WORDS = new Set([
 const GROUNDING_CLAUSE_VERBS =
   '(?:shall|must|may|can|cannot|is|are|has|have|do|does)';
 const MATERIAL_PROPOSITION_SUBJECTS =
-  'i|you|he|she|they|father|mother|parent|the\\s+parties';
+  'i|you|he|she|they|(?:the\\s+)?(?:father|mother|parent)|the\\s+parties';
 const SOURCE_CLAUSE_SUBJECTS =
-  'father|mother|parent|the\\s+parties|he|she|they';
+  '(?:the\\s+)?(?:father|mother|parent)|the\\s+parties|he|she|they';
 
 /** Split sentences and compound legal clauses with a caller-specific subject list. */
 function splitGroundingClauses(

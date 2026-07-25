@@ -108,6 +108,21 @@ describe('plain-text document grounding', () => {
     expect(result.errors.join(' ')).toMatch(/shall not have access/i);
   });
 
+  it('grounds determiner-prefixed parent clauses independently', () => {
+    const result = verifyPlainTextDocumentGrounding({
+      message: 'The father shall have custody and the mother must pay support.',
+      sourcePackets: [{
+        ...sourcePackets[0],
+        text: 'The father shall have custody and the mother may pay support.',
+      }],
+      documentReference: detectDocumentReference('Quote the exact language from my uploaded order.'),
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.verifiedCitations).toHaveLength(1);
+    expect(result.errors.join(' ')).toMatch(/the mother must pay support/i);
+  });
+
   it('checks do-not-have-access language as a material order proposition', () => {
     const result = verifyPlainTextDocumentGrounding({
       message: 'We shall communicate only through AppClose. You do not have access to Amelia’s medical records.',

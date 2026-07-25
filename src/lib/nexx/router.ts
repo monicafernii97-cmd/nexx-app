@@ -34,8 +34,13 @@ const SAFETY_PATTERNS = [
 const HISTORICAL_SAFETY_CONTEXT_PATTERN =
   /\b(?:years?\s+ago|in\s+(?:19|20)\d{2}|when\s+(?:we|i)\s+(?:were|was)\s+together|during\s+our\s+relationship|previously|in\s+the\s+past|used\s+to)\b/i;
 
-const CURRENT_SAFETY_GRAMMAR_PATTERN =
-  /\b(?:is|are|am|has\s+been|have\s+been|keeps?|continues?)\s+(?:currently\s+)?(?:stalking|threatening|following|harassing|refusing\s+to\s+return|keeping\s+the\s+child)\b|\b(?:says?|threatens?|told|texted|wrote\s+to|messaged)\b.{0,70}\b(?:will|is\s+going\s+to|plans?\s+to|intends?\s+to|wants?\s+to)\b.{0,25}\b(?:kill|hurt|harm|hit|shoot|stab|come\s+after|take\s+the\s+child|kidnap)\b|\b(?:he|she|they|the\s+other\s+parent|my\s+ex)\s+(?:is\s+going\s+to|will|plans?\s+to|intends?\s+to|wants?\s+to)\s+(?:kill|hurt|harm|hit|shoot|stab|come\s+after|take\s+the\s+child|kidnap)\b|\bis\s+threatening\b.{0,40}\b(?:kill|hurt|harm|hit|shoot|stab|come\s+after|take\s+the\s+child|kidnap)\b|\brefuses?\s+to\s+return\s+(?:the\s+)?child\b/i;
+const CURRENT_SAFETY_GRAMMAR_PATTERNS = [
+  /\b(?:is|are|am|has\s+been|have\s+been|keeps?|continues?)\s+(?:currently\s+)?(?:stalking|threatening|following|harassing|refusing\s+to\s+return|keeping\s+the\s+child)\b/i,
+  /\b(?:says?|threatens?|told|texted|wrote\s+to|messaged)\b.{0,70}\b(?:will|is\s+going\s+to|plans?\s+to|intends?\s+to|wants?\s+to)\b.{0,25}\b(?:kill|hurt|harm|hit|shoot|stab|come\s+after|take\s+the\s+child|kidnap)\b/i,
+  /\b(?:he|she|they|the\s+other\s+parent|my\s+ex)\s+(?:is\s+going\s+to|will|plans?\s+to|intends?\s+to|wants?\s+to)\s+(?:kill|hurt|harm|hit|shoot|stab|come\s+after|take\s+the\s+child|kidnap)\b/i,
+  /\bis\s+threatening\b.{0,40}\b(?:kill|hurt|harm|hit|shoot|stab|come\s+after|take\s+the\s+child|kidnap)\b/i,
+  /\brefuses?\s+to\s+return\s+(?:the\s+)?child\b/i,
+];
 
 const CURRENT_SAFETY_NEGATION_PATTERN =
   /\b(?:not\s+(?:because\s+)?(?:i|we|my child|our child|my daughter|my son|the child)\s+(?:am|are|is)\s+(?:currently\s+)?(?:in\s+)?(?:danger|unsafe)|not\s+in\s+danger\s+now|no\s+(?:current|immediate)\s+safety\s+concern)\b/i;
@@ -100,7 +105,7 @@ const ACTIVE_DOCUMENT_FOLLOW_UP_PATTERN =
   /\b(can|could|should|does|did|is|are|must|shall|allowed|right|mean|means|wrong|okay|ok|do that|say back|respond)\b/i;
 
 const SAME_ISSUE_WHAT_TO_SAY_PATTERN =
-  /\b(what\s+(?:do|should)\s+i\s+say(?:\s+back)?|how\s+(?:do|should)\s+i\s+(?:respond|reply)|say\s+back|respond\s+back|reply\s+back)\b/i;
+  /\b(what\s+(?:(?:do|should)\s+i|i\s+should)\s+say(?:\s+back)?|how\s+(?:(?:do|should)\s+i|i\s+should)\s+(?:respond|reply)|say\s+back|respond\s+back|reply\s+back)\b/i;
 
 const SAME_ISSUE_NEXT_STEP_PATTERN =
   /\b(what\s+(?:do|should)\s+i\s+do\s+next|next\s+step|what\s+now|how\s+do\s+i\s+handle\s+this)\b/i;
@@ -118,7 +123,7 @@ const LEGAL_ACTIVE_CONTEXT_PATTERN =
   /\b(court\s+order|order|possession|access|visitation|custody|conservatorship|decision[-\s]?making|support|enforcement|contempt|other parent|father|mother|appclose|pickup|pick up|drop[-\s]?off|exchange|deadline|obligation|rights?)\b/i;
 
 const SHORT_CONTINUATION_PATTERN =
-  /^(?:(?:yes|yeah|yep|okay|ok|sure|right)[,;]?\s+)?(?:please\s+)?(?:yes|yeah|yep|okay|ok|sure|right|go ahead|let'?s do (?:that|it|all(?:\s+\d+)?))(?:[.!])?$/i;
+  /^(?:(?:yes|yeah|yep|okay|ok|sure|right)[,;]?\s+)?(?:please\s+)?(?:yes|yeah|yep|okay|ok|sure|right|go ahead|let['\u2019]?s do (?:that|it|all(?:\s+\d+)?))(?:[.!])?$/i;
 
 const EXPLANATION_CONTINUATION_PATTERN =
   /\b(?:can|could|would)\s+you\s+(?:explain|expand|elaborate|go\s+deeper|say\s+more)\b|\b(?:tell|show)\s+me\s+more\b|\bwhat\s+do\s+you\s+mean\b|\b(?:can|could|should)\s+we\s+(?:rephrase|rewrite|make|change|shorten|remove|adjust)\b|\bi\s+(?:do\s+not|don'?t)\s+(?:want|need)\s+(?:to\s+)?(?:say|include|add|invite|remind)\b|\bi\s+think\b.{0,100}\bi\s+(?:do\s+not|don'?t)\s+need\b/i;
@@ -179,16 +184,33 @@ function hasSafetyEscalationSignal(message: string) {
   // Scope historical suppression to the sentence that contains the safety
   // signal. A historical disclosure in one sentence must never suppress a new
   // current-risk report elsewhere in the same turn.
-  const safetySegments = message
+  const segments = message
     .split(/(?<=[.!?;])\s+|\r?\n+|,\s+(?=(?:and|but)\b)|\s+(?:and|but)\s+(?=(?:he|she|they|i|we|now|today|tonight|currently)\b)/i)
     .map((segment) => segment.trim())
-    .filter((segment) => matchesAny(segment, SAFETY_PATTERNS));
+    .filter(Boolean);
 
-  return safetySegments.some((segment) => {
+  // Threat grammar can straddle a conjunction boundary ("he threatened me /
+  // and he would hurt me tonight"). Evaluate small adjacent windows so a
+  // separate historical or negated sentence cannot suppress that current
+  // threat through a whole-message check.
+  const candidates: string[] = [];
+  for (let start = 0; start < segments.length; start++) {
+    for (let size = 1; size <= 3 && start + size <= segments.length; size++) {
+      const candidate = segments.slice(start, start + size).join(' ');
+      if (matchesAny(candidate, SAFETY_PATTERNS)) candidates.push(candidate);
+    }
+  }
+
+  // A safety phrase can straddle a grammatical split. If the whole-message
+  // gate matched but no local window did, fail safely by evaluating the
+  // original message with the same historical and negation checks.
+  if (candidates.length === 0) candidates.push(message);
+
+  return candidates.some((segment) => {
     if (CURRENT_SAFETY_NEGATION_PATTERN.test(segment)) return false;
     const isHistorical =
       HISTORICAL_SAFETY_CONTEXT_PATTERN.test(segment) &&
-      !CURRENT_SAFETY_GRAMMAR_PATTERN.test(segment);
+      !matchesAny(segment, CURRENT_SAFETY_GRAMMAR_PATTERNS);
     return !isHistorical;
   });
 }
@@ -214,15 +236,15 @@ function isLitigationNavigationRoute(mode?: RouteMode) {
     mode === 'court_ready_drafting';
 }
 
+/** Classify whether a short turn continues the current issue and what it requests. */
 export function classifyFollowUpIntent(message: string): FollowUpIntent {
   const text = message.trim();
   if (!text) return 'new_issue';
-  if (SHORT_CONTINUATION_PATTERN.test(text) || EXPLANATION_CONTINUATION_PATTERN.test(text)) {
-    return 'same_issue_yes_no';
-  }
+  if (SHORT_CONTINUATION_PATTERN.test(text)) return 'same_issue_yes_no';
   if (SAME_ISSUE_WHAT_TO_SAY_PATTERN.test(text)) return 'same_issue_what_to_say';
   if (SAME_ISSUE_NEXT_STEP_PATTERN.test(text)) return 'same_issue_next_step';
   if (SAME_ISSUE_RIGHTS_CHECK_PATTERN.test(text)) return 'same_issue_rights_check';
+  if (EXPLANATION_CONTINUATION_PATTERN.test(text)) return 'same_issue_yes_no';
   if (SAME_ISSUE_YES_NO_PATTERN.test(text)) return 'same_issue_yes_no';
   if (hasConversationalContinuationSignal(text)) return 'same_issue_yes_no';
   return 'new_issue';
@@ -230,10 +252,8 @@ export function classifyFollowUpIntent(message: string): FollowUpIntent {
 
 function hasActiveFamilyLawContext(
   conversationSummary?: string,
-  activeMode?: RouteMode,
-  _hasActiveDocumentContext = false
+  activeMode?: RouteMode
 ) {
-  void _hasActiveDocumentContext;
   return isDocumentRoute(activeMode) ||
     isLitigationNavigationRoute(activeMode) ||
     Boolean(conversationSummary && LEGAL_ACTIVE_CONTEXT_PATTERN.test(conversationSummary));
@@ -304,19 +324,24 @@ function isBareVaguePronounFollowUp(
 /**
  * Classify a user message into a RouteMode.
  * Safety-first: safety_escalation is always checked first.
+ *
+ * Active-document upgrades happen only in `resolveTurnRoute`, after the
+ * user's natural intent has been classified.
  */
 export function classifyMessage(
   message: string,
   conversationSummary?: string,
-  activeMode?: RouteMode,
-  hasActiveDocumentContext = false
+  activeMode?: RouteMode
 ): RouterResult {
   const text = message.toLowerCase();
   const documentReference = detectDocumentReference(message);
   const legalIntent = classifyLegalIntent(message);
-  const multiIntent = classifyPackedCaseIntake(message, conversationSummary);
+  // A durable summary may retain old service, deadline, and filing facts.
+  // Packed-case intake must be triggered by the current turn, or stale legal
+  // history can hijack an unrelated medical or co-parent reply request.
+  const multiIntent = classifyPackedCaseIntake(message);
   const followUpIntent = classifyFollowUpIntent(message);
-  const hasActiveContext = hasActiveFamilyLawContext(conversationSummary, activeMode, hasActiveDocumentContext);
+  const hasActiveContext = hasActiveFamilyLawContext(conversationSummary, activeMode);
   const bareVaguePronounFollowUp = isBareVaguePronounFollowUp(documentReference, followUpIntent);
 
   // Safety-first: always check escalation first
@@ -349,6 +374,10 @@ export function classifyMessage(
     ![
       'court_filing_draft',
       'court_response_planning',
+      'packed_case_intake',
+      'new_court_filing_received',
+      'court_response_deadline',
+      'deadline_or_timing_question',
       'filing_walkthrough',
       'pro_se_feasibility',
       'attorney_cost_question',
@@ -521,10 +550,15 @@ export function classifyMessage(
   return buildResult('adaptive_chat', undefined, legalIntent);
 }
 
+/**
+ * Preserve a classified user intent, upgrading only unopinionated routes when
+ * the current turn truly continues an active document question.
+ */
 export function preserveOrUpgradeDocumentRoute(
   classified: RouterResult,
   message: string,
-  activeMode?: RouteMode
+  activeMode?: RouteMode,
+  conversationSummary?: string
 ): RouterResult {
   if (classified.mode === 'safety_escalation') return classified;
   if (isDocumentAvailabilityQuestion(message)) return classified;
@@ -537,15 +571,9 @@ export function preserveOrUpgradeDocumentRoute(
   // Classification has already considered the user's request. An attachment
   // should enrich a relational, drafting, procedure, or support route—not
   // replace that route with generic document analysis.
-  if (
-    !isDocumentRoute(classified.mode) &&
-    classified.mode !== 'adaptive_chat' &&
-    classified.mode !== 'direct_legal_answer'
-  ) {
+  if (classified.mode !== 'adaptive_chat' && classified.mode !== 'direct_legal_answer') {
     return classified;
   }
-
-  if (isDocumentRoute(classified.mode)) return classified;
 
   const hasExplicitDocumentRequest =
     documentReference.referencesDocument && !bareVaguePronounFollowUp;
@@ -574,7 +602,7 @@ export function preserveOrUpgradeDocumentRoute(
     )
   ) {
     return buildResult(
-      inferFollowUpRoute(message, undefined, activeMode),
+      inferFollowUpRoute(message, conversationSummary, activeMode),
       activeReference,
       'direct_order_interpretation'
     );
@@ -595,12 +623,16 @@ export function resolveTurnRoute(args: {
   const classified = classifyMessage(
     args.message,
     args.conversationSummary,
-    args.activeMode,
-    args.hasActiveDocumentContext ?? false
+    args.activeMode
   );
 
   return args.hasActiveDocumentContext && classified.mode !== 'safety_escalation'
-    ? preserveOrUpgradeDocumentRoute(classified, args.message, args.activeMode)
+    ? preserveOrUpgradeDocumentRoute(
+        classified,
+        args.message,
+        args.activeMode,
+        args.conversationSummary,
+      )
     : classified;
 }
 

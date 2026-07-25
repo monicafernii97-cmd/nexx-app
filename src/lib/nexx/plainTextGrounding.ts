@@ -11,6 +11,29 @@ const GROUNDING_STOP_WORDS = new Set([
   'clarity', 'court', 'exact', 'language', 'order', 'says', 'states', 'under',
 ]);
 
+const GROUNDING_CLAUSE_VERBS =
+  '(?:shall|must|may|can|cannot|is|are|has|have|do|does)';
+const MATERIAL_PROPOSITION_SUBJECTS =
+  'i|you|he|she|they|father|mother|parent|the\\s+parties';
+const SOURCE_CLAUSE_SUBJECTS =
+  'father|mother|parent|the\\s+parties|he|she|they';
+
+/** Split sentences and compound legal clauses with a caller-specific subject list. */
+function splitGroundingClauses(
+  value: string,
+  sentenceBoundary: RegExp,
+  subjectPattern: string,
+) {
+  const conjunctionBoundary = new RegExp(
+    `\\s+(?:and|but)\\s+(?=(?:(?:${subjectPattern})\\s+)?${GROUNDING_CLAUSE_VERBS}\\b)`,
+    'i',
+  );
+
+  return value
+    .split(sentenceBoundary)
+    .flatMap((sentence) => sentence.split(conjunctionBoundary));
+}
+
 function normalizedGroundingWords(value: string) {
   return value
     .toLowerCase()
@@ -39,13 +62,11 @@ function candidateGroundingPhrases(value: string) {
 }
 
 function materialOrderPropositions(value: string) {
-  return value
-    .split(/(?<=[.!?])\s+|\r?\n+/)
-    .flatMap((sentence) =>
-      sentence.split(
-        /\s+(?:and|but)\s+(?=(?:(?:i|you|he|she|they|father|mother|parent|the\s+parties)\s+)?(?:shall|must|may|can|cannot|is|are|has|have|do|does)\b)/i,
-      )
-    )
+  return splitGroundingClauses(
+    value,
+    /(?<=[.!?])\s+|\r?\n+/,
+    MATERIAL_PROPOSITION_SUBJECTS,
+  )
     .map((sentence) => sentence.replace(/^[>\s"'“”*-]+|[>"'“”\s]+$/g, '').trim())
     .filter((sentence) => sentence.length > 0)
     .filter((sentence) =>
@@ -76,13 +97,11 @@ function legalModality(value: string): LegalModality {
 }
 
 function sourceClauses(value: string) {
-  return value
-    .split(/(?<=[.!?;])\s+|\r?\n+/)
-    .flatMap((sentence) =>
-      sentence.split(
-        /\s+(?:and|but)\s+(?=(?:(?:father|mother|parent|the\s+parties|he|she|they)\s+)?(?:shall|must|may|can|cannot|is|are|has|have|do|does)\b)/i,
-      )
-    )
+  return splitGroundingClauses(
+    value,
+    /(?<=[.!?;])\s+|\r?\n+/,
+    SOURCE_CLAUSE_SUBJECTS,
+  )
     .map((clause) => clause.trim())
     .filter(Boolean);
 }

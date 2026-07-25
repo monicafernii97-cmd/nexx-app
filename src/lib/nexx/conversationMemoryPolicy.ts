@@ -7,6 +7,7 @@ export type ConversationMemoryCandidate = {
   roleOrder: number;
 };
 
+/** Return whether an edit or retry changed history already represented in memory. */
 export function shouldInvalidateConversationSummary(args: {
   summaryTurnCount?: number;
   editedMessageId?: string;
@@ -23,6 +24,7 @@ export function shouldInvalidateConversationSummary(args: {
   });
 }
 
+/** Select committed canonical messages within the requested compaction window. */
 export function canonicalConversationMemoryPage(args: {
   messages: ConversationMemoryCandidate[];
   fromTurnExclusive: number;
@@ -47,12 +49,22 @@ export function canonicalConversationMemoryPage(args: {
     .map(({ role, content }) => ({ role, content }));
 }
 
-/** Preserve both the setup and the user's final refinement in very long turns. */
+/**
+ * Preserve both the setup and the user's final refinement in very long turns
+ * while strictly honoring the requested storage budget.
+ */
 export function compactConversationMemoryContent(value: string, maxChars = 12_000) {
-  if (value.length <= maxChars) return value;
+  if (!Number.isFinite(maxChars)) return maxChars === Number.POSITIVE_INFINITY ? value : '';
+  const budget = Math.max(0, Math.floor(maxChars));
+  if (value.length <= budget) return value;
+  if (budget === 0) return '';
+
   const omissionMarker = '\n\n[Earlier pasted content omitted during memory compaction]\n\n';
-  const available = Math.max(0, maxChars - omissionMarker.length);
+  if (budget <= omissionMarker.length) return value.slice(0, budget);
+
+  const available = budget - omissionMarker.length;
   const headChars = Math.ceil(available * 0.58);
   const tailChars = available - headChars;
-  return `${value.slice(0, headChars)}${omissionMarker}${value.slice(-tailChars)}`;
+  const tail = tailChars > 0 ? value.slice(-tailChars) : '';
+  return `${value.slice(0, headChars)}${omissionMarker}${tail}`;
 }

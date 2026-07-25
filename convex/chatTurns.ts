@@ -66,6 +66,23 @@ const MAX_EXPLICIT_ALIAS_MATCHED_FILES = 50;
 const MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE = 300;
 const MAX_DOCUMENT_CHUNKS_FROM_SEARCH_PER_FILE = 80;
 const MAX_RETRIEVED_CHUNKS_PER_FILE = 12;
+const MAX_CONVERSATION_SUMMARY_JSON_CHARS = 60_000;
+
+/** Compact JSON formatting without ever persisting a truncated document. */
+function compactConversationSummaryJson(value: string) {
+    try {
+        const parsed: unknown = JSON.parse(value);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return null;
+        }
+        const compacted = JSON.stringify(parsed);
+        return compacted.length <= MAX_CONVERSATION_SUMMARY_JSON_CHARS
+            ? compacted
+            : null;
+    } catch {
+        return null;
+    }
+}
 
 const documentEvidenceSourceValidator = v.object({
     uploadedFileId: v.id('uploadedFiles'),
@@ -958,23 +975,31 @@ export const acceptChatTurn = mutation({
             }
         }
 
-        const existingDocumentState = await ctx.db
-            .query('conversationDocumentState')
-            .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
-            .first();
+        const [existingDocumentState, conversationSummary] = await Promise.all([
+            ctx.db
+                .query('conversationDocumentState')
+                .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
+                .first(),
+            ctx.db
+                .query('conversationSummaries')
+                .withIndex('by_conversationId', (q) => q.eq('conversationId', args.conversationId))
+                .first(),
+        ]);
         const hasActiveDocumentContext =
             validatedAttachments.length > 0 ||
             Boolean(existingDocumentState?.activeUploadedFileId);
         const contextualRoute = resolveTurnRoute({
             message: effectiveMessage,
+            conversationSummary: conversationSummary?.summary,
             activeMode: conversation.routeMode as RouteMode | undefined,
             hasActiveDocumentContext,
         });
         const routeMode = args.routeMode === 'safety_escalation'
             ? args.routeMode
             : contextualRoute.mode;
-        const temperature = args.routeMode === routeMode
-            ? args.temperature
+        const requestedTemperature = args.routeMode === routeMode ? args.temperature : undefined;
+        const temperature = requestedTemperature !== undefined && Number.isFinite(requestedTemperature)
+            ? Math.min(2, Math.max(0, requestedTemperature))
             : contextualRoute.temperature;
         console.info('[ChatTurns] Route resolved', {
             conversationId: args.conversationId,
@@ -1581,6 +1606,8 @@ export const getConversationMemoryWork = internalQuery({
             turnCount: turn.turnNumber,
             fromTurnExclusive: forceCanonicalRebuild ? 0 : previousTurnCount,
             existingSummaryJson: forceCanonicalRebuild ? undefined : summaryDoc?.summary,
+            previousSummaryId: summaryDoc?._id,
+            previousSummaryUpdatedAt: summaryDoc?.updatedAt,
         };
     },
 });
@@ -1629,6 +1656,8 @@ export const upsertConversationSummaryInternal = internalMutation({
         userId: v.id('users'),
         summary: v.string(),
         turnCount: v.number(),
+        previousSummaryId: v.optional(v.id('conversationSummaries')),
+        previousSummaryUpdatedAt: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
         const conversation = await ctx.db.get(args.conversationId);
@@ -1645,14 +1674,33 @@ export const upsertConversationSummaryInternal = internalMutation({
             .query('conversationSummaries')
             .withIndex('by_conversationId', (q) => q.eq('conversationId', args.conversationId))
             .first();
+        const hasPreviousSummaryId = args.previousSummaryId !== undefined;
+        const hasPreviousSummaryVersion = args.previousSummaryUpdatedAt !== undefined;
+        if (hasPreviousSummaryId !== hasPreviousSummaryVersion) return null;
+
+        if (existing) {
+            if (
+                !hasPreviousSummaryId ||
+                existing._id !== args.previousSummaryId ||
+                existing.updatedAt !== args.previousSummaryUpdatedAt ||
+                existing.turnCount >= args.turnCount
+            ) {
+                return null;
+            }
+        } else if (hasPreviousSummaryId) {
+            return null;
+        }
+
+        const summary = compactConversationSummaryJson(args.summary);
+        if (!summary) return null;
+
         const value = {
-            summary: args.summary.slice(0, 60_000),
+            summary,
             turnCount: args.turnCount,
-            updatedAt: Date.now(),
+            updatedAt: Math.max(Date.now(), (existing?.updatedAt ?? 0) + 1),
         };
 
         if (existing) {
-            if (existing.turnCount > args.turnCount) return existing._id;
             await ctx.db.patch(existing._id, value);
             return existing._id;
         }

@@ -26,6 +26,9 @@ describe('user-supplied relational chat benchmark', () => {
     const continuationMode = route('Yes, let\'s do all 3.', firstMode);
     expect(continuationMode).toBe('pattern_analysis');
 
+    const smartQuoteContinuationMode = route('Yes, let\u2019s do all 3.', firstMode);
+    expect(smartQuoteContinuationMode).toBe('pattern_analysis');
+
     const humanMode = route(
       'Can you explain, reading this not as a judge, what do you see from both sides transparently?',
       continuationMode,

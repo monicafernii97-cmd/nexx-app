@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
 
   let conversation;
   try {
-    conversation = await convex.query(api.conversations.get, { id: typedConversationId });
+    conversation = await convex.query(api.conversations.getChatRoutingContext, { id: typedConversationId });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     if (errorMsg.includes('Not authorized') || errorMsg.includes('Not authenticated')) {
@@ -254,16 +254,21 @@ export async function POST(req: NextRequest) {
       : 'free';
 
   const activeRouteMode = conversation.routeMode as RouteMode | undefined;
+  const hasActiveDocumentContext =
+    sanitizedAttachments.length > 0 ||
+    Boolean(conversation.activeUploadedFileId);
   const routerResult = resolveTurnRoute({
     message,
+    conversationSummary: conversation.conversationSummary ?? undefined,
     activeMode: activeRouteMode,
-    hasActiveDocumentContext: sanitizedAttachments.length > 0,
+    hasActiveDocumentContext,
   });
   console.info('[Chat] Accepting chat turn', {
     requestId: turnRequestId,
     conversationIdPresent: Boolean(conversationId),
     messageLength: message.length,
     attachmentCount: sanitizedAttachments.length,
+    hasActiveDocumentContext,
     attachmentStatuses: sanitizedAttachments.map((attachment) => attachment.status),
     routeMode: routerResult.mode,
   });

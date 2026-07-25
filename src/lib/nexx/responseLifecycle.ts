@@ -85,10 +85,12 @@ const HIGH_VERBOSITY_ROUTES = new Set<RouteMode>([
   'pattern_analysis',
 ]);
 
+/** Return whether a route should preserve the model's natural conversational prose. */
 export function isNaturalRelationalRoute(routeMode: RouteMode) {
   return NATURAL_RELATIONAL_ROUTES.has(routeMode);
 }
 
+/** Return whether a route explicitly requests deterministic litigation navigation. */
 export function isExplicitDeterministicLitigationRoute(routeMode: RouteMode) {
   return EXPLICIT_DETERMINISTIC_LITIGATION_ROUTES.has(routeMode);
 }
@@ -142,14 +144,17 @@ export function explicitlyRequestsStoredDocumentForTurn(args: {
     GENERAL_STORED_DOCUMENT_REQUEST.test(message);
 }
 
+/** Gate the deterministic litigation renderer to explicit procedural routes. */
 export function shouldApplyDeterministicLitigationRenderer(routeMode: RouteMode) {
   return isExplicitDeterministicLitigationRoute(routeMode);
 }
 
+/** Gate legal-field enrichment to routes that actually request substantive legal work. */
 export function shouldApplyDeterministicLegalEnrichment(routeMode: RouteMode) {
   return SUBSTANTIVE_LEGAL_ROUTES.has(routeMode);
 }
 
+/** Gate rendered-output verification to substantive legal routes. */
 export function shouldApplyRenderedLegalVerifier(routeMode: RouteMode) {
   return SUBSTANTIVE_LEGAL_ROUTES.has(routeMode);
 }
@@ -169,6 +174,7 @@ export function responseReasoningEffort(
   return 'medium';
 }
 
+/** Select a response-detail level without flattening nuanced or document-heavy work. */
 export function responseVerbosity(
   routeMode: RouteMode,
   options: { highComplexity?: boolean } = {},
@@ -213,6 +219,7 @@ export function shouldForceStoredDocumentGrounding(args: {
   return args.currentTurnExplicitlyRequestsStoredDocument === true;
 }
 
+/** Build the single response policy consumed by transport and post-processing. */
 export function responseLifecyclePolicy(
   routeMode: RouteMode,
   options: { highComplexity?: boolean } = {},

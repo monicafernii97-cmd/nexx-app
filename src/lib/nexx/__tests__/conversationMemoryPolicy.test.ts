@@ -71,4 +71,22 @@ describe('conversation memory edit and retry policy', () => {
     expect(compacted).toContain(ending);
     expect(compacted).toContain('omitted during memory compaction');
   });
+
+  it.each([0, 1, 5, 60, 61, 62, 63])(
+    'never exceeds a tiny compaction budget of %i characters',
+    (maxChars) => {
+      const content = 'beginning '.repeat(80) + 'final refinement';
+      const compacted = compactConversationMemoryContent(content, maxChars);
+
+      expect(compacted.length).toBeLessThanOrEqual(maxChars);
+    },
+  );
+
+  it('does not append the entire input when the computed tail budget is zero', () => {
+    const content = 'x'.repeat(500);
+    const compacted = compactConversationMemoryContent(content, 62);
+
+    expect(compacted.length).toBe(62);
+    expect(compacted).not.toBe(content);
+  });
 });

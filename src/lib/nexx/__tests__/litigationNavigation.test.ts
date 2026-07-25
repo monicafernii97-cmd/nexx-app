@@ -47,7 +47,7 @@ describe('litigation navigation and client-care layer', () => {
 
   it('drafts a short neutral co-parent response without turning the answer into a legal memo', () => {
     const message = 'What should I respond?';
-    const route = classifyMessage(message, "Prior issue: Father's Day possession dispute under a court order.", 'possession_access_schedule', true);
+    const route = classifyMessage(message, "Prior issue: Father's Day possession dispute under a court order.", 'possession_access_schedule');
     const { text } = rendered(message, route.mode);
 
     expect(route.mode).toBe('co_parent_response');

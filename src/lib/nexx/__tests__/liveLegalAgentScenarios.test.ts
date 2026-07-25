@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { extractCourtFilingFromSources } from '../legal-engine/courtFilingExtractor';
 import { buildLitigationNavigationResponse, mergeCourtFilingIntoLitigationNavigation, renderLitigationNavigationMarkdown } from '../legal-engine/litigationNavigationRenderer';
 import { verifyRenderedOutput } from '../legal-engine/renderedOutputVerifier';
-import { classifyMessage } from '../router';
+import { resolveTurnRoute } from '../router';
 import type { LegalDocumentSourcePacket } from '../legalDocumentAnswer';
 import type { RouteMode } from '../../types';
 
@@ -12,12 +12,12 @@ function runScenario(message: string, options: {
   hasActiveDocumentContext?: boolean;
   courtPackets?: LegalDocumentSourcePacket[];
 } = {}) {
-  const route = classifyMessage(
+  const route = resolveTurnRoute({
     message,
-    options.context,
-    options.activeMode,
-    options.hasActiveDocumentContext
-  );
+    conversationSummary: options.context,
+    activeMode: options.activeMode,
+    hasActiveDocumentContext: options.hasActiveDocumentContext,
+  });
   const extraction = options.courtPackets ? extractCourtFilingFromSources(options.courtPackets) : null;
   const response = mergeCourtFilingIntoLitigationNavigation(
     buildLitigationNavigationResponse({
@@ -45,12 +45,12 @@ function runScenario(message: string, options: {
 
 describe('live-style legal agent scenarios', () => {
   it('routes vague active order follow-up into legal interpretation', () => {
-    const route = classifyMessage(
-      'Can he do that?',
-      "Prior issue: Father's Day possession dispute under uploaded order.",
-      'possession_access_schedule',
-      true
-    );
+    const route = resolveTurnRoute({
+      message: 'Can he do that?',
+      conversationSummary: "Prior issue: Father's Day possession dispute under uploaded order.",
+      activeMode: 'possession_access_schedule',
+      hasActiveDocumentContext: true,
+    });
 
     expect(['possession_access_schedule', 'order_interpretation']).toContain(route.mode);
     expect(route.legalIntent).toBe('direct_order_interpretation');

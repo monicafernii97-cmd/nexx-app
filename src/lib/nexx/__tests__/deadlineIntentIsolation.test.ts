@@ -49,6 +49,15 @@ describe('deadline intent isolation', () => {
   });
 
   it.each([
+    "What's my deadline?",
+    'What\u2019s my deadline?',
+    "When's my response due?",
+    'When\u2019s the hearing?',
+  ])('recognizes a contracted timing request: %s', (message) => {
+    expect(hasDeadlineQuestion(message)).toBe(true);
+  });
+
+  it.each([
     ['Draft a court-ready declaration about our communication history.', 'court_ready_drafting'],
     ['What do I file in response to his motion?', 'court_response_planning'],
     ['Walk me through filing this declaration.', 'filing_walkthrough'],

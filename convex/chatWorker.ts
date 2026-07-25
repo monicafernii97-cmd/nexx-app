@@ -1187,8 +1187,7 @@ function buildInput(
     const routerResult = classifyMessage(
         context.turn.message,
         followUpSummary,
-        routeMode,
-        hasActiveDocumentContext(context)
+        routeMode
     );
     const documentReference = routerResult.documentReference ?? detectDocumentReference(context.turn.message);
     const allowStoredFileSearch =
@@ -2159,8 +2158,7 @@ async function generateWithFallbacks({
     const routerResult = classifyMessage(
         context.turn.message,
         followUpSummary,
-        storedRouteMode,
-        hasActiveDocumentContext(context)
+        storedRouteMode
     );
     const routeMode = (storedRouteMode ?? routerResult.mode) as RouteMode;
     const model = context.turn.model ?? 'gpt-5.4';
@@ -2721,6 +2719,8 @@ export const persistConversationMemory = internalAction({
                 turnCount: number;
                 fromTurnExclusive: number;
                 existingSummaryJson?: string;
+                previousSummaryId?: Id<'conversationSummaries'>;
+                previousSummaryUpdatedAt?: number;
             } | null = await ctx.runQuery(internal.chatTurns.getConversationMemoryWork, {
                 turnId: args.turnId,
             });
@@ -2792,12 +2792,25 @@ export const persistConversationMemory = internalAction({
                 ...rollingSummary,
                 turnCount: work.turnCount,
             };
-            await ctx.runMutation(internal.chatTurns.upsertConversationSummaryInternal, {
+            const persistedSummaryId = await ctx.runMutation(internal.chatTurns.upsertConversationSummaryInternal, {
                 conversationId: work.conversationId,
                 userId: work.userId,
                 summary: JSON.stringify(durableSummary),
                 turnCount: work.turnCount,
+                ...(work.previousSummaryId
+                    ? { previousSummaryId: work.previousSummaryId }
+                    : {}),
+                ...(work.previousSummaryUpdatedAt !== undefined
+                    ? { previousSummaryUpdatedAt: work.previousSummaryUpdatedAt }
+                    : {}),
             });
+            if (!persistedSummaryId) {
+                console.info('[ChatWorker] Conversation memory compaction skipped stale work', {
+                    conversationId: work.conversationId,
+                    turnCount: work.turnCount,
+                });
+                return null;
+            }
             console.info('[ChatWorker] Conversation memory compacted', {
                 conversationId: work.conversationId,
                 turnCount: work.turnCount,
@@ -2926,9 +2939,13 @@ export const processChatGenerationJob = internalAction({
             });
 
             if (completion && !result.degraded) {
-                await ctx.scheduler.runAfter(0, internal.chatWorker.persistConversationMemory, {
-                    turnId: lease.turnId,
-                });
+                try {
+                    await ctx.scheduler.runAfter(0, internal.chatWorker.persistConversationMemory, {
+                        turnId: lease.turnId,
+                    });
+                } catch (scheduleError) {
+                    console.error('[ChatWorker] Failed to schedule conversation memory compaction', scheduleError);
+                }
             }
 
             if (
@@ -2990,8 +3007,7 @@ export const processChatGenerationJob = internalAction({
                 const auditRouterResult = classifyMessage(
                     context.turn.message,
                     auditFollowUpSummary,
-                    storedAuditRouteMode,
-                    hasActiveDocumentContext(context)
+                    storedAuditRouteMode
                 );
                 const auditRouteMode = (storedAuditRouteMode ?? auditRouterResult.mode) as RouteMode;
                 const selectedUploadedFileIds = result.attachmentContexts.map((attachment) => attachment.uploadedFileId);

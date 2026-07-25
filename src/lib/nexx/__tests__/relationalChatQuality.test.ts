@@ -17,7 +17,7 @@ describe('relational chat quality routing', () => {
   ])('treats document availability as a direct conversational question: %s', (message) => {
     expect(isDocumentAvailabilityQuestion(message)).toBe(true);
     expect(detectDocumentReference(message).referencesDocument).toBe(false);
-    const classified = classifyMessage(message, undefined, 'document_analysis', true);
+    const classified = classifyMessage(message, undefined, 'document_analysis');
     expect(classified.mode).toBe('adaptive_chat');
     expect(preserveOrUpgradeDocumentRoute(classified, message, 'document_analysis').mode)
       .toBe('adaptive_chat');
@@ -30,7 +30,7 @@ describe('relational chat quality routing', () => {
   ])('does not mistake a substantive order question for storage metadata: %s', (message) => {
     expect(isDocumentAvailabilityQuestion(message)).toBe(false);
     expect(detectDocumentReference(message).referencesDocument).toBe(true);
-    expect(classifyMessage(message, undefined, 'document_analysis', true).mode).not.toBe('adaptive_chat');
+    expect(classifyMessage(message, undefined, 'document_analysis').mode).not.toBe('adaptive_chat');
   });
 
   it.each([
@@ -57,7 +57,7 @@ describe('relational chat quality routing', () => {
       not because I am in danger now. What do you see in the communication dynamic?
     `;
 
-    const classified = classifyMessage(message, undefined, 'document_analysis', true);
+    const classified = classifyMessage(message, undefined, 'document_analysis');
     expect(classified.mode).toBe('pattern_analysis');
     expect(preserveOrUpgradeDocumentRoute(classified, message, 'document_analysis').mode)
       .toBe('pattern_analysis');
@@ -101,6 +101,21 @@ describe('relational chat quality routing', () => {
     expect(classifyMessage(message).mode).toBe('safety_escalation');
   });
 
+  it('fails safely when a current threat phrase spans a segment boundary', () => {
+    const message = 'He threatened me and he would hurt me tonight.';
+    expect(classifyMessage(message).mode).toBe('safety_escalation');
+  });
+
+  it('does not let a separate historical disclosure hide a cross-boundary current threat', () => {
+    const message = 'He hit me years ago. He threatened me and he would hurt me tonight.';
+    expect(classifyMessage(message).mode).toBe('safety_escalation');
+  });
+
+  it('does not let an unrelated negated sentence hide a cross-boundary current threat', () => {
+    const message = 'My child is not in danger now. He threatened me and he would hurt me tonight.';
+    expect(classifyMessage(message).mode).toBe('safety_escalation');
+  });
+
   it('does not turn a request to understand historical stalking into a current emergency', () => {
     const message = 'He was stalking me when we were together and I need help understanding the pattern.';
     expect(classifyMessage(message).mode).not.toBe('safety_escalation');
@@ -118,7 +133,7 @@ describe('relational chat quality routing', () => {
 
   it('does not let an attached document turn a new relational topic into order interpretation', () => {
     const message = 'Can you explain how to emotionally detach without becoming cold?';
-    const classified = classifyMessage(message, undefined, 'document_analysis', true);
+    const classified = classifyMessage(message, undefined, 'document_analysis');
 
     expect(classified.mode).toBe('supportive_strategy');
     expect(preserveOrUpgradeDocumentRoute(classified, message, 'document_analysis').mode)
@@ -144,7 +159,69 @@ describe('relational chat quality routing', () => {
     ['I think he already knows that, so I don\'t need to remind him.', 'co_parent_response'],
   ] as const)('continues short relational follow-ups in the active non-document route: %s', (message, mode) => {
     expect(classifyFollowUpIntent(message)).not.toBe('new_issue');
-    expect(classifyMessage(message, undefined, mode, true).mode).toBe(mode);
+    expect(classifyMessage(message, undefined, mode).mode).toBe(mode);
+  });
+
+  it('keeps a specific reply request ahead of a generic request to explain', () => {
+    expect(classifyFollowUpIntent(
+      'Can you explain what I should say to him about the exchange?',
+    )).toBe('same_issue_what_to_say');
+  });
+
+  it.each([
+    'Can you explain what I should say to him?',
+    'Can you explain how I should respond?',
+  ])('routes a natural what-to-say follow-up to co-parent response: %s', (message) => {
+    const result = resolveTurnRoute({
+      message,
+      activeMode: 'document_analysis',
+      hasActiveDocumentContext: true,
+    });
+
+    expect(result.mode).toBe('co_parent_response');
+    expect(result.legalIntent).toBe('co_parent_response_strategy');
+  });
+
+  it('does not let relational wording preempt a newly served multi-issue filing intake', () => {
+    expect(classifyMessage(
+      'I was just served with a motion and I am trying to figure out parallel parenting.',
+    ).mode).toBe('packed_case_intake');
+  });
+
+  it('does not let stale filing memory hijack a new medical-access reply request', () => {
+    const result = resolveTurnRoute({
+      message: 'The portal includes my other children. Can you help me respond to him naturally?',
+      conversationSummary: JSON.stringify({
+        keyFacts: [
+          'The user was served with a prior motion.',
+          'A response deadline was discussed.',
+          'The user felt overwhelmed by AppClose accusations.',
+        ],
+        goals: ['Prepare for the earlier hearing.'],
+      }),
+      activeMode: 'litigation_navigation',
+      hasActiveDocumentContext: false,
+    });
+
+    expect(result.mode).toBe('co_parent_response');
+    expect(result.legalIntent).toBe('co_parent_response_strategy');
+  });
+
+  it('does not let relational wording preempt a deadline question', () => {
+    const result = classifyMessage('What is the deadline to request parallel parenting?');
+    expect(result.legalIntent).toBe('deadline_or_timing_question');
+    expect(result.mode).toBe('local_procedure');
+  });
+
+  it('uses summary context through the authoritative resolver for an active document follow-up', () => {
+    const result = resolveTurnRoute({
+      message: 'Is that allowed?',
+      conversationSummary: "The current issue is Father's Day possession and exchange timing.",
+      activeMode: 'document_analysis',
+      hasActiveDocumentContext: true,
+    });
+
+    expect(result.mode).toBe('possession_access_schedule');
   });
 
   it('keeps the relational analysis contract in every route prompt', () => {

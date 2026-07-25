@@ -100,7 +100,7 @@ describe('classifyMessage document follow-ups', () => {
   });
 
   it('upgrades vague active-document follow-ups into legal interpretation', () => {
-    const result = classifyMessage('Can he do that?', undefined, 'possession_access_schedule', true);
+    const result = classifyMessage('Can he do that?', undefined, 'possession_access_schedule');
 
     expect(classifyFollowUpIntent('Can he do that?')).toBe('same_issue_yes_no');
     expect(result.mode).toBe('possession_access_schedule');
@@ -110,7 +110,7 @@ describe('classifyMessage document follow-ups', () => {
   });
 
   it('routes what-to-say active-document follow-ups to co-parent response with active order context', () => {
-    const result = classifyMessage('What do I say back?', undefined, 'order_interpretation', true);
+    const result = classifyMessage('What do I say back?', undefined, 'order_interpretation');
 
     expect(classifyFollowUpIntent('What do I say back?')).toBe('same_issue_what_to_say');
     expect(result.mode).toBe('co_parent_response');
@@ -131,8 +131,7 @@ describe('classifyMessage document follow-ups', () => {
     const result = classifyMessage(
       'I am so confused. Am I wrong?',
       "Prior issue: Father's Day possession dispute under a court order.",
-      'possession_access_schedule',
-      true
+      'possession_access_schedule'
     );
 
     expect(classifyFollowUpIntent('Am I wrong?')).toBe('same_issue_rights_check');

@@ -302,6 +302,31 @@ export const get = query({
     },
 });
 
+/** Return the minimal authenticated context needed to admit and route a chat turn. */
+export const getChatRoutingContext = query({
+    args: { id: v.id('conversations') },
+    handler: async (ctx, args) => {
+        const { conversation } = await getAuthenticatedUserAndConversation(ctx, args.id);
+        const [conversationDocumentState, conversationSummary] = await Promise.all([
+            ctx.db
+                .query('conversationDocumentState')
+                .withIndex('by_conversation', (q) => q.eq('conversationId', conversation._id))
+                .first(),
+            ctx.db
+                .query('conversationSummaries')
+                .withIndex('by_conversationId', (q) => q.eq('conversationId', conversation._id))
+                .first(),
+        ]);
+
+        return {
+            title: conversation.title,
+            routeMode: conversation.routeMode,
+            activeUploadedFileId: conversationDocumentState?.activeUploadedFileId ?? null,
+            conversationSummary: conversationSummary?.summary ?? null,
+        };
+    },
+});
+
 // ── NEW: Responses API + Conversations API state management ──
 // All mutations below derive the caller from ctx.auth (Clerk JWT),
 // NOT from caller-supplied args. This prevents forgery.

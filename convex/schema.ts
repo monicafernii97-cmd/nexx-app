@@ -343,10 +343,14 @@ export default defineSchema({
         updatedAt: v.number(),
         startedAt: v.optional(v.number()),
         completedAt: v.optional(v.number()),
+        /** Set after the recovery sweep has verified/saved a terminal fallback. */
+        recoveryCheckedAt: v.optional(v.number()),
     })
         .index('by_turn', ['turnId'])
         .index('by_request', ['conversationId', 'requestId'])
         .index('by_status', ['status'])
+        .index('by_status_leaseExpiresAt', ['status', 'leaseExpiresAt'])
+        .index('by_status_recoveryCheckedAt', ['status', 'recoveryCheckedAt'])
         .index('by_conversation_status', ['conversationId', 'status']),
 
     chatUploadSessions: defineTable({
@@ -1662,7 +1666,8 @@ export default defineSchema({
         createdAt: v.number(),
         updatedAt: v.number(),
     })
-        .index('by_userId', ['userId']),
+        .index('by_userId', ['userId'])
+        .index('by_userId_createdAt', ['userId', 'createdAt']),
 
     // ═══ NEW: Case Pins (workspace pinned items) ═══
     casePins: defineTable({
@@ -1707,6 +1712,7 @@ export default defineSchema({
         .index('by_userId', ['userId'])
         .index('by_userId_type', ['userId', 'type'])
         .index('by_userId_requestId', ['userId', 'requestId'])
+        .index('by_userId_caseId', ['userId', 'caseId'])
         .index('by_caseId', ['caseId']),
 
     // ═══ NEW: Case Memory (saved strategy/analysis items) ═══
@@ -1747,6 +1753,7 @@ export default defineSchema({
         .index('by_userId', ['userId'])
         .index('by_userId_type', ['userId', 'type'])
         .index('by_userId_requestId', ['userId', 'requestId'])
+        .index('by_userId_caseId', ['userId', 'caseId'])
         .index('by_caseId', ['caseId']),
 
     // ═══ NEW: Timeline Candidates (AI-suggested timeline entries) ═══
@@ -1775,6 +1782,7 @@ export default defineSchema({
         .index('by_userId', ['userId'])
         .index('by_userId_status', ['userId', 'status'])
         .index('by_userId_requestId', ['userId', 'requestId'])
+        .index('by_userId_caseId', ['userId', 'caseId'])
         .index('by_caseId', ['caseId']),
 
     // ═══ NEW: Detected Patterns (evidence-based behavioral patterns) ═══
@@ -1846,6 +1854,8 @@ export default defineSchema({
             /** Exclude this item from the export entirely */
             excluded: v.optional(v.boolean()),
         })),
+        /** Hash of the last atomic review checkpoint applied to this row. */
+        checkpointHash: v.optional(v.string()),
         createdAt: v.number(),
         updatedAt: v.number(),
     })
@@ -1871,8 +1881,11 @@ export default defineSchema({
         exportRequestJson: v.string(),
         /** Serialized AssemblyResult (after assembly completes) */
         assemblyResultJson: v.optional(v.string()),
+        /** Review edits are stored separately from the immutable assembly shell. */
+        reviewItemsJson: v.optional(v.string()),
         /** Serialized draft output (after GPT drafting completes) */
         draftOutputJson: v.optional(v.string()),
+        checkpointHash: v.optional(v.string()),
         createdAt: v.number(),
         updatedAt: v.number(),
     })
@@ -1907,6 +1920,7 @@ export default defineSchema({
         .index('by_fingerprint', ['fingerprint'])
         .index('by_userId', ['userId'])
         .index('by_status', ['status'])
+        .index('by_status_createdAt', ['status', 'createdAt'])
         .index('by_createdAt', ['createdAt']),
 
     // ═══ Export Jobs (Queue Admission Control) ═══

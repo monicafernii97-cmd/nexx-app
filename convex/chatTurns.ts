@@ -2297,7 +2297,9 @@ export const recoverStaleJobs = internalMutation({
         const now = Date.now();
         const running = await ctx.db
             .query('chatGenerationJobs')
-            .withIndex('by_status', (q) => q.eq('status', 'running'))
+            .withIndex('by_status_leaseExpiresAt', (q) =>
+                q.eq('status', 'running').lt('leaseExpiresAt', now)
+            )
             .take(50);
 
         let recovered = 0;
@@ -2349,12 +2351,15 @@ export const recoverStaleJobs = internalMutation({
 
         const failedFinal = await ctx.db
             .query('chatGenerationJobs')
-            .withIndex('by_status', (q) => q.eq('status', 'failed_final'))
+            .withIndex('by_status_recoveryCheckedAt', (q) =>
+                q.eq('status', 'failed_final').eq('recoveryCheckedAt', undefined)
+            )
             .take(50);
 
         for (const job of failedFinal) {
             const turn = await ctx.db.get(job.turnId);
             if (!turn || turn.status === 'assistant_saved' || turn.status === 'degraded_saved' || turn.status === 'cancelled') {
+                await ctx.db.patch(job._id, { recoveryCheckedAt: now, updatedAt: now });
                 continue;
             }
 
@@ -2365,9 +2370,19 @@ export const recoverStaleJobs = internalMutation({
                 job.errorCode ?? 'chat_generation_failed',
                 job.errorMessage ?? 'Chat generation failed before completion.'
             );
+            await ctx.db.patch(job._id, { recoveryCheckedAt: now, updatedAt: now });
             recovered++;
         }
 
-        return { recovered };
+        if (recovered > 0 || new Date(now).getUTCMinutes() === 0) {
+            console.info(JSON.stringify({
+                level: 'info',
+                event: 'maintenance_sweep',
+                job: 'recover_stale_chat_generation_jobs',
+                scanned: running.length + failedFinal.length,
+                changed: recovered,
+            }));
+        }
+        return { scanned: running.length + failedFinal.length, recovered };
     },
 });

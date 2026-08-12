@@ -38,8 +38,9 @@ export const reapStaleRuns = internalMutation({
         // oldest stuck records, even if many recent in_progress rows exist.
         const candidateRuns = await ctx.db
             .query('exportRuns')
-            .withIndex('by_createdAt')
-            .filter((q) => q.lt(q.field('createdAt'), staleCutoff))
+            .withIndex('by_status_createdAt', (q) =>
+                q.eq('status', 'in_progress').lt('createdAt', staleCutoff)
+            )
             .take(BATCH_LIMIT);
 
         let reapedRuns = 0;
@@ -79,11 +80,18 @@ export const reapStaleRuns = internalMutation({
             reapedJobs++;
         }
 
-        if (reapedRuns > 0 || reapedJobs > 0) {
-            console.log(
-                `[ExportMaintenance] Reaped ${reapedRuns} stale runs, ${reapedJobs} timed-out jobs`,
-            );
+        if (reapedRuns > 0 || reapedJobs > 0 || new Date(now).getUTCMinutes() === 0) {
+            console.info(JSON.stringify({
+                level: 'info',
+                event: 'maintenance_sweep',
+                job: 'reap_stale_export_runs',
+                scanned: candidateRuns.length + runningJobs.length + queuedJobs.length,
+                changed: reapedRuns + reapedJobs,
+                reapedRuns,
+                reapedJobs,
+            }));
         }
+        return { scanned: candidateRuns.length + runningJobs.length + queuedJobs.length, reapedRuns, reapedJobs };
     },
 });
 
@@ -101,11 +109,19 @@ export const purgeExpiredRuns = internalMutation({
         const cutoff = Date.now() - COMPLETED_RUN_RETENTION_MS;
 
         // ── Purge expired exportRuns ──
-        const expiredRuns = await ctx.db
-            .query('exportRuns')
-            .withIndex('by_createdAt')
-            .filter((q) => q.lt(q.field('createdAt'), cutoff))
-            .take(BATCH_LIMIT);
+        const [completedRuns, failedRuns] = await Promise.all([
+            ctx.db
+                .query('exportRuns')
+                .withIndex('by_status_createdAt', (q) => q.eq('status', 'completed').lt('createdAt', cutoff))
+                .take(BATCH_LIMIT),
+            ctx.db
+                .query('exportRuns')
+                .withIndex('by_status_createdAt', (q) => q.eq('status', 'failed').lt('createdAt', cutoff))
+                .take(BATCH_LIMIT),
+        ]);
+        const expiredRuns = [...completedRuns, ...failedRuns]
+            .sort((a, b) => a.createdAt - b.createdAt)
+            .slice(0, BATCH_LIMIT);
 
         let purgedRuns = 0;
         for (const run of expiredRuns) {
@@ -117,11 +133,23 @@ export const purgeExpiredRuns = internalMutation({
         }
 
         // ── Purge expired exportJobs ──
-        const expiredJobs = await ctx.db
-            .query('exportJobs')
-            .withIndex('by_createdAt')
-            .filter((q) => q.lt(q.field('createdAt'), cutoff))
-            .take(BATCH_LIMIT);
+        const [completedJobs, failedJobs, timedOutJobs] = await Promise.all([
+            ctx.db
+                .query('exportJobs')
+                .withIndex('by_status_createdAt', (q) => q.eq('status', 'completed').lt('createdAt', cutoff))
+                .take(BATCH_LIMIT),
+            ctx.db
+                .query('exportJobs')
+                .withIndex('by_status_createdAt', (q) => q.eq('status', 'failed').lt('createdAt', cutoff))
+                .take(BATCH_LIMIT),
+            ctx.db
+                .query('exportJobs')
+                .withIndex('by_status_createdAt', (q) => q.eq('status', 'timeout').lt('createdAt', cutoff))
+                .take(BATCH_LIMIT),
+        ]);
+        const expiredJobs = [...completedJobs, ...failedJobs, ...timedOutJobs]
+            .sort((a, b) => a.createdAt - b.createdAt)
+            .slice(0, BATCH_LIMIT);
 
         let purgedJobs = 0;
         for (const job of expiredJobs) {

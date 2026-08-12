@@ -51,10 +51,14 @@ export default function ExhibitPacketBuilder() {
   const sourceId = searchParams.get('sourceId');
   const autoStagedSourceRef = useRef<string | null>(null);
 
-  // Live workspace data — casePins.listByUser doesn't filter by case,
-  // so we filter client-side
-  const allCasePins = useQuery(api.casePins.listByUser, {});
-  const allCaseMemory = useQuery(api.caseMemory.listByUser, {});
+  const allCasePins = useQuery(
+    api.casePins.listByCase,
+    activeCaseId ? { caseId: activeCaseId } : 'skip',
+  );
+  const allCaseMemory = useQuery(
+    api.caseMemory.listByCase,
+    activeCaseId ? { caseId: activeCaseId } : 'skip',
+  );
 
   // Local state for exhibit items (user-assembled)
   const [items, setItems] = useState<ExhibitItem[]>([]);
@@ -76,7 +80,7 @@ export default function ExhibitPacketBuilder() {
     const existing = new Set(items.map(i => i.sourceId));
     const evidence: Array<{ id: string; title: string; summary: string; type: 'text' | 'image' | 'pdf' }> = [];
 
-    const casePins = allCasePins?.filter(p => p.caseId === activeCaseId) ?? [];
+    const casePins = allCasePins ?? [];
 
     for (const pin of casePins) {
       if (existing.has(pin._id)) continue;
@@ -91,7 +95,7 @@ export default function ExhibitPacketBuilder() {
     }
 
     const exhibitNotes =
-      allCaseMemory?.filter(item => item.caseId === activeCaseId && item.type === 'exhibit_note') ?? [];
+      allCaseMemory?.filter(item => item.type === 'exhibit_note') ?? [];
 
     for (const note of exhibitNotes) {
       if (existing.has(note._id)) continue;

@@ -28,6 +28,7 @@ import {
 } from '@phosphor-icons/react';
 import { useExport, type DraftingStage, type ExportExhibitReferenceMatch } from '../context/ExportContext';
 import { useDraftingStream, type DraftStreamInput } from '@/hooks/useDraftingStream';
+import { useAutoSaveExport } from '@/hooks/useAutoSaveExport';
 import { runPreflightChecks } from '@/lib/export-assembly/validation/preflightValidator';
 import MappingCanvas from '@/components/review/MappingCanvas';
 import RevisionModal from '@/components/review/RevisionModal';
@@ -270,6 +271,10 @@ export default function ReviewHubContent() {
         startDrafting,
         reset,
     } = useExport();
+    const { doSave: retryCheckpointSave, isSaving: isCheckpointSaving, saveError } = useAutoSaveExport(
+        state.caseId,
+        state.phase === 'reviewing',
+    );
 
     const router = useRouter();
     const { startStream, abort } = useDraftingStream({ dispatch });
@@ -332,9 +337,22 @@ export default function ReviewHubContent() {
     // Query court settings and nex profile for full identity resolution
     const rawCourtSettings = useQuery(api.courtSettings.get);
     const rawNexProfile = useQuery(api.nexProfiles.getByUser);
-    const rawCasePins = useQuery(api.casePins.listByUser, {});
-    const rawExhibitNotes = useQuery(api.caseMemory.listByType, { type: 'exhibit_note' });
-    const rawTimelineEvents = useQuery(api.timelineCandidates.listByUser, {});
+    const rawCasePins = useQuery(
+        api.casePins.listByCase,
+        state.caseId ? { caseId: state.caseId } : 'skip',
+    );
+    const rawCaseMemory = useQuery(
+        api.caseMemory.listByCase,
+        state.caseId ? { caseId: state.caseId } : 'skip',
+    );
+    const rawExhibitNotes = useMemo(
+        () => rawCaseMemory?.filter(item => item.type === 'exhibit_note'),
+        [rawCaseMemory],
+    );
+    const rawTimelineEvents = useQuery(
+        api.timelineCandidates.listByCase,
+        state.caseId ? { caseId: state.caseId } : 'skip',
+    );
 
     // Map Convex objects to the shapes expected by resolveCourtIdentity
     const courtSettingsData = useMemo((): CourtSettingsData | undefined => (
@@ -917,6 +935,22 @@ export default function ReviewHubContent() {
         <div className="flex h-full overflow-hidden">
             {/* ── Main Canvas Area ── */}
             <div className="flex-1 flex flex-col min-w-0">
+                {saveError && (
+                    <div
+                        role="alert"
+                        className="shrink-0 flex items-center justify-between gap-3 border-b border-amber-400/20 bg-amber-400/10 px-6 py-2.5 text-[12px] text-amber-100"
+                    >
+                        <span>Your latest review changes have not been backed up yet. Please retry.</span>
+                        <button
+                            type="button"
+                            onClick={() => { void retryCheckpointSave(); }}
+                            disabled={isCheckpointSaving}
+                            className="shrink-0 rounded-lg border border-amber-200/30 px-3 py-1 font-bold text-amber-50 transition-colors hover:bg-amber-200/10 disabled:cursor-wait disabled:opacity-60"
+                        >
+                            {isCheckpointSaving ? 'Retrying…' : 'Retry backup'}
+                        </button>
+                    </div>
+                )}
                 {/* Header Bar */}
                 <div className="shrink-0 px-6 py-4 border-b border-white/10 bg-[rgba(10,17,40,0.6)] backdrop-blur-xl">
                     <div className="flex items-center justify-between">

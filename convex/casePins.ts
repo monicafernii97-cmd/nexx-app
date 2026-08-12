@@ -1,6 +1,7 @@
 import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import { getAuthenticatedUser } from './lib/auth';
+import { resolveCaseScope } from './lib/caseScope';
 
 /**
  * Pinnable type validator (must match `PinnableType` in `src/lib/integration/types.ts`).
@@ -45,6 +46,33 @@ export const listByUser = query({
             (a, b) =>
                 (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) ||
                 b.createdAt - a.createdAt
+        );
+    },
+});
+
+/** List pins for one case. Legacy unscoped rows appear only in the oldest case. */
+export const listByCase = query({
+    args: { caseId: v.id('cases') },
+    handler: async (ctx, { caseId }) => {
+        const user = await getAuthenticatedUser(ctx);
+        const { includeLegacy } = await resolveCaseScope(ctx, user._id, caseId);
+        const [scoped, legacy] = await Promise.all([
+            ctx.db
+                .query('casePins')
+                .withIndex('by_userId_caseId', (q) => q.eq('userId', user._id).eq('caseId', caseId))
+                .collect(),
+            includeLegacy
+                ? ctx.db
+                    .query('casePins')
+                    .withIndex('by_userId_caseId', (q) => q.eq('userId', user._id).eq('caseId', undefined))
+                    .collect()
+                : Promise.resolve([]),
+        ]);
+
+        return [...scoped, ...legacy].sort(
+            (a, b) =>
+                (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) ||
+                b.createdAt - a.createdAt,
         );
     },
 });

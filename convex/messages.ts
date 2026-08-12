@@ -2,6 +2,10 @@ import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { getAuthenticatedUserAndConversation } from './lib/auth';
 import { routeModeValidator } from './lib/routeModeValidator';
+import { paginationOptsValidator } from 'convex/server';
+
+const MAX_CITATIONS_PER_MESSAGE = 50;
+const MAX_CITATIONS_PER_PAGE = 500;
 
 function isLegacyClientFailureMessage(msg: { role: 'user' | 'assistant'; content: string }) {
     if (msg.role !== 'assistant') return false;
@@ -224,35 +228,38 @@ export const prepareRegenerate = mutation({
 
 /** List messages for a conversation — auth-guarded */
 export const list = query({
-    args: { conversationId: v.id('conversations') },
+    args: {
+        conversationId: v.id('conversations'),
+        paginationOpts: paginationOptsValidator,
+    },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) return [];
+        if (!identity) return { page: [], isDone: true, continueCursor: '' };
 
         const user = await ctx.db
             .query('users')
             .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
             .first();
-        if (!user) return [];
+        if (!user) return { page: [], isDone: true, continueCursor: '' };
 
         // Verify conversation ownership
         const conversation = await ctx.db.get(args.conversationId);
         if (!conversation || conversation.userId !== user._id) {
-            return [];
+            return { page: [], isDone: true, continueCursor: '' };
         }
 
-        const rows = await ctx.db
+        const pageResult = await ctx.db
             .query('messages')
             .withIndex('by_conversation', (q) =>
                 q.eq('conversationId', args.conversationId)
             )
             .order('desc')
-            .take(200);
+            .paginate(args.paginationOpts);
 
         // Bound the DB read first, then filter soft-deleted and legacy client
         // failure rows in memory. This keeps the query predictable while hiding
         // stale transport-error artifacts from the chat transcript.
-        const visibleRows = rows
+        const visibleRows = pageResult.page
             .filter((msg) => msg.status !== 'deleted' && !isLegacyClientFailureMessage(msg))
             .sort((a, b) => {
                 const aTurn = a.turnNumber ?? 0;
@@ -271,23 +278,27 @@ export const list = query({
                 .filter((message) => message.role === 'assistant')
                 .map((message) => message._id.toString())
         );
-        // Fetch citations once per conversation instead of issuing one query per
-        // assistant message. The old N+1 pattern made long chats progressively
-        // slower and could exhaust Convex read limits near the 200-message cap.
-        const recentAnswerSources = assistantMessageIds.size > 0
-            ? await ctx.db
-                .query('chatAnswerSources')
-                .withIndex('by_conversation_created', (q) => q.eq('conversationId', args.conversationId))
-                .order('desc')
-                .take(1000)
-            : [];
-        const scopedAnswerSources = recentAnswerSources
+        // Fetch only sources attached to messages in this page. This avoids the
+        // previous 1,000-row conversation scan while preserving every citation
+        // normally displayed for a message.
+        const perMessageSources = await Promise.all(
+            visibleRows
+                .filter((message) => message.role === 'assistant')
+                .map((message) => ctx.db
+                    .query('chatAnswerSources')
+                    .withIndex('by_message', (q) => q.eq('messageId', message._id))
+                    .order('asc')
+                    .take(MAX_CITATIONS_PER_MESSAGE)),
+        );
+        const scopedAnswerSources = perMessageSources
+            .flat()
             .filter((source) =>
                 source.messageId &&
                 assistantMessageIds.has(source.messageId.toString()) &&
                 source.conversationId === args.conversationId &&
                 source.clerkUserId === user.clerkId
-            );
+            )
+            .slice(0, MAX_CITATIONS_PER_PAGE);
         const uniqueUploadedFileSources = scopedAnswerSources.filter(
             (source, index, sources) =>
                 sources.findIndex((candidate) => candidate.uploadedFileId.toString() === source.uploadedFileId.toString()) === index
@@ -313,7 +324,7 @@ export const list = query({
             sourcesByMessageId.set(messageId, [...(sourcesByMessageId.get(messageId) ?? []), source]);
         }
 
-        return visibleRows.map((message) => {
+        const hydratedPage = visibleRows.map((message) => {
             if (message.role !== 'assistant') return message;
 
             const answerSources = sourcesByMessageId.get(message._id.toString()) ?? [];
@@ -331,7 +342,7 @@ export const list = query({
                 citationVerifierStatus: 'verified' | 'partial' | 'failed';
             }> = [];
 
-            for (const source of answerSources.slice(0, 50)) {
+            for (const source of answerSources.slice(0, MAX_CITATIONS_PER_MESSAGE)) {
                 if (
                     source.conversationId !== args.conversationId ||
                     source.messageId !== message._id ||
@@ -375,6 +386,8 @@ export const list = query({
                 },
             };
         });
+
+        return { ...pageResult, page: hydratedPage };
     },
 });
 

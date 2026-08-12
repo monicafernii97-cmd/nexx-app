@@ -50,9 +50,9 @@ export async function POST(req: NextRequest) {
         // Load case data in parallel — pass caseId for scoped queries
         const [incidents, timeline, caseMemory, pins, detectedPatterns] = await Promise.all([
             convex.query(api.incidents.list, { caseId }),
-            convex.query(api.timelineCandidates.listByUser, {}),
-            convex.query(api.caseMemory.listByUser, {}),
-            convex.query(api.casePins.listByUser, {}),
+            convex.query(api.timelineCandidates.listByCase, { caseId }),
+            convex.query(api.caseMemory.listByCase, { caseId }),
+            convex.query(api.casePins.listByCase, { caseId }),
             convex.query(api.detectedPatterns.listByCase, { caseId }),
         ]);
 

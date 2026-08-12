@@ -94,32 +94,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     // The default (original) case gets legacy (no caseId) records.
     // cases.list returns newest-first, so we need the oldest case — not [0].
-    const defaultCaseId =
-        cases && cases.length > 0
-            ? cases.reduce((oldest, c) => (c.createdAt < oldest.createdAt ? c : oldest))._id
-            : null;
-    const isDefaultCase =
-        defaultCaseId !== null && resolvedActiveCaseId === defaultCaseId;
-
-    // Queries — still user-scoped (caseId filtering done client-side for backward compat)
-    const allPins = useQuery(api.casePins.listByUser, canLoadWorkspace ? {} : 'skip');
-    const allMemory = useQuery(api.caseMemory.listByUser, canLoadWorkspace ? {} : 'skip');
-    const allTimeline = useQuery(api.timelineCandidates.listByUser, canLoadWorkspace ? {} : 'skip');
-
-    // Filter to active case — legacy items (no caseId) only appear in the default case.
-    // Return undefined until cases is loaded (or empty) so consumers see loading state.
-    const pins =
-        cases === undefined || cases.length === 0
-            ? undefined
-            : allPins?.filter(p => (p.caseId ? p.caseId === resolvedActiveCaseId : isDefaultCase));
-    const memory =
-        cases === undefined || cases.length === 0
-            ? undefined
-            : allMemory?.filter(m => (m.caseId ? m.caseId === resolvedActiveCaseId : isDefaultCase));
-    const timeline =
-        cases === undefined || cases.length === 0
-            ? undefined
-            : allTimeline?.filter(t => (t.caseId ? t.caseId === resolvedActiveCaseId : isDefaultCase));
+    const caseQueryArgs = canLoadWorkspace && resolvedActiveCaseId
+        ? { caseId: resolvedActiveCaseId }
+        : 'skip';
+    const pins = useQuery(api.casePins.listByCase, caseQueryArgs);
+    const memory = useQuery(api.caseMemory.listByCase, caseQueryArgs);
+    const timeline = useQuery(api.timelineCandidates.listByCase, caseQueryArgs);
 
     // Mutations
     const removePinMutation = useMutation(api.casePins.remove);

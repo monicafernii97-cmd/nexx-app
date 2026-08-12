@@ -683,9 +683,6 @@ const ExportContext = createContext<ExportContextValue | null>(null);
 // Provider
 // ---------------------------------------------------------------------------
 
-/** Auto-save interval in milliseconds (30 seconds). */
-const AUTO_SAVE_INTERVAL_MS = 30_000;
-
 /**
  * ExportProvider — Context provider for the full export lifecycle.
  *
@@ -706,28 +703,24 @@ export function ExportProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (state.phase !== 'reviewing') return;
 
-        const interval = setInterval(() => {
-            // Compare all review edits that must trigger autosave.
-            const snapshot = JSON.stringify({
-                overrides: state.overrides,
-                reviewItems: state.reviewItems,
-                courtIdentityPatch: state.courtIdentityPatch,
-                courtResolvedText: state.courtResolvedText,
-                includeTimeline: state.config?.includeTimeline,
-                selectedTimelineIds: state.config?.selectedTimelineIds,
-                includeExhibits: state.config?.includeExhibits,
-                linkedExhibitIds: state.config?.linkedExhibitIds,
-                exhibitReferenceMatches: state.exhibitReferenceMatches,
-                skippedExhibitReferences: state.skippedExhibitReferences,
-            });
+        // Compare all review edits that must trigger autosave.
+        const snapshot = JSON.stringify({
+            overrides: state.overrides,
+            reviewItems: state.reviewItems,
+            courtIdentityPatch: state.courtIdentityPatch,
+            courtResolvedText: state.courtResolvedText,
+            includeTimeline: state.config?.includeTimeline,
+            selectedTimelineIds: state.config?.selectedTimelineIds,
+            includeExhibits: state.config?.includeExhibits,
+            linkedExhibitIds: state.config?.linkedExhibitIds,
+            exhibitReferenceMatches: state.exhibitReferenceMatches,
+            skippedExhibitReferences: state.skippedExhibitReferences,
+        });
 
-            if (snapshot !== lastCheckedSnapshotRef.current) {
-                lastCheckedSnapshotRef.current = snapshot;
-                setIsDirty(true);
-            }
-        }, AUTO_SAVE_INTERVAL_MS);
-
-        return () => clearInterval(interval);
+        if (snapshot !== lastCheckedSnapshotRef.current) {
+            lastCheckedSnapshotRef.current = snapshot;
+            setIsDirty(true);
+        }
     }, [
         state.phase,
         state.overrides,

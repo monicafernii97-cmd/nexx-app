@@ -21,4 +21,31 @@ describe('checkpointFingerprint', () => {
             itemOverrides: [{ nodeId: 'n1', editedText: 'updated' }],
         }));
     });
+
+    it('changes for a same-length edit', () => {
+        const before = { ...base, itemOverrides: [{ nodeId: 'n1', editedText: 'abcd' }] };
+        const after = { ...base, itemOverrides: [{ nodeId: 'n1', editedText: 'abce' }] };
+        expect(checkpointFingerprint(before)).not.toBe(checkpointFingerprint(after));
+    });
+
+    it('changes when a section lock changes', () => {
+        expect(checkpointFingerprint(base)).not.toBe(checkpointFingerprint({
+            ...base,
+            sectionOverrides: [{ sectionId: 'facts', isLocked: false }],
+        }));
+    });
+
+    it('changes when the export path changes', () => {
+        expect(checkpointFingerprint(base)).not.toBe(checkpointFingerprint({
+            ...base,
+            exportPath: 'case_summary',
+        }));
+    });
+
+    it('treats an absent optional field and explicit undefined as identical', () => {
+        const { assemblyResultJson, ...withoutAssembly } = base;
+        void assemblyResultJson;
+        expect(checkpointFingerprint({ ...withoutAssembly, assemblyResultJson: undefined }))
+            .toBe(checkpointFingerprint(withoutAssembly));
+    });
 });

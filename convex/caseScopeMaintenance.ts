@@ -8,6 +8,7 @@ import { internalMutation } from './_generated/server';
 const args = {
     apply: v.optional(v.boolean()),
     batchSize: v.optional(v.number()),
+    cursor: v.optional(v.union(v.string(), v.null())),
 };
 
 function boundedBatchSize(value?: number) {
@@ -17,10 +18,11 @@ function boundedBatchSize(value?: number) {
 export const backfillCasePins = internalMutation({
     args,
     handler: async (ctx, input) => {
-        const rows = await ctx.db
+        const page = await ctx.db
             .query('casePins')
             .withIndex('by_caseId', (q) => q.eq('caseId', undefined))
-            .take(boundedBatchSize(input.batchSize));
+            .paginate({ cursor: input.cursor ?? null, numItems: boundedBatchSize(input.batchSize) });
+        const rows = page.page;
         let eligible = 0;
         let updated = 0;
         for (const row of rows) {
@@ -36,16 +38,24 @@ export const backfillCasePins = internalMutation({
                 updated++;
             }
         }
-        return { dryRun: input.apply !== true, scanned: rows.length, eligible, updated };
+        return {
+            dryRun: input.apply !== true,
+            scanned: rows.length,
+            eligible,
+            updated,
+            cursor: page.continueCursor,
+            isDone: page.isDone,
+        };
     },
 });
 export const backfillCaseMemory = internalMutation({
     args,
     handler: async (ctx, input) => {
-        const rows = await ctx.db
+        const page = await ctx.db
             .query('caseMemory')
             .withIndex('by_caseId', (q) => q.eq('caseId', undefined))
-            .take(boundedBatchSize(input.batchSize));
+            .paginate({ cursor: input.cursor ?? null, numItems: boundedBatchSize(input.batchSize) });
+        const rows = page.page;
         let eligible = 0;
         let updated = 0;
         for (const row of rows) {
@@ -61,17 +71,25 @@ export const backfillCaseMemory = internalMutation({
                 updated++;
             }
         }
-        return { dryRun: input.apply !== true, scanned: rows.length, eligible, updated };
+        return {
+            dryRun: input.apply !== true,
+            scanned: rows.length,
+            eligible,
+            updated,
+            cursor: page.continueCursor,
+            isDone: page.isDone,
+        };
     },
 });
 
 export const backfillTimelineCandidates = internalMutation({
     args,
     handler: async (ctx, input) => {
-        const rows = await ctx.db
+        const page = await ctx.db
             .query('timelineCandidates')
             .withIndex('by_caseId', (q) => q.eq('caseId', undefined))
-            .take(boundedBatchSize(input.batchSize));
+            .paginate({ cursor: input.cursor ?? null, numItems: boundedBatchSize(input.batchSize) });
+        const rows = page.page;
         let eligible = 0;
         let updated = 0;
         for (const row of rows) {
@@ -87,6 +105,13 @@ export const backfillTimelineCandidates = internalMutation({
                 updated++;
             }
         }
-        return { dryRun: input.apply !== true, scanned: rows.length, eligible, updated };
+        return {
+            dryRun: input.apply !== true,
+            scanned: rows.length,
+            eligible,
+            updated,
+            cursor: page.continueCursor,
+            isDone: page.isDone,
+        };
     },
 });

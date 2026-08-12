@@ -16,7 +16,13 @@ export function useAutoSaveExport(caseId: Id<'cases'> | undefined, enabled = tru
     const saveCheckpoint = useMutation(api.exportOverrides.saveReviewCheckpoint);
     const isSavingRef = useRef(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
     const lastSavedHashRef = useRef<string | null>(null);
+
+    const assemblyResultJson = useMemo(
+        () => (state.assemblyResult ? JSON.stringify(state.assemblyResult) : undefined),
+        [state.assemblyResult],
+    );
 
     const checkpoint = useMemo(() => {
         if (!caseId || state.phase !== 'reviewing') return null;
@@ -34,11 +40,11 @@ export function useAutoSaveExport(caseId: Id<'cases'> | undefined, enabled = tru
                 excluded: item.excluded,
             })),
             exportRequestJson: state.exportRequest ? JSON.stringify(state.exportRequest) : '{}',
-            assemblyResultJson: state.assemblyResult ? JSON.stringify(state.assemblyResult) : undefined,
+            assemblyResultJson,
             reviewItemsJson: JSON.stringify(state.reviewItems),
         };
         return { payload, hash: checkpointFingerprint(payload) };
-    }, [caseId, state.phase, state.exportPath, state.overrides, state.exportRequest, state.assemblyResult, state.reviewItems]);
+    }, [caseId, state.phase, state.exportPath, state.overrides, state.exportRequest, assemblyResultJson, state.reviewItems]);
     const latestHashRef = useRef(checkpoint?.hash);
     useEffect(() => {
         latestHashRef.current = checkpoint?.hash;
@@ -47,12 +53,14 @@ export function useAutoSaveExport(caseId: Id<'cases'> | undefined, enabled = tru
     const doSave = useCallback(async () => {
         if (!enabled || !caseId || !checkpoint || !isDirty || isSavingRef.current) return;
         if (lastSavedHashRef.current === checkpoint.hash) {
+            setSaveError(null);
             markSaved();
             return;
         }
 
         isSavingRef.current = true;
         setIsSaving(true);
+        setSaveError(null);
         try {
             await saveCheckpoint({
                 caseId,
@@ -63,6 +71,7 @@ export function useAutoSaveExport(caseId: Id<'cases'> | undefined, enabled = tru
             lastSavedHashRef.current = checkpoint.hash;
             if (latestHashRef.current === checkpoint.hash) markSaved();
         } catch (error) {
+            setSaveError(error instanceof Error ? error.message : String(error));
             console.error(JSON.stringify({
                 level: 'error',
                 message: 'export_checkpoint_failed',
@@ -74,6 +83,11 @@ export function useAutoSaveExport(caseId: Id<'cases'> | undefined, enabled = tru
         }
     }, [caseId, checkpoint, enabled, isDirty, markSaved, saveCheckpoint]);
 
+    const doSaveRef = useRef(doSave);
+    useEffect(() => {
+        doSaveRef.current = doSave;
+    }, [doSave]);
+
     useEffect(() => {
         if (!enabled || !isDirty || !checkpoint) return;
         const timeout = window.setTimeout(() => { void doSave(); }, SAVE_DEBOUNCE_MS);
@@ -81,19 +95,19 @@ export function useAutoSaveExport(caseId: Id<'cases'> | undefined, enabled = tru
     }, [checkpoint, doSave, enabled, isDirty]);
 
     useEffect(() => {
-        if (!enabled || !checkpoint) return;
-        const interval = window.setInterval(() => { void doSave(); }, MAX_CHECKPOINT_INTERVAL_MS);
+        if (!enabled) return;
+        const interval = window.setInterval(() => { void doSaveRef.current(); }, MAX_CHECKPOINT_INTERVAL_MS);
         return () => window.clearInterval(interval);
-    }, [checkpoint, doSave, enabled]);
+    }, [enabled]);
 
     useEffect(() => {
-        const flush = () => { void doSave(); };
+        const flush = () => { void doSaveRef.current(); };
         window.addEventListener('pagehide', flush);
         return () => {
             window.removeEventListener('pagehide', flush);
-            void doSave();
+            void doSaveRef.current();
         };
-    }, [doSave]);
+    }, []);
 
-    return { doSave, isSaving };
+    return { doSave, isSaving, saveError };
 }

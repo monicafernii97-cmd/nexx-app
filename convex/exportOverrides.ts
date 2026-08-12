@@ -308,6 +308,8 @@ export const saveReviewCheckpoint = mutation({
         exportRequestJson: v.string(),
         assemblyResultJson: v.optional(v.string()),
         reviewItemsJson: v.optional(v.string()),
+        clearAssemblyResult: v.optional(v.boolean()),
+        clearReviewItems: v.optional(v.boolean()),
         checkpointHash: v.string(),
     },
     handler: async (ctx, input) => {
@@ -332,7 +334,9 @@ export const saveReviewCheckpoint = mutation({
                 .collect(),
         ]);
 
-        const override = overrideRows[0];
+        const sortedOverrideRows = [...overrideRows]
+            .sort((a, b) => a._creationTime - b._creationTime);
+        const override = sortedOverrideRows[0];
         const session = sessionRows.find((row) => row.phase !== 'completed');
         if (override?.checkpointHash === input.checkpointHash && session?.checkpointHash === input.checkpointHash) {
             return { changed: false, checkpointHash: input.checkpointHash };
@@ -345,7 +349,7 @@ export const saveReviewCheckpoint = mutation({
                 checkpointHash: input.checkpointHash,
                 updatedAt: now,
             });
-            for (const duplicate of overrideRows.slice(1)) await ctx.db.delete(duplicate._id);
+            for (const duplicate of sortedOverrideRows.slice(1)) await ctx.db.delete(duplicate._id);
         } else {
             await ctx.db.insert('exportOverrides', {
                 userId: user._id,
@@ -370,11 +374,20 @@ export const saveReviewCheckpoint = mutation({
             } = {
                 phase: input.phase,
                 exportRequestJson: input.exportRequestJson,
-                reviewItemsJson: input.reviewItemsJson,
                 checkpointHash: input.checkpointHash,
                 updatedAt: now,
             };
-            if (session.assemblyResultJson !== input.assemblyResultJson) {
+            if (input.clearReviewItems === true) {
+                sessionPatch.reviewItemsJson = undefined;
+            } else if (input.reviewItemsJson !== undefined) {
+                sessionPatch.reviewItemsJson = input.reviewItemsJson;
+            }
+            if (input.clearAssemblyResult === true) {
+                sessionPatch.assemblyResultJson = undefined;
+            } else if (
+                input.assemblyResultJson !== undefined
+                && session.assemblyResultJson !== input.assemblyResultJson
+            ) {
                 sessionPatch.assemblyResultJson = input.assemblyResultJson;
             }
             await ctx.db.patch(session._id, sessionPatch);
@@ -389,8 +402,12 @@ export const saveReviewCheckpoint = mutation({
                 caseId: input.caseId,
                 phase: input.phase,
                 exportRequestJson: input.exportRequestJson,
-                assemblyResultJson: input.assemblyResultJson,
-                reviewItemsJson: input.reviewItemsJson,
+                ...(input.clearAssemblyResult !== true && input.assemblyResultJson !== undefined
+                    ? { assemblyResultJson: input.assemblyResultJson }
+                    : {}),
+                ...(input.clearReviewItems !== true && input.reviewItemsJson !== undefined
+                    ? { reviewItemsJson: input.reviewItemsJson }
+                    : {}),
                 checkpointHash: input.checkpointHash,
                 createdAt: now,
                 updatedAt: now,

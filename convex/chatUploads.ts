@@ -917,12 +917,14 @@ export const cleanupStaleUploadSessions = internalMutation({
     ] as const;
 
     let deleted = 0;
+    let retentionScanned = 0;
     for (const status of cleanupStatuses) {
       const retentionCutoff = now - CHAT_UPLOAD_CONFIG.uploadSessionTtlMs;
       const expired = await ctx.db
         .query('chatUploadSessions')
         .withIndex('by_status_updated', (q) => q.eq('status', status).lt('updatedAt', retentionCutoff))
         .take(25);
+      retentionScanned += expired.length;
 
       for (const session of expired) {
         if (now - session.updatedAt < CHAT_UPLOAD_CONFIG.uploadSessionTtlMs) continue;
@@ -940,12 +942,12 @@ export const cleanupStaleUploadSessions = internalMutation({
         level: 'info',
         event: 'maintenance_sweep',
         job: 'cleanup_stale_chat_uploads',
-        scanned: staleProcessing.length,
+        scanned: staleProcessing.length + retentionScanned,
         changed: stalled + deleted,
         stalled,
         deleted,
       }));
     }
-    return { scanned: staleProcessing.length, stalled, deleted };
+    return { scanned: staleProcessing.length + retentionScanned, stalled, deleted };
   },
 });

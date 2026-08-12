@@ -271,7 +271,10 @@ export default function ReviewHubContent() {
         startDrafting,
         reset,
     } = useExport();
-    useAutoSaveExport(state.caseId, state.phase === 'reviewing');
+    const { doSave: retryCheckpointSave, isSaving: isCheckpointSaving, saveError } = useAutoSaveExport(
+        state.caseId,
+        state.phase === 'reviewing',
+    );
 
     const router = useRouter();
     const { startStream, abort } = useDraftingStream({ dispatch });
@@ -932,6 +935,22 @@ export default function ReviewHubContent() {
         <div className="flex h-full overflow-hidden">
             {/* ── Main Canvas Area ── */}
             <div className="flex-1 flex flex-col min-w-0">
+                {saveError && (
+                    <div
+                        role="alert"
+                        className="shrink-0 flex items-center justify-between gap-3 border-b border-amber-400/20 bg-amber-400/10 px-6 py-2.5 text-[12px] text-amber-100"
+                    >
+                        <span>Your latest review changes have not been backed up yet. Please retry.</span>
+                        <button
+                            type="button"
+                            onClick={() => { void retryCheckpointSave(); }}
+                            disabled={isCheckpointSaving}
+                            className="shrink-0 rounded-lg border border-amber-200/30 px-3 py-1 font-bold text-amber-50 transition-colors hover:bg-amber-200/10 disabled:cursor-wait disabled:opacity-60"
+                        >
+                            {isCheckpointSaving ? 'Retrying…' : 'Retry backup'}
+                        </button>
+                    </div>
+                )}
                 {/* Header Bar */}
                 <div className="shrink-0 px-6 py-4 border-b border-white/10 bg-[rgba(10,17,40,0.6)] backdrop-blur-xl">
                     <div className="flex items-center justify-between">

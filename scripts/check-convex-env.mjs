@@ -52,11 +52,15 @@ export function assertSafeConvexEnvironment(values, target) {
   }
 }
 
+export function resolveEnvironmentTarget(targetArg = 'development', vercelEnv = process.env.VERCEL_ENV) {
+  return targetArg === 'build' ? (vercelEnv ?? 'development') : targetArg;
+}
+
 const invokedDirectly = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
 if (invokedDirectly) {
   const root = process.cwd();
   const targetArg = process.argv[2] ?? 'development';
-  const target = process.env.VERCEL_ENV ?? (targetArg === 'build' ? 'development' : targetArg);
+  const target = resolveEnvironmentTarget(targetArg);
   const values = { ...localEnvironment(root), ...process.env };
   try {
     assertSafeConvexEnvironment(values, target);

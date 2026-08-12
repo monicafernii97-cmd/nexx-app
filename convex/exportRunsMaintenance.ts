@@ -119,7 +119,9 @@ export const purgeExpiredRuns = internalMutation({
                 .withIndex('by_status_createdAt', (q) => q.eq('status', 'failed').lt('createdAt', cutoff))
                 .take(BATCH_LIMIT),
         ]);
-        const expiredRuns = [...completedRuns, ...failedRuns].slice(0, BATCH_LIMIT);
+        const expiredRuns = [...completedRuns, ...failedRuns]
+            .sort((a, b) => a.createdAt - b.createdAt)
+            .slice(0, BATCH_LIMIT);
 
         let purgedRuns = 0;
         for (const run of expiredRuns) {
@@ -145,7 +147,9 @@ export const purgeExpiredRuns = internalMutation({
                 .withIndex('by_status_createdAt', (q) => q.eq('status', 'timeout').lt('createdAt', cutoff))
                 .take(BATCH_LIMIT),
         ]);
-        const expiredJobs = [...completedJobs, ...failedJobs, ...timedOutJobs].slice(0, BATCH_LIMIT);
+        const expiredJobs = [...completedJobs, ...failedJobs, ...timedOutJobs]
+            .sort((a, b) => a.createdAt - b.createdAt)
+            .slice(0, BATCH_LIMIT);
 
         let purgedJobs = 0;
         for (const job of expiredJobs) {

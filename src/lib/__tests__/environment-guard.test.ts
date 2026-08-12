@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { assertSafeConvexEnvironment } from '../../../scripts/check-convex-env.mjs';
+import {
+    assertSafeConvexEnvironment,
+    resolveEnvironmentTarget,
+} from '../../../scripts/check-convex-env.mjs';
 
 describe('Convex environment guard', () => {
     it('rejects the production hostname during local development', () => {
@@ -38,5 +41,18 @@ describe('Convex environment guard', () => {
         expect(() => assertSafeConvexEnvironment({
             CONVEX_DEPLOYMENT: 'prod:blessed-rabbit-457',
         }, 'production')).not.toThrow();
+    });
+
+    it('does not let VERCEL_ENV override an explicit local command target', () => {
+        const target = resolveEnvironmentTarget('development', 'production');
+        expect(target).toBe('development');
+        expect(() => assertSafeConvexEnvironment({
+            CONVEX_DEPLOYMENT: 'prod:blessed-rabbit-457',
+        }, target)).toThrow(/production Convex deployment/);
+    });
+
+    it('uses VERCEL_ENV to distinguish preview and production builds', () => {
+        expect(resolveEnvironmentTarget('build', 'preview')).toBe('preview');
+        expect(resolveEnvironmentTarget('build', 'production')).toBe('production');
     });
 });

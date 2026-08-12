@@ -222,8 +222,8 @@ export async function POST(req: NextRequest) {
 
         // Load case data in parallel — pass caseId for scoped queries
         const [timeline, caseMemory, detectedPatterns] = await Promise.all([
-            convex.query(api.timelineCandidates.listByUser, {}),
-            convex.query(api.caseMemory.listByUser, {}),
+            convex.query(api.timelineCandidates.listByCase, { caseId: config.caseId }),
+            convex.query(api.caseMemory.listByCase, { caseId: config.caseId }),
             convex.query(api.detectedPatterns.listByCase, { caseId: config.caseId }),
         ]);
 

@@ -12,7 +12,7 @@
  */
 
 import { useState, useCallback, useRef, type ReactNode } from 'react';
-import { useMutation, useQuery } from 'convex/react';
+import { useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Doc } from '@convex/_generated/dataModel';
 import type { ActionType, PanelData } from '@/lib/ui-intelligence/types';
@@ -92,15 +92,12 @@ export interface WorkspaceContext {
 /** Workspace client orchestrator — renders children with action context. */
 export function WorkspaceClient({ children }: WorkspaceClientProps) {
     const { showToast } = useToast();
-    const { activeCaseId } = useWorkspace();
+    const { activeCaseId, pins: pinnedItems } = useWorkspace();
 
     // ── Convex mutations ──
     const saveToCaseMemory = useMutation(api.caseMemory.save);
     const createPin = useMutation(api.casePins.create);
     const createTimelineCandidate = useMutation(api.timelineCandidates.create);
-
-    // ── Convex queries ──
-    const pinnedItems = useQuery(api.casePins.listByUser);
 
     // ── Modal state ──
     const [saveModalOpen, setSaveModalOpen] = useState(false);

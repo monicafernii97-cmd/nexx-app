@@ -1,6 +1,7 @@
 import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import { getAuthenticatedUser } from './lib/auth';
+import { resolveCaseScope } from './lib/caseScope';
 
 /**
  * Save-type validator (must match `SaveType` in `src/lib/ui-intelligence/types.ts`).
@@ -40,6 +41,30 @@ export const listByUser = query({
             .withIndex('by_userId', (q) => q.eq('userId', user._id))
             .order('desc')
             .collect();
+    },
+});
+
+/** List memory for one case. Legacy unscoped rows appear only in the oldest case. */
+export const listByCase = query({
+    args: { caseId: v.id('cases') },
+    handler: async (ctx, { caseId }) => {
+        const user = await getAuthenticatedUser(ctx);
+        const { includeLegacy } = await resolveCaseScope(ctx, user._id, caseId);
+        const [scoped, legacy] = await Promise.all([
+            ctx.db
+                .query('caseMemory')
+                .withIndex('by_userId_caseId', (q) => q.eq('userId', user._id).eq('caseId', caseId))
+                .order('desc')
+                .collect(),
+            includeLegacy
+                ? ctx.db
+                    .query('caseMemory')
+                    .withIndex('by_userId_caseId', (q) => q.eq('userId', user._id).eq('caseId', undefined))
+                    .order('desc')
+                    .collect()
+                : Promise.resolve([]),
+        ]);
+        return [...scoped, ...legacy].sort((a, b) => b.createdAt - a.createdAt);
     },
 });
 

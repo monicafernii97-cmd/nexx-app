@@ -28,6 +28,7 @@ import {
 } from '@phosphor-icons/react';
 import { useExport, type DraftingStage, type ExportExhibitReferenceMatch } from '../context/ExportContext';
 import { useDraftingStream, type DraftStreamInput } from '@/hooks/useDraftingStream';
+import { useAutoSaveExport } from '@/hooks/useAutoSaveExport';
 import { runPreflightChecks } from '@/lib/export-assembly/validation/preflightValidator';
 import MappingCanvas from '@/components/review/MappingCanvas';
 import RevisionModal from '@/components/review/RevisionModal';
@@ -270,6 +271,7 @@ export default function ReviewHubContent() {
         startDrafting,
         reset,
     } = useExport();
+    useAutoSaveExport(state.caseId, state.phase === 'reviewing');
 
     const router = useRouter();
     const { startStream, abort } = useDraftingStream({ dispatch });
@@ -332,9 +334,22 @@ export default function ReviewHubContent() {
     // Query court settings and nex profile for full identity resolution
     const rawCourtSettings = useQuery(api.courtSettings.get);
     const rawNexProfile = useQuery(api.nexProfiles.getByUser);
-    const rawCasePins = useQuery(api.casePins.listByUser, {});
-    const rawExhibitNotes = useQuery(api.caseMemory.listByType, { type: 'exhibit_note' });
-    const rawTimelineEvents = useQuery(api.timelineCandidates.listByUser, {});
+    const rawCasePins = useQuery(
+        api.casePins.listByCase,
+        state.caseId ? { caseId: state.caseId } : 'skip',
+    );
+    const rawCaseMemory = useQuery(
+        api.caseMemory.listByCase,
+        state.caseId ? { caseId: state.caseId } : 'skip',
+    );
+    const rawExhibitNotes = useMemo(
+        () => rawCaseMemory?.filter(item => item.type === 'exhibit_note'),
+        [rawCaseMemory],
+    );
+    const rawTimelineEvents = useQuery(
+        api.timelineCandidates.listByCase,
+        state.caseId ? { caseId: state.caseId } : 'skip',
+    );
 
     // Map Convex objects to the shapes expected by resolveCourtIdentity
     const courtSettingsData = useMemo((): CourtSettingsData | undefined => (

@@ -36,7 +36,7 @@ crons.interval(
  */
 crons.interval(
   'recover stale chat generation jobs',
-  { minutes: 1 },
+  { minutes: 5 },
   internal.chatTurns.recoverStaleJobs,
 );
 

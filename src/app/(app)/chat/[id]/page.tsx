@@ -1,8 +1,8 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
-import { useConvex, useMutation, useQuery } from 'convex/react';
+import { useState, useRef, useEffect, useCallback, useLayoutEffect, useMemo } from 'react';
+import { useConvex, useMutation, usePaginatedQuery, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { useParams, useRouter } from 'next/navigation';
@@ -15,6 +15,7 @@ import type { ActionType, AnalysisStep } from '@/lib/ui-intelligence/types';
 import type { ChatAttachmentRef } from '@/lib/chat/uploadConfig';
 import { recoverPendingChatUploadAttaches, type ChatComposerFileState, uploadFileForConversation } from '@/lib/chat/uploadClient';
 import { createChatRequestId, readChatAdmissionError } from '@/lib/chat/admission';
+import { shouldShowLoadEarlier } from '@/lib/chat/message-pagination';
 
 /** Premium full-screen chat interface for a single NEXX AI conversation. */
 export default function ConversationPage() {
@@ -27,7 +28,24 @@ export default function ConversationPage() {
     // All hooks must be called unconditionally — use 'skip' when ID is invalid
     const conversation = useQuery(api.conversations.get, isValidId ? { id: conversationId } : 'skip');
     const convex = useConvex();
-    const messages = useQuery(api.messages.list, isValidId ? { conversationId } : 'skip');
+    const {
+        results: paginatedMessages,
+        status: messagePageStatus,
+        loadMore: loadMoreMessages,
+    } = usePaginatedQuery(
+        api.messages.list,
+        isValidId ? { conversationId } : 'skip',
+        { initialNumItems: 50 },
+    );
+    const messages = useMemo(() => [...paginatedMessages].sort((a, b) => {
+        const aTurn = a.turnNumber ?? 0;
+        const bTurn = b.turnNumber ?? 0;
+        if (aTurn !== bTurn) return aTurn - bTurn;
+        const aRole = a.roleOrder ?? (a.role === 'user' ? 0 : 1);
+        const bRole = b.roleOrder ?? (b.role === 'user' ? 0 : 1);
+        if (aRole !== bRole) return aRole - bRole;
+        return a.createdAt - b.createdAt;
+    }), [paginatedMessages]);
     const activeTurns = useQuery(api.chatTurns.activeForConversation, isValidId ? { conversationId } : 'skip');
     const archiveConversation = useMutation(api.conversations.archive);
 
@@ -147,7 +165,7 @@ export default function ConversationPage() {
         }
     }, [isValidId, router]);
 
-    const isThreadReady = conversation !== undefined && messages !== undefined && activeTurns !== undefined;
+    const isThreadReady = conversation !== undefined && messagePageStatus !== 'LoadingFirstPage' && activeTurns !== undefined;
 
     useEffect(() => {
         void recoverPendingChatUploadAttaches(convex);
@@ -485,6 +503,21 @@ export default function ConversationPage() {
                     scrollPaddingBottom: 'calc(var(--chat-composer-height, 176px) + env(safe-area-inset-bottom) + 40px)',
                 }}
             >
+                {shouldShowLoadEarlier(messagePageStatus) && (
+                    <div className="flex justify-center py-2">
+                        <button
+                            type="button"
+                            onClick={() => loadMoreMessages(50)}
+                            disabled={messagePageStatus === 'LoadingMore'}
+                            className={`rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition ${isLight
+                                ? 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'
+                                : 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10'
+                            } disabled:opacity-50`}
+                        >
+                            {messagePageStatus === 'LoadingMore' ? 'Loading…' : 'Load earlier messages'}
+                        </button>
+                    </div>
+                )}
                 {messages?.length === 0 && !isGenerating && (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}

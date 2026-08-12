@@ -684,7 +684,7 @@ const ExportContext = createContext<ExportContextValue | null>(null);
 // ---------------------------------------------------------------------------
 
 /** Auto-save interval in milliseconds (30 seconds). */
-const AUTO_SAVE_INTERVAL_MS = 30_000;
+const DIRTY_CHECK_INTERVAL_MS = 1_000;
 
 /**
  * ExportProvider — Context provider for the full export lifecycle.
@@ -725,7 +725,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                 lastCheckedSnapshotRef.current = snapshot;
                 setIsDirty(true);
             }
-        }, AUTO_SAVE_INTERVAL_MS);
+        }, DIRTY_CHECK_INTERVAL_MS);
 
         return () => clearInterval(interval);
     }, [

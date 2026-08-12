@@ -278,6 +278,14 @@ export const cleanupStaleUploadDrafts = internalMutation({
             }
         }
 
+        if (deleted > 0 || new Date().getUTCMinutes() === 0) {
+            console.info(JSON.stringify({
+                level: 'info',
+                event: 'maintenance_sweep',
+                job: 'cleanup_stale_upload_drafts',
+                changed: deleted,
+            }));
+        }
         return { deleted };
     },
 });

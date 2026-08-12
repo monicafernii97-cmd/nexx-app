@@ -888,9 +888,10 @@ export const cleanupStaleUploadSessions = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
+    const processingCutoff = now - CHAT_UPLOAD_CONFIG.processingStaleAfterMs;
     const staleProcessing = await ctx.db
       .query('chatUploadSessions')
-      .withIndex('by_status_updated', (q) => q.eq('status', 'processing'))
+      .withIndex('by_status_updated', (q) => q.eq('status', 'processing').lt('updatedAt', processingCutoff))
       .take(50);
 
     let stalled = 0;
@@ -917,9 +918,10 @@ export const cleanupStaleUploadSessions = internalMutation({
 
     let deleted = 0;
     for (const status of cleanupStatuses) {
+      const retentionCutoff = now - CHAT_UPLOAD_CONFIG.uploadSessionTtlMs;
       const expired = await ctx.db
         .query('chatUploadSessions')
-        .withIndex('by_status_updated', (q) => q.eq('status', status))
+        .withIndex('by_status_updated', (q) => q.eq('status', status).lt('updatedAt', retentionCutoff))
         .take(25);
 
       for (const session of expired) {
@@ -933,6 +935,17 @@ export const cleanupStaleUploadSessions = internalMutation({
       }
     }
 
-    return { stalled, deleted };
+    if (stalled > 0 || deleted > 0 || new Date(now).getUTCMinutes() === 0) {
+      console.info(JSON.stringify({
+        level: 'info',
+        event: 'maintenance_sweep',
+        job: 'cleanup_stale_chat_uploads',
+        scanned: staleProcessing.length,
+        changed: stalled + deleted,
+        stalled,
+        deleted,
+      }));
+    }
+    return { scanned: staleProcessing.length, stalled, deleted };
   },
 });

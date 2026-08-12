@@ -1,120 +1,99 @@
 'use client';
 
-/**
- * useAutoSaveExport — Auto-saves export review state to Convex every 30 seconds.
- *
- * Saves when:
- * 1. The state is dirty (overrides or review items changed)
- * 2. The phase is 'reviewing' (only during active review)
- * 3. At least 30 seconds have passed since the last save
- *
- * Also saves immediately on unmount (e.g., browser close, navigation)
- * for crash recovery.
- */
-
-import { useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { useExport } from '@/app/(app)/docuvault/context/ExportContext';
+import { checkpointFingerprint } from '@/lib/export-autosave';
 
-const AUTO_SAVE_INTERVAL_MS = 30_000; // 30 seconds
+const SAVE_DEBOUNCE_MS = 5_000;
+const MAX_CHECKPOINT_INTERVAL_MS = 60_000;
 
-/**
- * Hook that auto-saves export review state to Convex.
- *
- * @param caseId  — ID of the current case (required for scoping)
- * @param enabled — whether auto-save is active (default: true)
- */
-export function useAutoSaveExport(
-    caseId: Id<'cases'> | undefined,
-    enabled = true,
-) {
+/** Change-aware, transactional crash-recovery checkpoint for export review. */
+export function useAutoSaveExport(caseId: Id<'cases'> | undefined, enabled = true) {
     const { state, isDirty, markSaved } = useExport();
+    const saveCheckpoint = useMutation(api.exportOverrides.saveReviewCheckpoint);
+    const isSavingRef = useRef(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const lastSavedHashRef = useRef<string | null>(null);
 
-    // Use generated API — these will resolve once `npx convex dev` regenerates
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const saveSessionMutation = useMutation((api as any).exportOverrides.saveSession);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const saveOverridesMutation = useMutation((api as any).exportOverrides.saveOverrides);
-
-    // Ref to track if a save is in progress
-    const isSaving = useRef(false);
+    const checkpoint = useMemo(() => {
+        if (!caseId || state.phase !== 'reviewing') return null;
+        const payload = {
+            exportPath: state.exportPath ?? 'court_document',
+            sectionOverrides: state.overrides.sectionOverrides.map((section) => ({
+                sectionId: section.sectionId,
+                isLocked: section.isLocked,
+                itemOrder: section.itemOrder,
+            })),
+            itemOverrides: state.overrides.itemOverrides.map((item) => ({
+                nodeId: item.nodeId,
+                editedText: item.editedText,
+                forcedSection: item.forcedSection,
+                excluded: item.excluded,
+            })),
+            exportRequestJson: state.exportRequest ? JSON.stringify(state.exportRequest) : '{}',
+            assemblyResultJson: state.assemblyResult ? JSON.stringify(state.assemblyResult) : undefined,
+            reviewItemsJson: JSON.stringify(state.reviewItems),
+        };
+        return { payload, hash: checkpointFingerprint(payload) };
+    }, [caseId, state.phase, state.exportPath, state.overrides, state.exportRequest, state.assemblyResult, state.reviewItems]);
+    const latestHashRef = useRef(checkpoint?.hash);
+    useEffect(() => {
+        latestHashRef.current = checkpoint?.hash;
+    }, [checkpoint?.hash]);
 
     const doSave = useCallback(async () => {
-        if (!caseId || !isDirty || isSaving.current) return;
-        if (state.phase !== 'reviewing') return;
-
-        isSaving.current = true;
-        try {
-            // Save overrides
-            await saveOverridesMutation({
-                caseId,
-                exportPath: state.exportPath ?? 'court_document',
-                sectionOverrides: state.overrides.sectionOverrides.map(s => ({
-                    sectionId: s.sectionId,
-                    isLocked: s.isLocked,
-                    itemOrder: s.itemOrder,
-                })),
-                itemOverrides: state.overrides.itemOverrides.map(i => ({
-                    nodeId: i.nodeId,
-                    editedText: i.editedText,
-                    forcedSection: i.forcedSection,
-                    excluded: i.excluded,
-                })),
-            });
-
-            // Save session state
-            await saveSessionMutation({
-                caseId,
-                phase: state.phase,
-                exportRequestJson: state.exportRequest ? JSON.stringify(state.exportRequest) : '{}',
-                assemblyResultJson: state.assemblyResult ? JSON.stringify(state.assemblyResult) : undefined,
-            });
-
+        if (!enabled || !caseId || !checkpoint || !isDirty || isSavingRef.current) return;
+        if (lastSavedHashRef.current === checkpoint.hash) {
             markSaved();
-        } catch (error) {
-            console.error('[AutoSave] Failed to save export state:', error);
-        } finally {
-            isSaving.current = false;
+            return;
         }
-    }, [
-        caseId, isDirty, state.phase, state.exportPath,
-        state.overrides, state.exportRequest, state.assemblyResult,
-        saveOverridesMutation, saveSessionMutation, markSaved,
-    ]);
 
-    // ── Periodic auto-save ──
+        isSavingRef.current = true;
+        setIsSaving(true);
+        try {
+            await saveCheckpoint({
+                caseId,
+                phase: 'reviewing',
+                ...checkpoint.payload,
+                checkpointHash: checkpoint.hash,
+            });
+            lastSavedHashRef.current = checkpoint.hash;
+            if (latestHashRef.current === checkpoint.hash) markSaved();
+        } catch (error) {
+            console.error(JSON.stringify({
+                level: 'error',
+                message: 'export_checkpoint_failed',
+                error: error instanceof Error ? error.message : String(error),
+            }));
+        } finally {
+            isSavingRef.current = false;
+            setIsSaving(false);
+        }
+    }, [caseId, checkpoint, enabled, isDirty, markSaved, saveCheckpoint]);
+
     useEffect(() => {
-        if (!enabled || !caseId || state.phase !== 'reviewing') return;
+        if (!enabled || !isDirty || !checkpoint) return;
+        const timeout = window.setTimeout(() => { void doSave(); }, SAVE_DEBOUNCE_MS);
+        return () => window.clearTimeout(timeout);
+    }, [checkpoint, doSave, enabled, isDirty]);
 
-        const interval = setInterval(() => {
-            if (isDirty) {
-                doSave();
-            }
-        }, AUTO_SAVE_INTERVAL_MS);
-
-        return () => clearInterval(interval);
-    }, [enabled, caseId, state.phase, isDirty, doSave]);
-
-    // ── Save on unmount / page close ──
     useEffect(() => {
-        const handleBeforeUnload = () => {
-            if (isDirty && caseId && state.phase === 'reviewing') {
-                // Fire-and-forget — can't await in beforeunload
-                doSave();
-            }
-        };
+        if (!enabled || !checkpoint) return;
+        const interval = window.setInterval(() => { void doSave(); }, MAX_CHECKPOINT_INTERVAL_MS);
+        return () => window.clearInterval(interval);
+    }, [checkpoint, doSave, enabled]);
 
-        window.addEventListener('beforeunload', handleBeforeUnload);
+    useEffect(() => {
+        const flush = () => { void doSave(); };
+        window.addEventListener('pagehide', flush);
         return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload);
-            // Save on component unmount
-            if (isDirty && caseId && state.phase === 'reviewing') {
-                doSave();
-            }
+            window.removeEventListener('pagehide', flush);
+            void doSave();
         };
-    }, [isDirty, caseId, state.phase, doSave]);
+    }, [doSave]);
 
-    return { doSave, isSaving: isSaving.current };
+    return { doSave, isSaving };
 }

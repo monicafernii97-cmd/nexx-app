@@ -1,5 +1,7 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+Environment separation, cost controls, maintenance telemetry, and dry-run migration guidance are documented in [docs/COST_EFFICIENCY.md](docs/COST_EFFICIENCY.md).
+
 ## Getting Started
 
 First, run the development server:

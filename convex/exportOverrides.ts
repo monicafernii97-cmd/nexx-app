@@ -280,6 +280,127 @@ export const saveSession = mutation({
     },
 });
 
+/**
+ * Atomically save the editable review state and its recovery session.
+ * Identical checkpoint hashes are no-ops, and the large immutable assembly
+ * payload is only rewritten when it actually changes.
+ */
+export const saveReviewCheckpoint = mutation({
+    args: {
+        caseId: v.id('cases'),
+        exportPath: v.union(
+            v.literal('case_summary'),
+            v.literal('court_document'),
+            v.literal('exhibit_document'),
+        ),
+        phase: v.literal('reviewing'),
+        sectionOverrides: v.array(v.object({
+            sectionId: v.string(),
+            isLocked: v.boolean(),
+            itemOrder: v.optional(v.array(v.string())),
+        })),
+        itemOverrides: v.array(v.object({
+            nodeId: v.string(),
+            editedText: v.optional(v.string()),
+            forcedSection: v.optional(v.string()),
+            excluded: v.optional(v.boolean()),
+        })),
+        exportRequestJson: v.string(),
+        assemblyResultJson: v.optional(v.string()),
+        reviewItemsJson: v.optional(v.string()),
+        checkpointHash: v.string(),
+    },
+    handler: async (ctx, input) => {
+        const user = await getAuthenticatedUser(ctx);
+        const ownedCase = await ctx.db.get(input.caseId);
+        if (!ownedCase || ownedCase.userId !== user._id) {
+            throw new Error('Not authorized to save this review checkpoint');
+        }
+
+        const now = Date.now();
+        const [overrideRows, sessionRows] = await Promise.all([
+            ctx.db
+                .query('exportOverrides')
+                .withIndex('by_userId_case_path', (q) =>
+                    q.eq('userId', user._id).eq('caseId', input.caseId).eq('exportPath', input.exportPath),
+                )
+                .collect(),
+            ctx.db
+                .query('exportSessions')
+                .withIndex('by_userId_case', (q) => q.eq('userId', user._id).eq('caseId', input.caseId))
+                .order('desc')
+                .collect(),
+        ]);
+
+        const override = overrideRows[0];
+        const session = sessionRows.find((row) => row.phase !== 'completed');
+        if (override?.checkpointHash === input.checkpointHash && session?.checkpointHash === input.checkpointHash) {
+            return { changed: false, checkpointHash: input.checkpointHash };
+        }
+
+        if (override) {
+            await ctx.db.patch(override._id, {
+                sectionOverrides: input.sectionOverrides,
+                itemOverrides: input.itemOverrides,
+                checkpointHash: input.checkpointHash,
+                updatedAt: now,
+            });
+            for (const duplicate of overrideRows.slice(1)) await ctx.db.delete(duplicate._id);
+        } else {
+            await ctx.db.insert('exportOverrides', {
+                userId: user._id,
+                caseId: input.caseId,
+                exportPath: input.exportPath,
+                sectionOverrides: input.sectionOverrides,
+                itemOverrides: input.itemOverrides,
+                checkpointHash: input.checkpointHash,
+                createdAt: now,
+                updatedAt: now,
+            });
+        }
+
+        if (session) {
+            const sessionPatch: {
+                phase: 'reviewing';
+                exportRequestJson: string;
+                reviewItemsJson?: string;
+                checkpointHash: string;
+                updatedAt: number;
+                assemblyResultJson?: string;
+            } = {
+                phase: input.phase,
+                exportRequestJson: input.exportRequestJson,
+                reviewItemsJson: input.reviewItemsJson,
+                checkpointHash: input.checkpointHash,
+                updatedAt: now,
+            };
+            if (session.assemblyResultJson !== input.assemblyResultJson) {
+                sessionPatch.assemblyResultJson = input.assemblyResultJson;
+            }
+            await ctx.db.patch(session._id, sessionPatch);
+            for (const duplicate of sessionRows) {
+                if (duplicate._id !== session._id && duplicate.phase !== 'completed') {
+                    await ctx.db.delete(duplicate._id);
+                }
+            }
+        } else {
+            await ctx.db.insert('exportSessions', {
+                userId: user._id,
+                caseId: input.caseId,
+                phase: input.phase,
+                exportRequestJson: input.exportRequestJson,
+                assemblyResultJson: input.assemblyResultJson,
+                reviewItemsJson: input.reviewItemsJson,
+                checkpointHash: input.checkpointHash,
+                createdAt: now,
+                updatedAt: now,
+            });
+        }
+
+        return { changed: true, checkpointHash: input.checkpointHash };
+    },
+});
+
 /** Delete a completed or abandoned session. */
 export const clearSession = mutation({
     args: {

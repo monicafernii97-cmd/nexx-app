@@ -7,6 +7,7 @@ const base = {
     itemOverrides: [],
     exportRequestJson: '{"path":"court_document"}',
     assemblyResultJson: '{"reviewItems":[]}',
+    clearAssemblyResult: false,
     reviewItemsJson: '[]',
 };
 
@@ -47,5 +48,22 @@ describe('checkpointFingerprint', () => {
         void assemblyResultJson;
         expect(checkpointFingerprint({ ...withoutAssembly, assemblyResultJson: undefined }))
             .toBe(checkpointFingerprint(withoutAssembly));
+    });
+
+    it('fingerprints assembly removal and restoration without reviving cleared data', () => {
+        const cleared = {
+            ...base,
+            assemblyResultJson: undefined,
+            clearAssemblyResult: true,
+        };
+        const restored = {
+            ...cleared,
+            assemblyResultJson: base.assemblyResultJson,
+            clearAssemblyResult: false,
+        };
+
+        expect(cleared.clearAssemblyResult).toBe(true);
+        expect(checkpointFingerprint(cleared)).not.toBe(checkpointFingerprint(base));
+        expect(checkpointFingerprint(restored)).toBe(checkpointFingerprint(base));
     });
 });

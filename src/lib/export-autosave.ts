@@ -6,6 +6,7 @@ export interface ExportCheckpointInput {
     itemOverrides: ItemOverride[];
     exportRequestJson: string;
     assemblyResultJson?: string;
+    clearAssemblyResult: boolean;
     reviewItemsJson?: string;
 }
 /** Deterministic non-cryptographic fingerprint used only to suppress duplicate writes. */

@@ -41,6 +41,7 @@ export function useAutoSaveExport(caseId: Id<'cases'> | undefined, enabled = tru
             })),
             exportRequestJson: state.exportRequest ? JSON.stringify(state.exportRequest) : '{}',
             assemblyResultJson,
+            clearAssemblyResult: assemblyResultJson === undefined,
             reviewItemsJson: JSON.stringify(state.reviewItems),
         };
         return { payload, hash: checkpointFingerprint(payload) };

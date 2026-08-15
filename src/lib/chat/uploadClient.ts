@@ -10,8 +10,10 @@ import {
 } from './uploadConfig';
 import {
   postFileToStorageWithDiagnostics,
+  StorageUploadError,
   type StorageUploadDiagnosticEvent,
 } from './uploadErrors';
+import { shouldPersistUploadProgressDiagnostic } from './uploadShared';
 
 type ConvexClientLike = {
   mutation: ConvexReactClient['mutation'];
@@ -37,6 +39,8 @@ type UploadSessionSnapshot = {
   errorCode?: string;
   errorMessage?: string;
   retryable?: boolean;
+  nextStorageRetryAt?: number;
+  lastTransport?: 'direct' | 'fallback';
   extractionPreview?: string;
   extractionCharCount?: number;
   chatContextCharCount?: number;
@@ -130,6 +134,37 @@ export type UploadFileForConversationArgs = {
 };
 
 const PENDING_ATTACH_PREFIX = 'pending-chat-upload:';
+
+type FallbackUploadTicket =
+  | {
+      alreadyStored: true;
+      uploadSessionId: string;
+      storageId: string;
+    }
+  | {
+      alreadyStored: false;
+      uploadSessionId: string;
+      uploadAttemptId: string;
+      attemptNo: number;
+      fallbackUploadUrl: string;
+      expiresAt: number;
+    };
+
+function waitMs(delayMs: number) {
+  return new Promise<void>((resolve) => globalThis.setTimeout(resolve, Math.max(0, delayMs)));
+}
+
+function createFallbackBearerToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function sha256Hex(value: string) {
+  const encoded = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest('SHA-256', encoded);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 function normalizeStatus(status: string): ChatComposerFileStatus {
   if (status === 'awaiting_storage_upload') return 'session_created';
@@ -356,6 +391,64 @@ async function recordDiagnosticEvent(args: {
   }
 }
 
+function createThrottledDiagnosticRecorder(convex: ConvexClientLike) {
+  let lastProgressRecordedAt = 0;
+  let lastProgressPercent = -CHAT_UPLOAD_CONFIG.progressDiagnosticMinPercentDelta;
+  const terminalWrites: Promise<void>[] = [];
+
+  return {
+    handle(event: StorageUploadDiagnosticEvent) {
+      if (event.type === 'storage_post_progress') {
+        const now = Date.now();
+        const total = event.diagnostics.totalBytes;
+        const percent = total > 0
+          ? Math.floor((event.diagnostics.loadedBytes / total) * 100)
+          : 0;
+        if (!shouldPersistUploadProgressDiagnostic({
+          now,
+          lastRecordedAt: lastProgressRecordedAt,
+          percent,
+          lastRecordedPercent: lastProgressPercent,
+        })) return;
+        lastProgressRecordedAt = now;
+        lastProgressPercent = percent;
+      }
+
+      const write = recordDiagnosticEvent({ convex, event });
+      if (event.type === 'storage_post_failed' || event.type === 'storage_post_succeeded') {
+        terminalWrites.push(write);
+      }
+    },
+    async flushTerminal() {
+      if (terminalWrites.length === 0) return;
+      await Promise.all(terminalWrites.splice(0, terminalWrites.length));
+    },
+  };
+}
+
+async function refreshSessionAfterRetryDelay(args: {
+  convex: ConvexClientLike;
+  session: UploadSessionSnapshot;
+  file: File;
+  conversationId?: Id<'conversations'> | string;
+  caseId?: Id<'cases'> | string;
+  intent: ChatUploadIntent;
+  clientUploadKey: string;
+}) {
+  const retryAt = args.session.nextStorageRetryAt;
+  if (!retryAt || retryAt <= Date.now()) return args.session;
+  await waitMs(retryAt - Date.now());
+  return parseSessionSnapshot(await args.convex.mutation(api.chatUploads.startUploadSession, {
+    conversationId: args.conversationId as Id<'conversations'> | undefined,
+    caseId: args.caseId as Id<'cases'> | undefined,
+    clientUploadKey: args.clientUploadKey,
+    filename: args.file.name,
+    mimeType: args.file.type || 'application/octet-stream',
+    byteSize: args.file.size,
+    intent: args.intent,
+  }));
+}
+
 async function waitForUploadProcessing(args: {
   convex: ConvexClientLike;
   uploadSessionId: string;
@@ -431,17 +524,30 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
     }));
   }
 
+  session = await refreshSessionAfterRetryDelay({
+    convex: args.convex,
+    session,
+    file: args.file,
+    conversationId: args.conversationId,
+    caseId: args.caseId,
+    intent: args.intent,
+    clientUploadKey: args.clientUploadKey,
+  });
+
   const uploadSessionId = session.uploadSessionId;
   if (!uploadSessionId) throw new Error('Upload session was not created.');
   const uploadAttemptId = session.uploadAttemptId ?? session.attemptId ?? crypto.randomUUID();
   const resolvedClientTurnId = existing?.clientTurnId ?? crypto.randomUUID();
   let storageId = session.storageId ?? existing?.storageId;
   const retryableIndexingPartial = session.status === 'partial' && Boolean(session.indexingError);
+  const retryableProcessingFailure = session.status === 'failed_processing' || session.status === 'stalled';
 
   if (!storageId) {
     const uploadUrl = session.uploadUrl ?? existing?.uploadUrl;
-    if (!uploadUrl) throw new Error('Upload URL was not created.');
+    if (!uploadUrl) throw toUploadError(session);
     args.onStatus?.('uploading_to_storage');
+    let resolvedAttemptId = uploadAttemptId;
+    const directDiagnosticRecorder = createThrottledDiagnosticRecorder(args.convex);
     try {
       const upload = await postFileToStorageWithDiagnostics({
         uploadUrl,
@@ -452,10 +558,9 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
         clientTurnId: resolvedClientTurnId,
         timeoutMs: 135_000,
         onProgress: ({ percent }) => args.onProgress?.(percent),
-        onDiagnosticEvent: (event) => {
-          void recordDiagnosticEvent({ convex: args.convex, event });
-        },
+        onDiagnosticEvent: directDiagnosticRecorder.handle,
       });
+      await directDiagnosticRecorder.flushTerminal();
       storageId = upload.storageId;
       persistPendingAttach({
         uploadSessionId,
@@ -467,19 +572,90 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
       });
       args.onStorageReady?.({ uploadSessionId, storageId });
       args.onProgress?.(100);
-    } catch (error) {
-      args.onStatus?.('failed_storage_upload');
-      throw error;
+    } catch (directError) {
+      await directDiagnosticRecorder.flushTerminal();
+      const directFailureDiagnostics = directError instanceof StorageUploadError
+        ? directError.diagnostics
+        : undefined;
+      const fallbackEligible =
+        directError instanceof StorageUploadError &&
+        directError.retryable &&
+        args.file.size <= CHAT_UPLOAD_CONFIG.fallbackUploadMaxBytes;
+
+      if (!fallbackEligible) {
+        args.onStatus?.('failed_storage_upload');
+        throw directError;
+      }
+
+      await waitMs(CHAT_UPLOAD_CONFIG.storageRetryDelayMs + 100);
+      const bearerToken = createFallbackBearerToken();
+      const tokenHash = await sha256Hex(bearerToken);
+      const fallback = await args.convex.mutation(api.chatUploads.issueFallbackUploadTicket, {
+        uploadSessionId: uploadSessionId as Id<'chatUploadSessions'>,
+        tokenHash,
+      }) as FallbackUploadTicket;
+      if (fallback.alreadyStored) {
+        storageId = fallback.storageId;
+      } else {
+        resolvedAttemptId = fallback.uploadAttemptId;
+        args.onStatus?.('uploading_to_storage');
+        const fallbackDiagnostics = createThrottledDiagnosticRecorder(args.convex);
+        try {
+          const upload = await postFileToStorageWithDiagnostics({
+            uploadUrl: fallback.fallbackUploadUrl,
+            file: args.file,
+            sessionId: uploadSessionId,
+            attemptId: fallback.uploadAttemptId,
+            clientUploadKey: args.clientUploadKey,
+            clientTurnId: resolvedClientTurnId,
+            timeoutMs: 120_000,
+            authorizationBearer: bearerToken,
+            onProgress: ({ percent }) => args.onProgress?.(percent),
+            onDiagnosticEvent: fallbackDiagnostics.handle,
+          });
+          await fallbackDiagnostics.flushTerminal();
+          storageId = upload.storageId;
+        } catch (fallbackError) {
+          await fallbackDiagnostics.flushTerminal();
+          const reconciled = parseSessionSnapshot(await args.convex.query(api.chatUploads.getUploadSession, {
+            uploadSessionId: uploadSessionId as Id<'chatUploadSessions'>,
+          }));
+          if (reconciled.storageId) {
+            storageId = reconciled.storageId;
+            session = reconciled;
+          } else {
+            args.onStatus?.('failed_storage_upload');
+            if (directFailureDiagnostics?.loadedBytes === directFailureDiagnostics?.totalBytes) {
+              throw new ChatUploadError(
+                'Storage confirmation was lost and the secure fallback could not complete. Switch networks or disable a VPN/privacy blocker, then retry.',
+                { uploadStatus: 'failed_storage_upload', retryable: reconciled.retryable ?? true },
+              );
+            }
+            throw fallbackError;
+          }
+        }
+      }
+
+      persistPendingAttach({
+        uploadSessionId,
+        uploadAttemptId: resolvedAttemptId,
+        storageId,
+        conversationId: args.conversationId ? String(args.conversationId) : undefined,
+        clientUploadKey: args.clientUploadKey,
+        clientTurnId: resolvedClientTurnId,
+      });
+      args.onStorageReady?.({ uploadSessionId, storageId });
+      args.onProgress?.(100);
     }
 
     args.onStatus?.('stored');
     await args.convex.mutation(api.chatUploads.attachStorageAndScheduleProcessing, {
       uploadSessionId: uploadSessionId as Id<'chatUploadSessions'>,
-      uploadAttemptId: uploadAttemptId as Id<'chatUploadAttempts'>,
+      uploadAttemptId: resolvedAttemptId as Id<'chatUploadAttempts'>,
       storageId: storageId as Id<'_storage'>,
     });
     clearPendingAttach(uploadSessionId);
-  } else if (!session.uploadedFileId || retryableIndexingPartial) {
+  } else if (!session.uploadedFileId || retryableIndexingPartial || retryableProcessingFailure) {
     const normalizedStatus = typeof session.status === 'string' ? normalizeStatus(session.status) : undefined;
     if (
       normalizedStatus === 'failed_empty_extraction' ||

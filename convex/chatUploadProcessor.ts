@@ -7,6 +7,7 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { CHAT_UPLOAD_CONFIG } from './lib/chatUploadConfig';
+import { hasCompleteDocumentRetrieval } from './lib/chatUploadReadiness';
 import { extractDocumentText, type DocumentExtractionResult } from '../src/lib/nexx/documentExtraction';
 import { detectDocumentType, type DocumentDetectionResult } from '../src/lib/nexx/documentTypeDetection';
 import { buildDocumentMemoryArtifacts, type DocumentMemoryArtifacts } from '../src/lib/nexx/documentChunking';
@@ -695,9 +696,18 @@ export const processStoredUpload = internalAction({
       }
 
       let memoryIndexingError: string | undefined;
+      let activeMemoryGenerationId: Id<'documentMemoryGenerations'> | undefined;
       try {
         const documentMemory = buildDocumentMemoryArtifacts(extractedText);
-        await writeDocumentMemoryArtifacts(ctx, context, uploadedFileId, documentMemory, extraction, extractionStartedAt);
+        const generation = await writeDocumentMemoryArtifacts(
+          ctx,
+          context,
+          uploadedFileId,
+          documentMemory,
+          extraction,
+          extractionStartedAt,
+        );
+        activeMemoryGenerationId = generation.memoryGenerationId;
         console.info('[ChatUpload] document memory indexed', {
           uploadSessionId: args.uploadSessionId,
           uploadedFileId,
@@ -730,6 +740,33 @@ export const processStoredUpload = internalAction({
       const memoryIndexingUserMessage = memoryIndexingError
         ? 'Document memory indexing did not finish.'
         : undefined;
+
+      const completeDocumentRetrievalAvailable = hasCompleteDocumentRetrieval({
+        openaiFileId,
+        openaiTextFileId,
+        activeMemoryGenerationId: activeMemoryGenerationId
+          ? String(activeMemoryGenerationId)
+          : undefined,
+      });
+      if (
+        contextText.contextTruncated &&
+        !completeDocumentRetrievalAvailable
+      ) {
+        await ctx.runMutation(internal.chatUploads.failProcessing, {
+          uploadSessionId: args.uploadSessionId,
+          lockId,
+          status: 'failed_processing',
+          errorCode: 'incomplete_document_indexing',
+          errorMessage: 'NEXX uploaded the file but could not prepare the complete document for reliable analysis. Retry processing; the original file will not be uploaded again.',
+          retryable: true,
+        });
+        return {
+          ok: false,
+          uploadedFileId,
+          status: 'failed_processing',
+          error: 'Complete-document retrieval was unavailable.',
+        };
+      }
 
       await ctx.runMutation(internal.chatUploads.completeProcessing, {
         uploadSessionId: args.uploadSessionId,

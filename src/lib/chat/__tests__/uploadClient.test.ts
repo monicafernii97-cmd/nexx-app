@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { uploadFileForConversation, type ChatComposerFileState } from '../uploadClient';
+import { CHAT_UPLOAD_CONFIG } from '../uploadShared';
 
 function makeFile(name = 'order.pdf', size = 5) {
   return new File(['x'.repeat(size)], name, { type: 'application/pdf' });
@@ -65,6 +66,67 @@ function installTimeoutXhr() {
   vi.stubGlobal('XMLHttpRequest', MockXMLHttpRequest);
 }
 
+function installSequencedXhr(
+  behaviors: Array<'blocked' | 'success' | 'response_lost'>,
+  storageId = 'storage-fallback',
+) {
+  const instances: Array<{
+    url?: string;
+    headers: Record<string, string>;
+  }> = [];
+
+  class MockXMLHttpRequest {
+    status = 0;
+    statusText = '';
+    readyState = 4;
+    responseText = '';
+    timeout = 0;
+    upload = {} as XMLHttpRequestUpload & {
+      onprogress?: (event: { lengthComputable: boolean; loaded: number; total: number }) => void;
+    };
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    onabort: (() => void) | null = null;
+    ontimeout: (() => void) | null = null;
+    onreadystatechange: (() => void) | null = null;
+    url?: string;
+    headers: Record<string, string> = {};
+
+    constructor() {
+      instances.push(this);
+    }
+
+    open(_method: string, url: string) {
+      this.url = url;
+    }
+
+    setRequestHeader(name: string, value: string) {
+      this.headers[name] = value;
+    }
+
+    send(body: unknown) {
+      const behavior = behaviors.shift();
+      const size = body instanceof File ? body.size : 0;
+      queueMicrotask(() => {
+        if (behavior === 'success') {
+          this.status = 200;
+          this.responseText = JSON.stringify({ storageId });
+          this.upload.onprogress?.({ lengthComputable: true, loaded: size, total: size });
+          this.onload?.();
+          return;
+        }
+        if (behavior === 'response_lost') {
+          this.upload.onprogress?.({ lengthComputable: true, loaded: size, total: size });
+        }
+        this.onerror?.();
+      });
+    }
+  }
+
+  vi.stubGlobal('XMLHttpRequest', MockXMLHttpRequest);
+  return instances;
+}
+
 function makeConvexClient(readyStatus: 'ready' | 'partial' = 'ready') {
   const mutation = vi.fn(async (_ref: unknown, args: Record<string, unknown>) => {
     if ('filename' in args) {
@@ -87,7 +149,7 @@ function makeConvexClient(readyStatus: 'ready' | 'partial' = 'ready') {
       uploadSessionId: args.uploadSessionId,
       status: 'processing_queued',
     };
-  });
+  }) as ReturnType<typeof vi.fn>;
 
   const query = vi.fn(async () => ({
     uploadSessionId: 'session-1',
@@ -329,10 +391,15 @@ describe('uploadClient direct storage flow', () => {
   it('classifies storage upload timeout separately from generic network failure', async () => {
     installTimeoutXhr();
     const convex = makeConvexClient();
+    const largeFile = makeFile();
+    Object.defineProperty(largeFile, 'size', {
+      configurable: true,
+      value: CHAT_UPLOAD_CONFIG.fallbackUploadMaxBytes + 1,
+    });
 
     await expect(uploadFileForConversation({
       convex: convex as never,
-      file: makeFile(),
+      file: largeFile,
       conversationId: 'conversation-1',
       intent: 'court_order',
       clientUploadKey: 'client-upload-1',
@@ -344,6 +411,114 @@ describe('uploadClient direct storage flow', () => {
         failureKind: 'timeout',
       }),
     }));
+  });
+
+  it('automatically uses the authenticated fallback route after a blocked direct upload', async () => {
+    vi.useFakeTimers();
+    try {
+      const xhrInstances = installSequencedXhr(['blocked', 'success']);
+      const convex = makeConvexClient();
+      convex.mutation.mockImplementation(async (_ref: unknown, args: Record<string, unknown>) => {
+        if ('filename' in args) {
+          return {
+            uploadSessionId: 'session-1',
+            uploadAttemptId: 'attempt-1',
+            attemptNo: 1,
+            uploadUrl: 'https://convex-upload.test/direct',
+            status: 'awaiting_storage_upload',
+            filename: args.filename,
+            mimeType: args.mimeType,
+            byteSize: args.byteSize,
+            retryable: true,
+            processingAttempt: 0,
+          };
+        }
+        if ('tokenHash' in args) {
+          return {
+            alreadyStored: false,
+            uploadSessionId: 'session-1',
+            uploadAttemptId: 'attempt-2',
+            attemptNo: 2,
+            fallbackUploadUrl: 'https://deployment.convex.site/chat-upload-fallback?uploadSessionId=session-1&uploadAttemptId=attempt-2',
+            expiresAt: Date.now() + 60_000,
+          };
+        }
+        return { uploadSessionId: args.uploadSessionId, status: 'processing_queued' };
+      });
+
+      const uploadPromise = uploadFileForConversation({
+        convex: convex as never,
+        file: makeFile(),
+        conversationId: 'conversation-1',
+        intent: 'court_order',
+        clientUploadKey: 'client-upload-1',
+      });
+      await vi.runAllTimersAsync();
+      const upload = await uploadPromise;
+
+      expect(xhrInstances).toHaveLength(2);
+      expect(xhrInstances[0]?.url).toContain('/direct');
+      expect(xhrInstances[1]?.url).toContain('/chat-upload-fallback');
+      expect(xhrInstances[1]?.headers.Authorization).toMatch(/^Bearer [a-f0-9]{64}$/);
+      expect(convex.mutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        uploadSessionId: 'session-1',
+        uploadAttemptId: 'attempt-2',
+        storageId: 'storage-fallback',
+      }));
+      expect(upload.status).toBe('ready');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reconciles a completed fallback upload when its HTTP response is lost', async () => {
+    vi.useFakeTimers();
+    try {
+      installSequencedXhr(['blocked', 'response_lost']);
+      const convex = makeConvexClient();
+      convex.mutation.mockImplementation(async (_ref: unknown, args: Record<string, unknown>) => {
+        if ('filename' in args) {
+          return {
+            uploadSessionId: 'session-1',
+            uploadAttemptId: 'attempt-1',
+            attemptNo: 1,
+            uploadUrl: 'https://convex-upload.test/direct',
+            status: 'awaiting_storage_upload',
+            filename: args.filename,
+            mimeType: args.mimeType,
+            byteSize: args.byteSize,
+            retryable: true,
+            processingAttempt: 0,
+          };
+        }
+        if ('tokenHash' in args) {
+          return {
+            alreadyStored: false,
+            uploadSessionId: 'session-1',
+            uploadAttemptId: 'attempt-2',
+            attemptNo: 2,
+            fallbackUploadUrl: 'https://deployment.convex.site/chat-upload-fallback?uploadSessionId=session-1&uploadAttemptId=attempt-2',
+            expiresAt: Date.now() + 60_000,
+          };
+        }
+        return { uploadSessionId: args.uploadSessionId, status: 'processing_queued' };
+      });
+
+      const uploadPromise = uploadFileForConversation({
+        convex: convex as never,
+        file: makeFile(),
+        conversationId: 'conversation-1',
+        intent: 'court_order',
+        clientUploadKey: 'client-upload-1',
+      });
+      await vi.runAllTimersAsync();
+      const upload = await uploadPromise;
+
+      expect(convex.query).toHaveBeenCalledTimes(2);
+      expect(upload).toMatchObject({ storageId: 'storage-1', status: 'ready' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('normalizes resumed Convex sessions that use existing storage field names', async () => {

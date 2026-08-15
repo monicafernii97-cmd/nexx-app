@@ -378,6 +378,8 @@ export default defineSchema({
         lastFailureKind: v.optional(v.string()),
         lastFailureMessageSafe: v.optional(v.string()),
         lastFailureDiagnostics: v.optional(v.any()),
+        lastTransport: v.optional(v.union(v.literal('direct'), v.literal('fallback'))),
+        nextStorageRetryAt: v.optional(v.number()),
         status: v.union(
             v.literal('awaiting_storage_upload'),
             v.literal('uploading_to_storage'),
@@ -429,6 +431,7 @@ export default defineSchema({
         completedAt: v.optional(v.number()),
         failureKind: v.optional(v.string()),
         failureMessageSafe: v.optional(v.string()),
+        transport: v.optional(v.union(v.literal('direct'), v.literal('fallback'))),
         elapsedMs: v.optional(v.number()),
         loadedBytes: v.optional(v.number()),
         totalBytes: v.optional(v.number()),
@@ -442,6 +445,32 @@ export default defineSchema({
         .index('by_session', ['uploadSessionId'])
         .index('by_user_created', ['clerkUserId', 'createdAt'])
         .index('by_status_updated', ['status', 'updatedAt']),
+
+    chatUploadFallbackTickets: defineTable({
+        uploadSessionId: v.id('chatUploadSessions'),
+        uploadAttemptId: v.id('chatUploadAttempts'),
+        clerkUserId: v.string(),
+        tokenHash: v.string(),
+        status: v.union(
+            v.literal('issued'),
+            v.literal('claimed'),
+            v.literal('consumed'),
+            v.literal('failed'),
+            v.literal('expired')
+        ),
+        expectedByteSize: v.number(),
+        expectedMimeType: v.string(),
+        expiresAt: v.number(),
+        claimedAt: v.optional(v.number()),
+        consumedAt: v.optional(v.number()),
+        storageId: v.optional(v.id('_storage')),
+        failureCode: v.optional(v.string()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_token_hash', ['tokenHash'])
+        .index('by_session', ['uploadSessionId'])
+        .index('by_status_expires', ['status', 'expiresAt']),
 
     messageAttachments: defineTable({
         messageId: v.optional(v.id('messages')),

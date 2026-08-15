@@ -5,6 +5,9 @@ export type StorageUploadFailureKind =
   | 'timeout'
   | 'aborted'
   | 'network_or_cors'
+  | 'connection_blocked'
+  | 'connection_interrupted'
+  | 'response_lost'
   | 'http_error'
   | 'bad_response'
   | 'unknown';
@@ -64,6 +67,12 @@ export function getStorageUploadUserMessage(kind: StorageUploadFailureKind) {
       return 'The upload was interrupted before it finished. Retry the upload.';
     case 'network_or_cors':
       return 'The browser could not complete the direct storage upload. This can happen with VPNs, privacy extensions, corporate networks, or blocked storage domains.';
+    case 'connection_blocked':
+      return 'The browser could not reach secure file storage. Turn off any VPN or privacy blocker for this site, or switch networks, then retry.';
+    case 'connection_interrupted':
+      return 'The storage connection dropped while the file was uploading. NEXX will try its secure fallback route.';
+    case 'response_lost':
+      return 'The file finished transmitting but storage confirmation was lost. NEXX will check for completion before retrying.';
     case 'http_error':
       return 'Storage rejected the upload. Retry once; if it continues, report this upload diagnostic.';
     case 'bad_response':
@@ -106,6 +115,7 @@ export function postFileToStorageWithDiagnostics(args: {
   clientUploadKey: string;
   clientTurnId: string;
   timeoutMs?: number;
+  authorizationBearer?: string;
   onProgress?: (progress: StorageUploadProgress) => void;
   onDiagnosticEvent?: (event: StorageUploadDiagnosticEvent) => void;
 }): Promise<StorageUploadResult> {
@@ -265,7 +275,13 @@ export function postFileToStorageWithDiagnostics(args: {
       resolve({ storageId, diagnostics });
     };
     xhr.onerror = () => {
-      const kind: StorageUploadFailureKind = nav?.onLine === false ? 'offline' : 'network_or_cors';
+      const kind: StorageUploadFailureKind = nav?.onLine === false
+        ? 'offline'
+        : loadedBytes <= 0
+          ? 'connection_blocked'
+          : totalBytes > 0 && loadedBytes >= totalBytes
+            ? 'response_lost'
+            : 'connection_interrupted';
       rejectOnce(
         kind,
         getStorageUploadUserMessage(kind),
@@ -286,6 +302,9 @@ export function postFileToStorageWithDiagnostics(args: {
     });
     xhr.open('POST', args.uploadUrl, true);
     xhr.setRequestHeader('Content-Type', args.file.type || 'application/octet-stream');
+    if (args.authorizationBearer) {
+      xhr.setRequestHeader('Authorization', `Bearer ${args.authorizationBearer}`);
+    }
     xhr.send(args.file);
   });
 }

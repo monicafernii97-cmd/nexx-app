@@ -13,7 +13,26 @@ export const CHAT_UPLOAD_CONFIG = {
   uploadSessionTtlMs: 60 * 60 * 1000,
   processingStaleAfterMs: 12 * 60 * 1000,
   maxProcessingAttempts: 3,
+  maxStorageAttempts: 4,
   uploadUrlTtlMs: 60 * 60 * 1000,
+  fallbackUploadMaxBytes: 19 * 1024 * 1024,
+  fallbackTicketTtlMs: 5 * 60 * 1000,
+  storageRetryDelayMs: 1_500,
+  progressDiagnosticMinIntervalMs: 1_000,
+  progressDiagnosticMinPercentDelta: 10,
+  failureAlertWindowMs: 15 * 60 * 1000,
+  failureAlertThreshold: 3,
   workerTimeoutMs: 70_000,
   maxAttachmentsPerTurn: 5,
 } as const;
+
+export function shouldPersistUploadProgressDiagnostic(args: {
+  now: number;
+  lastRecordedAt: number;
+  percent: number;
+  lastRecordedPercent: number;
+}) {
+  const enoughTime = args.now - args.lastRecordedAt >= CHAT_UPLOAD_CONFIG.progressDiagnosticMinIntervalMs;
+  const enoughProgress = args.percent - args.lastRecordedPercent >= CHAT_UPLOAD_CONFIG.progressDiagnosticMinPercentDelta;
+  return enoughTime || enoughProgress;
+}

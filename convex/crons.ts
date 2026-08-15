@@ -51,6 +51,18 @@ crons.interval(
 );
 
 crons.interval(
+  'clean up fallback upload tickets',
+  { minutes: 5 },
+  internal.chatUploads.cleanupFallbackUploadTickets,
+);
+
+crons.interval(
+  'audit recent chat upload failures',
+  { minutes: 5 },
+  internal.chatUploads.auditRecentStorageUploadFailures,
+);
+
+crons.interval(
   'clean up stale chat upload drafts',
   { minutes: 5 },
   internal.conversations.cleanupStaleUploadDrafts,

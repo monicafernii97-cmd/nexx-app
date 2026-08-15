@@ -11,6 +11,12 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { getAuthenticatedUser, getAuthenticatedUserAndConversation, validateCaseOwnership } from './lib/auth';
 import { CHAT_UPLOAD_CONFIG, validateChatUploadMetadata } from './lib/chatUploadConfig';
+import {
+  getStorageAttachmentDisposition,
+  getStorageAttemptPolicy,
+  isValidFallbackTokenHash,
+} from './lib/chatUploadFallbackPolicy';
+import { hasCompleteDocumentRetrieval } from './lib/chatUploadReadiness';
 
 type StorageMetadata = {
   _id: Id<'_storage'>;
@@ -129,6 +135,8 @@ function toPublicSession(session: Doc<'chatUploadSessions'>, uploadUrl?: string)
     errorCode: session.errorCode,
     errorMessage: session.errorMessage,
     retryable: session.retryable,
+    nextStorageRetryAt: session.nextStorageRetryAt,
+    lastTransport: session.lastTransport,
   };
 }
 
@@ -153,6 +161,7 @@ async function createUploadAttempt(
     issuedAt: number;
     expiresAt: number;
     attemptNo: number;
+    transport: 'direct' | 'fallback';
   },
 ) {
   const attemptId = await ctx.db.insert('chatUploadAttempts', {
@@ -160,6 +169,7 @@ async function createUploadAttempt(
     clerkUserId: args.clerkUserId,
     attemptNo: args.attemptNo,
     status: 'created',
+    transport: args.transport,
     ...getUploadUrlParts(args.uploadUrl),
     uploadUrlIssuedAt: args.issuedAt,
     uploadUrlExpiresAt: args.expiresAt,
@@ -172,6 +182,23 @@ async function createUploadAttempt(
     updatedAt: args.issuedAt,
   });
   return attemptId;
+}
+
+function storageRetryState(attemptNo: number) {
+  const policy = getStorageAttemptPolicy({
+    attemptNo,
+    maxAttempts: CHAT_UPLOAD_CONFIG.maxStorageAttempts,
+    now: Date.now(),
+    retryDelayMs: CHAT_UPLOAD_CONFIG.storageRetryDelayMs,
+  });
+  return {
+    retryable: policy.retryable,
+    nextStorageRetryAt: policy.nextStorageRetryAt,
+    errorCode: policy.exhausted ? 'storage_attempts_exhausted' : undefined,
+    errorMessage: policy.exhausted
+      ? 'NEXX could not establish a reliable storage connection after several attempts. Remove the file, switch networks or disable a VPN/privacy blocker, and select it again.'
+      : undefined,
+  };
 }
 
 /** Start or resume an idempotent direct-to-storage chat upload session. */
@@ -222,6 +249,21 @@ export const startUploadSession = mutation({
       }
 
       if (!existing.storageId && existing.status !== 'cancelled') {
+        if ((existing.attemptNo ?? 0) >= CHAT_UPLOAD_CONFIG.maxStorageAttempts) {
+          const now = Date.now();
+          await ctx.db.patch(existing._id, {
+            retryable: false,
+            errorCode: 'storage_attempts_exhausted',
+            errorMessage: 'NEXX could not establish a reliable storage connection after several attempts. Remove the file, switch networks or disable a VPN/privacy blocker, and select it again.',
+            nextStorageRetryAt: undefined,
+            updatedAt: now,
+          });
+          const exhausted = await ctx.db.get(existing._id);
+          return toPublicSession(exhausted ?? existing);
+        }
+        if (existing.nextStorageRetryAt && existing.nextStorageRetryAt > Date.now()) {
+          return toPublicSession(existing);
+        }
         const uploadUrl = await ctx.storage.generateUploadUrl();
         const now = Date.now();
         const attemptNo = (existing.attemptNo ?? 0) + 1;
@@ -233,6 +275,7 @@ export const startUploadSession = mutation({
           issuedAt: now,
           expiresAt: uploadUrlExpiresAt,
           attemptNo,
+          transport: 'direct',
         });
         await ctx.db.patch(existing._id, {
           status: 'awaiting_storage_upload',
@@ -246,6 +289,8 @@ export const startUploadSession = mutation({
           lastFailureKind: undefined,
           lastFailureMessageSafe: undefined,
           lastFailureDiagnostics: undefined,
+          lastTransport: 'direct',
+          nextStorageRetryAt: undefined,
           updatedAt: now,
         });
         const refreshed = await ctx.db.get(existing._id);
@@ -273,6 +318,7 @@ export const startUploadSession = mutation({
       uploadUrlExpiresAt,
       processingAttempt: 0,
       retryable: true,
+      lastTransport: 'direct',
       createdAt: now,
       updatedAt: now,
     });
@@ -283,6 +329,7 @@ export const startUploadSession = mutation({
       issuedAt: now,
       expiresAt: uploadUrlExpiresAt,
       attemptNo: 1,
+      transport: 'direct',
     });
 
     console.info('[ChatUpload] session started', {
@@ -299,37 +346,54 @@ export const startUploadSession = mutation({
   },
 });
 
-/** Attach the direct-storage upload result and schedule processing exactly once. */
-export const attachStorageAndScheduleProcessing = mutation({
+async function attachStorageToSession(
+  ctx: MutationCtx,
   args: {
-    uploadSessionId: v.id('chatUploadSessions'),
-    uploadAttemptId: v.optional(v.id('chatUploadAttempts')),
-    storageId: v.id('_storage'),
+    session: Doc<'chatUploadSessions'>;
+    clerkUserId: string;
+    uploadAttemptId?: Id<'chatUploadAttempts'>;
+    storageId: Id<'_storage'>;
   },
-  handler: async (ctx, args) => {
-    const { clerkUserId, session } = await getOwnedSession(ctx, args.uploadSessionId);
+) {
+    const { clerkUserId, session } = args;
     if (session.status === 'cancelled') throw new Error('Upload session was cancelled');
 
     if (args.uploadAttemptId) {
       const attempt = await ctx.db.get(args.uploadAttemptId);
       if (
         !attempt ||
-        attempt.uploadSessionId !== args.uploadSessionId ||
+        attempt.uploadSessionId !== session._id ||
         attempt.clerkUserId !== clerkUserId
       ) {
         throw new Error('Upload attempt does not belong to this session.');
       }
     }
 
-    if (session.storageId && session.storageId !== args.storageId) {
+    const attachmentDisposition = getStorageAttachmentDisposition(
+      session.storageId ? String(session.storageId) : undefined,
+      String(args.storageId),
+    );
+    if (attachmentDisposition === 'conflict') {
       throw new Error('Upload session already has a different storage file attached.');
+    }
+
+    if (attachmentDisposition === 'already_attached') {
+      const now = Date.now();
+      if (args.uploadAttemptId) {
+        await ctx.db.patch(args.uploadAttemptId, {
+          status: 'attached',
+          completedAt: now,
+          updatedAt: now,
+        });
+      }
+      return { uploadSessionId: session._id, status: session.status, alreadyAttached: true };
     }
 
     const existingForStorage = await ctx.db
       .query('chatUploadSessions')
       .withIndex('by_storage', (q) => q.eq('storageId', args.storageId))
       .first();
-    if (existingForStorage && existingForStorage._id !== args.uploadSessionId) {
+    if (existingForStorage && existingForStorage._id !== session._id) {
       throw new Error('This stored file is already attached to another upload session.');
     }
 
@@ -349,7 +413,7 @@ export const attachStorageAndScheduleProcessing = mutation({
 
     const now = Date.now();
     const nextStatus = terminalSuccessStatuses.has(session.status) ? session.status : 'processing_queued';
-    await ctx.db.patch(args.uploadSessionId, {
+    await ctx.db.patch(session._id, {
       storageId: args.storageId,
       storageSha256: metadata.sha256,
       storageContentType: metadata.contentType,
@@ -358,6 +422,7 @@ export const attachStorageAndScheduleProcessing = mutation({
       errorCode: undefined,
       errorMessage: undefined,
       retryable: !terminalSuccessStatuses.has(session.status),
+      nextStorageRetryAt: undefined,
       updatedAt: now,
     });
     if (args.uploadAttemptId) {
@@ -369,7 +434,7 @@ export const attachStorageAndScheduleProcessing = mutation({
     }
 
     console.info('[ChatUpload] storage attached', {
-      uploadSessionId: args.uploadSessionId,
+      uploadSessionId: session._id,
       storageId: args.storageId,
       storageSize: metadata.size,
       storageContentType: metadata.contentType,
@@ -377,11 +442,28 @@ export const attachStorageAndScheduleProcessing = mutation({
 
     if (!terminalSuccessStatuses.has(session.status)) {
       await ctx.scheduler.runAfter(0, internal.chatUploadProcessor.processStoredUpload, {
-        uploadSessionId: args.uploadSessionId,
+        uploadSessionId: session._id,
       });
     }
 
-    return { uploadSessionId: args.uploadSessionId, status: nextStatus };
+    return { uploadSessionId: session._id, status: nextStatus, alreadyAttached: false };
+}
+
+/** Attach the direct-storage upload result and schedule processing exactly once. */
+export const attachStorageAndScheduleProcessing = mutation({
+  args: {
+    uploadSessionId: v.id('chatUploadSessions'),
+    uploadAttemptId: v.optional(v.id('chatUploadAttempts')),
+    storageId: v.id('_storage'),
+  },
+  handler: async (ctx, args) => {
+    const { clerkUserId, session } = await getOwnedSession(ctx, args.uploadSessionId);
+    return await attachStorageToSession(ctx, {
+      session,
+      clerkUserId,
+      uploadAttemptId: args.uploadAttemptId,
+      storageId: args.storageId,
+    });
   },
 });
 
@@ -418,13 +500,16 @@ export const recordUploadClientEvent = mutation({
       const failed = args.eventType === 'storage_post_failed';
       const succeeded = args.eventType === 'storage_post_succeeded';
       const isStoragePostEvent = args.eventType.startsWith('storage_post_');
-      const status = failed
-        ? 'failed'
-        : succeeded
-          ? 'storage_returned'
-          : isStoragePostEvent
-            ? 'posting'
-            : attempt.status;
+      const isTerminalAttempt = attempt.status === 'failed' || attempt.status === 'attached';
+      const status = isTerminalAttempt
+        ? attempt.status
+        : failed
+          ? 'failed'
+          : succeeded
+            ? 'storage_returned'
+            : isStoragePostEvent
+              ? 'posting'
+              : attempt.status;
       await ctx.db.patch(args.uploadAttemptId, {
         status,
         failureKind: failed && typeof diagnostics.failureKind === 'string' ? diagnostics.failureKind : undefined,
@@ -449,6 +534,7 @@ export const recordUploadClientEvent = mutation({
       (session.status === 'awaiting_storage_upload' ||
         session.status === 'uploading_to_storage' ||
         session.status === 'failed_storage_upload');
+    const retryState = storageRetryState(session.attemptNo ?? 1);
     await ctx.db.patch(args.uploadSessionId, {
       status: mayApplyStorageFailure
         ? 'failed_storage_upload'
@@ -479,11 +565,228 @@ export const recordUploadClientEvent = mutation({
         uploadUrlHost: diagnostics.uploadUrlHost,
         uploadUrlProtocol: diagnostics.uploadUrlProtocol,
       } : session.lastFailureDiagnostics,
-      retryable: mayApplyStorageFailure ? true : session.retryable,
+      retryable: mayApplyStorageFailure ? retryState.retryable : session.retryable,
+      nextStorageRetryAt: mayApplyStorageFailure ? retryState.nextStorageRetryAt : session.nextStorageRetryAt,
+      errorCode: mayApplyStorageFailure ? retryState.errorCode : session.errorCode,
+      errorMessage: mayApplyStorageFailure ? retryState.errorMessage : session.errorMessage,
       updatedAt: now,
     });
 
     return true;
+  },
+});
+
+function getFallbackUploadSiteUrl() {
+  const configured = process.env.CONVEX_SITE_URL?.trim();
+  if (configured) return configured.replace(/\/$/, '');
+  const cloudUrl = process.env.CONVEX_CLOUD_URL?.trim();
+  if (cloudUrl?.endsWith('.convex.cloud')) {
+    return cloudUrl.replace(/\.convex\.cloud\/?$/, '.convex.site');
+  }
+  throw new Error('Fallback upload endpoint is not configured.');
+}
+
+/** Issue a short-lived, single-use fallback ticket after a direct upload failure. */
+export const issueFallbackUploadTicket = mutation({
+  args: {
+    uploadSessionId: v.id('chatUploadSessions'),
+    tokenHash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { clerkUserId, session } = await getOwnedSession(ctx, args.uploadSessionId);
+    const tokenHash = args.tokenHash.trim().toLowerCase();
+    if (!isValidFallbackTokenHash(tokenHash)) throw new Error('Fallback upload token is invalid.');
+    if (session.storageId) {
+      return {
+        alreadyStored: true as const,
+        uploadSessionId: session._id,
+        storageId: session.storageId,
+      };
+    }
+    if (session.status === 'cancelled') throw new Error('Upload session was cancelled.');
+    if (session.byteSize > CHAT_UPLOAD_CONFIG.fallbackUploadMaxBytes) {
+      throw new Error('This file is too large for the secure fallback route. Switch networks or disable a VPN/privacy blocker, then retry the direct upload.');
+    }
+    if ((session.attemptNo ?? 0) >= CHAT_UPLOAD_CONFIG.maxStorageAttempts) {
+      throw new Error('Maximum storage attempts reached. Remove the file, switch networks, and select it again.');
+    }
+    const now = Date.now();
+    if (session.nextStorageRetryAt && session.nextStorageRetryAt > now) {
+      throw new Error('Secure storage is preparing a retry. Please wait a moment.');
+    }
+    const duplicateToken = await ctx.db
+      .query('chatUploadFallbackTickets')
+      .withIndex('by_token_hash', (q) => q.eq('tokenHash', tokenHash))
+      .first();
+    if (duplicateToken) throw new Error('Fallback upload token was already used.');
+
+    const fallbackSiteUrl = getFallbackUploadSiteUrl();
+    const expiresAt = now + CHAT_UPLOAD_CONFIG.fallbackTicketTtlMs;
+    const attemptNo = (session.attemptNo ?? 0) + 1;
+    const attemptId = await createUploadAttempt(ctx, {
+      uploadSessionId: session._id,
+      clerkUserId,
+      uploadUrl: `${fallbackSiteUrl}/chat-upload-fallback`,
+      issuedAt: now,
+      expiresAt,
+      attemptNo,
+      transport: 'fallback',
+    });
+    await ctx.db.insert('chatUploadFallbackTickets', {
+      uploadSessionId: session._id,
+      uploadAttemptId: attemptId,
+      clerkUserId,
+      tokenHash,
+      status: 'issued',
+      expectedByteSize: session.byteSize,
+      expectedMimeType: session.mimeType,
+      expiresAt,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch(session._id, {
+      status: 'awaiting_storage_upload',
+      currentAttemptId: attemptId,
+      attemptNo,
+      uploadUrlIssuedAt: now,
+      uploadUrlExpiresAt: expiresAt,
+      retryable: true,
+      errorCode: undefined,
+      errorMessage: undefined,
+      nextStorageRetryAt: undefined,
+      lastTransport: 'fallback',
+      updatedAt: now,
+    });
+
+    return {
+      alreadyStored: false as const,
+      uploadSessionId: session._id,
+      uploadAttemptId: attemptId,
+      attemptNo,
+      fallbackUploadUrl: `${fallbackSiteUrl}/chat-upload-fallback?uploadSessionId=${encodeURIComponent(String(session._id))}&uploadAttemptId=${encodeURIComponent(String(attemptId))}`,
+      expiresAt,
+    };
+  },
+});
+
+export const claimFallbackUploadTicket = internalMutation({
+  args: {
+    uploadSessionId: v.id('chatUploadSessions'),
+    uploadAttemptId: v.id('chatUploadAttempts'),
+    tokenHash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const ticket = await ctx.db
+      .query('chatUploadFallbackTickets')
+      .withIndex('by_token_hash', (q) => q.eq('tokenHash', args.tokenHash))
+      .first();
+    if (
+      !ticket ||
+      ticket.uploadSessionId !== args.uploadSessionId ||
+      ticket.uploadAttemptId !== args.uploadAttemptId
+    ) {
+      throw new Error('Fallback upload ticket was not found.');
+    }
+    const session = await ctx.db.get(ticket.uploadSessionId);
+    const attempt = await ctx.db.get(ticket.uploadAttemptId);
+    if (!session || !attempt || attempt.transport !== 'fallback') {
+      throw new Error('Fallback upload session is unavailable.');
+    }
+    const now = Date.now();
+    if (ticket.expiresAt <= now) {
+      await ctx.db.patch(ticket._id, { status: 'expired', updatedAt: now });
+      throw new Error('Fallback upload ticket expired.');
+    }
+    if (ticket.status !== 'issued') throw new Error('Fallback upload ticket is already in use.');
+    if (session.storageId) throw new Error('Upload session already has stored data.');
+    await ctx.db.patch(ticket._id, {
+      status: 'claimed',
+      claimedAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch(attempt._id, {
+      status: 'posting',
+      startedAt: attempt.startedAt ?? now,
+      updatedAt: now,
+    });
+    return {
+      ticketId: ticket._id,
+      expectedByteSize: ticket.expectedByteSize,
+      expectedMimeType: ticket.expectedMimeType,
+    };
+  },
+});
+
+export const completeFallbackUpload = internalMutation({
+  args: {
+    ticketId: v.id('chatUploadFallbackTickets'),
+    storageId: v.id('_storage'),
+  },
+  handler: async (ctx, args) => {
+    const ticket = await ctx.db.get(args.ticketId);
+    if (!ticket) throw new Error('Fallback upload ticket was not found.');
+    const session = await ctx.db.get(ticket.uploadSessionId);
+    if (!session) throw new Error('Fallback upload session was not found.');
+    if (ticket.status === 'consumed' && ticket.storageId === args.storageId) {
+      return { storageId: args.storageId, alreadyAttached: true };
+    }
+    if (ticket.status !== 'claimed') throw new Error('Fallback upload ticket is not claimable.');
+    const result = await attachStorageToSession(ctx, {
+      session,
+      clerkUserId: ticket.clerkUserId,
+      uploadAttemptId: ticket.uploadAttemptId,
+      storageId: args.storageId,
+    });
+    const now = Date.now();
+    await ctx.db.patch(ticket._id, {
+      status: 'consumed',
+      storageId: args.storageId,
+      consumedAt: now,
+      updatedAt: now,
+    });
+    return { storageId: args.storageId, alreadyAttached: result.alreadyAttached };
+  },
+});
+
+export const failFallbackUpload = internalMutation({
+  args: {
+    ticketId: v.id('chatUploadFallbackTickets'),
+    failureCode: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const ticket = await ctx.db.get(args.ticketId);
+    if (!ticket || ticket.status === 'consumed') return null;
+    const now = Date.now();
+    await ctx.db.patch(ticket._id, {
+      status: 'failed',
+      failureCode: args.failureCode.slice(0, 120),
+      updatedAt: now,
+    });
+    const attempt = await ctx.db.get(ticket.uploadAttemptId);
+    if (attempt && attempt.status !== 'attached') {
+      await ctx.db.patch(attempt._id, {
+        status: 'failed',
+        failureKind: args.failureCode.slice(0, 120),
+        failureMessageSafe: 'The secure fallback upload did not finish.',
+        completedAt: now,
+        updatedAt: now,
+      });
+    }
+    const session = await ctx.db.get(ticket.uploadSessionId);
+    if (session && !session.storageId && session.currentAttemptId === ticket.uploadAttemptId) {
+      const retryState = storageRetryState(session.attemptNo ?? 1);
+      await ctx.db.patch(session._id, {
+        status: 'failed_storage_upload',
+        lastFailureKind: args.failureCode.slice(0, 120),
+        lastFailureMessageSafe: 'The secure fallback upload did not finish.',
+        retryable: retryState.retryable,
+        nextStorageRetryAt: retryState.nextStorageRetryAt,
+        errorCode: retryState.errorCode,
+        errorMessage: retryState.errorMessage,
+        updatedAt: now,
+      });
+    }
+    return null;
   },
 });
 
@@ -511,6 +814,8 @@ export const getUploadSession = query({
       errorCode: session.errorCode,
       errorMessage: session.errorMessage,
       retryable: session.retryable,
+      nextStorageRetryAt: session.nextStorageRetryAt,
+      lastTransport: session.lastTransport,
       updatedAt: session.updatedAt,
       extractionPreview: uploadedFile?.chatContextText?.slice(0, CHAT_UPLOAD_CONFIG.maxUploadResponsePreviewChars),
       extractionCharCount: uploadedFile?.extractionCharCount,
@@ -773,7 +1078,10 @@ export const upsertProcessedUploadedFile = internalMutation({
     const now = Date.now();
 
     if (session.uploadedFileId) {
-      await ctx.db.patch(session.uploadedFileId, {
+      const existingUploadedFile = await ctx.db.get(session.uploadedFileId);
+      if (!existingUploadedFile) throw new Error('Linked uploaded file is unavailable');
+      const previousFullTextStorageId = existingUploadedFile.fullTextStorageId;
+      await ctx.db.patch(existingUploadedFile._id, {
         status: args.status,
         fullTextStorageId: args.fullTextStorageId,
         fullTextSha256: args.fullTextSha256,
@@ -795,7 +1103,13 @@ export const upsertProcessedUploadedFile = internalMutation({
         vectorStoreId: args.vectorStoreId,
         updatedAt: now,
       });
-      return session.uploadedFileId;
+      if (
+        previousFullTextStorageId &&
+        previousFullTextStorageId !== args.fullTextStorageId
+      ) {
+        await ctx.storage.delete(previousFullTextStorageId);
+      }
+      return existingUploadedFile._id;
     }
 
     const uploadedFileId = await ctx.db.insert('uploadedFiles', {
@@ -868,6 +1182,19 @@ export const validateAttachmentsForChat = query({
         (uploadedFile.status !== 'ready' && uploadedFile.status !== 'partial')
       ) {
         throw new Error('Attachment is not ready or does not belong to this conversation.');
+      }
+      if (
+        uploadedFile.status === 'partial' &&
+        uploadedFile.contextTruncated &&
+        !hasCompleteDocumentRetrieval({
+          openaiFileId: uploadedFile.openaiFileId,
+          openaiTextFileId: uploadedFile.openaiTextFileId,
+          activeMemoryGenerationId: uploadedFile.activeMemoryGenerationId
+            ? String(uploadedFile.activeMemoryGenerationId)
+            : undefined,
+        })
+      ) {
+        throw new Error('Attachment is incomplete and must finish document indexing before chat analysis.');
       }
       sanitized.push({
         uploadedFileId: uploadedFile._id,
@@ -949,5 +1276,97 @@ export const cleanupStaleUploadSessions = internalMutation({
       }));
     }
     return { scanned: staleProcessing.length + retentionScanned, stalled, deleted };
+  },
+});
+
+export const cleanupFallbackUploadTickets = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    let expired = 0;
+    let deleted = 0;
+    for (const status of ['issued', 'claimed'] as const) {
+      const tickets = await ctx.db
+        .query('chatUploadFallbackTickets')
+        .withIndex('by_status_expires', (q) => q.eq('status', status).lt('expiresAt', now))
+        .take(50);
+      for (const ticket of tickets) {
+        await ctx.db.patch(ticket._id, {
+          status: 'expired',
+          failureCode: 'fallback_ticket_expired',
+          updatedAt: now,
+        });
+        const session = await ctx.db.get(ticket.uploadSessionId);
+        if (session && !session.storageId && session.currentAttemptId === ticket.uploadAttemptId) {
+          const retryState = storageRetryState(session.attemptNo ?? 1);
+          await ctx.db.patch(session._id, {
+            status: 'failed_storage_upload',
+            lastFailureKind: 'fallback_ticket_expired',
+            lastFailureMessageSafe: 'The secure fallback upload expired before completion.',
+            retryable: retryState.retryable,
+            nextStorageRetryAt: retryState.nextStorageRetryAt,
+            errorCode: retryState.errorCode,
+            errorMessage: retryState.errorMessage,
+            updatedAt: now,
+          });
+        }
+        expired += 1;
+      }
+    }
+
+    const deleteBefore = now - CHAT_UPLOAD_CONFIG.uploadSessionTtlMs;
+    for (const status of ['consumed', 'failed', 'expired'] as const) {
+      const tickets = await ctx.db
+        .query('chatUploadFallbackTickets')
+        .withIndex('by_status_expires', (q) => q.eq('status', status).lt('expiresAt', deleteBefore))
+        .take(50);
+      for (const ticket of tickets) {
+        await ctx.db.delete(ticket._id);
+        deleted += 1;
+      }
+    }
+
+    if (expired > 0 || deleted > 0) {
+      console.info(JSON.stringify({
+        level: 'info',
+        event: 'fallback_upload_ticket_cleanup',
+        expired,
+        deleted,
+      }));
+    }
+    return { expired, deleted };
+  },
+});
+
+export const auditRecentStorageUploadFailures = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const cutoff = now - CHAT_UPLOAD_CONFIG.failureAlertWindowMs;
+    const failures = await ctx.db
+      .query('chatUploadAttempts')
+      .withIndex('by_status_updated', (q) => q.eq('status', 'failed').gt('updatedAt', cutoff))
+      .take(100);
+    if (failures.length >= CHAT_UPLOAD_CONFIG.failureAlertThreshold) {
+      const byTransport = failures.reduce<Record<string, number>>((counts, attempt) => {
+        const transport = attempt.transport ?? 'legacy';
+        counts[transport] = (counts[transport] ?? 0) + 1;
+        return counts;
+      }, {});
+      const byFailureKind = failures.reduce<Record<string, number>>((counts, attempt) => {
+        const failureKind = attempt.failureKind ?? 'unknown';
+        counts[failureKind] = (counts[failureKind] ?? 0) + 1;
+        return counts;
+      }, {});
+      console.warn(JSON.stringify({
+        level: 'warn',
+        event: 'chat_upload_failure_threshold_exceeded',
+        windowMinutes: Math.round(CHAT_UPLOAD_CONFIG.failureAlertWindowMs / 60_000),
+        failureCount: failures.length,
+        byTransport,
+        byFailureKind,
+      }));
+    }
+    return { failureCount: failures.length };
   },
 });
